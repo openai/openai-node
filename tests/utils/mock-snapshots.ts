@@ -10,7 +10,7 @@ export async function makeSnapshotRequest<T>(
   snapshotIndex = 1,
 ): Promise<T> {
   if (process.env['UPDATE_API_SNAPSHOTS'] === '1') {
-    var capturedResponseContent: string | null = null;
+    let capturedResponseContent: string | null = null;
 
     const snapshotFetch = async (url: RequestInfo, init?: RequestInit) => {
       const response = await defaultFetch(url, init);
@@ -69,7 +69,7 @@ export async function makeStreamSnapshotRequest<T extends AsyncIterable<any>>(
   requestFn: (client: OpenAI) => T,
 ): Promise<T> {
   if (process.env['UPDATE_API_SNAPSHOTS'] === '1') {
-    var capturedResponseContent: string | null = null;
+    let capturedResponseContent: string | null = null;
 
     const snapshotFetch = async (url: RequestInfo, init?: RequestInit) => {
       const response = await defaultFetch(url, init);

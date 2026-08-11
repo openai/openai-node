@@ -57,7 +57,6 @@ const compatibilityRules = [
   'unicorn/prefer-string-slice',
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',
-  'vars-on-top',
 ];
 
 module.exports = defineConfig({

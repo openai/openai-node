@@ -1286,7 +1286,7 @@ describe('stringify()', function () {
       stringify({ 'foo[bar]': 'baz', 'foo[baz]': a });
     }).toThrow('Cyclic object value');
 
-    var circular: any = {
+    const circular: any = {
       a: 'value',
     };
     circular.a = circular;
@@ -1301,7 +1301,7 @@ describe('stringify()', function () {
       stringify(circular);
     }).toThrow('Cyclic object value');
 
-    var arr = ['a'];
+    const arr = ['a'];
     // st.doesNotThrow(function () {
     // 	stringify({ x: arr, y: arr });
     // }, 'non-cyclic values do not throw');
@@ -1521,9 +1521,9 @@ describe('stringify()', function () {
             if (str.length === 0) {
               return '';
             }
-            var buf = iconv.encode(str, 'shiftjis');
-            var result = [];
-            for (var i = 0; i < buf.length; ++i) {
+            const buf = iconv.encode(str, 'shiftjis');
+            const result = [];
+            for (let i = 0; i < buf.length; i += 1) {
               result.push(buf.readUInt8(i).toString(16));
             }
             return '%' + result.join('%');
@@ -1652,7 +1652,7 @@ describe('stringify()', function () {
     // );
     expect(stringify({ a: date })).toBe('a=' + date.toISOString().replace(/:/g, '%3A'));
 
-    var mutatedDate = new Date();
+    const mutatedDate = new Date();
     mutatedDate.toISOString = function () {
       throw new SyntaxError('Invalid date serialization');
     };
@@ -1671,7 +1671,7 @@ describe('stringify()', function () {
       'a=' + Date.prototype.toISOString.call(mutatedDate).replace(/:/g, '%3A'),
     );
 
-    var specificDate = new Date(6);
+    const specificDate = new Date(6);
     // st.equal(
     // 	stringify(
     // 		{ a: specificDate },
@@ -2153,15 +2153,15 @@ describe('stringify()', function () {
   });
 
   test('encodes a very long string', function () {
-    var chars = [];
-    var expected = [];
-    for (var i = 0; i < 5e3; i++) {
+    const chars = [];
+    const expected = [];
+    for (let i = 0; i < 5e3; i += 1) {
       chars.push(' ' + i);
 
       expected.push('%20' + i);
     }
 
-    var obj = {
+    const obj = {
       foo: chars.join(''),
     };
 

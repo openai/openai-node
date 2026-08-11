@@ -14,7 +14,7 @@ describe('merge()', function () {
   // );
   expect(merge({ a: 'b' }, { a: 'c' })).toEqual({ a: ['b', 'c'] });
 
-  var oneMerged = merge({ foo: 'bar' }, { foo: { first: '123' } });
+  const oneMerged = merge({ foo: 'bar' }, { foo: { first: '123' } });
   // t.deepEqual(
   // 	oneMerged,
   // 	{ foo: ['bar', { first: '123' }] },
@@ -22,7 +22,7 @@ describe('merge()', function () {
   // );
   expect(oneMerged).toEqual({ foo: ['bar', { first: '123' }] });
 
-  var twoMerged = merge({ foo: ['bar', { first: '123' }] }, { foo: { second: '456' } });
+  const twoMerged = merge({ foo: ['bar', { first: '123' }] }, { foo: { second: '456' } });
   // t.deepEqual(
   // 	twoMerged,
   // 	{ foo: { 0: 'bar', 1: { first: '123' }, second: '456' } },
@@ -30,7 +30,7 @@ describe('merge()', function () {
   // );
   expect(twoMerged).toEqual({ foo: { 0: 'bar', 1: { first: '123' }, second: '456' } });
 
-  var sandwiched = merge({ foo: ['bar', { first: '123', second: '456' }] }, { foo: 'baz' });
+  const sandwiched = merge({ foo: ['bar', { first: '123', second: '456' }] }, { foo: 'baz' });
   // t.deepEqual(
   // 	sandwiched,
   // 	{ foo: ['bar', { first: '123', second: '456' }, 'baz'] },
@@ -38,11 +38,11 @@ describe('merge()', function () {
   // );
   expect(sandwiched).toEqual({ foo: ['bar', { first: '123', second: '456' }, 'baz'] });
 
-  var nestedArrays = merge({ foo: ['baz'] }, { foo: ['bar', 'xyzzy'] });
+  const nestedArrays = merge({ foo: ['baz'] }, { foo: ['bar', 'xyzzy'] });
   // t.deepEqual(nestedArrays, { foo: ['baz', 'bar', 'xyzzy'] });
   expect(nestedArrays).toEqual({ foo: ['baz', 'bar', 'xyzzy'] });
 
-  var noOptionsNonObjectSource = merge({ foo: 'baz' }, 'bar');
+  const noOptionsNonObjectSource = merge({ foo: 'baz' }, 'bar');
   // t.deepEqual(noOptionsNonObjectSource, { foo: 'baz', bar: true });
   expect(noOptionsNonObjectSource).toEqual({ foo: 'baz', bar: true });
 
@@ -123,7 +123,7 @@ describe('combine()', function () {
     expect(combinedAnB).not.toEqual(b);
     expect(combinedAnB).toEqual([1, 2]);
 
-    var combinedABn = combine(a, bN);
+    const combinedABn = combine(a, bN);
     // st.deepEqual(a, [aN], 'a is not mutated');
     // st.notEqual(aN, combinedABn, 'a + bN !== aN');
     // st.notEqual(a, combinedABn, 'a + bN !== a');
@@ -169,15 +169,15 @@ test('is_buffer()', function () {
     expect(is_buffer(x)).toEqual(false);
   }
 
-  var fakeBuffer = { constructor: Buffer };
+  const fakeBuffer = { constructor: Buffer };
   // t.equal(is_buffer(fakeBuffer), false, 'fake buffer is not a buffer');
   expect(is_buffer(fakeBuffer)).toEqual(false);
 
-  var saferBuffer = Buffer.from('abc');
+  const saferBuffer = Buffer.from('abc');
   // t.equal(is_buffer(saferBuffer), true, 'SaferBuffer instance is a buffer');
   expect(is_buffer(saferBuffer)).toEqual(true);
 
-  var buffer = Buffer.from('abc');
+  const buffer = Buffer.from('abc');
   // t.equal(is_buffer(buffer), true, 'real Buffer instance is a buffer');
   expect(is_buffer(buffer)).toEqual(true);
 });
