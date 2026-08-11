@@ -33,7 +33,6 @@ const compatibilityRules = [
   'prefer-named-capture-group',
   'prefer-template',
   'promise/avoid-new',
-  'promise/prefer-await-to-callbacks',
   'promise/prefer-await-to-then',
   'require-await',
   'require-unicode-regexp',
@@ -233,6 +232,30 @@ module.exports = defineConfig({
       ],
       rules: {
         'default-case': 'off',
+      },
+    },
+    {
+      // These promise callbacks are intentional entrypoint, memoization, deferred
+      // execution, or Node stream callback boundaries whose timing must stay stable.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'examples/azure/assistants.ts',
+        'examples/azure/chat.ts',
+        'examples/azure/responses.ts',
+        'examples/fine-tuning/fine-tuning.ts',
+        'examples/images/image-stream.ts',
+        'examples/images/picture.ts',
+        'examples/responses/manual-conversation-state.ts',
+        'examples/responses/websocket.ts',
+        'scripts/_vendor/tsc-multi/src/worker/entry.ts',
+        'src/auth/subject-token-providers.ts',
+        'src/helpers/audio.ts',
+        'src/lib/EventStream.ts',
+        'tests/helpers/audio-recording.test.ts',
+        'tests/helpers/audio.test.ts',
+      ],
+      rules: {
+        'promise/prefer-await-to-callbacks': 'off',
       },
     },
     {
