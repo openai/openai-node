@@ -18,7 +18,7 @@ async function defaultReadFile(path: string): Promise<string> {
   });
 
   const { readFile } = await fsPromisesModule;
-  return readFile(path, 'utf8');
+  return readFile(path, 'utf-8');
 }
 
 export function k8sServiceAccountTokenProvider(

@@ -25,7 +25,7 @@ describe('Kubernetes Service Account Token Provider', () => {
     const token = await provider.getToken();
 
     expect(token).toBe('my-k8s-token');
-    expect(fsPromises.readFile).toHaveBeenCalledWith('/custom/path/token', 'utf8');
+    expect(fsPromises.readFile).toHaveBeenCalledWith('/custom/path/token', 'utf-8');
   });
 
   test('uses default path when none provided', async () => {

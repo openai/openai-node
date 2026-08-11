@@ -41,7 +41,6 @@ const compatibilityRules = [
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
   'unicorn/switch-case-braces',
-  'unicorn/text-encoding-identifier-case',
 ];
 
 module.exports = defineConfig({

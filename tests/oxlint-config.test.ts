@@ -10,7 +10,7 @@ const oxfmt = path.join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
 test('inherits Ultracite native plugins and enforces their rules', () => {
   const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
     cwd: repoRoot,
-    encoding: 'utf8',
+    encoding: 'utf-8',
   });
 
   expect(printed.status).toBe(0);
@@ -36,7 +36,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
     const linted = spawnSync(
       process.execPath,
       [oxlint, '--config', path.join(repoRoot, 'oxlint.config.ts'), '--format', 'json', fixturePath],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(linted.status).toBe(1);
@@ -47,7 +47,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
     const formatted = spawnSync(
       process.execPath,
       [oxfmt, '--config', path.join(repoRoot, 'oxfmt.config.ts'), '--check', fixturePath],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(formatted.status).toBe(0);
@@ -92,7 +92,7 @@ test('formats generated SDK files without linting them', () => {
 
   const formatted = spawnSync(process.execPath, [oxfmt, `--stdin-filepath=${generatedPath}`], {
     cwd: repoRoot,
-    encoding: 'utf8',
+    encoding: 'utf-8',
     input: unformatted,
   });
 
@@ -102,7 +102,7 @@ test('formats generated SDK files without linting them', () => {
   const linted = spawnSync(
     process.execPath,
     [oxlint, '--format', 'json', '--no-error-on-unmatched-pattern', generatedPath],
-    { cwd: repoRoot, encoding: 'utf8' },
+    { cwd: repoRoot, encoding: 'utf-8' },
   );
 
   expect(linted.status).toBe(0);
@@ -143,18 +143,18 @@ test('removes adjacent unused imports from generated files until fixes stabilize
       const fixed = spawnSync(
         process.execPath,
         [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath, handwrittenPath],
-        { cwd: repoRoot, encoding: 'utf8' },
+        { cwd: repoRoot, encoding: 'utf-8' },
       );
 
       expect(fixed.status).toBe(0);
 
-      const result = readFileSync(generatedPath, 'utf8');
+      const result = readFileSync(generatedPath, 'utf-8');
       expect(result).not.toMatch(/\bUnused(?:\d+|Named)\b/u);
       expect(result).toContain("import { Retained } from './dependency';");
       expect(result).toContain("import './side-effect';");
       expect(result).toContain('const intentionallyUnused = 1;');
       expect(result).toContain('export interface Result<T>');
-      expect(readFileSync(handwrittenPath, 'utf8')).toBe(handwritten);
+      expect(readFileSync(handwrittenPath, 'utf-8')).toBe(handwritten);
     }
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
@@ -178,12 +178,12 @@ test('limits generated import cleanup to paths supplied through a fast-format fi
     const fixed = spawnSync(
       process.execPath,
       [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', '--file-list', fileList],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(fixed.status).toBe(0);
-    expect(readFileSync(selectedPath, 'utf8')).not.toContain('Unused');
-    expect(readFileSync(untouchedPath, 'utf8')).toBe(source);
+    expect(readFileSync(selectedPath, 'utf-8')).not.toContain('Unused');
+    expect(readFileSync(untouchedPath, 'utf-8')).toBe(source);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -206,28 +206,28 @@ test('checks unused generated imports without rejecting intentionally unused var
     const checked = spawnSync(
       process.execPath,
       [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(checked.status).toBe(1);
     expect(checked.stderr).toContain("Identifier 'Unused' is imported but never used.");
     expect(checked.stderr).not.toContain('intentionallyUnused');
     expect(checked.stderr).not.toContain("Variable 'T'");
-    expect(readFileSync(generatedPath, 'utf8')).toBe(source);
+    expect(readFileSync(generatedPath, 'utf-8')).toBe(source);
 
     const fixed = spawnSync(
       process.execPath,
       [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(fixed.status).toBe(0);
-    expect(readFileSync(generatedPath, 'utf8')).toContain('const intentionallyUnused = 1;');
+    expect(readFileSync(generatedPath, 'utf-8')).toContain('const intentionallyUnused = 1;');
 
     const rechecked = spawnSync(
       process.execPath,
       [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(rechecked.status).toBe(0);
@@ -252,31 +252,31 @@ test('rejects SDK package imports in generated source but allows them in generat
     const checkedSource = spawnSync(
       process.execPath,
       [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', sourcePath],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(checkedSource.status).toBe(1);
     expect(checkedSource.stderr).toContain('Use a relative import, not a package import.');
-    expect(readFileSync(sourcePath, 'utf8')).toBe(source);
+    expect(readFileSync(sourcePath, 'utf-8')).toBe(source);
 
     const fixedSource = spawnSync(
       process.execPath,
       [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', sourcePath],
-      { cwd: repoRoot, encoding: 'utf8' },
+      { cwd: repoRoot, encoding: 'utf-8' },
     );
 
     expect(fixedSource.status).toBe(1);
-    expect(readFileSync(sourcePath, 'utf8')).toBe(source);
+    expect(readFileSync(sourcePath, 'utf-8')).toBe(source);
 
     for (const mode of ['--check', '--fix']) {
       const generatedTest = spawnSync(
         process.execPath,
         [path.join(repoRoot, 'scripts/lint-generated.cjs'), mode, testPath],
-        { cwd: repoRoot, encoding: 'utf8' },
+        { cwd: repoRoot, encoding: 'utf-8' },
       );
 
       expect(generatedTest.status).toBe(0);
-      expect(readFileSync(testPath, 'utf8')).toBe(source);
+      expect(readFileSync(testPath, 'utf-8')).toBe(source);
     }
   } finally {
     rmSync(sourceRoot, { recursive: true, force: true });
@@ -299,19 +299,19 @@ test('checks and fixes generated imports through the public package commands', (
       ].join('\n'),
     );
 
-    const rejected = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf8' });
+    const rejected = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf-8' });
 
     expect(rejected.status).toBe(1);
     expect(`${rejected.stdout}${rejected.stderr}`).toContain(
       "Identifier 'Unused' is imported but never used.",
     );
 
-    const fixed = spawnSync('pnpm', ['format'], { cwd: repoRoot, encoding: 'utf8' });
+    const fixed = spawnSync('pnpm', ['format'], { cwd: repoRoot, encoding: 'utf-8' });
 
     expect(fixed.status).toBe(0);
-    expect(readFileSync(generatedPath, 'utf8')).not.toContain('Unused');
+    expect(readFileSync(generatedPath, 'utf-8')).not.toContain('Unused');
 
-    const accepted = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf8' });
+    const accepted = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf-8' });
 
     expect(accepted.status).toBe(0);
   } finally {

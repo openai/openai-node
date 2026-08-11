@@ -49,7 +49,7 @@ const nodeVersionPolicyPath = require('node:path');
     policyStatuses.some((status) => status === value);
 
   const root = path.resolve(__dirname, '..');
-  const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf8');
+  const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf-8');
   const readJSON = <Value>(file: string): Value => JSON.parse(read(file)) as Value;
   const unique = <Value>(values: Value[]): Value[] => [...new Set(values)];
 
