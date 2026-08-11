@@ -29,7 +29,7 @@ export const getRefs = (options?: string | Partial<Options<Targets>>): Refs => {
       : [..._options.basePath, _options.definitionPath, _options.name];
   return {
     ..._options,
-    currentPath: currentPath,
+    currentPath,
     propertyPath: undefined,
     seenRefs: new Set(),
     seen: new Map(

@@ -22,7 +22,6 @@ const compatibilityRules = [
   'no-unused-vars',
   'no-use-before-define',
   'no-var',
-  'object-shorthand',
   'prefer-arrow-callback',
   'prefer-destructuring',
   'prefer-named-capture-group',

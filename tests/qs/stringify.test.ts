@@ -1454,8 +1454,8 @@ describe('stringify()', function () {
     // 	stringify({ a: 'c', z: { j: 'a', i: 'b' }, b: 'f' }, { sort: sort }),
     // 	'a=c&b=f&z%5Bi%5D=b&z%5Bj%5D=a',
     // );
-    expect(stringify({ a: 'c', z: 'y', b: 'f' }, { sort: sort })).toBe('a=c&b=f&z=y');
-    expect(stringify({ a: 'c', z: { j: 'a', i: 'b' }, b: 'f' }, { sort: sort })).toBe(
+    expect(stringify({ a: 'c', z: 'y', b: 'f' }, { sort })).toBe('a=c&b=f&z=y');
+    expect(stringify({ a: 'c', z: { j: 'a', i: 'b' }, b: 'f' }, { sort })).toBe(
       'a=c&b=f&z%5Bi%5D=b&z%5Bj%5D=a',
     );
   });
@@ -1482,7 +1482,7 @@ describe('stringify()', function () {
     expect(
       stringify(
         { a: 'a', z: { zj: { zjb: 'zjb', zja: 'zja' }, zi: { zib: 'zib', zia: 'zia' } }, b: 'b' },
-        { sort: sort, encode: false },
+        { sort, encode: false },
       ),
     ).toBe('a=a&b=b&z[zi][zia]=zia&z[zi][zib]=zib&z[zj][zja]=zja&z[zj][zjb]=zjb');
     expect(
@@ -1517,7 +1517,7 @@ describe('stringify()', function () {
       stringify(
         { 県: '大阪府', '': '' },
         {
-          encoder: function (str) {
+          encoder(str) {
             if (str.length === 0) {
               return '';
             }
@@ -1547,7 +1547,7 @@ describe('stringify()', function () {
     stringify(
       { a: 1, b: new Date(), c: true, d: [1] },
       {
-        encoder: function (str) {
+        encoder(str) {
           // st.match(typeof str, /^(?:string|number|boolean)$/);
           assert.match(typeof str, /^(?:string|number|boolean)$/);
           return '';
@@ -1570,7 +1570,7 @@ describe('stringify()', function () {
       { a: 1 },
       {
         // @ts-ignore
-        encoder: function (_str, defaultEncoder) {
+        encoder(_str, defaultEncoder) {
           expect(defaultEncoder).toBe(encode);
         },
       },
@@ -1609,7 +1609,7 @@ describe('stringify()', function () {
         stringify(
           { a: Buffer.from([1]) },
           {
-            encoder: function (buffer) {
+            encoder(buffer) {
               if (typeof buffer === 'string') {
                 return buffer;
               }
@@ -1634,7 +1634,7 @@ describe('stringify()', function () {
         stringify(
           { a: Buffer.from('a b') },
           {
-            encoder: function (buffer) {
+            encoder(buffer) {
               return buffer;
             },
           },
@@ -1689,7 +1689,7 @@ describe('stringify()', function () {
         { a: specificDate },
         {
           // @ts-ignore
-          serializeDate: function (d) {
+          serializeDate(d) {
             return d.getTime() * 7;
           },
         },
@@ -1728,7 +1728,7 @@ describe('stringify()', function () {
         { a: [date] },
         {
           // @ts-expect-error
-          serializeDate: function (d) {
+          serializeDate(d) {
             return d.getTime();
           },
           arrayFormat: 'comma',
@@ -1740,7 +1740,7 @@ describe('stringify()', function () {
         { a: [date] },
         {
           // @ts-expect-error
-          serializeDate: function (d) {
+          serializeDate(d) {
             return d.getTime();
           },
           arrayFormat: 'comma',
@@ -1791,7 +1791,7 @@ describe('stringify()', function () {
       // }, new TypeError('Unknown format option provided.'));
       expect(() => {
         // @ts-expect-error
-        stringify({ a: 'b c' }, { format: format });
+        stringify({ a: 'b c' }, { format });
       }).toThrow(TypeError);
     }
   });
@@ -1932,7 +1932,7 @@ describe('stringify()', function () {
       return value;
     };
 
-    var options = { strictNullHandling: true, filter: filter };
+    var options = { strictNullHandling: true, filter };
     // st.equal(stringify({ key: null }, options), 'key');
     expect(stringify({ key: null }, options)).toBe('key');
   });
@@ -1941,7 +1941,7 @@ describe('stringify()', function () {
     var serializeDate = function () {
       return null;
     };
-    var options = { strictNullHandling: true, serializeDate: serializeDate };
+    var options = { strictNullHandling: true, serializeDate };
     var date = new Date();
     // st.equal(stringify({ key: date }, options), 'key');
     // @ts-expect-error
@@ -1961,7 +1961,7 @@ describe('stringify()', function () {
     };
 
     // st.deepEqual(stringify({ KeY: 'vAlUe' }, { encoder: encoder }), 'key=VALUE');
-    expect(stringify({ KeY: 'vAlUe' }, { encoder: encoder })).toBe('key=VALUE');
+    expect(stringify({ KeY: 'vAlUe' }, { encoder })).toBe('key=VALUE');
   });
 
   test('objects inside arrays', function () {

@@ -105,7 +105,7 @@ export async function createCompletionParams(
   const params = {
     model: 'gpt-3.5-turbo',
     messages: [{ role: 'user' as const, content: 'Hello!' }],
-    stream: stream,
+    stream,
   };
 
   // <your logic here>

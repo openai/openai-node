@@ -280,11 +280,11 @@ function normalize_stringify_options(
   return {
     addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults.addQueryPrefix,
     // @ts-ignore
-    allowDots: allowDots,
+    allowDots,
     allowEmptyArrays:
       typeof opts.allowEmptyArrays === 'boolean' ? !!opts.allowEmptyArrays : defaults.allowEmptyArrays,
-    arrayFormat: arrayFormat,
-    charset: charset,
+    arrayFormat,
+    charset,
     charsetSentinel:
       typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
     commaRoundTrip: !!opts.commaRoundTrip,
@@ -295,9 +295,9 @@ function normalize_stringify_options(
     encoder: typeof opts.encoder === 'function' ? opts.encoder : defaults.encoder,
     encodeValuesOnly:
       typeof opts.encodeValuesOnly === 'boolean' ? opts.encodeValuesOnly : defaults.encodeValuesOnly,
-    filter: filter,
-    format: format,
-    formatter: formatter,
+    filter,
+    format,
+    formatter,
     serializeDate: typeof opts.serializeDate === 'function' ? opts.serializeDate : defaults.serializeDate,
     skipNulls: typeof opts.skipNulls === 'boolean' ? opts.skipNulls : defaults.skipNulls,
     // @ts-ignore
