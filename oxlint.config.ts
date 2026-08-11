@@ -68,7 +68,6 @@ const compatibilityRules = [
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
-  'unicorn/prefer-spread',
   'unicorn/prefer-string-replace-all',
   'unicorn/prefer-string-slice',
   'unicorn/switch-case-braces',

@@ -236,9 +236,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
 }
 
 const escapeNonAlphaNumeric = (value: string) =>
-  Array.from(value)
-    .map((c) => (/[a-zA-Z0-9]/.test(c) ? c : `\\${c}`))
-    .join('');
+  [...value].map((c) => (/[a-zA-Z0-9]/.test(c) ? c : `\\${c}`)).join('');
 
 const addFormat = (
   schema: JsonSchema7StringType,

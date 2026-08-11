@@ -77,6 +77,7 @@ export function merge(
   }
 
   if (!target || typeof target !== 'object') {
+    // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
     return [target].concat(source);
   }
 
@@ -254,6 +255,7 @@ export function is_buffer(obj: any) {
 }
 
 export function combine(a: any, b: any) {
+  // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
   return [].concat(a, b);
 }
 

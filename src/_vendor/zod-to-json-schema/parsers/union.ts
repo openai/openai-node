@@ -33,8 +33,7 @@ export function parseUnionDef(
 ): JsonSchema7PrimitiveUnionType | JsonSchema7AnyOfType | undefined {
   if (refs.target === 'openApi3') return asAnyOf(def, refs);
 
-  const options: readonly ZodTypeAny[] =
-    def.options instanceof Map ? Array.from(def.options.values()) : def.options;
+  const options: readonly ZodTypeAny[] = def.options instanceof Map ? [...def.options.values()] : def.options;
 
   // This blocks tries to look ahead a bit to produce nicer looking schemas with type array instead of anyOf.
   if (
@@ -111,7 +110,7 @@ const asAnyOf = (
   def: ZodUnionDef | ZodDiscriminatedUnionDef<any, any>,
   refs: Refs,
 ): JsonSchema7PrimitiveUnionType | JsonSchema7AnyOfType | undefined => {
-  const anyOf = ((def.options instanceof Map ? Array.from(def.options.values()) : def.options) as any[])
+  const anyOf = ((def.options instanceof Map ? [...def.options.values()] : def.options) as any[])
     .map((x, i) =>
       parseDef(x._def, {
         ...refs,
