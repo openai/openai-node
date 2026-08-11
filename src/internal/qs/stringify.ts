@@ -86,14 +86,14 @@ function inner_stringify(
     // Where object last appeared in the ref tree
     const pos = tmp_sc.get(object);
     step += 1;
-    if (typeof pos !== 'undefined') {
+    if (pos !== undefined) {
       if (pos === step) {
         throw new RangeError('Cyclic object value');
       } else {
         find_flag = true; // Break while
       }
     }
-    if (typeof tmp_sc.get(sentinel) === 'undefined') {
+    if (tmp_sc.get(sentinel) === undefined) {
       step = 0;
     }
   }
@@ -140,7 +140,7 @@ function inner_stringify(
 
   const values: string[] = [];
 
-  if (typeof obj === 'undefined') {
+  if (obj === undefined) {
     return values;
   }
 
@@ -174,7 +174,7 @@ function inner_stringify(
   for (const key of obj_keys) {
     const value =
       // @ts-ignore
-      typeof key === 'object' && typeof key.value !== 'undefined' ? key.value : obj[key as any];
+      typeof key === 'object' && key.value !== undefined ? key.value : obj[key as any];
 
     if (skipNulls && value === null) {
       continue;
@@ -226,25 +226,25 @@ function inner_stringify(
 function normalize_stringify_options(
   opts: StringifyOptions = defaults,
 ): NonNullableProperties<Omit<StringifyOptions, 'indices'>> & { indices?: boolean } {
-  if (typeof opts.allowEmptyArrays !== 'undefined' && typeof opts.allowEmptyArrays !== 'boolean') {
+  if (opts.allowEmptyArrays !== undefined && typeof opts.allowEmptyArrays !== 'boolean') {
     throw new TypeError('`allowEmptyArrays` option can only be `true` or `false`, when provided');
   }
 
-  if (typeof opts.encodeDotInKeys !== 'undefined' && typeof opts.encodeDotInKeys !== 'boolean') {
+  if (opts.encodeDotInKeys !== undefined && typeof opts.encodeDotInKeys !== 'boolean') {
     throw new TypeError('`encodeDotInKeys` option can only be `true` or `false`, when provided');
   }
 
-  if (opts.encoder !== null && typeof opts.encoder !== 'undefined' && typeof opts.encoder !== 'function') {
+  if (opts.encoder !== null && opts.encoder !== undefined && typeof opts.encoder !== 'function') {
     throw new TypeError('Encoder has to be a function.');
   }
 
   const charset = opts.charset || defaults.charset;
-  if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
+  if (opts.charset !== undefined && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
     throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
   }
 
   let format = default_format;
-  if (typeof opts.format !== 'undefined') {
+  if (opts.format !== undefined) {
     if (!has(formatters, opts.format)) {
       throw new TypeError('Unknown format option provided.');
     }
@@ -288,7 +288,7 @@ function normalize_stringify_options(
     charsetSentinel:
       typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
     commaRoundTrip: !!opts.commaRoundTrip,
-    delimiter: typeof opts.delimiter === 'undefined' ? defaults.delimiter : opts.delimiter,
+    delimiter: opts.delimiter === undefined ? defaults.delimiter : opts.delimiter,
     encode: typeof opts.encode === 'boolean' ? opts.encode : defaults.encode,
     encodeDotInKeys:
       typeof opts.encodeDotInKeys === 'boolean' ? opts.encodeDotInKeys : defaults.encodeDotInKeys,
