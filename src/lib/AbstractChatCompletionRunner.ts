@@ -28,12 +28,8 @@ import type {
 } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
 import { BaseEvents, EventStream } from './EventStream';
-import {
-  isRunnableFunctionWithParse,
-  type BaseFunctionsArgs,
-  type RunnableFunction,
-  type RunnableToolFunction,
-} from './RunnableFunction';
+import { isRunnableFunctionWithParse } from './RunnableFunction';
+import type { BaseFunctionsArgs, RunnableFunction, RunnableToolFunction } from './RunnableFunction';
 
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
 

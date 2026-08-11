@@ -1,19 +1,20 @@
 import { OpenAIError } from '../error';
 import type { ChatCompletionTool } from '../resources/chat/completions';
-import {
-  ResponseTextConfig,
-  type FunctionTool,
-  type ParsedContent,
-  type ParsedResponse,
-  type ParsedResponseFunctionToolCall,
-  type ParsedResponseOutputItem,
-  type Response,
-  type ResponseCreateParamsBase,
-  type ResponseCreateParamsNonStreaming,
-  type ResponseFunctionToolCall,
-  type Tool,
+import { ResponseTextConfig } from '../resources/responses/responses';
+import type {
+  FunctionTool,
+  ParsedContent,
+  ParsedResponse,
+  ParsedResponseFunctionToolCall,
+  ParsedResponseOutputItem,
+  Response,
+  ResponseCreateParamsBase,
+  ResponseCreateParamsNonStreaming,
+  ResponseFunctionToolCall,
+  Tool,
 } from '../resources/responses/responses';
-import { type AutoParseableTextFormat, isAutoParsableResponseFormat } from '../lib/parser';
+import { isAutoParsableResponseFormat } from '../lib/parser';
+import type { AutoParseableTextFormat } from '../lib/parser';
 
 export type ParseableToolsParams = Tool[] | ChatCompletionTool | null;
 

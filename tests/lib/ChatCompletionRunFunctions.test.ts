@@ -5,10 +5,12 @@ import { PassThrough } from 'node:stream';
 import {
   ParsingToolFunction,
   ChatCompletionRunner,
-  type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
-  type ChatCompletionStreamingToolRunnerParams,
-  type ChatCompletionMessageParam,
+} from 'openai/resources/chat/completions';
+import type {
+  ChatCompletionToolRunnerParams,
+  ChatCompletionStreamingToolRunnerParams,
+  ChatCompletionMessageParam,
 } from 'openai/resources/chat/completions';
 import type { RunnableToolFunction } from 'openai/lib/RunnableFunction';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';

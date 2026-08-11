@@ -3,7 +3,8 @@ import OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { configureProvider } from 'openai/internal/provider';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
-import { bedrock, type BedrockProviderOptions } from 'openai/providers/bedrock/aws';
+import { bedrock } from 'openai/providers/bedrock/aws';
+import type { BedrockProviderOptions } from 'openai/providers/bedrock/aws';
 import { SignatureV4 } from '@smithy/signature-v4';
 
 import sigV4Fixture from '../fixtures/bedrock/v1/sigv4.json';

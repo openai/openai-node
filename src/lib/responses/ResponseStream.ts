@@ -1,16 +1,17 @@
-import {
-  ResponseTextConfig,
-  type ParsedResponse,
-  type Response,
-  type ResponseCreateParamsBase,
-  type ResponseCreateParamsStreaming,
-  type ResponseStreamEvent,
+import { ResponseTextConfig } from '../../resources/responses/responses';
+import type {
+  ParsedResponse,
+  Response,
+  ResponseCreateParamsBase,
+  ResponseCreateParamsStreaming,
+  ResponseStreamEvent,
 } from '../../resources/responses/responses';
 import { RequestOptions } from '../../internal/request-options';
 import type { ReadableStream } from '../../internal/shim-types';
 import { APIUserAbortError, OpenAIError } from '../../error';
 import OpenAI from '../../index';
-import { type BaseEvents, EventStream } from '../EventStream';
+import { EventStream } from '../EventStream';
+import type { BaseEvents } from '../EventStream';
 import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
 import { accumulateResponse } from './ResponseAccumulator';
 import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';

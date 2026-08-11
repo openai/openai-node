@@ -1,4 +1,5 @@
-import { vi, type MockedFunction } from 'vitest';
+import { vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
 import { spawn } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { playAudio } from 'openai/helpers/audio';

@@ -1,12 +1,8 @@
 import * as Errors from '../error';
 import type { Provider } from '../internal/provider';
 import { createProvider } from '../internal/provider';
-import {
-  resolveBedrockBearerAuth,
-  resolveBedrockEndpoint,
-  type BedrockBearerOptions,
-  type BedrockEndpointOptions,
-} from '../internal/bedrock';
+import { resolveBedrockBearerAuth, resolveBedrockEndpoint } from '../internal/bedrock';
+import type { BedrockBearerOptions, BedrockEndpointOptions } from '../internal/bedrock';
 
 export interface BedrockProviderOptions extends BedrockEndpointOptions, BedrockBearerOptions {}
 

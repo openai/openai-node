@@ -9,7 +9,6 @@ const compatibilityRules = [
   'curly',
   'func-names',
   'func-style',
-  'import/consistent-type-specifier-style',
   'import/no-cycle',
   'no-use-before-define',
   'prefer-arrow-callback',
@@ -821,6 +820,25 @@ module.exports = defineConfig({
       ],
       rules: {
         'prefer-destructuring': 'off',
+      },
+    },
+    {
+      // These mixed value/type import groups intentionally stay colocated to preserve
+      // public-module grouping and avoid duplicate import declarations.
+      files: [
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ResponsesParser.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'src/providers/bedrock.ts',
+        'src/providers/bedrock/aws.ts',
+        'src/realtime/websocket.ts',
+        'src/realtime/ws.ts',
+        'tests/buildHeaders.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+      ],
+      rules: {
+        'import/consistent-type-specifier-style': 'off',
       },
     },
     {

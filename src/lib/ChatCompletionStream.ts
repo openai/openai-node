@@ -19,22 +19,20 @@ import {
   shouldParseToolCall,
 } from '../lib/parser';
 import { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
-import {
-  type ChatCompletionAudio,
-  ChatCompletionTokenLogprob,
-  type ChatCompletion,
-  type ChatCompletionChunk,
-  type ChatCompletionCreateParams,
-  type ChatCompletionCreateParamsBase,
-  type ChatCompletionCreateParamsStreaming,
-  type ChatCompletionMessageParam,
-  type ChatCompletionRole,
+import { ChatCompletionTokenLogprob } from '../resources/chat/completions/completions';
+import type {
+  ChatCompletionAudio,
+  ChatCompletion,
+  ChatCompletionChunk,
+  ChatCompletionCreateParams,
+  ChatCompletionCreateParamsBase,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
+  ChatCompletionRole,
 } from '../resources/chat/completions/completions';
 import { Stream } from '../streaming';
-import {
-  AbstractChatCompletionRunner,
-  type AbstractChatCompletionRunnerEvents,
-} from './AbstractChatCompletionRunner';
+import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
+import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
 
 export interface ContentDeltaEvent {
   delta: string;

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai';
+import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
+import type { UIMessage } from 'ai';
 import { NextRequest } from 'next/server';
 
 export const config = {

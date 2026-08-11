@@ -1,4 +1,5 @@
-import { vi, type Mock } from 'vitest';
+import { vi } from 'vitest';
+import type { Mock } from 'vitest';
 
 import OpenAI, { AzureOpenAI } from 'openai';
 import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtime/websocket';
