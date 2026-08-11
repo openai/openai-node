@@ -648,7 +648,9 @@ export type TranscriptionCreateParams =
 export interface TranscriptionCreateParamsBase {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:
-   * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
+   * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm. The request must include
+   * enough format metadata for the file to be identified. We recommend an
+   * extension-bearing filename and an appropriate content type.
    */
   file: Uploadable;
 
