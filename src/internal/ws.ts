@@ -160,35 +160,50 @@ export class SendQueue<T = unknown> {
 // RFC 6455 §7.4.1
 export function isRecoverableClose(code: number): boolean {
   switch (code) {
-    case 1000:
-      return false; // Normal closure
-    case 1001:
-      return true; // Going away (server shutting down)
-    case 1002:
-      return false; // Protocol error
-    case 1003:
-      return false; // Unsupported data
-    case 1005:
-      return true; // No status code (abnormal)
-    case 1006:
-      return true; // Abnormal closure (network drop)
-    case 1007:
-      return false; // Invalid payload
-    case 1008:
-      return false; // Policy violation
-    case 1009:
-      return false; // Message too big
-    case 1010:
-      return false; // Missing extension
-    case 1011:
-      return true; // Internal server error
-    case 1012:
-      return true; // Service restart
-    case 1013:
-      return true; // Try again later
-    case 1015:
-      return true; // TLS handshake failure
-    default:
+    case 1000: {
       return false;
+    } // Normal closure
+    case 1001: {
+      return true;
+    } // Going away (server shutting down)
+    case 1002: {
+      return false;
+    } // Protocol error
+    case 1003: {
+      return false;
+    } // Unsupported data
+    case 1005: {
+      return true;
+    } // No status code (abnormal)
+    case 1006: {
+      return true;
+    } // Abnormal closure (network drop)
+    case 1007: {
+      return false;
+    } // Invalid payload
+    case 1008: {
+      return false;
+    } // Policy violation
+    case 1009: {
+      return false;
+    } // Message too big
+    case 1010: {
+      return false;
+    } // Missing extension
+    case 1011: {
+      return true;
+    } // Internal server error
+    case 1012: {
+      return true;
+    } // Service restart
+    case 1013: {
+      return true;
+    } // Try again later
+    case 1015: {
+      return true;
+    } // TLS handshake failure
+    default: {
+      return false;
+    }
   }
 }

@@ -153,9 +153,10 @@ export class ResponseStream<ParsedT = null>
         }
         break;
       }
-      default:
+      default: {
         maybeEmit(event.type, event);
         break;
+      }
     }
   }
 

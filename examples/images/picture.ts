@@ -49,15 +49,19 @@ async function createImageEdit(imageFiles: string[]) {
 
 function imageContentType(file: string): string {
   switch (path.extname(file).toLowerCase()) {
-    case '.png':
+    case '.png': {
       return 'image/png';
+    }
     case '.jpg':
-    case '.jpeg':
+    case '.jpeg': {
       return 'image/jpeg';
-    case '.webp':
+    }
+    case '.webp': {
       return 'image/webp';
-    default:
+    }
+    default: {
       throw new Error(`Unsupported image type for ${file}. Use a PNG, JPEG, or WebP file.`);
+    }
   }
 }
 

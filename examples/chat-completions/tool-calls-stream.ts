@@ -81,17 +81,21 @@ async function callTool(
 ): Promise<any> {
   const args = JSON.parse(tool_call.function.arguments);
   switch (tool_call.function.name) {
-    case 'list':
+    case 'list': {
       return await list(args['genre']);
+    }
 
-    case 'search':
+    case 'search': {
       return await search(args['name']);
+    }
 
-    case 'get':
+    case 'get': {
       return await get(args['id']);
+    }
 
-    default:
+    default: {
       throw new Error('No function found');
+    }
   }
 }
 

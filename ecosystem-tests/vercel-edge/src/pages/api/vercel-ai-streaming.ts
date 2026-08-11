@@ -22,14 +22,18 @@ export default async function handler(request: NextRequest) {
       .join('');
 
     switch (message.role) {
-      case 'system':
+      case 'system': {
         return { role: 'system', content };
-      case 'assistant':
+      }
+      case 'assistant': {
         return { role: 'assistant', content };
-      case 'user':
+      }
+      case 'user': {
         return { role: 'user', content };
-      default:
+      }
+      default: {
         throw new Error('Unsupported message role');
+      }
     }
   });
 

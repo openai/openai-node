@@ -96,7 +96,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
   if (def.checks) {
     for (const check of def.checks) {
       switch (check.kind) {
-        case 'min':
+        case 'min': {
           setResponseValueAndErrors(
             res,
             'minLength',
@@ -105,7 +105,8 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
             refs,
           );
           break;
-        case 'max':
+        }
+        case 'max': {
           setResponseValueAndErrors(
             res,
             'maxLength',
@@ -115,55 +116,71 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           );
 
           break;
-        case 'email':
+        }
+        case 'email': {
           switch (refs.emailStrategy) {
-            case 'format:email':
+            case 'format:email': {
               addFormat(res, 'email', check.message, refs);
               break;
-            case 'format:idn-email':
+            }
+            case 'format:idn-email': {
               addFormat(res, 'idn-email', check.message, refs);
               break;
-            case 'pattern:zod':
+            }
+            case 'pattern:zod': {
               addPattern(res, zodPatterns.email, check.message, refs);
               break;
+            }
           }
 
           break;
-        case 'url':
+        }
+        case 'url': {
           addFormat(res, 'uri', check.message, refs);
           break;
-        case 'uuid':
+        }
+        case 'uuid': {
           addFormat(res, 'uuid', check.message, refs);
           break;
-        case 'regex':
+        }
+        case 'regex': {
           addPattern(res, check.regex, check.message, refs);
           break;
-        case 'cuid':
+        }
+        case 'cuid': {
           addPattern(res, zodPatterns.cuid, check.message, refs);
           break;
-        case 'cuid2':
+        }
+        case 'cuid2': {
           addPattern(res, zodPatterns.cuid2, check.message, refs);
           break;
-        case 'startsWith':
+        }
+        case 'startsWith': {
           addPattern(res, new RegExp(`^${processPattern(check.value)}`), check.message, refs);
           break;
-        case 'endsWith':
+        }
+        case 'endsWith': {
           addPattern(res, new RegExp(`${processPattern(check.value)}$`), check.message, refs);
           break;
+        }
 
-        case 'datetime':
+        case 'datetime': {
           addFormat(res, 'date-time', check.message, refs);
           break;
-        case 'date':
+        }
+        case 'date': {
           addFormat(res, 'date', check.message, refs);
           break;
-        case 'time':
+        }
+        case 'time': {
           addFormat(res, 'time', check.message, refs);
           break;
-        case 'duration':
+        }
+        case 'duration': {
           addFormat(res, 'duration', check.message, refs);
           break;
-        case 'length':
+        }
+        case 'length': {
           setResponseValueAndErrors(
             res,
             'minLength',
@@ -179,6 +196,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
             refs,
           );
           break;
+        }
         case 'includes': {
           addPattern(res, new RegExp(processPattern(check.value)), check.message, refs);
           break;
@@ -192,9 +210,10 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           }
           break;
         }
-        case 'emoji':
+        case 'emoji': {
           addPattern(res, zodPatterns.emoji, check.message, refs);
           break;
+        }
         case 'ulid': {
           addPattern(res, zodPatterns.ulid, check.message, refs);
           break;
@@ -224,10 +243,12 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
         }
         case 'toLowerCase':
         case 'toUpperCase':
-        case 'trim':
+        case 'trim': {
           break;
-        default:
+        }
+        default: {
           ((_: never) => undefined)(check);
+        }
       }
     }
   }
