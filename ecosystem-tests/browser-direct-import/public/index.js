@@ -62,7 +62,7 @@ function describe(description, handler) {
 /**
  * @param {string} description
  * @param {() => any} run
- * @param {number} [timeout=60000]
+ * @param {number} [timeout] - Defaults to `60000`.
  */
 function it(description, run, timeout = 60000) {
   tests.push({ path: [...testPath, description], run, timeout });
