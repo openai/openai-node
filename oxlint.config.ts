@@ -30,7 +30,6 @@ const compatibilityRules = [
   'prefer-named-capture-group',
   'prefer-template',
   'promise/avoid-new',
-  'promise/prefer-await-to-then',
   'require-await',
   'require-unicode-regexp',
   'sort-keys',
@@ -257,6 +256,38 @@ module.exports = defineConfig({
       files: ['tests/lib/ChatCompletionRunFunctions.test.ts'],
       rules: {
         'func-name-matching': 'off',
+      },
+    },
+    {
+      // These chains intentionally preserve fire-and-forget entrypoints, deferred
+      // execution, cancellation consumption, and memoized promise lifetimes.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'examples/audio/speech-to-text.ts',
+        'examples/audio/text-to-speech.ts',
+        'examples/azure/assistants.ts',
+        'examples/azure/chat.ts',
+        'examples/azure/responses.ts',
+        'examples/bedrock/responses.ts',
+        'examples/chat-completions/stream-to-client-browser.ts',
+        'examples/chat-completions/stream-to-client-express.ts',
+        'examples/chat-completions/stream-to-client-raw.ts',
+        'examples/client/raw-response.ts',
+        'examples/fine-tuning/fine-tuning.ts',
+        'examples/images/image-stream.ts',
+        'examples/images/picture.ts',
+        'examples/responses/manual-conversation-state.ts',
+        'examples/responses/structured-outputs.ts',
+        'examples/responses/websocket.ts',
+        'scripts/_vendor/tsc-multi/src/worker/entry.ts',
+        'src/auth/subject-token-providers.ts',
+        'src/auth/workload-identity-auth.ts',
+        'src/core/streaming.ts',
+        'src/helpers/standard-schema.ts',
+        'src/lib/EventStream.ts',
+      ],
+      rules: {
+        'promise/prefer-await-to-then': 'off',
       },
     },
     {
