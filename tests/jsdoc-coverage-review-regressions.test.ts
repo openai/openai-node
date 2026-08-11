@@ -74,6 +74,36 @@ describe('JSDoc coverage review regressions', () => {
     );
   });
 
+  test('follows deferred conditional values through cross-module handwritten generic wrappers', () => {
+    const source = `
+      import type { Wrapper } from './wrapper';
+
+      /** Selects a cross-module wrapper after the value is known. */
+      type Select<Value, Yes, No> = Value extends string ? Wrapper<Yes> : Wrapper<No>;
+      /** Public dictionary exposing wrapped conditional branches. */
+      export type Public<Key extends string, Value> = Record<
+        Key,
+        Select<Value, { missing: string }, { other: string }>
+      >;
+    `;
+    const dependencies = {
+      'src/wrapper.ts': `
+        /** Handwritten wrapper already audited in its own module. */
+        export interface Wrapper<Value> {
+          /** Wrapped public value. */
+          value: Value;
+        }
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining(['Public.[key: Key].value.missing', 'Public.[key: Key].value.other']),
+    );
+    expect(declarations.map(({ name }) => name)).not.toContain('Wrapper');
+  });
+
   test('keeps substituted conditional alias branch documentation independent', () => {
     const source = `
       /** Forwards one unresolved generic branch. */
@@ -369,6 +399,57 @@ describe('JSDoc coverage review regressions', () => {
     expect(missing(source)).toContain('openai/ambient.Client.missing');
   });
 
+  test('checks imported internal CommonJS export-assignment targets across handwritten modules', () => {
+    const source = `
+      import Hidden = require('./internal-commonjs');
+      export = Hidden;
+    `;
+    const dependencies = {
+      'src/internal-commonjs.ts': `
+        /** @internal */
+        class Hidden {
+          missing = { nested: true };
+          static available = { nested: true };
+          /** @internal */ implementation = true;
+        }
+        export = Hidden;
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Hidden.missing',
+        'Hidden.missing.nested',
+        'Hidden.static.available',
+        'Hidden.static.available.nested',
+      ]),
+    );
+    expect(undocumented).not.toContain('Hidden.implementation');
+    expect(declarations.find(({ name }) => name === 'Hidden.missing')).toEqual(
+      expect.objectContaining({ file: 'src/internal-commonjs.ts', line: 4 }),
+    );
+  });
+
+  test('does not inspect ordinary cross-module CommonJS forwarding barrels', () => {
+    const source = `
+      import Client = require('./public-commonjs');
+      export = Client;
+    `;
+    const dependencies = {
+      'src/public-commonjs.ts': `
+        /** Public implementation already audited in its own module. */
+        class Client {
+          missing = true;
+        }
+        export = Client;
+      `,
+    };
+
+    expect(inspectSource('src/fixture.ts', source, dependencies)).toEqual([]);
+  });
+
   test('checks handwritten internal shapes exposed through cross-file import types', () => {
     const source = `
       /** Public inline-imported shape. */
@@ -461,6 +542,53 @@ describe('JSDoc coverage review regressions', () => {
     );
   });
 
+  test('terminates cyclic internal namespace aliases while preserving public visible members', () => {
+    const source = `
+      export { Hidden as Public } from './internal-namespace-cycle';
+    `;
+    const dependencies = {
+      'src/internal-namespace-cycle.ts': `
+        /** @internal */
+        export namespace Hidden {
+          export interface Shape {
+            missing: string;
+          }
+          export import Again = Hidden;
+        }
+      `,
+    };
+    const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+      .filter(({ documented }) => !documented)
+      .map(({ name }) => name);
+
+    expect(undocumented).toContain('Public.Shape.missing');
+    expect(undocumented.some((name) => name.includes('Again.Again'))).toBe(false);
+  });
+
+  test('checks constraints and defaults of publicly exposed internal cross-module generic types', () => {
+    const source = `
+      export { Hidden as Public } from './internal-generic';
+    `;
+    const dependencies = {
+      'src/internal-generic.ts': `
+        /** @internal */
+        export interface Hidden<
+          Value extends { missing: string } = { other: string }
+        > {
+          /** Public generic value. */
+          value: Value;
+        }
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(expect.arrayContaining(['Public.Value.missing', 'Public.Value.other']));
+    expect(declarations.find(({ name }) => name === 'Public.Value.missing')).toEqual(
+      expect.objectContaining({ file: 'src/internal-generic.ts', line: 4 }),
+    );
+  });
+
   test('checks imported internal runtime values exposed through cross-module type queries', () => {
     const source = `
       import { client } from './internal-value';
@@ -528,6 +656,72 @@ describe('JSDoc coverage review regressions', () => {
     expect(undocumented).toEqual(expect.arrayContaining(['Tuple.shared', 'Generic.shared']));
     expect(declarations.filter(({ name }) => name === 'Tuple.shared')).toHaveLength(2);
     expect(declarations.filter(({ name }) => name === 'Generic.shared')).toHaveLength(2);
+  });
+
+  test('requires nested option and result documentation separately for every method overload', () => {
+    const source = `
+      /** Public overloaded client. */
+      export interface Client {
+        /** Sends a typed request. */
+        send(options: {
+          /** First overload discriminator. */
+          kind: 'first';
+        }): {
+          /** First overload output. */
+          output: 'first';
+        };
+        send(options: {
+          kind: 'second';
+        }): {
+          output: 'second';
+        };
+      }
+    `;
+    const declarations = inspectSource('src/fixture.ts', source);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(['Client.send.options.kind', 'Client.send.result.output']);
+    expect(declarations.filter(({ name }) => name === 'Client.send')).toHaveLength(1);
+    expect(declarations.filter(({ name }) => name === 'Client.send.options.kind')).toHaveLength(2);
+    expect(declarations.filter(({ name }) => name === 'Client.send.result.output')).toHaveLength(2);
+  });
+
+  test('keeps function, callable, and constructor overload fields independent without duplicating roots', () => {
+    const source = `
+      /** Public overloaded function. */
+      export declare function send(options: {
+        /** First callable discriminator. */
+        kind: 'first';
+      }): {
+        /** First callable output. */
+        output: 'first';
+      };
+      export declare function send(options: { kind: 'second' }): { output: 'second' };
+
+      /** Public overloaded callable and constructor. */
+      export interface Callable {
+        /** First callable signature. */
+        (options: { /** First callable option. */ kind: 'first' }): void;
+        (options: { kind: 'second' }): void;
+        /** First constructor signature. */
+        new (options: { /** First constructor option. */ kind: 'first' }): Callable;
+        new (options: { kind: 'second' }): Callable;
+      }
+    `;
+    const declarations = inspectSource('src/fixture.ts', source);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'send.options.kind',
+        'send.result.output',
+        'Callable.[call].options.kind',
+        'Callable.[new].options.kind',
+      ]),
+    );
+    expect(declarations.filter(({ name }) => name === 'send')).toHaveLength(1);
+    expect(declarations.filter(({ name }) => name === 'Callable.[call]')).toHaveLength(1);
+    expect(declarations.filter(({ name }) => name === 'Callable.[new]')).toHaveLength(1);
   });
 
   test('requires documentation on genuine index signatures projected into public types', () => {

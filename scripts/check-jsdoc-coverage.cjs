@@ -19,6 +19,7 @@ const {
   memberName,
   positionalBranch,
   sourceSymbolAtPath,
+  visibleHandwrittenMember,
 } = require('./jsdoc-coverage-compiler.cjs');
 const stainlessGeneratedFiles = require('./stainless-generated-files.cjs');
 
@@ -61,6 +62,7 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
   const inspected = new Map();
   const activeTypes = new Set();
   const activeValueSymbols = new Set();
+  const activeNamespaces = new Set();
   const publicTargets = new Set();
   const displayFile = relativePath(emitted.originalFile);
   const sourceMappings = new Map();
@@ -276,6 +278,12 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     const referenced = checker.getSymbolAtLocation(node.typeName);
     const target = referenced && resolvedSymbol(referenced);
     if (internalHandwrittenSymbol(target)) {
+      const declaration = target.declarations?.find((candidate) =>
+        handwrittenFiles.has(candidate.getSourceFile().fileName),
+      );
+      if (declaration) {
+        inspectTypeParameters(declaration, owner);
+      }
       inspectResolvedType(type, owner, node);
       return true;
     }
@@ -412,17 +420,33 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     return !symbol || !localSymbol(resolvedSymbol(symbol));
   }
 
+  function acceptsExternalMembers(type, anchor, inherited) {
+    if (inherited || internalHandwrittenSymbol(type.symbol)) {
+      return true;
+    }
+    if (ts.isImportTypeNode(anchor) && internalImport(anchor)) {
+      return true;
+    }
+    if (!semanticTypeMapper) {
+      return false;
+    }
+    return Boolean(
+      type.symbol?.declarations?.some((declaration) =>
+        handwrittenFiles.has(declaration.getSourceFile().fileName),
+      ),
+    );
+  }
+
   function inspectResolvedProperties(type, owner, anchor, kind, staticValue, inheritedOnly = false) {
     const mapped = isMappedType(type);
-    const exposedInternal =
-      internalHandwrittenSymbol(type.symbol) || (ts.isImportTypeNode(anchor) && internalImport(anchor));
+    const includeExternal = acceptsExternalMembers(type, anchor, inheritedOnly);
     for (const property of checker.getPropertiesOfType(type)) {
-      const localDeclaration = property.declarations?.find(
-        (candidate) =>
-          isVisibleMember(candidate) &&
-          (candidate.getSourceFile() === sourceFile ||
-            (handwrittenFiles.has(candidate.getSourceFile().fileName) &&
-              (inheritedOnly || exposedInternal || candidate.getSourceFile() === anchor.getSourceFile()))),
+      const localDeclaration = visibleHandwrittenMember(
+        property,
+        sourceFile,
+        handwrittenFiles,
+        anchor,
+        includeExternal,
       );
       const synthetic =
         !localDeclaration && !property.declarations?.length && mapped && !isExternalProjection(anchor);
@@ -627,7 +651,7 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
 
   function inspectSignature(node, owner) {
     for (const parameter of node.parameters ?? []) {
-      inspectType(parameter.type, `${owner}.${parameter.name.getText(sourceFile)}`);
+      inspectType(parameter.type, `${owner}.${parameter.name.getText(parameter.getSourceFile())}`);
     }
     inspectTypeParameters(node, owner);
     inspectType(node.type, `${owner}.result`);
@@ -635,7 +659,7 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
 
   function inspectTypeParameters(node, owner) {
     for (const parameter of node.typeParameters ?? []) {
-      const parameterName = `${owner}.${parameter.name.getText(sourceFile)}`;
+      const parameterName = `${owner}.${parameter.name.getText(parameter.getSourceFile())}`;
       inspectType(parameter.constraint, parameterName);
       inspectType(parameter.default, parameterName);
     }
@@ -652,7 +676,7 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
         (ts.getModifiers(member) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)
           ? 'static.'
           : '';
-      const name = `${owner}.${staticPrefix}${memberName(member, sourceFile)}`;
+      const name = `${owner}.${staticPrefix}${memberName(member, member.getSourceFile())}`;
       record(member, name, ts.isConstructorDeclaration(member) ? 'constructor' : kind);
 
       if (
@@ -676,7 +700,10 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
         const constructorName = `${owner}.constructor`;
         record(member, constructorName, 'constructor');
         for (const parameter of member.parameters) {
-          inspectType(parameter.type, `${constructorName}.${parameter.name.getText(sourceFile)}`);
+          inspectType(
+            parameter.type,
+            `${constructorName}.${parameter.name.getText(parameter.getSourceFile())}`,
+          );
         }
         inspectType(member.type, owner);
       } else {
@@ -804,10 +831,19 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
       record(alias, owner, 'export', exported);
     }
     if (ts.isModuleDeclaration(declaration)) {
-      inspectExports(symbol, `${owner}.`);
+      if (activeNamespaces.has(symbol)) {
+        return;
+      }
+      activeNamespaces.add(symbol);
+      try {
+        inspectExports(symbol, `${owner}.`);
+      } finally {
+        activeNamespaces.delete(symbol);
+      }
       return;
     }
 
+    inspectTypeParameters(declaration, owner);
     const type =
       ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)
         ? checker.getDeclaredTypeOfSymbol(symbol)
@@ -864,6 +900,11 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     if (declaration) {
       publicTargets.add(target);
       inspectSymbol(target, canonicalName(declaration), exportAssignment);
+    } else if (internalHandwrittenSymbol(target)) {
+      const external = target.valueDeclaration ?? target.declarations?.[0];
+      if (external) {
+        inspectInternalExport(target, canonicalName(external), exportAssignment);
+      }
     }
     return true;
   }

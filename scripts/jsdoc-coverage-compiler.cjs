@@ -63,6 +63,25 @@ function canonicalName(node) {
   return names.join('.');
 }
 
+function overloadedSignature(node) {
+  const siblings = node.parent?.members ?? node.parent?.statements;
+  if (!siblings) {
+    return false;
+  }
+
+  const name = node.name?.getText(node.getSourceFile());
+  let matches = 0;
+  for (const sibling of siblings) {
+    if (sibling.kind === node.kind && sibling.name?.getText(sibling.getSourceFile()) === name) {
+      matches += 1;
+      if (matches > 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function positionalBranch(parent, child) {
   if (ts.isUnionTypeNode(parent)) {
     return `${parent.pos}:${parent.types.indexOf(child)}`;
@@ -77,6 +96,13 @@ function positionalBranch(parent, child) {
     if (child === parent.falseType) {
       return `${parent.pos}:1`;
     }
+  }
+  if (
+    ts.isFunctionLike(parent) &&
+    (child === parent.type || parent.parameters?.includes(child)) &&
+    overloadedSignature(parent)
+  ) {
+    return `${parent.pos}:signature`;
   }
   if (
     ts.isTypeReferenceNode(parent) ||
@@ -165,6 +191,20 @@ function isVisibleMember(node) {
     (modifier) =>
       modifier.kind === ts.SyntaxKind.PrivateKeyword || modifier.kind === ts.SyntaxKind.ProtectedKeyword,
   );
+}
+
+function visibleHandwrittenMember(property, sourceFile, handwrittenFiles, anchor, includeExternal) {
+  return property.declarations?.find((declaration) => {
+    if (!isVisibleMember(declaration)) {
+      return false;
+    }
+    const declarationFile = declaration.getSourceFile();
+    return (
+      declarationFile === sourceFile ||
+      (handwrittenFiles.has(declarationFile.fileName) &&
+        (includeExternal || declarationFile === anchor.getSourceFile()))
+    );
+  });
 }
 
 function compilerOptions(virtual) {
@@ -383,4 +423,5 @@ module.exports = {
   memberName,
   positionalBranch,
   sourceSymbolAtPath,
+  visibleHandwrittenMember,
 };
