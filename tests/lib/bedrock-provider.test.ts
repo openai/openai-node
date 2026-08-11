@@ -68,7 +68,7 @@ describe('bedrock provider', () => {
 
     await client.request({ method: 'get', path: '/models' });
     delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
-    const copiedClient = client.withOptions({ timeout: 1_000 });
+    const copiedClient = client.withOptions({ timeout: 1000 });
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'refreshed-token';
     await copiedClient.request({ method: 'get', path: '/models' });
 

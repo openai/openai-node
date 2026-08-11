@@ -57,7 +57,7 @@ function describe(description: string, handler: () => void) {
   }
 }
 
-function it(description: string, run: () => any, timeout = 60000) {
+function it(description: string, run: () => any, timeout = 60_000) {
   tests.push({ path: [...testPath, description], run, timeout });
 }
 
