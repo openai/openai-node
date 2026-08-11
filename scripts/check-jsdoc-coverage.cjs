@@ -2,16 +2,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 const {
+  canonicalName,
   compilerOptions,
   createProgram,
   declarationProgram,
   emitDeclarations,
+  externalTypeArguments,
   hasCommentText,
   hasNodeDocumentation,
+  handwrittenIndexDeclaration,
   instantiateMappedType,
   isInternal,
+  isMappedType,
   isVisibleMember,
+  mappedArgument,
   memberName,
+  positionalBranch,
   sourceSymbolAtPath,
 } = require('./jsdoc-coverage-compiler.cjs');
 const stainlessGeneratedFiles = require('./stainless-generated-files.cjs');
@@ -165,14 +171,9 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     let child = node;
     let { parent } = child;
     while (parent) {
-      if (ts.isUnionTypeNode(parent)) {
-        branches.push(`${parent.pos}:${parent.types.indexOf(child)}`);
-      } else if (ts.isConditionalTypeNode(parent)) {
-        if (child === parent.trueType) {
-          branches.push(`${parent.pos}:0`);
-        } else if (child === parent.falseType) {
-          branches.push(`${parent.pos}:1`);
-        }
+      const branch = positionalBranch(parent, child);
+      if (branch !== undefined) {
+        branches.push(branch);
       }
       child = parent;
       ({ parent } = child);
@@ -211,18 +212,6 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     });
   }
 
-  function canonicalName(node) {
-    const names = [node.name?.text ?? 'default'];
-    let { parent } = node;
-    while (parent) {
-      if (ts.isModuleDeclaration(parent)) {
-        names.unshift(parent.name.text);
-      }
-      ({ parent } = parent);
-    }
-    return names.join('.');
-  }
-
   function localSymbol(symbol) {
     return symbol?.declarations?.some((declaration) => declaration.getSourceFile() === sourceFile);
   }
@@ -240,10 +229,6 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
   function internalImport(node) {
     const symbol = node.qualifier && checker.getSymbolAtLocation(node.qualifier);
     return internalHandwrittenSymbol(symbol && resolvedSymbol(symbol));
-  }
-
-  function isMappedType(type) {
-    return Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
   }
 
   function inspectReference(node) {
@@ -326,6 +311,9 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
       const type = checker.getTypeAtLocation(node);
       if (internalHandwrittenSymbol(type.symbol) || internalImport(node)) {
         inspectResolvedType(type, owner, node);
+      }
+      for (const argument of node.typeArguments ?? []) {
+        inspectType(argument, owner);
       }
       return;
     }
@@ -410,40 +398,6 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     }
   }
 
-  function handwrittenIndex(index, anchor) {
-    const direct = index.declaration;
-    if (
-      direct &&
-      ts.isIndexSignatureDeclaration(direct) &&
-      handwrittenFiles.has(direct.getSourceFile().fileName)
-    ) {
-      return direct;
-    }
-
-    let current = anchor;
-    while (ts.isTypeReferenceNode(current) || ts.isMappedTypeNode(current)) {
-      const constraint = ts.isMappedTypeNode(current) ? current.typeParameter.constraint : undefined;
-      const source =
-        constraint && ts.isTypeOperatorNode(constraint) ? constraint.type : current.typeArguments?.[0];
-      if (!source) {
-        return;
-      }
-      const original = checker
-        .getIndexInfosOfType(checker.getTypeAtLocation(source))
-        .find(
-          (candidate) =>
-            candidate.declaration &&
-            ts.isIndexSignatureDeclaration(candidate.declaration) &&
-            handwrittenFiles.has(candidate.declaration.getSourceFile().fileName) &&
-            checker.isTypeAssignableTo(index.keyType, candidate.keyType),
-        );
-      if (original) {
-        return original.declaration;
-      }
-      current = source;
-    }
-  }
-
   function isExternalProjection(anchor) {
     if (!ts.isTypeReferenceNode(anchor)) {
       return false;
@@ -500,19 +454,6 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
       const instantiated = checker.getTypeOfSymbolAtLocation(property, anchor);
       inspectResolvedType(instantiated, name, declaration, kind);
     }
-  }
-
-  function mappedArgument(node, mappedDeclaration, anchor) {
-    if (!ts.isTypeReferenceNode(node) || !ts.isIdentifier(node.typeName)) {
-      return;
-    }
-
-    const alias = ts.findAncestor(mappedDeclaration, ts.isTypeAliasDeclaration);
-    const index = alias?.typeParameters?.findIndex((parameter) => parameter.name.text === node.typeName.text);
-    if (index === undefined || index < 0) {
-      return;
-    }
-    return anchor.typeArguments?.[index];
   }
 
   function inspectUnresolvedMapped(type, owner, anchor, indexes) {
@@ -622,9 +563,13 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
         return;
       }
 
+      for (const argument of externalTypeArguments(checker, type, handwrittenFiles)) {
+        inspectResolvedType(argument, owner, anchor, kind);
+      }
+
       const indexes = checker.getIndexInfosOfType(type);
       for (const index of indexes) {
-        const declaration = handwrittenIndex(index, anchor);
+        const declaration = handwrittenIndexDeclaration(checker, index, anchor, handwrittenFiles);
         if (declaration && !isVisibleMember(declaration)) {
           continue;
         }
@@ -656,7 +601,8 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     }
 
     const target = resolvedSymbol(symbol);
-    if (!localSymbol(target)) {
+    const internal = internalHandwrittenSymbol(target);
+    if (!localSymbol(target) && !internal) {
       return;
     }
     if (activeValueSymbols.has(target)) {
@@ -666,7 +612,8 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     activeValueSymbols.add(target);
     try {
       for (const declaration of target.declarations ?? []) {
-        if (declaration.getSourceFile() !== sourceFile || !isVisibleMember(declaration)) {
+        const handwritten = handwrittenFiles.has(declaration.getSourceFile().fileName);
+        if (!handwritten || (!internal && !isVisibleMember(declaration))) {
           continue;
         }
 
@@ -840,8 +787,32 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
       const target = resolvedSymbol(exported);
       if (localSymbol(target)) {
         inspectSymbol(target, `${prefix}${exported.getName()}`, exported);
+      } else if (internalHandwrittenSymbol(target)) {
+        inspectInternalExport(target, `${prefix}${exported.getName()}`, exported);
       }
     }
+  }
+
+  function inspectInternalExport(symbol, owner, exported) {
+    const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+    if (!declaration || !handwrittenFiles.has(declaration.getSourceFile().fileName)) {
+      return;
+    }
+
+    const alias = exported.declarations?.find((candidate) => candidate.getSourceFile() === sourceFile);
+    if (alias && !isInternal(alias)) {
+      record(alias, owner, 'export', exported);
+    }
+    if (ts.isModuleDeclaration(declaration)) {
+      inspectExports(symbol, `${owner}.`);
+      return;
+    }
+
+    const type =
+      ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)
+        ? checker.getDeclaredTypeOfSymbol(symbol)
+        : checker.getTypeOfSymbolAtLocation(symbol, declaration);
+    inspectResolvedType(type, owner, declaration);
   }
 
   function inspectGlobalDeclaration(node) {

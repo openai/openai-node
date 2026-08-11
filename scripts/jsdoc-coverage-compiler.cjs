@@ -51,6 +51,107 @@ function memberName(node, sourceFile) {
   return node.name?.getText(sourceFile) ?? 'default';
 }
 
+function canonicalName(node) {
+  const names = [node.name?.text ?? 'default'];
+  let { parent } = node;
+  while (parent) {
+    if (ts.isModuleDeclaration(parent)) {
+      names.unshift(parent.name.text);
+    }
+    ({ parent } = parent);
+  }
+  return names.join('.');
+}
+
+function positionalBranch(parent, child) {
+  if (ts.isUnionTypeNode(parent)) {
+    return `${parent.pos}:${parent.types.indexOf(child)}`;
+  }
+  if (ts.isTupleTypeNode(parent)) {
+    return `${parent.pos}:${parent.elements.indexOf(child)}`;
+  }
+  if (ts.isConditionalTypeNode(parent)) {
+    if (child === parent.trueType) {
+      return `${parent.pos}:0`;
+    }
+    if (child === parent.falseType) {
+      return `${parent.pos}:1`;
+    }
+  }
+  if (
+    ts.isTypeReferenceNode(parent) ||
+    ts.isImportTypeNode(parent) ||
+    ts.isExpressionWithTypeArguments(parent)
+  ) {
+    const index = parent.typeArguments?.indexOf(child) ?? -1;
+    if (index !== -1) {
+      return `${parent.pos}:${index}`;
+    }
+  }
+}
+
+function isMappedType(type) {
+  return Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
+}
+
+function externalTypeArguments(checker, type, handwrittenFiles) {
+  const reference = Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Reference) % 2 === 1;
+  if (!reference || checker.isArrayType(type) || checker.isTupleType(type)) {
+    return [];
+  }
+  const handwritten = type.symbol?.declarations?.some((declaration) =>
+    handwrittenFiles.has(declaration.getSourceFile().fileName),
+  );
+  return handwritten ? [] : checker.getTypeArguments(type);
+}
+
+function mappedArgument(node, mappedDeclaration, anchor) {
+  if (!ts.isTypeReferenceNode(node) || !ts.isIdentifier(node.typeName)) {
+    return;
+  }
+
+  const alias = ts.findAncestor(mappedDeclaration, ts.isTypeAliasDeclaration);
+  const index = alias?.typeParameters?.findIndex((parameter) => parameter.name.text === node.typeName.text);
+  if (index === undefined || index < 0) {
+    return;
+  }
+  return anchor.typeArguments?.[index];
+}
+
+function handwrittenIndexDeclaration(checker, index, anchor, handwrittenFiles) {
+  const direct = index.declaration;
+  if (
+    direct &&
+    ts.isIndexSignatureDeclaration(direct) &&
+    handwrittenFiles.has(direct.getSourceFile().fileName)
+  ) {
+    return direct;
+  }
+
+  let current = anchor;
+  while (ts.isTypeReferenceNode(current) || ts.isMappedTypeNode(current)) {
+    const constraint = ts.isMappedTypeNode(current) ? current.typeParameter.constraint : undefined;
+    const source =
+      constraint && ts.isTypeOperatorNode(constraint) ? constraint.type : current.typeArguments?.[0];
+    if (!source) {
+      return;
+    }
+    const original = checker
+      .getIndexInfosOfType(checker.getTypeAtLocation(source))
+      .find(
+        (candidate) =>
+          candidate.declaration &&
+          ts.isIndexSignatureDeclaration(candidate.declaration) &&
+          handwrittenFiles.has(candidate.declaration.getSourceFile().fileName) &&
+          checker.isTypeAssignableTo(index.keyType, candidate.keyType),
+      );
+    if (original) {
+      return original.declaration;
+    }
+    current = source;
+  }
+}
+
 function isVisibleMember(node) {
   if (node.name && ts.isPrivateIdentifier(node.name)) {
     return false;
@@ -265,15 +366,21 @@ function instantiateMappedType(type, mapper) {
 }
 
 module.exports = {
+  canonicalName,
   compilerOptions,
   createProgram,
   declarationProgram,
   emitDeclarations,
+  externalTypeArguments,
   hasCommentText,
   hasNodeDocumentation,
+  handwrittenIndexDeclaration,
   instantiateMappedType,
   isInternal,
+  isMappedType,
   isVisibleMember,
+  mappedArgument,
   memberName,
+  positionalBranch,
   sourceSymbolAtPath,
 };

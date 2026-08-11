@@ -58,6 +58,22 @@ describe('JSDoc coverage review regressions', () => {
     );
   });
 
+  test('propagates substituted conditional branches through external generic containers', () => {
+    const source = `
+      /** Forwards conditional values through runtime promise wrappers. */
+      type Select<Value, Yes, No> = Value extends string ? Promise<Yes> : Promise<No>;
+      /** Public dictionary exposing the eventual conditional value. */
+      export type Public<Key extends string, Value> = Record<
+        Key,
+        Select<Value, { missing: string }, { other: string }>
+      >;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining(['Public.[key: Key].missing', 'Public.[key: Key].other']),
+    );
+  });
+
   test('keeps substituted conditional alias branch documentation independent', () => {
     const source = `
       /** Forwards one unresolved generic branch. */
@@ -387,6 +403,131 @@ describe('JSDoc coverage review regressions', () => {
     expect(declarations.find(({ name }) => name === 'Public.missing')).toEqual(
       expect.objectContaining({ file: 'src/internal-shape.ts', line: 4 }),
     );
+  });
+
+  test('checks public inline import type arguments without auditing the external wrapper declaration', () => {
+    const source = `
+      /** Public inline import with a user-provided argument. */
+      export type Public = import('./wrapper').Wrapper<{ missing: string }>;
+    `;
+    const dependencies = {
+      'src/wrapper.ts': `
+        export type Wrapper<Value> = Value;
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(['Public.missing']);
+    expect(declarations.map(({ name }) => name)).not.toContain('Wrapper');
+  });
+
+  test('checks handwritten internal declarations exposed through cross-module re-export aliases', () => {
+    const source = `
+      export { Hidden as Public } from './internal-export';
+      export type { Hidden as PublicType } from './internal-export';
+      export { External as Ignored } from './ordinary-barrel';
+    `;
+    const dependencies = {
+      'src/internal-export.ts': `
+        /** @internal */
+        export interface Hidden {
+          missing: { nested: string };
+          /** @internal */ implementation: boolean;
+        }
+      `,
+      'src/ordinary-barrel.ts': `
+        export interface External {
+          ignored: string;
+        }
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Public.missing',
+        'Public.missing.nested',
+        'PublicType.missing',
+        'PublicType.missing.nested',
+      ]),
+    );
+    expect(undocumented).not.toContain('Hidden');
+    expect(undocumented).not.toContain('Public.implementation');
+    expect(undocumented).not.toContain('Ignored.ignored');
+    expect(declarations.find(({ name }) => name === 'Public.missing')).toEqual(
+      expect.objectContaining({ file: 'src/internal-export.ts', line: 4 }),
+    );
+  });
+
+  test('checks imported internal runtime values exposed through cross-module type queries', () => {
+    const source = `
+      import { client } from './internal-value';
+
+      /** Public shape derived from an imported internal value. */
+      export type Public = typeof client;
+      /** Public container of the imported value shape. */
+      export interface Container {
+        /** Public runtime value. */
+        value: typeof client;
+      }
+    `;
+    const dependencies = {
+      'src/internal-value.ts': `
+        /** @internal */
+        export const client = {
+          missing: { nested: true },
+          /** @internal */ implementation: true,
+        };
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Public.missing',
+        'Public.missing.nested',
+        'Container.value.missing',
+        'Container.value.missing.nested',
+      ]),
+    );
+    expect(undocumented).not.toContain('client');
+    expect(undocumented).not.toContain('Public.implementation');
+  });
+
+  test('keeps same-named tuple elements and generic type arguments independently documented', () => {
+    const source = `
+      /** Internal generic two-position mapping. */
+      type Pair<First, Second> = [First, Second];
+      /** Public tuple with independently documented positional fields. */
+      export type Tuple = [
+        {
+          /** Only the first position is documented. */
+          shared: string;
+        },
+        {
+          shared: string;
+        },
+      ];
+      /** Public generic with independently documented type arguments. */
+      export type Generic = Pair<
+        {
+          /** Only the first type argument is documented. */
+          shared: string;
+        },
+        {
+          shared: string;
+        }
+      >;
+    `;
+    const declarations = inspectSource('src/fixture.ts', source);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(expect.arrayContaining(['Tuple.shared', 'Generic.shared']));
+    expect(declarations.filter(({ name }) => name === 'Tuple.shared')).toHaveLength(2);
+    expect(declarations.filter(({ name }) => name === 'Generic.shared')).toHaveLength(2);
   });
 
   test('requires documentation on genuine index signatures projected into public types', () => {
