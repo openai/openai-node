@@ -30,10 +30,10 @@ async function runTests() {
           setTimeout(() => reject(new Error(`Test timed out after ${timeout} ms`)), timeout),
         ),
       ]);
-      console.log('passed ', ...path);
+      console.log('passed', ...path);
       results.push({ path, passed: true });
     } catch (error) {
-      console.log('error  ', ...path);
+      console.log('error', ...path);
       console.error(error);
       results.push({ path, passed: false, error: error instanceof Error ? error.stack : String(error) });
     }
