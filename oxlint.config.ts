@@ -36,7 +36,6 @@ const compatibilityRules = [
   'typescript/no-explicit-any',
   'typescript/no-non-null-assertion',
   'typescript/prefer-ts-expect-error',
-  'unicorn/catch-error-name',
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
   'unicorn/numeric-separators-style',
@@ -415,6 +414,35 @@ module.exports = defineConfig({
       ],
       rules: {
         'no-shadow': 'off',
+      },
+    },
+    {
+      // These existing catches use short or domain-specific names in vendored,
+      // fixture, and adapter code; renaming them adds churn without behavior value.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'examples/azure/assistants.ts',
+        'examples/azure/chat.ts',
+        'examples/azure/responses.ts',
+        'examples/client/errors.ts',
+        'examples/fine-tuning/fine-tuning.ts',
+        'scripts/_vendor/tsc-multi/src/utils.ts',
+        'scripts/_vendor/tsc-multi/src/worker/entry.ts',
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/beta/realtime/websocket.ts',
+        'src/beta/realtime/ws.ts',
+        'src/core/streaming.ts',
+        'src/internal/bedrock.ts',
+        'src/internal/stream-utils.ts',
+        'src/internal/ws.ts',
+        'src/providers/bedrock/aws.ts',
+        'src/realtime/websocket.ts',
+        'src/realtime/ws.ts',
+        'tests/path.test.ts',
+        'tests/utils/mock-fetch.ts',
+      ],
+      rules: {
+        'unicorn/catch-error-name': 'off',
       },
     },
     {
