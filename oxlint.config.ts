@@ -13,7 +13,6 @@ const compatibilityRules = [
   'import/consistent-type-specifier-style',
   'import/no-cycle',
   'no-await-in-loop',
-  'no-bitwise',
   'no-eq-null',
   'no-inline-comments',
   'no-plusplus',
@@ -475,6 +474,18 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/method-signature-style': 'off',
+      },
+    },
+    {
+      // These parser, encoding, and benchmark paths intentionally use bit masks
+      // and shifts; arithmetic rewrites would change low-level behavior.
+      files: [
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/internal/qs/utils.ts',
+        'tests/benchmarks/streaming.bench.ts',
+      ],
+      rules: {
+        'no-bitwise': 'off',
       },
     },
     {
