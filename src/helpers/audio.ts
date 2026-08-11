@@ -138,8 +138,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       };
       let wasStopped = false;
       const stopRecording = () => {
-        wasStopped = true;
-        ffmpeg.kill('SIGTERM');
+        wasStopped ||= ffmpeg.kill('SIGTERM');
       };
 
       ffmpeg.stdout.on('data', (chunk) => {

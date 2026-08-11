@@ -13,7 +13,7 @@ function mockFfmpeg() {
   const ffmpeg = Object.assign(new EventEmitter(), {
     stdout: new PassThrough(),
     stderr: new PassThrough(),
-    kill: vi.fn(),
+    kill: vi.fn().mockReturnValue(true),
   });
   spawnMock.mockReturnValue(ffmpeg as any);
   return ffmpeg;
@@ -96,6 +96,19 @@ describe('recordAudio', () => {
 
     const file = await recording;
     expect(Buffer.from(await file.arrayBuffer()).toString()).toBe('captured before abort');
+  });
+
+  test('rejects a failed ffmpeg process when abort cannot deliver its termination signal', async () => {
+    const ffmpeg = mockFfmpeg();
+    ffmpeg.kill.mockReturnValue(false);
+    const controller = new AbortController();
+    const recording = recordAudio({ signal: controller.signal });
+
+    controller.abort();
+    expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
+    ffmpeg.emit('close', 2);
+
+    await expect(recording).rejects.toThrow('ffmpeg process exited with code 2');
   });
 
   test('immediately stops recording for an already-aborted signal', async () => {

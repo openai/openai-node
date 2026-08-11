@@ -96,7 +96,10 @@ export class EventStream<EventTypes extends BaseEvents> {
     return this.#aborted;
   }
 
-  /** Cancels the underlying request and causes pending stream operations to reject. */
+  /**
+   * Cancels the underlying request; {@link done} and {@link events} observe cancellation.
+   * Promises returned by {@link emitted} for other events may remain pending.
+   */
   abort() {
     this.controller.abort();
   }

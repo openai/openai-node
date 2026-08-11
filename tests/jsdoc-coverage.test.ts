@@ -2,6 +2,8 @@ import { createRequire } from 'node:module';
 
 interface CoverageDeclaration {
   file: string;
+  line: number;
+  column: number;
   kind: string;
   name: string;
   documented: boolean;
@@ -442,6 +444,73 @@ describe('handwritten SDK JSDoc coverage', () => {
     `;
 
     expect(missing(source)).toEqual(expect.arrayContaining(['value.missing']));
+  });
+
+  test('follows type queries to their local value properties and nested aliases', () => {
+    const source = `
+      const privateValue = {
+        undocumented: true,
+        nested: { missing: true },
+      };
+      /** Exported value using the private object's public shape. */
+      export const value: typeof privateValue = privateValue;
+      /** Exported alias of the same private object. */
+      export type Value = typeof privateValue;
+      /** Exported nested object query. */
+      export type Nested = typeof privateValue.nested;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'value.undocumented',
+        'value.nested',
+        'value.nested.missing',
+        'Value.undocumented',
+        'Value.nested',
+        'Value.nested.missing',
+        'Nested.missing',
+      ]),
+    );
+  });
+
+  test('reports undocumented declaration coordinates in the original source file', () => {
+    const source = [
+      "import type { IncomingMessage } from 'node:http';",
+      '',
+      'function implementation(value: IncomingMessage | undefined): void {',
+      '  if (value) {',
+      '    value.destroy();',
+      '  }',
+      '}',
+      '',
+      '/** Public API. */',
+      'export interface Public {',
+      '  undocumented: string;',
+      '}',
+    ].join('\n');
+
+    expect(
+      inspectSource('src/fixture.ts', source).find(({ name }) => name === 'Public.undocumented'),
+    ).toEqual(expect.objectContaining({ file: 'src/fixture.ts', line: 11, column: 3, documented: false }));
+  });
+
+  test('maps inferred declaration members to their original compiler symbol locations', () => {
+    const source = [
+      'function hidden(): number {',
+      '  return 1;',
+      '}',
+      '',
+      '/** Creates a public value. */',
+      'export function create() {',
+      '  return {',
+      '    missing: true,',
+      '  };',
+      '}',
+    ].join('\n');
+
+    expect(
+      inspectSource('src/fixture.ts', source).find(({ name }) => name === 'create.result.missing'),
+    ).toEqual(expect.objectContaining({ line: 8, column: 5, documented: false }));
   });
 
   test('accepts documentation on any overload and excludes nonpublic details', () => {

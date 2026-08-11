@@ -96,6 +96,7 @@ function compilerOptions(virtual) {
       target: ts.ScriptTarget.ES2022,
       module: ts.ModuleKind.CommonJS,
       declaration: true,
+      declarationMap: true,
       emitDeclarationOnly: true,
       noEmitOnError: false,
       noLib: true,
@@ -116,7 +117,7 @@ function compilerOptions(virtual) {
     noEmit: false,
     declaration: true,
     emitDeclarationOnly: true,
-    declarationMap: false,
+    declarationMap: true,
     sourceMap: false,
     noEmitOnError: false,
     removeComments: false,
@@ -151,11 +152,14 @@ function emitDeclarations(program, files) {
   for (const file of files) {
     const sourceFile = program.getSourceFile(file);
     let declarationFile;
+    let declarationMap;
     const result = program.emit(
       sourceFile,
       (name, text) => {
         if (name.endsWith('.d.ts')) {
           declarationFile = { originalFile: file, fileName: path.resolve(name), text };
+        } else if (name.endsWith('.d.ts.map')) {
+          declarationMap = JSON.parse(text);
         }
       },
       undefined,
@@ -168,7 +172,7 @@ function emitDeclarations(program, files) {
         .join('; ');
       throw new Error(`Could not emit public declarations for ${relativePath(file)}: ${diagnostics}`);
     }
-    emitted.push(declarationFile);
+    emitted.push({ ...declarationFile, declarationMap });
   }
 
   return emitted;
@@ -188,14 +192,84 @@ function declarationProgram(emitted) {
   return createProgram([...virtualSources.keys()], virtualSources, options);
 }
 
-function inspectDeclarations(program, emitted) {
+function sourceSymbolType(checker, symbol) {
+  const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+  if (!declaration) {
+    return;
+  }
+
+  if (
+    ts.isClassDeclaration(declaration) ||
+    ts.isInterfaceDeclaration(declaration) ||
+    ts.isTypeAliasDeclaration(declaration)
+  ) {
+    return checker.getDeclaredTypeOfSymbol(symbol);
+  }
+  return checker.getTypeOfSymbolAtLocation(symbol, declaration);
+}
+
+function sourceSymbolAtPath(checker, moduleSymbol, name) {
+  const [root, ...segments] = name.split('.');
+  let symbol = checker.getExportsOfModule(moduleSymbol).find((candidate) => candidate.getName() === root);
+  if (!symbol) {
+    return;
+  }
+  if (symbol.flags === ts.SymbolFlags.Alias) {
+    symbol = checker.getAliasedSymbol(symbol);
+  }
+
+  let type = sourceSymbolType(checker, symbol);
+  for (const segment of segments) {
+    if (!type) {
+      return;
+    }
+    if (segment === 'result') {
+      type = type.getCallSignatures()[0]?.getReturnType();
+      continue;
+    }
+    if (segment === 'static') {
+      const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+      type = declaration ? checker.getTypeOfSymbolAtLocation(symbol, declaration) : undefined;
+      continue;
+    }
+
+    const property = checker.getPropertyOfType(type, segment);
+    const parameter = type
+      .getCallSignatures()[0]
+      ?.getParameters()
+      .find((candidate) => candidate.getName() === segment);
+    symbol = property ?? parameter;
+    if (!symbol) {
+      return;
+    }
+    type = sourceSymbolType(checker, symbol);
+  }
+
+  return symbol;
+}
+
+function inspectDeclarations(program, emitted, originalProgram) {
   const checker = program.getTypeChecker();
   const sourceFile = program.getSourceFile(emitted.fileName);
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
+  const originalChecker = originalProgram.getTypeChecker();
+  const originalSourceFile = originalProgram.getSourceFile(emitted.originalFile);
+  const originalModule = originalChecker.getSymbolAtLocation(originalSourceFile);
   const declarations = new Map();
   const inspected = new Map();
+  const inspectedTypeQueries = new Map();
   const publicTargets = new Set();
   const displayFile = relativePath(emitted.originalFile);
+  const sourceMappings = new Map();
+
+  for (const mapping of ts.decodeMappings(emitted.declarationMap?.mappings ?? '')) {
+    if (mapping.sourceLine === undefined || mapping.sourceCharacter === undefined) {
+      continue;
+    }
+    const mappings = sourceMappings.get(mapping.generatedLine) ?? [];
+    mappings.push(mapping);
+    sourceMappings.set(mapping.generatedLine, mappings);
+  }
 
   if (!moduleSymbol) {
     return [];
@@ -215,6 +289,23 @@ function inspectDeclarations(program, emitted) {
     );
   }
 
+  function originalPosition(node, name) {
+    const generated = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+    const mappings = sourceMappings.get(generated.line) ?? [];
+    const mapping = mappings.findLast((candidate) => candidate.generatedCharacter <= generated.character);
+    const originalSymbol = originalModule && sourceSymbolAtPath(originalChecker, originalModule, name);
+    const originalNode = originalSymbol?.valueDeclaration ?? originalSymbol?.declarations?.[0];
+    const original =
+      originalNode?.getSourceFile() === originalSourceFile
+        ? originalSourceFile.getLineAndCharacterOfPosition(originalNode.getStart(originalSourceFile))
+        : undefined;
+
+    return {
+      line: (original?.line ?? mapping?.sourceLine ?? generated.line) + 1,
+      column: (original?.character ?? mapping?.sourceCharacter ?? generated.character) + 1,
+    };
+  }
+
   function record(node, name, kind, ...symbols) {
     if (isInternal(node)) {
       return;
@@ -232,11 +323,11 @@ function inspectDeclarations(program, emitted) {
       return;
     }
 
-    const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+    const { line, column } = originalPosition(node, name);
     declarations.set(key, {
       file: displayFile,
-      line: line + 1,
-      column: character + 1,
+      line,
+      column,
       kind,
       name,
       documented: Boolean(documented),
@@ -291,6 +382,10 @@ function inspectDeclarations(program, emitted) {
     if (ts.isTypeReferenceNode(node)) {
       inspectReference(node.typeName);
     }
+    if (ts.isTypeQueryNode(node)) {
+      inspectTypeQuery(node, owner);
+      return;
+    }
     if (ts.isExpressionWithTypeArguments(node)) {
       inspectReference(node.expression);
     }
@@ -304,6 +399,41 @@ function inspectDeclarations(program, emitted) {
     }
 
     ts.forEachChild(node, (child) => inspectType(child, owner));
+  }
+
+  function inspectTypeQuery(node, owner) {
+    const symbol = checker.getSymbolAtLocation(node.exprName);
+    if (!symbol) {
+      return;
+    }
+
+    const target = resolvedSymbol(symbol);
+    if (!localSymbol(target)) {
+      return;
+    }
+
+    const owners = inspectedTypeQueries.get(target) ?? new Set();
+    if (owners.has(owner)) {
+      return;
+    }
+    owners.add(owner);
+    inspectedTypeQueries.set(target, owners);
+
+    for (const declaration of target.declarations ?? []) {
+      if (declaration.getSourceFile() !== sourceFile || !isVisibleMember(declaration)) {
+        continue;
+      }
+      if (
+        ts.isVariableDeclaration(declaration) ||
+        ts.isPropertySignature(declaration) ||
+        ts.isPropertyDeclaration(declaration) ||
+        ts.isGetAccessorDeclaration(declaration)
+      ) {
+        inspectType(declaration.type, owner);
+      } else if (ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)) {
+        inspectSignature(declaration, owner);
+      }
+    }
   }
 
   function inspectSignature(node, owner) {
@@ -463,7 +593,7 @@ function inspectFiles(files, virtualSources = new Map()) {
   const emitted = emitDeclarations(sourceProgram, files);
   const publicProgram = declarationProgram(emitted);
 
-  return emitted.flatMap((declaration) => inspectDeclarations(publicProgram, declaration));
+  return emitted.flatMap((declaration) => inspectDeclarations(publicProgram, declaration, sourceProgram));
 }
 
 function inspectSource(file, text) {
