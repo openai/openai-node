@@ -7,7 +7,7 @@ import {
 } from '../error';
 import OpenAI from '../index';
 import { RequestOptions } from '../internal/request-options';
-import { type ReadableStream } from '../internal/shim-types';
+import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
 import {
   AutoParseableResponseFormat,

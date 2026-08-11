@@ -1,4 +1,4 @@
-import { type Fetch, type RequestInfo, type RequestInit, type Response } from 'openai/internal/builtin-types';
+import type { Fetch, RequestInfo, RequestInit, Response } from 'openai/internal/builtin-types';
 
 /**
  * Creates a mock `fetch` function and a `handleRequest` function for intercepting `fetch` calls.

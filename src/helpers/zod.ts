@@ -12,8 +12,8 @@ import {
 } from '../lib/parser';
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
-import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
-import { type RealtimeFunctionTool } from '../resources/realtime/realtime';
+import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
+import type { RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 import { hasOwn } from '../internal/utils/values';

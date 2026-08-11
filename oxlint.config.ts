@@ -42,7 +42,6 @@ const compatibilityRules = [
   'typescript/consistent-type-imports',
   'typescript/method-signature-style',
   'typescript/no-explicit-any',
-  'typescript/no-import-type-side-effects',
   'typescript/no-non-null-assertion',
   'typescript/prefer-ts-expect-error',
   'unicorn/catch-error-name',
