@@ -17,7 +17,6 @@ const compatibilityRules = [
   'no-bitwise',
   'no-eq-null',
   'no-inline-comments',
-  'no-param-reassign',
   'no-plusplus',
   'no-promise-executor-return',
   'no-shadow',
@@ -280,6 +279,31 @@ module.exports = defineConfig({
       ],
       rules: {
         complexity: 'off',
+      },
+    },
+    {
+      // These constructors, normalizers, and reducer fixtures intentionally rebind
+      // parameters while resolving defaults or preserving accumulator semantics.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'examples/chat-completions/function-call-stream-raw.ts',
+        'examples/chat-completions/function-call-stream.ts',
+        'examples/chat-completions/tool-calls-stream.ts',
+        'src/azure.ts',
+        'src/bedrock.ts',
+        'src/beta/realtime/internal-base.ts',
+        'src/beta/realtime/websocket.ts',
+        'src/beta/realtime/ws.ts',
+        'src/core/streaming.ts',
+        'src/internal/to-file.ts',
+        'src/lib/EventStream.ts',
+        'src/lib/responses/ResponseAccumulator.ts',
+        'src/realtime/internal-base.ts',
+        'src/realtime/websocket.ts',
+        'src/realtime/ws.ts',
+      ],
+      rules: {
+        'no-param-reassign': 'off',
       },
     },
     {
