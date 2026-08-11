@@ -132,10 +132,26 @@ function createProgram(files, virtualSources, options) {
   const host = ts.createCompilerHost(options);
   const readFile = host.readFile.bind(host);
   const fileExists = host.fileExists.bind(host);
+  const directoryExists = host.directoryExists?.bind(host);
   const getSourceFile = host.getSourceFile.bind(host);
+  const virtualDirectories = new Set();
+
+  for (const file of virtualSources.keys()) {
+    let directory = path.dirname(file);
+    while (!virtualDirectories.has(directory)) {
+      virtualDirectories.add(directory);
+      const parent = path.dirname(directory);
+      if (parent === directory) {
+        break;
+      }
+      directory = parent;
+    }
+  }
 
   host.readFile = (file) => virtualSources.get(path.resolve(file)) ?? readFile(file);
   host.fileExists = (file) => virtualSources.has(path.resolve(file)) || fileExists(file);
+  host.directoryExists = (directory) =>
+    virtualDirectories.has(path.resolve(directory)) || Boolean(directoryExists?.(directory));
   host.getSourceFile = (file, languageVersion, onError, shouldCreateNewSourceFile) => {
     const source = virtualSources.get(path.resolve(file));
     if (source !== undefined) {
@@ -250,7 +266,7 @@ function sourceSymbolAtPath(checker, moduleSymbol, name) {
   return symbol;
 }
 
-function inspectDeclarations(program, emitted, originalProgram) {
+function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles) {
   const checker = program.getTypeChecker();
   const sourceFile = program.getSourceFile(emitted.fileName);
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
@@ -293,7 +309,63 @@ function inspectDeclarations(program, emitted, originalProgram) {
     );
   }
 
+  function externalMappedPosition(node, external) {
+    const declarationFile = node.getSourceFile();
+    const generated = declarationFile.getLineAndCharacterOfPosition(node.getStart(declarationFile));
+    let closest;
+    for (const mapping of ts.decodeMappings(external.declarationMap?.mappings ?? '')) {
+      if (
+        mapping.generatedLine === generated.line &&
+        mapping.generatedCharacter <= generated.character &&
+        mapping.sourceLine !== undefined &&
+        mapping.sourceCharacter !== undefined
+      ) {
+        closest = mapping;
+      }
+    }
+    return {
+      file: relativePath(external.originalFile),
+      line: (closest?.sourceLine ?? generated.line) + 1,
+      column: (closest?.sourceCharacter ?? generated.character) + 1,
+    };
+  }
+
+  function externalOriginalPosition(node, name) {
+    if (node.getSourceFile() === sourceFile) {
+      return;
+    }
+
+    const external = handwrittenFiles.get(node.getSourceFile().fileName);
+    if (!external) {
+      return;
+    }
+    const externalSourceFile = originalProgram.getSourceFile(external.originalFile);
+    if (!externalSourceFile) {
+      return;
+    }
+
+    const originalSymbol = originalModule && sourceSymbolAtPath(originalChecker, originalModule, name);
+    const originalNode = originalSymbol?.valueDeclaration ?? originalSymbol?.declarations?.[0];
+    if (originalNode?.getSourceFile() !== externalSourceFile) {
+      return externalMappedPosition(node, external);
+    }
+
+    const original = externalSourceFile.getLineAndCharacterOfPosition(
+      originalNode.getStart(externalSourceFile),
+    );
+    return {
+      file: relativePath(external.originalFile),
+      line: original.line + 1,
+      column: original.character + 1,
+    };
+  }
+
   function originalPosition(node, name) {
+    const external = externalOriginalPosition(node, name);
+    if (external) {
+      return external;
+    }
+
     const generated = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
     const mappings = sourceMappings.get(generated.line) ?? [];
     const mapping = mappings.findLast((candidate) => candidate.generatedCharacter <= generated.character);
@@ -346,9 +418,9 @@ function inspectDeclarations(program, emitted, originalProgram) {
       return;
     }
 
-    const { line, column } = originalPosition(node, name);
+    const { file = displayFile, line, column } = originalPosition(node, name);
     declarations.set(key, {
-      file: displayFile,
+      file,
       line,
       column,
       kind,
@@ -461,7 +533,17 @@ function inspectDeclarations(program, emitted, originalProgram) {
   function inspectResolvedSignatures(signatures, owner, anchor, constructor) {
     for (const signature of signatures) {
       const declaration = signature.getDeclaration();
-      const signatureOwner = constructor ? `${owner}.constructor` : owner;
+      const callable =
+        !constructor &&
+        declaration &&
+        declaration.getSourceFile() === sourceFile &&
+        ts.isCallSignatureDeclaration(declaration);
+      let signatureOwner = owner;
+      if (constructor) {
+        signatureOwner = `${owner}.constructor`;
+      } else if (callable) {
+        signatureOwner = `${owner}.[call]`;
+      }
       if (
         constructor &&
         declaration &&
@@ -469,6 +551,8 @@ function inspectDeclarations(program, emitted, originalProgram) {
         (ts.isConstructorDeclaration(declaration) || ts.isConstructSignatureDeclaration(declaration))
       ) {
         record(declaration, signatureOwner, 'constructor');
+      } else if (callable) {
+        record(declaration, signatureOwner, 'option');
       }
 
       for (const parameter of signature.getParameters()) {
@@ -476,7 +560,7 @@ function inspectDeclarations(program, emitted, originalProgram) {
         inspectResolvedType(parameterType, `${signatureOwner}.${parameter.getName()}`, declaration ?? anchor);
       }
 
-      const returnOwner = constructor ? owner : `${owner}.result`;
+      const returnOwner = constructor ? owner : `${signatureOwner}.result`;
       inspectResolvedType(signature.getReturnType(), returnOwner, declaration ?? anchor, 'member');
     }
   }
@@ -507,7 +591,11 @@ function inspectDeclarations(program, emitted, originalProgram) {
     const mapped = Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
     for (const property of checker.getPropertiesOfType(type)) {
       const localDeclaration = property.declarations?.find(
-        (candidate) => candidate.getSourceFile() === sourceFile && isVisibleMember(candidate),
+        (candidate) =>
+          isVisibleMember(candidate) &&
+          (candidate.getSourceFile() === sourceFile ||
+            (handwrittenFiles.has(candidate.getSourceFile().fileName) &&
+              (inheritedOnly || candidate.getSourceFile() === anchor.getSourceFile()))),
       );
       const synthetic =
         !localDeclaration && !property.declarations?.length && mapped && !isExternalProjection(anchor);
@@ -532,6 +620,62 @@ function inspectDeclarations(program, emitted, originalProgram) {
     }
   }
 
+  function mappedArgument(node, mappedDeclaration, anchor) {
+    if (!ts.isTypeReferenceNode(node) || !ts.isIdentifier(node.typeName)) {
+      return;
+    }
+
+    const alias = ts.findAncestor(mappedDeclaration, ts.isTypeAliasDeclaration);
+    const index = alias?.typeParameters?.findIndex((parameter) => parameter.name.text === node.typeName.text);
+    if (index === undefined || index < 0) {
+      return;
+    }
+    return anchor.typeArguments?.[index];
+  }
+
+  function inspectUnresolvedMapped(type, owner, anchor, indexes) {
+    if (indexes.length > 0 || checker.getPropertiesOfType(type).length > 0) {
+      return;
+    }
+
+    const mappedDeclaration = type.target?.declaration ?? type.declaration;
+    if (!mappedDeclaration || !ts.isMappedTypeNode(mappedDeclaration) || !mappedDeclaration.type) {
+      return;
+    }
+
+    const { constraint } = mappedDeclaration.typeParameter;
+    let keyNode = constraint;
+    let value = mappedDeclaration.type;
+    let key = constraint?.getText(mappedDeclaration.getSourceFile()) ?? 'unknown';
+    if (mappedDeclaration.getSourceFile() !== sourceFile) {
+      if (!ts.isTypeReferenceNode(anchor)) {
+        return;
+      }
+      const argument = mappedArgument(value, mappedDeclaration, anchor);
+      if (!argument) {
+        return;
+      }
+      value = argument;
+      if (constraint) {
+        keyNode = mappedArgument(constraint, mappedDeclaration, anchor) ?? constraint;
+        key = keyNode.getText(keyNode.getSourceFile());
+      }
+    }
+
+    if (keyNode) {
+      const keyType = checker.getTypeAtLocation(keyNode);
+      const constraintType = checker.getBaseConstraintOfType(keyType);
+      const impossible = [keyType, constraintType].some(
+        (candidate) => candidate && Math.trunc(candidate.flags / ts.TypeFlags.Never) % 2 === 1,
+      );
+      if (impossible) {
+        return;
+      }
+    }
+
+    inspectResolvedType(checker.getTypeAtLocation(value), `${owner}.[key: ${key}]`, value);
+  }
+
   function inspectResolvedType(type, owner, anchor, kind = 'option') {
     if (!type || activeTypes.has(type)) {
       return;
@@ -553,6 +697,14 @@ function inspectDeclarations(program, emitted, originalProgram) {
         inspectResolvedTuple(type, owner, anchor);
         return;
       }
+
+      const indexes = checker.getIndexInfosOfType(type);
+      for (const index of indexes) {
+        const indexOwner = `${owner}.[key: ${checker.typeToString(index.keyType)}]`;
+        inspectResolvedType(index.type, indexOwner, anchor, kind);
+      }
+
+      inspectUnresolvedMapped(type, owner, anchor, indexes);
 
       const constructors = type.getConstructSignatures();
       inspectResolvedSignatures(type.getCallSignatures(), owner, anchor, false);
@@ -770,18 +922,44 @@ function inspectDeclarations(program, emitted, originalProgram) {
   return [...declarations.values()];
 }
 
-function inspectFiles(files, virtualSources = new Map()) {
+function inspectFiles(files, focusFile, virtualSources = new Map()) {
   const options = compilerOptions(virtualSources.size > 0);
   const sourceProgram = createProgram(files, virtualSources, options);
   const emitted = emitDeclarations(sourceProgram, files);
   const publicProgram = declarationProgram(emitted);
+  const handwrittenFiles = new Map(emitted.map((declaration) => [declaration.fileName, declaration]));
 
-  return emitted.flatMap((declaration) => inspectDeclarations(publicProgram, declaration, sourceProgram));
+  const declarations = emitted
+    .filter((declaration) => !focusFile || declaration.originalFile === focusFile)
+    .flatMap((declaration) =>
+      inspectDeclarations(publicProgram, declaration, sourceProgram, handwrittenFiles),
+    );
+  const unique = new Map();
+  for (const declaration of declarations) {
+    const key = [
+      declaration.file,
+      declaration.kind,
+      declaration.name,
+      declaration.line,
+      declaration.column,
+    ].join(':');
+    const existing = unique.get(key);
+    if (existing) {
+      existing.documented ||= declaration.documented;
+    } else {
+      unique.set(key, declaration);
+    }
+  }
+  return [...unique.values()];
 }
 
-function inspectSource(file, text) {
+function inspectSource(file, text, dependencies = {}) {
   const sourceFile = path.resolve(repositoryRoot, file);
-  return inspectFiles([sourceFile], new Map([[sourceFile, text]]));
+  const virtualSources = new Map([[sourceFile, text]]);
+  for (const [dependency, source] of Object.entries(dependencies)) {
+    virtualSources.set(path.resolve(repositoryRoot, dependency), source);
+  }
+  return inspectFiles([...virtualSources.keys()], sourceFile, virtualSources);
 }
 
 function collectCoverage() {

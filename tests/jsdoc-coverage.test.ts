@@ -16,7 +16,11 @@ const { collectCoverage, inspectSource } = loadCoverageChecker('./scripts/check-
     declarations: CoverageDeclaration[];
     undocumented: CoverageDeclaration[];
   };
-  inspectSource: (file: string, source: string) => CoverageDeclaration[];
+  inspectSource: (
+    file: string,
+    source: string,
+    dependencies?: Record<string, string>,
+  ) => CoverageDeclaration[];
 };
 
 function missing(source: string): string[] {
@@ -654,6 +658,73 @@ describe('handwritten SDK JSDoc coverage', () => {
     );
   });
 
+  test('checks nested values behind mapped string, number, and symbol index signatures', () => {
+    const source = `
+      /** Public values indexed by strings. */
+      export type StringValues = Record<string, { timeout: number }>;
+      /** Public values indexed by numbers. */
+      export type NumberValues = Record<number, { port: number }>;
+      /** Public values indexed by symbols. */
+      export type SymbolValues = Record<symbol, { token: string }>;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'StringValues.[key: string].timeout',
+        'NumberValues.[key: number].port',
+        'SymbolValues.[key: symbol].token',
+      ]),
+    );
+  });
+
+  test('checks generic mapped dictionaries and named values behind open Record indexes', () => {
+    const source = `
+      /** Named dictionary value. */
+      interface Hidden {
+        missing: string;
+      }
+      /** Public dictionary with an unresolved generic key space. */
+      export type Generic<Key extends PropertyKey> = {
+        [Current in Key]: { missing: string };
+      };
+      /** Private generic dictionary template. */
+      type Template<Key extends string> = {
+        [Current in Key]: { missing: string };
+      };
+      /** Public projection of a private generic dictionary. */
+      export type Projected<Key extends string> = Template<Key>;
+      /** Public generic Record with an inline dictionary value. */
+      export type GenericRecord<Key extends PropertyKey> = Record<Key, { missing: string }>;
+      /** Public generic Record with a named dictionary value. */
+      export type NamedGenericRecord<Key extends string> = Record<Key, Hidden>;
+      /** Public open dictionary with a named value. */
+      export type Named = Record<string, Hidden>;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'Generic.[key: Key].missing',
+        'Projected.[key: Key].missing',
+        'GenericRecord.[key: Key].missing',
+        'NamedGenericRecord.[key: Key].missing',
+        'Named.[key: string].missing',
+      ]),
+    );
+  });
+
+  test('does not require dictionary value documentation when its key space is empty', () => {
+    const source = `
+      /** Public dictionary without any possible keys. */
+      export type EmptyRecord = Record<never, { missing: string }>;
+      /** Public mapped dictionary without any possible keys. */
+      export type EmptyMapped = { [Key in never]: { missing: string } };
+      /** Public generic dictionary whose keys can never exist. */
+      export type EmptyGeneric<Key extends never> = Record<Key, { missing: string }>;
+    `;
+
+    expect(missing(source)).toEqual([]);
+  });
+
   test('checks synthetic public properties from direct finite mapped types', () => {
     const source = `
       /** Public finite mapped object. */
@@ -716,6 +787,55 @@ describe('handwritten SDK JSDoc coverage', () => {
 
     expect(missing(source)).toEqual(
       expect.arrayContaining(['Arguments.0.missing', 'ConstructorArguments.0.missing']),
+    );
+  });
+
+  test('checks array elements exposed through projected returns, indexed access, and rest tuples', () => {
+    const source = `
+      /** Internal callable implementation. */
+      function create(): { missing: string }[] {
+        return [];
+      }
+      /** Internal object shape. */
+      interface Shape {
+        /** Public list of objects. */
+        items: { missing: string }[];
+      }
+      /** Internal rest implementation. */
+      function accepts(...items: { missing: string }[]): void {}
+      /** Public returned elements. */
+      export type Returned = ReturnType<typeof create>;
+      /** Public indexed elements. */
+      export type Indexed = Shape['items'];
+      /** Public rest elements. */
+      export type Arguments = Parameters<typeof accepts>;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'Returned.[key: number].missing',
+        'Indexed.[key: number].missing',
+        'Arguments.[key: number].missing',
+      ]),
+    );
+  });
+
+  test('requires documentation on callable signatures preserved by projected public types', () => {
+    const source = `
+      /** Callable implementation type. */
+      type Callable = {
+        (options: { missing: string }): { output: string };
+      };
+      /** Public callable projection. */
+      export type Public = Extract<Callable, (...args: any[]) => unknown>;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'Public.[call]',
+        'Public.[call].options.missing',
+        'Public.[call].result.output',
+      ]),
     );
   });
 
@@ -815,6 +935,49 @@ describe('handwritten SDK JSDoc coverage', () => {
     `;
 
     expect(missing(source)).toEqual(expect.arrayContaining(['Public.inherited', 'Public.inherited.missing']));
+  });
+
+  test('checks public members inherited from internal handwritten declarations in another module', () => {
+    const source = `
+      import { InternalBase } from './internal-base';
+
+      /** Public derived client. */
+      export class Public extends InternalBase {}
+    `;
+    const dependencies = {
+      'src/internal-base.ts': `
+        /** @internal */
+        export class InternalBase {
+          inherited = { missing: true };
+          static inheritedStatic = { missing: true };
+          private secret = true;
+          protected hidden = true;
+          /** @internal */ implementation = true;
+        }
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations
+      .filter((declaration) => !declaration.documented)
+      .map((declaration) => declaration.name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Public.inherited',
+        'Public.inherited.missing',
+        'Public.static.inheritedStatic',
+        'Public.static.inheritedStatic.missing',
+      ]),
+    );
+    expect(undocumented).not.toEqual(
+      expect.arrayContaining(['InternalBase', 'Public.secret', 'Public.hidden']),
+    );
+    expect(declarations.find(({ name }) => name === 'Public.inherited')).toEqual(
+      expect.objectContaining({ file: 'src/internal-base.ts', line: 4 }),
+    );
+    expect(declarations.find(({ name }) => name === 'Public.static.inheritedStatic')).toEqual(
+      expect.objectContaining({ file: 'src/internal-base.ts', line: 5 }),
+    );
   });
 
   test('reports undocumented declaration coordinates in the original source file', () => {
