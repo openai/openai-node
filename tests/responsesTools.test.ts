@@ -109,7 +109,7 @@ type _AutoParseableToolRemainsFunctionTool = Assert<
 type _ParseableToolsStillAcceptNull = Assert<IsAssignable<null, ParseableToolsParams>>;
 type _ParseableToolsStillAcceptChatTools = Assert<IsAssignable<ChatCompletionTool, ParseableToolsParams>>;
 type _ResponseCreateParamsWithToolsStillAcceptSharedTools = Assert<
-  IsAssignable<{ tools?: Array<Tool> }, Pick<ResponseCreateParamsWithTools, 'tools'>>
+  IsAssignable<{ tools?: Tool[] }, Pick<ResponseCreateParamsWithTools, 'tools'>>
 >;
 
 test('response tools and parser helpers stay backwards compatible', () => {

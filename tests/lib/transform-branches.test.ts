@@ -11,7 +11,7 @@ import {
 
 describe('JSON Schema child traversal', () => {
   test('visits schema-valued keywords without descending into literal payloads', () => {
-    const visited: Array<{ path: string; keyword: string; value: unknown }> = [];
+    const visited: { path: string; keyword: string; value: unknown }[] = [];
     const schema = {
       type: 'object',
       additionalProperties: false,

@@ -918,7 +918,7 @@ export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefini
   return isSchemaDefinition(resolved) ? resolved : undefined;
 }
 
-function isObject<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
+function isObject<T>(obj: T | any[]): obj is Extract<T, Record<string, any>> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
@@ -1751,7 +1751,7 @@ function mergeObjectAllOf(
     }
   }
 
-  const branches: Array<{ schema: JSONSchema; sourcePath: string[] | undefined }> = [];
+  const branches: { schema: JSONSchema; sourcePath: string[] | undefined }[] = [];
   if (parentHasObjectShape) {
     branches.push({ schema: jsonSchema, sourcePath: path });
   }
@@ -1795,11 +1795,11 @@ function mergeObjectAllOf(
   const mergedProperties = Object.create(null) as Record<string, JSONSchemaDefinition>;
   const mergedRequired = new Set<string>();
   const closedPropertySets: Set<string>[] = [];
-  const propertyEntries: Array<{
+  const propertyEntries: {
     key: string;
     propertySchema: JSONSchemaDefinition;
     sourcePath: string[] | undefined;
-  }> = [];
+  }[] = [];
   let sawProperties = false;
   let sawRequired = false;
   let hasExplicitObjectType = false;

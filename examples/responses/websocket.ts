@@ -40,7 +40,7 @@ type SupplierShipment = {
 
 type SupplierETAOutput = {
   sku: string;
-  supplier_shipments: Array<SupplierShipment>;
+  supplier_shipments: SupplierShipment[];
 };
 
 type QualityAlert = {
@@ -52,7 +52,7 @@ type QualityAlert = {
 
 type QualityAlertsOutput = {
   sku: string;
-  alerts: Array<QualityAlert>;
+  alerts: QualityAlert[];
 };
 
 type ToolOutput = SKUInventoryOutput | SupplierETAOutput | QualityAlertsOutput;
@@ -66,7 +66,7 @@ type FunctionCallRequest = {
 type RunResponseResult = {
   text: string;
   responseID: string;
-  functionCalls: Array<FunctionCallRequest>;
+  functionCalls: FunctionCallRequest[];
 };
 
 type RunTurnResult = {
@@ -91,7 +91,7 @@ type CLIArgs = {
 
 const BETA_HEADER_VALUE = 'responses_websockets=2026-02-06';
 
-const TOOLS: Array<FunctionTool> = [
+const TOOLS: FunctionTool[] = [
   {
     type: 'function',
     name: 'get_sku_inventory',
@@ -145,7 +145,7 @@ const TOOLS: Array<FunctionTool> = [
   },
 ];
 
-const DEMO_TURNS: Array<DemoTurn> = [
+const DEMO_TURNS: DemoTurn[] = [
   {
     tool_name: 'get_sku_inventory',
     prompt:
@@ -162,7 +162,7 @@ const DEMO_TURNS: Array<DemoTurn> = [
   },
 ];
 
-const parseArgs = (argv: Array<string>): CLIArgs => {
+const parseArgs = (argv: string[]): CLIArgs => {
   let model = 'gpt-5.2';
   let useBetaHeader = false;
   let showEvents = false;
@@ -342,8 +342,8 @@ const runResponse = async ({
   showEvents: boolean;
 }): Promise<RunResponseResult> =>
   await new Promise<RunResponseResult>((resolve, reject) => {
-    const textParts: Array<string> = [];
-    const functionCalls: Array<FunctionCallRequest> = [];
+    const textParts: string[] = [];
+    const functionCalls: FunctionCallRequest[] = [];
 
     const finish = (responseID: string): void => {
       cleanup();
@@ -436,7 +436,7 @@ const runTurn = async ({
   showEvents: boolean;
   showToolIO: boolean;
 }): Promise<RunTurnResult> => {
-  const accumulatedTextParts: Array<string> = [];
+  const accumulatedTextParts: string[] = [];
 
   let currentInput: string | ResponseInput = turnPrompt;
   let currentToolChoice: ToolChoice = { type: 'function', name: forcedToolName };

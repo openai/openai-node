@@ -23,7 +23,7 @@ import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 
 type StandardSchemaIssue = {
   readonly message: string;
-  readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined;
+  readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
 };
 
 type StandardSchemaResult<Output> =
@@ -32,7 +32,7 @@ type StandardSchemaResult<Output> =
       readonly issues?: undefined;
     }
   | {
-      readonly issues: ReadonlyArray<StandardSchemaIssue>;
+      readonly issues: readonly StandardSchemaIssue[];
     };
 
 type StandardJSONSchemaOptions = {
@@ -116,7 +116,7 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return typeof value === 'object' && value !== null && 'then' in value && typeof value.then === 'function';
 }
 
-function formatStandardSchemaIssues(issues: ReadonlyArray<StandardSchemaIssue>): string {
+function formatStandardSchemaIssues(issues: readonly StandardSchemaIssue[]): string {
   return issues
     .map((issue) => {
       const path = issue.path

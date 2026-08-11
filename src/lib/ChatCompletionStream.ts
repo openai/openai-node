@@ -79,21 +79,21 @@ export interface FunctionToolCallArgumentsDoneEvent {
 }
 
 export interface LogProbsContentDeltaEvent {
-  content: Array<ChatCompletionTokenLogprob>;
-  snapshot: Array<ChatCompletionTokenLogprob>;
+  content: ChatCompletionTokenLogprob[];
+  snapshot: ChatCompletionTokenLogprob[];
 }
 
 export interface LogProbsContentDoneEvent {
-  content: Array<ChatCompletionTokenLogprob>;
+  content: ChatCompletionTokenLogprob[];
 }
 
 export interface LogProbsRefusalDeltaEvent {
-  refusal: Array<ChatCompletionTokenLogprob>;
-  snapshot: Array<ChatCompletionTokenLogprob>;
+  refusal: ChatCompletionTokenLogprob[];
+  snapshot: ChatCompletionTokenLogprob[];
 }
 
 export interface LogProbsRefusalDoneEvent {
-  refusal: Array<ChatCompletionTokenLogprob>;
+  refusal: ChatCompletionTokenLogprob[];
 }
 
 export interface ChatCompletionStreamEvents<ParsedT = null> extends AbstractChatCompletionRunnerEvents {
@@ -866,7 +866,7 @@ export interface ChatCompletionSnapshot {
    * A list of chat completion choices. Can be more than one if `n` is greater
    * than 1.
    */
-  choices: Array<ChatCompletionSnapshot.Choice>;
+  choices: ChatCompletionSnapshot.Choice[];
 
   /**
    * The Unix timestamp (in seconds) of when the chat completion was created.
@@ -940,7 +940,7 @@ export namespace ChatCompletionSnapshot {
        */
       function_call?: Message.FunctionCall;
 
-      tool_calls?: Array<Message.ToolCall>;
+      tool_calls?: Message.ToolCall[];
 
       /**
        * The role of the author of this message.

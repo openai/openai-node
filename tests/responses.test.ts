@@ -15,7 +15,7 @@ describe('request id', () => {
     compareType<Awaited<APIPromise<{ foo: string }>>, { foo: string } & { _request_id?: string | null }>(
       true,
     );
-    compareType<Awaited<APIPromise<Array<{ foo: string }>>>, Array<{ foo: string }>>(true);
+    compareType<Awaited<APIPromise<{ foo: string }[]>>, { foo: string }[]>(true);
   });
 
   test('withResponse', async () => {
@@ -89,7 +89,7 @@ describe('request id', () => {
   });
 
   test('array response', async () => {
-    const promise = new APIPromise<Array<{ foo: string }>>(
+    const promise = new APIPromise<{ foo: string }[]>(
       client,
       Promise.resolve({
         response: new Response(JSON.stringify([{ foo: 'bar' }]), {

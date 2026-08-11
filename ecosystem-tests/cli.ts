@@ -143,7 +143,7 @@ const projectRunners = {
   },
 };
 
-let projectNames = Object.keys(projectRunners) as Array<keyof typeof projectRunners>;
+let projectNames = Object.keys(projectRunners) as (keyof typeof projectRunners)[];
 const projectNamesSet = new Set(projectNames);
 
 async function startProxy() {
@@ -678,7 +678,7 @@ export const packageDir = async (): Promise<string> => {
 // so that they can be restored when the script either finishes or is
 // terminated
 const fileCache = (() => {
-  const filesToCache: Array<string> = ['package.json', 'package-lock.json', 'deno.lock', 'bun.lockb'];
+  const filesToCache: string[] = ['package.json', 'package-lock.json', 'deno.lock', 'bun.lockb'];
   const generatedFilesToRemove = new Set(['deno/package.json']);
 
   return {
