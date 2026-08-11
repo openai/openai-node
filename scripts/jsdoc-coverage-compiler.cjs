@@ -1,10 +1,46 @@
+const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const stainlessGeneratedFiles = require('./stainless-generated-files.cjs');
 
 const repositoryRoot = path.resolve(__dirname, '..');
+const generatedFiles = new Set(stainlessGeneratedFiles);
+const excludedDirectories = new Set(['_vendor']);
+const excludedPaths = new Set(['src/internal/qs']);
 
 function relativePath(file) {
   return path.relative(repositoryRoot, file).split(path.sep).join('/');
+}
+
+function generatedSource(file, relativeFile) {
+  if (generatedFiles.has(relativeFile)) {
+    return true;
+  }
+  const [firstLine] = fs.readFileSync(file, 'utf-8').split('\n', 1);
+  return /^\/\/ File generated from our OpenAPI spec by (?:Stainless|Castiron)\./u.test(firstLine);
+}
+
+function collectSourceFiles(directory) {
+  const files = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    const relativeFile = relativePath(file);
+    if (entry.isDirectory()) {
+      if (!excludedDirectories.has(entry.name) && !excludedPaths.has(relativeFile)) {
+        files.push(...collectSourceFiles(file));
+      }
+      continue;
+    }
+    if (
+      entry.isFile() &&
+      ts.isSupportedSourceFileName(file, { allowJs: false }) &&
+      !ts.isDeclarationFileName(file) &&
+      !generatedSource(file, relativeFile)
+    ) {
+      files.push(file);
+    }
+  }
+  return files;
 }
 
 function hasCommentText(comment) {
@@ -64,6 +100,10 @@ function canonicalName(node) {
 }
 
 function overloadedSignature(node) {
+  const declarations = node.symbol?.declarations;
+  if (declarations?.filter((declaration) => declaration.kind === node.kind).length > 1) {
+    return true;
+  }
   const siblings = node.parent?.members ?? node.parent?.statements;
   if (!siblings) {
     return false;
@@ -82,12 +122,28 @@ function overloadedSignature(node) {
   return false;
 }
 
+function genericParameterBranch(parent, child) {
+  if (!ts.isTypeParameterDeclaration(parent) || !parent.constraint || !parent.default) {
+    return;
+  }
+  if (child === parent.constraint) {
+    return `${parent.pos}:constraint`;
+  }
+  if (child === parent.default) {
+    return `${parent.pos}:default`;
+  }
+}
+
 function positionalBranch(parent, child) {
   if (ts.isUnionTypeNode(parent)) {
     return `${parent.pos}:${parent.types.indexOf(child)}`;
   }
   if (ts.isTupleTypeNode(parent)) {
     return `${parent.pos}:${parent.elements.indexOf(child)}`;
+  }
+  const generic = genericParameterBranch(parent, child);
+  if (generic !== undefined) {
+    return generic;
   }
   if (ts.isConditionalTypeNode(parent)) {
     if (child === parent.trueType) {
@@ -99,7 +155,7 @@ function positionalBranch(parent, child) {
   }
   if (
     ts.isFunctionLike(parent) &&
-    (child === parent.type || parent.parameters?.includes(child)) &&
+    (child === parent.type || parent.parameters?.includes(child) || parent.typeParameters?.includes(child)) &&
     overloadedSignature(parent)
   ) {
     return `${parent.pos}:signature`;
@@ -128,7 +184,17 @@ function externalTypeArguments(checker, type, handwrittenFiles) {
   const handwritten = type.symbol?.declarations?.some((declaration) =>
     handwrittenFiles.has(declaration.getSourceFile().fileName),
   );
-  return handwritten ? [] : checker.getTypeArguments(type);
+  if (!handwritten) {
+    return checker.getTypeArguments(type);
+  }
+  const own = checker
+    .getPropertiesOfType(type)
+    .some((property) =>
+      property.declarations?.some((declaration) =>
+        handwrittenFiles.has(declaration.getSourceFile().fileName),
+      ),
+    );
+  return own ? [] : checker.getTypeArguments(type);
 }
 
 function mappedArgument(node, mappedDeclaration, anchor) {
@@ -216,6 +282,7 @@ function compilerOptions(virtual) {
       declarationMap: true,
       emitDeclarationOnly: true,
       noEmitOnError: false,
+      jsx: ts.JsxEmit.Preserve,
       lib: ['lib.es5.d.ts'],
       noResolve: true,
       removeComments: false,
@@ -238,6 +305,7 @@ function compilerOptions(virtual) {
     declarationMap: true,
     sourceMap: false,
     noEmitOnError: false,
+    jsx: parsed.options.jsx ?? ts.JsxEmit.Preserve,
     removeComments: false,
     stripInternal: false,
     outDir: path.join(repositoryRoot, '.jsdoc-coverage'),
@@ -290,9 +358,9 @@ function emitDeclarations(program, files) {
     const result = program.emit(
       sourceFile,
       (name, text) => {
-        if (name.endsWith('.d.ts')) {
+        if (ts.isDeclarationFileName(name)) {
           declarationFile = { originalFile: file, fileName: path.resolve(name), text };
-        } else if (name.endsWith('.d.ts.map')) {
+        } else if (name.endsWith('.map') && ts.isDeclarationFileName(name.slice(0, -4))) {
           declarationMap = JSON.parse(text);
         }
       },
@@ -407,6 +475,7 @@ function instantiateMappedType(type, mapper) {
 
 module.exports = {
   canonicalName,
+  collectSourceFiles,
   compilerOptions,
   createProgram,
   declarationProgram,

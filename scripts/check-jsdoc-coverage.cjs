@@ -1,8 +1,8 @@
-const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 const {
   canonicalName,
+  collectSourceFiles,
   compilerOptions,
   createProgram,
   declarationProgram,
@@ -21,34 +21,11 @@ const {
   sourceSymbolAtPath,
   visibleHandwrittenMember,
 } = require('./jsdoc-coverage-compiler.cjs');
-const stainlessGeneratedFiles = require('./stainless-generated-files.cjs');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-const generatedFiles = new Set(stainlessGeneratedFiles);
-const excludedDirectories = new Set(['_vendor']);
-const excludedPaths = new Set(['src/internal/qs']);
 
 function relativePath(file) {
   return path.relative(repositoryRoot, file).split(path.sep).join('/');
-}
-
-function collectSourceFiles(directory) {
-  const files = [];
-
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const file = path.join(directory, entry.name);
-    const relativeFile = relativePath(file);
-
-    if (entry.isDirectory()) {
-      if (!excludedDirectories.has(entry.name) && !excludedPaths.has(relativeFile)) {
-        files.push(...collectSourceFiles(file));
-      }
-    } else if (entry.isFile() && file.endsWith('.ts') && !generatedFiles.has(relativeFile)) {
-      files.push(file);
-    }
-  }
-
-  return files;
 }
 
 function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles) {
@@ -388,6 +365,9 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
         record(declaration, signatureOwner, 'option');
       }
 
+      if (handwritten) {
+        inspectTypeParameters(declaration, signatureOwner);
+      }
       for (const parameter of signature.getParameters()) {
         const parameterType = checker.getTypeOfSymbolAtLocation(parameter, declaration ?? anchor);
         inspectResolvedType(parameterType, `${signatureOwner}.${parameter.getName()}`, declaration ?? anchor);
@@ -812,11 +792,29 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
 
     for (const exported of exports) {
       const target = resolvedSymbol(exported);
+      const owner = `${prefix}${exported.getName()}`;
       if (localSymbol(target)) {
-        inspectSymbol(target, `${prefix}${exported.getName()}`, exported);
+        inspectSymbol(target, owner, exported);
       } else if (internalHandwrittenSymbol(target)) {
-        inspectInternalExport(target, `${prefix}${exported.getName()}`, exported);
+        inspectInternalExport(target, owner, exported);
+      } else if (exported.declarations?.some(ts.isNamespaceExport)) {
+        inspectNamespaceModule(target, owner);
       }
+    }
+  }
+
+  function inspectNamespaceModule(symbol, owner) {
+    const handwritten = symbol.declarations?.some((declaration) =>
+      handwrittenFiles.has(declaration.getSourceFile().fileName),
+    );
+    if (!handwritten || activeNamespaces.has(symbol)) {
+      return;
+    }
+    activeNamespaces.add(symbol);
+    try {
+      inspectExports(symbol, `${owner}.`);
+    } finally {
+      activeNamespaces.delete(symbol);
     }
   }
 
