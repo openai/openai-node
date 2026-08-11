@@ -673,6 +673,10 @@ export class AssistantStream
 
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     for (const [key, deltaValue] of Object.entries(delta)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        throw new OpenAIError(`Assistant stream delta contains an unsafe property: ${key}`);
+      }
+
       if (!hasOwn(acc, key)) {
         acc[key] = deltaValue;
         continue;

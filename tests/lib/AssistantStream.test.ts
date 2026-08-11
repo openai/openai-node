@@ -45,6 +45,62 @@ describe('AssistantStream delta accumulation', () => {
     });
   });
 
+  test('preserves accumulator identity and ordinary object prototypes', () => {
+    const nested = { text: 'hello' };
+    const accumulator = { nested };
+
+    const result = AssistantStream.accumulateDelta(accumulator, {
+      nested: { text: ' world' },
+      status: 'ready',
+    });
+
+    expect(result).toBe(accumulator);
+    expect(result['nested']).toBe(nested);
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(result['nested'])).toBe(Object.prototype);
+    expect(result).toEqual({ nested: { text: 'hello world' }, status: 'ready' });
+    expect(Object.getOwnPropertyDescriptor(result, 'status')).toEqual({
+      configurable: true,
+      enumerable: true,
+      value: 'ready',
+      writable: true,
+    });
+  });
+
+  test('creates own fields without changing ordinary inherited values', () => {
+    const inherited = { label: 'inherited' };
+    const accumulator: Record<string, unknown> = Object.create(inherited);
+
+    const result = AssistantStream.accumulateDelta(accumulator, { label: 'updated', status: 'ready' });
+
+    expect(result).toBe(accumulator);
+    expect(Object.getPrototypeOf(result)).toBe(inherited);
+    expect(inherited.label).toBe('inherited');
+    expect(result['label']).toBe('updated');
+    expect(result['status']).toBe('ready');
+    expect(Object.getOwnPropertyDescriptor(result, 'label')).toMatchObject({ value: 'updated' });
+  });
+
+  test('preserves null-prototype accumulators during ordinary nested updates', () => {
+    const nested: Record<string, string> = Object.create(null);
+    nested['text'] = 'hello';
+
+    const accumulator: Record<string, unknown> = Object.create(null);
+    accumulator['details'] = nested;
+
+    const result = AssistantStream.accumulateDelta(accumulator, {
+      details: { text: ' world' },
+      status: 'ready',
+    });
+
+    expect(result).toBe(accumulator);
+    expect(result['details']).toBe(nested);
+    expect(Object.getPrototypeOf(result)).toBeNull();
+    expect(Object.getPrototypeOf(result['details'])).toBeNull();
+    expect(result['details']['text']).toBe('hello world');
+    expect(result['status']).toBe('ready');
+  });
+
   test('replaces null values and special index or type properties', () => {
     expect(
       AssistantStream.accumulateDelta(
