@@ -12,7 +12,6 @@ const compatibilityRules = [
   'import/consistent-type-specifier-style',
   'import/no-cycle',
   'no-inline-comments',
-  'no-plusplus',
   'no-use-before-define',
   'prefer-arrow-callback',
   'prefer-destructuring',
@@ -621,6 +620,40 @@ module.exports = defineConfig({
       ],
       rules: {
         'no-unused-vars': 'off',
+      },
+    },
+    {
+      // These parser indexes, retry counters, and fixture counters intentionally
+      // rely on prefix/postfix old-vs-new value semantics.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'scripts/_vendor/tsc-multi/src/build.ts',
+        'scripts/lint-generated.cjs',
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/_vendor/zod-to-json-schema/parseDef.ts',
+        'src/_vendor/zod-to-json-schema/parsers/string.ts',
+        'src/_vendor/zod-to-json-schema/zodToJsonSchema.ts',
+        'src/azure.ts',
+        'src/helpers/standard-schema.ts',
+        'src/internal/decoders/line.ts',
+        'src/internal/qs/utils.ts',
+        'src/internal/ws.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/transform.ts',
+        'tests/_vendor/partial-json-parser/partial-json-parsing.test.ts',
+        'tests/auth/workload-identity-auth.test.ts',
+        'tests/benchmarks/streaming.bench.ts',
+        'tests/generated-resource-helpers.test.ts',
+        'tests/lib/azure.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/lib/provider.test.ts',
+        'tests/lib/ResponseStream.test.ts',
+        'tests/lib/responsesWebSocket.test.ts',
+        'tests/lib/workload-identity.test.ts',
+        'tests/ws.test.ts',
+      ],
+      rules: {
+        'no-plusplus': 'off',
       },
     },
     {
