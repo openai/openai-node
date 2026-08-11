@@ -382,8 +382,10 @@ async function main() {
         progressDisplayed = true;
         const spin = spinner[Math.floor(Date.now() / 500) % spinner.length];
         process.stderr.write(
-          `${spin} Running ${[...runningProjects].join(', ')}`.substring(0, process.stdout.columns - 3) +
-            '...',
+          `${spin} Running ${[...runningProjects].join(', ')}`.slice(
+            0,
+            Math.max(0, process.stdout.columns - 3),
+          ) + '...',
         );
       };
 

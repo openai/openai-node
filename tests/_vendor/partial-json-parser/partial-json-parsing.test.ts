@@ -41,7 +41,7 @@ describe('partial parsing', () => {
         for (let i = 1; i < jsonString.length; i++) {
           // speedup
           i += Math.floor(Math.random() * 3);
-          const substring = jsonString.substring(0, i);
+          const substring = jsonString.slice(0, i);
 
           // since we don't allow partial parsing for numbers
           if (
