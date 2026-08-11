@@ -406,7 +406,7 @@ export class AssistantStream
 
     for (const content of newContent) {
       const snapshotContent = accumulatedMessage.content[content.index];
-      if (snapshotContent?.type == 'text') {
+      if (snapshotContent?.type === 'text') {
         this._emit('textCreated', snapshotContent.text);
       }
     }
@@ -425,17 +425,17 @@ export class AssistantStream
         if (event.data.delta.content) {
           for (const content of event.data.delta.content) {
             //If it is text delta, emit a text delta event
-            if (content.type == 'text' && content.text) {
+            if (content.type === 'text' && content.text) {
               const textDelta = content.text;
               const snapshot = accumulatedMessage.content[content.index];
-              if (snapshot && snapshot.type == 'text') {
+              if (snapshot && snapshot.type === 'text') {
                 this._emit('textDelta', textDelta, snapshot.text);
               } else {
                 throw new Error('The snapshot associated with this text delta is not text or missing');
               }
             }
 
-            if (content.index != this.#currentContentIndex) {
+            if (content.index !== this.#currentContentIndex) {
               //See if we have in progress content
               if (this.#currentContent) {
                 switch (this.#currentContent.type) {
@@ -494,12 +494,12 @@ export class AssistantStream
         const delta = event.data.delta;
         if (
           delta.step_details &&
-          delta.step_details.type == 'tool_calls' &&
+          delta.step_details.type === 'tool_calls' &&
           delta.step_details.tool_calls &&
-          accumulatedRunStep.step_details.type == 'tool_calls'
+          accumulatedRunStep.step_details.type === 'tool_calls'
         ) {
           for (const toolCall of delta.step_details.tool_calls) {
-            if (toolCall.index == this.#currentToolCallIndex) {
+            if (toolCall.index === this.#currentToolCallIndex) {
               this._emit(
                 'toolCallDelta',
                 toolCall,
@@ -526,7 +526,7 @@ export class AssistantStream
       case 'thread.run.step.expired': {
         this.#currentRunStepSnapshot = undefined;
         const details = event.data.step_details;
-        if (details.type == 'tool_calls' && this.#currentToolCall) {
+        if (details.type === 'tool_calls' && this.#currentToolCall) {
           this._emit('toolCallDone', this.#currentToolCall as ToolCall);
           this.#currentToolCall = undefined;
         }
