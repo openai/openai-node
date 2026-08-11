@@ -330,14 +330,14 @@ describe('instantiate bedrock client', () => {
       const requestURL = new URL(url.toString());
       requests.push(`${init?.method} ${requestURL.pathname}`);
 
-      const body =
-        requestURL.pathname === '/openai/v1/responses/compact'
-          ? COMPACTED_RESPONSE_BODY
-          : requestURL.pathname === '/openai/v1/responses/input_tokens'
-            ? INPUT_TOKENS_BODY
-            : requestURL.pathname === '/openai/v1/responses/resp_123/input_items'
-              ? INPUT_ITEMS_BODY
-              : RESPONSE_BODY;
+      let body: unknown = RESPONSE_BODY;
+      if (requestURL.pathname === '/openai/v1/responses/compact') {
+        body = COMPACTED_RESPONSE_BODY;
+      } else if (requestURL.pathname === '/openai/v1/responses/input_tokens') {
+        body = INPUT_TOKENS_BODY;
+      } else if (requestURL.pathname === '/openai/v1/responses/resp_123/input_items') {
+        body = INPUT_ITEMS_BODY;
+      }
 
       return new globalThis.Response(JSON.stringify(body), {
         status: 200,

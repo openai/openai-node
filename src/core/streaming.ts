@@ -286,12 +286,14 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
       continue;
     }
 
-    const binaryChunk =
-      chunk instanceof ArrayBuffer
-        ? new Uint8Array(chunk)
-        : typeof chunk === 'string'
-          ? encodeUTF8(chunk)
-          : chunk;
+    let binaryChunk: Uint8Array;
+    if (chunk instanceof ArrayBuffer) {
+      binaryChunk = new Uint8Array(chunk);
+    } else if (typeof chunk === 'string') {
+      binaryChunk = encodeUTF8(chunk);
+    } else {
+      binaryChunk = chunk;
+    }
 
     const newData = new Uint8Array(data.length + binaryChunk.length);
     newData.set(data);

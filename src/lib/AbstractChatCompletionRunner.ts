@@ -501,11 +501,13 @@ export class AbstractChatCompletionRunner<
   }
 
   static #stringifyFunctionCallResult(rawContent: unknown): string {
-    return typeof rawContent === 'string'
-      ? rawContent
-      : rawContent === undefined
-        ? 'undefined'
-        : JSON.stringify(rawContent);
+    if (typeof rawContent === 'string') {
+      return rawContent;
+    }
+    if (rawContent === undefined) {
+      return 'undefined';
+    }
+    return JSON.stringify(rawContent);
   }
 }
 

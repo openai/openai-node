@@ -20,8 +20,12 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
 } => {
   const refs = getRefs(options);
 
-  const name =
-    typeof options === 'string' ? options : options?.nameStrategy === 'title' ? undefined : options?.name;
+  let name: string | undefined;
+  if (typeof options === 'string') {
+    name = options;
+  } else if (options?.nameStrategy !== 'title') {
+    name = options?.name;
+  }
 
   const main =
     parseDef(
@@ -77,39 +81,37 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     return definitions;
   })();
 
-  const combined: ReturnType<typeof zodToJsonSchema<Target>> =
-    name === undefined
-      ? definitions
+  let combined: ReturnType<typeof zodToJsonSchema<Target>>;
+  if (name === undefined) {
+    combined = definitions
+      ? {
+          ...main,
+          [refs.definitionPath]: definitions,
+        }
+      : main;
+  } else if (refs.nameStrategy === 'duplicate-ref') {
+    combined = {
+      ...main,
+      ...(definitions || refs.seenRefs.size
         ? {
-            ...main,
-            [refs.definitionPath]: definitions,
-          }
-        : main
-      : refs.nameStrategy === 'duplicate-ref'
-        ? {
-            ...main,
-            ...(definitions || refs.seenRefs.size
-              ? {
-                  [refs.definitionPath]: {
-                    ...definitions,
-                    // only actually duplicate the schema definition if it was ever referenced
-                    // otherwise the duplication is completely pointless
-                    ...(refs.seenRefs.size ? { [name]: main } : undefined),
-                  },
-                }
-              : undefined),
-          }
-        : {
-            $ref: [
-              ...(refs.$refStrategy === 'relative' ? [] : refs.basePath),
-              refs.definitionPath,
-              name,
-            ].join('/'),
             [refs.definitionPath]: {
               ...definitions,
-              [name]: main,
+              // only actually duplicate the schema definition if it was ever referenced
+              // otherwise the duplication is completely pointless
+              ...(refs.seenRefs.size ? { [name]: main } : undefined),
             },
-          };
+          }
+        : undefined),
+    };
+  } else {
+    combined = {
+      $ref: [...(refs.$refStrategy === 'relative' ? [] : refs.basePath), refs.definitionPath, name].join('/'),
+      [refs.definitionPath]: {
+        ...definitions,
+        [name]: main,
+      },
+    };
+  }
 
   if (refs.target === 'jsonSchema7') {
     combined.$schema = 'http://json-schema.org/draft-07/schema#';

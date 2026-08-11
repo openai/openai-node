@@ -271,6 +271,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
       }
       return ctx.factory.updateSourceFile(
         sourceFile,
+        // oxlint-disable unicorn/no-nested-ternary, no-nested-ternary -- Preserve the vendored transformer AST construction shape.
         newStatements.map((group) =>
           Array.isArray(group)
             ? group.length === 1 &&
@@ -312,6 +313,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
                 ])
             : group,
         ),
+        // oxlint-enable unicorn/no-nested-ternary, no-nested-ternary
       );
     };
 

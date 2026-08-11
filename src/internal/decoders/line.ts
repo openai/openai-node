@@ -26,12 +26,14 @@ export class LineDecoder {
       return [];
     }
 
-    const binaryChunk =
-      chunk instanceof ArrayBuffer
-        ? new Uint8Array(chunk)
-        : typeof chunk === 'string'
-          ? encodeUTF8(chunk)
-          : chunk;
+    let binaryChunk: Uint8Array;
+    if (chunk instanceof ArrayBuffer) {
+      binaryChunk = new Uint8Array(chunk);
+    } else if (typeof chunk === 'string') {
+      binaryChunk = encodeUTF8(chunk);
+    } else {
+      binaryChunk = chunk;
+    }
 
     this.#buffer = concatBytes([this.#buffer, binaryChunk]);
 
