@@ -47,8 +47,8 @@ async function runTests() {
 const testPath = [];
 
 /**
- * @param {string} description 
- * @param {() => void} handler 
+ * @param {string} description - Test suite description.
+ * @param {() => void} handler - Test suite callback.
  */
 function describe(description, handler) {
   testPath.push(description);
@@ -60,8 +60,8 @@ function describe(description, handler) {
 }
 
 /**
- * @param {string} description
- * @param {() => any} run
+ * @param {string} description - Test case description.
+ * @param {() => any} run - Test case callback.
  * @param {number} [timeout] - Defaults to `60000`.
  */
 function it(description, run, timeout = 60000) {
@@ -69,7 +69,7 @@ function it(description, run, timeout = 60000) {
 }
 
 /**
- * @param {any} received
+ * @param {any} received - Value being asserted.
  * @returns {{
  *   toEqual: (expected: any) => void;
  *   toBeSimilarTo: (comparedTo: string, expectedDistance: number) => void;
