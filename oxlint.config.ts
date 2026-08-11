@@ -29,7 +29,6 @@ const compatibilityRules = [
   'typescript/consistent-type-imports',
   'typescript/no-explicit-any',
   'typescript/no-non-null-assertion',
-  'unicorn/consistent-function-scoping',
   'unicorn/switch-case-braces',
 ];
 
@@ -506,6 +505,36 @@ module.exports = defineConfig({
       ],
       rules: {
         'no-eq-null': 'off',
+      },
+    },
+    {
+      // These nested helpers intentionally stay close to their fixture, test, or
+      // state-machine call sites; hoisting them would create collisions and reduce locality.
+      files: [
+        'ecosystem-tests/browser-direct-import/src/test.ts',
+        'ecosystem-tests/cloudflare-worker/src/worker.ts',
+        'ecosystem-tests/ts-browser-webpack/src/test.ts',
+        'examples/chat-completions/function-call-stream-raw.ts',
+        'examples/chat-completions/function-call-stream.ts',
+        'examples/chat-completions/tool-calls-stream.ts',
+        'scripts/_vendor/tsc-multi/src/report.ts',
+        'scripts/check-node-version-policy.ts',
+        'src/lib/EventStream.ts',
+        'tests/buildHeaders.test.ts',
+        'tests/form.test.ts',
+        'tests/helpers/standard-schema.test.ts',
+        'tests/internal/uploads-branches.test.ts',
+        'tests/lib/azure.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/lib/responsesWebSocket.test.ts',
+        'tests/lib/transform.test.ts',
+        'tests/lib/workload-identity.test.ts',
+        'tests/qs/stringify.test.ts',
+        'tests/streaming.test.ts',
+        'tests/test-script.test.ts',
+      ],
+      rules: {
+        'unicorn/consistent-function-scoping': 'off',
       },
     },
     {
