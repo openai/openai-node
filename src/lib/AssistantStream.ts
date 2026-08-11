@@ -630,6 +630,16 @@ export class AssistantStream
 
         //If this delta does not have content, nothing to process
         if (data.delta.content) {
+          assertSafeAssistantStreamDelta(data.delta);
+
+          for (const contentElement of data.delta.content) {
+            if (!Number.isInteger(contentElement.index) || contentElement.index < 0) {
+              throw new OpenAIError(
+                `Assistant stream delta contains an invalid content index: ${contentElement.index}`,
+              );
+            }
+          }
+
           for (const contentElement of data.delta.content) {
             if (contentElement.index in snapshot.content) {
               const currentContent = snapshot.content[contentElement.index];
@@ -672,6 +682,8 @@ export class AssistantStream
   }
 
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
+    assertSafeAssistantStreamDelta(delta);
+
     for (const [key, deltaValue] of Object.entries(delta)) {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
         throw new OpenAIError(`Assistant stream delta contains an unsafe property: ${key}`);
@@ -800,6 +812,20 @@ export class AssistantStream
     options?: RequestOptions,
   ): Promise<Run> {
     return await this._createToolAssistantStream(runs, runId, params, options);
+  }
+}
+
+function assertSafeAssistantStreamDelta(value: unknown): void {
+  if (!isObj(value) && !Array.isArray(value)) {
+    return;
+  }
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw new OpenAIError(`Assistant stream delta contains an unsafe property: ${key}`);
+    }
+
+    assertSafeAssistantStreamDelta(nestedValue);
   }
 }
 

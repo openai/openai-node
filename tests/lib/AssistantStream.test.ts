@@ -101,6 +101,68 @@ describe('AssistantStream delta accumulation', () => {
     expect(result['status']).toBe('ready');
   });
 
+  test('preserves newly inserted nested objects and arrays', () => {
+    const metadata = { profile: { name: 'Ada' } };
+    const entries = [{ index: 0, details: { text: 'hello' } }];
+    const accumulator = {};
+
+    const result = AssistantStream.accumulateDelta(accumulator, { metadata, entries });
+
+    expect(result).toBe(accumulator);
+    expect(result['metadata']).toBe(metadata);
+    expect(result['entries']).toBe(entries);
+    expect(result).toEqual({
+      metadata: { profile: { name: 'Ada' } },
+      entries: [{ index: 0, details: { text: 'hello' } }],
+    });
+  });
+
+  test('validates newly inserted nested arrays before mutating the accumulator', () => {
+    const failure = new Error('Nested value is unavailable');
+    const unreadable = {
+      get value(): never {
+        throw failure;
+      },
+    };
+    const accumulator = { text: 'hello' };
+
+    expect(() =>
+      AssistantStream.accumulateDelta(accumulator, {
+        text: ' world',
+        entries: [{ index: 0, details: { nested: unreadable } }],
+      }),
+    ).toThrow(failure);
+
+    expect(accumulator).toEqual({ text: 'hello' });
+    expect(Object.getOwnPropertyDescriptor(accumulator, 'entries')).toBeUndefined();
+  });
+
+  test.each(['__proto__', 'constructor', 'prototype'])(
+    'rejects the reserved %s property before mutating any accumulator path',
+    (key) => {
+      const deltas = [
+        { text: ' updated', [key]: 'blocked' },
+        { text: ' updated', metadata: { details: { [key]: 'blocked' } } },
+        {
+          text: ' updated',
+          entries: [
+            { index: 0, text: ' updated' },
+            { index: 1, details: { [key]: 'blocked' } },
+          ],
+        },
+      ];
+
+      for (const delta of deltas) {
+        const accumulator = { text: 'original', entries: [{ index: 0, text: 'first' }] };
+
+        expect(() => AssistantStream.accumulateDelta(accumulator, delta)).toThrow(
+          `Assistant stream delta contains an unsafe property: ${key}`,
+        );
+        expect(accumulator).toEqual({ text: 'original', entries: [{ index: 0, text: 'first' }] });
+      }
+    },
+  );
+
   test('replaces null values and special index or type properties', () => {
     expect(
       AssistantStream.accumulateDelta(
@@ -156,6 +218,57 @@ describe('AssistantStream delta accumulation', () => {
 });
 
 describe('AssistantStream snapshots and message lifecycle', () => {
+  test.each(['__proto__', 'constructor', 'prototype'])(
+    'rejects the reserved %s property in newly inserted message content',
+    async (key) => {
+      const message = { id: 'msg_123', role: 'assistant', content: [] };
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: message },
+        {
+          event: 'thread.message.delta',
+          data: {
+            id: 'msg_123',
+            delta: {
+              content: [{ index: 0, type: 'text', text: { value: 'hello', [key]: 'blocked' } }],
+            },
+          },
+        },
+      ]);
+
+      await expect(runner.done()).rejects.toThrow(`unsafe property: ${key}`);
+      expect(runner.currentMessageSnapshot()).toEqual(message);
+    },
+  );
+
+  test.each(['invalid', -1, 1.5, null])(
+    'rejects the invalid content index %j without mutating the message snapshot',
+    async (index) => {
+      const message = {
+        id: 'msg_123',
+        role: 'assistant',
+        content: [{ type: 'text', text: { value: 'original', annotations: [] } }],
+      };
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: message },
+        {
+          event: 'thread.message.delta',
+          data: {
+            id: 'msg_123',
+            delta: {
+              content: [
+                { index: 0, type: 'text', text: { value: ' updated' } },
+                { index, type: 'text', text: { value: 'ignored', annotations: [] } },
+              ],
+            },
+          },
+        },
+      ]);
+
+      await expect(runner.done()).rejects.toThrow('invalid content index');
+      expect(runner.currentMessageSnapshot()).toEqual(message);
+    },
+  );
+
   test('accumulates message content and exposes current and final snapshots', async () => {
     const initialMessage = { id: 'msg_123', role: 'assistant', status: 'in_progress', content: [] };
     const finalMessage = {
