@@ -53,6 +53,209 @@ describe('handwritten SDK declaration module formats', () => {
     );
   });
 
+  test.each([
+    ['a bare import type', "export type Public = typeof import('./internal-module');"],
+    [
+      'an imported namespace',
+      "import * as Internal from './internal-module'; export type Public = typeof Internal;",
+    ],
+  ])('checks hidden handwritten values exposed through %s', (_description, declaration) => {
+    const source = declaration.startsWith('import')
+      ? declaration.replace('; export type', ';\n/** Public namespace value shape. */\nexport type')
+      : `/** Public namespace value shape. */\n${declaration}`;
+    const dependencies = {
+      'src/internal-module.ts': `
+        /** @internal */
+        export interface TypeOnly {
+          excludedType: string;
+        }
+        /** @internal */
+        export type AliasOnly = { excludedAlias: string };
+        /** @internal */
+        export const hidden = {
+          missing: true,
+          nested: { deep: true },
+        };
+        /** Public values are audited in their original handwritten file. */
+        export const ordinary = { ignored: true };
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining(['Public.hidden.missing', 'Public.hidden.nested', 'Public.hidden.nested.deep']),
+    );
+    expect(undocumented.some((name) => name.includes('ordinary'))).toBe(false);
+    expect(undocumented.some((name) => name.includes('TypeOnly') || name.includes('AliasOnly'))).toBe(false);
+    expect(declarations.find(({ name }) => name === 'Public.hidden.missing')).toEqual(
+      expect.objectContaining({ file: 'src/internal-module.ts', line: 10 }),
+    );
+  });
+
+  test('includes internal namespace constructors, static values, and cyclic nested namespaces', () => {
+    const source = `
+      /** Public namespace value shape. */
+      export type Public = typeof import('./namespace-values');
+    `;
+    const dependencies = {
+      'src/namespace-values.ts': `
+        /** @internal */
+        export class Client {
+          constructor(options: { constructorOnly: string }) {}
+          static factory = { staticOnly: true };
+          /** Visible instance behavior. */
+          run(options: { instanceOnly: string }) {}
+        }
+        /** @internal */
+        export namespace Group {
+          export interface TypeOnly {
+            excludedType: string;
+          }
+          export const child = { nestedOnly: true };
+          export import Again = Group;
+        }
+      `,
+    };
+    const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+      .filter(({ documented }) => !documented)
+      .map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Public.Client.constructor',
+        'Public.Client.constructor.options.constructorOnly',
+        'Public.Client.static.factory',
+        'Public.Client.static.factory.staticOnly',
+        'Public.Client.run.options.instanceOnly',
+        'Public.Group.child.nestedOnly',
+      ]),
+    );
+    expect(undocumented.some((name) => name.includes('Again.Again'))).toBe(false);
+    expect(undocumented.some((name) => name.includes('TypeOnly'))).toBe(false);
+  });
+
+  test('checks internal runtime functions exposed through imported module namespaces', () => {
+    const source = `
+      /** Public module namespace. */
+      export type Public = typeof import('./namespace-functions');
+    `;
+    const dependencies = {
+      'src/namespace-functions.ts': `
+        /** @internal */
+        export function hidden(options: { missing: string }): { other: string } {
+          return { other: options.missing };
+        }
+        /** @internal */
+        export async function asynchronous(options: { missing: string }): Promise<{ result: string }> {
+          return { result: options.missing };
+        }
+      `,
+    };
+    const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+      .filter(({ documented }) => !documented)
+      .map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Public.hidden.options.missing',
+        'Public.hidden.result.other',
+        'Public.asynchronous.options.missing',
+        'Public.asynchronous.result.result',
+      ]),
+    );
+  });
+
+  test.each([
+    ['a function result', '/** Creates an instance. */ export function create(): Hidden;'],
+    ['an instance alias', '/** Public instance alias. */ export type Public = Hidden;'],
+    [
+      'an instance property',
+      '/** Public object. */ export interface Public { /** Public instance. */ value: Hidden }',
+    ],
+    ['interface inheritance', '/** Public derived instance. */ export interface Public extends Hidden {}'],
+  ])(
+    'excludes constructor and static members when a private class is used as %s',
+    (_description, exposure) => {
+      const source = `
+      /** Private helper instance shape. */
+      declare class Hidden {
+        constructor(options: { constructorOnly: string });
+        static factory(options: { staticOnly: string }): Hidden;
+        /** Visible instance data. */
+        value: { missing: string };
+      }
+      ${exposure}
+    `;
+      const declarations = inspectSource('src/fixture.ts', source);
+      const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+      expect(undocumented.some((name) => name.endsWith('.value.missing'))).toBe(true);
+      expect(
+        declarations.some(({ name }) => name.includes('.constructor') || name.includes('.static.')),
+      ).toBe(false);
+    },
+  );
+
+  test('continues checking constructor and static members on private class value queries', () => {
+    const source = `
+      /** Private runtime constructor. */
+      declare class Hidden {
+        constructor(options: { missing: string });
+        static factory: { missing: string };
+        /** Visible instance value. */
+        value: string;
+      }
+      /** Public constructor and static value. */
+      export type Public = typeof Hidden;
+    `;
+    const undocumented = inspectSource('src/fixture.ts', source)
+      .filter(({ documented }) => !documented)
+      .map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Public.constructor',
+        'Public.constructor.options.missing',
+        'Public.static.factory',
+        'Public.static.factory.missing',
+      ]),
+    );
+  });
+
+  test('keeps inherited instance and constructor-parameter properties without exposing static sides', () => {
+    const source = `
+      /** Private inherited instance shape. */
+      declare class Base {
+        /** Visible inherited operation. */
+        run(options: { inheritedOnly: string }): void;
+        static baseFactory: { staticOnly: string };
+      }
+      /** Private concrete instance shape. */
+      class Hidden extends Base {
+        constructor(public token: { parameterOnly: string }) {
+          super();
+        }
+        static ownFactory = { staticOnly: 'private' };
+      }
+      /** Creates a concrete instance. */
+      export function create(): Hidden;
+    `;
+    const declarations = inspectSource('src/fixture.ts', source);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Base.run.options.inheritedOnly',
+        'Hidden.token',
+        'Hidden.token.parameterOnly',
+      ]),
+    );
+    expect(declarations.some(({ name }) => name.includes('.constructor') || name.includes('.static.'))).toBe(
+      false,
+    );
+  });
+
   test.each(['ts', 'tsx', 'mts', 'cts'])('checks handwritten .%s declaration surfaces', (extension) => {
     const declarations = inspectSource(
       `src/fixture.${extension}`,
@@ -460,6 +663,110 @@ describe('handwritten SDK declaration module formats', () => {
   });
 
   test.each([
+    [
+      'a named imported reference',
+      "import type { Wrapper } from './direct-wrapper';",
+      'export type Public = Wrapper<{ missing: string }>;',
+    ],
+    [
+      'an inline imported reference',
+      '',
+      "export type Public = import('./direct-wrapper').Wrapper<{ missing: string }>;",
+    ],
+    [
+      'direct interface inheritance',
+      "import type { Wrapper } from './direct-wrapper';",
+      'export interface Public extends Wrapper<{ missing: string }> {}',
+    ],
+  ])('does not audit a phantom generic argument through %s', (_description, imports, declaration) => {
+    const source = `${imports}\n/** Public phantom-wrapper shape. */\n${declaration}`;
+    const dependencies = {
+      'src/direct-wrapper.ts': `
+        /** A generic wrapper whose value is intentionally private. */
+        export interface Wrapper<Value> {
+          /** Public stable identifier. */
+          id: string;
+        }
+      `,
+    };
+
+    expect(
+      inspectSource('src/fixture.ts', source, dependencies).filter(({ documented }) => !documented),
+    ).toEqual([]);
+  });
+
+  test.each([
+    [
+      'a named imported reference',
+      "import type { Wrapper } from './direct-wrapper';",
+      'export type Public = Wrapper<{ missing: string }>;',
+    ],
+    [
+      'an inline imported reference',
+      '',
+      "export type Public = import('./direct-wrapper').Wrapper<{ missing: string }>;",
+    ],
+    [
+      'direct interface inheritance',
+      "import type { Wrapper } from './direct-wrapper';",
+      'export interface Public extends Wrapper<{ missing: string }> {}',
+    ],
+  ])('preserves transformed inherited values through %s', (_description, imports, declaration) => {
+    const source = `${imports}\n/** Public transformed-wrapper shape. */\n${declaration}`;
+    const dependencies = {
+      'src/direct-wrapper.ts': `
+        /** A wrapper exposing its value only through the promise result. */
+        export interface Wrapper<Value> extends Promise<{ wrapped: Value }> {
+          /** Public stable identifier. */
+          id: string;
+        }
+      `,
+    };
+    const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+      .filter(({ documented }) => !documented)
+      .map(({ name }) => name);
+
+    expect(undocumented).toEqual(expect.arrayContaining(['Public.wrapped', 'Public.wrapped.missing']));
+    expect(undocumented).not.toContain('Public.missing');
+  });
+
+  test.each([
+    [
+      'own property',
+      '/** Direct wrapper. */ export interface Wrapper<Value> { /** Wrapped value. */ value: Value }',
+      'value',
+    ],
+    [
+      'transformed alias',
+      '/** Promise wrapper. */ export type Wrapper<Value> = Promise<{ wrapped: Value }>',
+      'wrapped',
+    ],
+  ])('preserves %s shapes through every direct handwritten reference', (_description, wrapper, property) => {
+    const references = [
+      [
+        "import type { Wrapper } from './direct-wrapper';",
+        'export type Public = Wrapper<{ missing: string }>;',
+      ],
+      ['', "export type Public = import('./direct-wrapper').Wrapper<{ missing: string }>;"],
+      [
+        "import type { Wrapper } from './direct-wrapper';",
+        'export interface Public extends Wrapper<{ missing: string }> {}',
+      ],
+    ];
+    const dependencies = { 'src/direct-wrapper.ts': wrapper };
+
+    for (const [imports, declaration] of references) {
+      const source = `${imports}\n/** Public wrapper shape. */\n${declaration}`;
+      const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+        .filter(({ documented }) => !documented)
+        .map(({ name }) => name);
+
+      expect(undocumented).toContain(`Public.${property}.missing`);
+      expect(undocumented).not.toContain('Public.missing');
+    }
+  });
+
+  test.each([
     ['callable', '', ''],
     ['constructable', 'new ', 'new '],
   ])(
@@ -518,6 +825,31 @@ describe('handwritten SDK declaration module formats', () => {
     expect(declarations.find(({ name }) => name === 'Public.callback.runner.done')).toEqual(
       expect.objectContaining({ documented: false, line: 13 }),
     );
+  });
+
+  test('prefers subclass override documentation and source over external inherited methods', () => {
+    const source = `
+      import { Base } from './override-base';
+      /** Public overriding class. */
+      export class Derived extends Base<{ ignored: string }> {
+        override finish() {}
+      }
+    `;
+    const dependencies = {
+      'src/override-base.ts': `
+        /** Generic base class. */
+        export class Base<Value> {
+          /** Documentation that belongs only to the inherited implementation. */
+          finish() {}
+        }
+      `,
+    };
+    const declarations = inspectSource('src/fixture.ts', source, dependencies);
+
+    expect(declarations.find(({ name }) => name === 'Derived.finish')).toEqual(
+      expect.objectContaining({ file: 'src/fixture.ts', line: 5, documented: false }),
+    );
+    expect(declarations.some(({ name }) => name === 'Derived.ignored')).toBe(false);
   });
 
   test('checks constraints and defaults on publicly exposed internal callable signatures', () => {

@@ -4,8 +4,10 @@ const { canonicalName, isInternal } = require('./jsdoc-coverage-syntax.cjs');
 function createCoverageExports(context) {
   const { checker, sourceFile, moduleSymbol, handwrittenFiles, activeNamespaces, publicTargets } = context;
 
-  function inspectExports(namespace, prefix = '') {
-    const exports = checker.getExportsOfModule(namespace);
+  function inspectExports(namespace, prefix = '', runtimeType = null) {
+    const exports = checker
+      .getExportsOfModule(namespace)
+      .filter((exported) => !runtimeType || checker.getPropertyOfType(runtimeType, exported.getName()));
     for (const exported of exports) {
       const target = context.resolvedSymbol(exported);
       if (context.localSymbol(target)) {
@@ -19,7 +21,7 @@ function createCoverageExports(context) {
       if (context.localSymbol(target)) {
         context.inspectSymbol(target, owner, exported);
       } else if (context.internalHandwrittenSymbol(target)) {
-        inspectInternalExport(target, owner, exported);
+        inspectInternalExport(target, owner, exported, Boolean(runtimeType));
       } else if (exported.declarations?.some(ts.isNamespaceExport)) {
         inspectNamespaceModule(target, owner);
       }
@@ -41,7 +43,7 @@ function createCoverageExports(context) {
     }
   }
 
-  function inspectInternalExport(symbol, owner, exported) {
+  function inspectInternalExport(symbol, owner, exported, valueOnly = false) {
     const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
     if (!declaration || !handwrittenFiles.has(declaration.getSourceFile().fileName)) {
       return;
@@ -57,13 +59,17 @@ function createCoverageExports(context) {
       }
       activeNamespaces.add(symbol);
       try {
-        inspectExports(symbol, `${owner}.`);
+        const nestedType = valueOnly ? checker.getTypeOfSymbolAtLocation(symbol, declaration) : undefined;
+        inspectExports(symbol, `${owner}.`, nestedType);
       } finally {
         activeNamespaces.delete(symbol);
       }
       return;
     }
 
+    if (ts.isFunctionDeclaration(declaration)) {
+      context.inspectSignature(declaration, owner);
+    }
     context.inspectTypeParameters(declaration, owner);
     const type =
       ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)

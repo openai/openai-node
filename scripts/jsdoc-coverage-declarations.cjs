@@ -21,7 +21,7 @@ function createCoverageDeclarations(context) {
     }
   }
 
-  function inspectMembers(members, owner, kind) {
+  function inspectMembers(members, owner, kind, instanceOnly = false) {
     for (const member of members) {
       if (!isVisibleMember(member)) {
         continue;
@@ -32,6 +32,9 @@ function createCoverageDeclarations(context) {
         (ts.getModifiers(member) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)
           ? 'static.'
           : '';
+      if (instanceOnly && (ts.isConstructorDeclaration(member) || staticPrefix)) {
+        continue;
+      }
       const name = `${owner}.${staticPrefix}${memberName(member, member.getSourceFile())}`;
       context.record(member, name, ts.isConstructorDeclaration(member) ? 'constructor' : kind);
 
@@ -73,6 +76,12 @@ function createCoverageDeclarations(context) {
       for (const inherited of clause.types) {
         context.inspectReference(inherited.expression);
         const inheritedType = checker.getTypeAtLocation(inherited);
+        const reference = checker.getSymbolAtLocation(inherited.expression);
+        const target = reference && context.resolvedSymbol(reference);
+        const kind = ts.isClassDeclaration(node) ? 'member' : 'property';
+        if (context.inspectExternalReference(inheritedType, target, inherited, canonicalName(node), kind)) {
+          continue;
+        }
         if (isMappedType(inheritedType)) {
           context.inspectResolvedType(inheritedType, canonicalName(node), inherited);
           context.inspectMappedArguments(inherited.typeArguments ?? [], canonicalName(node));
@@ -105,11 +114,17 @@ function createCoverageDeclarations(context) {
       return;
     }
     if (ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) {
+      const instanceOnly = ts.isClassDeclaration(node) && kind === 'type';
       inspectTypeParameters(node, owner);
       inspectHeritage(node);
-      inspectMembers(node.members, owner, ts.isClassDeclaration(node) ? 'member' : 'property');
+      inspectMembers(node.members, owner, ts.isClassDeclaration(node) ? 'member' : 'property', instanceOnly);
       if (ts.isClassDeclaration(node)) {
-        inspectInheritedClass(symbol, node, owner);
+        if (instanceOnly) {
+          const instance = checker.getDeclaredTypeOfSymbol(symbol);
+          context.inspectResolvedProperties(instance, owner, node, 'member', false, true);
+        } else {
+          inspectInheritedClass(symbol, node, owner);
+        }
       } else {
         const inherited = checker.getDeclaredTypeOfSymbol(symbol);
         context.inspectResolvedProperties(inherited, owner, node, 'property', false, true);

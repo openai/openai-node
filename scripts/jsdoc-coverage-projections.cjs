@@ -124,6 +124,8 @@ function createCoverageProjections(context) {
           declarations.has(`${memberKind}:${name}:${branch}`),
         )
       ) {
+        const instantiated = checker.getTypeOfSymbolAtLocation(property, anchor);
+        inspectResolvedType(instantiated, name, declaration, kind);
         continue;
       }
       if (synthetic) {

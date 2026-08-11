@@ -134,6 +134,13 @@ function createCoverageRecords(context) {
     return synthetic || semantic.conditional || semantic.intersection ? semantic.branch : '';
   }
 
+  function declarationPriority(node) {
+    if (!node || !ts.isClassDeclaration(node.parent)) {
+      return 0;
+    }
+    return node.getSourceFile() === sourceFile ? 2 : 1;
+  }
+
   function record(node, name, kind, ...symbols) {
     if (isInternal(node)) {
       return;
@@ -148,12 +155,12 @@ function createCoverageRecords(context) {
     const existing = declarations.get(key);
     if (existing) {
       const previous = recordedDeclarations.get(key);
-      const previousClassMember = previous && ts.isClassDeclaration(previous.parent);
-      const nextClassMember = ts.isClassDeclaration(node.parent);
-      if (previousClassMember && !nextClassMember) {
+      const previousPriority = declarationPriority(previous);
+      const nextPriority = declarationPriority(node);
+      if (previousPriority > nextPriority) {
         return;
       }
-      if (nextClassMember && !previousClassMember) {
+      if (nextPriority > previousPriority) {
         const { file = displayFile, line, column } = originalPosition(node, name);
         Object.assign(existing, { file, line, column, documented: Boolean(documented) });
         recordedDeclarations.set(key, node);

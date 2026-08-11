@@ -1,9 +1,14 @@
 const ts = require('typescript');
 const { canonicalName, isVisibleMember } = require('./jsdoc-coverage-syntax.cjs');
-const { isMappedType } = require('./jsdoc-coverage-type-system.cjs');
+const {
+  externalTypeArguments,
+  instantiateMappedType,
+  isMappedType,
+} = require('./jsdoc-coverage-type-system.cjs');
 
 function createCoverageTypes(context) {
-  const { checker, sourceFile, handwrittenFiles, activeValueSymbols, publicTargets } = context;
+  const { checker, sourceFile, handwrittenFiles, activeValueSymbols, activeNamespaces, publicTargets } =
+    context;
 
   function inspectReference(node) {
     const symbol = checker.getSymbolAtLocation(node);
@@ -59,6 +64,9 @@ function createCoverageTypes(context) {
       context.inspectResolvedType(type, owner, node);
       return true;
     }
+    if (inspectExternalReference(type, target, node, owner)) {
+      return true;
+    }
     const conditional = target?.declarations?.some(
       (declaration) => ts.isTypeAliasDeclaration(declaration) && ts.isConditionalTypeNode(declaration.type),
     );
@@ -74,6 +82,36 @@ function createCoverageTypes(context) {
     }
     context.inspectResolvedType(type, owner, node);
     if (mapped) {
+      inspectMappedArguments(node.typeArguments, owner);
+    }
+    return true;
+  }
+
+  function inspectExternalReference(type, symbol, node, owner, kind = 'option') {
+    const unresolved = Math.trunc(type.flags / ts.TypeFlags.Any) % 2 === 1 || type.intrinsicName === 'error';
+    if (!symbol || context.localSymbol(symbol) || !node.typeArguments?.length || unresolved) {
+      return false;
+    }
+
+    const declaration = symbol.declarations?.find((candidate) =>
+      handwrittenFiles.has(candidate.getSourceFile().fileName),
+    );
+    if (!declaration) {
+      return false;
+    }
+
+    context.inspectResolvedType(type, owner, declaration, kind);
+    const exposed = new Set(
+      externalTypeArguments(checker, type, handwrittenFiles).map(({ type: argument, mapper }) =>
+        instantiateMappedType(argument, mapper),
+      ),
+    );
+    for (const argument of node.typeArguments) {
+      if (ts.isTypeReferenceNode(argument) && exposed.has(checker.getTypeAtLocation(argument))) {
+        inspectReference(argument.typeName);
+      }
+    }
+    if (isMappedType(type)) {
       inspectMappedArguments(node.typeArguments, owner);
     }
     return true;
@@ -127,6 +165,14 @@ function createCoverageTypes(context) {
 
   function inspectImportType(node, owner) {
     const type = checker.getTypeAtLocation(node);
+    if (node.isTypeOf && !node.qualifier && inspectImportedNamespace(type.symbol, owner, type)) {
+      return;
+    }
+    const imported = node.qualifier && checker.getSymbolAtLocation(node.qualifier);
+    const target = imported && context.resolvedSymbol(imported);
+    if (inspectExternalReference(type, target, node, owner)) {
+      return;
+    }
     const mapped = isMappedType(type);
     if (mapped || context.internalHandwrittenSymbol(type.symbol) || context.internalImport(node)) {
       context.inspectResolvedType(type, owner, node);
@@ -138,6 +184,24 @@ function createCoverageTypes(context) {
     for (const argument of node.typeArguments ?? []) {
       inspectType(argument, owner);
     }
+  }
+
+  function inspectImportedNamespace(symbol, owner, type) {
+    const handwritten = symbol?.declarations?.some(
+      (declaration) =>
+        ts.isSourceFile(declaration) && handwrittenFiles.has(declaration.getSourceFile().fileName),
+    );
+    if (!handwritten || activeNamespaces.has(symbol)) {
+      return false;
+    }
+
+    activeNamespaces.add(symbol);
+    try {
+      context.inspectExports(symbol, `${owner}.`, type);
+    } finally {
+      activeNamespaces.delete(symbol);
+    }
+    return true;
   }
 
   function inspectIntersection(node, owner) {
@@ -181,6 +245,9 @@ function createCoverageTypes(context) {
     }
 
     const target = context.resolvedSymbol(symbol);
+    if (inspectImportedNamespace(target, owner, checker.getTypeAtLocation(node))) {
+      return;
+    }
     const internal = context.internalHandwrittenSymbol(target);
     if (!context.localSymbol(target) && !internal) {
       return;
@@ -205,7 +272,7 @@ function createCoverageTypes(context) {
     }
   }
 
-  return { inspectReference, inspectType, inspectMappedArguments };
+  return { inspectReference, inspectExternalReference, inspectType, inspectMappedArguments };
 }
 
 module.exports = { createCoverageTypes };
