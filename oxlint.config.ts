@@ -45,7 +45,6 @@ const compatibilityRules = [
   'typescript/consistent-type-definitions',
   'typescript/consistent-type-imports',
   'typescript/method-signature-style',
-  'typescript/no-dynamic-delete',
   'typescript/no-explicit-any',
   'typescript/no-import-type-side-effects',
   'typescript/no-non-null-assertion',
@@ -193,6 +192,19 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/no-namespace': 'off',
+      },
+    },
+    {
+      // Schema normalization intentionally deletes dynamic keys in place, and these
+      // tests exercise deletion/restoration behavior directly.
+      files: [
+        'src/lib/transform.ts',
+        'tests/internal/detect-platform.test.ts',
+        'tests/internal/utils.test.ts',
+        'tests/lib/bedrock-provider.test.ts',
+      ],
+      rules: {
+        'typescript/no-dynamic-delete': 'off',
       },
     },
     {
