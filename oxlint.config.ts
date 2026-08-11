@@ -9,7 +9,6 @@ const compatibilityRules = [
   'arrow-body-style',
   'complexity',
   'curly',
-  'default-case',
   'eqeqeq',
   'func-name-matching',
   'func-names',
@@ -217,6 +216,24 @@ module.exports = defineConfig({
       ],
       rules: {
         'unicorn/prefer-at': 'off',
+      },
+    },
+    {
+      // These switches intentionally enumerate schema, event, or test fixture
+      // variants; preserving their no-op behavior for unknown variants is safer.
+      files: [
+        'src/_vendor/zod-to-json-schema/parseDef.ts',
+        'src/_vendor/zod-to-json-schema/parsers/bigint.ts',
+        'src/_vendor/zod-to-json-schema/parsers/date.ts',
+        'src/_vendor/zod-to-json-schema/parsers/number.ts',
+        'src/_vendor/zod-to-json-schema/parsers/string.ts',
+        'src/_vendor/zod-to-json-schema/parsers/union.ts',
+        'src/lib/AssistantStream.ts',
+        'tests/lib/AssistantStream.test.ts',
+        'tests/live/bedrock.live.test.ts',
+      ],
+      rules: {
+        'default-case': 'off',
       },
     },
     {
