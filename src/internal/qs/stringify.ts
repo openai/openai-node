@@ -16,7 +16,7 @@ const array_prefix_generators = {
   },
 };
 
-const push_to_array = function (arr: any[], value_or_array: any) {
+const push_to_array = function push_to_array(arr: any[], value_or_array: any) {
   Array.prototype.push.apply(arr, isArray(value_or_array) ? value_or_array : [value_or_array]);
 };
 

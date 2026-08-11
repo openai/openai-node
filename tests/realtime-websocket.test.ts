@@ -20,7 +20,7 @@ type FakeNodeSocket = {
 };
 
 vi.mock('ws', () => ({
-  WebSocket: vi.fn().mockImplementation(function (url: URL, options: FakeNodeSocket['options']) {
+  WebSocket: vi.fn().mockImplementation(function WebSocket(url: URL, options: FakeNodeSocket['options']) {
     const listeners = new Map<string, Listener>();
 
     return {

@@ -37,7 +37,7 @@ describe('stringify()', () => {
   test('stringifies bigints', () => {
     const three = 3n;
     // @ts-expect-error
-    const encodeWithN = function (value, defaultEncoder, charset) {
+    const encodeWithN = function encodeWithN(value, defaultEncoder, charset) {
       const result = defaultEncoder(value, defaultEncoder, charset);
       return typeof value === 'bigint' ? result + 'n' : result;
     };
@@ -1409,7 +1409,7 @@ describe('stringify()', () => {
   test('supports custom representations when filter=function', () => {
     let calls = 0;
     const obj = { a: 'b', c: 'd', e: { f: new Date(1_257_894_000_000) } };
-    const filterFunc: StringifyOptions['filter'] = function (prefix, value) {
+    const filterFunc: StringifyOptions['filter'] = function filterFunc(prefix, value) {
       calls += 1;
       if (calls === 1) {
         // st.equal(prefix, '', 'prefix is empty');
@@ -1446,7 +1446,7 @@ describe('stringify()', () => {
 
   test('can sort the keys', () => {
     // @ts-expect-error
-    const sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
+    const sort: NonNullable<StringifyOptions['sort']> = function sort(a: string, b: string) {
       return a.localeCompare(b);
     };
     // st.equal(stringify({ a: 'c', z: 'y', b: 'f' }, { sort: sort }), 'a=c&b=f&z=y');
@@ -1462,7 +1462,7 @@ describe('stringify()', () => {
 
   test('can sort the keys at depth 3 or more too', () => {
     // @ts-expect-error
-    const sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
+    const sort: NonNullable<StringifyOptions['sort']> = function sort(a: string, b: string) {
       return a.localeCompare(b);
     };
     // st.equal(
@@ -1650,7 +1650,7 @@ describe('stringify()', () => {
     expect(stringify({ a: date })).toBe('a=' + date.toISOString().replace(/:/g, '%3A'));
 
     const mutatedDate = new Date();
-    mutatedDate.toISOString = function () {
+    mutatedDate.toISOString = function toISOString() {
       throw new SyntaxError('Invalid date serialization');
     };
     // st['throws'](function () {
@@ -1925,7 +1925,7 @@ describe('stringify()', () => {
 
   test('strictNullHandling works with custom filter', () => {
     // @ts-expect-error
-    const filter = function (_prefix, value) {
+    const filter = function filter(_prefix, value) {
       return value;
     };
 
@@ -1935,7 +1935,7 @@ describe('stringify()', () => {
   });
 
   test('strictNullHandling works with null serializeDate', () => {
-    const serializeDate = function () {
+    const serializeDate = function serializeDate() {
       return null;
     };
     const options = { strictNullHandling: true, serializeDate };
@@ -1947,7 +1947,7 @@ describe('stringify()', () => {
 
   test('allows for encoding keys and values differently', () => {
     // @ts-expect-error
-    const encoder = function (str, defaultEncoder, charset, type) {
+    const encoder = function encoder(str, defaultEncoder, charset, type) {
       if (type === 'key') {
         return defaultEncoder(str, defaultEncoder, charset, type).toLowerCase();
       }
