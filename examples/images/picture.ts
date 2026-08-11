@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import OpenAI, { toFile } from 'openai';
 
 const openai = new OpenAI();

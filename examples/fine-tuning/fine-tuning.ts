@@ -7,7 +7,7 @@
  * - https://platform.openai.com/docs/guides/fine-tuning
  */
 
-import fs from 'fs';
+import fs from 'node:fs';
 import OpenAI from 'openai';
 import { FineTuningJobEvent } from 'openai/resources/fine-tuning';
 

@@ -1,10 +1,10 @@
-import fs from 'fs/promises';
+import fs from 'node:fs/promises';
 import execa from 'execa';
 import yargs from 'yargs';
-import assert from 'assert';
-import path from 'path';
-import { createServer } from 'http';
-import { connect } from 'net';
+import assert from 'node:assert';
+import path from 'node:path';
+import { createServer } from 'node:http';
+import { connect } from 'node:net';
 
 const TAR_NAME = 'openai.tgz';
 const PACK_FOLDER = '.pack';

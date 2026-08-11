@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 import { _iterSSEMessages } from 'openai/core/streaming';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 

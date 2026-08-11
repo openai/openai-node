@@ -1,4 +1,4 @@
-import nodePath = require('path');
+import nodePath = require('node:path');
 import { object, string, array, Infer, validate, optional, type, integer, min, boolean } from 'superstruct';
 import Debug from './debug';
 import { readJSON, tryReadJSON } from './utils';

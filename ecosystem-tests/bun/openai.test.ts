@@ -1,5 +1,5 @@
 import OpenAI, { toFile } from 'openai';
-import fs from 'fs';
+import fs from 'node:fs';
 import { distance } from 'fastest-levenshtein';
 import { test, expect } from 'bun:test';
 import { ChatCompletion } from 'openai/resources/chat/completions';
