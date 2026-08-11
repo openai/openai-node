@@ -81,6 +81,51 @@ describe('standalone readable stream adapter', () => {
     await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
     expect(stream.locked).toBe(false);
   });
+
+  test('makes extracted async iterators iterable when they do not expose Symbol.asyncIterator', async () => {
+    const sourceIterator = {
+      next: vi
+        .fn()
+        .mockResolvedValueOnce({ done: false, value: 'first' })
+        .mockResolvedValueOnce({ done: true, value: undefined }),
+    };
+    const stream = { [Symbol.asyncIterator]: () => sourceIterator };
+
+    const iterator = adaptStandaloneReadableStream<string>(stream);
+    const values: string[] = [];
+    for await (const value of iterator) {
+      values.push(value);
+    }
+
+    expect(iterator).not.toBe(sourceIterator);
+    expect(iterator[Symbol.asyncIterator]()).toBe(iterator);
+    expect(values).toEqual(['first']);
+    expect(sourceIterator.next.mock.contexts).toEqual([sourceIterator, sourceIterator]);
+    expect(iterator.return).toBeUndefined();
+    expect(iterator.throw).toBeUndefined();
+  });
+
+  test('preserves cancellation and error delegation for extracted async iterators', async () => {
+    const sourceIterator = {
+      next: vi.fn().mockResolvedValue({ done: false, value: 'first' }),
+      return: vi.fn().mockResolvedValue({ done: true, value: undefined }),
+      throw: vi.fn().mockResolvedValue({ done: true, value: 'recovered' }),
+    };
+    const stream = { [Symbol.asyncIterator]: () => sourceIterator };
+    const iterator = adaptStandaloneReadableStream<string>(stream);
+
+    for await (const _value of iterator) {
+      break;
+    }
+
+    expect(sourceIterator.return).toHaveBeenCalledTimes(1);
+    expect(sourceIterator.return.mock.contexts).toEqual([sourceIterator]);
+
+    const failure = new Error('stream failed');
+    await expect(iterator.throw?.(failure)).resolves.toEqual({ done: true, value: 'recovered' });
+    expect(sourceIterator.throw).toHaveBeenCalledWith(failure);
+    expect(sourceIterator.throw.mock.contexts).toEqual([sourceIterator]);
+  });
 });
 
 describe('ReadableStreamFrom', () => {

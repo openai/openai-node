@@ -99,10 +99,11 @@ function compilerOptions(virtual) {
       declarationMap: true,
       emitDeclarationOnly: true,
       noEmitOnError: false,
-      noLib: true,
+      lib: ['lib.es5.d.ts'],
       noResolve: true,
       removeComments: false,
       skipLibCheck: true,
+      types: [],
       outDir: path.join(repositoryRoot, '.jsdoc-coverage'),
       rootDir: repositoryRoot,
     };
@@ -184,9 +185,10 @@ function declarationProgram(emitted) {
     target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.CommonJS,
     noEmit: true,
-    noLib: true,
+    lib: ['lib.es5.d.ts'],
     noResolve: true,
     skipLibCheck: true,
+    types: [],
   };
 
   return createProgram([...virtualSources.keys()], virtualSources, options);
@@ -257,6 +259,7 @@ function inspectDeclarations(program, emitted, originalProgram) {
   const originalModule = originalChecker.getSymbolAtLocation(originalSourceFile);
   const declarations = new Map();
   const inspected = new Map();
+  const inspectedProjectedTypes = new Map();
   const inspectedTypeQueries = new Map();
   const publicTargets = new Set();
   const displayFile = relativePath(emitted.originalFile);
@@ -381,6 +384,24 @@ function inspectDeclarations(program, emitted, originalProgram) {
 
     if (ts.isTypeReferenceNode(node)) {
       inspectReference(node.typeName);
+      const type = checker.getTypeAtLocation(node);
+      const isMapped = Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
+      const referenced = checker.getSymbolAtLocation(node.typeName);
+      const isConditional = referenced?.declarations?.some(
+        (declaration) => ts.isTypeAliasDeclaration(declaration) && ts.isConditionalTypeNode(declaration.type),
+      );
+      const isProjection = isMapped || (isConditional && type.intrinsicName !== 'error');
+      if (isProjection && node.typeArguments?.length) {
+        inspectProjectedType(type, owner);
+        if (isMapped) {
+          inspectMappedArguments(node.typeArguments, owner);
+        }
+        return;
+      }
+    }
+    if (ts.isIndexedAccessTypeNode(node)) {
+      inspectProjectedType(checker.getTypeAtLocation(node), owner);
+      return;
     }
     if (ts.isTypeQueryNode(node)) {
       inspectTypeQuery(node, owner);
@@ -399,6 +420,54 @@ function inspectDeclarations(program, emitted, originalProgram) {
     }
 
     ts.forEachChild(node, (child) => inspectType(child, owner));
+  }
+
+  function inspectMappedArguments(nodes, owner) {
+    for (const node of nodes) {
+      if (ts.isMappedTypeNode(node)) {
+        inspectType(node.type, owner);
+      } else if (ts.isIntersectionTypeNode(node) || ts.isUnionTypeNode(node)) {
+        inspectMappedArguments(node.types, owner);
+      } else if (ts.isParenthesizedTypeNode(node)) {
+        inspectMappedArguments([node.type], owner);
+      }
+    }
+  }
+
+  function inspectProjectedType(type, owner) {
+    const owners = inspectedProjectedTypes.get(type) ?? new Set();
+    if (owners.has(owner)) {
+      return;
+    }
+    owners.add(owner);
+    inspectedProjectedTypes.set(type, owners);
+
+    if (type.isUnionOrIntersection()) {
+      for (const branch of type.types) {
+        inspectProjectedType(branch, owner);
+      }
+    }
+
+    for (const property of checker.getPropertiesOfType(type)) {
+      const declaration = property.declarations?.find(
+        (candidate) => candidate.getSourceFile() === sourceFile && isVisibleMember(candidate),
+      );
+      if (!declaration) {
+        continue;
+      }
+
+      const name = `${owner}.${property.getName()}`;
+      record(declaration, name, 'option', property);
+      if (
+        ts.isPropertySignature(declaration) ||
+        ts.isPropertyDeclaration(declaration) ||
+        ts.isGetAccessorDeclaration(declaration)
+      ) {
+        inspectType(declaration.type, name);
+      } else if (ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)) {
+        inspectSignature(declaration, name);
+      }
+    }
   }
 
   function inspectTypeQuery(node, owner) {
@@ -500,6 +569,13 @@ function inspectDeclarations(program, emitted, originalProgram) {
     for (const clause of node.heritageClauses ?? []) {
       for (const inherited of clause.types) {
         inspectReference(inherited.expression);
+        const inheritedType = checker.getTypeAtLocation(inherited);
+        const isMapped = Math.trunc((inheritedType.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
+        if (isMapped) {
+          inspectProjectedType(inheritedType, canonicalName(node));
+          inspectMappedArguments(inherited.typeArguments ?? [], canonicalName(node));
+          continue;
+        }
         for (const argument of inherited.typeArguments ?? []) {
           inspectType(argument, canonicalName(node));
         }

@@ -3,16 +3,38 @@
  * built-in stream iteration support.
  *
  * Existing async iterators are reused; async-iterable streams that are not
- * themselves iterators are converted through `Symbol.asyncIterator`. Streams
- * without built-in iteration are locked with `getReader()` until iteration
- * completes, fails, or is canceled. Returning early cancels a fallback stream
- * and releases its reader lock.
+ * themselves iterators are converted through `Symbol.asyncIterator`. Iterator
+ * results without their own async-iterator method are adapted while preserving
+ * cancellation and error propagation. Streams without built-in iteration are
+ * locked with `getReader()` until iteration completes, fails, or is canceled.
+ * Returning early cancels a fallback stream and releases its reader lock.
  *
  * Adapted from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1627354490.
  */
 export function ReadableStreamToAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
   if (stream[Symbol.asyncIterator]) {
-    return typeof stream.next === 'function' ? stream : stream[Symbol.asyncIterator]();
+    if (typeof stream.next === 'function') {
+      return stream;
+    }
+
+    const iterator = stream[Symbol.asyncIterator]();
+    if (typeof iterator[Symbol.asyncIterator] === 'function') {
+      return iterator;
+    }
+
+    const iterableIterator: AsyncIterableIterator<T> = {
+      next: iterator.next.bind(iterator),
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
+    if (typeof iterator.return === 'function') {
+      iterableIterator.return = iterator.return.bind(iterator);
+    }
+    if (typeof iterator.throw === 'function') {
+      iterableIterator.throw = iterator.throw.bind(iterator);
+    }
+    return iterableIterator;
   }
 
   const reader = stream.getReader();

@@ -473,6 +473,140 @@ describe('handwritten SDK JSDoc coverage', () => {
     );
   });
 
+  test('inspects only properties exposed by instantiated Pick and Omit types', () => {
+    const source = `
+      /** Selects a documented subset of properties. */
+      type Pick<T, K extends keyof T> = { [P in K]: T[P] };
+      /** Removes the documented subset of properties. */
+      type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+      /** Excludes selected union members. */
+      type Exclude<T, U> = T extends U ? never : T;
+      /** Internal implementation shape. */
+      interface Shape {
+        /** The public property. */
+        visible: string;
+        hidden: string;
+      }
+      /** The selected public shape. */
+      export type Picked = Pick<Shape, 'visible'>;
+      /** The public shape with private details omitted. */
+      export type Omitted = Omit<Shape, 'hidden'>;
+    `;
+
+    expect(missing(source)).toEqual([]);
+  });
+
+  test('inspects only members exposed through indexed-access type aliases', () => {
+    const source = `
+      /** Internal implementation shape. */
+      interface Shape {
+        /** The publicly selected nested value. */
+        visible: {
+          /** The public nested property. */
+          included: string;
+          hidden: string;
+        };
+        omitted: string;
+      }
+      /** The selected public nested property. */
+      export type Public = Shape['visible']['included'];
+    `;
+
+    expect(missing(source)).toEqual([]);
+  });
+
+  test('resolves built-in Pick and Omit while checking only selected public members', () => {
+    const source = `
+      /** Internal implementation shape. */
+      interface Shape {
+        selected: string;
+        hidden: string;
+      }
+      /** The explicitly selected public property. */
+      export type Picked = Pick<Shape, 'selected'>;
+      /** The same public property after hiding internal details. */
+      export type Omitted = Omit<Shape, 'hidden'>;
+      /** The selected public property made optional. */
+      export type Optional = Partial<Pick<Shape, 'selected'>>;
+      /** The selected public property made readonly. */
+      export type Immutable = Readonly<Pick<Shape, 'selected'>>;
+    `;
+
+    expect(missing(source)).toEqual([
+      'Picked.selected',
+      'Omitted.selected',
+      'Optional.selected',
+      'Immutable.selected',
+    ]);
+  });
+
+  test('checks the selected object returned by indexed access without inspecting omitted peers', () => {
+    const source = `
+      /** Internal implementation shape. */
+      interface Shape {
+        /** The selected public object. */
+        selected: { missing: string };
+        omitted: string;
+      }
+      /** Only the selected object is public. */
+      export type Public = Shape['selected'];
+    `;
+
+    expect(missing(source)).toEqual(['Public.missing']);
+  });
+
+  test('checks all object branches returned by indexed-access unions', () => {
+    const source = `
+      /** Internal implementation shape. */
+      interface Shape {
+        /** The selected public union. */
+        selected: { first: string } | { second: number };
+        omitted: string;
+      }
+      /** Only the selected union is public. */
+      export type Public = Shape['selected'];
+    `;
+
+    expect(missing(source)).toEqual(['Public.first', 'Public.second']);
+  });
+
+  test('projects utility types in public interface heritage clauses', () => {
+    const source = `
+      /** Internal implementation shape. */
+      interface Shape {
+        selected: string;
+        hidden: string;
+      }
+      /** Public projected inheritance. */
+      export interface Public extends Pick<Shape, 'selected'> {}
+    `;
+
+    expect(missing(source)).toEqual(['Public.selected']);
+  });
+
+  test('projects conditional Extract and Exclude without checking discarded union branches', () => {
+    const source = `
+      /** Internal discriminated union. */
+      type Shape =
+        | {
+            /** Discriminator selecting the public branch. */
+            kind: 'selected';
+            included: string;
+          }
+        | {
+            /** Discriminator selecting the internal branch. */
+            kind: 'hidden';
+            omitted: string;
+          };
+      /** The explicitly selected public branch. */
+      export type Extracted = Extract<Shape, { kind: 'selected' }>;
+      /** The public branch after excluding internal details. */
+      export type Excluded = Exclude<Shape, { kind: 'hidden' }>;
+    `;
+
+    expect(missing(source)).toEqual(['Extracted.included', 'Excluded.included']);
+  });
+
   test('reports undocumented declaration coordinates in the original source file', () => {
     const source = [
       "import type { IncomingMessage } from 'node:http';",
