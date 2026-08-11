@@ -84,21 +84,23 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
-      const onError = (error: unknown) => {
-        this.off(event, onEvent as any);
-        reject(error);
-      };
-      const onEvent = (...values: unknown[]) => {
-        if (event !== 'error') {
-          this.off('error', onError as any);
-        }
-        resolve((values.length > 1 ? values : values[0]) as any);
+      const listeners = {
+        onError: (error: unknown) => {
+          this.off(event, listeners.onEvent as any);
+          reject(error);
+        },
+        onEvent: (...values: unknown[]) => {
+          if (event !== 'error') {
+            this.off('error', listeners.onError as any);
+          }
+          resolve((values.length > 1 ? values : values[0]) as any);
+        },
       };
 
       if (event !== 'error') {
-        this.once('error', onError as any);
+        this.once('error', listeners.onError as any);
       }
-      this.once(event, onEvent as any);
+      this.once(event, listeners.onEvent as any);
     });
   }
 
