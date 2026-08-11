@@ -7,7 +7,6 @@ const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-fil
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = [
   'arrow-body-style',
-  'complexity',
   'curly',
   'eqeqeq',
   'func-names',
@@ -259,6 +258,28 @@ module.exports = defineConfig({
       files: ['tests/lib/ChatCompletionRunFunctions.test.ts'],
       rules: {
         'func-name-matching': 'off',
+      },
+    },
+    {
+      // These established parsers and stream state machines intentionally encode
+      // protocol branching in one place; splitting them would risk behavior changes.
+      files: [
+        'scripts/_vendor/tsc-multi/src/transformer.ts',
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/_vendor/zod-to-json-schema/parseDef.ts',
+        'src/_vendor/zod-to-json-schema/parsers/string.ts',
+        'src/_vendor/zod-to-json-schema/parsers/union.ts',
+        'src/internal/qs/stringify.ts',
+        'src/internal/qs/utils.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/responses/ResponseAccumulator.ts',
+        'src/lib/responses/ResponseInputItems.ts',
+        'src/lib/transform.ts',
+      ],
+      rules: {
+        complexity: 'off',
       },
     },
     {
