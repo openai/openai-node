@@ -1,10 +1,15 @@
-(() => {
-  const assert = require('node:assert/strict');
-  const childProcess = require('node:child_process');
-  const fs = require('node:fs');
-  const os = require('node:os');
-  const path = require('node:path');
+const packedPackageAssert = require('node:assert/strict');
+const packedPackageChildProcess = require('node:child_process');
+const packedPackageFs = require('node:fs');
+const packedPackageOs = require('node:os');
+const packedPackagePath = require('node:path');
 
+(() => {
+  const assert = packedPackageAssert;
+  const childProcess = packedPackageChildProcess;
+  const fs = packedPackageFs;
+  const os = packedPackageOs;
+  const path = packedPackagePath;
   interface PackageMetadata {
     engines?: {
       node?: string;

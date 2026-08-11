@@ -30,7 +30,6 @@ const compatibilityRules = [
   'no-unused-vars',
   'no-use-before-define',
   'no-var',
-  'node/global-require',
   'object-shorthand',
   'prefer-arrow-callback',
   'prefer-destructuring',

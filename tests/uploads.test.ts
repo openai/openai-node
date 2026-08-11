@@ -78,6 +78,7 @@ describe('missing File error message', () => {
     // The file shim captures the global File object when it's first imported.
     // Reset modules before each test so we can test the error thrown when it's undefined.
     vi.resetModules();
+    // oxlint-disable-next-line node/global-require -- Resetting modules requires loading this fresh for each test.
     const buffer = require('node:buffer');
     // @ts-ignore
     prevGlobalFile = globalThis.File;
@@ -90,6 +91,7 @@ describe('missing File error message', () => {
     // Clean up
     // @ts-ignore
     globalThis.File = prevGlobalFile;
+    // oxlint-disable-next-line node/global-require -- Resetting modules requires restoring the freshly loaded module.
     require('node:buffer').File = prevNodeFile;
     vi.resetModules();
   });

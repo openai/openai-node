@@ -24,6 +24,7 @@ type TS = typeof ts;
 
 function loadCompiler(cwd: string, name = 'typescript'): TS {
   const path = require.resolve(name, { paths: [cwd, __dirname] });
+  // oxlint-disable-next-line node/global-require -- The compiler package is selected at runtime from worker options.
   return require(path);
 }
 

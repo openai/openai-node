@@ -1,8 +1,11 @@
-(() => {
-  const assert = require('node:assert/strict');
-  const fs = require('node:fs');
-  const path = require('node:path');
+const nodeVersionPolicyAssert = require('node:assert/strict');
+const nodeVersionPolicyFs = require('node:fs');
+const nodeVersionPolicyPath = require('node:path');
 
+(() => {
+  const assert = nodeVersionPolicyAssert;
+  const fs = nodeVersionPolicyFs;
+  const path = nodeVersionPolicyPath;
   interface PackageMetadata {
     engines?: {
       node?: string;

@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const pkg = require('../../package.json');
 
 const main = () => {
-  const pkg = require('../../package.json');
   const version = pkg['version'];
   if (!version) throw new Error('The version property is not set in the package.json file');
   if (typeof version !== 'string') {
