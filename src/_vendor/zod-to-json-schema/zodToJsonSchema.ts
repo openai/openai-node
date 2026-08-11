@@ -9,13 +9,14 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   options?: Partial<Options<Target>> | string,
 ): (Target extends 'jsonSchema7' ? JsonSchema7Type : object) & {
   $schema?: string;
-  definitions?: {
-    [key: string]: Target extends 'jsonSchema7'
+  definitions?: Record<
+    string,
+    Target extends 'jsonSchema7'
       ? JsonSchema7Type
       : Target extends 'jsonSchema2019-09'
         ? JsonSchema7Type
-        : object;
-  };
+        : object
+  >;
 } => {
   const refs = getRefs(options);
 

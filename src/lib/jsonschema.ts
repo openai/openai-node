@@ -102,16 +102,8 @@ export interface JSONSchema {
   maxProperties?: number | undefined;
   minProperties?: number | undefined;
   required?: string[] | undefined;
-  properties?:
-    | {
-        [key: string]: JSONSchemaDefinition;
-      }
-    | undefined;
-  patternProperties?:
-    | {
-        [key: string]: JSONSchemaDefinition;
-      }
-    | undefined;
+  properties?: Record<string, JSONSchemaDefinition> | undefined;
+  patternProperties?: Record<string, JSONSchemaDefinition> | undefined;
   additionalProperties?: JSONSchemaDefinition | undefined;
   propertyNames?: JSONSchemaDefinition | undefined;
 
@@ -133,21 +125,13 @@ export interface JSONSchema {
   /**
    * @see https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.2.4
    */
-  $defs?:
-    | {
-        [key: string]: JSONSchemaDefinition;
-      }
-    | undefined;
+  $defs?: Record<string, JSONSchemaDefinition> | undefined;
 
   /**
    * @deprecated Use $defs instead (draft 2019-09+)
    * @see https://tools.ietf.org/doc/html/draft-handrews-json-schema-validation-01#page-22
    */
-  definitions?:
-    | {
-        [key: string]: JSONSchemaDefinition;
-      }
-    | undefined;
+  definitions?: Record<string, JSONSchemaDefinition> | undefined;
 
   /**
    * @see https://json-schema.org/draft/2020-12/json-schema-core#ref

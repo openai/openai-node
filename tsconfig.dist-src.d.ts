@@ -4,9 +4,7 @@ export {};
 
 declare global {
   namespace NodeJS {
-    interface ProcessEnv {
-      [key: string]: string | undefined;
-    }
+    type ProcessEnv = Record<string, string | undefined>;
 
     interface Process {
       env: ProcessEnv;

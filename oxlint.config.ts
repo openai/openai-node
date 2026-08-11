@@ -42,7 +42,6 @@ const compatibilityRules = [
   'sort-keys',
   'typescript/array-type',
   'typescript/ban-ts-comment',
-  'typescript/consistent-indexed-object-style',
   'typescript/consistent-type-definitions',
   'typescript/consistent-type-imports',
   'typescript/method-signature-style',

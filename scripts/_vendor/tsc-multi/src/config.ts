@@ -13,7 +13,7 @@ const targetSchema = type({
   transpileOnly: optional(boolean()),
 });
 
-export type Target = Infer<typeof targetSchema> & { [key: string]: unknown };
+export type Target = Infer<typeof targetSchema> & Record<string, unknown>;
 
 const configSchema = object({
   projects: optional(array(string())),
