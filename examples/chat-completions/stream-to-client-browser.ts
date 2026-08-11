@@ -1,12 +1,11 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
 /**
- * This file is intended be run from the command-line with Node
+ * This file is intended to be run from the command line with Node
  * for easy demo purposes, but simulating use in the browser.
  *
  * To run it in a browser application, copy/paste it into a frontend application,
- * remove the 'node-fetch' import, and replace `process.stdout.write` with
- * a console.log or UI display.
+ * and replace `process.stdout.write` with `console.log` or a UI update.
  */
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 
@@ -15,8 +14,12 @@ fetch('http://localhost:3000', {
   body: 'Tell me why dogs are better than cats',
   headers: { 'Content-Type': 'text/plain' },
 }).then(async (res) => {
-  // @ts-ignore ReadableStream on different environments can be strange
-  const runner = ChatCompletionStream.fromReadableStream(res.body);
+  const stream = res.body;
+  if (!stream) {
+    throw new Error('Streaming response did not include a response body.');
+  }
+
+  const runner = ChatCompletionStream.fromReadableStream(stream);
 
   runner.on('content', (delta, snapshot) => {
     process.stdout.write(delta);

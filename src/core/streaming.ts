@@ -9,23 +9,43 @@ import type { OpenAI } from '../client';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+/** A decoded server-sent event before its JSON payload has been parsed. */
 export type ServerSentEvent = {
+  /** Explicit SSE event name, or `null` when the event has no `event:` field. */
   event: string | null;
+  /** Joined contents of the event's `data:` fields. */
   data: string;
+  /** Original event lines retained for diagnostics when parsing fails. */
   raw: string[];
 };
 
+/**
+ * A single-consumption asynchronous API response stream.
+ *
+ * Use {@link Stream.tee} when two consumers need the same events. Breaking out of
+ * a response-backed stream early aborts its request; branches created by `tee()`
+ * instead share {@link Stream.controller} for explicit cancellation.
+ */
 export class Stream<Item> implements AsyncIterable<Item> {
+  /** Abort controller for the underlying request and all branches created with `tee()`. */
   controller: AbortController;
   #client: OpenAI | undefined;
   private iterator: () => AsyncIterator<Item>;
 
+  /** Wraps an asynchronous event iterator and the controller that owns its request. */
   constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: OpenAI) {
     this.iterator = iterator;
     this.controller = controller;
     this.#client = client;
   }
 
+  /**
+   * Decodes an SSE response into parsed JSON events.
+   *
+   * The resulting stream can be consumed only once, ignores events after `[DONE]`, and
+   * surfaces API error payloads as `APIError` instances. When
+   * `synthesizeEventData` is enabled, each item also includes its SSE event name.
+   */
   static fromSSEResponse<Item>(
     response: Response,
     controller: AbortController,
@@ -199,6 +219,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     return new Stream(iterator, controller, client);
   }
 
+  /** Starts consuming this stream; attempting to consume it again throws. */
   [Symbol.asyncIterator](): AsyncIterator<Item> {
     return this.iterator();
   }
@@ -262,6 +283,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
   }
 }
 
+/**
+ * Decodes complete SSE records from a response and aborts when its body is absent.
+ *
+ * @yields {ServerSentEvent} Each decoded server-sent event in wire order.
+ */
 export async function* _iterSSEMessages(
   response: Response,
   controller: AbortController,

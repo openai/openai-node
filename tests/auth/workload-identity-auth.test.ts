@@ -6,6 +6,15 @@ import type { WorkloadIdentity } from 'openai/auth/types';
 
 const originalFetch = global.fetch;
 
+function tokenExchangeResponse(accessToken: string, expiresIn: number): Response {
+  return Response.json({
+    access_token: accessToken,
+    issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+    token_type: 'Bearer',
+    expires_in: expiresIn,
+  });
+}
+
 describe('WorkloadIdentityAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -137,6 +146,34 @@ describe('WorkloadIdentityAuth', () => {
     expect(token3).toBe('access-token');
     expect(providerCallCount).toBe(1);
     expect(fetchCallCount).toBe(1);
+  });
+
+  test('keeps cached tokens usable after a failed background refresh and retries later', async () => {
+    const config: WorkloadIdentity = {
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(tokenExchangeResponse('cached-token', 60))
+      .mockRejectedValueOnce(new Error('temporary refresh failure'))
+      .mockResolvedValueOnce(tokenExchangeResponse('refreshed-token', 3600));
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(3));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await expect(auth.getToken()).resolves.toBe('refreshed-token');
   });
 
   test('sends correct OAuth2 token exchange request', async () => {

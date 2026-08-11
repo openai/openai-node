@@ -4,39 +4,51 @@ import type { WebSocketLike } from './ws-adapter';
 /** A generic event listener callback. */
 type Listener = (...args: any[]) => void;
 
+/**
+ * Adapts a Node.js `ws` socket to the SDK's platform-neutral WebSocket API.
+ *
+ * Text frames become strings, binary frames become `Buffer` values, fragmented
+ * messages are merged, and close reasons are decoded before reaching listeners.
+ */
 export class NodeWebSocket implements WebSocketLike {
   private _ws: WS.WebSocket;
 
   /** Maps `(event, originalListener)` -> wrapped listener for correct `off()` removal. */
   private _listenerMap = new Map<string, Map<Listener, Listener>>();
 
+  /** Wraps an existing socket created by the optional `ws` package. */
   constructor(ws: WS.WebSocket) {
     this._ws = ws;
   }
 
-  /** The underlying platform-specific socket. Code that accesses this will not be isomorphic across server and browser environments. */
+  /** The underlying `ws` socket; accessing it makes calling code Node.js-specific. */
   get platformSocket(): WS.WebSocket {
     return this._ws;
   }
 
+  /** Current numeric socket connection state, using standard WebSocket values. */
   get readyState(): number {
     return this._ws.readyState;
   }
 
+  /** Sends a text or binary frame through the underlying `ws` connection. */
   send(data: string | ArrayBufferLike | ArrayBufferView): void {
     this._ws.send(data);
   }
 
+  /** Initiates the socket's closing handshake with an optional code and reason. */
   close(code?: number, reason?: string): void {
     this._ws.close(code, reason);
   }
 
+  /** Registers a listener with normalized message payloads and close reasons. */
   on(event: string, listener: Listener): void {
     const wrapped = NodeWebSocket._wrapListener(event, listener);
     this._listenersFor(event).set(listener, wrapped);
     this._ws.on(event, wrapped);
   }
 
+  /** Removes the platform listener associated with the original callback. */
   off(event: string, listener: Listener): void {
     const byListener = this._listenerMap.get(event);
     if (!byListener) {
@@ -49,6 +61,7 @@ export class NodeWebSocket implements WebSocketLike {
     }
   }
 
+  /** Registers a listener that is removed before it handles its first event. */
   once(event: string, listener: Listener): void {
     const onceListener: Listener = (...args) => {
       this.off(event, listener);

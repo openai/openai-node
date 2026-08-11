@@ -2,8 +2,11 @@ import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../re
 import { OpenAIError } from '../../error';
 import { addOutputText } from '../ResponsesParser';
 
+/** A transport keepalive event that leaves the accumulated response unchanged. */
 type ResponseKeepAliveEvent = {
+  /** Identifies a non-content keepalive event emitted by the response transport. */
   type: 'keepalive';
+  /** Monotonically ordered event sequence number assigned by the response stream. */
   sequence_number: number;
 };
 

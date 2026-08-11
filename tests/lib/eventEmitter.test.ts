@@ -3,6 +3,7 @@ import { EventEmitter } from 'openai/lib/EventEmitter';
 
 type TestEvents = {
   foo: (value: string) => void;
+  pair: (value: string, index: number) => void;
   error: (err: Error) => void;
 };
 
@@ -12,6 +13,9 @@ class TestEmitter extends EventEmitter<TestEvents> {
   }
   emitError(err: Error) {
     this._emit('error', err);
+  }
+  emitPair(value: string, index: number) {
+    this._emit('pair', value, index);
   }
   hasListener(event: keyof TestEvents) {
     return this._hasListener(event);
@@ -42,6 +46,16 @@ describe('EventEmitter.emitted', () => {
     const error = new Error('oops');
     emitter.emitError(error);
     await expect(promise).resolves.toBe(error);
+  });
+
+  test('resolves all arguments from a multi-argument event as a tuple', async () => {
+    const emitter = new TestEmitter();
+    const promise = emitter.emitted('pair');
+
+    emitter.emitPair('value', 3);
+
+    await expect(promise).resolves.toEqual(['value', 3]);
+    expect(emitter.hasListener('error')).toBe(false);
   });
 });
 

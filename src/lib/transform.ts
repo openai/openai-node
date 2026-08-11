@@ -87,6 +87,7 @@ const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
   'type',
 ]);
 
+/** Visits a nested schema together with its root-relative path and containing schema keyword. */
 type JSONSchemaChildVisitor = (schema: unknown, path: string[], keyword: string) => void;
 
 /**
@@ -135,6 +136,14 @@ export function forEachJSONSchemaChild(
   }
 }
 
+/**
+ * Returns a cloned schema normalized for strict Structured Outputs.
+ *
+ * Object properties become required, object schemas are closed to additional
+ * properties, and representable local references and intersections are preserved.
+ *
+ * @throws {Error} If the schema cannot be represented without changing its validation semantics.
+ */
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const schemaCopy = structuredClone(schema);
   // JSON serialization omits undefined object properties. Drop optional
@@ -864,6 +873,12 @@ function resolvePointerPart(resolved: unknown, part: string): unknown | undefine
   return resolved[part];
 }
 
+/**
+ * Resolves a local JSON Pointer through schema-bearing keywords only.
+ *
+ * Returns `undefined` for external references, malformed pointers, missing
+ * targets, and pointers into literal values such as `default` or `enum`.
+ */
 export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | undefined {
   const parts = parseLocalRef(ref);
   if (parts === undefined) {
@@ -1016,6 +1031,7 @@ function isArrayOnlySchema(
   );
 }
 
+/** Returns whether a schema contains only a reference, reusable definitions, and annotations. */
 export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
   return Object.keys(schema).every(
     // Definition maps do not add sibling validation constraints, and keeping
@@ -1152,6 +1168,11 @@ function normalizeAnyOfFalseBranches(jsonSchema: JSONSchema): void {
   }
 }
 
+/**
+ * Rejects nested schema resource identifiers that would change local reference scope.
+ *
+ * @throws {Error} If a nested subschema defines its own `$id`.
+ */
 export function assertNoNestedSchemaIds(schema: JSONSchema): void {
   const visit = (value: JSONSchemaDefinition, path: string[]): void => {
     if (typeof value === 'boolean' || !isObject(value)) {

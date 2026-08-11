@@ -18,12 +18,16 @@ import type { ParseableToolsParams } from '../ResponsesParser';
 import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
 
+/** Parameters for starting a new response stream or replaying an existing response. */
 export type ResponseStreamParams = ResponseCreateAndStreamParams | ResponseStreamByIdParams;
 
+/** Response-creation parameters accepted by the streaming convenience helper. */
 export type ResponseCreateAndStreamParams = Omit<ResponseCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
 
+/** Parameters for replaying an existing response and optionally filtering emitted events. */
 export type ResponseStreamByIdParams = {
   /**
    * The ID of the response to stream.
@@ -51,22 +55,37 @@ export type ResponseStreamByIdParams = {
   tools?: ParseableToolsParams;
 };
 
+/** Raw Responses API events, lifecycle notifications, and snapshot-enhanced delta listeners. */
 type ResponseEvents = BaseEvents &
   Omit<
     {
-      [K in ResponseStreamEvent['type']]: (event: Extract<ResponseStreamEvent, { type: K }>) => void;
+      [K in ResponseStreamEvent['type']]: (
+        event: Extract<
+          ResponseStreamEvent,
+          {
+            /** Event discriminator that selects the listener's precise server-event payload. */
+            type: K;
+          }
+        >,
+      ) => void;
     },
     'response.output_text.delta' | 'response.function_call_arguments.delta'
   > & {
+    /** Called for every raw response event that passes the replay sequence filter. */
     event: (event: ResponseStreamEvent) => void;
+    /** Called with each text fragment and the complete text accumulated for its content part. */
     'response.output_text.delta': (event: ResponseTextDeltaEvent) => void;
+    /** Called with each argument fragment and the complete JSON accumulated for its function call. */
     'response.function_call_arguments.delta': (event: ResponseFunctionCallArgumentsDeltaEvent) => void;
   };
 
+/** Response request parameters retained to parse structured output and tool arguments. */
 export type ResponseStreamingParams = Omit<ResponseCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
 
+/** Streams Responses API events while accumulating the latest response and parsed output. */
 export class ResponseStream<ParsedT = null>
   extends EventStream<ResponseEvents>
   implements AsyncIterable<ResponseStreamEvent>
@@ -75,11 +94,13 @@ export class ResponseStream<ParsedT = null>
   #currentResponseSnapshot: Response | undefined;
   #finalResponse: ParsedResponse<ParsedT> | undefined;
 
+  /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ResponseStreamingParams | null) {
     super();
     this.#params = params;
   }
 
+  /** Starts a new response stream or replays an existing response by its identifier. */
   static createResponse<ParsedT>(
     client: OpenAI,
     params: ResponseStreamParams,
@@ -95,6 +116,7 @@ export class ResponseStream<ParsedT = null>
     return runner;
   }
 
+  /** Consumes serialized response events from a readable stream in another runtime. */
   static fromReadableStream(stream: ReadableStream): ResponseStream<null> {
     const runner = new ResponseStream(null);
     runner._run(() => runner._fromReadableStream(stream));
@@ -233,6 +255,7 @@ export class ResponseStream<ParsedT = null>
     return this.#endRequest();
   }
 
+  /** Iterates over response events; stopping iteration early aborts the underlying request. */
   [Symbol.asyncIterator](this: ResponseStream<ParsedT>): AsyncIterator<ResponseStreamEvent> {
     const pushQueue: ResponseStreamEvent[] = [];
     const readQueue: {
@@ -295,14 +318,16 @@ export class ResponseStream<ParsedT = null>
   }
 
   /**
-   * @returns a promise that resolves with the final Response, or rejects
-   * if an error occurred or the stream ended prematurely without producing a REsponse.
+   * Waits for the stream to end and returns its latest accumulated response.
+   *
+   * A clean end after at least one response event resolves even when the response is
+   * incomplete. Network errors, cancellation, and streams without a response reject.
    */
   async finalResponse(): Promise<ParsedResponse<ParsedT>> {
     await this.done();
     const response = this.#finalResponse;
     if (!response) {
-      throw new OpenAIError('stream ended without producing a ChatCompletion');
+      throw new OpenAIError('stream ended without producing a Response');
     }
     return response;
   }

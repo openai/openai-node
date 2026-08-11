@@ -10,6 +10,7 @@ import type { ResponseStreamParams } from './lib/responses/ResponseStream';
 import * as API from './resources/index';
 import type * as ResponsesAPI from './resources/responses/responses';
 
+/** Configures Amazon Bedrock's OpenAI-compatible endpoint and bearer-token authentication. */
 export interface BedrockClientOptions extends Omit<
   ClientOptions,
   'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity'
@@ -181,6 +182,7 @@ export class BedrockOpenAI extends OpenAI {
     return super.authHeaders(opts, security);
   }
 
+  /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */
   override withOptions(options: Partial<BedrockClientOptions>): this {
     const bedrockTokenProvider =
       options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;

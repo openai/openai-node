@@ -1,3 +1,4 @@
+/** The listener callback associated with one event name in an event map. */
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
 type EventListeners<Events, EventType extends keyof Events> = {
@@ -5,11 +6,13 @@ type EventListeners<Events, EventType extends keyof Events> = {
   once?: boolean;
 }[];
 
+/** The positional listener arguments associated with a named event. */
 export type EventParameters<Events, EventType extends keyof Events> = Record<
   EventType,
   EventListener<Events, EventType> extends (...args: infer P) => any ? P : never
 >[EventType];
 
+/** A lightweight event emitter with type-safe listeners and promise-based event waiting. */
 export class EventEmitter<EventTypes extends Record<string, (...args: any) => any>> {
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
@@ -61,9 +64,11 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   /**
    * This is similar to `.once()`, but returns a Promise that resolves the next time
    * the event is triggered, instead of calling a listener callback.
-   * @returns a Promise that resolves the next time given event is triggered,
-   * or rejects if an error is emitted.  (If you request the 'error' event,
-   * returns a promise that resolves with the error).
+   * Events without arguments resolve to `undefined`, single-argument events resolve
+   * to that argument, and events with multiple arguments resolve to an argument tuple.
+   *
+   * @returns A promise for the next event, or a rejection if an error occurs first.
+   * Requesting the `error` event resolves with the emitted error instead.
    *
    * Example:
    *
@@ -83,11 +88,11 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         this.off(event, onEvent as any);
         reject(error);
       };
-      const onEvent = (value: unknown) => {
+      const onEvent = (...values: unknown[]) => {
         if (event !== 'error') {
           this.off('error', onError as any);
         }
-        resolve(value as any);
+        resolve((values.length > 1 ? values : values[0]) as any);
       };
 
       if (event !== 'error') {

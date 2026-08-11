@@ -47,6 +47,53 @@ describe('toFile', () => {
     expect(file.name).toEqual('input.jsonl');
   });
 
+  it('infers the MIME type of a Blob when creating a File', async () => {
+    const input = new Blob(['contents'], { type: 'text/plain' });
+
+    const file = await toFile(input, 'contents.txt');
+
+    expect(file.name).toBe('contents.txt');
+    expect(file.type).toBe('text/plain');
+    await expect(file.text()).resolves.toBe('contents');
+  });
+
+  it('prefers an explicit MIME type over the input Blob type', async () => {
+    const input = new Blob(['contents'], { type: 'text/plain' });
+
+    const file = await toFile(input, 'contents.txt', { type: 'application/custom' });
+
+    expect(file.type).toBe('application/custom');
+  });
+
+  it('preserves the filename and MIME type of a non-native File-compatible input', async () => {
+    const input = Object.assign(new Blob(['foreign contents'], { type: 'text/plain' }), {
+      name: 'foreign.txt',
+      lastModified: 123,
+    });
+
+    const file = await toFile(input);
+
+    expect(file.name).toBe('foreign.txt');
+    expect(file.type).toBe('text/plain');
+    await expect(file.text()).resolves.toBe('foreign contents');
+  });
+
+  it('applies filename and metadata overrides to non-native File-compatible inputs', async () => {
+    const input = Object.assign(new Blob(['foreign contents'], { type: 'text/plain' }), {
+      name: 'foreign.txt',
+      lastModified: 123,
+    });
+
+    const file = await toFile(input, 'override.txt', {
+      type: 'application/custom',
+      lastModified: 42,
+    });
+
+    expect(file.name).toBe('override.txt');
+    expect(file.type).toBe('application/custom');
+    expect(file.lastModified).toBe(42);
+  });
+
   it('extracts a file name from a ReadStream', async () => {
     const input = fs.createReadStream('tests/uploads.test.ts');
     const file = await toFile(input);

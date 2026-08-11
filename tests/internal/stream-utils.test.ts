@@ -64,6 +64,25 @@ describe.each([
   });
 });
 
+describe('standalone readable stream adapter', () => {
+  test('returns an actual async iterator for native Web ReadableStreams', async () => {
+    const stream = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue('value');
+        controller.close();
+      },
+    });
+
+    const iterator = adaptStandaloneReadableStream<string>(stream);
+
+    expect(iterator).not.toBe(stream);
+    expect(typeof iterator.next).toBe('function');
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: 'value' });
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
+    expect(stream.locked).toBe(false);
+  });
+});
+
 describe('ReadableStreamFrom', () => {
   test('consumes synchronous and asynchronous iterables', async () => {
     const synchronous: number[] = [];
