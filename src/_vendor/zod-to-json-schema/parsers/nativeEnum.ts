@@ -14,10 +14,13 @@ export function parseNativeEnumDef(def: ZodNativeEnumDef): JsonSchema7NativeEnum
   const actualValues = actualKeys.map((key: string) => object[key]!);
 
   const parsedTypes = [...new Set(actualValues.map((values: string | number) => typeof values))];
+  let type: 'string' | 'number' | ['string', 'number'] = ['string', 'number'];
+  if (parsedTypes.length === 1) {
+    type = parsedTypes[0] === 'string' ? 'string' : 'number';
+  }
 
   return {
-    type:
-      parsedTypes.length === 1 ? (parsedTypes[0] === 'string' ? 'string' : 'number') : ['string', 'number'],
+    type,
     enum: actualValues,
   };
 }

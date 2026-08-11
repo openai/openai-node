@@ -19,7 +19,6 @@ const compatibilityRules = [
   'no-bitwise',
   'no-eq-null',
   'no-inline-comments',
-  'no-nested-ternary',
   'no-param-reassign',
   'no-plusplus',
   'no-promise-executor-return',
