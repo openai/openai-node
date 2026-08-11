@@ -12,7 +12,9 @@ export type JsonSchema7AllOfType = {
 const isJsonSchema7AllOfType = (
   type: JsonSchema7Type | JsonSchema7StringType,
 ): type is JsonSchema7AllOfType => {
-  if ('type' in type && type.type === 'string') return false;
+  if ('type' in type && type.type === 'string') {
+    return false;
+  }
   return 'allOf' in type;
 };
 

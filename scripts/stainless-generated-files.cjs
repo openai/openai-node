@@ -12,10 +12,16 @@ function findGeneratedFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(directory, entry.name);
 
-    if (entry.isDirectory()) return ignoredDirectories.has(entry.name) ? [] : findGeneratedFiles(file);
-    if (!entry.isFile() || !/\.[cm]?[jt]sx?$/.test(entry.name)) return [];
+    if (entry.isDirectory()) {
+      return ignoredDirectories.has(entry.name) ? [] : findGeneratedFiles(file);
+    }
+    if (!entry.isFile() || !/\.[cm]?[jt]sx?$/.test(entry.name)) {
+      return [];
+    }
     const content = fs.readFileSync(file, 'utf-8');
-    if (!generatedHeaders.some((header) => content.startsWith(header))) return [];
+    if (!generatedHeaders.some((header) => content.startsWith(header))) {
+      return [];
+    }
 
     return [path.relative(repositoryRoot, file).split(path.sep).join('/')];
   });

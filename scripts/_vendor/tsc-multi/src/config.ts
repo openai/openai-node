@@ -47,7 +47,9 @@ export async function loadConfig({ cwd = process.cwd(), path }: LoadConfigOption
   debug('Read config from %s', configPath);
 
   const json = await (() => {
-    if (mustLoadConfig) return readJSON(configPath);
+    if (mustLoadConfig) {
+      return readJSON(configPath);
+    }
     return tryReadJSON(configPath);
   })();
 

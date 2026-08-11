@@ -8,7 +8,9 @@ function findResourceIndexes(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = nodePath.join(directory, entry.name);
 
-    if (entry.isDirectory()) return findResourceIndexes(path);
+    if (entry.isDirectory()) {
+      return findResourceIndexes(path);
+    }
     return entry.name === 'index.ts' ? [path] : [];
   });
 }

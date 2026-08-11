@@ -11,7 +11,9 @@ export function addErrorMessage<T extends { errorMessage?: ErrorMessages<any> }>
   errorMessage: string | undefined,
   refs: Refs,
 ) {
-  if (!refs?.errorMessages) return;
+  if (!refs?.errorMessages) {
+    return;
+  }
   if (errorMessage) {
     res.errorMessage = {
       ...res.errorMessage,

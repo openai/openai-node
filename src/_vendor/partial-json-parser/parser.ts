@@ -70,10 +70,18 @@ const _parseJSON = (jsonString: string, allow: number) => {
 
   const parseAny: () => any = () => {
     skipBlank();
-    if (index >= length) markPartialJSON('Unexpected end of input');
-    if (jsonString[index] === '"') return parseStr();
-    if (jsonString[index] === '{') return parseObj();
-    if (jsonString[index] === '[') return parseArr();
+    if (index >= length) {
+      markPartialJSON('Unexpected end of input');
+    }
+    if (jsonString[index] === '"') {
+      return parseStr();
+    }
+    if (jsonString[index] === '{') {
+      return parseObj();
+    }
+    if (jsonString[index] === '[') {
+      return parseArr();
+    }
     if (
       jsonString.substring(index, index + 4) === 'null' ||
       (Allow.NULL & allow && length - index < 4 && 'null'.startsWith(jsonString.substring(index)))
@@ -154,7 +162,9 @@ const _parseJSON = (jsonString: string, allow: number) => {
     try {
       while (jsonString[index] !== '}') {
         skipBlank();
-        if (index >= length && Allow.OBJ & allow) return obj;
+        if (index >= length && Allow.OBJ & allow) {
+          return obj;
+        }
         const key = parseStr();
         skipBlank();
         index++; // skip colon
@@ -162,14 +172,20 @@ const _parseJSON = (jsonString: string, allow: number) => {
           const value = parseAny();
           Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
         } catch (e) {
-          if (Allow.OBJ & allow) return obj;
+          if (Allow.OBJ & allow) {
+            return obj;
+          }
           throw e;
         }
         skipBlank();
-        if (jsonString[index] === ',') index++; // skip comma
+        if (jsonString[index] === ',') {
+          index++;
+        } // skip comma
       }
     } catch {
-      if (Allow.OBJ & allow) return obj;
+      if (Allow.OBJ & allow) {
+        return obj;
+      }
       markPartialJSON("Expected '}' at end of object");
     }
     index++; // skip final brace
@@ -199,14 +215,17 @@ const _parseJSON = (jsonString: string, allow: number) => {
 
   const parseNum = () => {
     if (index === 0) {
-      if (jsonString === '-' && Allow.NUM & allow) markPartialJSON("Not sure what '-' is");
+      if (jsonString === '-' && Allow.NUM & allow) {
+        markPartialJSON("Not sure what '-' is");
+      }
       try {
         return JSON.parse(jsonString);
       } catch (e) {
         if (Allow.NUM & allow) {
           try {
-            if (jsonString[jsonString.length - 1] === '.')
+            if (jsonString[jsonString.length - 1] === '.') {
               return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('.')));
+            }
             return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('e')));
           } catch {
             // Fall through to report malformed input below.
@@ -218,16 +237,23 @@ const _parseJSON = (jsonString: string, allow: number) => {
 
     const start = index;
 
-    if (jsonString[index] === '-') index++;
-    while (jsonString[index] && !',]}'.includes(jsonString[index]!)) index++;
+    if (jsonString[index] === '-') {
+      index++;
+    }
+    while (jsonString[index] && !',]}'.includes(jsonString[index]!)) {
+      index++;
+    }
 
-    if (index === length && !(Allow.NUM & allow)) markPartialJSON('Unterminated number literal');
+    if (index === length && !(Allow.NUM & allow)) {
+      markPartialJSON('Unterminated number literal');
+    }
 
     try {
       return JSON.parse(jsonString.substring(start, index));
     } catch {
-      if (jsonString.substring(start, index) === '-' && Allow.NUM & allow)
+      if (jsonString.substring(start, index) === '-' && Allow.NUM & allow) {
         markPartialJSON("Not sure what '-' is");
+      }
       try {
         return JSON.parse(jsonString.substring(start, jsonString.lastIndexOf('e')));
       } catch (e) {

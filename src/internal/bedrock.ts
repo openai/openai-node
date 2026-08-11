@@ -70,7 +70,9 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
       ? normalizeOptionalString(readEnv('AWS_BEDROCK_BASE_URL'))
       : normalizeOptionalString(options.baseURL);
 
-  if (configuredBaseURL) return { region, baseURL: normalizeBaseURL(configuredBaseURL) };
+  if (configuredBaseURL) {
+    return { region, baseURL: normalizeBaseURL(configuredBaseURL) };
+  }
   if (!region) {
     throw new Errors.OpenAIError(
       'Bedrock requires an AWS region. Pass `region` to `bedrock(...)`, or set `AWS_REGION` or `AWS_DEFAULT_REGION`.',

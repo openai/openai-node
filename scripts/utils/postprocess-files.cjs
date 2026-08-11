@@ -9,14 +9,19 @@ const distDir = process.env['DIST_PATH']
 async function* walk(dir) {
   for await (const d of await fs.promises.opendir(dir)) {
     const entry = path.join(dir, d.name);
-    if (d.isDirectory()) yield* walk(entry);
-    else if (d.isFile()) yield entry;
+    if (d.isDirectory()) {
+      yield* walk(entry);
+    } else if (d.isFile()) {
+      yield entry;
+    }
   }
 }
 
 async function postprocess() {
   for await (const file of walk(distDir)) {
-    if (!/(\.d)?[cm]?ts$/.test(file)) continue;
+    if (!/(\.d)?[cm]?ts$/.test(file)) {
+      continue;
+    }
 
     const code = await fs.promises.readFile(file, 'utf-8');
 

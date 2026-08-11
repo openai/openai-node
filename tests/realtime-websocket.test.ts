@@ -154,11 +154,17 @@ describe.each([
       );
       expect(new Realtime({ model: 'gpt-realtime' }, ephemeral).socket).toBe(lastBrowserSocket());
     } finally {
-      if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
-      else Reflect.deleteProperty(globalThis, 'window');
+      if (originalWindow) {
+        Object.defineProperty(globalThis, 'window', originalWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, 'window');
+      }
 
-      if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
-      else Reflect.deleteProperty(globalThis, 'navigator');
+      if (originalNavigator) {
+        Object.defineProperty(globalThis, 'navigator', originalNavigator);
+      } else {
+        Reflect.deleteProperty(globalThis, 'navigator');
+      }
     }
   });
 

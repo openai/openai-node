@@ -45,7 +45,9 @@ type QueueEntry =
   | { kind: 'raw'; data: RawWebSocketData; byteLength: number };
 
 function toUint8Array(view: ArrayBufferView): Uint8Array {
-  if (view instanceof Uint8Array) return view;
+  if (view instanceof Uint8Array) {
+    return view;
+  }
   return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
 }
 
@@ -54,13 +56,19 @@ function toUint8Array(view: ArrayBufferView): Uint8Array {
  * `ws.send()` transmits the correct bytes.
  */
 export function flattenRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
-  if (Array.isArray(data)) return concatBytes(data.map(toUint8Array));
+  if (Array.isArray(data)) {
+    return concatBytes(data.map(toUint8Array));
+  }
   return data;
 }
 
 function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
-  if (typeof data === 'string') return data;
-  if (Array.isArray(data)) return concatBytes(data.map(toUint8Array));
+  if (typeof data === 'string') {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return concatBytes(data.map(toUint8Array));
+  }
   if (ArrayBuffer.isView(data)) {
     const copy = new Uint8Array(data.byteLength);
     copy.set(toUint8Array(data));
@@ -71,9 +79,15 @@ function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, Arra
 }
 
 function rawByteLength(data: RawWebSocketData): number {
-  if (typeof data === 'string') return encodeUTF8(data).byteLength;
-  if (Array.isArray(data)) return data.reduce((sum, buf) => sum + buf.byteLength, 0);
-  if ('byteLength' in data) return data.byteLength;
+  if (typeof data === 'string') {
+    return encodeUTF8(data).byteLength;
+  }
+  if (Array.isArray(data)) {
+    return data.reduce((sum, buf) => sum + buf.byteLength, 0);
+  }
+  if ('byteLength' in data) {
+    return data.byteLength;
+  }
   return 0;
 }
 
@@ -148,7 +162,9 @@ export class SendQueue<T = unknown> {
    */
   drain(): UnsentMessage<T>[] {
     const unsent = this._queue.map((entry): UnsentMessage<T> => {
-      if (entry.kind === 'raw') return { type: 'raw', data: entry.data };
+      if (entry.kind === 'raw') {
+        return { type: 'raw', data: entry.data };
+      }
       return { type: 'message', message: JSON.parse(entry.data) as T };
     });
     this._queue = [];

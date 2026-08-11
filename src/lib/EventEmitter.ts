@@ -37,9 +37,13 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    */
   off<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
     const listeners = this.#listeners[event];
-    if (!listeners) return this;
+    if (!listeners) {
+      return this;
+    }
     const index = listeners.findIndex((l) => l.listener === listener);
-    if (index !== -1) listeners.splice(index, 1);
+    if (index !== -1) {
+      listeners.splice(index, 1);
+    }
     return this;
   }
 
@@ -80,11 +84,15 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         reject(error);
       };
       const onEvent = (value: unknown) => {
-        if (event !== 'error') this.off('error', onError as any);
+        if (event !== 'error') {
+          this.off('error', onError as any);
+        }
         resolve(value as any);
       };
 
-      if (event !== 'error') this.once('error', onError as any);
+      if (event !== 'error') {
+        this.once('error', onError as any);
+      }
       this.once(event, onEvent as any);
     });
   }

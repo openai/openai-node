@@ -337,7 +337,9 @@ const addPattern = (
 // Mutate z.string.regex() in a best attempt to accommodate for regex flags when applyRegexFlags is true
 const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): string => {
   const regex = typeof regexOrFunction === 'function' ? regexOrFunction() : regexOrFunction;
-  if (!refs.applyRegexFlags || !regex.flags) return regex.source;
+  if (!refs.applyRegexFlags || !regex.flags) {
+    return regex.source;
+  }
 
   // Currently handled flags
   const flags = {

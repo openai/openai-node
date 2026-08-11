@@ -70,7 +70,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
     sourceFile: ts.SourceFile,
     node: T,
   ): ts.LiteralExpression | T {
-    if (!isStringLiteral(node) || !isRelativePath(node.text)) return node;
+    if (!isStringLiteral(node) || !isRelativePath(node.text)) {
+      return node;
+    }
 
     const ext = nodePath.extname(node.text);
 
@@ -165,7 +167,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
 
       // ESM export
       if (isExportDeclaration(node)) {
-        if (!node.moduleSpecifier) return node;
+        if (!node.moduleSpecifier) {
+          return node;
+        }
 
         return factory.updateExportDeclaration(
           node,
@@ -180,7 +184,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
       // ESM dynamic import
       if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
         const [firstArg, ...restArg] = node.arguments;
-        if (!firstArg) return node;
+        if (!firstArg) {
+          return node;
+        }
 
         return factory.updateCallExpression(node, node.expression, node.typeArguments, [
           updateModuleSpecifier(ctx, sourceFile, firstArg),
@@ -195,7 +201,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
         node.expression.escapedText === 'require'
       ) {
         const [firstArg, ...restArgs] = node.arguments;
-        if (!firstArg) return node;
+        if (!firstArg) {
+          return node;
+        }
 
         return factory.updateCallExpression(node, node.expression, node.typeArguments, [
           resolvedShareHelpers && tslibRequires.has(node)
@@ -220,7 +228,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
     };
 
     const pureClassAssignment = (sourceFile: ts.SourceFile) => {
-      if (!options.pureClassAssignment) return sourceFile;
+      if (!options.pureClassAssignment) {
+        return sourceFile;
+      }
       const newStatements = [];
       const classes: Record<
         string,

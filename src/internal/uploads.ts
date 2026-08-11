@@ -130,7 +130,9 @@ export const maybeMultipartFormRequestOptions = async (
   opts: RequestOptions,
   fetch: OpenAI | Fetch,
 ): Promise<RequestOptions> => {
-  if (!hasUploadableValue(opts.body)) return opts;
+  if (!hasUploadableValue(opts.body)) {
+    return opts;
+  }
 
   if (hasStreamingUploadableValue(opts.body)) {
     return createStreamingFormRequestOptions(opts);
@@ -163,7 +165,9 @@ const supportsFormDataMap = /* @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>
 function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
   const fetch: Fetch = typeof fetchObject === 'function' ? fetchObject : (fetchObject as any).fetch;
   const cached = supportsFormDataMap.get(fetch);
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
   const promise = (async () => {
     try {
       let FetchResponse: typeof Response;
@@ -225,22 +229,34 @@ const isUploadable = (value: unknown): value is Uploadable =>
     isNamedBlob(value));
 
 const hasStreamingUploadableValue = (value: unknown): boolean => {
-  if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) return true;
-  if (Array.isArray(value)) return value.some(hasStreamingUploadableValue);
+  if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.some(hasStreamingUploadableValue);
+  }
   if (value && typeof value === 'object' && !isNamedBlob(value) && !(value instanceof Response)) {
     for (const k in value) {
-      if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) return true;
+      if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) {
+        return true;
+      }
     }
   }
   return false;
 };
 
 const hasUploadableValue = (value: unknown): boolean => {
-  if (isUploadable(value)) return true;
-  if (Array.isArray(value)) return value.some(hasUploadableValue);
+  if (isUploadable(value)) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.some(hasUploadableValue);
+  }
   if (value && typeof value === 'object') {
     for (const k in value) {
-      if (hasUploadableValue((value as any)[k])) return true;
+      if (hasUploadableValue((value as any)[k])) {
+        return true;
+      }
     }
   }
   return false;
@@ -282,7 +298,9 @@ async function* iterateMultipartBody(body: unknown, boundary: string): AsyncGene
 }
 
 async function* iterateFormEntries(body: unknown): AsyncGenerator<FormEntry> {
-  if (!body || typeof body !== 'object') return;
+  if (!body || typeof body !== 'object') {
+    return;
+  }
 
   for (const [key, value] of Object.entries(body)) {
     yield* iterateFormValue(key, value);
@@ -290,7 +308,9 @@ async function* iterateFormEntries(body: unknown): AsyncGenerator<FormEntry> {
 }
 
 async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<FormEntry> {
-  if (value === undefined) return;
+  if (value === undefined) {
+    return;
+  }
   if (value == null) {
     throw new TypeError(
       `Received null for "${key}"; to pass null in FormData, you must use the string 'null'`,
@@ -324,14 +344,22 @@ function getStreamingFileName(value: Uploadable): string {
 }
 
 function getStreamingFileType(value: Uploadable): string {
-  if (isStreamingFile(value)) return value.type || 'application/octet-stream';
-  if (isNamedBlob(value) && value.type) return value.type;
-  if (value instanceof Response) return value.headers.get('content-type') || 'application/octet-stream';
+  if (isStreamingFile(value)) {
+    return value.type || 'application/octet-stream';
+  }
+  if (isNamedBlob(value) && value.type) {
+    return value.type;
+  }
+  if (value instanceof Response) {
+    return value.headers.get('content-type') || 'application/octet-stream';
+  }
   return 'application/octet-stream';
 }
 
 function getStreamingFileData(value: Uploadable): unknown {
-  if (isStreamingFile(value)) return value.data;
+  if (isStreamingFile(value)) {
+    return value.data;
+  }
   return value;
 }
 
@@ -368,7 +396,9 @@ function escapeHeaderValue(value: string): string {
 }
 
 const addFormValue = async (form: FormData, key: string, value: unknown): Promise<void> => {
-  if (value === undefined) return;
+  if (value === undefined) {
+    return;
+  }
   if (value == null) {
     throw new TypeError(
       `Received null for "${key}"; to pass null in FormData, you must use the string 'null'`,

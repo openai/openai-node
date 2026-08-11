@@ -39,7 +39,9 @@ export class NodeWebSocket implements WebSocketLike {
 
   off(event: string, listener: Listener): void {
     const byListener = this._listenerMap.get(event);
-    if (!byListener) return;
+    if (!byListener) {
+      return;
+    }
     const wrapped = byListener.get(listener);
     if (wrapped) {
       byListener.delete(listener);
@@ -75,13 +77,21 @@ export class NodeWebSocket implements WebSocketLike {
     isBinary: boolean,
   ): string | Buffer {
     if (!isBinary) {
-      if (Array.isArray(data)) return Buffer.concat(data).toString();
-      if (data instanceof ArrayBuffer) return Buffer.from(data).toString();
+      if (Array.isArray(data)) {
+        return Buffer.concat(data).toString();
+      }
+      if (data instanceof ArrayBuffer) {
+        return Buffer.from(data).toString();
+      }
       return data.toString();
     }
 
-    if (Array.isArray(data)) return Buffer.concat(data);
-    if (data instanceof ArrayBuffer) return Buffer.from(data);
+    if (Array.isArray(data)) {
+      return Buffer.concat(data);
+    }
+    if (data instanceof ArrayBuffer) {
+      return Buffer.from(data);
+    }
     return data;
   }
 

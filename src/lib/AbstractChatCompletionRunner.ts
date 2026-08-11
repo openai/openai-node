@@ -52,15 +52,27 @@ function normalizeToolCallIds(chatCompletion: ChatCompletion): void {
  * on runner.messages for callers, but only replay valid request fields.
  */
 function toRequestMessage(message: ChatCompletionMessageParam): ChatCompletionMessageParam {
-  if (!isAssistantMessage(message)) return message;
+  if (!isAssistantMessage(message)) {
+    return message;
+  }
 
   const requestMessage: ChatCompletionAssistantMessageParam = { role: 'assistant' };
 
-  if (message.audio != null) requestMessage.audio = { id: message.audio.id };
-  if (message.content !== undefined) requestMessage.content = message.content;
-  if (message.function_call != null) requestMessage.function_call = message.function_call;
-  if (message.name !== undefined) requestMessage.name = message.name;
-  if (message.refusal != null) requestMessage.refusal = message.refusal;
+  if (message.audio != null) {
+    requestMessage.audio = { id: message.audio.id };
+  }
+  if (message.content !== undefined) {
+    requestMessage.content = message.content;
+  }
+  if (message.function_call != null) {
+    requestMessage.function_call = message.function_call;
+  }
+  if (message.name !== undefined) {
+    requestMessage.name = message.name;
+  }
+  if (message.refusal != null) {
+    requestMessage.refusal = message.refusal;
+  }
   if (message.tool_calls !== undefined) {
     requestMessage.tool_calls = message.tool_calls.map((toolCall) => {
       if (toolCall.type === 'custom') {
@@ -120,7 +132,9 @@ export class AbstractChatCompletionRunner<
     this._chatCompletions.push(chatCompletion);
     this._emit('chatCompletion', chatCompletion);
     const message = chatCompletion.choices[0]?.message;
-    if (message) this._addMessage(message as ChatCompletionMessageParam);
+    if (message) {
+      this._addMessage(message as ChatCompletionMessageParam);
+    }
     return chatCompletion;
   }
 
@@ -129,7 +143,9 @@ export class AbstractChatCompletionRunner<
     message: ChatCompletionMessageParam,
     emit = true,
   ) {
-    if (!('content' in message)) message.content = null;
+    if (!('content' in message)) {
+      message.content = null;
+    }
 
     this.messages.push(message);
 
@@ -155,7 +171,9 @@ export class AbstractChatCompletionRunner<
   async finalChatCompletion(): Promise<ParsedChatCompletion<ParsedT>> {
     await this.done();
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
-    if (!completion) throw new OpenAIError('stream ended without producing a ChatCompletion');
+    if (!completion) {
+      throw new OpenAIError('stream ended without producing a ChatCompletion');
+    }
     return completion;
   }
 
@@ -277,17 +295,27 @@ export class AbstractChatCompletionRunner<
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
   ) {
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
-    if (completion) this._emit('finalChatCompletion', completion);
+    if (completion) {
+      this._emit('finalChatCompletion', completion);
+    }
     const finalMessage = this.#getFinalMessage();
-    if (finalMessage) this._emit('finalMessage', finalMessage);
+    if (finalMessage) {
+      this._emit('finalMessage', finalMessage);
+    }
     const finalContent = this.#getFinalContent();
-    if (finalContent) this._emit('finalContent', finalContent);
+    if (finalContent) {
+      this._emit('finalContent', finalContent);
+    }
 
     const finalFunctionCall = this.#getFinalFunctionToolCall();
-    if (finalFunctionCall) this._emit('finalFunctionToolCall', finalFunctionCall);
+    if (finalFunctionCall) {
+      this._emit('finalFunctionToolCall', finalFunctionCall);
+    }
 
     const finalFunctionCallResult = this.#getFinalFunctionToolCallResult();
-    if (finalFunctionCallResult != null) this._emit('finalFunctionToolCallResult', finalFunctionCallResult);
+    if (finalFunctionCallResult != null) {
+      this._emit('finalFunctionToolCallResult', finalFunctionCallResult);
+    }
 
     if (this._chatCompletions.some((c) => c.usage)) {
       this._emit('totalUsage', this.#calculateTotalUsage());
@@ -403,7 +431,9 @@ export class AbstractChatCompletionRunner<
     };
 
     const runToolCall = async (toolCall: ChatCompletionMessageToolCall): Promise<ToolCallResult> => {
-      if (toolCall.type !== 'function') return { message: undefined, functionCalled: false };
+      if (toolCall.type !== 'function') {
+        return { message: undefined, functionCalled: false };
+      }
 
       const tool_call_id = toolCall.id;
       const { name, arguments: args } = toolCall.function;
@@ -468,7 +498,9 @@ export class AbstractChatCompletionRunner<
       if (singleFunctionToCall || params.parallel_tool_calls === false) {
         for (const toolCall of message.tool_calls) {
           const result = await runToolCall(toolCall);
-          if (result.message) this._addMessage(result.message);
+          if (result.message) {
+            this._addMessage(result.message);
+          }
 
           if (singleFunctionToCall && result.functionCalled) {
             await afterCompletion?.(chatCompletion, runner);
@@ -481,7 +513,9 @@ export class AbstractChatCompletionRunner<
         // Wait for every concurrently running tool to settle before surfacing an
         // error so tool side effects cannot continue after the runner has ended.
         for (const result of results) {
-          if (result.status === 'rejected') throw result.reason;
+          if (result.status === 'rejected') {
+            throw result.reason;
+          }
         }
 
         // Promise.allSettled preserves input order, so the next request receives

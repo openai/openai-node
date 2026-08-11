@@ -27,7 +27,10 @@ function mockChatCompletionFetch() {
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
-      if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
+      if (typeof rawBody !== 'string') {
+        // oxlint-disable-next-line unicorn/prefer-type-error -- Preserve the mock's historical Error identity.
+        throw new Error(`expected init.body to be a string`);
+      }
       const body: ChatCompletionToolRunnerParams<any[]> = JSON.parse(rawBody);
       return Response.json(await handler(body), {
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +52,10 @@ function mockStreamingChatCompletionFetch() {
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
-      if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
+      if (typeof rawBody !== 'string') {
+        // oxlint-disable-next-line unicorn/prefer-type-error -- Preserve the mock's historical Error identity.
+        throw new Error(`expected init.body to be a string`);
+      }
       const body: ChatCompletionStreamingToolRunnerParams<any[]> = JSON.parse(rawBody);
       const stream = new PassThrough();
       (async () => {
@@ -72,7 +78,9 @@ function mockStreamingChatCompletionFetch() {
 function findLastAssistantMessage(messages: ChatCompletionMessageParam[]) {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
-    if (message && isAssistantMessage(message)) return message;
+    if (message && isAssistantMessage(message)) {
+      return message;
+    }
   }
   return undefined;
 }
@@ -192,7 +200,9 @@ class RunnerListener {
   } = {}) {
     expect(this.onceMessageCallCount).toBeLessThanOrEqual(1);
     expect(this.gotAbort).toEqual(this.runner.aborted);
-    if (this.runner.aborted) expect(this.runner.errored).toBe(true);
+    if (this.runner.aborted) {
+      expect(this.runner.errored).toBe(true);
+    }
     if (error) {
       expect(this.error?.message).toEqual(error);
       expect(this.runner.errored).toBe(true);
@@ -224,7 +234,9 @@ class RunnerListener {
       return;
     }
 
-    if (error) return;
+    if (error) {
+      return;
+    }
 
     const expectedContents = this.messages
       .filter(isAssistantMessage)
@@ -341,9 +353,13 @@ class StreamingRunnerListener {
       return;
     }
 
-    if (error) return;
+    if (error) {
+      return;
+    }
 
-    if (this.eventContents.length) expect(this.eventChunks.length).toBeGreaterThan(0);
+    if (this.eventContents.length) {
+      expect(this.eventChunks.length).toBeGreaterThan(0);
+    }
     expect(this.finalMessage).toEqual(findLastAssistantMessage(this.eventMessages));
     expect(await this.runner.finalMessage()).toEqual(this.finalMessage);
     expect(this.finalContent).toEqual(this.eventContents[this.eventContents.length - 1]?.[1] ?? null);
@@ -621,7 +637,9 @@ describe('resource completions', () => {
         {
           afterCompletion: (completion, runner) => {
             completionIDs.push(completion.id);
-            if (completion.id === '1') runner.messages.push(injectedMessage);
+            if (completion.id === '1') {
+              runner.messages.push(injectedMessage);
+            }
           },
         },
       );
@@ -1956,7 +1974,9 @@ describe('resource completions', () => {
         {
           afterCompletion: (completion, runner) => {
             completionIDs.push(completion.id);
-            if (completion.id === '1') runner.messages.push(injectedMessage);
+            if (completion.id === '1') {
+              runner.messages.push(injectedMessage);
+            }
           },
         },
       );

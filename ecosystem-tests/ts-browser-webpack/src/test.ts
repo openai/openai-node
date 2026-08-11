@@ -28,7 +28,7 @@ import puppeteer from 'puppeteer';
 
     const apiKey = process.env.OPENAI_API_KEY;
 
-    if (!apiKey) throw new Error('missing process.env.OPENAI_API_KEY');
+    if (!apiKey) {throw new Error('missing process.env.OPENAI_API_KEY');}
 
     // Navigate the page to a URL
     await page.goto(`http://localhost:8080/index.html?apiKey=${apiKey}`);

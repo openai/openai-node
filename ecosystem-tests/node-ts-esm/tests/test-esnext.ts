@@ -52,7 +52,7 @@ it(`raw response`, async () => {
     .asResponse();
 
   const chunks: string[] = [];
-  if (!response.body) throw new Error(`expected response.body to be defined`);
+  if (!response.body) {throw new Error(`expected response.body to be defined`);}
 
   const decoder = new TextDecoder();
 

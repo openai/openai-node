@@ -120,12 +120,16 @@ export function forEachJSONSchemaChild(
 
   for (const keyword of JSON_SCHEMA_MAP_SCHEMA_KEYWORDS) {
     const children = record[keyword];
-    if (!isObject(children)) continue;
+    if (!isObject(children)) {
+      continue;
+    }
 
     for (const [key, child] of Object.entries(children)) {
       // Draft 7 dependencies also permits property dependency arrays. They
       // are not schemas and must not be traversed as literal JSON payloads.
-      if (keyword === 'dependencies' && !isSchemaDefinition(child)) continue;
+      if (keyword === 'dependencies' && !isSchemaDefinition(child)) {
+        continue;
+      }
       visit(child, [...path, keyword, key], keyword);
     }
   }
@@ -1807,7 +1811,9 @@ function mergeObjectAllOf(
 
   const mergeAnnotations = (schema: JSONSchema) => {
     for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
-      if (!(keyword in schema)) continue;
+      if (!(keyword in schema)) {
+        continue;
+      }
       // Annotation keywords do not affect Draft 7 validation. Preserve the
       // first value (the outer schema, then earlier branches) instead of
       // rejecting an otherwise exactly mergeable intersection.
@@ -1819,7 +1825,9 @@ function mergeObjectAllOf(
 
   mergeAnnotations(jsonSchema);
   for (const resolvedEntry of resolvedEntries) {
-    if (resolvedEntry === undefined) continue;
+    if (resolvedEntry === undefined) {
+      continue;
+    }
     for (const entry of resolvedEntry.refChain) {
       mergeAnnotations(entry);
     }
@@ -1827,7 +1835,9 @@ function mergeObjectAllOf(
 
   for (const { schema: branch, sourcePath } of branches) {
     for (const keyword of Object.keys(branch)) {
-      if (keyword === 'allOf' && branch === jsonSchema) continue;
+      if (keyword === 'allOf' && branch === jsonSchema) {
+        continue;
+      }
       if (
         (keyword === '$defs' || keyword === 'definitions') &&
         isObject((branch as Record<string, unknown>)[keyword])
@@ -1872,7 +1882,9 @@ function mergeObjectAllOf(
         fail();
       }
       sawRequired = true;
-      for (const key of branch.required) mergedRequired.add(key);
+      for (const key of branch.required) {
+        mergedRequired.add(key);
+      }
     }
 
     if ('additionalProperties' in branch) {
@@ -1942,9 +1954,15 @@ function mergeObjectAllOf(
   if (hasExplicitObjectType || hasExplicitNullableObjectType) {
     merged.type = hasExplicitObjectType ? 'object' : ['object', 'null'];
   }
-  if (sawProperties) merged.properties = Object.fromEntries(Object.entries(mergedProperties));
-  if (sawRequired) merged.required = [...mergedRequired];
-  if (closedPropertySets.length > 0) merged.additionalProperties = false;
+  if (sawProperties) {
+    merged.properties = Object.fromEntries(Object.entries(mergedProperties));
+  }
+  if (sawRequired) {
+    merged.required = [...mergedRequired];
+  }
+  if (closedPropertySets.length > 0) {
+    merged.additionalProperties = false;
+  }
 
   for (const keyword of Object.keys(jsonSchema)) {
     delete (jsonSchema as any)[keyword];

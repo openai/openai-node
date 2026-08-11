@@ -5,13 +5,7 @@ const core = requireConfig('ultracite/oxlint/core').default;
 const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
-const compatibilityRules = [
-  'curly',
-  'func-style',
-  'no-use-before-define',
-  'sort-keys',
-  'typescript/no-explicit-any',
-];
+const compatibilityRules = ['func-style', 'no-use-before-define', 'sort-keys', 'typescript/no-explicit-any'];
 
 module.exports = defineConfig({
   extends: [core],

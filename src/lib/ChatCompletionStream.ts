@@ -240,7 +240,9 @@ export class ChatCompletionStream<ParsedT = null>
   }
 
   #beginRequest() {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
     this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
   }
@@ -264,7 +266,9 @@ export class ChatCompletionStream<ParsedT = null>
   }
 
   #addChunk(this: ChatCompletionStream<ParsedT>, chunk: ChatCompletionChunk) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
 
     const completion = this.#accumulateChatCompletion(chunk);
     this._emit('chunk', chunk, completion);
@@ -502,7 +506,9 @@ export class ChatCompletionStream<ParsedT = null>
       }
 
       this.#addChunk(chunk);
-      if (chunk.id) chatId = chunk.id;
+      if (chunk.id) {
+        chatId = chunk.id;
+      }
     }
     if (stream.controller.signal?.aborted) {
       throw new APIUserAbortError();
@@ -584,7 +590,9 @@ export class ChatCompletionStream<ParsedT = null>
 
       Object.assign(choice, other);
 
-      if (!delta) continue; // Shouldn't happen; just in case.
+      if (!delta) {
+        continue;
+      } // Shouldn't happen; just in case.
 
       this.#audioDoneChoiceIndexes.delete(index);
       const { audio, content, refusal, function_call, role, tool_calls, ...rest } = delta as typeof delta & {
@@ -611,19 +619,29 @@ export class ChatCompletionStream<ParsedT = null>
         choice.message.refusal = (choice.message.refusal || '') + refusal;
       }
 
-      if (role) choice.message.role = role;
+      if (role) {
+        choice.message.role = role;
+      }
       if (audio) {
         const audioSnapshot = (choice.message.audio ??= {});
-        if (audio.id != null) audioSnapshot.id = audio.id;
-        if (audio.data != null) audioSnapshot.data = (audioSnapshot.data ?? '') + audio.data;
+        if (audio.id != null) {
+          audioSnapshot.id = audio.id;
+        }
+        if (audio.data != null) {
+          audioSnapshot.data = (audioSnapshot.data ?? '') + audio.data;
+        }
         if (audio.transcript != null) {
           audioSnapshot.transcript = (audioSnapshot.transcript ?? '') + audio.transcript;
         }
-        if (audio.expires_at != null) audioSnapshot.expires_at = audio.expires_at;
+        if (audio.expires_at != null) {
+          audioSnapshot.expires_at = audio.expires_at;
+        }
       }
       if (function_call) {
         if (choice.message.function_call) {
-          if (function_call.name) choice.message.function_call.name = function_call.name;
+          if (function_call.name) {
+            choice.message.function_call.name = function_call.name;
+          }
           if (function_call.arguments) {
             choice.message.function_call.arguments ??= '';
             choice.message.function_call.arguments += function_call.arguments;
@@ -642,16 +660,26 @@ export class ChatCompletionStream<ParsedT = null>
       }
 
       if (tool_calls) {
-        if (!choice.message.tool_calls) choice.message.tool_calls = [];
+        if (!choice.message.tool_calls) {
+          choice.message.tool_calls = [];
+        }
 
         for (const { index, id, type, function: fn, ...rest } of tool_calls) {
           const tool_call = (choice.message.tool_calls[index] ??=
             {} as ChatCompletionSnapshot.Choice.Message.ToolCall);
           Object.assign(tool_call, rest);
-          if (id) tool_call.id = id;
-          if (type) tool_call.type = type;
-          if (fn) tool_call.function ??= { name: fn.name ?? '', arguments: '' };
-          if (fn?.name) tool_call.function!.name = fn.name;
+          if (id) {
+            tool_call.id = id;
+          }
+          if (type) {
+            tool_call.type = type;
+          }
+          if (fn) {
+            tool_call.function ??= { name: fn.name ?? '', arguments: '' };
+          }
+          if (fn?.name) {
+            tool_call.function!.name = fn.name;
+          }
           if (fn?.arguments) {
             tool_call.function!.arguments += fn.arguments;
 

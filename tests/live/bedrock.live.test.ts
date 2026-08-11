@@ -31,13 +31,17 @@ type AuthMode = (typeof authModes)[number];
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(`Set ${name} before running the Bedrock live test.`);
+  if (!value) {
+    throw new Error(`Set ${name} before running the Bedrock live test.`);
+  }
   return value;
 }
 
 function readAuthMode(): AuthMode {
   const value = requiredEnv(AUTH_MODE_ENV);
-  if ((authModes as readonly string[]).includes(value)) return value as AuthMode;
+  if ((authModes as readonly string[]).includes(value)) {
+    return value as AuthMode;
+  }
   throw new Error(`${AUTH_MODE_ENV} must be one of: ${authModes.join(', ')}.`);
 }
 
@@ -88,7 +92,9 @@ if (process.env[LIVE_TEST_FLAG] !== '1') {
 }
 
 const region = process.env['AWS_REGION']?.trim() || process.env['AWS_DEFAULT_REGION']?.trim();
-if (!region) throw new Error('Set AWS_REGION or AWS_DEFAULT_REGION before running the Bedrock live test.');
+if (!region) {
+  throw new Error('Set AWS_REGION or AWS_DEFAULT_REGION before running the Bedrock live test.');
+}
 
 const model = requiredEnv(MODEL_ENV);
 const authMode = readAuthMode();

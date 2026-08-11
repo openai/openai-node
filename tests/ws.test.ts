@@ -63,7 +63,9 @@ describe('SendQueue', () => {
     expect(() =>
       queue.flush((data: RawWebSocketData) => {
         callCount++;
-        if (callCount === 2) throw new Error('send failed');
+        if (callCount === 2) {
+          throw new Error('send failed');
+        }
       }),
     ).toThrow('send failed');
 

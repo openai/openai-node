@@ -23,7 +23,9 @@ const BEDROCK_ENVIRONMENT_VARIABLES = [
 
 beforeEach(() => {
   process.env = { ...originalEnv };
-  for (const name of BEDROCK_ENVIRONMENT_VARIABLES) delete process.env[name];
+  for (const name of BEDROCK_ENVIRONMENT_VARIABLES) {
+    delete process.env[name];
+  }
 });
 
 afterEach(() => {
@@ -321,7 +323,9 @@ describe('bedrock provider', () => {
     } catch (error) {
       thrown = error;
     } finally {
-      if (processDescriptor) Object.defineProperty(globalThis, 'process', processDescriptor);
+      if (processDescriptor) {
+        Object.defineProperty(globalThis, 'process', processDescriptor);
+      }
     }
 
     expect(thrown).toMatchObject({

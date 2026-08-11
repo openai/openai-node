@@ -11,7 +11,7 @@ export default function Chat() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim()) {return;}
 
     void sendMessage({ text: input });
     setInput('');

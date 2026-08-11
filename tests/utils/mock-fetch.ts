@@ -27,9 +27,13 @@ export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => P
 
   async function fetch(req: string | RequestInfo, init?: RequestInit): Promise<Response> {
     const handler = await handlerQueue.shift();
-    if (!handler) throw new Error('expected handler to be defined');
+    if (!handler) {
+      throw new Error('expected handler to be defined');
+    }
     const signal = init?.signal;
-    if (!signal) return await handler(req, init);
+    if (!signal) {
+      return await handler(req, init);
+    }
     return await Promise.race([
       handler(req, init),
       new Promise<Response>((resolve, reject) => {

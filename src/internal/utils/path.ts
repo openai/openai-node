@@ -17,7 +17,9 @@ const EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null))
 export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
   function path(statics: readonly string[], ...params: readonly unknown[]): string {
     // If there are no params, no processing is needed.
-    if (statics.length === 1) return statics[0]!;
+    if (statics.length === 1) {
+      return statics[0]!;
+    }
 
     let postPath = false;
     const invalidSegments = [];

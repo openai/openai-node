@@ -27,8 +27,12 @@ describe('path template tag function', () => {
     ];
 
     function paramPermutations(len: number): string[][] {
-      if (len === 0) return [];
-      if (len === 1) return testParams.map((e) => [e]);
+      if (len === 0) {
+        return [];
+      }
+      if (len === 1) {
+        return testParams.map((e) => [e]);
+      }
       const rest = paramPermutations(len - 1);
       return testParams.flatMap((e) => rest.map((r) => [e, ...r]));
     }

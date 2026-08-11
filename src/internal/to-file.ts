@@ -148,7 +148,9 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
 }
 
 function propsForError(value: unknown): string {
-  if (typeof value !== 'object' || value === null) return '';
+  if (typeof value !== 'object' || value === null) {
+    return '';
+  }
   const props = Object.getOwnPropertyNames(value);
   return `; props: [${props.map((p) => `"${p}"`).join(', ')}]`;
 }

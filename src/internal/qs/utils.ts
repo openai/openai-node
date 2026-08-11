@@ -23,7 +23,9 @@ const hex_table = /* @__PURE__ */ (() => {
 function compact_queue<T extends Record<string, any>>(queue: { obj: T; prop: string }[]) {
   while (queue.length > 1) {
     const item = queue.pop();
-    if (!item) continue;
+    if (!item) {
+      continue;
+    }
 
     const obj = item.obj[item.prop];
 

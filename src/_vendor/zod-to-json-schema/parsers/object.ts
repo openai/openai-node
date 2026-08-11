@@ -31,14 +31,18 @@ export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
   const properties: Record<string, JsonSchema7Type> = {};
   const required: string[] = [];
   for (const [propName, propDef] of Object.entries(def.shape())) {
-    if (propDef === undefined || propDef._def === undefined) continue;
+    if (propDef === undefined || propDef._def === undefined) {
+      continue;
+    }
     const propertyPath = [...refs.currentPath, 'properties', propName];
     const parsedDef = parseDef(propDef._def, {
       ...refs,
       currentPath: propertyPath,
       propertyPath,
     });
-    if (parsedDef === undefined) continue;
+    if (parsedDef === undefined) {
+      continue;
+    }
     if (
       refs.openaiStrictMode &&
       propDef.isOptional() &&
@@ -52,7 +56,9 @@ export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
       );
     }
     properties[propName] = parsedDef;
-    if (!propDef.isOptional() || refs.openaiStrictMode) required.push(propName);
+    if (!propDef.isOptional() || refs.openaiStrictMode) {
+      required.push(propName);
+    }
   }
 
   const result: JsonSchema7ObjectType = {
@@ -61,6 +67,8 @@ export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
     required,
     additionalProperties: decideAdditionalProperties(def, refs),
   };
-  if (!result.required!.length) delete result.required;
+  if (!result.required!.length) {
+    delete result.required;
+  }
   return result;
 }

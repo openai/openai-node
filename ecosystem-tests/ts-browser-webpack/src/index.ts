@@ -43,7 +43,7 @@ async function runTests() {
     displayResults();
   }
   const runningEl = document.querySelector('#running');
-  if (runningEl) runningEl.remove();
+  if (runningEl) {runningEl.remove();}
 }
 
 const testPath: string[] = [];
@@ -72,7 +72,7 @@ function expect(received: any) {
     },
     toBeSimilarTo(comparedTo: string, expectedDistance: number) {
       const actualDistance = distance(received, comparedTo);
-      if (actualDistance < expectedDistance) return;
+      if (actualDistance < expectedDistance) {return;}
 
       throw new Error(
         [
@@ -132,14 +132,14 @@ it(`raw response`, async () => {
 
   // test that we can use web Response API
   const { body } = response;
-  if (!body) throw new Error('expected response.body to be defined');
+  if (!body) {throw new Error('expected response.body to be defined');}
 
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let result;
   do {
     result = await reader.read();
-    if (!result.done) chunks.push(result.value);
+    if (!result.done) {chunks.push(result.value);}
   } while (!result.done);
 
   reader.releaseLock();

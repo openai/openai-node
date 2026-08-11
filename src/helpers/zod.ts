@@ -67,10 +67,14 @@ function escapeSchemaDefinitionRefs<T extends object>(
   );
 
   const visit = (value: unknown): void => {
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== 'object') {
+      return;
+    }
 
     if (Array.isArray(value)) {
-      for (const child of value) visit(child);
+      for (const child of value) {
+        visit(child);
+      }
       return;
     }
 
@@ -80,7 +84,9 @@ function escapeSchemaDefinitionRefs<T extends object>(
       record['$ref'] = refReplacements.get(ref) ?? ref;
     }
 
-    for (const child of Object.values(record)) visit(child);
+    for (const child of Object.values(record)) {
+      visit(child);
+    }
   };
 
   visit(schema);
@@ -88,7 +94,9 @@ function escapeSchemaDefinitionRefs<T extends object>(
 }
 
 function getZodV3RootName(name: string, schemaDefinitions: ZodSchemaDefinitions | undefined): string {
-  if (!schemaDefinitions) return name;
+  if (!schemaDefinitions) {
+    return name;
+  }
 
   let rootName = name;
   while (hasOwn(schemaDefinitions, rootName)) {
