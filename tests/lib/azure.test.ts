@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { AzureOpenAI, APIUserAbortError } from 'openai';
+import type { AzureClientOptions } from 'openai';
 import type { RequestInit, RequestInfo, Response } from 'openai/internal/builtin-types';
 
 const defaultFetch = fetch;
@@ -20,6 +21,17 @@ describe('instantiate azure client', () => {
 
   afterEach(() => {
     process.env = env;
+  });
+
+  test('exports AzureClientOptions from the package root', () => {
+    const options: AzureClientOptions = {
+      baseURL: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    };
+
+    const client = new AzureOpenAI(options);
+    expect(client.baseURL).toEqual('https://example.com');
   });
 
   describe('defaultHeaders', () => {
