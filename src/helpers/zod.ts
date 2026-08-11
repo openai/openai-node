@@ -16,6 +16,7 @@ import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 import { type RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
+import { hasOwn } from '../internal/utils/values';
 
 type ZodV4Schema = z4.ZodType | z4Mini.ZodMiniType;
 type ZodSchema = z3.ZodType | ZodV4Schema;
@@ -54,7 +55,7 @@ function encodeSchemaDefinitionRefToken(token: string): string {
 }
 
 function validateSchemaDefinitions(schemaDefinitions: ZodSchemaDefinitions | undefined): void {
-  if (schemaDefinitions && Object.prototype.hasOwnProperty.call(schemaDefinitions, '__proto__')) {
+  if (schemaDefinitions && hasOwn(schemaDefinitions, '__proto__')) {
     throw new Error('schemaDefinitions cannot include "__proto__" as a definition name');
   }
 }
@@ -95,7 +96,7 @@ function getZodV3RootName(name: string, schemaDefinitions: ZodSchemaDefinitions 
   if (!schemaDefinitions) return name;
 
   let rootName = name;
-  while (Object.prototype.hasOwnProperty.call(schemaDefinitions, rootName)) {
+  while (hasOwn(schemaDefinitions, rootName)) {
     rootName = `${rootName}_root`;
   }
   return rootName;

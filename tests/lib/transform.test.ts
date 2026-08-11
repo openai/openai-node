@@ -1,6 +1,7 @@
 import { toStrictJsonSchema } from 'openai/lib/transform';
 import { detailedDiff } from 'deep-object-diff';
 import { JSONSchema } from 'openai/lib/jsonschema';
+import { hasOwn } from 'openai/internal/utils/values';
 
 describe('toStrictJsonSchema', () => {
   describe('Root Schema Validation', () => {
@@ -2564,7 +2565,7 @@ describe('toStrictJsonSchema', () => {
           ['other', { type: 'number' }],
         ]),
       );
-      expect(Object.prototype.hasOwnProperty.call(properties, '__proto__')).toBe(true);
+      expect(hasOwn(properties as object, '__proto__')).toBe(true);
     });
 
     test('merges matching object allOf properties with reordered schema keys', () => {

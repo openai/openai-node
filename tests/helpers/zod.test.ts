@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { hasOwn } from 'openai/internal/utils/values';
 
 import {
   zodFunction,
@@ -55,7 +56,7 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
   for (const token of tokens) {
     expect(value).not.toBeNull();
     expect(typeof value).toBe('object');
-    expect(Object.prototype.hasOwnProperty.call(value, token)).toBe(true);
+    expect(hasOwn(value as object, token)).toBe(true);
     value = (value as Record<string, unknown>)[token];
   }
   return value;

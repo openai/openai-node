@@ -30,7 +30,7 @@ import {
 import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from '../resources/beta/threads/runs/steps';
 import { ThreadCreateAndRunParamsBase, Threads } from '../resources/beta/threads/threads';
 import { BaseEvents, EventStream } from './EventStream';
-import { isObj } from '../internal/utils';
+import { hasOwn, isObj } from '../internal/utils';
 
 export interface AssistantStreamEvents extends BaseEvents {
   run: (run: Run) => void;
@@ -641,7 +641,7 @@ export class AssistantStream
 
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     for (const [key, deltaValue] of Object.entries(delta)) {
-      if (!Object.prototype.hasOwnProperty.call(acc, key)) {
+      if (!hasOwn(acc, key)) {
         acc[key] = deltaValue;
         continue;
       }
