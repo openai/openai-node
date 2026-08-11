@@ -45,7 +45,6 @@ const compatibilityRules = [
   'typescript/no-non-null-assertion',
   'typescript/prefer-ts-expect-error',
   'unicorn/catch-error-name',
-  'unicorn/consistent-assert',
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
   'unicorn/no-useless-undefined',
