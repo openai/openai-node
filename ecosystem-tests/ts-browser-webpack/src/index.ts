@@ -97,7 +97,7 @@ const params = new URLSearchParams(location.search);
 
 const client = new OpenAI({ apiKey: params.get('apiKey') ?? undefined, dangerouslyAllowBrowser: true });
 
-it('supports Bedrock bearer authentication without AWS dependencies', async function () {
+it('supports Bedrock bearer authentication without AWS dependencies', async () => {
   let authorization: string | null = null;
   const bedrockClient = new OpenAI({
     provider: bedrock({ region: 'us-east-1', apiKey: 'bedrock-token' }),
@@ -122,7 +122,7 @@ async function typeTests() {
   await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
 }
 
-it(`raw response`, async function () {
+it(`raw response`, async () => {
   const response = await client.chat.completions
     .create({
       model: 'gpt-4o-mini',
@@ -155,7 +155,7 @@ it(`raw response`, async function () {
   expect(json.choices[0]?.message.content || '').toBeSimilarTo('This is a test', 10);
 });
 
-it(`streaming works`, async function () {
+it(`streaming works`, async () => {
   const stream = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
@@ -169,7 +169,7 @@ it(`streaming works`, async function () {
 });
 
 if (typeof File !== 'undefined') {
-  it('handles builtinFile', async function () {
+  it('handles builtinFile', async () => {
     const file = await fetch(url)
       .then((x) => x.arrayBuffer())
       .then((x) => new File([x], filename));
@@ -179,7 +179,7 @@ if (typeof File !== 'undefined') {
   });
 }
 
-it('handles Response', async function () {
+it('handles Response', async () => {
   const file = await fetch(url);
 
   const result = await client.audio.transcriptions.create({ file, model });
@@ -190,7 +190,7 @@ const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated te
 
 describe('toFile', () => {
   if (typeof Blob !== 'undefined') {
-    it('handles builtin Blob', async function () {
+    it('handles builtin Blob', async () => {
       const result = await client.files.create({
         file: await toFile(
           // @ts-ignore avoid DOM lib for testing purposes
@@ -202,21 +202,21 @@ describe('toFile', () => {
       expect(result.filename).toEqual('finetune.jsonl');
     });
   }
-  it('handles Uint8Array', async function () {
+  it('handles Uint8Array', async () => {
     const result = await client.files.create({
       file: await toFile(new TextEncoder().encode(fineTune), 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
     expect(result.filename).toEqual('finetune.jsonl');
   });
-  it('handles ArrayBuffer', async function () {
+  it('handles ArrayBuffer', async () => {
     const result = await client.files.create({
       file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
     expect(result.filename).toEqual('finetune.jsonl');
   });
-  it('handles DataView', async function () {
+  it('handles DataView', async () => {
     const result = await client.files.create({
       file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.jsonl'),
       purpose: 'fine-tune',

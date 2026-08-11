@@ -1,6 +1,6 @@
 import { combine, merge, is_buffer, assign_single_source } from 'openai/internal/qs/utils';
 
-describe('merge()', function () {
+describe('merge()', () => {
   // t.deepEqual(merge(null, true), [null, true], 'merges true into null');
   expect(merge(null, true)).toEqual([null, true]);
 
@@ -48,7 +48,7 @@ describe('merge()', function () {
 
   (typeof Object.defineProperty === 'function' ? test : test.skip)(
     'avoids invoking array setters unnecessarily',
-    function () {
+    () => {
       let setCount = 0;
       let getCount = 0;
       const observed: any[] = [];
@@ -75,7 +75,7 @@ describe('merge()', function () {
   );
 });
 
-test('assign()', function () {
+test('assign()', () => {
   const target = { a: 1, b: 2 };
   const source = { b: 3, c: 4 };
   const result = assign_single_source(target, source);
@@ -85,8 +85,8 @@ test('assign()', function () {
   expect(source).toEqual({ b: 3, c: 4 });
 });
 
-describe('combine()', function () {
-  test('both arrays', function () {
+describe('combine()', () => {
+  test('both arrays', () => {
     const a = [1];
     const b = [2];
     const combined = combine(a, b);
@@ -103,7 +103,7 @@ describe('combine()', function () {
     expect(b).not.toEqual(combined);
   });
 
-  test('one array, one non-array', function () {
+  test('one array, one non-array', () => {
     const aN = 1;
     const a = [aN];
     const bN = 2;
@@ -138,7 +138,7 @@ describe('combine()', function () {
     expect(combinedABn).toEqual([1, 2]);
   });
 
-  test('neither is an array', function () {
+  test('neither is an array', () => {
     const combined = combine(1, 2);
     // st.notEqual(1, combined, '1 + 2 !== 1');
     // st.notEqual(2, combined, '1 + 2 !== 2');
@@ -149,7 +149,7 @@ describe('combine()', function () {
   });
 });
 
-test('is_buffer()', function () {
+test('is_buffer()', () => {
   for (const x of [
     null,
     undefined,

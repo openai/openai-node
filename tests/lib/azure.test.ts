@@ -357,10 +357,10 @@ describe('instantiate azure client', () => {
 describe('azure request building', () => {
   const client = new AzureOpenAI({ baseURL: 'https://example.com', apiKey: 'My API Key', apiVersion });
 
-  describe('model to deployment mapping', function () {
+  describe('model to deployment mapping', () => {
     const testFetch = async (url: RequestInfo): Promise<Response> =>
       Response.json({ url }, { headers: { 'content-type': 'application/json' } });
-    describe('with client-level deployment', function () {
+    describe('with client-level deployment', () => {
       const client = new AzureOpenAI({
         endpoint: 'https://example.com',
         apiKey: 'My API Key',
@@ -491,7 +491,7 @@ describe('azure request building', () => {
       });
     });
 
-    describe('with no client-level deployment', function () {
+    describe('with no client-level deployment', () => {
       const client = new AzureOpenAI({
         endpoint: 'https://example.com',
         apiKey: 'My API Key',

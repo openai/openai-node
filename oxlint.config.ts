@@ -10,7 +10,6 @@ const compatibilityRules = [
   'func-names',
   'func-style',
   'no-use-before-define',
-  'prefer-arrow-callback',
   'sort-keys',
   'typescript/no-explicit-any',
 ];
@@ -40,6 +39,14 @@ module.exports = defineConfig({
   },
   ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...stainlessGeneratedFiles],
   overrides: [
+    {
+      // This mock must stay constructable because the websocket client invokes it
+      // as a constructor; arrow callbacks cannot be constructors.
+      files: ['tests/realtime-websocket.test.ts'],
+      rules: {
+        'prefer-arrow-callback': 'off',
+      },
+    },
     {
       // These signatures intentionally expose direct `void` for zero-argument events,
       // and the type test verifies the public `APIPromise<void>` contract.

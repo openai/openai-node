@@ -47,7 +47,7 @@ export function uploadWebApiTestCases({
 		await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
 	}
 
-	it(`raw response`, async function () {
+	it(`raw response`, async () => {
 		const response = await client.chat.completions
 			.create({
 				model: 'gpt-4o-mini',
@@ -80,7 +80,7 @@ export function uploadWebApiTestCases({
 		expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
 	});
 
-	it(`streaming works`, async function () {
+	it(`streaming works`, async () => {
 		const stream = await client.chat.completions.create({
 			model: 'gpt-4o-mini',
 			messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],

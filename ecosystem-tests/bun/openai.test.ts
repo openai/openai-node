@@ -35,7 +35,7 @@ function expectSimilar(received: any, comparedTo: string, expectedDistance: numb
   expect(actualDistance).toBeLessThan(expectedDistance);
 }
 
-test(`basic request works`, async function () {
+test(`basic request works`, async () => {
   const completion = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
@@ -43,7 +43,7 @@ test(`basic request works`, async function () {
   expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
 });
 
-test(`proxied request works`, async function () {
+test(`proxied request works`, async () => {
   const client = new OpenAI({
     fetchOptions: {
       proxy: process.env['ECOSYSTEM_TESTS_PROXY'],
@@ -57,7 +57,7 @@ test(`proxied request works`, async function () {
   expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
 });
 
-test(`raw response`, async function () {
+test(`raw response`, async () => {
   const response = await client.chat.completions
     .create({
       model: 'gpt-4o-mini',
@@ -90,7 +90,7 @@ test(`raw response`, async function () {
   expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
 });
 
-test(`streaming works`, async function () {
+test(`streaming works`, async () => {
   const stream = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
@@ -105,7 +105,7 @@ test(`streaming works`, async function () {
 
 // @ts-ignore avoid DOM lib for testing purposes
 if (typeof File !== 'undefined') {
-  test('handles builtinFile', async function () {
+  test('handles builtinFile', async () => {
     const file = await fetch(url)
       .then((x) => x.arrayBuffer())
       // @ts-ignore avoid DOM lib for testing purposes
@@ -116,14 +116,14 @@ if (typeof File !== 'undefined') {
   });
 }
 
-test('handles Response', async function () {
+test('handles Response', async () => {
   const file = await fetch(url);
 
   const result = await client.audio.transcriptions.create({ file, model });
   expectSimilar(result.text, correctAnswer, 12);
 });
 
-test('handles fs.ReadStream', async function () {
+test('handles fs.ReadStream', async () => {
   const result = await client.audio.transcriptions.create({
     file: fs.createReadStream('sample1.mp3'),
     model,
@@ -131,7 +131,7 @@ test('handles fs.ReadStream', async function () {
   expectSimilar(result.text, correctAnswer, 12);
 });
 
-test('handles Bun.File', async function () {
+test('handles Bun.File', async () => {
   const result = await client.audio.transcriptions.create({
     file: Bun.file('sample1.mp3'),
     model,
@@ -143,7 +143,7 @@ const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated te
 
 // @ts-ignore avoid DOM lib for testing purposes
 if (typeof Blob !== 'undefined') {
-  test('toFile handles builtin Blob', async function () {
+  test('toFile handles builtin Blob', async () => {
     const result = await client.files.create({
       file: await toFile(
         // @ts-ignore avoid DOM lib for testing purposes
@@ -155,7 +155,7 @@ if (typeof Blob !== 'undefined') {
     expect(result.filename).toEqual('finetune.jsonl');
   });
 }
-test('toFile handles Uint8Array', async function () {
+test('toFile handles Uint8Array', async () => {
   const result = await client.files.create({
     file: await toFile(
       // @ts-ignore avoid DOM lib for testing purposes
@@ -166,7 +166,7 @@ test('toFile handles Uint8Array', async function () {
   });
   expect(result.filename).toEqual('finetune.jsonl');
 });
-test('toFile handles ArrayBuffer', async function () {
+test('toFile handles ArrayBuffer', async () => {
   const result = await client.files.create({
     file: await toFile(
       // @ts-ignore avoid DOM lib for testing purposes
@@ -177,7 +177,7 @@ test('toFile handles ArrayBuffer', async function () {
   });
   expect(result.filename).toEqual('finetune.jsonl');
 });
-test('toFile handles DataView', async function () {
+test('toFile handles DataView', async () => {
   const result = await client.files.create({
     file: await toFile(
       // @ts-ignore avoid DOM lib for testing purposes

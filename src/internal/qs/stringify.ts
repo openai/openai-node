@@ -103,7 +103,7 @@ function inner_stringify(
   } else if (obj instanceof Date) {
     obj = serializeDate?.(obj);
   } else if (generateArrayPrefix === 'comma' && isArray(obj)) {
-    obj = maybe_map(obj, function (value) {
+    obj = maybe_map(obj, (value) => {
       if (value instanceof Date) {
         return serializeDate?.(value);
       }
