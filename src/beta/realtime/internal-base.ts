@@ -24,6 +24,7 @@ export class OpenAIRealtimeError extends OpenAIError {
   }
 }
 
+// oxlint-disable-next-line typescript/ban-types -- The empty intersection materializes the mapped event shape without changing its public type.
 type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
 
 type RealtimeEvents = Simplify<
