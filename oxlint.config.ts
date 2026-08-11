@@ -18,7 +18,6 @@ const compatibilityRules = [
   'no-eq-null',
   'no-inline-comments',
   'no-plusplus',
-  'no-promise-executor-return',
   'no-shadow',
   'no-sparse-arrays',
   'no-unused-vars',
@@ -309,6 +308,33 @@ module.exports = defineConfig({
       ],
       rules: {
         'unicorn/prefer-string-replace-all': 'off',
+      },
+    },
+    {
+      // These executors intentionally use concise callback bodies; their returned
+      // values are ignored by Promise and changing the bodies would be behavior-neutral churn.
+      files: [
+        'ecosystem-tests/browser-direct-import/public/index.js',
+        'ecosystem-tests/browser-direct-import/src/test.ts',
+        'ecosystem-tests/cli.ts',
+        'ecosystem-tests/proxy.ts',
+        'ecosystem-tests/ts-browser-webpack/src/index.ts',
+        'ecosystem-tests/ts-browser-webpack/src/test.ts',
+        'examples/chat-completions/tool-calls-stream.ts',
+        'examples/fine-tuning/fine-tuning.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ChatCompletionStreamingRunner.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'tests/auth/workload-identity-auth.test.ts',
+        'tests/helpers/standard-schema.test.ts',
+        'tests/lib/azure.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/lib/responsesWebSocket.test.ts',
+        'tests/lib/workload-identity.test.ts',
+      ],
+      rules: {
+        'no-promise-executor-return': 'off',
       },
     },
     {
