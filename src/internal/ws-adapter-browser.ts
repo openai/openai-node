@@ -52,7 +52,7 @@ export class BrowserWebSocket implements WebSocketLike {
   }
 
   on(event: string, listener: Listener): void {
-    const wrapped = this._wrapListener(event, listener);
+    const wrapped = BrowserWebSocket._wrapListener(event, listener);
     this._listenersFor(event).set(listener, wrapped);
     this._ws.addEventListener(event, wrapped);
   }
@@ -72,7 +72,7 @@ export class BrowserWebSocket implements WebSocketLike {
       this.off(event, listener);
       listener(...args);
     };
-    const wrapped = this._wrapListener(event, onceListener);
+    const wrapped = BrowserWebSocket._wrapListener(event, onceListener);
     this._listenersFor(event).set(listener, wrapped);
     this._ws.addEventListener(event, wrapped);
   }
@@ -90,7 +90,7 @@ export class BrowserWebSocket implements WebSocketLike {
    * Converts browser event objects to positional arguments matching the
    * {@link WebSocketLike} interface.
    */
-  private _wrapListener(event: string, listener: Listener): DOMEventHandler {
+  private static _wrapListener(event: string, listener: Listener): DOMEventHandler {
     switch (event) {
       case 'message':
         return (ev: MessageEvent) => {

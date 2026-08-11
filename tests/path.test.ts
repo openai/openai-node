@@ -46,6 +46,7 @@ describe('path template tag function', () => {
       readonly kind = 'class';
     })();
     const classWithToString = new (class {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture intentionally exercises an instance toString protocol.
       toString() {
         return 'ok';
       }
@@ -115,6 +116,7 @@ describe('path template tag function', () => {
     const crossRealmString = new newRealm.String();
     const crossRealmClass = new (class extends newRealm.Object {})();
     const crossRealmClassWithToString = new (class extends newRealm.Object {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture intentionally exercises an instance toString protocol.
       toString() {
         return 'ok';
       }

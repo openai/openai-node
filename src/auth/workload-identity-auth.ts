@@ -28,7 +28,7 @@ export class WorkloadIdentityAuth {
   }
 
   async getToken(): Promise<string> {
-    if (!this.cachedToken || this.isTokenExpired(this.cachedToken)) {
+    if (!this.cachedToken || WorkloadIdentityAuth.isTokenExpired(this.cachedToken)) {
       if (this.refreshPromise) {
         return await this.refreshPromise;
       }
@@ -118,7 +118,7 @@ export class WorkloadIdentityAuth {
     return accessToken;
   }
 
-  private isTokenExpired(cachedToken: CachedToken): boolean {
+  private static isTokenExpired(cachedToken: CachedToken): boolean {
     return Date.now() >= cachedToken.expiresAt;
   }
 

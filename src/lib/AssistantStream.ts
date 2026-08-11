@@ -630,6 +630,7 @@ export class AssistantStream
     throw new Error('Tried to accumulate a non-message event');
   }
 
+  // oxlint-disable-next-line class-methods-use-this -- Keeping this helper on the instance preserves nearby accumulator method structure.
   #accumulateContent(
     contentElement: MessageContentDelta,
     currentContent: MessageContent | undefined,
@@ -730,6 +731,7 @@ export class AssistantStream
     }
   }
 
+  // oxlint-disable-next-line class-methods-use-this -- Subclasses can override this instance hook.
   protected _addRun(run: Run): Run {
     return run;
   }
