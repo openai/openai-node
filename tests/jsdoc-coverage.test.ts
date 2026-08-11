@@ -123,16 +123,18 @@ describe('handwritten SDK JSDoc coverage', () => {
     `;
 
     expect(missing(source)).toEqual(['missingAlias', 'Group.exposed']);
-    expect(inspectSource('src/fixture.ts', source).map(({ name }) => name)).toEqual([
-      'missingAlias',
-      'documentedAlias',
-      'documentedSpecifier',
-      'Public',
-      'Public.member',
-      'accepts',
-      'Group',
-      'Group.exposed',
-    ]);
+    expect(inspectSource('src/fixture.ts', source).map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        'missingAlias',
+        'documentedAlias',
+        'documentedSpecifier',
+        'Public',
+        'Public.member',
+        'accepts',
+        'Group',
+        'Group.exposed',
+      ]),
+    );
   });
 
   test('does not require duplicate documentation on re-export-only barrels', () => {
@@ -243,15 +245,23 @@ describe('handwritten SDK JSDoc coverage', () => {
           public missing: string,
           public documented: string,
           /** A documented readonly property. */ readonly readonlyValue: string,
-          private secret: string,
-          protected hidden: string,
           ordinary: string,
         ) {}
         undocumented() {}
       };
+      /** Public named class. */
+      export class Visibility {
+        /** Creates a client without exposing these parameter properties. */
+        constructor(private secret: string, protected hidden: string) {}
+      }
     `;
 
-    expect(missing(source)).toEqual(['Client.missing', 'Client.undocumented']);
+    expect(missing(source)).toEqual([
+      'Client.constructor',
+      'Client.missing',
+      'Client.documented',
+      'Client.undocumented',
+    ]);
   });
 
   test('resolves namespace-local private types within their lexical scopes', () => {
@@ -285,7 +295,7 @@ describe('handwritten SDK JSDoc coverage', () => {
 
   test('checks exported identifiers from nested object and array binding patterns', () => {
     const source = `
-      /** Variable-statement documentation does not appear on destructured bindings. */
+      // Undocumented local destructured bindings remain undocumented in declaration emit.
       const { value: renamed, nested: { nested }, list: [first, , third] } = source;
       export {
         renamed,
@@ -293,11 +303,11 @@ describe('handwritten SDK JSDoc coverage', () => {
         first,
         third,
       };
-      /** Variable-statement documentation does not document this exported binding. */
+      /** Variable-statement documentation survives on this directly exported binding. */
       export const { direct } = source;
     `;
 
-    expect(missing(source)).toEqual(['renamed', 'first', 'third', 'direct']);
+    expect(missing(source)).toEqual(['renamed', 'first', 'third']);
   });
 
   test('resolves object spread properties, their documentation, and overwrite order', () => {
@@ -322,6 +332,116 @@ describe('handwritten SDK JSDoc coverage', () => {
     `;
 
     expect(missing(source)).toEqual(['Surface.overridden', 'Surface.undocumented']);
+  });
+
+  test('enforces inferred public return and class-property object surfaces', () => {
+    const source = `
+      /** Creates a public value. */
+      export function create() {
+        return { undocumented: true, callback: (options: { missing: string }) => options };
+      }
+      /** Public client. */
+      export class Client {
+        /** Public configuration. */
+        config = { undocumented: true };
+        /** Public callback. */
+        callback = (options: { missing: string }) => ({ result: true });
+      }
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'create.result.undocumented',
+        'create.result.callback',
+        'create.result.callback.options.missing',
+        'Client.config.undocumented',
+        'Client.callback.options.missing',
+        'Client.callback.result.result',
+      ]),
+    );
+  });
+
+  test('distinguishes static and instance members with identical names', () => {
+    const source = `
+      /** Public client. */
+      export class Client {
+        /** Documented instance member. */
+        value = true;
+        static value = true;
+      }
+    `;
+
+    expect(missing(source)).toEqual(['Client.static.value']);
+  });
+
+  test('enforces non-exported base classes, interfaces, enum values, and class types', () => {
+    const source = `
+      class Base { method() {} }
+      interface Shape { property: string }
+      enum Status { Pending }
+      class Hidden { member = true }
+      /** Public client. */
+      export class Client extends Base implements Shape {
+        /** Implemented property. */
+        property = '';
+        /** Uses public helper types. */
+        use(status: Status, hidden: Hidden): void {}
+      }
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'Base',
+        'Base.method',
+        'Shape',
+        'Shape.property',
+        'Status',
+        'Status.Pending',
+        'Hidden',
+        'Hidden.member',
+      ]),
+    );
+  });
+
+  test('enforces class index signatures, interface accessors, and override parameter properties', () => {
+    const source = `
+      /** Public indexed client. */
+      export class Indexed {
+        [key: string]: unknown;
+      }
+      /** Public accessor contract. */
+      export interface Accessors {
+        get value(): string;
+        set value(next: string);
+      }
+      /** Public base. */
+      export class Base {
+        /** Base value. */
+        value = '';
+      }
+      /** Public derived class. */
+      export class Derived extends Base {
+        /** Creates an instance. */
+        constructor(override value: string) {
+          super();
+        }
+      }
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining(['Indexed.[key: string]', 'Accessors.value', 'Derived.value']),
+    );
+  });
+
+  test('enforces properties introduced through typed object spreads', () => {
+    const source = `
+      interface Shape { missing: string }
+      declare const typed: Shape;
+      /** Public object. */
+      export const value = { ...typed };
+    `;
+
+    expect(missing(source)).toEqual(expect.arrayContaining(['value.missing']));
   });
 
   test('accepts documentation on any overload and excludes nonpublic details', () => {

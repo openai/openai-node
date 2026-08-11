@@ -23,27 +23,12 @@ function collectSourceFiles(directory) {
       if (!excludedDirectories.has(entry.name) && !excludedPaths.has(relativeFile)) {
         files.push(...collectSourceFiles(file));
       }
-      continue;
-    }
-
-    if (entry.isFile() && file.endsWith('.ts') && !generatedFiles.has(relativeFile)) {
+    } else if (entry.isFile() && file.endsWith('.ts') && !generatedFiles.has(relativeFile)) {
       files.push(file);
     }
   }
 
   return files;
-}
-
-function modifiers(node) {
-  return ts.canHaveModifiers(node) ? (ts.getModifiers(node) ?? []) : [];
-}
-
-function isExported(node) {
-  return modifiers(node).some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
-}
-
-function isInternal(node) {
-  return ts.getJSDocTags(node).some((tag) => tag.tagName.text === 'internal');
 }
 
 function hasCommentText(comment) {
@@ -58,49 +43,23 @@ function hasCommentText(comment) {
     if (typeof part === 'string') {
       return part.trim().length > 0;
     }
-    if (typeof part.text === 'string' && part.text.trim().length > 0) {
-      return true;
-    }
-    return typeof part.getText === 'function' && part.getText().trim().length > 0;
+    return typeof part.text === 'string' && part.text.trim().length > 0;
   });
 }
 
-function hasDocumentation(node) {
-  return (
-    (node.jsDoc ?? []).some(
-      (comment) =>
-        hasCommentText(comment.comment) ||
-        (comment.tags ?? []).some((tag) => tag.tagName.text !== 'internal' && hasCommentText(tag.comment)),
-    ) ||
-    (ts.isParameter(node) && ts.getJSDocParameterTags(node).some((tag) => hasCommentText(tag.comment)))
+function hasNodeDocumentation(node) {
+  return (node.jsDoc ?? []).some(
+    (comment) =>
+      hasCommentText(comment.comment) ||
+      (comment.tags ?? []).some((tag) => tag.tagName.text !== 'internal' && hasCommentText(tag.comment)),
   );
 }
 
-function isPublicMember(node) {
-  if (
-    !ts.isConstructorDeclaration(node) &&
-    !ts.isMethodDeclaration(node) &&
-    !ts.isPropertyDeclaration(node) &&
-    !ts.isGetAccessorDeclaration(node) &&
-    !ts.isSetAccessorDeclaration(node)
-  ) {
-    return false;
-  }
-
-  if (node.name && ts.isPrivateIdentifier(node.name)) {
-    return false;
-  }
-  if (isInternal(node)) {
-    return false;
-  }
-
-  return !modifiers(node).some(
-    (modifier) =>
-      modifier.kind === ts.SyntaxKind.PrivateKeyword || modifier.kind === ts.SyntaxKind.ProtectedKeyword,
-  );
+function isInternal(node) {
+  return ts.getJSDocTags(node).some((tag) => tag.tagName.text === 'internal');
 }
 
-function declarationName(node, sourceFile) {
+function memberName(node, sourceFile) {
   if (ts.isConstructorDeclaration(node)) {
     return 'constructor';
   }
@@ -113,482 +72,413 @@ function declarationName(node, sourceFile) {
   if (ts.isConstructSignatureDeclaration(node)) {
     return '[new]';
   }
-  if (!node.name) {
-    return 'default';
+  return node.name?.getText(sourceFile) ?? 'default';
+}
+
+function isVisibleMember(node) {
+  if (node.name && ts.isPrivateIdentifier(node.name)) {
+    return false;
   }
-  return node.name.getText(sourceFile);
-}
+  if (isInternal(node)) {
+    return false;
+  }
 
-function isTypeMember(node) {
-  return (
-    ts.isPropertySignature(node) ||
-    ts.isMethodSignature(node) ||
-    ts.isIndexSignatureDeclaration(node) ||
-    ts.isCallSignatureDeclaration(node) ||
-    ts.isConstructSignatureDeclaration(node)
-  );
-}
-
-function isStandaloneSignature(node) {
-  return (
-    ts.isIndexSignatureDeclaration(node) ||
-    ts.isCallSignatureDeclaration(node) ||
-    ts.isConstructSignatureDeclaration(node)
-  );
-}
-
-function isNamedDeclaration(node) {
-  return (
-    ts.isModuleDeclaration(node) ||
-    ts.isFunctionDeclaration(node) ||
-    ts.isClassDeclaration(node) ||
-    ts.isInterfaceDeclaration(node) ||
-    ts.isTypeAliasDeclaration(node) ||
-    ts.isEnumDeclaration(node)
-  );
-}
-
-function isPublicParameterProperty(parameter) {
-  const flags = modifiers(parameter);
-  const isProperty = flags.some(
-    (modifier) =>
-      modifier.kind === ts.SyntaxKind.PublicKeyword || modifier.kind === ts.SyntaxKind.ReadonlyKeyword,
-  );
-  const isNonpublic = flags.some(
+  const modifiers = ts.canHaveModifiers(node) ? (ts.getModifiers(node) ?? []) : [];
+  return !modifiers.some(
     (modifier) =>
       modifier.kind === ts.SyntaxKind.PrivateKeyword || modifier.kind === ts.SyntaxKind.ProtectedKeyword,
   );
-
-  return isProperty && !isNonpublic && !isInternal(parameter);
 }
 
-function bindingIdentifiers(name) {
-  if (ts.isIdentifier(name)) {
-    return [name];
+function compilerOptions(virtual) {
+  if (virtual) {
+    return {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      declaration: true,
+      emitDeclarationOnly: true,
+      noEmitOnError: false,
+      noLib: true,
+      noResolve: true,
+      removeComments: false,
+      skipLibCheck: true,
+      outDir: path.join(repositoryRoot, '.jsdoc-coverage'),
+      rootDir: repositoryRoot,
+    };
   }
 
-  return name.elements.flatMap((element) =>
-    ts.isOmittedExpression(element) ? [] : bindingIdentifiers(element.name),
-  );
+  const configPath = path.join(repositoryRoot, 'tsconfig.json');
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, repositoryRoot);
+
+  return {
+    ...parsed.options,
+    noEmit: false,
+    declaration: true,
+    emitDeclarationOnly: true,
+    declarationMap: false,
+    sourceMap: false,
+    noEmitOnError: false,
+    removeComments: false,
+    stripInternal: false,
+    outDir: path.join(repositoryRoot, '.jsdoc-coverage'),
+    rootDir: repositoryRoot,
+  };
 }
 
-function inspectSource(file, text) {
-  const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-  const declarations = new Map();
-  const inspectedLocalTypes = new Set();
-  let currentScope;
+function createProgram(files, virtualSources, options) {
+  const host = ts.createCompilerHost(options);
+  const readFile = host.readFile.bind(host);
+  const fileExists = host.fileExists.bind(host);
+  const getSourceFile = host.getSourceFile.bind(host);
 
-  function resolveScopedDeclaration(name, collection) {
-    for (let scope = currentScope; scope; scope = scope.parent) {
-      const declaration = scope[collection].get(name);
-      if (declaration) {
-        return { declaration, scope };
-      }
+  host.readFile = (file) => virtualSources.get(path.resolve(file)) ?? readFile(file);
+  host.fileExists = (file) => virtualSources.has(path.resolve(file)) || fileExists(file);
+  host.getSourceFile = (file, languageVersion, onError, shouldCreateNewSourceFile) => {
+    const source = virtualSources.get(path.resolve(file));
+    if (source !== undefined) {
+      return ts.createSourceFile(file, source, languageVersion, true);
     }
+    return getSourceFile(file, languageVersion, onError, shouldCreateNewSourceFile);
+  };
+
+  return ts.createProgram({ rootNames: files, options, host });
+}
+
+function emitDeclarations(program, files) {
+  const emitted = [];
+
+  for (const file of files) {
+    const sourceFile = program.getSourceFile(file);
+    let declarationFile;
+    const result = program.emit(
+      sourceFile,
+      (name, text) => {
+        if (name.endsWith('.d.ts')) {
+          declarationFile = { originalFile: file, fileName: path.resolve(name), text };
+        }
+      },
+      undefined,
+      true,
+    );
+
+    if (result.emitSkipped || !declarationFile) {
+      const diagnostics = result.diagnostics
+        .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
+        .join('; ');
+      throw new Error(`Could not emit public declarations for ${relativePath(file)}: ${diagnostics}`);
+    }
+    emitted.push(declarationFile);
   }
 
-  function record(node, name, kind, ...documentationNodes) {
+  return emitted;
+}
+
+function declarationProgram(emitted) {
+  const virtualSources = new Map(emitted.map(({ fileName, text }) => [fileName, text]));
+  const options = {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.CommonJS,
+    noEmit: true,
+    noLib: true,
+    noResolve: true,
+    skipLibCheck: true,
+  };
+
+  return createProgram([...virtualSources.keys()], virtualSources, options);
+}
+
+function inspectDeclarations(program, emitted) {
+  const checker = program.getTypeChecker();
+  const sourceFile = program.getSourceFile(emitted.fileName);
+  const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
+  const declarations = new Map();
+  const inspected = new Map();
+  const publicTargets = new Set();
+  const displayFile = relativePath(emitted.originalFile);
+
+  if (!moduleSymbol) {
+    return [];
+  }
+
+  function resolvedSymbol(symbol) {
+    return symbol.flags === ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  }
+
+  function symbolDocumentation(symbol) {
+    if (!symbol) {
+      return false;
+    }
+    return (
+      hasCommentText(symbol.getDocumentationComment(checker)) ||
+      symbol.getJsDocTags(checker).some((tag) => tag.name !== 'internal' && hasCommentText(tag.text))
+    );
+  }
+
+  function record(node, name, kind, ...symbols) {
     if (isInternal(node)) {
       return;
     }
 
-    const documented = [node, ...documentationNodes].some(hasDocumentation);
+    const statement = ts.isVariableDeclaration(node) ? node.parent?.parent : undefined;
+    const documented =
+      hasNodeDocumentation(node) ||
+      (statement && hasNodeDocumentation(statement)) ||
+      symbols.some(symbolDocumentation);
     const key = `${kind}:${name}`;
-    const declaration = declarations.get(key);
-    if (declaration) {
-      declaration.documented ||= documented;
+    const existing = declarations.get(key);
+    if (existing) {
+      existing.documented ||= Boolean(documented);
       return;
     }
 
     const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
     declarations.set(key, {
-      file,
+      file: displayFile,
       line: line + 1,
       column: character + 1,
       kind,
       name,
-      documented,
+      documented: Boolean(documented),
     });
   }
 
-  function inspectObjectTypes(node, owner) {
+  function canonicalName(node) {
+    const names = [node.name?.text ?? 'default'];
+    let { parent } = node;
+    while (parent) {
+      if (ts.isModuleDeclaration(parent)) {
+        names.unshift(parent.name.text);
+      }
+      ({ parent } = parent);
+    }
+    return names.join('.');
+  }
+
+  function localSymbol(symbol) {
+    return symbol?.declarations?.some((declaration) => declaration.getSourceFile() === sourceFile);
+  }
+
+  function inspectReference(node) {
+    const symbol = checker.getSymbolAtLocation(node);
+    if (!symbol) {
+      return;
+    }
+
+    const target = resolvedSymbol(symbol);
+    if (!localSymbol(target) || publicTargets.has(target)) {
+      return;
+    }
+
+    const declaration = target.declarations?.find(
+      (candidate) =>
+        candidate.getSourceFile() === sourceFile &&
+        (ts.isClassDeclaration(candidate) ||
+          ts.isInterfaceDeclaration(candidate) ||
+          ts.isTypeAliasDeclaration(candidate) ||
+          ts.isEnumDeclaration(candidate)),
+    );
+    if (declaration) {
+      inspectSymbol(target, canonicalName(declaration), undefined, 'type');
+    }
+  }
+
+  function inspectType(node, owner) {
     if (!node) {
       return;
     }
 
-    if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
-      const resolved = resolveScopedDeclaration(node.typeName.text, 'types');
-      const referenced = resolved?.declaration;
-      if (
-        referenced &&
-        !isExported(referenced) &&
-        !resolved.scope.namedExports.has(referenced.name.text) &&
-        !inspectedLocalTypes.has(referenced)
-      ) {
-        inspectedLocalTypes.add(referenced);
-        if (!isInternal(referenced)) {
-          const name = `${resolved.scope.namespace}${referenced.name.text}`;
-          record(referenced, name, 'type');
-          const previousScope = currentScope;
-          currentScope = resolved.scope;
-          try {
-            if (ts.isInterfaceDeclaration(referenced)) {
-              inspectInterface(referenced, name);
-            }
-            if (ts.isTypeAliasDeclaration(referenced)) {
-              inspectObjectTypes(referenced.type, name);
-            }
-            inspectTypeParameters(referenced, name);
-          } finally {
-            currentScope = previousScope;
-          }
-        }
-      }
+    if (ts.isTypeReferenceNode(node)) {
+      inspectReference(node.typeName);
     }
-
+    if (ts.isExpressionWithTypeArguments(node)) {
+      inspectReference(node.expression);
+    }
     if (ts.isTypeLiteralNode(node)) {
-      for (const member of node.members) {
-        if (!isTypeMember(member)) {
-          continue;
-        }
-        if (isInternal(member)) {
-          continue;
-        }
-
-        const name = `${owner}.${declarationName(member, sourceFile)}`;
-        record(member, name, 'option');
-        if (isStandaloneSignature(member)) {
-          inspectSignature(member, name);
-        } else {
-          inspectObjectTypes(member.type, name);
-          inspectParameters(member, name);
-        }
-      }
+      inspectMembers(node.members, owner, 'option');
       return;
     }
-
-    ts.forEachChild(node, (child) => inspectObjectTypes(child, owner));
-  }
-
-  function inspectParameters(node, owner) {
-    for (const parameter of node.parameters ?? []) {
-      inspectObjectTypes(parameter.type, `${owner}.${parameter.name.getText(sourceFile)}`);
-    }
-  }
-
-  function inspectTypeParameters(node, owner) {
-    for (const parameter of node.typeParameters ?? []) {
-      inspectObjectTypes(parameter.constraint, `${owner}.${parameter.name.getText(sourceFile)}`);
-      inspectObjectTypes(parameter.default, `${owner}.${parameter.name.getText(sourceFile)}`);
-    }
-  }
-
-  function inspectHeritage(node, owner) {
-    for (const clause of node.heritageClauses ?? []) {
-      for (const inherited of clause.types) {
-        inspectObjectTypes(inherited, `${owner}.base`);
-      }
-    }
-  }
-
-  function inspectSignature(node, owner) {
-    inspectParameters(node, owner);
-    inspectTypeParameters(node, owner);
-    inspectObjectTypes(node.type, `${owner}.result`);
-  }
-
-  function inspectClass(node, owner) {
-    inspectTypeParameters(node, owner);
-    inspectHeritage(node, owner);
-    for (const member of node.members) {
-      if (!isPublicMember(member)) {
-        continue;
-      }
-
-      const name = `${owner}.${declarationName(member, sourceFile)}`;
-      record(member, name, ts.isConstructorDeclaration(member) ? 'constructor' : 'member');
-      inspectSignature(member, name);
-
-      if (ts.isConstructorDeclaration(member)) {
-        for (const parameter of member.parameters) {
-          if (!isPublicParameterProperty(parameter)) {
-            continue;
-          }
-
-          const propertyName = `${owner}.${parameter.name.getText(sourceFile)}`;
-          record(parameter, propertyName, 'member');
-          inspectObjectTypes(parameter.type, propertyName);
-        }
-      }
-    }
-  }
-
-  function inspectInterface(node, owner) {
-    inspectTypeParameters(node, owner);
-    inspectHeritage(node, owner);
-    for (const member of node.members) {
-      if (!isTypeMember(member)) {
-        continue;
-      }
-      if (isInternal(member)) {
-        continue;
-      }
-
-      const name = `${owner}.${declarationName(member, sourceFile)}`;
-      record(member, name, 'property');
-      if (isStandaloneSignature(member)) {
-        inspectSignature(member, name);
-      } else {
-        inspectObjectTypes(member.type, name);
-        inspectSignature(member, name);
-      }
-    }
-  }
-
-  function inspectInitializer(node, owner, seenProperties = new Set(), activeInitializers = new Set()) {
-    if (!node) {
-      return;
-    }
-
-    if (
-      ts.isAsExpression(node) ||
-      ts.isSatisfiesExpression(node) ||
-      ts.isParenthesizedExpression(node) ||
-      ts.isTypeAssertionExpression(node)
-    ) {
-      inspectInitializer(node.expression, owner, seenProperties, activeInitializers);
-      return;
-    }
-
-    if (ts.isIdentifier(node)) {
-      const resolved = resolveScopedDeclaration(node.text, 'values');
-      if (!resolved || activeInitializers.has(resolved.declaration)) {
-        return;
-      }
-
-      activeInitializers.add(resolved.declaration);
-      const previousScope = currentScope;
-      currentScope = resolved.scope;
-      try {
-        inspectInitializer(resolved.declaration.initializer, owner, seenProperties, activeInitializers);
-      } finally {
-        currentScope = previousScope;
-        activeInitializers.delete(resolved.declaration);
-      }
-      return;
-    }
-
-    if (ts.isClassExpression(node)) {
-      inspectClass(node, owner);
-      return;
-    }
-
-    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+    if (ts.isFunctionTypeNode(node) || ts.isConstructorTypeNode(node)) {
       inspectSignature(node, owner);
       return;
     }
 
-    if (ts.isObjectLiteralExpression(node)) {
-      inspectObjectInitializer(node, owner, seenProperties, activeInitializers);
+    ts.forEachChild(node, (child) => inspectType(child, owner));
+  }
+
+  function inspectSignature(node, owner) {
+    for (const parameter of node.parameters ?? []) {
+      inspectType(parameter.type, `${owner}.${parameter.name.getText(sourceFile)}`);
+    }
+    inspectTypeParameters(node, owner);
+    inspectType(node.type, `${owner}.result`);
+  }
+
+  function inspectTypeParameters(node, owner) {
+    for (const parameter of node.typeParameters ?? []) {
+      const parameterName = `${owner}.${parameter.name.getText(sourceFile)}`;
+      inspectType(parameter.constraint, parameterName);
+      inspectType(parameter.default, parameterName);
     }
   }
 
-  function inspectObjectInitializer(node, owner, seenProperties, activeInitializers) {
-    for (const property of node.properties.toReversed()) {
-      if (ts.isSpreadAssignment(property)) {
-        inspectInitializer(property.expression, owner, seenProperties, activeInitializers);
+  function inspectMembers(members, owner, kind) {
+    for (const member of members) {
+      if (!isVisibleMember(member)) {
         continue;
       }
+
+      const staticPrefix =
+        ts.canHaveModifiers(member) &&
+        (ts.getModifiers(member) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)
+          ? 'static.'
+          : '';
+      const name = `${owner}.${staticPrefix}${memberName(member, sourceFile)}`;
+      record(member, name, ts.isConstructorDeclaration(member) ? 'constructor' : kind);
 
       if (
-        !ts.isPropertyAssignment(property) &&
-        !ts.isShorthandPropertyAssignment(property) &&
-        !ts.isMethodDeclaration(property) &&
-        !ts.isGetAccessorDeclaration(property) &&
-        !ts.isSetAccessorDeclaration(property)
+        ts.isPropertySignature(member) ||
+        ts.isPropertyDeclaration(member) ||
+        ts.isGetAccessorDeclaration(member)
       ) {
-        continue;
-      }
-      if (isInternal(property)) {
-        continue;
-      }
-
-      const name = `${owner}.${declarationName(property, sourceFile)}`;
-      if (seenProperties.has(name)) {
-        continue;
-      }
-      seenProperties.add(name);
-      record(property, name, 'property');
-      inspectSignature(property, name);
-      if (ts.isPropertyAssignment(property)) {
-        inspectInitializer(property.initializer, name);
+        inspectType(member.type, name);
+      } else {
+        inspectSignature(member, name);
       }
     }
   }
 
-  function collectNamedExports(statements) {
-    const namedExports = new Map();
-
-    function addLocalExport(localName, exportedName, documentationNode) {
-      const aliases = namedExports.get(localName) ?? [];
-      aliases.push({ name: exportedName, documentationNode });
-      namedExports.set(localName, aliases);
-    }
-
-    for (const statement of statements) {
-      if (
-        ts.isExportAssignment(statement) &&
-        !statement.isExportEquals &&
-        ts.isIdentifier(statement.expression)
-      ) {
-        addLocalExport(statement.expression.text, 'default', statement);
+  function inspectClassLikeValue(type, owner) {
+    for (const member of type.members) {
+      if (!isVisibleMember(member)) {
         continue;
       }
-
-      if (
-        !ts.isExportDeclaration(statement) ||
-        statement.moduleSpecifier ||
-        !statement.exportClause ||
-        !ts.isNamedExports(statement.exportClause)
-      ) {
-        continue;
-      }
-
-      for (const specifier of statement.exportClause.elements) {
-        if (isInternal(specifier)) {
-          continue;
+      if (ts.isConstructSignatureDeclaration(member)) {
+        const constructorName = `${owner}.constructor`;
+        record(member, constructorName, 'constructor');
+        for (const parameter of member.parameters) {
+          inspectType(parameter.type, `${constructorName}.${parameter.name.getText(sourceFile)}`);
         }
-        const localName = (specifier.propertyName ?? specifier.name).text;
-        addLocalExport(localName, specifier.name.text, specifier);
+        inspectType(member.type, owner);
+      } else {
+        inspectMembers([member], `${owner}.static`, 'member');
       }
     }
-
-    return namedExports;
   }
 
-  function inspectVariableDeclaration(statement, namedExports, namespace) {
-    for (const declaration of statement.declarationList.declarations) {
-      const isDestructured = !ts.isIdentifier(declaration.name);
-      for (const identifier of bindingIdentifiers(declaration.name)) {
-        const localName = identifier.text;
-        const exports = [...(namedExports.get(localName) ?? [])];
-        if (isExported(statement)) {
-          exports.push({ name: localName });
-        }
-
-        for (const { name: exportedName, documentationNode } of exports) {
-          const name = `${namespace}${exportedName}`;
-          const documentationNodes = documentationNode ? [documentationNode] : [];
-          if (!isDestructured) {
-            documentationNodes.push(statement);
-          }
-          record(isDestructured ? identifier : declaration, name, 'export', ...documentationNodes);
-          if (!isDestructured) {
-            inspectObjectTypes(declaration.type, name);
-            inspectInitializer(declaration.initializer, name);
-          }
+  function inspectHeritage(node) {
+    for (const clause of node.heritageClauses ?? []) {
+      for (const inherited of clause.types) {
+        inspectReference(inherited.expression);
+        for (const argument of inherited.typeArguments ?? []) {
+          inspectType(argument, canonicalName(node));
         }
       }
     }
   }
 
-  function inspectNamedDeclaration(statement, namedExports, namespace) {
-    const localName = declarationName(statement, sourceFile);
-    const exports = [...(namedExports.get(localName) ?? [])];
-    if (isExported(statement)) {
-      const isDefault = modifiers(statement).some(
-        (modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword,
-      );
-      exports.push({ name: isDefault ? 'default' : localName });
+  function inspectNode(node, symbol, owner, exportSymbol, kind) {
+    if (isInternal(node)) {
+      return;
     }
 
-    for (const { name: exportedName, documentationNode } of exports) {
-      const name = `${namespace}${exportedName}`;
-      record(
-        statement,
-        name,
-        ts.isModuleDeclaration(statement) ? 'namespace' : 'export',
-        ...(documentationNode ? [documentationNode] : []),
-      );
+    const declarationKind = ts.isModuleDeclaration(node) ? 'namespace' : kind;
+    record(node, owner, declarationKind, exportSymbol, symbol);
 
-      if (ts.isModuleDeclaration(statement) && statement.body && ts.isModuleBlock(statement.body)) {
-        inspectDeclarations(statement.body.statements, `${name}.`);
+    if (ts.isModuleDeclaration(node)) {
+      inspectExports(symbol, `${owner}.`);
+      return;
+    }
+    if (ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) {
+      inspectTypeParameters(node, owner);
+      inspectHeritage(node);
+      inspectMembers(node.members, owner, ts.isClassDeclaration(node) ? 'member' : 'property');
+      return;
+    }
+    if (ts.isEnumDeclaration(node)) {
+      inspectMembers(node.members, owner, 'member');
+      return;
+    }
+    if (ts.isTypeAliasDeclaration(node)) {
+      inspectTypeParameters(node, owner);
+      inspectType(node.type, owner);
+      return;
+    }
+    if (ts.isFunctionDeclaration(node)) {
+      inspectSignature(node, owner);
+      return;
+    }
+    if (ts.isVariableDeclaration(node)) {
+      const isClassLike =
+        node.type &&
+        ts.isTypeLiteralNode(node.type) &&
+        node.type.members.some(ts.isConstructSignatureDeclaration);
+      if (isClassLike) {
+        inspectClassLikeValue(node.type, owner);
+      } else {
+        inspectType(node.type, owner);
       }
-      if (ts.isClassDeclaration(statement)) {
-        inspectClass(statement, name);
-      }
-      if (ts.isInterfaceDeclaration(statement)) {
-        inspectInterface(statement, name);
-      }
-      if (ts.isTypeAliasDeclaration(statement)) {
-        inspectTypeParameters(statement, name);
-        inspectObjectTypes(statement.type, name);
-      }
-      if (ts.isFunctionDeclaration(statement)) {
-        inspectSignature(statement, name);
-      }
-      if (ts.isEnumDeclaration(statement)) {
-        for (const member of statement.members) {
-          record(member, `${name}.${declarationName(member, sourceFile)}`, 'member');
-        }
+    }
+  }
+
+  function inspectSymbol(symbol, owner, exportSymbol, kind = 'export') {
+    const owners = inspected.get(symbol) ?? new Set();
+    if (owners.has(owner)) {
+      return;
+    }
+    owners.add(owner);
+    inspected.set(symbol, owners);
+
+    for (const declaration of symbol.declarations ?? []) {
+      if (declaration.getSourceFile() === sourceFile) {
+        inspectNode(declaration, symbol, owner, exportSymbol, kind);
       }
     }
   }
 
-  function inspectDeclarations(statements, namespace = '') {
-    const namedExports = collectNamedExports(statements);
-    const types = new Map(
-      statements
-        .filter((statement) => ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement))
-        .map((statement) => [statement.name.text, statement]),
-    );
-    const values = new Map();
-    for (const statement of statements) {
-      if (!ts.isVariableStatement(statement)) {
-        continue;
-      }
-      for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name)) {
-          values.set(declaration.name.text, declaration);
-        }
+  function inspectExports(namespace, prefix = '') {
+    const exports = checker.getExportsOfModule(namespace);
+    for (const exported of exports) {
+      const target = resolvedSymbol(exported);
+      if (localSymbol(target)) {
+        publicTargets.add(target);
       }
     }
 
-    const previousScope = currentScope;
-    currentScope = { parent: previousScope, namespace, namedExports, types, values };
-    try {
-      for (const statement of statements) {
-        if (isInternal(statement)) {
-          continue;
-        }
-        if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
-          const name = `${namespace}default`;
-          record(statement, name, 'export');
-          inspectInitializer(statement.expression, name);
-        } else if (ts.isVariableStatement(statement)) {
-          inspectVariableDeclaration(statement, namedExports, namespace);
-        } else if (isNamedDeclaration(statement)) {
-          inspectNamedDeclaration(statement, namedExports, namespace);
-        }
+    for (const exported of exports) {
+      const target = resolvedSymbol(exported);
+      if (localSymbol(target)) {
+        inspectSymbol(target, `${prefix}${exported.getName()}`, exported);
       }
-    } finally {
-      currentScope = previousScope;
     }
   }
 
-  inspectDeclarations(sourceFile.statements);
-
+  inspectExports(moduleSymbol);
   return [...declarations.values()];
+}
+
+function inspectFiles(files, virtualSources = new Map()) {
+  const options = compilerOptions(virtualSources.size > 0);
+  const sourceProgram = createProgram(files, virtualSources, options);
+  const emitted = emitDeclarations(sourceProgram, files);
+  const publicProgram = declarationProgram(emitted);
+
+  return emitted.flatMap((declaration) => inspectDeclarations(publicProgram, declaration));
+}
+
+function inspectSource(file, text) {
+  const sourceFile = path.resolve(repositoryRoot, file);
+  return inspectFiles([sourceFile], new Map([[sourceFile, text]]));
 }
 
 function collectCoverage() {
   const files = collectSourceFiles(path.join(repositoryRoot, 'src'));
-  const declarations = files.flatMap((file) =>
-    inspectSource(relativePath(file), fs.readFileSync(file, 'utf-8')),
-  );
-  const undocumented = declarations.filter((declaration) => !declaration.documented);
-
-  return { files: files.length, declarations, undocumented };
+  const declarations = inspectFiles(files);
+  return {
+    files: files.length,
+    declarations,
+    undocumented: declarations.filter((declaration) => !declaration.documented),
+  };
 }
 
 if (require.main === module) {
