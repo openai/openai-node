@@ -49,9 +49,9 @@ describe('merge()', function () {
   (typeof Object.defineProperty === 'function' ? test : test.skip)(
     'avoids invoking array setters unnecessarily',
     function () {
-      var setCount = 0;
-      var getCount = 0;
-      var observed: any[] = [];
+      let setCount = 0;
+      let getCount = 0;
+      const observed: any[] = [];
       Object.defineProperty(observed, 0, {
         get() {
           getCount += 1;
@@ -76,9 +76,9 @@ describe('merge()', function () {
 });
 
 test('assign()', function () {
-  var target = { a: 1, b: 2 };
-  var source = { b: 3, c: 4 };
-  var result = assign_single_source(target, source);
+  const target = { a: 1, b: 2 };
+  const source = { b: 3, c: 4 };
+  const result = assign_single_source(target, source);
 
   expect(result).toEqual(target);
   expect(target).toEqual({ a: 1, b: 3, c: 4 });
@@ -87,9 +87,9 @@ test('assign()', function () {
 
 describe('combine()', function () {
   test('both arrays', function () {
-    var a = [1];
-    var b = [2];
-    var combined = combine(a, b);
+    const a = [1];
+    const b = [2];
+    const combined = combine(a, b);
 
     // st.deepEqual(a, [1], 'a is not mutated');
     // st.deepEqual(b, [2], 'b is not mutated');
@@ -104,12 +104,12 @@ describe('combine()', function () {
   });
 
   test('one array, one non-array', function () {
-    var aN = 1;
-    var a = [aN];
-    var bN = 2;
-    var b = [bN];
+    const aN = 1;
+    const a = [aN];
+    const bN = 2;
+    const b = [bN];
 
-    var combinedAnB = combine(aN, b);
+    const combinedAnB = combine(aN, b);
     // st.deepEqual(b, [bN], 'b is not mutated');
     // st.notEqual(aN, combinedAnB, 'aN + b !== aN');
     // st.notEqual(a, combinedAnB, 'aN + b !== a');
@@ -139,7 +139,7 @@ describe('combine()', function () {
   });
 
   test('neither is an array', function () {
-    var combined = combine(1, 2);
+    const combined = combine(1, 2);
     // st.notEqual(1, combined, '1 + 2 !== 1');
     // st.notEqual(2, combined, '1 + 2 !== 2');
     // st.deepEqual([1, 2], combined, 'both arguments are array-wrapped when not an array');

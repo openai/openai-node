@@ -15,7 +15,6 @@ const compatibilityRules = [
   'no-inline-comments',
   'no-plusplus',
   'no-use-before-define',
-  'no-var',
   'prefer-arrow-callback',
   'prefer-destructuring',
   'prefer-template',

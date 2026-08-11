@@ -410,7 +410,7 @@ describe('.stream()', () => {
   });
 
   it('emits content logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
     const request = await makeStreamSnapshotRequest((openai) =>
       openai.chat.completions.stream({
@@ -569,7 +569,7 @@ describe('.stream()', () => {
   });
 
   it('emits refusal logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
     const request = await makeStreamSnapshotRequest((openai) =>
       openai.chat.completions.stream({
