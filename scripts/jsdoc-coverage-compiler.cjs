@@ -134,12 +134,62 @@ function genericParameterBranch(parent, child) {
   }
 }
 
+function callableIntersectionBranch(parent, child) {
+  if (ts.isIntersectionTypeNode(parent)) {
+    let constituent = child;
+    while (ts.isParenthesizedTypeNode(constituent)) {
+      constituent = constituent.type;
+    }
+    if (ts.isFunctionTypeNode(constituent) || ts.isConstructorTypeNode(constituent)) {
+      return `${parent.pos}:${parent.types.indexOf(child)}`;
+    }
+    return;
+  }
+
+  if (
+    !ts.isFunctionLike(parent) ||
+    (child !== parent.type && !parent.parameters?.includes(child) && !parent.typeParameters?.includes(child))
+  ) {
+    return;
+  }
+
+  let constituent = parent.parent;
+  if (!ts.isTypeLiteralNode(constituent)) {
+    return;
+  }
+  while (ts.isParenthesizedTypeNode(constituent.parent)) {
+    constituent = constituent.parent;
+  }
+  const intersection = constituent.parent;
+  if (ts.isIntersectionTypeNode(intersection)) {
+    return `${intersection.pos}:${intersection.types.indexOf(constituent)}`;
+  }
+}
+
+function typeArgumentBranch(parent, child) {
+  if (
+    !ts.isTypeReferenceNode(parent) &&
+    !ts.isImportTypeNode(parent) &&
+    !ts.isExpressionWithTypeArguments(parent)
+  ) {
+    return;
+  }
+  const index = parent.typeArguments?.indexOf(child) ?? -1;
+  if (index !== -1) {
+    return `${parent.pos}:${index}`;
+  }
+}
+
 function positionalBranch(parent, child) {
   if (ts.isUnionTypeNode(parent)) {
     return `${parent.pos}:${parent.types.indexOf(child)}`;
   }
   if (ts.isTupleTypeNode(parent)) {
     return `${parent.pos}:${parent.elements.indexOf(child)}`;
+  }
+  const callable = callableIntersectionBranch(parent, child);
+  if (callable !== undefined) {
+    return callable;
   }
   const generic = genericParameterBranch(parent, child);
   if (generic !== undefined) {
@@ -160,23 +210,38 @@ function positionalBranch(parent, child) {
   ) {
     return `${parent.pos}:signature`;
   }
-  if (
-    ts.isTypeReferenceNode(parent) ||
-    ts.isImportTypeNode(parent) ||
-    ts.isExpressionWithTypeArguments(parent)
-  ) {
-    const index = parent.typeArguments?.indexOf(child) ?? -1;
-    if (index !== -1) {
-      return `${parent.pos}:${index}`;
-    }
-  }
+  return typeArgumentBranch(parent, child);
 }
 
 function isMappedType(type) {
   return Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
 }
 
+function inheritedTypeArguments(checker, type, arguments_) {
+  const inherited = [];
+  for (const declaration of type.symbol?.declarations ?? []) {
+    const sources = (declaration.typeParameters ?? []).map((parameter) =>
+      checker.getTypeAtLocation(parameter),
+    );
+    const mapper = { sources, targets: arguments_ };
+    for (const clause of declaration.heritageClauses ?? []) {
+      for (const heritage of clause.types) {
+        const heritageArguments =
+          heritage.typeArguments?.map((argument) => checker.getTypeAtLocation(argument)) ??
+          checker.getTypeArguments(checker.getTypeAtLocation(heritage));
+        for (const argument of heritageArguments) {
+          inherited.push({ type: argument, mapper });
+        }
+      }
+    }
+  }
+  return inherited;
+}
+
 function externalTypeArguments(checker, type, handwrittenFiles) {
+  if (type.isIntersection()) {
+    return type.types.flatMap((constituent) => externalTypeArguments(checker, constituent, handwrittenFiles));
+  }
   const reference = Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Reference) % 2 === 1;
   if (!reference || checker.isArrayType(type) || checker.isTupleType(type)) {
     return [];
@@ -185,7 +250,7 @@ function externalTypeArguments(checker, type, handwrittenFiles) {
     handwrittenFiles.has(declaration.getSourceFile().fileName),
   );
   if (!handwritten) {
-    return checker.getTypeArguments(type);
+    return checker.getTypeArguments(type).map((argument) => ({ type: argument }));
   }
   const own = checker
     .getPropertiesOfType(type)
@@ -194,7 +259,10 @@ function externalTypeArguments(checker, type, handwrittenFiles) {
         handwrittenFiles.has(declaration.getSourceFile().fileName),
       ),
     );
-  return own ? [] : checker.getTypeArguments(type);
+  const arguments_ = checker.getTypeArguments(type);
+  return own
+    ? inheritedTypeArguments(checker, type, arguments_)
+    : arguments_.map((argument) => ({ type: argument }));
 }
 
 function mappedArgument(node, mappedDeclaration, anchor) {
@@ -491,6 +559,7 @@ module.exports = {
   mappedArgument,
   memberName,
   positionalBranch,
+  relativePath,
   sourceSymbolAtPath,
   visibleHandwrittenMember,
 };

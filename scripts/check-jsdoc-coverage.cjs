@@ -18,15 +18,12 @@ const {
   mappedArgument,
   memberName,
   positionalBranch,
+  relativePath,
   sourceSymbolAtPath,
   visibleHandwrittenMember,
 } = require('./jsdoc-coverage-compiler.cjs');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-
-function relativePath(file) {
-  return path.relative(repositoryRoot, file).split(path.sep).join('/');
-}
 
 function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles) {
   const checker = program.getTypeChecker();
@@ -306,6 +303,9 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
       inspectResolvedType(checker.getTypeAtLocation(node), owner, node);
       return;
     }
+    if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.KeyOfKeyword) {
+      return;
+    }
     if (ts.isMappedTypeNode(node)) {
       inspectResolvedType(checker.getTypeAtLocation(node), owner, node);
       return;
@@ -567,8 +567,17 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
         return;
       }
 
-      for (const argument of externalTypeArguments(checker, type, handwrittenFiles)) {
-        inspectResolvedType(argument, owner, anchor, kind);
+      for (const { type: argument, mapper } of externalTypeArguments(checker, type, handwrittenFiles)) {
+        const previousMapper = semanticTypeMapper;
+        semanticTypeMapper =
+          mapper && previousMapper
+            ? { mapper1: mapper, mapper2: previousMapper }
+            : (mapper ?? previousMapper);
+        try {
+          inspectResolvedType(argument, owner, anchor, kind);
+        } finally {
+          semanticTypeMapper = previousMapper;
+        }
       }
 
       const indexes = checker.getIndexInfosOfType(type);

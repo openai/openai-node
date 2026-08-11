@@ -206,6 +206,158 @@ describe('handwritten SDK declaration module formats', () => {
     ).toEqual(expect.arrayContaining(['Public.[key: Key].missing', 'Public.[key: Key].other']));
   });
 
+  test.each([
+    [
+      'an interface',
+      'export interface Wrapper<Value> extends Promise<Value> {\n/** Identifier. */\nid: string }',
+    ],
+    [
+      'a class',
+      'export declare class Wrapper<Value> extends Promise<Value> {\n/** Identifier. */\nid: string }',
+    ],
+    [
+      'an intersection alias',
+      'export type Wrapper<Value> = Promise<Value> & {\n/** Identifier. */\nid: string }',
+    ],
+    [
+      'multiple bases',
+      '/** Marker. */ interface Marker {\n/** Label. */\nlabel: string } export interface Wrapper<Value> extends Promise<Value>, Marker {\n/** Identifier. */\nid: string }',
+    ],
+  ])('forwards inherited generic values through %s with unrelated members', (_description, declaration) => {
+    const source = `
+      import type { Wrapper } from './promise-wrapper';
+      /** Chooses an inherited wrapper. */
+      type Select<Value, Yes, No> = Value extends string ? Wrapper<Yes> : Wrapper<No>;
+      /** Public deferred dictionary. */
+      export type Public<Key extends string, Value> = Record<
+        Key,
+        Select<Value, { missing: string }, { other: string }>
+      >;
+    `;
+    const dependencies = { 'src/promise-wrapper.ts': declaration };
+
+    expect(
+      inspectSource('src/fixture.ts', source, dependencies)
+        .filter(({ documented }) => !documented)
+        .map(({ name }) => name),
+    ).toEqual(expect.arrayContaining(['Public.[key: Key].missing', 'Public.[key: Key].other']));
+  });
+
+  test('does not audit unused external generic arguments', () => {
+    const source = `
+      import type { Wrapper } from './unused-wrapper';
+      /** Chooses a wrapper without exposing its generic argument. */
+      type Select<Value, Yes, No> = Value extends string ? Wrapper<Yes> : Wrapper<No>;
+      /** Public deferred dictionary. */
+      export type Public<Key extends string, Value> = Record<
+        Key,
+        Select<Value, { missing: string }, { other: string }>
+      >;
+    `;
+    const dependencies = {
+      'src/unused-wrapper.ts': `
+        /** Wrapper that does not expose Value. */
+        export interface Wrapper<Value> {
+          /** Public identifier. */
+          id: string;
+        }
+      `,
+    };
+
+    expect(
+      inspectSource('src/fixture.ts', source, dependencies).filter(({ documented }) => !documented),
+    ).toEqual([]);
+  });
+
+  test.each([
+    ['an inherited object', '{ wrapped: Value }'],
+    ['an inherited array', 'Value[]'],
+  ])('substitutes generic values nested inside %s', (_description, inherited) => {
+    const source = `
+      import type { Wrapper } from './nested-wrapper';
+      /** Chooses a nested inherited wrapper. */
+      type Select<Value, Yes, No> = Value extends string ? Wrapper<Yes> : Wrapper<No>;
+      /** Public deferred dictionary. */
+      export type Public<Key extends string, Value> = Record<
+        Key,
+        Select<Value, { missing: string }, { other: string }>
+      >;
+    `;
+    const dependencies = {
+      'src/nested-wrapper.ts': `
+        /** Nested promise wrapper. */
+        export interface Wrapper<Value> extends Promise<${inherited}> {
+          /** Public identifier. */
+          id: string;
+        }
+      `,
+    };
+    const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+      .filter(({ documented }) => !documented)
+      .map(({ name }) => name);
+
+    expect(undocumented.some((name) => name.endsWith('.missing'))).toBe(true);
+    expect(undocumented.some((name) => name.endsWith('.other'))).toBe(true);
+    if (inherited.includes('wrapped')) {
+      expect(undocumented).toContain('Public.[key: Key].wrapped.missing');
+      expect(undocumented).toContain('Public.[key: Key].wrapped.other');
+    }
+  });
+
+  test.each([
+    [
+      'callable',
+      '((options: {\n/** First option. */\nshared: string }) => {\n/** First result. */\nresult: string }) & ((options: { shared: string }) => { result: string })',
+    ],
+    [
+      'constructable',
+      '(new (options: {\n/** First option. */\nshared: string }) => {\n/** First result. */\nresult: string }) & (new (options: { shared: string }) => { result: string })',
+    ],
+    [
+      'call-signature',
+      '{ (options: {\n/** First option. */\nshared: string }): {\n/** First result. */\nresult: string } } & { (options: { shared: string }): { result: string } }',
+    ],
+  ])('keeps %s intersection constituent fields independently documented', (_description, type) => {
+    const source = `/** Public overloaded intersection. */\nexport type Public = ${type};`;
+    const declarations = inspectSource('src/fixture.ts', source);
+    const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+    expect(undocumented.some((name) => name.endsWith('.shared'))).toBe(true);
+    expect(undocumented.some((name) => name.endsWith('.result'))).toBe(true);
+    expect(declarations.filter(({ name }) => name === 'Public')).toHaveLength(1);
+  });
+
+  test('continues merging shared properties in ordinary object intersections', () => {
+    const source = `
+      /** Public object intersection. */
+      export type Public = {
+        /** Shared field documentation. */
+        shared: string;
+      } & {
+        shared: string;
+      };
+    `;
+    const declarations = inspectSource('src/fixture.ts', source);
+
+    expect(declarations.filter(({ name }) => name === 'Public.shared')).toHaveLength(1);
+    expect(declarations.filter(({ documented }) => !documented)).toEqual([]);
+  });
+
+  test('does not audit the private object behind a public keyof projection', () => {
+    const source = `
+      interface Shape {
+        hidden: string;
+        nested: { missing: string };
+      }
+      /** Public key names without their underlying value shapes. */
+      export type Public = keyof Shape;
+    `;
+    const declarations = inspectSource('src/fixture.ts', source);
+
+    expect(declarations.map(({ name }) => name)).toEqual(['Public']);
+    expect(declarations.filter(({ documented }) => !documented)).toEqual([]);
+  });
+
   test('checks constraints and defaults on publicly exposed internal callable signatures', () => {
     const source = `
       export { Hidden as Public } from './internal-callable';
