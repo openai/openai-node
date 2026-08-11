@@ -231,6 +231,99 @@ describe('handwritten SDK JSDoc coverage', () => {
     );
   });
 
+  test('checks class expressions and public constructor parameter properties', () => {
+    const source = `
+      /** Public client. */
+      export const Client = class {
+        /**
+         * Creates the client.
+         * @param documented A documented public property.
+         */
+        constructor(
+          public missing: string,
+          public documented: string,
+          /** A documented readonly property. */ readonly readonlyValue: string,
+          private secret: string,
+          protected hidden: string,
+          ordinary: string,
+        ) {}
+        undocumented() {}
+      };
+    `;
+
+    expect(missing(source)).toEqual(['Client.missing', 'Client.undocumented']);
+  });
+
+  test('resolves namespace-local private types within their lexical scopes', () => {
+    const source = `
+      type Options = { outer: string };
+      /** Uses the outer options. */
+      export function outer(options: Options): void {}
+      /** Public namespace. */
+      export namespace Group {
+        type Options = { nested: string };
+        /** Uses the namespace options. */
+        export function nested(options: Options): void {}
+        /** Nested public namespace. */
+        export namespace Child {
+          type Options = { child: string };
+          /** Uses the child options. */
+          export function nested(options: Options): void {}
+        }
+      }
+    `;
+
+    expect(missing(source)).toEqual([
+      'Options',
+      'Options.outer',
+      'Group.Options',
+      'Group.Options.nested',
+      'Group.Child.Options',
+      'Group.Child.Options.child',
+    ]);
+  });
+
+  test('checks exported identifiers from nested object and array binding patterns', () => {
+    const source = `
+      /** Variable-statement documentation does not appear on destructured bindings. */
+      const { value: renamed, nested: { nested }, list: [first, , third] } = source;
+      export {
+        renamed,
+        /** Documented exported alias. */ nested as documented,
+        first,
+        third,
+      };
+      /** Variable-statement documentation does not document this exported binding. */
+      export const { direct } = source;
+    `;
+
+    expect(missing(source)).toEqual(['renamed', 'first', 'third', 'direct']);
+  });
+
+  test('resolves object spread properties, their documentation, and overwrite order', () => {
+    const source = `
+      const base = {
+        /** Inherited documented property. */
+        documented: true,
+        undocumented: true,
+        /** Documentation removed by a later override. */
+        overridden: true,
+      };
+      const intermediate = {
+        ...base,
+        /** Documented through a nested spread. */
+        nested: true,
+      };
+      /** Exported object. */
+      export const Surface = {
+        ...intermediate,
+        overridden: false,
+      };
+    `;
+
+    expect(missing(source)).toEqual(['Surface.overridden', 'Surface.undocumented']);
+  });
+
   test('accepts documentation on any overload and excludes nonpublic details', () => {
     const source = `
       /** Creates a request. */
