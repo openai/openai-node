@@ -120,9 +120,12 @@ describe('instantiate azure client', () => {
       apiVersion,
       fetch: (url) =>
         Promise.resolve(
-          new Response(JSON.stringify({ url, custom: true }), {
-            headers: { 'Content-Type': 'application/json' },
-          }),
+          Response.json(
+            { url, custom: true },
+            {
+              headers: { 'Content-Type': 'application/json' },
+            },
+          ),
         ),
     });
 
@@ -246,7 +249,7 @@ describe('instantiate azure client', () => {
   describe('Azure Active Directory (AD)', () => {
     test('with azureADTokenProvider', async () => {
       const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
-        new Response(JSON.stringify({ a: 1 }), { headers: headers ?? [] });
+        Response.json({ a: 1 }, { headers: headers ?? [] });
       const client = new AzureOpenAI({
         baseURL: 'http://localhost:5000/',
         azureADTokenProvider: async () => 'my token',
@@ -283,9 +286,12 @@ describe('instantiate azure client', () => {
             },
           });
         }
-        return new Response(JSON.stringify({}), {
-          headers: headers ?? [],
-        });
+        return Response.json(
+          {},
+          {
+            headers: headers ?? [],
+          },
+        );
       };
       let counter = 0;
       async function azureADTokenProvider() {
@@ -309,7 +315,7 @@ describe('instantiate azure client', () => {
 
   test('uses api-key header when apiKey is provided', async () => {
     const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
-      new Response(JSON.stringify({ a: 1 }), { headers: headers ?? [] });
+      Response.json({ a: 1 }, { headers: headers ?? [] });
     const client = new AzureOpenAI({
       baseURL: 'http://localhost:5000/',
       apiKey: 'My API Key',
@@ -353,7 +359,7 @@ describe('azure request building', () => {
 
   describe('model to deployment mapping', function () {
     const testFetch = async (url: RequestInfo): Promise<Response> =>
-      new Response(JSON.stringify({ url }), { headers: { 'content-type': 'application/json' } });
+      Response.json({ url }, { headers: { 'content-type': 'application/json' } });
     describe('with client-level deployment', function () {
       const client = new AzureOpenAI({
         endpoint: 'https://example.com',
@@ -635,7 +641,7 @@ describe('retries', () => {
           signal?.addEventListener('abort', () => reject(new Error('timed out'))),
         );
       }
-      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+      return Response.json({ a: 1 }, { headers: { 'Content-Type': 'application/json' } });
     };
 
     const client = new AzureOpenAI({
@@ -668,7 +674,7 @@ describe('retries', () => {
           },
         });
       }
-      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+      return Response.json({ a: 1 }, { headers: { 'Content-Type': 'application/json' } });
     };
 
     const client = new AzureOpenAI({
@@ -700,7 +706,7 @@ describe('retries', () => {
           },
         });
       }
-      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+      return Response.json({ a: 1 }, { headers: { 'Content-Type': 'application/json' } });
     };
 
     const client = new AzureOpenAI({

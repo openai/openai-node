@@ -18,7 +18,7 @@ class IdempotentOpenAI extends OpenAI {
 }
 
 function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
-  return new Response(JSON.stringify(value), {
+  return Response.json(value, {
     ...init,
     headers: { 'content-type': 'application/json', ...init.headers },
   });

@@ -62,11 +62,11 @@ describe('Azure IMDS Token Provider', () => {
       const headers = new Headers(init?.headers);
       expect(headers.get('Metadata')).toBe('true');
 
-      return new Response(
-        JSON.stringify({
+      return Response.json(
+        {
           access_token: 'azure-token',
           expires_in: '3600',
-        }),
+        },
         { status: 200 },
       );
     }) as typeof fetch;
@@ -83,7 +83,7 @@ describe('Azure IMDS Token Provider', () => {
       const urlObj = new URL(url);
       expect(urlObj.searchParams.get('resource')).toBe('https://cognitiveservices.azure.com/');
 
-      return new Response(JSON.stringify({ access_token: 'azure-token' }), { status: 200 });
+      return Response.json({ access_token: 'azure-token' }, { status: 200 });
     }) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider('https://cognitiveservices.azure.com/');
@@ -96,10 +96,10 @@ describe('Azure IMDS Token Provider', () => {
     global.fetch = vi.fn(async (url: string) => {
       expect(url).toContain('api-version=2019-08-01');
 
-      return new Response(
-        JSON.stringify({
+      return Response.json(
+        {
           access_token: 'azure-token',
-        }),
+        },
         { status: 200 },
       );
     }) as typeof fetch;
@@ -113,14 +113,13 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('uses the configured fetch implementation', async () => {
-    const customFetch = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            access_token: 'azure-token',
-          }),
-          { status: 200 },
-        ),
+    const customFetch = vi.fn(async () =>
+      Response.json(
+        {
+          access_token: 'azure-token',
+        },
+        { status: 200 },
+      ),
     ) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider(undefined, {
@@ -140,9 +139,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError when access_token missing', async () => {
-    global.fetch = vi.fn(
-      async () => new Response(JSON.stringify({ expires_in: '3600' }), { status: 200 }),
-    ) as typeof fetch;
+    global.fetch = vi.fn(async () => Response.json({ expires_in: '3600' }, { status: 200 })) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);

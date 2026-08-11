@@ -22,9 +22,12 @@ describe('request id', () => {
     const client = new OpenAI({
       apiKey: 'dummy',
       fetch: async () =>
-        new Response(JSON.stringify({ id: 'bar' }), {
-          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-        }),
+        Response.json(
+          { id: 'bar' },
+          {
+            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+          },
+        ),
     });
 
     const {
@@ -43,9 +46,12 @@ describe('request id', () => {
     const client = new OpenAI({
       apiKey: 'dummy',
       fetch: async () =>
-        new Response(JSON.stringify({ id: 'bar' }), {
-          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-        }),
+        Response.json(
+          { id: 'bar' },
+          {
+            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+          },
+        ),
     });
 
     const rsp = await client.chat.completions.create({ messages: [], model: 'gpt-4' });
@@ -58,9 +64,12 @@ describe('request id', () => {
     const promise = new APIPromise<{ data: { foo: string } }>(
       client,
       Promise.resolve({
-        response: new Response(JSON.stringify({ data: { foo: 'bar' } }), {
-          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-        }),
+        response: Response.json(
+          { data: { foo: 'bar' } },
+          {
+            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+          },
+        ),
         controller: {} as any,
         options: {} as any,
         requestLogID: 'log_...',
@@ -78,9 +87,12 @@ describe('request id', () => {
     const client = new OpenAI({
       apiKey: 'dummy',
       fetch: async () =>
-        new Response(JSON.stringify({ data: [{ foo: 'bar' }] }), {
-          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-        }),
+        Response.json(
+          { data: [{ foo: 'bar' }] },
+          {
+            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+          },
+        ),
     });
 
     const page = await client.fineTuning.jobs.list();
@@ -92,7 +104,7 @@ describe('request id', () => {
     const promise = new APIPromise<{ foo: string }[]>(
       client,
       Promise.resolve({
-        response: new Response(JSON.stringify([{ foo: 'bar' }]), {
+        response: Response.json([{ foo: 'bar' }], {
           headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
         }),
         controller: {} as any,
