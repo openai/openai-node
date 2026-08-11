@@ -242,6 +242,28 @@ function sourceSymbolAtPath(checker, moduleSymbol, name) {
   return symbol;
 }
 
+function instantiateMappedType(type, mapper) {
+  if (!mapper) {
+    return type;
+  }
+
+  if (mapper.sources) {
+    const index = mapper.sources.indexOf(type);
+    if (index === -1) {
+      return type;
+    }
+    const target = mapper.targets?.[index];
+    return typeof target === 'function' ? target() : (target ?? type);
+  }
+  if (mapper.source) {
+    return type === mapper.source ? mapper.target : type;
+  }
+  if (mapper.mapper1 && mapper.mapper2) {
+    return instantiateMappedType(instantiateMappedType(type, mapper.mapper1), mapper.mapper2);
+  }
+  return mapper.func ? mapper.func(type) : type;
+}
+
 module.exports = {
   compilerOptions,
   createProgram,
@@ -249,6 +271,7 @@ module.exports = {
   emitDeclarations,
   hasCommentText,
   hasNodeDocumentation,
+  instantiateMappedType,
   isInternal,
   isVisibleMember,
   memberName,

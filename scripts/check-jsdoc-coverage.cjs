@@ -8,6 +8,7 @@ const {
   emitDeclarations,
   hasCommentText,
   hasNodeDocumentation,
+  instantiateMappedType,
   isInternal,
   isVisibleMember,
   memberName,
@@ -58,6 +59,8 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
   const displayFile = relativePath(emitted.originalFile);
   const sourceMappings = new Map();
   let semanticUnionBranch = '';
+  let semanticConditionalBranch = false;
+  let semanticTypeMapper;
 
   for (const mapping of ts.decodeMappings(emitted.declarationMap?.mappings ?? '')) {
     if (mapping.sourceLine === undefined || mapping.sourceCharacter === undefined) {
@@ -177,7 +180,7 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     if (branches.length > 0) {
       return branches.join(':');
     }
-    return synthetic ? semanticUnionBranch : '';
+    return synthetic || semanticConditionalBranch ? semanticUnionBranch : '';
   }
 
   function record(node, name, kind, ...symbols) {
@@ -228,9 +231,15 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     return Boolean(
       symbol?.declarations?.some(
         (declaration) =>
-          handwrittenFiles.has(declaration.getSourceFile().fileName) && isInternal(declaration),
+          handwrittenFiles.has(declaration.getSourceFile().fileName) &&
+          Boolean(ts.findAncestor(declaration, isInternal)),
       ),
     );
+  }
+
+  function internalImport(node) {
+    const symbol = node.qualifier && checker.getSymbolAtLocation(node.qualifier);
+    return internalHandwrittenSymbol(symbol && resolvedSymbol(symbol));
   }
 
   function isMappedType(type) {
@@ -281,6 +290,10 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     const mapped = isMappedType(type);
     const referenced = checker.getSymbolAtLocation(node.typeName);
     const target = referenced && resolvedSymbol(referenced);
+    if (internalHandwrittenSymbol(target)) {
+      inspectResolvedType(type, owner, node);
+      return true;
+    }
     const conditional = target?.declarations?.some(
       (declaration) => ts.isTypeAliasDeclaration(declaration) && ts.isConditionalTypeNode(declaration.type),
     );
@@ -290,11 +303,6 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     } else {
       inspectConditionalAlias(target);
     }
-    if (internalHandwrittenSymbol(target)) {
-      inspectResolvedType(type, owner, node);
-      return true;
-    }
-
     const projection = mapped || (conditional && type.intrinsicName !== 'error');
     if (!projection || !node.typeArguments?.length) {
       return false;
@@ -312,6 +320,13 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     }
 
     if (ts.isTypeReferenceNode(node) && inspectTypeReference(node, owner)) {
+      return;
+    }
+    if (ts.isImportTypeNode(node)) {
+      const type = checker.getTypeAtLocation(node);
+      if (internalHandwrittenSymbol(type.symbol) || internalImport(node)) {
+        inspectResolvedType(type, owner, node);
+      }
       return;
     }
     if (ts.isIndexedAccessTypeNode(node)) {
@@ -356,11 +371,11 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
   function inspectResolvedSignatures(signatures, owner, anchor, constructor) {
     for (const signature of signatures) {
       const declaration = signature.getDeclaration();
-      const callable =
-        !constructor &&
-        declaration &&
-        declaration.getSourceFile() === sourceFile &&
-        ts.isCallSignatureDeclaration(declaration);
+      const handwritten = declaration && handwrittenFiles.has(declaration.getSourceFile().fileName);
+      if (handwritten && !isVisibleMember(declaration)) {
+        continue;
+      }
+      const callable = !constructor && handwritten && ts.isCallSignatureDeclaration(declaration);
       let signatureOwner = owner;
       if (constructor) {
         signatureOwner = `${owner}.constructor`;
@@ -369,8 +384,7 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
       }
       if (
         constructor &&
-        declaration &&
-        declaration.getSourceFile() === sourceFile &&
+        handwritten &&
         (ts.isConstructorDeclaration(declaration) || ts.isConstructSignatureDeclaration(declaration))
       ) {
         record(declaration, signatureOwner, 'constructor');
@@ -396,6 +410,40 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     }
   }
 
+  function handwrittenIndex(index, anchor) {
+    const direct = index.declaration;
+    if (
+      direct &&
+      ts.isIndexSignatureDeclaration(direct) &&
+      handwrittenFiles.has(direct.getSourceFile().fileName)
+    ) {
+      return direct;
+    }
+
+    let current = anchor;
+    while (ts.isTypeReferenceNode(current) || ts.isMappedTypeNode(current)) {
+      const constraint = ts.isMappedTypeNode(current) ? current.typeParameter.constraint : undefined;
+      const source =
+        constraint && ts.isTypeOperatorNode(constraint) ? constraint.type : current.typeArguments?.[0];
+      if (!source) {
+        return;
+      }
+      const original = checker
+        .getIndexInfosOfType(checker.getTypeAtLocation(source))
+        .find(
+          (candidate) =>
+            candidate.declaration &&
+            ts.isIndexSignatureDeclaration(candidate.declaration) &&
+            handwrittenFiles.has(candidate.declaration.getSourceFile().fileName) &&
+            checker.isTypeAssignableTo(index.keyType, candidate.keyType),
+        );
+      if (original) {
+        return original.declaration;
+      }
+      current = source;
+    }
+  }
+
   function isExternalProjection(anchor) {
     if (!ts.isTypeReferenceNode(anchor)) {
       return false;
@@ -412,7 +460,8 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
 
   function inspectResolvedProperties(type, owner, anchor, kind, staticValue, inheritedOnly = false) {
     const mapped = isMappedType(type);
-    const exposedInternal = internalHandwrittenSymbol(type.symbol);
+    const exposedInternal =
+      internalHandwrittenSymbol(type.symbol) || (ts.isImportTypeNode(anchor) && internalImport(anchor));
     for (const property of checker.getPropertiesOfType(type)) {
       const localDeclaration = property.declarations?.find(
         (candidate) =>
@@ -524,15 +573,30 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     }
 
     const previousBranch = semanticUnionBranch;
-    for (const [index, branch] of [conditional.trueType, conditional.falseType].entries()) {
-      semanticUnionBranch = `${previousBranch}:${conditional.pos}:${index}`;
-      inspectResolvedType(checker.getTypeAtLocation(branch), owner, branch, kind);
+    const previousConditional = semanticConditionalBranch;
+    const previousMapper = semanticTypeMapper;
+    semanticConditionalBranch = true;
+    semanticTypeMapper = previousMapper ? { mapper1: type.mapper, mapper2: previousMapper } : type.mapper;
+    try {
+      for (const [index, branch] of [conditional.trueType, conditional.falseType].entries()) {
+        semanticUnionBranch = `${previousBranch}:${conditional.pos}:${index}`;
+        const branchType = instantiateMappedType(checker.getTypeAtLocation(branch), type.mapper);
+        inspectResolvedType(branchType, owner, branch, kind);
+      }
+    } finally {
+      semanticUnionBranch = previousBranch;
+      semanticConditionalBranch = previousConditional;
+      semanticTypeMapper = previousMapper;
     }
-    semanticUnionBranch = previousBranch;
     return true;
   }
 
   function inspectResolvedType(type, owner, anchor, kind = 'option') {
+    const mapped = instantiateMappedType(type, semanticTypeMapper);
+    if (mapped !== type) {
+      inspectResolvedType(mapped, owner, anchor, kind);
+      return;
+    }
     if (!type || activeTypes.has(type)) {
       return;
     }
@@ -560,7 +624,17 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
 
       const indexes = checker.getIndexInfosOfType(type);
       for (const index of indexes) {
-        const indexOwner = `${owner}.[key: ${checker.typeToString(index.keyType)}]`;
+        const declaration = handwrittenIndex(index, anchor);
+        if (declaration && !isVisibleMember(declaration)) {
+          continue;
+        }
+        const name = declaration
+          ? memberName(declaration, declaration.getSourceFile())
+          : `[key: ${checker.typeToString(index.keyType)}]`;
+        const indexOwner = `${owner}.${name}`;
+        if (declaration) {
+          record(declaration, indexOwner, kind);
+        }
         inspectResolvedType(index.type, indexOwner, anchor, kind);
       }
 
@@ -799,7 +873,9 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
         const symbol = checker.getSymbolAtLocation(statement.name);
         if (symbol && !isInternal(statement)) {
           const name = ts.isGlobalScopeAugmentation(statement) ? 'global' : statement.name.text;
-          inspectExports(symbol, `${name}.`);
+          if (!inspectExportAssignment(symbol)) {
+            inspectExports(symbol, `${name}.`);
+          }
         }
       } else if (globalScript) {
         inspectGlobalDeclaration(statement);
@@ -807,15 +883,21 @@ function inspectDeclarations(program, emitted, originalProgram, handwrittenFiles
     }
   }
 
-  const exportAssignment = moduleSymbol?.exports?.get(ts.InternalSymbolName.ExportEquals);
-  if (exportAssignment) {
+  function inspectExportAssignment(namespace) {
+    const exportAssignment = namespace?.exports?.get(ts.InternalSymbolName.ExportEquals);
+    if (!exportAssignment) {
+      return false;
+    }
     const target = resolvedSymbol(exportAssignment);
     const declaration = target.declarations?.find((candidate) => candidate.getSourceFile() === sourceFile);
     if (declaration) {
       publicTargets.add(target);
       inspectSymbol(target, canonicalName(declaration), exportAssignment);
     }
-  } else if (moduleSymbol) {
+    return true;
+  }
+
+  if (moduleSymbol && !inspectExportAssignment(moduleSymbol)) {
     inspectExports(moduleSymbol);
   }
   inspectAmbientDeclarations();
