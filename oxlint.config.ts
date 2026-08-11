@@ -5,7 +5,7 @@ const core = requireConfig('ultracite/oxlint/core').default;
 const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
-const compatibilityRules = ['func-style', 'sort-keys', 'typescript/no-explicit-any'];
+const compatibilityRules = ['func-style', 'sort-keys'];
 
 module.exports = defineConfig({
   extends: [core],
@@ -38,6 +38,58 @@ module.exports = defineConfig({
       files: ['tests/realtime-websocket.test.ts'],
       rules: {
         'prefer-arrow-callback': 'off',
+      },
+    },
+    {
+      // These dynamic fixtures, vendored implementations, and legacy interop
+      // surfaces intentionally use any; replacing it with unknown would change
+      // public assignability or runtime-adapter contracts.
+      files: [
+        'tests/**',
+        'examples/**',
+        'ecosystem-tests/**',
+        'scripts/_vendor/**',
+        'src/_vendor/**',
+        'src/internal/utils/bytes.ts',
+        'src/lib/parser.ts',
+        'src/lib/ResponsesParser.ts',
+        'src/lib/RunnableFunction.ts',
+        'src/lib/ChatCompletionStreamingRunner.ts',
+        'src/internal/provider.ts',
+        'src/lib/ChatCompletionRunner.ts',
+        'src/internal/to-file.ts',
+        'src/core/streaming.ts',
+        'src/internal/utils/path.ts',
+        'src/internal/qs/types.ts',
+        'src/auth/workload-identity-auth.ts',
+        'src/helpers/zod.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'src/internal/qs/stringify.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/internal/uploads.ts',
+        'src/internal/qs/utils.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/EventStream.ts',
+        'src/lib/transform.ts',
+        'src/helpers/standard-schema.ts',
+        'src/internal/ws-adapter.ts',
+        'src/internal/ws-adapter-node.ts',
+        'src/internal/ws-adapter-browser.ts',
+        'src/core/EventEmitter.ts',
+        'src/helpers/audio.ts',
+        'src/beta/realtime/internal-base.ts',
+        'src/lib/EventEmitter.ts',
+        'src/beta/realtime/websocket.ts',
+        'src/internal/stream-utils.ts',
+        'src/realtime/ws.ts',
+        'src/realtime/internal-base.ts',
+        'src/realtime/websocket.ts',
+        'src/beta/realtime/ws.ts',
+        'src/providers/bedrock/aws.ts',
+      ],
+      rules: {
+        'typescript/no-explicit-any': 'off',
       },
     },
     {
