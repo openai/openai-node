@@ -1194,6 +1194,9 @@ export interface BetaResponse {
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
     | 'gpt-5.1-codex-max'
+    | 'gpt-daybreak-blue-latest'
+    | 'gpt-daybreak-red-latest'
+    | 'gpt-5.6-cyber'
     | (string & {});
 
   /**
@@ -10387,6 +10390,9 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-5-pro'
       | 'gpt-5-pro-2025-10-06'
       | 'gpt-5.1-codex-max'
+      | 'gpt-daybreak-blue-latest'
+      | 'gpt-daybreak-red-latest'
+      | 'gpt-5.6-cyber'
       | (string & {});
 
     /**
@@ -11763,6 +11769,9 @@ export interface ResponseCreateParamsBase {
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
     | 'gpt-5.1-codex-max'
+    | 'gpt-daybreak-blue-latest'
+    | 'gpt-daybreak-red-latest'
+    | 'gpt-5.6-cyber'
     | (string & {});
 
   /**
@@ -12407,6 +12416,9 @@ export interface ResponseCompactParams {
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
     | 'gpt-5.1-codex-max'
+    | 'gpt-daybreak-blue-latest'
+    | 'gpt-daybreak-red-latest'
+    | 'gpt-5.6-cyber'
     | (string & {})
     | null;
 

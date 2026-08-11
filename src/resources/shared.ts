@@ -16,7 +16,10 @@ export type AllModels =
   | 'gpt-5-codex'
   | 'gpt-5-pro'
   | 'gpt-5-pro-2025-10-06'
-  | 'gpt-5.1-codex-max';
+  | 'gpt-5.1-codex-max'
+  | 'gpt-daybreak-blue-latest'
+  | 'gpt-daybreak-red-latest'
+  | 'gpt-5.6-cyber';
 
 export type ChatModel =
   | 'gpt-5.6-sol'
@@ -435,4 +438,7 @@ export type ResponsesModel =
   | 'gpt-5-codex'
   | 'gpt-5-pro'
   | 'gpt-5-pro-2025-10-06'
-  | 'gpt-5.1-codex-max';
+  | 'gpt-5.1-codex-max'
+  | 'gpt-daybreak-blue-latest'
+  | 'gpt-daybreak-red-latest'
+  | 'gpt-5.6-cyber';
