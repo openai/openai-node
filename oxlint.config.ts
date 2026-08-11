@@ -40,7 +40,6 @@ const compatibilityRules = [
   'unicorn/catch-error-name',
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
-  'unicorn/no-useless-undefined',
   'unicorn/numeric-separators-style',
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
@@ -331,6 +330,36 @@ module.exports = defineConfig({
       ],
       rules: {
         'no-promise-executor-return': 'off',
+      },
+    },
+    {
+      // These sites intentionally preserve explicit undefined values for resolver
+      // arity, protocol snapshots, and tests that cover undefined behavior.
+      files: [
+        'scripts/_vendor/tsc-multi/src/worker/worker.ts',
+        'src/_vendor/zod-to-json-schema/parseDef.ts',
+        'src/_vendor/zod-to-json-schema/parsers/string.ts',
+        'src/_vendor/zod-to-json-schema/zodToJsonSchema.ts',
+        'src/core/streaming.ts',
+        'src/helpers/standard-schema.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ChatCompletionStreamingRunner.ts',
+        'src/lib/EventStream.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'tests/internal/stream-utils.test.ts',
+        'tests/internal/utils.test.ts',
+        'tests/lib/AssistantStream.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/lib/ResponsesParser.behavior.test.ts',
+        'tests/lib/chatCompletionUtils.test.ts',
+        'tests/lib/core-error.test.ts',
+        'tests/lib/streaming-core.test.ts',
+        'tests/qs/stringify.test.ts',
+        'tests/sdk-behavior.test.ts',
+      ],
+      rules: {
+        'unicorn/no-useless-undefined': 'off',
       },
     },
     {
