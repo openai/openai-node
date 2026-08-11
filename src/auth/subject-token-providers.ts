@@ -163,7 +163,8 @@ export function gcpIDTokenProvider(
           throw new Error(`GCP Metadata Server returned ${response.status}: ${errorText}`);
         }
 
-        const token = (await response.text()).trim();
+        const tokenText = await response.text();
+        const token = tokenText.trim();
         if (!token) {
           throw new Error('GCP metadata server returned an empty token');
         }

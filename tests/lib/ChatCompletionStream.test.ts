@@ -349,7 +349,8 @@ describe('.stream()', () => {
       }),
     );
 
-    expect((await stream.finalChatCompletion()).choices[0]).toMatchInlineSnapshot(`
+    const completion = await stream.finalChatCompletion();
+    expect(completion.choices[0]).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
         "index": 0,
@@ -387,7 +388,8 @@ describe('.stream()', () => {
       }),
     );
 
-    expect((await stream.finalChatCompletion()).choices[0]).toMatchInlineSnapshot(`
+    const completion = await stream.finalChatCompletion();
+    expect(completion.choices[0]).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
         "index": 0,
@@ -410,33 +412,33 @@ describe('.stream()', () => {
   it('emits content logprobs events', async () => {
     var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.chat.completions.stream({
-          model: 'gpt-4o-2024-08-06',
-          messages: [
-            {
-              role: 'user',
-              content: "What's the weather like in SF?",
-            },
-          ],
-          logprobs: true,
-          response_format: zodResponseFormat(
-            z.object({
-              city: z.string(),
-              units: z.enum(['c', 'f']).default('f'),
-            }),
-            'location',
-          ),
-        }),
-      )
-    ).on('logprobs.content.done', (props) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: "What's the weather like in SF?",
+          },
+        ],
+        logprobs: true,
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+    const stream = request.on('logprobs.content.done', (props) => {
       if (!capturedLogProbs?.length) {
         capturedLogProbs = props.content;
       }
     });
 
-    const choice = (await stream.finalChatCompletion()).choices[0];
+    const completion = await stream.finalChatCompletion();
+    const choice = completion.choices[0];
     expect(choice).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
@@ -569,33 +571,33 @@ describe('.stream()', () => {
   it('emits refusal logprobs events', async () => {
     var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.chat.completions.stream({
-          model: 'gpt-4o-2024-08-06',
-          messages: [
-            {
-              role: 'user',
-              content: 'a bad question',
-            },
-          ],
-          logprobs: true,
-          response_format: zodResponseFormat(
-            z.object({
-              city: z.string(),
-              units: z.enum(['c', 'f']).default('f'),
-            }),
-            'location',
-          ),
-        }),
-      )
-    ).on('logprobs.refusal.done', (props) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: 'a bad question',
+          },
+        ],
+        logprobs: true,
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+    const stream = request.on('logprobs.refusal.done', (props) => {
       if (!capturedLogProbs?.length) {
         capturedLogProbs = props.refusal;
       }
     });
 
-    const choice = (await stream.finalChatCompletion()).choices[0];
+    const completion = await stream.finalChatCompletion();
+    const choice = completion.choices[0];
     expect(choice).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",

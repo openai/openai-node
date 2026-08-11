@@ -53,7 +53,6 @@ const compatibilityRules = [
   'unicorn/consistent-assert',
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
-  'unicorn/no-await-expression-member',
   'unicorn/no-console-spaces',
   'unicorn/no-nested-ternary',
   'unicorn/no-typeof-undefined',

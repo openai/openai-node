@@ -256,11 +256,8 @@ describe('instantiate azure client', () => {
         apiVersion,
         fetch: testFetch,
       });
-      expect(
-        (await client.request({ method: 'post', path: 'https://example.com' }).asResponse()).headers.get(
-          'authorization',
-        ),
-      ).toEqual('Bearer my token');
+      const response = await client.request({ method: 'post', path: 'https://example.com' }).asResponse();
+      expect(response.headers.get('authorization')).toEqual('Bearer my token');
     });
 
     test('apiKey and azureADTokenProvider cant be combined', () => {
@@ -303,16 +300,13 @@ describe('instantiate azure client', () => {
         apiVersion,
         fetch: testFetch,
       });
-      expect(
-        (
-          await client.chat.completions
-            .create({
-              model,
-              messages: [{ role: 'system', content: 'Hello' }],
-            })
-            .asResponse()
-        ).headers.get('authorization'),
-      ).toEqual('Bearer token-1');
+      const response = await client.chat.completions
+        .create({
+          model,
+          messages: [{ role: 'system', content: 'Hello' }],
+        })
+        .asResponse();
+      expect(response.headers.get('authorization')).toEqual('Bearer token-1');
     });
   });
 
@@ -442,15 +436,12 @@ describe('azure request building', () => {
       });
 
       test('handles text to speech', async () => {
-        expect(
-          await (
-            await client.audio.speech.create({
-              model,
-              input: '',
-              voice: 'alloy',
-            })
-          ).json(),
-        ).toMatchObject({
+        const response = await client.audio.speech.create({
+          model,
+          input: '',
+          voice: 'alloy',
+        });
+        expect(await response.json()).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
         });
       });
@@ -569,15 +560,12 @@ describe('azure request building', () => {
       });
 
       test('handles text to speech', async () => {
-        expect(
-          await (
-            await client.audio.speech.create({
-              model: deployment,
-              input: '',
-              voice: 'alloy',
-            })
-          ).json(),
-        ).toMatchObject({
+        const response = await client.audio.speech.create({
+          model: deployment,
+          input: '',
+          voice: 'alloy',
+        });
+        expect(await response.json()).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
         });
       });
