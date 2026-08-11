@@ -607,6 +607,216 @@ describe('handwritten SDK JSDoc coverage', () => {
     expect(missing(source)).toEqual(['Extracted.included', 'Excluded.included']);
   });
 
+  test('follows function and class value surfaces exposed through type queries', () => {
+    const source = `
+      /** Private callable implementation. */
+      function implementation(options: { missing: string }): { output: string } {
+        return { output: options.missing };
+      }
+      /** Private base class. */
+      class Base {
+        static staticMissing = { nested: true };
+        /** Creates the private base. */
+        constructor(options: { missing: string }) {}
+        inherited(): void {}
+      }
+      /** Public callable value. */
+      export const callable: typeof implementation = implementation;
+      /** Public constructor value. */
+      export const Client: typeof Base = Base;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'callable.options.missing',
+        'callable.result.output',
+        'Client.constructor.options.missing',
+        'Client.static.staticMissing',
+        'Client.static.staticMissing.nested',
+        'Client.inherited',
+      ]),
+    );
+  });
+
+  test('checks synthetic Record keys and their instantiated nested value types', () => {
+    const source = `
+      /** Public keyed object. */
+      export type Public = Record<'selected' | 'alternate', { missing: string }>;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'Public.selected',
+        'Public.selected.missing',
+        'Public.alternate',
+        'Public.alternate.missing',
+      ]),
+    );
+  });
+
+  test('checks synthetic public properties from direct finite mapped types', () => {
+    const source = `
+      /** Public finite mapped object. */
+      export type Public = { [Key in 'first' | 'second']: { missing: string } };
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'Public.first',
+        'Public.first.missing',
+        'Public.second',
+        'Public.second.missing',
+      ]),
+    );
+  });
+
+  test('does not classify standard array prototype members as synthetic SDK properties', () => {
+    const source = `
+      /** Public array-preserving transformation. */
+      export type Public<Values extends readonly unknown[]> = {
+        [Index in keyof Values]: Values[Index];
+      };
+    `;
+
+    expect(inspectSource('src/fixture.ts', source).map(({ name }) => name)).not.toEqual(
+      expect.arrayContaining(['Public.length', 'Public.map', 'Public.reduce']),
+    );
+  });
+
+  test('keeps documentation independent across distinct union branches', () => {
+    const source = `
+      /** Public discriminated value. */
+      export type Public =
+        | {
+            /** Documented on only this branch. */
+            shared: string;
+          }
+        | {
+            shared: string;
+          };
+    `;
+
+    expect(missing(source)).toEqual(['Public.shared']);
+  });
+
+  test('checks tuple elements produced by Parameters and ConstructorParameters', () => {
+    const source = `
+      /** Callable implementation. */
+      function implementation(options: { missing: string }): void {}
+      /** Constructor implementation. */
+      class Client {
+        /** Constructs the client. */
+        constructor(options: { missing: string }) {}
+      }
+      /** Public callable parameter tuple. */
+      export type Arguments = Parameters<typeof implementation>;
+      /** Public constructor parameter tuple. */
+      export type ConstructorArguments = ConstructorParameters<typeof Client>;
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining(['Arguments.0.missing', 'ConstructorArguments.0.missing']),
+    );
+  });
+
+  test('inspects the target of CommonJS export assignments', () => {
+    const source = `
+      /** Public CommonJS client. */
+      class Client {
+        missing(): void {}
+      }
+      export = Client;
+    `;
+
+    expect(missing(source)).toEqual(['Client.missing']);
+  });
+
+  test('terminates recursive public type traversal without hiding sibling members', () => {
+    const source = `
+      /** Recursive implementation shape. */
+      interface Recursive {
+        /** Recursive successor. */
+        next?: Recursive;
+        missing: string;
+      }
+      /** Public recursive projection. */
+      export type Public = Partial<Recursive>;
+    `;
+
+    expect(missing(source)).toEqual(expect.arrayContaining(['Public.missing']));
+  });
+
+  test('does not inspect original property values replaced by mapped transformations', () => {
+    const source = `
+      /** Internal implementation shape. */
+      interface Shape {
+        /** Property whose public value becomes a string. */
+        nested: { hidden: string };
+      }
+      /** Converts every property value to a string. */
+      type ToStrings<T> = { [K in keyof T]: string };
+      /** Public transformed shape. */
+      export type Public = ToStrings<Shape>;
+    `;
+
+    expect(missing(source)).toEqual([]);
+  });
+
+  test('terminates recursive value queries and conditional projections', () => {
+    const source = `
+      /** Recursive implementation shape. */
+      interface Recursive {
+        /** Recursive successor. */
+        next?: Recursive;
+        missing: string;
+      }
+      declare const recursive: Recursive;
+      /** Public recursive value. */
+      export const value: typeof recursive = recursive;
+      /** Public recursive conditional shape. */
+      export type Conditional = Extract<Recursive, { missing: string }>;
+    `;
+
+    expect(missing(source)).toEqual(expect.arrayContaining(['value.missing', 'Conditional.missing']));
+  });
+
+  test('checks inherited instance and static members from local class expressions', () => {
+    const source = `
+      const LocalBase = class {
+        inherited = { missing: true };
+        static inheritedStatic = { missing: true };
+      };
+      /** Public derived client. */
+      export class Public extends LocalBase {}
+    `;
+
+    expect(missing(source)).toEqual(
+      expect.arrayContaining([
+        'Public.inherited',
+        'Public.inherited.missing',
+        'Public.static.inheritedStatic',
+        'Public.static.inheritedStatic.missing',
+      ]),
+    );
+  });
+
+  test('checks undocumented members inherited through local mixin expressions', () => {
+    const source = `
+      /** Public base constructor. */
+      class Base {}
+      /** Adds inherited public functionality. */
+      function mixin<T extends new (...args: any[]) => object>(base: T) {
+        return class extends base {
+          inherited = { missing: true };
+        };
+      }
+      /** Public mixed-in class. */
+      export class Public extends mixin(Base) {}
+    `;
+
+    expect(missing(source)).toEqual(expect.arrayContaining(['Public.inherited', 'Public.inherited.missing']));
+  });
+
   test('reports undocumented declaration coordinates in the original source file', () => {
     const source = [
       "import type { IncomingMessage } from 'node:http';",

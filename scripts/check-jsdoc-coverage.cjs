@@ -259,11 +259,12 @@ function inspectDeclarations(program, emitted, originalProgram) {
   const originalModule = originalChecker.getSymbolAtLocation(originalSourceFile);
   const declarations = new Map();
   const inspected = new Map();
-  const inspectedProjectedTypes = new Map();
-  const inspectedTypeQueries = new Map();
+  const activeTypes = new Set();
+  const activeValueSymbols = new Set();
   const publicTargets = new Set();
   const displayFile = relativePath(emitted.originalFile);
   const sourceMappings = new Map();
+  let semanticUnionBranch = '';
 
   for (const mapping of ts.decodeMappings(emitted.declarationMap?.mappings ?? '')) {
     if (mapping.sourceLine === undefined || mapping.sourceCharacter === undefined) {
@@ -296,7 +297,9 @@ function inspectDeclarations(program, emitted, originalProgram) {
     const generated = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
     const mappings = sourceMappings.get(generated.line) ?? [];
     const mapping = mappings.findLast((candidate) => candidate.generatedCharacter <= generated.character);
-    const originalSymbol = originalModule && sourceSymbolAtPath(originalChecker, originalModule, name);
+    const branchSpecific = unionBranch(node, false);
+    const originalSymbol =
+      !branchSpecific && originalModule && sourceSymbolAtPath(originalChecker, originalModule, name);
     const originalNode = originalSymbol?.valueDeclaration ?? originalSymbol?.declarations?.[0];
     const original =
       originalNode?.getSourceFile() === originalSourceFile
@@ -309,17 +312,34 @@ function inspectDeclarations(program, emitted, originalProgram) {
     };
   }
 
+  function unionBranch(node, synthetic) {
+    const branches = [];
+    let child = node;
+    let { parent } = child;
+    while (parent) {
+      if (ts.isUnionTypeNode(parent)) {
+        branches.push(`${parent.pos}:${parent.types.indexOf(child)}`);
+      }
+      child = parent;
+      ({ parent } = child);
+    }
+    if (branches.length > 0) {
+      return branches.join(':');
+    }
+    return synthetic ? semanticUnionBranch : '';
+  }
+
   function record(node, name, kind, ...symbols) {
     if (isInternal(node)) {
       return;
     }
 
+    const synthetic = symbols[0] === null;
     const statement = ts.isVariableDeclaration(node) ? node.parent?.parent : undefined;
     const documented =
-      hasNodeDocumentation(node) ||
-      (statement && hasNodeDocumentation(statement)) ||
+      (!synthetic && (hasNodeDocumentation(node) || (statement && hasNodeDocumentation(statement)))) ||
       symbols.some(symbolDocumentation);
-    const key = `${kind}:${name}`;
+    const key = `${kind}:${name}:${unionBranch(node, synthetic)}`;
     const existing = declarations.get(key);
     if (existing) {
       existing.documented ||= Boolean(documented);
@@ -392,7 +412,7 @@ function inspectDeclarations(program, emitted, originalProgram) {
       );
       const isProjection = isMapped || (isConditional && type.intrinsicName !== 'error');
       if (isProjection && node.typeArguments?.length) {
-        inspectProjectedType(type, owner);
+        inspectResolvedType(type, owner, node);
         if (isMapped) {
           inspectMappedArguments(node.typeArguments, owner);
         }
@@ -400,7 +420,11 @@ function inspectDeclarations(program, emitted, originalProgram) {
       }
     }
     if (ts.isIndexedAccessTypeNode(node)) {
-      inspectProjectedType(checker.getTypeAtLocation(node), owner);
+      inspectResolvedType(checker.getTypeAtLocation(node), owner, node);
+      return;
+    }
+    if (ts.isMappedTypeNode(node)) {
+      inspectResolvedType(checker.getTypeAtLocation(node), owner, node);
       return;
     }
     if (ts.isTypeQueryNode(node)) {
@@ -434,39 +458,108 @@ function inspectDeclarations(program, emitted, originalProgram) {
     }
   }
 
-  function inspectProjectedType(type, owner) {
-    const owners = inspectedProjectedTypes.get(type) ?? new Set();
-    if (owners.has(owner)) {
-      return;
-    }
-    owners.add(owner);
-    inspectedProjectedTypes.set(type, owners);
-
-    if (type.isUnionOrIntersection()) {
-      for (const branch of type.types) {
-        inspectProjectedType(branch, owner);
+  function inspectResolvedSignatures(signatures, owner, anchor, constructor) {
+    for (const signature of signatures) {
+      const declaration = signature.getDeclaration();
+      const signatureOwner = constructor ? `${owner}.constructor` : owner;
+      if (
+        constructor &&
+        declaration &&
+        declaration.getSourceFile() === sourceFile &&
+        (ts.isConstructorDeclaration(declaration) || ts.isConstructSignatureDeclaration(declaration))
+      ) {
+        record(declaration, signatureOwner, 'constructor');
       }
+
+      for (const parameter of signature.getParameters()) {
+        const parameterType = checker.getTypeOfSymbolAtLocation(parameter, declaration ?? anchor);
+        inspectResolvedType(parameterType, `${signatureOwner}.${parameter.getName()}`, declaration ?? anchor);
+      }
+
+      const returnOwner = constructor ? owner : `${owner}.result`;
+      inspectResolvedType(signature.getReturnType(), returnOwner, declaration ?? anchor, 'member');
+    }
+  }
+
+  function inspectResolvedTuple(type, owner, anchor) {
+    const elements = checker.getTypeArguments(type);
+    const labels = type.target?.labeledElementDeclarations ?? [];
+    for (const [index, element] of elements.entries()) {
+      inspectResolvedType(element, `${owner}.${index}`, labels[index] ?? anchor);
+    }
+  }
+
+  function isExternalProjection(anchor) {
+    if (!ts.isTypeReferenceNode(anchor)) {
+      return false;
     }
 
+    const [argument] = anchor.typeArguments ?? [];
+    if (!argument || !ts.isTypeReferenceNode(argument)) {
+      return false;
+    }
+
+    const symbol = checker.getSymbolAtLocation(argument.typeName);
+    return !symbol || !localSymbol(resolvedSymbol(symbol));
+  }
+
+  function inspectResolvedProperties(type, owner, anchor, kind, staticValue, inheritedOnly = false) {
+    const mapped = Math.trunc((type.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
     for (const property of checker.getPropertiesOfType(type)) {
-      const declaration = property.declarations?.find(
+      const localDeclaration = property.declarations?.find(
         (candidate) => candidate.getSourceFile() === sourceFile && isVisibleMember(candidate),
       );
-      if (!declaration) {
+      const synthetic =
+        !localDeclaration && !property.declarations?.length && mapped && !isExternalProjection(anchor);
+      if (!localDeclaration && !synthetic) {
+        continue;
+      }
+      if (inheritedOnly && localDeclaration && ts.findAncestor(localDeclaration, (node) => node === anchor)) {
         continue;
       }
 
-      const name = `${owner}.${property.getName()}`;
-      record(declaration, name, 'option', property);
-      if (
-        ts.isPropertySignature(declaration) ||
-        ts.isPropertyDeclaration(declaration) ||
-        ts.isGetAccessorDeclaration(declaration)
-      ) {
-        inspectType(declaration.type, name);
-      } else if (ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)) {
-        inspectSignature(declaration, name);
+      const prefix = staticValue ? 'static.' : '';
+      const name = `${owner}.${prefix}${property.getName()}`;
+      const declaration = localDeclaration ?? anchor;
+      if (synthetic) {
+        record(declaration, name, kind, null, property);
+      } else {
+        record(declaration, name, kind, property);
       }
+
+      const instantiated = checker.getTypeOfSymbolAtLocation(property, anchor);
+      inspectResolvedType(instantiated, name, declaration, kind);
+    }
+  }
+
+  function inspectResolvedType(type, owner, anchor, kind = 'option') {
+    if (!type || activeTypes.has(type)) {
+      return;
+    }
+    activeTypes.add(type);
+
+    try {
+      if (type.isUnion()) {
+        const previousBranch = semanticUnionBranch;
+        for (const branch of type.types) {
+          semanticUnionBranch = `${previousBranch}:${branch.id}`;
+          inspectResolvedType(branch, owner, anchor, kind);
+        }
+        semanticUnionBranch = previousBranch;
+        return;
+      }
+
+      if (checker.isTupleType(type)) {
+        inspectResolvedTuple(type, owner, anchor);
+        return;
+      }
+
+      const constructors = type.getConstructSignatures();
+      inspectResolvedSignatures(type.getCallSignatures(), owner, anchor, false);
+      inspectResolvedSignatures(constructors, owner, anchor, true);
+      inspectResolvedProperties(type, owner, anchor, kind, constructors.length > 0);
+    } finally {
+      activeTypes.delete(type);
     }
   }
 
@@ -480,28 +573,22 @@ function inspectDeclarations(program, emitted, originalProgram) {
     if (!localSymbol(target)) {
       return;
     }
-
-    const owners = inspectedTypeQueries.get(target) ?? new Set();
-    if (owners.has(owner)) {
+    if (activeValueSymbols.has(target)) {
       return;
     }
-    owners.add(owner);
-    inspectedTypeQueries.set(target, owners);
 
-    for (const declaration of target.declarations ?? []) {
-      if (declaration.getSourceFile() !== sourceFile || !isVisibleMember(declaration)) {
-        continue;
+    activeValueSymbols.add(target);
+    try {
+      for (const declaration of target.declarations ?? []) {
+        if (declaration.getSourceFile() !== sourceFile || !isVisibleMember(declaration)) {
+          continue;
+        }
+
+        const type = checker.getTypeOfSymbolAtLocation(target, declaration);
+        inspectResolvedType(type, owner, declaration);
       }
-      if (
-        ts.isVariableDeclaration(declaration) ||
-        ts.isPropertySignature(declaration) ||
-        ts.isPropertyDeclaration(declaration) ||
-        ts.isGetAccessorDeclaration(declaration)
-      ) {
-        inspectType(declaration.type, owner);
-      } else if (ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)) {
-        inspectSignature(declaration, owner);
-      }
+    } finally {
+      activeValueSymbols.delete(target);
     }
   }
 
@@ -572,7 +659,7 @@ function inspectDeclarations(program, emitted, originalProgram) {
         const inheritedType = checker.getTypeAtLocation(inherited);
         const isMapped = Math.trunc((inheritedType.objectFlags ?? 0) / ts.ObjectFlags.Mapped) % 2 === 1;
         if (isMapped) {
-          inspectProjectedType(inheritedType, canonicalName(node));
+          inspectResolvedType(inheritedType, canonicalName(node), inherited);
           inspectMappedArguments(inherited.typeArguments ?? [], canonicalName(node));
           continue;
         }
@@ -581,6 +668,13 @@ function inspectDeclarations(program, emitted, originalProgram) {
         }
       }
     }
+  }
+
+  function inspectInheritedClass(symbol, node, owner) {
+    const instance = checker.getDeclaredTypeOfSymbol(symbol);
+    const constructor = checker.getTypeOfSymbolAtLocation(symbol, node);
+    inspectResolvedProperties(instance, owner, node, 'member', false, true);
+    inspectResolvedProperties(constructor, owner, node, 'member', true, true);
   }
 
   function inspectNode(node, symbol, owner, exportSymbol, kind) {
@@ -599,6 +693,9 @@ function inspectDeclarations(program, emitted, originalProgram) {
       inspectTypeParameters(node, owner);
       inspectHeritage(node);
       inspectMembers(node.members, owner, ts.isClassDeclaration(node) ? 'member' : 'property');
+      if (ts.isClassDeclaration(node)) {
+        inspectInheritedClass(symbol, node, owner);
+      }
       return;
     }
     if (ts.isEnumDeclaration(node)) {
@@ -659,7 +756,17 @@ function inspectDeclarations(program, emitted, originalProgram) {
     }
   }
 
-  inspectExports(moduleSymbol);
+  const exportAssignment = moduleSymbol.exports?.get(ts.InternalSymbolName.ExportEquals);
+  if (exportAssignment) {
+    const target = resolvedSymbol(exportAssignment);
+    const declaration = target.declarations?.find((candidate) => candidate.getSourceFile() === sourceFile);
+    if (declaration) {
+      publicTargets.add(target);
+      inspectSymbol(target, canonicalName(declaration), exportAssignment);
+    }
+  } else {
+    inspectExports(moduleSymbol);
+  }
   return [...declarations.values()];
 }
 
