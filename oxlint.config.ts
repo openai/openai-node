@@ -49,7 +49,6 @@ const compatibilityRules = [
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
-  'unicorn/prefer-string-replace-all',
   'unicorn/prefer-string-slice',
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',
@@ -288,6 +287,28 @@ module.exports = defineConfig({
       ],
       rules: {
         'promise/prefer-await-to-then': 'off',
+      },
+    },
+    {
+      // These TypeScript files intentionally stay compatible with the ES2020
+      // declaration library, which does not include String.prototype.replaceAll.
+      files: [
+        'scripts/_vendor/tsc-multi/src/worker/worker.ts',
+        'src/helpers/zod.ts',
+        'src/internal/qs/formats.ts',
+        'src/internal/qs/stringify.ts',
+        'src/internal/qs/utils.ts',
+        'src/internal/uploads.ts',
+        'src/internal/utils/path.ts',
+        'src/lib/transform.ts',
+        'src/realtime/internal-base.ts',
+        'tests/helpers/zod.test.ts',
+        'tests/path.test.ts',
+        'tests/qs/stringify.test.ts',
+        'tests/utils/mock-snapshots.ts',
+      ],
+      rules: {
+        'unicorn/prefer-string-replace-all': 'off',
       },
     },
     {
