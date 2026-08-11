@@ -30,7 +30,6 @@ const compatibilityRules = [
   'typescript/ban-ts-comment',
   'typescript/consistent-type-definitions',
   'typescript/consistent-type-imports',
-  'typescript/method-signature-style',
   'typescript/no-explicit-any',
   'typescript/no-non-null-assertion',
   'unicorn/consistent-function-scoping',
@@ -442,6 +441,40 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/prefer-ts-expect-error': 'off',
+      },
+    },
+    {
+      // These public, overload, and declaration-merging surfaces intentionally use
+      // method signatures; property-function rewrites can change variance or overloads.
+      files: [
+        'ecosystem-tests/cloudflare-worker/src/uploadWebApiTestCases.ts',
+        'ecosystem-tests/node-ts-cjs-auto/tests/test.ts',
+        'ecosystem-tests/node-ts-cjs-web/tests/test-jsdom.ts',
+        'ecosystem-tests/node-ts-cjs-web/tests/test-node.ts',
+        'ecosystem-tests/node-ts-cjs/tests/test-jsdom.ts',
+        'ecosystem-tests/node-ts-cjs/tests/test-node.ts',
+        'ecosystem-tests/node-ts-esm-auto/tests/test.ts',
+        'ecosystem-tests/node-ts-esm-web/tests/test.ts',
+        'ecosystem-tests/node-ts-esm/tests/test-esnext.ts',
+        'ecosystem-tests/node-ts-esm/tests/test.ts',
+        'ecosystem-tests/node-ts4.5-jest28/tests/test.ts',
+        'ecosystem-tests/vercel-edge/src/uploadWebApiTestCases.ts',
+        'examples/responses/websocket.ts',
+        'scripts/_vendor/tsc-multi/src/debug.ts',
+        'scripts/_vendor/tsc-multi/src/transformer.ts',
+        'src/internal/bedrock.ts',
+        'src/internal/provider.ts',
+        'src/internal/to-file.ts',
+        'src/internal/uploads.ts',
+        'src/internal/ws-adapter-browser.ts',
+        'src/internal/ws-adapter.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/ResponsesParser.ts',
+        'src/lib/parser.ts',
+        'tsconfig.dist-src.d.ts',
+      ],
+      rules: {
+        'typescript/method-signature-style': 'off',
       },
     },
     {
