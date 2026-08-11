@@ -1,6 +1,5 @@
 import { OpenAIError } from '../error';
 import type { ChatCompletionTool } from '../resources/chat/completions';
-import { ResponseTextConfig } from '../resources/responses/responses';
 import type {
   FunctionTool,
   ParsedContent,
@@ -11,6 +10,7 @@ import type {
   ResponseCreateParamsBase,
   ResponseCreateParamsNonStreaming,
   ResponseFunctionToolCall,
+  ResponseTextConfig,
   Tool,
 } from '../resources/responses/responses';
 import { isAutoParsableResponseFormat } from '../lib/parser';

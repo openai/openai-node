@@ -1,7 +1,7 @@
 import iconv from 'iconv-lite';
 import { stringify } from 'openai/internal/qs';
 import { encode } from 'openai/internal/qs/utils';
-import { StringifyOptions } from 'openai/internal/qs/types';
+import type { StringifyOptions } from 'openai/internal/qs/types';
 import { empty_test_cases } from './empty-keys-cases';
 import assert from 'node:assert';
 

@@ -1,4 +1,4 @@
-import { Target } from '../config';
+import type { Target } from '../config';
 
 export interface WorkerOptions {
   target: Omit<Target, 'extname'>;

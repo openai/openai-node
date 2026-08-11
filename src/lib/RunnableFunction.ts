@@ -1,6 +1,6 @@
 import type { ChatCompletionRunner } from './ChatCompletionRunner';
 import type { ChatCompletionStreamingRunner } from './ChatCompletionStreamingRunner';
-import { JSONSchema } from './jsonschema';
+import type { JSONSchema } from './jsonschema';
 
 type PromiseOrValue<T> = T | Promise<T>;
 

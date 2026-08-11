@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 
-import OpenAI, { ClientOptions } from 'openai/index';
+import type { ClientOptions } from 'openai/index';
+import OpenAI from 'openai/index';
 
 const opts: ClientOptions = {
   apiKey: 'example-api-key',

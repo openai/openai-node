@@ -1,5 +1,6 @@
 import nodePath = require('node:path');
-import { object, string, array, Infer, validate, optional, type, integer, min, boolean } from 'superstruct';
+import type { Infer } from 'superstruct';
+import { object, string, array, validate, optional, type, integer, min, boolean } from 'superstruct';
 import Debug from './debug';
 import { readJSON, tryReadJSON } from './utils';
 import glob from 'fast-glob';

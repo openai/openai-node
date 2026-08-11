@@ -1,3 +1,4 @@
+import type * as FsPromises from 'node:fs/promises';
 import type { SubjectTokenProvider } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
@@ -9,7 +10,7 @@ const AZURE_IMDS_BASE_URL = 'http://169.254.169.254/metadata/identity/oauth2/tok
 
 type ReadFile = (path: string) => Promise<string>;
 
-let fsPromisesModule: Promise<typeof import('node:fs/promises')> | undefined;
+let fsPromisesModule: Promise<typeof FsPromises> | undefined;
 
 async function defaultReadFile(path: string): Promise<string> {
   fsPromisesModule ??= import('node:fs/promises').catch((error) => {

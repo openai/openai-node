@@ -9,7 +9,7 @@
 
 import fs from 'node:fs';
 import OpenAI from 'openai';
-import { FineTuningJobEvent } from 'openai/resources/fine-tuning';
+import type { FineTuningJobEvent } from 'openai/resources/fine-tuning';
 
 // Gets the API Key from the environment variable `OPENAI_API_KEY`
 const client = new OpenAI();

@@ -4,7 +4,8 @@
 // a new-line separated JSON-encoded stream.
 
 import OpenAI from 'openai';
-import express, { Request, Response } from 'express';
+import type { Request, Response } from 'express';
+import express from 'express';
 
 const openai = new OpenAI();
 const app = express();

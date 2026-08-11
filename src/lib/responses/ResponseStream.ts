@@ -1,20 +1,21 @@
-import { ResponseTextConfig } from '../../resources/responses/responses';
 import type {
   ParsedResponse,
   Response,
   ResponseCreateParamsBase,
   ResponseCreateParamsStreaming,
   ResponseStreamEvent,
+  ResponseTextConfig,
 } from '../../resources/responses/responses';
-import { RequestOptions } from '../../internal/request-options';
+import type { RequestOptions } from '../../internal/request-options';
 import type { ReadableStream } from '../../internal/shim-types';
 import { APIUserAbortError, OpenAIError } from '../../error';
-import OpenAI from '../../index';
+import type OpenAI from '../../index';
 import { EventStream } from '../EventStream';
 import type { BaseEvents } from '../EventStream';
 import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
 import { accumulateResponse } from './ResponseAccumulator';
-import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';
+import type { ParseableToolsParams } from '../ResponsesParser';
+import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
 
 export type ResponseStreamParams = ResponseCreateAndStreamParams | ResponseStreamByIdParams;

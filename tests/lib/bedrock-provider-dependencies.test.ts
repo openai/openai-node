@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import type { bedrock } from 'openai/providers/bedrock/aws';
 
 const originalEnv = process.env;
 const optionalDependencies = [
@@ -36,8 +38,8 @@ function jsonResponse(body: unknown = {}): Response {
 }
 
 async function loadBedrockModules(): Promise<{
-  OpenAI: typeof import('openai').default;
-  bedrock: typeof import('openai/providers/bedrock/aws').bedrock;
+  OpenAI: typeof OpenAI;
+  bedrock: typeof bedrock;
 }> {
   const openai = await import('openai');
   const bedrockProvider = await import('openai/providers/bedrock/aws');

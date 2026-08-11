@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server';
 import { distance } from 'fastest-levenshtein';
 import OpenAI from 'openai';
 import { uploadWebApiTestCases } from '../../uploadWebApiTestCases';

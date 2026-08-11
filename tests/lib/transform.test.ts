@@ -1,6 +1,6 @@
 import { toStrictJsonSchema } from 'openai/lib/transform';
 import { detailedDiff } from 'deep-object-diff';
-import { JSONSchema } from 'openai/lib/jsonschema';
+import type { JSONSchema } from 'openai/lib/jsonschema';
 import { hasOwn } from 'openai/internal/utils/values';
 
 describe('toStrictJsonSchema', () => {

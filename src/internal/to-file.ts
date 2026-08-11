@@ -1,4 +1,5 @@
-import { BlobPart, getName, makeFile, isAsyncIterable, checkFileSupport } from './uploads';
+import type { BlobPart } from './uploads';
+import { getName, makeFile, isAsyncIterable, checkFileSupport } from './uploads';
 import type { FilePropertyBag } from './builtin-types';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | DataView;

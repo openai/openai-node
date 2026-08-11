@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { distance } from 'fastest-levenshtein';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 
 // The tests in this file don't typecheck with "moduleResolution": "node"
 

@@ -1,6 +1,7 @@
-import { ZodSchema } from 'zod/v3';
-import { Options, Targets } from './Options';
-import { JsonSchema7Type, parseDef } from './parseDef';
+import type { ZodSchema } from 'zod/v3';
+import type { Options, Targets } from './Options';
+import type { JsonSchema7Type } from './parseDef';
+import { parseDef } from './parseDef';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 

@@ -1,3 +1,5 @@
+import type { Dirent } from 'node:fs';
+
 const packedPackageAssert = require('node:assert/strict');
 const packedPackageChildProcess = require('node:child_process');
 const packedPackageFs = require('node:fs');
@@ -41,7 +43,7 @@ const packedPackagePath = require('node:path');
     JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
   const findSourceMaps = (directory: string): string[] => {
     const maps: string[] = [];
-    const entries = fs.readdirSync(directory, { withFileTypes: true }) as import('node:fs').Dirent[];
+    const entries = fs.readdirSync(directory, { withFileTypes: true }) as Dirent[];
     for (const entry of entries) {
       const resolved = path.join(directory, entry.name);
       if (entry.isDirectory() && entry.name !== 'node_modules') {
