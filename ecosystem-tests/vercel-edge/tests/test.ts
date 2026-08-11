@@ -4,18 +4,21 @@ console.log(baseUrl);
 it(
   'node runtime',
   async () => {
-    expect(await (await fetch(`${baseUrl}/api/node-test`)).text()).toEqual('Passed!');
+    const response = await fetch(`${baseUrl}/api/node-test`);
+    expect(await response.text()).toEqual('Passed!');
   },
-  3 * 60000,
+  3 * 60_000,
 );
 
 it(
   'edge runtime',
   async () => {
-    expect(await (await fetch(`${baseUrl}/api/edge-test`)).text()).toEqual('Passed!');
+    const response = await fetch(`${baseUrl}/api/edge-test`);
+    expect(await response.text()).toEqual('Passed!');
   },
-  3 * 60000,
+  3 * 60_000,
 );
 
 // make isolatedModules happy
+// oxlint-disable-next-line unicorn/require-module-specifiers -- keep this test file a module
 export {};

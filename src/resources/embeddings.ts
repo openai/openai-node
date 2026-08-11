@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
@@ -25,8 +25,9 @@ export class Embeddings extends APIResource {
     const hasUserProvidedEncodingFormat = !!body.encoding_format;
     // No encoding_format specified, defaulting to base64 for performance reasons
     // See https://github.com/openai/openai-node/pull/1312
-    let encoding_format: EmbeddingCreateParams['encoding_format'] =
-      hasUserProvidedEncodingFormat ? body.encoding_format : 'base64';
+    let encoding_format: EmbeddingCreateParams['encoding_format'] = hasUserProvidedEncodingFormat
+      ? body.encoding_format
+      : 'base64';
 
     if (hasUserProvidedEncodingFormat) {
       loggerFor(this._client).debug('embeddings/user defined encoding_format:', body.encoding_format);
@@ -38,6 +39,7 @@ export class Embeddings extends APIResource {
         encoding_format: encoding_format as EmbeddingCreateParams['encoding_format'],
       },
       ...options,
+      __security: { bearerAuth: true },
     });
 
     // if the user specified an encoding_format, return the response as-is

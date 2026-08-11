@@ -77,6 +77,7 @@ export type RequestOptions = {
   defaultBaseURL?: string | undefined;
 
   __metadata?: Record<string, unknown>;
+  __security?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean };
   __binaryResponse?: boolean | undefined;
   __streamClass?: typeof Stream;
   __synthesizeEventData?: boolean;

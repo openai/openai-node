@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as ThreadsAPI from './threads';
@@ -25,6 +25,7 @@ export class Sessions extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -43,6 +44,7 @@ export class Sessions extends APIResource {
     return this._client.post(path`/chatkit/sessions/${sessionID}/cancel`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }

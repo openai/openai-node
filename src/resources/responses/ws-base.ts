@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { ResponsesEmitter, ResponsesStreamMessage, WebSocketError, buildURL } from './internal-base';
 import { InternalEventEmitter } from '../../core/EventEmitter';
@@ -603,7 +603,9 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   }
 
   protected _authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${this._client.apiKey}` };
+    if (this._client.apiKey) {
+      return { Authorization: `Bearer ${this._client.apiKey}` };
+    }
     return {};
   }
 }

@@ -1,5 +1,5 @@
-import { JsonSchema7TypeUnion } from './parseDef';
-import { Refs } from './Refs';
+import type { JsonSchema7TypeUnion } from './parseDef';
+import type { Refs } from './Refs';
 
 export type ErrorMessages<T extends JsonSchema7TypeUnion, OmitProperties extends string = ''> = Partial<
   Omit<{ [key in keyof T]: string }, OmitProperties | 'type' | 'errorMessages'>
@@ -11,7 +11,9 @@ export function addErrorMessage<T extends { errorMessage?: ErrorMessages<any> }>
   errorMessage: string | undefined,
   refs: Refs,
 ) {
-  if (!refs?.errorMessages) return;
+  if (!refs?.errorMessages) {
+    return;
+  }
   if (errorMessage) {
     res.errorMessage = {
       ...res.errorMessage,

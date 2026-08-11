@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 export const config = {
@@ -11,10 +12,10 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   const result = await openai.beta.assistants.list({ limit: 10 });
 
   return NextResponse.json(result);
-};
+}

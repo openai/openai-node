@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as ChatKitAPI from './chatkit';
@@ -26,6 +26,7 @@ export class Threads extends APIResource {
     return this._client.get(path`/chatkit/threads/${threadID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -48,6 +49,7 @@ export class Threads extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -65,6 +67,7 @@ export class Threads extends APIResource {
     return this._client.delete(path`/chatkit/threads/${threadID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -104,7 +107,12 @@ export class Threads extends APIResource {
         | ChatKitThreadItemList.ChatKitTask
         | ChatKitThreadItemList.ChatKitTaskGroup
       >,
-      { query, ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]) },
+      {
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      },
     );
   }
 }

@@ -15,16 +15,19 @@ describe('request id', () => {
     compareType<Awaited<APIPromise<{ foo: string }>>, { foo: string } & { _request_id?: string | null }>(
       true,
     );
-    compareType<Awaited<APIPromise<Array<{ foo: string }>>>, Array<{ foo: string }>>(true);
+    compareType<Awaited<APIPromise<{ foo: string }[]>>, { foo: string }[]>(true);
   });
 
   test('withResponse', async () => {
     const client = new OpenAI({
       apiKey: 'dummy',
       fetch: async () =>
-        new Response(JSON.stringify({ id: 'bar' }), {
-          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-        }),
+        Response.json(
+          { id: 'bar' },
+          {
+            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+          },
+        ),
     });
 
     const {
@@ -43,9 +46,12 @@ describe('request id', () => {
     const client = new OpenAI({
       apiKey: 'dummy',
       fetch: async () =>
-        new Response(JSON.stringify({ id: 'bar' }), {
-          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-        }),
+        Response.json(
+          { id: 'bar' },
+          {
+            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+          },
+        ),
     });
 
     const rsp = await client.chat.completions.create({ messages: [], model: 'gpt-4' });
@@ -57,18 +63,19 @@ describe('request id', () => {
   test('envelope response', async () => {
     const promise = new APIPromise<{ data: { foo: string } }>(
       client,
-      (async () => {
-        return {
-          response: new Response(JSON.stringify({ data: { foo: 'bar' } }), {
+      Promise.resolve({
+        response: Response.json(
+          { data: { foo: 'bar' } },
+          {
             headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-          }),
-          controller: {} as any,
-          options: {} as any,
-          requestLogID: 'log_...',
-          retryOfRequestLogID: undefined,
-          startTime: Date.now(),
-        };
-      })(),
+          },
+        ),
+        controller: {} as any,
+        options: {} as any,
+        requestLogID: 'log_...',
+        retryOfRequestLogID: undefined,
+        startTime: Date.now(),
+      }),
     )._thenUnwrap((d) => d.data);
 
     const rsp = await promise;
@@ -80,9 +87,12 @@ describe('request id', () => {
     const client = new OpenAI({
       apiKey: 'dummy',
       fetch: async () =>
-        new Response(JSON.stringify({ data: [{ foo: 'bar' }] }), {
-          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-        }),
+        Response.json(
+          { data: [{ foo: 'bar' }] },
+          {
+            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+          },
+        ),
     });
 
     const page = await client.fineTuning.jobs.list();
@@ -91,20 +101,18 @@ describe('request id', () => {
   });
 
   test('array response', async () => {
-    const promise = new APIPromise<Array<{ foo: string }>>(
+    const promise = new APIPromise<{ foo: string }[]>(
       client,
-      (async () => {
-        return {
-          response: new Response(JSON.stringify([{ foo: 'bar' }]), {
-            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-          }),
-          controller: {} as any,
-          options: {} as any,
-          requestLogID: 'log_...',
-          retryOfRequestLogID: undefined,
-          startTime: Date.now(),
-        };
-      })(),
+      Promise.resolve({
+        response: Response.json([{ foo: 'bar' }], {
+          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+        }),
+        controller: {} as any,
+        options: {} as any,
+        requestLogID: 'log_...',
+        retryOfRequestLogID: undefined,
+        startTime: Date.now(),
+      }),
     );
 
     const rsp = await promise;
@@ -116,18 +124,16 @@ describe('request id', () => {
   test('string response', async () => {
     const promise = new APIPromise<string>(
       client,
-      (async () => {
-        return {
-          response: new Response('hello world', {
-            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/text' },
-          }),
-          controller: {} as any,
-          options: {} as any,
-          requestLogID: 'log_...',
-          retryOfRequestLogID: undefined,
-          startTime: Date.now(),
-        };
-      })(),
+      Promise.resolve({
+        response: new Response('hello world', {
+          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/text' },
+        }),
+        controller: {} as any,
+        options: {} as any,
+        requestLogID: 'log_...',
+        retryOfRequestLogID: undefined,
+        startTime: Date.now(),
+      }),
     );
 
     const result = await promise;

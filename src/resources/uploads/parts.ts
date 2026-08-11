@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import { APIPromise } from '../../core/api-promise';
@@ -27,7 +27,7 @@ export class Parts extends APIResource {
   create(uploadID: string, body: PartCreateParams, options?: RequestOptions): APIPromise<UploadPart> {
     return this._client.post(
       path`/uploads/${uploadID}/parts`,
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 }

@@ -1,11 +1,10 @@
-import OpenAI from 'openai';
+import { vi } from 'vitest';
+import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
 import type { Response, RequestInit } from 'openai/internal/builtin-types';
-import { OAuthError, SubjectTokenProviderError } from 'openai';
 
 const originalFetch = global.fetch;
 
 const createTestWorkloadIdentity = () => ({
-  clientId: 'test-client-id',
   identityProviderId: 'test-identity-provider-id',
   serviceAccountId: 'test-service-account-id',
   provider: {
@@ -22,11 +21,15 @@ const createTestClientOptions = () => ({
 
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
   });
 
   test('initializes with workloadIdentity', () => {
@@ -47,31 +50,35 @@ describe('OpenAI with Workload Identity', () => {
     ).toThrow(/mutually exclusive/);
   });
 
-  test('requires either apiKey or workloadIdentity', () => {
+  test('requires at least one credential source', () => {
     expect(() => new OpenAI({})).toThrow(/Missing credentials/);
+  });
+
+  test('allows client initialization with adminAPIKey only', () => {
+    expect(() => new OpenAI({ apiKey: null, adminAPIKey: 'my-admin-api-key' })).not.toThrow();
   });
 
   test('injects Authorization header with workload identity token', async () => {
     let apiRequestHeaders: Headers | undefined;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'exchanged-access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
         apiRequestHeaders = new Headers(init?.headers);
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -85,27 +92,45 @@ describe('OpenAI with Workload Identity', () => {
     expect(apiRequestHeaders!.get('Authorization')).toBe('Bearer exchanged-access-token');
   });
 
+  test('does not satisfy admin-only auth with workload identity', async () => {
+    global.fetch = vi.fn(async () => new Response('Unexpected request', { status: 500 })) as typeof fetch;
+
+    const client = new OpenAI(createTestClientOptions());
+
+    await expect(
+      client
+        .request({
+          path: '/organization/projects',
+          method: 'get',
+          __security: { adminAPIKeyAuth: true },
+        })
+        .asResponse(),
+    ).rejects.toThrow(/Could not resolve authentication method/);
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test('reuses cached token across multiple requests', async () => {
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'exchanged-access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -124,18 +149,18 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: `access-token-${tokenExchangeCallCount}`,
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
@@ -143,9 +168,9 @@ describe('OpenAI with Workload Identity', () => {
       if (urlStr.includes('/models')) {
         apiCallCount++;
         if (apiCallCount === 1) {
-          return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), { status: 401 });
+          return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
         }
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -164,25 +189,25 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
         apiCallCount++;
-        return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), { status: 401 });
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -200,25 +225,25 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/files')) {
         apiCallCount++;
-        return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), { status: 401 });
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -244,7 +269,6 @@ describe('OpenAI with Workload Identity', () => {
   test('propagates SubjectTokenProviderError', async () => {
     const client = new OpenAI({
       workloadIdentity: {
-        clientId: 'test-client-id',
         identityProviderId: 'test-identity-provider-id',
         serviceAccountId: 'test-service-account-id',
         provider: {
@@ -262,15 +286,15 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('propagates OAuthError on token exchange failure', async () => {
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             error: 'invalid_grant',
             error_description: 'Invalid subject token',
-          }),
+          },
           { status: 400 },
         );
       }
@@ -286,24 +310,24 @@ describe('OpenAI with Workload Identity', () => {
   test('refreshes expired tokens automatically', async () => {
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: `access-token-${tokenExchangeCallCount}`,
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 1,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -321,23 +345,23 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('withOptions preserves workloadIdentity', async () => {
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -355,23 +379,23 @@ describe('OpenAI with Workload Identity', () => {
   test('works with custom subject token provider', async () => {
     let customProviderCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -379,7 +403,6 @@ describe('OpenAI with Workload Identity', () => {
 
     const client = new OpenAI({
       workloadIdentity: {
-        clientId: 'test-client-id',
         identityProviderId: 'test-identity-provider-id',
         serviceAccountId: 'test-service-account-id',
         provider: {
@@ -400,26 +423,26 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('uses client fetch for token exchange', async () => {
-    const globalFetchSpy = jest.fn(originalFetch as any);
+    const globalFetchSpy = vi.fn(originalFetch as any);
     global.fetch = globalFetchSpy as typeof fetch;
 
-    const clientFetch = jest.fn(async (url: string) => {
+    const clientFetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
