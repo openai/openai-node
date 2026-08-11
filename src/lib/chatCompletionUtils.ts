@@ -1,7 +1,7 @@
-import {
-  type ChatCompletionAssistantMessageParam,
-  type ChatCompletionMessageParam,
-  type ChatCompletionToolMessageParam,
+import type {
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionMessageParam,
+  ChatCompletionToolMessageParam,
 } from '../resources';
 
 export const isAssistantMessage = (

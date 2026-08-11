@@ -83,9 +83,9 @@ export default {
 				console.error('running', description);
 				try {
 					await handler();
-					console.error('passed ', description);
+					console.error('passed', description);
 				} catch (error) {
-					console.error('failed ', description, error);
+					console.error('failed', description, error);
 					return new Response('Internal Server Error', { status: 500 });
 				}
 			}

@@ -8,7 +8,7 @@ import {
   makeParseableTool,
 } from '../lib/parser';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
-import { type JSONSchema } from '../lib/jsonschema';
+import type { JSONSchema } from '../lib/jsonschema';
 import {
   assertNoNestedSchemaIds,
   forEachJSONSchemaChild,
@@ -19,7 +19,7 @@ import {
   toStrictJsonSchema,
 } from '../lib/transform';
 import { ResponseFormatJSONSchema } from '../resources/index';
-import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
+import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 
 type StandardSchemaIssue = {
   readonly message: string;

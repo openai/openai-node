@@ -13,7 +13,7 @@ const main = () => {
 
   const versionFile = path.resolve(__dirname, '..', '..', 'src', 'version.ts');
   const contents = fs.readFileSync(versionFile, 'utf8');
-  const output = contents.replace(/(export const VERSION = ')(.*)(')/g, `$1${version}$3`);
+  const output = contents.replaceAll(/(export const VERSION = ')(.*)(')/g, `$1${version}$3`);
   fs.writeFileSync(versionFile, output);
 };
 

@@ -7,7 +7,6 @@ const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-fil
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = [
   'arrow-body-style',
-  'complexity',
   'curly',
   'eqeqeq',
   'func-names',
@@ -18,11 +17,8 @@ const compatibilityRules = [
   'no-bitwise',
   'no-eq-null',
   'no-inline-comments',
-  'no-param-reassign',
   'no-plusplus',
-  'no-promise-executor-return',
   'no-shadow',
-  'no-sparse-arrays',
   'no-unused-vars',
   'no-use-before-define',
   'no-var',
@@ -32,7 +28,6 @@ const compatibilityRules = [
   'prefer-named-capture-group',
   'prefer-template',
   'promise/avoid-new',
-  'promise/prefer-await-to-then',
   'require-await',
   'require-unicode-regexp',
   'sort-keys',
@@ -42,24 +37,18 @@ const compatibilityRules = [
   'typescript/consistent-type-imports',
   'typescript/method-signature-style',
   'typescript/no-explicit-any',
-  'typescript/no-import-type-side-effects',
   'typescript/no-non-null-assertion',
   'typescript/prefer-ts-expect-error',
   'unicorn/catch-error-name',
-  'unicorn/consistent-assert',
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
-  'unicorn/no-console-spaces',
   'unicorn/no-useless-undefined',
   'unicorn/numeric-separators-style',
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
-  'unicorn/prefer-string-replace-all',
-  'unicorn/prefer-string-slice',
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',
-  'vars-on-top',
 ];
 
 module.exports = defineConfig({
@@ -263,6 +252,150 @@ module.exports = defineConfig({
       files: ['tests/lib/ChatCompletionRunFunctions.test.ts'],
       rules: {
         'func-name-matching': 'off',
+      },
+    },
+    {
+      // These chains intentionally preserve fire-and-forget entrypoints, deferred
+      // execution, cancellation consumption, and memoized promise lifetimes.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'examples/audio/speech-to-text.ts',
+        'examples/audio/text-to-speech.ts',
+        'examples/azure/assistants.ts',
+        'examples/azure/chat.ts',
+        'examples/azure/responses.ts',
+        'examples/bedrock/responses.ts',
+        'examples/chat-completions/stream-to-client-browser.ts',
+        'examples/chat-completions/stream-to-client-express.ts',
+        'examples/chat-completions/stream-to-client-raw.ts',
+        'examples/client/raw-response.ts',
+        'examples/fine-tuning/fine-tuning.ts',
+        'examples/images/image-stream.ts',
+        'examples/images/picture.ts',
+        'examples/responses/manual-conversation-state.ts',
+        'examples/responses/structured-outputs.ts',
+        'examples/responses/websocket.ts',
+        'scripts/_vendor/tsc-multi/src/worker/entry.ts',
+        'src/auth/subject-token-providers.ts',
+        'src/auth/workload-identity-auth.ts',
+        'src/core/streaming.ts',
+        'src/helpers/standard-schema.ts',
+        'src/lib/EventStream.ts',
+      ],
+      rules: {
+        'promise/prefer-await-to-then': 'off',
+      },
+    },
+    {
+      // These TypeScript files intentionally stay compatible with the ES2020
+      // declaration library, which does not include String.prototype.replaceAll.
+      files: [
+        'scripts/_vendor/tsc-multi/src/worker/worker.ts',
+        'src/helpers/zod.ts',
+        'src/internal/qs/formats.ts',
+        'src/internal/qs/stringify.ts',
+        'src/internal/qs/utils.ts',
+        'src/internal/uploads.ts',
+        'src/internal/utils/path.ts',
+        'src/lib/transform.ts',
+        'src/realtime/internal-base.ts',
+        'tests/helpers/zod.test.ts',
+        'tests/path.test.ts',
+        'tests/qs/stringify.test.ts',
+        'tests/utils/mock-snapshots.ts',
+      ],
+      rules: {
+        'unicorn/prefer-string-replace-all': 'off',
+      },
+    },
+    {
+      // These executors intentionally use concise callback bodies; their returned
+      // values are ignored by Promise and changing the bodies would be behavior-neutral churn.
+      files: [
+        'ecosystem-tests/browser-direct-import/public/index.js',
+        'ecosystem-tests/browser-direct-import/src/test.ts',
+        'ecosystem-tests/cli.ts',
+        'ecosystem-tests/proxy.ts',
+        'ecosystem-tests/ts-browser-webpack/src/index.ts',
+        'ecosystem-tests/ts-browser-webpack/src/test.ts',
+        'examples/chat-completions/tool-calls-stream.ts',
+        'examples/fine-tuning/fine-tuning.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ChatCompletionStreamingRunner.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'tests/auth/workload-identity-auth.test.ts',
+        'tests/helpers/standard-schema.test.ts',
+        'tests/lib/azure.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/lib/responsesWebSocket.test.ts',
+        'tests/lib/workload-identity.test.ts',
+      ],
+      rules: {
+        'no-promise-executor-return': 'off',
+      },
+    },
+    {
+      // Sparse holes are the behavior under test in the query-string fixture;
+      // replacing them with explicit undefined values would change coverage.
+      files: ['tests/qs/stringify.test.ts'],
+      rules: {
+        'no-sparse-arrays': 'off',
+      },
+    },
+    {
+      // The vendored partial parser relies on substring's clamping and bound-swapping
+      // behavior for malformed input, which is not equivalent to slice.
+      files: ['src/_vendor/partial-json-parser/parser.ts'],
+      rules: {
+        'unicorn/prefer-string-slice': 'off',
+      },
+    },
+    {
+      // These established parsers and stream state machines intentionally encode
+      // protocol branching in one place; splitting them would risk behavior changes.
+      files: [
+        'scripts/_vendor/tsc-multi/src/transformer.ts',
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/_vendor/zod-to-json-schema/parseDef.ts',
+        'src/_vendor/zod-to-json-schema/parsers/string.ts',
+        'src/_vendor/zod-to-json-schema/parsers/union.ts',
+        'src/internal/qs/stringify.ts',
+        'src/internal/qs/utils.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/responses/ResponseAccumulator.ts',
+        'src/lib/responses/ResponseInputItems.ts',
+        'src/lib/transform.ts',
+      ],
+      rules: {
+        complexity: 'off',
+      },
+    },
+    {
+      // These constructors, normalizers, and reducer fixtures intentionally rebind
+      // parameters while resolving defaults or preserving accumulator semantics.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'examples/chat-completions/function-call-stream-raw.ts',
+        'examples/chat-completions/function-call-stream.ts',
+        'examples/chat-completions/tool-calls-stream.ts',
+        'src/azure.ts',
+        'src/bedrock.ts',
+        'src/beta/realtime/internal-base.ts',
+        'src/beta/realtime/websocket.ts',
+        'src/beta/realtime/ws.ts',
+        'src/core/streaming.ts',
+        'src/internal/to-file.ts',
+        'src/lib/EventStream.ts',
+        'src/lib/responses/ResponseAccumulator.ts',
+        'src/realtime/internal-base.ts',
+        'src/realtime/websocket.ts',
+        'src/realtime/ws.ts',
+      ],
+      rules: {
+        'no-param-reassign': 'off',
       },
     },
     {

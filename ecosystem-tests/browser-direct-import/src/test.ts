@@ -15,7 +15,7 @@ import puppeteer from 'puppeteer';
         console.error(
           `${debugEvent('console')} ${message
             .type()
-            .substr(0, 'warning'.length)
+            .slice(0, 'warning'.length)
             .toUpperCase()
             .padEnd('warning'.length)} ${message.text()}`,
         ),

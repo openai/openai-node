@@ -15,7 +15,7 @@ import {
   ParsedChoice,
   ParsedFunctionToolCall,
 } from '../resources/chat/completions';
-import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
+import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 import { ResponseFormatJSONSchema } from '../resources/shared';
 
 type AnyChatCompletionCreateParams =

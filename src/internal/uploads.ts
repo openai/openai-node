@@ -1,4 +1,4 @@
-import { type RequestOptions } from './request-options';
+import type { RequestOptions } from './request-options';
 import type { FilePropertyBag, Fetch } from './builtin-types';
 import type { OpenAI } from '../client';
 import { buildHeaders } from './headers';

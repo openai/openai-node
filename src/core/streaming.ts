@@ -1,5 +1,5 @@
 import { OpenAIError, APIError } from './error';
-import { type ReadableStream } from '../internal/shim-types';
+import type { ReadableStream } from '../internal/shim-types';
 import { makeReadableStream, ReadableStreamToAsyncIterable } from '../internal/shims';
 import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
 import { isAbortError } from '../internal/errors';
@@ -324,7 +324,7 @@ class SSEDecoder {
 
   decode(line: string) {
     if (line.endsWith('\r')) {
-      line = line.substring(0, line.length - 1);
+      line = line.slice(0, -1);
     }
 
     if (!line) {
@@ -354,7 +354,7 @@ class SSEDecoder {
     let value = initialValue;
 
     if (value.startsWith(' ')) {
-      value = value.substring(1);
+      value = value.slice(1);
     }
 
     if (fieldname === 'event') {
@@ -370,7 +370,7 @@ class SSEDecoder {
 function partition(str: string, delimiter: string): [string, string, string] {
   const index = str.indexOf(delimiter);
   if (index !== -1) {
-    return [str.substring(0, index), delimiter, str.substring(index + delimiter.length)];
+    return [str.slice(0, index), delimiter, str.slice(index + delimiter.length)];
   }
 
   return [str, '', ''];

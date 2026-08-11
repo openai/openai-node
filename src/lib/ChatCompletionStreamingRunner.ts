@@ -1,10 +1,10 @@
-import {
-  type ChatCompletionChunk,
-  type ChatCompletionCreateParamsStreaming,
-  type ChatCompletionMessageParam,
+import type {
+  ChatCompletionChunk,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
 } from '../resources/chat/completions';
 import { RunnerOptions, type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
-import { type ReadableStream } from '../internal/shim-types';
+import type { ReadableStream } from '../internal/shim-types';
 import { RunnableTools, type BaseFunctionsArgs } from './RunnableFunction';
 import {
   type ChatCompletionReadableStreamItem,

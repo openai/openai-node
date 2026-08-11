@@ -7,11 +7,11 @@ import {
   type ResponseStreamEvent,
 } from '../../resources/responses/responses';
 import { RequestOptions } from '../../internal/request-options';
-import { type ReadableStream } from '../../internal/shim-types';
+import type { ReadableStream } from '../../internal/shim-types';
 import { APIUserAbortError, OpenAIError } from '../../error';
 import OpenAI from '../../index';
 import { type BaseEvents, EventStream } from '../EventStream';
-import { type ResponseFunctionCallArgumentsDeltaEvent, type ResponseTextDeltaEvent } from './EventTypes';
+import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
 import { accumulateResponse } from './ResponseAccumulator';
 import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';
 import { Stream } from '../../streaming';

@@ -312,7 +312,7 @@ export class Worker {
 
         if (this.data.shareHelpers) {
           const out = program.getCompilerOptions().outDir;
-          assert(out, 'outDir must be set when specifying shareHelpers');
+          assert.ok(out, 'outDir must be set when specifying shareHelpers');
           const write = writeFile || this.system.writeFile;
           this.writeHelpers(helpersNeeded, write, out, program.getCompilerOptions());
         }
@@ -330,7 +330,7 @@ export class Worker {
     out: string,
     compilerOptions: ts.CompilerOptions,
   ) {
-    assert(this.data.shareHelpers);
+    assert.ok(this.data.shareHelpers);
     const helperDeps = [...helpersNeeded].filter((e) => helpers[e]);
     let helperLength = 0;
     while (helperLength !== helperDeps.length) {
@@ -433,7 +433,7 @@ export class Worker {
 
     if (this.data.shareHelpers) {
       const out = config.options.outDir;
-      assert(out, 'outDir must be set when specifying shareHelpers');
+      assert.ok(out, 'outDir must be set when specifying shareHelpers');
       this.writeHelpers(helpersNeeded, this.system.writeFile, out, config.options);
     }
   }

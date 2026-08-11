@@ -47,9 +47,9 @@ export default async function handler(request: NextApiRequest, response: NextApi
       console.error('running', description);
       try {
         await handler();
-        console.error('passed ', description);
+        console.error('passed', description);
       } catch (error) {
-        console.error('failed ', description, error);
+        console.error('failed', description, error);
         response.status(500).end('Internal Server Error');
         return;
       }
