@@ -358,6 +358,168 @@ describe('handwritten SDK declaration module formats', () => {
     expect(declarations.filter(({ documented }) => !documented)).toEqual([]);
   });
 
+  test.each([
+    [
+      'named imports',
+      "import type { Hidden } from './internal-shape'; import type { OnlyA } from './projection';",
+      'OnlyA<Hidden>',
+    ],
+    ['inline imports', '', "import('./projection').OnlyA<import('./internal-shape').Hidden>"],
+  ])(
+    'checks only selected internal fields through external mapped %s',
+    (_description, imports, publicType) => {
+      const source = `${imports}\n/** Public selected shape. */\nexport type Public = ${publicType};`;
+      const dependencies = {
+        'src/projection.ts': `
+        /** Selects the public field. */
+        export type OnlyA<Value extends { a: unknown }> = Pick<Value, 'a'>;
+      `,
+        'src/internal-shape.ts': `
+        /** @internal */
+        export interface Hidden {
+          a: { missing: string };
+          b: { excluded: string };
+        }
+      `,
+      };
+      const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+        .filter(({ documented }) => !documented)
+        .map(({ name }) => name);
+
+      expect(undocumented).toEqual(expect.arrayContaining(['Public.a', 'Public.a.missing']));
+      expect(undocumented.some((name) => name.includes('excluded') || name.endsWith('.b'))).toBe(false);
+    },
+  );
+
+  test('does not expose generic arguments discarded by inherited handwritten aliases', () => {
+    const source = `
+      import type { Wrapper } from './phantom-wrapper';
+      /** Selects a wrapper whose base does not expose its generic value. */
+      type Select<Value, Yes, No> = Value extends string ? Wrapper<Yes> : Wrapper<No>;
+      /** Public deferred dictionary. */
+      export type Public<Key extends string, Value> = Record<
+        Key,
+        Select<Value, { missing: string }, { other: string }>
+      >;
+    `;
+    const dependencies = {
+      'src/phantom-wrapper.ts': `
+        /** Base that intentionally does not expose Value. */
+        interface Base<Value> {
+          /** Public identifier. */
+          id: string;
+        }
+        /** Derived wrapper. */
+        export interface Wrapper<Value> extends Base<Value> {
+          /** Public name. */
+          name: string;
+        }
+      `,
+    };
+
+    expect(
+      inspectSource('src/fixture.ts', source, dependencies).filter(({ documented }) => !documented),
+    ).toEqual([]);
+  });
+
+  test('preserves transformed public shapes inherited through generic aliases', () => {
+    const source = `
+      import type { Wrapper } from './transformed-wrapper';
+      /** Selects a transformed inherited wrapper. */
+      type Select<Value, Yes, No> = Value extends string ? Wrapper<Yes> : Wrapper<No>;
+      /** Public deferred dictionary. */
+      export type Public<Key extends string, Value> = Record<
+        Key,
+        Select<Value, { missing: string }, { other: string }>
+      >;
+    `;
+    const dependencies = {
+      'src/transformed-wrapper.ts': `
+        /** Transforms each inherited value into a wrapped promise result. */
+        type Base<Value> = Promise<{ wrapped: Value }>;
+        /** Wrapper retaining its transformed base shape. */
+        export interface Wrapper<Value> extends Base<Value> {
+          /** Public identifier. */
+          id: string;
+        }
+      `,
+    };
+    const undocumented = inspectSource('src/fixture.ts', source, dependencies)
+      .filter(({ documented }) => !documented)
+      .map(({ name }) => name);
+
+    expect(undocumented).toEqual(
+      expect.arrayContaining([
+        'Public.[key: Key].wrapped',
+        'Public.[key: Key].wrapped.missing',
+        'Public.[key: Key].wrapped.other',
+      ]),
+    );
+    expect(undocumented).not.toContain('Public.[key: Key].missing');
+    expect(undocumented).not.toContain('Public.[key: Key].other');
+  });
+
+  test.each([
+    ['callable', '', ''],
+    ['constructable', 'new ', 'new '],
+  ])(
+    'keeps named internal %s intersection constituents independently documented',
+    (_description, first, second) => {
+      const source = `
+      import type { Documented, Undocumented } from './internal-callables';
+      /** Public overloaded intersection. */
+      export type Public = Documented & Undocumented;
+    `;
+      const dependencies = {
+        'src/internal-callables.ts': `
+        /** @internal */
+        export type Documented = ${first}(options: {
+          /** First signature options. */
+          shared: string;
+        }) => {
+          /** First signature result. */
+          value: string;
+        };
+        /** @internal */
+        export type Undocumented = ${second}(options: { shared: string }) => { value: string };
+      `,
+      };
+      const declarations = inspectSource('src/fixture.ts', source, dependencies);
+      const undocumented = declarations.filter(({ documented }) => !documented).map(({ name }) => name);
+
+      expect(undocumented.some((name) => name.endsWith('.shared'))).toBe(true);
+      expect(undocumented.some((name) => name.endsWith('.value'))).toBe(true);
+    },
+  );
+
+  test('prefers actual runner methods over same-named projected event callbacks', () => {
+    const source = `
+      /** Available runner events. */
+      interface Events {
+        /** This documentation describes the event, not the runner method. */
+        done: () => void;
+      }
+      /** Generic typed runner. */
+      class Runner<Value extends Events> {
+        /** Registers a typed event callback. */
+        on<Key extends keyof Value>(_event: Key): this {
+          return this;
+        }
+        done() {}
+      }
+      /** Public mapped callback options. */
+      export type Public = Pick<{
+        /** Runs the user callback. */
+        callback: (runner: Runner<Events>) => void;
+      }, 'callback'>;
+    `;
+    const declarations = inspectSource('src/fixture.ts', source);
+
+    expect(declarations.find(({ name }) => name === 'Public.callback.runner.done')).toEqual(
+      expect.objectContaining({ documented: false, line: 13 }),
+    );
+  });
+
   test('checks constraints and defaults on publicly exposed internal callable signatures', () => {
     const source = `
       export { Hidden as Public } from './internal-callable';
