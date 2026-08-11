@@ -6,13 +6,12 @@ const opts: ClientOptions = {
   apiKey: 'example-api-key',
   baseURL: 'http://localhost:5000/',
   logLevel: 'debug',
-  fetch: (url) => {
-    return Promise.resolve(
+  fetch: (url) =>
+    Promise.resolve(
       new Response(JSON.stringify({ url, custom: true }), {
         headers: { 'Content-Type': 'application/json' },
       }),
-    );
-  },
+    ),
 };
 
 describe('debug()', () => {

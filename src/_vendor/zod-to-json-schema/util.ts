@@ -1,8 +1,7 @@
 import type { ZodSchema, ZodTypeDef } from 'zod/v3';
 
-export const zodDef = (zodSchema: ZodSchema | ZodTypeDef): ZodTypeDef => {
-  return '_def' in zodSchema ? zodSchema._def : zodSchema;
-};
+export const zodDef = (zodSchema: ZodSchema | ZodTypeDef): ZodTypeDef =>
+  '_def' in zodSchema ? zodSchema._def : zodSchema;
 
 export function isEmptyObj(obj: object | null | undefined): boolean {
   if (!obj) return true;

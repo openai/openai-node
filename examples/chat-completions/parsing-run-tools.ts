@@ -36,9 +36,7 @@ async function main() {
       tools: [
         zodFunction({
           name: 'query',
-          function: (args) => {
-            return { table_name: args.table_name, data: fakeOrders };
-          },
+          function: (args) => ({ table_name: args.table_name, data: fakeOrders }),
           parameters: z.object({
             location: z.string(),
             table_name: Table,

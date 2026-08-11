@@ -210,9 +210,8 @@ const parseArgs = (argv: Array<string>): CLIArgs => {
   return { model, useBetaHeader, showEvents, showToolIO };
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 const parseToolName = (name: string): ToolName => {
   if (name === 'get_sku_inventory' || name === 'get_supplier_eta' || name === 'get_quality_alerts') {
@@ -341,8 +340,8 @@ const runResponse = async ({
   inputPayload: string | ResponseInput;
   toolChoice: ToolChoice;
   showEvents: boolean;
-}): Promise<RunResponseResult> => {
-  return await new Promise<RunResponseResult>((resolve, reject) => {
+}): Promise<RunResponseResult> =>
+  await new Promise<RunResponseResult>((resolve, reject) => {
     const textParts: Array<string> = [];
     const functionCalls: Array<FunctionCallRequest> = [];
 
@@ -419,7 +418,6 @@ const runResponse = async ({
     };
     ws.send(createEvent);
   });
-};
 
 const runTurn = async ({
   ws,

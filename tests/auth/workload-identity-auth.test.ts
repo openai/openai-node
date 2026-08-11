@@ -265,15 +265,16 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = vi.fn(async () => {
-      return new Response(
-        JSON.stringify({
-          error: 'invalid_grant',
-          error_description: 'The subject token is invalid',
-        }),
-        { status: 400 },
-      );
-    }) as typeof fetch;
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: 'invalid_grant',
+            error_description: 'The subject token is invalid',
+          }),
+          { status: 400 },
+        ),
+    ) as typeof fetch;
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -291,16 +292,17 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = vi.fn(async () => {
-      return new Response(
-        JSON.stringify({
-          access_token: 'access-token',
-          issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-          token_type: 'Bearer',
-        }),
-        { status: 200 },
-      );
-    }) as typeof fetch;
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            access_token: 'access-token',
+            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            token_type: 'Bearer',
+          }),
+          { status: 200 },
+        ),
+    ) as typeof fetch;
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -346,9 +348,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = vi.fn(async () => {
-      return new Response(JSON.stringify(body), { status: 200 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 })) as typeof fetch;
 
     const auth = new WorkloadIdentityAuth(config);
     const tokenPromise = auth.getToken();
@@ -404,17 +404,18 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    const customFetch = vi.fn(async () => {
-      return new Response(
-        JSON.stringify({
-          access_token: 'access-token',
-          issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        }),
-        { status: 200 },
-      );
-    }) as typeof fetch;
+    const customFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            access_token: 'access-token',
+            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          }),
+          { status: 200 },
+        ),
+    ) as typeof fetch;
 
     const auth = new WorkloadIdentityAuth(config, customFetch);
     await auth.getToken();

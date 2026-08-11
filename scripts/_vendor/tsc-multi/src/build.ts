@@ -114,8 +114,8 @@ export async function build({
       const prefix = `[${trimPrefix(extname || DEFAULT_EXTNAME, '.')}]: `;
       const prefixStyle = reportStyles[i % reportStyles.length];
 
-      return () => {
-        return runWorker({
+      return () =>
+        runWorker({
           ...options,
           projects,
           stdout,
@@ -127,7 +127,6 @@ export async function build({
           reportPrefix: prefixStyle(prefix),
           transpileOnly,
         });
-      };
     }),
     { concurrency: maxWorkers },
   );
