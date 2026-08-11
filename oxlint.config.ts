@@ -41,7 +41,6 @@ const compatibilityRules = [
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
   'unicorn/numeric-separators-style',
-  'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
   'unicorn/switch-case-braces',
@@ -360,6 +359,30 @@ module.exports = defineConfig({
       ],
       rules: {
         'unicorn/no-useless-undefined': 'off',
+      },
+    },
+    {
+      // These files intentionally exercise or provide CommonJS tooling, config,
+      // fixture, and runtime-loading behavior; converting them would change loading.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'ecosystem-tests/node-js/test.js',
+        'ecosystem-tests/ts-browser-webpack/webpack.config.js',
+        'ecosystem-tests/vercel-edge/next.config.js',
+        'examples/audio/audio.ts',
+        'oxfmt.config.ts',
+        'oxlint.config.ts',
+        'scripts/_vendor/tsc-multi/src/build.ts',
+        'scripts/_vendor/tsc-multi/src/worker/worker.ts',
+        'scripts/check-node-version-policy.ts',
+        'scripts/test-packed-package.ts',
+        'tests/oxlint-config.test.ts',
+        'tests/resource-exports.test.ts',
+        'tests/uploads.test.ts',
+        'vitest.config.mts',
+      ],
+      rules: {
+        'unicorn/prefer-module': 'off',
       },
     },
     {
