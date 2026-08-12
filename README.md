@@ -269,6 +269,9 @@ await client.files.create({
 
 Verifying webhook signatures is _optional but encouraged_.
 
+Webhook verification is asynchronous. Always `await` `unwrap()` or `verifySignature()` before trusting
+the event.
+
 For more information about webhooks, see [the API docs](https://platform.openai.com/docs/guides/webhooks).
 
 ### Parsing webhook payloads
@@ -290,7 +293,7 @@ export async function webhook(request: Request) {
   const body = await request.text();
 
   try {
-    const event = client.webhooks.unwrap(body, headersList);
+    const event = await client.webhooks.unwrap(body, headersList);
 
     switch (event.type) {
       case 'response.completed':
@@ -330,7 +333,7 @@ export async function webhook(request: Request) {
   const body = await request.text();
 
   try {
-    client.webhooks.verifySignature(body, headersList);
+    await client.webhooks.verifySignature(body, headersList);
 
     // Parse the body after verification
     const event = JSON.parse(body);

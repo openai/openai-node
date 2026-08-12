@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
 import OpenAI, { InvalidWebhookSignatureError } from 'openai';
 
@@ -128,5 +129,23 @@ describe('portable webhook verification', () => {
         }
       }
     });
+  });
+});
+
+describe('webhook documentation', () => {
+  test('README awaits webhook verification before processing events', () => {
+    const readme = readFileSync('README.md', 'utf-8');
+    const examples = readme.match(/```(?:ts|typescript)\r?\n[\s\S]*?\r?\n```/gu) ?? [];
+    const calls = examples.flatMap((example) => [
+      ...example.matchAll(/(?:await\s+)?client\.webhooks\.(?<method>unwrap|verifySignature)\s*\(/gu),
+    ]);
+
+    expect(calls.map((call) => call.groups?.['method'])).toEqual(
+      expect.arrayContaining(['unwrap', 'verifySignature']),
+    );
+
+    for (const [call] of calls) {
+      expect(call).toMatch(/^await\s+/u);
+    }
   });
 });
