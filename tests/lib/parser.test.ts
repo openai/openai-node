@@ -1,7 +1,7 @@
 import { z as z4 } from 'zod/v4';
 import { z as z3 } from 'zod/v3';
 import { vi } from 'vitest';
-import type OpenAI from 'openai';
+import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import {
   isParseableResponseFormat,
@@ -11,8 +11,9 @@ import {
 } from '../../src/lib/parser';
 import type { AutoParseableResponseFormat, ExtractParsedContentFromParams } from '../../src/lib/parser';
 import type { ChatCompletionStreamParams } from '../../src/lib/ChatCompletionStream';
+import { mockFetch } from '../utils/mock-fetch';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
-import { compareType } from '../utils/typing';
+import { compareType, expectType } from '../utils/typing';
 
 describe.each([
   { version: 'v3', z: z3 },
@@ -1413,6 +1414,168 @@ describe.each([
         }
       `);
     });
+  });
+});
+
+describe('custom tool calls', () => {
+  const customTool: OpenAI.Chat.ChatCompletionCustomTool = {
+    type: 'custom',
+    custom: { name: 'code_exec', description: 'Executes arbitrary code' },
+  };
+
+  const strictFunctionTool: OpenAI.Chat.ChatCompletionFunctionTool = {
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      strict: true,
+      parameters: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+        additionalProperties: false,
+      },
+    },
+  };
+
+  const response: OpenAI.Chat.ChatCompletion = {
+    id: 'chatcmpl-custom-1',
+    object: 'chat.completion',
+    created: 123_456_789,
+    model: 'gpt-5.5',
+    choices: [
+      {
+        index: 0,
+        finish_reason: 'tool_calls',
+        logprobs: null,
+        message: {
+          role: 'assistant',
+          content: null,
+          refusal: null,
+          tool_calls: [
+            {
+              id: 'call_custom_1',
+              type: 'custom',
+              custom: { name: 'code_exec', input: 'print("hello")' },
+            },
+            {
+              id: 'call_function_1',
+              type: 'function',
+              function: { name: 'get_weather', arguments: '{"city":"SF"}' },
+            },
+          ],
+        },
+      },
+    ],
+  };
+
+  it('passes custom tools through .parse() and returns their calls unparsed', async () => {
+    const { fetch, handleRequest } = mockFetch();
+    const client = new OpenAI({ apiKey: 'My API Key', fetch });
+
+    const completionPromise = client.chat.completions.parse({
+      model: 'gpt-5.5',
+      messages: [{ role: 'user', content: 'run some code' }],
+      tools: [customTool, strictFunctionTool],
+    });
+
+    let requestBody: unknown;
+    await handleRequest(async (_url, init) => {
+      requestBody = JSON.parse(init?.body as string);
+      return Response.json(response, {
+        status: 200,
+      });
+    });
+
+    // the custom tool is forwarded to the API rather than rejected client-side
+    expect(requestBody).toMatchObject({ tools: [customTool, strictFunctionTool] });
+
+    const completion = await completionPromise;
+    const toolCalls = completion.choices[0]?.message.tool_calls;
+
+    // custom tool calls are returned exactly as the API sent them
+    expect(toolCalls?.[0]).toEqual({
+      id: 'call_custom_1',
+      type: 'custom',
+      custom: { name: 'code_exec', input: 'print("hello")' },
+    });
+
+    // function tool calls alongside them are still auto-parsed
+    expect(toolCalls?.[1]).toEqual({
+      id: 'call_function_1',
+      type: 'function',
+      function: {
+        name: 'get_weather',
+        arguments: '{"city":"SF"}',
+        parsed_arguments: { city: 'SF' },
+      },
+    });
+
+    const toolCall = toolCalls?.[0];
+    if (toolCall?.type === 'custom') {
+      expectType<string>(toolCall.custom.input);
+    } else {
+      throw new Error('expected a custom tool call');
+    }
+
+    const functionCall = toolCalls?.[1];
+    if (functionCall?.type === 'function') {
+      expectType<string>(functionCall.function.arguments);
+      expectType<unknown>(functionCall.function.parsed_arguments);
+    } else {
+      throw new Error('expected a function tool call');
+    }
+  });
+
+  it('passes custom calls through when no request parameters are available', () => {
+    const completion = maybeParseChatCompletion(response, null);
+
+    expect(completion.choices[0]?.message.parsed).toBeNull();
+    expect(completion.choices[0]?.message.tool_calls).toEqual(response.choices[0]?.message.tool_calls);
+  });
+
+  it('preserves ordinary function-call metadata when no tools are auto-parseable', () => {
+    const completion = maybeParseChatCompletion(response, {
+      model: 'gpt-5.5',
+      messages: [{ role: 'user', content: 'run some code' }],
+      tools: [customTool, { type: 'function', function: { name: 'get_weather' } }],
+    });
+
+    expect(completion.choices[0]?.message.tool_calls?.[1]).toEqual({
+      id: 'call_function_1',
+      type: 'function',
+      function: { name: 'get_weather', arguments: '{"city":"SF"}' },
+    });
+    expect(completion.choices[0]?.message.tool_calls?.[1]).not.toHaveProperty('function.parsed_arguments');
+  });
+
+  it('still rejects function tools that are not strict', () => {
+    const client = new OpenAI({ apiKey: 'My API Key', fetch: mockFetch().fetch });
+
+    expect(() =>
+      client.chat.completions.parse({
+        model: 'gpt-5.5',
+        messages: [{ role: 'user', content: 'run some code' }],
+        tools: [customTool, { type: 'function', function: { name: 'get_weather' } }],
+      }),
+    ).toThrow(
+      'The `get_weather` tool is not marked with `strict: true`. Only strict function tools can be auto-parsed',
+    );
+  });
+
+  it('still rejects unknown tool types', () => {
+    const client = new OpenAI({ apiKey: 'My API Key', fetch: mockFetch().fetch });
+    const unsupportedTool = {
+      type: 'unsupported_tool',
+      custom: { name: 'unsupported' },
+    } as unknown as OpenAI.Chat.ChatCompletionCustomTool;
+
+    expect(() =>
+      client.chat.completions.parse({
+        model: 'gpt-5.5',
+        messages: [{ role: 'user', content: 'run some code' }],
+        tools: [unsupportedTool],
+      }),
+    ).toThrow('unsupported_tool');
   });
 });
 

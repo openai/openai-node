@@ -6,14 +6,15 @@ import type {
   ChatCompletionFunctionTool,
   ChatCompletionMessage,
   ChatCompletionMessageFunctionToolCall,
+  ChatCompletionMessageToolCall,
   ChatCompletionStreamingToolRunnerParams,
   ChatCompletionStreamingToolRunnerParamsWithContext,
   ChatCompletionStreamParams,
   ChatCompletionToolRunnerParams,
   ChatCompletionToolRunnerParamsWithContext,
   ParsedChatCompletion,
+  ParsedChatCompletionMessageToolCall,
   ParsedChoice,
-  ParsedFunctionToolCall,
 } from '../resources/chat/completions';
 import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 import type { ResponseFormatJSONSchema } from '../resources/shared';
@@ -250,23 +251,19 @@ export function maybeParseChatCompletion<
   if (!params || !hasAutoParseableInput(params)) {
     return {
       ...completion,
-      choices: completion.choices.map((choice) => {
-        assertToolCallsAreChatCompletionFunctionToolCalls(choice.message.tool_calls);
-
-        return {
-          ...choice,
-          message: {
-            ...choice.message,
-            parsed: null,
-            ...(choice.message.tool_calls
-              ? {
-                  tool_calls: choice.message.tool_calls,
-                }
-              : undefined),
-          },
-        };
-      }),
-    } as ParsedChatCompletion<ParsedT>;
+      choices: completion.choices.map((choice) => ({
+        ...choice,
+        message: {
+          ...choice.message,
+          parsed: null,
+          ...(choice.message.tool_calls
+            ? {
+                tool_calls: choice.message.tool_calls,
+              }
+            : undefined),
+        },
+      })),
+    };
   }
 
   return parseChatCompletion(completion, params);
@@ -292,8 +289,6 @@ export function parseChatCompletion<
       throw new ContentFilterFinishReasonError();
     }
 
-    assertToolCallsAreChatCompletionFunctionToolCalls(choice.message.tool_calls);
-
     return {
       ...choice,
       message: {
@@ -309,7 +304,7 @@ export function parseChatCompletion<
             ? parseResponseFormat(params, choice.message.content)
             : null,
       },
-    } as ParsedChoice<ParsedT>;
+    };
   });
 
   return { ...completion, choices };
@@ -324,8 +319,19 @@ function parseResponseFormat<
 
 function parseToolCall<Params extends ChatCompletionCreateParams>(
   params: Params,
-  toolCall: ChatCompletionMessageFunctionToolCall,
-): ParsedFunctionToolCall {
+  toolCall: ChatCompletionMessageToolCall,
+): ParsedChatCompletionMessageToolCall {
+  if (toolCall.type === 'custom') {
+    return toolCall;
+  }
+
+  if (toolCall.type !== 'function') {
+    const unsupportedType = (toolCall as { type: string }).type;
+    throw new OpenAIError(
+      `Currently only \`function\` and \`custom\` tool calls are supported; Received \`${unsupportedType}\``,
+    );
+  }
+
   const inputTool = params.tools?.find(
     (inputTool) =>
       isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name,
@@ -349,15 +355,19 @@ function parseToolCall<Params extends ChatCompletionCreateParams>(
 /** Returns whether a tool call matches a strict or auto-parseable function in the request. */
 export function shouldParseToolCall(
   params: ChatCompletionCreateParams | null | undefined,
-  toolCall: ChatCompletionMessageFunctionToolCall,
+  // accepts partially accumulated tool calls so streaming snapshots can be checked as they build up
+  toolCall: {
+    type?: ChatCompletionMessageToolCall['type'];
+    function?: { name?: string };
+  },
 ): boolean {
-  if (!params || !('tools' in params) || !params.tools) {
+  if (!params || !('tools' in params) || !params.tools || toolCall.type !== 'function') {
     return false;
   }
 
   const inputTool = params.tools?.find(
     (inputTool) =>
-      isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name,
+      isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function?.name,
   );
   return (
     isChatCompletionFunctionTool(inputTool) &&
@@ -396,15 +406,20 @@ export function assertToolCallsAreChatCompletionFunctionToolCalls(
 }
 
 /**
- * Validates that every tool can be automatically parsed by Chat Completions helpers.
+ * Validates strict function tools while preserving supported custom tools.
  *
- * @throws {OpenAIError} If a tool is not a function or is missing `strict: true`.
+ * @throws {OpenAIError} If a tool is unsupported or a function is missing `strict: true`.
  */
 export function validateInputTools(tools: ChatCompletionCreateParamsBase['tools']) {
   for (const tool of tools ?? []) {
+    if (tool.type === 'custom') {
+      continue;
+    }
+
     if (tool.type !== 'function') {
+      const unsupportedType = (tool as { type: string }).type;
       throw new OpenAIError(
-        `Currently only \`function\` tool types support auto-parsing; Received \`${tool.type}\``,
+        `Currently only \`function\` and \`custom\` tool types are supported; Received \`${unsupportedType}\``,
       );
     }
 

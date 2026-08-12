@@ -27,6 +27,7 @@ import type {
   ChatCompletionCreateParamsBase,
   ChatCompletionCreateParamsStreaming,
   ChatCompletionMessageParam,
+  ChatCompletionMessageToolCall,
   ChatCompletionRole,
   ChatCompletionTokenLogprob,
 } from '../resources/chat/completions/completions';
@@ -238,6 +239,20 @@ function getChatCompletionReadableStreamMessage(
   ) as ChatCompletionReadableStreamMessage;
 }
 
+/**
+ * A tool call snapshot while it is still being accumulated from stream chunks.
+ *
+ * Every property is optional because the deltas that make up a tool call arrive
+ * across chunks; once they have all been accumulated the entry satisfies
+ * {@link ChatCompletionSnapshot.Choice.Message.ToolCall}.
+ */
+type PartialToolCallSnapshot = {
+  id?: string;
+  type?: ChatCompletionSnapshot.Choice.Message.ToolCall['type'];
+  function?: ChatCompletionSnapshot.Choice.Message.ToolCall.Function;
+  custom?: ChatCompletionSnapshot.Choice.Message.ToolCall.CustomToolCall.Custom;
+};
+
 interface ChoiceEventState {
   content_done: boolean;
   refusal_done: boolean;
@@ -405,16 +420,16 @@ export class ChatCompletionStream<ParsedT = null>
           continue;
         }
 
-        if (toolCallSnapshot?.type === 'function') {
+        if (toolCallSnapshot.type === 'function') {
           this._emit('tool_calls.function.arguments.delta', {
-            name: toolCallSnapshot.function?.name,
+            name: toolCallSnapshot.function.name,
             index: toolCallDelta.index,
             arguments: toolCallSnapshot.function.arguments,
             parsed_arguments: toolCallSnapshot.function.parsed_arguments,
             arguments_delta: toolCallDelta.function?.arguments ?? '',
           });
-        } else {
-          assertNever(toolCallSnapshot?.type);
+        } else if (toolCallSnapshot.type !== 'custom') {
+          assertNever(toolCallSnapshot);
         }
       }
     }
@@ -453,8 +468,8 @@ export class ChatCompletionStream<ParsedT = null>
         arguments: toolCallSnapshot.function.arguments,
         parsed_arguments: parsedArguments,
       });
-    } else {
-      assertNever(toolCallSnapshot.type);
+    } else if (toolCallSnapshot.type !== 'custom') {
+      assertNever(toolCallSnapshot);
     }
   }
 
@@ -715,13 +730,13 @@ export class ChatCompletionStream<ParsedT = null>
       }
 
       if (tool_calls) {
-        if (!choice.message.tool_calls) {
-          choice.message.tool_calls = [];
-        }
+        // Tool calls are built up across chunks, so while the stream is in progress the
+        // entries are only partially filled in; they match `ChatCompletionSnapshot.Choice.Message.ToolCall`
+        // once every delta for them has been accumulated.
+        const toolCallSnapshots = (choice.message.tool_calls ??= []) as PartialToolCallSnapshot[];
 
-        for (const { index, id, type, function: fn, ...rest } of tool_calls) {
-          const tool_call = (choice.message.tool_calls[index] ??=
-            {} as ChatCompletionSnapshot.Choice.Message.ToolCall);
+        for (const { index, id, type, function: fn, custom, ...rest } of tool_calls) {
+          const tool_call = (toolCallSnapshots[index] ??= {});
           Object.assign(tool_call, rest);
           if (id) {
             tool_call.id = id;
@@ -729,17 +744,26 @@ export class ChatCompletionStream<ParsedT = null>
           if (type) {
             tool_call.type = type;
           }
+          if (custom) {
+            const customSnapshot = (tool_call.custom ??= { name: custom.name ?? '', input: '' });
+            if (custom.name) {
+              customSnapshot.name = custom.name;
+            }
+            if (custom.input) {
+              customSnapshot.input += custom.input;
+            }
+          }
           if (fn) {
-            tool_call.function ??= { name: fn.name ?? '', arguments: '' };
-          }
-          if (fn?.name) {
-            tool_call.function!.name = fn.name;
-          }
-          if (fn?.arguments) {
-            tool_call.function!.arguments += fn.arguments;
+            const functionSnapshot = (tool_call.function ??= { name: fn.name ?? '', arguments: '' });
+            if (fn.name) {
+              functionSnapshot.name = fn.name;
+            }
+            if (fn.arguments) {
+              functionSnapshot.arguments += fn.arguments;
 
-            if (shouldParseToolCall(this.#params, tool_call)) {
-              tool_call.function!.parsed_arguments = partialParse(tool_call.function!.arguments);
+              if (shouldParseToolCall(this.#params, tool_call)) {
+                functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+              }
             }
           }
         }
@@ -880,12 +904,29 @@ function finalizeChatCompletion<ParsedT>(
               role,
               content,
               refusal: message.refusal ?? null,
-              tool_calls: tool_calls.map((tool_call, i) => {
-                const { function: fn, type, id, ...toolRest } = tool_call;
-                const { arguments: args, name, ...fnRest } = fn || {};
-                if (type == null) {
+              tool_calls: tool_calls.map((tool_call, i): ChatCompletionMessageToolCall => {
+                if (tool_call.type == null) {
                   throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
                 }
+
+                if (tool_call.type === 'custom') {
+                  const { custom, type, id, ...toolRest } = tool_call;
+                  const { input = '', name, ...customRest } = custom || {};
+                  if (name == null) {
+                    throw new OpenAIError(
+                      `missing choices[${index}].tool_calls[${i}].custom.name\n${str(snapshot)}`,
+                    );
+                  }
+                  return {
+                    ...toolRest,
+                    id: id || `call_${uuid4()}`,
+                    type,
+                    custom: { ...customRest, name, input },
+                  };
+                }
+
+                const { function: fn, type, id, ...toolRest } = tool_call;
+                const { arguments: args, name, ...fnRest } = fn || {};
                 if (name == null) {
                   throw new OpenAIError(
                     `missing choices[${index}].tool_calls[${i}].function.name\n${str(snapshot)}`,
@@ -1029,7 +1070,7 @@ export namespace ChatCompletionSnapshot {
        */
       function_call?: Message.FunctionCall;
 
-      /** Function-tool calls accumulated so far; arguments may still contain incomplete JSON. */
+      /** Function and custom tool calls accumulated so far; inputs may still be incomplete. */
       tool_calls?: Message.ToolCall[];
 
       /**
@@ -1038,26 +1079,29 @@ export namespace ChatCompletionSnapshot {
       role?: ChatCompletionRole;
     }
 
-    /** Nested function-call shapes belonging to an in-progress assistant message. */
+    /** Nested tool-call shapes belonging to an in-progress assistant message. */
     export namespace Message {
-      /** A function-tool call whose name, identifier, and arguments are streamed incrementally. */
-      export interface ToolCall {
-        /**
-         * The ID of the tool call.
-         */
-        id: string;
+      /** A function or custom tool call accumulated incrementally from streamed chunks. */
+      export type ToolCall = ToolCall.FunctionToolCall | ToolCall.CustomToolCall;
 
-        /** The function name and the complete or partial JSON arguments received so far. */
-        function: ToolCall.Function;
-
-        /**
-         * The type of the tool.
-         */
-        type: 'function';
-      }
-
-      /** Function details nested under an in-progress tool call. */
+      /** Function and custom details nested under an in-progress tool call. */
       export namespace ToolCall {
+        /** A function-tool call whose name, identifier, and arguments are streamed incrementally. */
+        export interface FunctionToolCall {
+          /**
+           * The ID of the tool call.
+           */
+          id: string;
+
+          /** The function name and the complete or partial JSON arguments received so far. */
+          function: ToolCall.Function;
+
+          /**
+           * The type of the tool.
+           */
+          type: 'function';
+        }
+
         /** The name and incrementally accumulated arguments of a function-tool call. */
         export interface Function {
           /**
@@ -1075,6 +1119,34 @@ export namespace ChatCompletionSnapshot {
            * The name of the function to call.
            */
           name: string;
+        }
+
+        /** A custom-tool call whose name, identifier, and input are streamed incrementally. */
+        export interface CustomToolCall {
+          /**
+           * The ID of the tool call.
+           */
+          id: string;
+
+          /** The custom-tool name and complete or partial input received so far. */
+          custom: CustomToolCall.Custom;
+
+          /**
+           * The type of the tool.
+           */
+          type: 'custom';
+        }
+
+        /** Custom-tool details nested under an in-progress tool call. */
+        export namespace CustomToolCall {
+          /** The name and incrementally accumulated input of a custom-tool call. */
+          export interface Custom {
+            /** The name of the custom tool to call. */
+            name: string;
+
+            /** The custom tool's complete or partial free-form input. */
+            input: string;
+          }
         }
       }
 
