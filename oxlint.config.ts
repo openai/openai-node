@@ -2,7 +2,7 @@ const requireConfig = require('node:module').createRequire(__filename);
 
 const { defineConfig } = requireConfig('oxlint');
 const core = requireConfig('ultracite/oxlint/core').default;
-const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
+const generatedFiles = requireConfig('./scripts/generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = ['func-style', 'sort-keys'];
@@ -30,7 +30,7 @@ module.exports = defineConfig({
       },
     ],
   },
-  ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...stainlessGeneratedFiles],
+  ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...generatedFiles],
   overrides: [
     {
       // This example intentionally shows both mutually exclusive Next.js router
@@ -1136,7 +1136,7 @@ module.exports = defineConfig({
         'scripts/_vendor/tsc-multi/src/transformer.ts',
         'scripts/_vendor/tsc-multi/src/worker/worker.ts',
         'scripts/check-node-version-policy.ts',
-        'scripts/stainless-generated-files.cjs',
+        'scripts/generated-files.cjs',
         'scripts/test-packed-package.ts',
         'scripts/utils/check-version.cjs',
         'scripts/utils/fix-index-exports.cjs',

@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import type { FinalRequestOptions } from './request-options';
 import { Stream } from '../core/streaming';
 import { type OpenAI } from '../client';

@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { OpenAIError } from '../../core/error';
 import { encodeUTF8 } from './bytes';
 

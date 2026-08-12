@@ -56,26 +56,29 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
   }
 });
 
-test('recognizes both Stainless and Castiron generated SDK files', () => {
+test('recognizes generated SDK files and explicitly listed legacy files', () => {
   const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'openai-node-generated-files-'));
 
   try {
     const scriptsDirectory = path.join(fixtureRoot, 'scripts');
     mkdirSync(scriptsDirectory);
-    const generatedFilesScript = path.join(scriptsDirectory, 'stainless-generated-files.cjs');
-    copyFileSync(path.join(repoRoot, 'scripts/stainless-generated-files.cjs'), generatedFilesScript);
+    const generatedFilesScript = path.join(scriptsDirectory, 'generated-files.cjs');
+    copyFileSync(path.join(repoRoot, 'scripts/generated-files.cjs'), generatedFilesScript);
 
-    for (const generator of ['Stainless', 'Castiron']) {
+    for (const generator of ['Castiron']) {
       writeFileSync(
         path.join(fixtureRoot, `${generator.toLowerCase()}.ts`),
         `// File generated from our OpenAPI spec by ${generator}. See CONTRIBUTING.md for details.\n`,
       );
     }
     writeFileSync(path.join(fixtureRoot, 'handwritten.ts'), 'export const handwritten = true;\n');
+    const legacyDirectory = path.join(fixtureRoot, 'src', 'internal', 'utils');
+    mkdirSync(legacyDirectory, { recursive: true });
+    writeFileSync(path.join(legacyDirectory, 'env.ts'), 'export const legacy = true;\n');
 
     // oxlint-disable-next-line node/global-require -- The fixture module path is created dynamically for this test.
     const generatedFiles = require(generatedFilesScript) as string[];
-    expect(generatedFiles).toEqual(['castiron.ts', 'stainless.ts']);
+    expect(generatedFiles).toEqual(['castiron.ts', 'src/internal/utils/env.ts']);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -84,7 +87,7 @@ test('recognizes both Stainless and Castiron generated SDK files', () => {
 test('formats generated SDK files without linting them', () => {
   const generatedPath = 'src/client.ts';
   const unformatted = [
-    '// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.',
+    '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.',
     '',
     'export const generated = "formatted";',
     '',
@@ -111,6 +114,29 @@ test('formats generated SDK files without linting them', () => {
   expect(result.number_of_files).toBe(0);
 });
 
+test('keeps explicitly listed legacy SDK files under the generated lint profile', () => {
+  const legacyPath = 'src/internal/utils/env.ts';
+  const linted = spawnSync(
+    process.execPath,
+    [oxlint, '--format', 'json', '--no-error-on-unmatched-pattern', legacyPath],
+    {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    },
+  );
+
+  expect(linted.status).toBe(0);
+  expect((JSON.parse(linted.stdout) as { number_of_files: number }).number_of_files).toBe(0);
+
+  const generatedLinted = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', legacyPath],
+    { cwd: repoRoot, encoding: 'utf-8' },
+  );
+
+  expect(generatedLinted.status).toBe(0);
+});
+
 test('removes adjacent unused imports from generated files until fixes stabilize', () => {
   const fixtureRoot = mkdtempSync(path.join(repoRoot, '.oxlint-generated-imports-'));
 
@@ -119,7 +145,7 @@ test('removes adjacent unused imports from generated files until fixes stabilize
     const handwritten = "import { HandwrittenUnused } from './dependency';\nexport const value = 1;\n";
     writeFileSync(handwrittenPath, handwritten);
 
-    for (const generator of ['Stainless', 'Castiron']) {
+    for (const generator of ['Castiron']) {
       const generatedPath = path.join(fixtureRoot, `${generator.toLowerCase()}.ts`);
       const imports = Array.from(
         { length: 20 },
@@ -242,7 +268,7 @@ test('rejects SDK package imports in generated source but allows them in generat
   const testsRoot = mkdtempSync(path.join(repoRoot, 'tests', '.oxlint-generated-tests-'));
 
   try {
-    const header = '// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.';
+    const header = '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.';
     const sourcePath = path.join(sourceRoot, 'client.ts');
     const testPath = path.join(testsRoot, 'client.test.ts');
     const source = `${header}\nimport OpenAI from 'openai';\nexport const client = OpenAI;\n`;

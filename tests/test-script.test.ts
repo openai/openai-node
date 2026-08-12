@@ -4,7 +4,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -18,13 +17,9 @@ import generatedTestPatterns from '../scripts/generated-test-patterns.json';
 
 const testScriptPath = path.join(process.cwd(), 'scripts/test');
 const generatedTestPatternsPath = path.join(process.cwd(), 'scripts/generated-test-patterns.json');
-const generatedTopLevelTests = readdirSync(path.join(process.cwd(), 'tests')).filter(
-  (file) =>
-    file.endsWith('.test.ts') &&
-    readFileSync(path.join(process.cwd(), 'tests', file), 'utf-8').startsWith(
-      '// File generated from our OpenAPI spec by Stainless.',
-    ),
-);
+const generatedTopLevelTests = generatedTestPatterns
+  .filter((pattern) => pattern.endsWith('.test.ts'))
+  .map((pattern) => path.basename(pattern));
 
 describe('scripts/test', () => {
   let fixtureDir: string;
@@ -153,7 +148,7 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
     });
   });
 
-  test.each(generatedTopLevelTests)('routes Stainless-generated top-level test %s only to Jest', (file) => {
+  test.each(generatedTopLevelTests)('routes manifest-listed top-level test %s only to Jest', (file) => {
     const testPath = `tests/${file}`;
 
     expect(runTestScript([testPath])).toEqual({
