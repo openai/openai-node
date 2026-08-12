@@ -81,8 +81,8 @@ importers:
         specifier: ^3.0.7
         version: 3.0.7
       superstruct:
-        specifier: ^1.0.4
-        version: 1.0.4
+        specifier: ^2.0.2
+        version: 2.0.2
       ts-jest:
         specifier: ^29.1.0
         version: 29.4.11(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(jest-util@30.4.1)(jest@30.4.2(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.47)(@types/node@24.12.4)(typescript@6.0.3)))(typescript@6.0.3)
@@ -3214,8 +3214,8 @@ packages:
       babel-plugin-macros:
         optional: true
 
-  superstruct@1.0.4:
-    resolution: {integrity: sha512-7JpaAoX2NGyoFlI9NBh66BQXGONc+uE+MRS5i2iOBKuS4e+ccgMDjATgZldkah+33DakBxDHiss9kvUcGAO8UQ==}
+  superstruct@2.0.2:
+    resolution: {integrity: sha512-uV+TFRZdXsqXTL2pRvujROjdZQ4RAlBUS5BTh9IGm+jTqQntYThciG/qu57Gs69yjnVUSqdxF9YLmSnpupBW9A==}
     engines: {node: '>=14.0.0'}
 
   supports-color@7.2.0:
@@ -6824,7 +6824,7 @@ snapshots:
     optionalDependencies:
       '@babel/core': 7.29.7
 
-  superstruct@1.0.4: {}
+  superstruct@2.0.2: {}
 
   supports-color@7.2.0:
     dependencies:
