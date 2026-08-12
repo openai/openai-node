@@ -1503,10 +1503,12 @@ module.exports = defineConfig({
     },
     {
       // Dynamic parent-node_modules type probes and cross-runtime type shims
-      // cannot become static imports without changing consumer type acquisition.
+      // require JSDoc suppression comments in published declarations and cannot
+      // become static imports without changing consumer type acquisition.
       files: ['src/internal/shim-types.ts', 'src/internal/types.ts'],
       rules: {
         'jsdoc/check-tag-names': 'off',
+        'no-inline-comments': 'off',
         'typescript/consistent-type-imports': 'off',
       },
     },
