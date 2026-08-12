@@ -145,22 +145,37 @@ export function makeFile(
 /**
  * Infers a filename from an object's `name`, `url`, `filename`, or `path` value.
  *
- * Directory components separated by either `/` or `\\` are discarded.
+ * Directory components separated by either `/` or `\\` are discarded unless an
+ * explicitly supplied `name` or `filename` opts into preserving its path. Paths
+ * inferred from URLs and filesystem streams always discard their directories.
  */
-export function getName(value: any): string | undefined {
-  return (
-    (
-      (typeof value === 'object' &&
-        value !== null &&
-        (('name' in value && value.name && String(value.name)) ||
-          ('url' in value && value.url && String(value.url)) ||
-          ('filename' in value && value.filename && String(value.filename)) ||
-          ('path' in value && value.path && String(value.path)))) ||
-      ''
-    )
-      .split(/[\\/]/)
-      .pop() || undefined
-  );
+export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+
+  const explicitName =
+    ('name' in value && value.name && String(value.name)) ||
+    ('filename' in value && value.filename && String(value.filename));
+  if (explicitName) {
+    return options?.stripFilename === false ? explicitName : basename(explicitName);
+  }
+
+  const url = 'url' in value && value.url && String(value.url);
+  if (url) {
+    try {
+      return basename(new URL(url).pathname);
+    } catch {
+      return basename(url);
+    }
+  }
+
+  const path = 'path' in value && value.path && String(value.path);
+  return path ? basename(path) : undefined;
+}
+
+function basename(value: string): string | undefined {
+  return value.split(/[\\/]/).pop() || undefined;
 }
 
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
@@ -178,16 +193,17 @@ export const isAsyncIterable = (value: any): value is AsyncIterable<any> =>
 export const maybeMultipartFormRequestOptions = async (
   opts: RequestOptions,
   fetch: OpenAI | Fetch,
+  formOptions?: CreateFormOptions,
 ): Promise<RequestOptions> => {
   if (!hasUploadableValue(opts.body)) {
     return opts;
   }
 
   if (hasStreamingUploadableValue(opts.body)) {
-    return createStreamingFormRequestOptions(opts);
+    return createStreamingFormRequestOptions(opts, formOptions);
   }
 
-  return { ...opts, body: await createForm(opts.body, fetch) };
+  return { ...opts, body: await createForm(opts.body, fetch, formOptions) };
 };
 
 /** Request options whose body must be encoded as multipart form data. */
@@ -205,12 +221,13 @@ type MultipartFormRequestOptions = Omit<RequestOptions, 'body'> & {
 export const multipartFormRequestOptions = async (
   opts: MultipartFormRequestOptions,
   fetch: OpenAI | Fetch,
+  formOptions?: CreateFormOptions,
 ): Promise<RequestOptions> => {
   if (hasStreamingUploadableValue(opts.body)) {
-    return createStreamingFormRequestOptions(opts);
+    return createStreamingFormRequestOptions(opts, formOptions);
   }
 
-  return { ...opts, body: await createForm(opts.body, fetch) };
+  return { ...opts, body: await createForm(opts.body, fetch, formOptions) };
 };
 
 const supportsFormDataMap = /* @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>();
@@ -251,6 +268,12 @@ function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
   return promise;
 }
 
+/** Controls whether explicitly supplied multipart filenames retain directory components. */
+export type CreateFormOptions = {
+  /** Keep directories in explicit filenames when false; inferred paths remain basename-only. */
+  stripFilenames?: boolean;
+};
+
 /**
  * Materializes an object into platform `FormData` after verifying fetch support.
  *
@@ -264,6 +287,7 @@ function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
 export const createForm = async <T = Record<string, unknown>>(
   body: T | undefined,
   fetch: OpenAI | Fetch,
+  options: CreateFormOptions = {},
 ): Promise<FormData> => {
   if (!(await supportsFormData(fetch))) {
     throw new TypeError(
@@ -271,7 +295,9 @@ export const createForm = async <T = Record<string, unknown>>(
     );
   }
   const form = new FormData();
-  await Promise.all(Object.entries(body || {}).map(([key, value]) => addFormValue(form, key, value)));
+  await Promise.all(
+    Object.entries(body || {}).map(([key, value]) => addFormValue(form, key, value, options)),
+  );
   return form;
 };
 
@@ -333,9 +359,12 @@ const hasUploadableValue = (value: unknown): boolean => {
 
 type FormEntry = { key: string; value: unknown };
 
-const createStreamingFormRequestOptions = (opts: RequestOptions): RequestOptions => {
+const createStreamingFormRequestOptions = (
+  opts: RequestOptions,
+  options: CreateFormOptions = {},
+): RequestOptions => {
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
-  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary));
+  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options));
 
   return {
     ...opts,
@@ -344,11 +373,15 @@ const createStreamingFormRequestOptions = (opts: RequestOptions): RequestOptions
   };
 };
 
-async function* iterateMultipartBody(body: unknown, boundary: string): AsyncGenerator<Uint8Array> {
+async function* iterateMultipartBody(
+  body: unknown,
+  boundary: string,
+  options: CreateFormOptions,
+): AsyncGenerator<Uint8Array> {
   for await (const { key, value } of iterateFormEntries(body)) {
     yield encodeUTF8(`--${boundary}\r\n`);
     if (isUploadable(value)) {
-      const filename = getStreamingFileName(value);
+      const filename = getStreamingFileName(value, options);
       const type = getStreamingFileType(value);
       yield encodeUTF8(
         `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
@@ -408,8 +441,10 @@ async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<Fo
   }
 }
 
-function getStreamingFileName(value: Uploadable): string {
-  return isStreamingFile(value) ? value.name : (getName(value) ?? 'unknown_file');
+function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
+  return isStreamingFile(value)
+    ? value.name
+    : (getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file');
 }
 
 function getStreamingFileType(value: Uploadable): string {
@@ -464,7 +499,12 @@ function escapeHeaderValue(value: string): string {
   return value.replace(/["\\\r\n]/g, (character) => encodeURIComponent(character));
 }
 
-const addFormValue = async (form: FormData, key: string, value: unknown): Promise<void> => {
+const addFormValue = async (
+  form: FormData,
+  key: string,
+  value: unknown,
+  options: CreateFormOptions,
+): Promise<void> => {
   if (value === undefined) {
     return;
   }
@@ -478,16 +518,25 @@ const addFormValue = async (form: FormData, key: string, value: unknown): Promis
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     form.append(key, String(value));
   } else if (value instanceof Response) {
-    form.append(key, makeFile([await value.blob()], getName(value)));
+    form.append(
+      key,
+      makeFile([await value.blob()], getName(value, { stripFilename: options.stripFilenames })),
+    );
   } else if (isAsyncIterable(value)) {
-    form.append(key, makeFile([await new Response(ReadableStreamFrom(value)).blob()], getName(value)));
+    form.append(
+      key,
+      makeFile(
+        [await new Response(ReadableStreamFrom(value)).blob()],
+        getName(value, { stripFilename: options.stripFilenames }),
+      ),
+    );
   } else if (isNamedBlob(value)) {
-    form.append(key, value, getName(value));
+    form.append(key, value, getName(value, { stripFilename: options.stripFilenames }));
   } else if (Array.isArray(value)) {
-    await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry)));
+    await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry, options)));
   } else if (typeof value === 'object') {
     await Promise.all(
-      Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop)),
+      Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop, options)),
     );
   } else {
     throw new TypeError(

@@ -40,6 +40,16 @@ describe('streaming upload metadata', () => {
     expect(getName(value)).toBe(expected);
   });
 
+  test.each([
+    [{ name: 'my-skill/SKILL.md' }, 'my-skill/SKILL.md'],
+    [{ filename: 'my-skill/assets/data.json' }, 'my-skill/assets/data.json'],
+    [{ url: 'https://example.com/private/remote.txt?signature=example#fragment' }, 'remote.txt'],
+    [{ path: '/private/tmp/local.txt' }, 'local.txt'],
+    [{ path: 'C:\\private\\nested\\local.txt' }, 'local.txt'],
+  ] as const)('preserves only explicitly supplied filename paths', (value, expected) => {
+    expect(getName(value, { stripFilename: false })).toBe(expected);
+  });
+
   test('detects async iterables without treating arbitrary objects as streams', () => {
     const iterable = {
       async *[Symbol.asyncIterator]() {
@@ -96,6 +106,19 @@ describe('buffered multipart forms', () => {
     expect(form.get('count')).toBe('2');
     expect(form.get('enabled')).toBe('false');
     expect(form.get('nested[upload]')).toBeInstanceOf(File);
+  });
+
+  test('preserves explicit nested file paths only when requested', async () => {
+    const upload = new File(['manifest'], 'my-skill/SKILL.md');
+    const defaultOptions = await maybeMultipartFormRequestOptions({ body: { nested: { upload } } }, fetch);
+    const preservedOptions = await maybeMultipartFormRequestOptions({ body: { nested: { upload } } }, fetch, {
+      stripFilenames: false,
+    });
+
+    expect(((defaultOptions.body as FormData).get('nested[upload]') as File).name).toBe('SKILL.md');
+    expect(((preservedOptions.body as FormData).get('nested[upload]') as File).name).toBe(
+      'my-skill/SKILL.md',
+    );
   });
 
   test('serializes response bodies and async iterables into buffered File entries', async () => {
@@ -177,6 +200,64 @@ describe('buffered multipart forms', () => {
 });
 
 describe('lazy multipart stream encoding', () => {
+  test('continues stripping ordinary File paths when streaming is enabled', async () => {
+    async function* chunks() {
+      yield 'streamed';
+    }
+
+    const options = await maybeMultipartFormRequestOptions(
+      {
+        body: {
+          files: [new File(['manifest'], 'my-skill/SKILL.md'), toStreamingFile(chunks(), 'stream.txt')],
+        },
+      },
+      fetch,
+    );
+    const body = await new Response(options.body as ReadableStream).text();
+
+    expect(body).toContain('filename="SKILL.md"');
+    expect(body).toContain('filename="stream.txt"');
+    expect(body).not.toContain('my-skill/SKILL.md');
+  });
+
+  test.each([
+    ['conditional multipart', maybeMultipartFormRequestOptions],
+    ['required multipart', multipartFormRequestOptions],
+  ] as const)('preserves explicit paths but never inferred paths in %s streams', async (_, encodeRequest) => {
+    const response = new Response('downloaded');
+    Object.defineProperty(response, 'url', {
+      value: 'https://example.com/private/remote.txt?signature=example#fragment',
+    });
+
+    async function* chunks() {
+      yield 'streamed';
+    }
+
+    const filesystemStream = Object.assign(chunks(), { path: '/private/tmp/local.txt' });
+    const options = await encodeRequest(
+      {
+        body: {
+          files: [
+            new File(['manifest'], 'my-skill/SKILL.md'),
+            toStreamingFile(chunks(), 'my-skill/assets/data.txt'),
+            response,
+            filesystemStream,
+          ],
+        },
+      },
+      fetch,
+      { stripFilenames: false },
+    );
+    const body = await new Response(options.body as ReadableStream).text();
+
+    expect(body).toContain('filename="my-skill/SKILL.md"');
+    expect(body).toContain('filename="my-skill/assets/data.txt"');
+    expect(body).toContain('filename="remote.txt"');
+    expect(body).toContain('filename="local.txt"');
+    expect(body).not.toContain('/private/');
+    expect(body).not.toContain('signature=example');
+  });
+
   test('encodes mixed chunk formats and nested form fields without buffering', async () => {
     async function* nestedChunks() {
       yield new Uint8Array([69]);
