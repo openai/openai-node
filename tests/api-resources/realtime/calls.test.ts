@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
@@ -29,7 +29,9 @@ describe('resource calls', () => {
           noise_reduction: { type: 'near_field' },
           transcription: {
             delay: 'minimal',
+            keywords: ['string'],
             language: 'language',
+            languages: ['string'],
             model: 'whisper-1',
             prompt: 'prompt',
           },

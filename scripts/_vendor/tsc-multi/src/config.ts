@@ -1,5 +1,6 @@
-import { dirname, resolve } from 'path';
-import { object, string, array, Infer, validate, optional, type, integer, min, boolean } from 'superstruct';
+import nodePath = require('node:path');
+import type { Infer } from 'superstruct';
+import { object, string, array, validate, optional, type, integer, min, boolean } from 'superstruct';
 import Debug from './debug';
 import { readJSON, tryReadJSON } from './utils';
 import glob from 'fast-glob';
@@ -13,7 +14,7 @@ const targetSchema = type({
   transpileOnly: optional(boolean()),
 });
 
-export type Target = Infer<typeof targetSchema> & { [key: string]: unknown };
+export type Target = Infer<typeof targetSchema> & Record<string, unknown>;
 
 const configSchema = object({
   projects: optional(array(string())),
@@ -41,12 +42,14 @@ export interface LoadConfigOptions {
 
 export async function loadConfig({ cwd = process.cwd(), path }: LoadConfigOptions): Promise<Config> {
   const mustLoadConfig = !!path;
-  const configPath = resolve(cwd, path || 'tsc-multi.json');
+  const configPath = nodePath.resolve(cwd, path || 'tsc-multi.json');
 
   debug('Read config from %s', configPath);
 
   const json = await (() => {
-    if (mustLoadConfig) return readJSON(configPath);
+    if (mustLoadConfig) {
+      return readJSON(configPath);
+    }
     return tryReadJSON(configPath);
   })();
 
@@ -61,6 +64,6 @@ export async function loadConfig({ cwd = process.cwd(), path }: LoadConfigOption
   return {
     ...config,
     cwd,
-    projects: await resolveProjectPath(dirname(configPath), config.projects || []),
+    projects: await resolveProjectPath(nodePath.dirname(configPath), config.projects || []),
   };
 }

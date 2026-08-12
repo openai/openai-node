@@ -63,7 +63,16 @@ export async function defaultParseResponse<T>(
         return undefined as T;
       }
 
-      const json = await response.json();
+      const bodyText = await response.text();
+      if (!bodyText) {
+        // Some servers respond with an empty body and a JSON content-type but
+        // without a `content-length: 0` header (e.g. over HTTP/2 or with chunked
+        // transfer encoding). Treat this the same as an explicit `content-length: 0`
+        // instead of letting `JSON.parse` throw an opaque `SyntaxError`.
+        return undefined as T;
+      }
+
+      const json = JSON.parse(bodyText);
       return addRequestID(json as T, response);
     }
 
@@ -83,10 +92,11 @@ export async function defaultParseResponse<T>(
   return body;
 }
 
-export type WithRequestID<T> =
-  T extends Array<any> | Response | AbstractPage<any> ? T
-  : T extends Record<string, any> ? T & { _request_id?: string | null }
-  : T;
+export type WithRequestID<T> = T extends Array<any> | Response | AbstractPage<any>
+  ? T
+  : T extends Record<string, any>
+    ? T & { _request_id?: string | null }
+    : T;
 
 export function addRequestID<T>(value: T, response: Response): WithRequestID<T> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {

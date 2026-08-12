@@ -1,6 +1,7 @@
-import { ZodNumberDef } from 'zod/v3';
-import { addErrorMessage, ErrorMessages, setResponseValueAndErrors } from '../errorMessages';
-import { Refs } from '../Refs';
+import type { ZodNumberDef } from 'zod/v3';
+import type { ErrorMessages } from '../errorMessages';
+import { addErrorMessage, setResponseValueAndErrors } from '../errorMessages';
+import type { Refs } from '../Refs';
 
 export type JsonSchema7NumberType = {
   type: 'number' | 'integer';
@@ -17,15 +18,18 @@ export function parseNumberDef(def: ZodNumberDef, refs: Refs): JsonSchema7Number
     type: 'number',
   };
 
-  if (!def.checks) return res;
+  if (!def.checks) {
+    return res;
+  }
 
   for (const check of def.checks) {
     switch (check.kind) {
-      case 'int':
+      case 'int': {
         res.type = 'integer';
         addErrorMessage(res, 'type', check.message, refs);
         break;
-      case 'min':
+      }
+      case 'min': {
         if (refs.target === 'jsonSchema7') {
           if (check.inclusive) {
             setResponseValueAndErrors(res, 'minimum', check.value, check.message, refs);
@@ -39,7 +43,8 @@ export function parseNumberDef(def: ZodNumberDef, refs: Refs): JsonSchema7Number
           setResponseValueAndErrors(res, 'minimum', check.value, check.message, refs);
         }
         break;
-      case 'max':
+      }
+      case 'max': {
         if (refs.target === 'jsonSchema7') {
           if (check.inclusive) {
             setResponseValueAndErrors(res, 'maximum', check.value, check.message, refs);
@@ -53,9 +58,11 @@ export function parseNumberDef(def: ZodNumberDef, refs: Refs): JsonSchema7Number
           setResponseValueAndErrors(res, 'maximum', check.value, check.message, refs);
         }
         break;
-      case 'multipleOf':
+      }
+      case 'multipleOf': {
         setResponseValueAndErrors(res, 'multipleOf', check.value, check.message, refs);
         break;
+      }
     }
   }
   return res;

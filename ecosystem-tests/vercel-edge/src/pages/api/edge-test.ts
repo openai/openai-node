@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server';
 import { distance } from 'fastest-levenshtein';
 import OpenAI from 'openai';
 import { uploadWebApiTestCases } from '../../uploadWebApiTestCases';
@@ -40,7 +41,7 @@ function expectSimilar(received: string, expected: string, maxDistance: number) 
   throw new Error(message);
 }
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   try {
     console.error('creating client');
     const client = new OpenAI();
@@ -58,9 +59,9 @@ export default async (request: NextRequest) => {
       console.error('running', description);
       try {
         await handler();
-        console.error('passed ', description);
+        console.error('passed', description);
       } catch (error) {
-        console.error('failed ', description, error);
+        console.error('failed', description, error);
         return new NextResponse('Internal Server Error', { status: 500 });
       }
     }
@@ -70,4 +71,4 @@ export default async (request: NextRequest) => {
     console.error(error instanceof Error ? error.stack : String(error));
     return new NextResponse('Internal Server Error', { status: 500 });
   }
-};
+}

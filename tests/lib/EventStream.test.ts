@@ -1,5 +1,7 @@
+import { vi } from 'vitest';
 import { OpenAIError } from 'openai/error';
-import { type BaseEvents, EventStream } from 'openai/lib/EventStream';
+import { EventStream } from 'openai/lib/EventStream';
+import type { BaseEvents } from 'openai/lib/EventStream';
 
 interface TestEvents extends BaseEvents {
   foo: (value: string, index: number) => void;
@@ -18,6 +20,37 @@ class TestStream extends EventStream<TestEvents> {
     this._emit('end');
   }
 }
+
+describe('EventStream.emitted', () => {
+  test('resolves all arguments from a multi-argument event as a tuple', async () => {
+    const stream = new TestStream();
+    const pending = stream.emitted('foo');
+
+    stream.emitFoo('received', 4);
+
+    await expect(pending).resolves.toEqual(['received', 4]);
+  });
+
+  test('rejects when an error arrives before the requested event', async () => {
+    const stream = new TestStream();
+    const pending = stream.emitted('foo');
+    const failure = new OpenAIError('stream failed');
+
+    stream.emitError(failure);
+
+    await expect(pending).rejects.toBe(failure);
+  });
+
+  test('resolves rather than rejects when waiting for the error event itself', async () => {
+    const stream = new TestStream();
+    const pending = stream.emitted('error');
+    const failure = new OpenAIError('expected event');
+
+    stream.emitError(failure);
+
+    await expect(pending).resolves.toBe(failure);
+  });
+});
 
 describe('EventStream.events', () => {
   test('iterates over repeated events in order', async () => {
@@ -69,9 +102,7 @@ describe('EventStream.events', () => {
   test('does not suppress errors after iterator cleanup', async () => {
     const stream = new TestStream();
     const iterator = stream.events('foo');
-    const reject = jest
-      .spyOn(Promise, 'reject')
-      .mockImplementation(() => Promise.resolve() as Promise<never>);
+    const reject = vi.spyOn(Promise, 'reject').mockImplementation(() => Promise.resolve() as Promise<never>);
     const error = new OpenAIError('oops');
 
     try {

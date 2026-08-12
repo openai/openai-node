@@ -1,5 +1,6 @@
 import { inspect } from 'node:util';
-import { buildHeaders, type HeadersLike, type NullableHeaders } from 'openai/internal/headers';
+import { buildHeaders } from 'openai/internal/headers';
+import type { HeadersLike, NullableHeaders } from 'openai/internal/headers';
 
 function inspectNullableHeaders(headers: NullableHeaders) {
   return `NullableHeaders {${[

@@ -25,7 +25,7 @@ const unused = async () => {
     input: 'You are a helpful assistant.',
   });
 
-  const history: Array<ResponseInputItem | ResponseOutputItem> = [
+  const history: (ResponseInputItem | ResponseOutputItem)[] = [
     {
       type: 'function_call_output',
       call_id: 'call_123',

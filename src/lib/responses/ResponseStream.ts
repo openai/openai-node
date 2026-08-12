@@ -1,27 +1,33 @@
-import {
+import type {
+  ParsedResponse,
+  Response,
+  ResponseCreateParamsBase,
+  ResponseCreateParamsStreaming,
+  ResponseStreamEvent,
   ResponseTextConfig,
-  type ParsedResponse,
-  type Response,
-  type ResponseCreateParamsBase,
-  type ResponseCreateParamsStreaming,
-  type ResponseStreamEvent,
 } from '../../resources/responses/responses';
-import { RequestOptions } from '../../internal/request-options';
-import { type ReadableStream } from '../../internal/shim-types';
-import { APIUserAbortError, OpenAIError } from '../../error';
-import OpenAI from '../../index';
-import { type BaseEvents, EventStream } from '../EventStream';
-import { type ResponseFunctionCallArgumentsDeltaEvent, type ResponseTextDeltaEvent } from './EventTypes';
+import type { RequestOptions } from '../../internal/request-options';
+import type { ReadableStream } from '../../internal/shim-types';
+import { APIError, APIUserAbortError, OpenAIError } from '../../error';
+import type OpenAI from '../../index';
+import { EventStream } from '../EventStream';
+import type { BaseEvents } from '../EventStream';
+import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
 import { accumulateResponse } from './ResponseAccumulator';
-import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';
+import type { ParseableToolsParams } from '../ResponsesParser';
+import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
 
+/** Parameters for starting a new response stream or replaying an existing response. */
 export type ResponseStreamParams = ResponseCreateAndStreamParams | ResponseStreamByIdParams;
 
+/** Response-creation parameters accepted by the streaming convenience helper. */
 export type ResponseCreateAndStreamParams = Omit<ResponseCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
 
+/** Parameters for replaying an existing response and optionally filtering emitted events. */
 export type ResponseStreamByIdParams = {
   /**
    * The ID of the response to stream.
@@ -49,22 +55,37 @@ export type ResponseStreamByIdParams = {
   tools?: ParseableToolsParams;
 };
 
+/** Raw Responses API events, lifecycle notifications, and snapshot-enhanced delta listeners. */
 type ResponseEvents = BaseEvents &
   Omit<
     {
-      [K in ResponseStreamEvent['type']]: (event: Extract<ResponseStreamEvent, { type: K }>) => void;
+      [K in ResponseStreamEvent['type']]: (
+        event: Extract<
+          ResponseStreamEvent,
+          {
+            /** Event discriminator that selects the listener's precise server-event payload. */
+            type: K;
+          }
+        >,
+      ) => void;
     },
-    'response.output_text.delta' | 'response.function_call_arguments.delta'
+    'response.output_text.delta' | 'response.function_call_arguments.delta' | 'error'
   > & {
+    /** Called for every raw response event that passes the replay sequence filter. */
     event: (event: ResponseStreamEvent) => void;
+    /** Called with each text fragment and the complete text accumulated for its content part. */
     'response.output_text.delta': (event: ResponseTextDeltaEvent) => void;
+    /** Called with each argument fragment and the complete JSON accumulated for its function call. */
     'response.function_call_arguments.delta': (event: ResponseFunctionCallArgumentsDeltaEvent) => void;
   };
 
+/** Response request parameters retained to parse structured output and tool arguments. */
 export type ResponseStreamingParams = Omit<ResponseCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
 
+/** Streams Responses API events while accumulating the latest response and parsed output. */
 export class ResponseStream<ParsedT = null>
   extends EventStream<ResponseEvents>
   implements AsyncIterable<ResponseStreamEvent>
@@ -73,11 +94,13 @@ export class ResponseStream<ParsedT = null>
   #currentResponseSnapshot: Response | undefined;
   #finalResponse: ParsedResponse<ParsedT> | undefined;
 
+  /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ResponseStreamingParams | null) {
     super();
     this.#params = params;
   }
 
+  /** Starts a new response stream or replays an existing response by its identifier. */
   static createResponse<ParsedT>(
     client: OpenAI,
     params: ResponseStreamParams,
@@ -87,12 +110,13 @@ export class ResponseStream<ParsedT = null>
     runner._run(() =>
       runner._createOrRetrieveResponse(client, params, {
         ...options,
-        headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
+        __metadata: { ...options?.__metadata, helperMethod: 'stream' },
       }),
     );
     return runner;
   }
 
+  /** Consumes serialized response events from a readable stream in another runtime. */
   static fromReadableStream(stream: ReadableStream): ResponseStream<null> {
     const runner = new ResponseStream(null);
     runner._run(() => runner._fromReadableStream(stream));
@@ -100,18 +124,30 @@ export class ResponseStream<ParsedT = null>
   }
 
   #beginRequest() {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
     this.#currentResponseSnapshot = undefined;
   }
 
   #addEvent(this: ResponseStream<ParsedT>, event: ResponseStreamEvent, starting_after: number | null) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
 
     const maybeEmit = (name: string, event: ResponseStreamEvent & { snapshot?: string }) => {
       if (starting_after == null || event.sequence_number > starting_after) {
         this._emit(name as any, event);
       }
     };
+
+    if (event.type === 'error') {
+      // First-party providers nest their error payload; retain flat compatibility for
+      // serialized events matching the currently published event schema.
+      const error =
+        'error' in event && typeof event.error === 'object' && event.error !== null ? event.error : event;
+      throw new APIError(undefined, error, event.message, undefined);
+    }
 
     const response = accumulateResponse(event, this.#currentResponseSnapshot);
     this.#currentResponseSnapshot = response;
@@ -152,9 +188,10 @@ export class ResponseStream<ParsedT = null>
         }
         break;
       }
-      default:
+      default: {
         maybeEmit(event.type, event);
         break;
+      }
     }
   }
 
@@ -226,59 +263,13 @@ export class ResponseStream<ParsedT = null>
     return this.#endRequest();
   }
 
+  /** Iterates over response events; stopping iteration early aborts the underlying request. */
   [Symbol.asyncIterator](this: ResponseStream<ParsedT>): AsyncIterator<ResponseStreamEvent> {
-    const pushQueue: ResponseStreamEvent[] = [];
-    const readQueue: {
-      resolve: (event: ResponseStreamEvent | undefined) => void;
-      reject: (err: unknown) => void;
-    }[] = [];
-    let done = false;
-
-    this.on('event', (event) => {
-      const reader = readQueue.shift();
-      if (reader) {
-        reader.resolve(event);
-      } else {
-        pushQueue.push(event);
-      }
-    });
-
-    this.on('end', () => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.resolve(undefined);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('abort', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('error', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
+    const iterator = this.events('event');
     return {
-      next: async (): Promise<IteratorResult<ResponseStreamEvent>> => {
-        if (!pushQueue.length) {
-          if (done) {
-            return { value: undefined, done: true };
-          }
-          return new Promise<ResponseStreamEvent | undefined>((resolve, reject) =>
-            readQueue.push({ resolve, reject }),
-          ).then((event) => (event ? { value: event, done: false } : { value: undefined, done: true }));
-        }
-        const event = pushQueue.shift()!;
-        return { value: event, done: false };
+      next: async () => {
+        const result = await iterator.next();
+        return result.done ? { value: undefined, done: true } : { value: result.value[0], done: false };
       },
       return: async () => {
         this.abort();
@@ -288,13 +279,17 @@ export class ResponseStream<ParsedT = null>
   }
 
   /**
-   * @returns a promise that resolves with the final Response, or rejects
-   * if an error occurred or the stream ended prematurely without producing a REsponse.
+   * Waits for the stream to end and returns its latest accumulated response.
+   *
+   * A clean end after at least one response event resolves even when the response is
+   * incomplete. Network errors, cancellation, and streams without a response reject.
    */
   async finalResponse(): Promise<ParsedResponse<ParsedT>> {
     await this.done();
     const response = this.#finalResponse;
-    if (!response) throw new OpenAIError('stream ended without producing a ChatCompletion');
+    if (!response) {
+      throw new OpenAIError('stream ended without producing a Response');
+    }
     return response;
   }
 }

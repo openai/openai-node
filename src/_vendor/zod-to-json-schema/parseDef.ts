@@ -1,34 +1,57 @@
-import { ZodFirstPartyTypeKind, ZodTypeDef } from 'zod/v3';
-import { JsonSchema7AnyType, parseAnyDef } from './parsers/any';
-import { JsonSchema7ArrayType, parseArrayDef } from './parsers/array';
-import { JsonSchema7BigintType, parseBigintDef } from './parsers/bigint';
-import { JsonSchema7BooleanType, parseBooleanDef } from './parsers/boolean';
+import type { ZodTypeDef } from 'zod/v3';
+import { ZodFirstPartyTypeKind } from 'zod/v3';
+import type { JsonSchema7AnyType } from './parsers/any';
+import { parseAnyDef } from './parsers/any';
+import type { JsonSchema7ArrayType } from './parsers/array';
+import { parseArrayDef } from './parsers/array';
+import type { JsonSchema7BigintType } from './parsers/bigint';
+import { parseBigintDef } from './parsers/bigint';
+import type { JsonSchema7BooleanType } from './parsers/boolean';
+import { parseBooleanDef } from './parsers/boolean';
 import { parseBrandedDef } from './parsers/branded';
 import { parseCatchDef } from './parsers/catch';
-import { JsonSchema7DateType, parseDateDef } from './parsers/date';
+import type { JsonSchema7DateType } from './parsers/date';
+import { parseDateDef } from './parsers/date';
 import { parseDefaultDef } from './parsers/default';
 import { parseEffectsDef } from './parsers/effects';
-import { JsonSchema7EnumType, parseEnumDef } from './parsers/enum';
-import { JsonSchema7AllOfType, parseIntersectionDef } from './parsers/intersection';
-import { JsonSchema7LiteralType, parseLiteralDef } from './parsers/literal';
-import { JsonSchema7MapType, parseMapDef } from './parsers/map';
-import { JsonSchema7NativeEnumType, parseNativeEnumDef } from './parsers/nativeEnum';
-import { JsonSchema7NeverType, parseNeverDef } from './parsers/never';
-import { JsonSchema7NullType, parseNullDef } from './parsers/null';
-import { JsonSchema7NullableType, parseNullableDef } from './parsers/nullable';
-import { JsonSchema7NumberType, parseNumberDef } from './parsers/number';
-import { JsonSchema7ObjectType, parseObjectDef } from './parsers/object';
+import type { JsonSchema7EnumType } from './parsers/enum';
+import { parseEnumDef } from './parsers/enum';
+import type { JsonSchema7AllOfType } from './parsers/intersection';
+import { parseIntersectionDef } from './parsers/intersection';
+import type { JsonSchema7LiteralType } from './parsers/literal';
+import { parseLiteralDef } from './parsers/literal';
+import type { JsonSchema7MapType } from './parsers/map';
+import { parseMapDef } from './parsers/map';
+import type { JsonSchema7NativeEnumType } from './parsers/nativeEnum';
+import { parseNativeEnumDef } from './parsers/nativeEnum';
+import type { JsonSchema7NeverType } from './parsers/never';
+import { parseNeverDef } from './parsers/never';
+import type { JsonSchema7NullType } from './parsers/null';
+import { parseNullDef } from './parsers/null';
+import type { JsonSchema7NullableType } from './parsers/nullable';
+import { parseNullableDef } from './parsers/nullable';
+import type { JsonSchema7NumberType } from './parsers/number';
+import { parseNumberDef } from './parsers/number';
+import type { JsonSchema7ObjectType } from './parsers/object';
+import { parseObjectDef } from './parsers/object';
 import { parseOptionalDef } from './parsers/optional';
 import { parsePipelineDef } from './parsers/pipeline';
 import { parsePromiseDef } from './parsers/promise';
-import { JsonSchema7RecordType, parseRecordDef } from './parsers/record';
-import { JsonSchema7SetType, parseSetDef } from './parsers/set';
-import { JsonSchema7StringType, parseStringDef } from './parsers/string';
-import { JsonSchema7TupleType, parseTupleDef } from './parsers/tuple';
-import { JsonSchema7UndefinedType, parseUndefinedDef } from './parsers/undefined';
-import { JsonSchema7UnionType, parseUnionDef } from './parsers/union';
-import { JsonSchema7UnknownType, parseUnknownDef } from './parsers/unknown';
-import { Refs, Seen } from './Refs';
+import type { JsonSchema7RecordType } from './parsers/record';
+import { parseRecordDef } from './parsers/record';
+import type { JsonSchema7SetType } from './parsers/set';
+import { parseSetDef } from './parsers/set';
+import type { JsonSchema7StringType } from './parsers/string';
+import { parseStringDef } from './parsers/string';
+import type { JsonSchema7TupleType } from './parsers/tuple';
+import { parseTupleDef } from './parsers/tuple';
+import type { JsonSchema7UndefinedType } from './parsers/undefined';
+import { parseUndefinedDef } from './parsers/undefined';
+import type { JsonSchema7UnionType } from './parsers/union';
+import { parseUnionDef } from './parsers/union';
+import type { JsonSchema7UnknownType } from './parsers/unknown';
+import { parseUnknownDef } from './parsers/unknown';
+import type { Refs, Seen } from './Refs';
 import { parseReadonlyDef } from './parsers/readonly';
 import { ignoreOverride } from './Options';
 
@@ -128,8 +151,9 @@ const get$ref = (
   | {}
   | undefined => {
   switch (refs.$refStrategy) {
-    case 'root':
+    case 'root': {
       return { $ref: item.path.join('/') };
+    }
     // this case is needed as OpenAI strict mode doesn't support top-level `$ref`s, i.e.
     // the top-level schema *must* be `{"type": "object", "properties": {...}}` but if we ever
     // need to define a `$ref`, relative `$ref`s aren't supported, so we need to extract
@@ -138,7 +162,7 @@ const get$ref = (
     // e.g. if we need to reference a schema at
     // `["#","definitions","contactPerson","properties","person1","properties","name"]`
     // then we'll extract it out to `contactPerson_properties_person1_properties_name`
-    case 'extract-to-root':
+    case 'extract-to-root': {
       const name = item.path
         .slice(refs.basePath.length + 1)
         // The first part is either the root schema name or an extracted definition
@@ -154,8 +178,10 @@ const get$ref = (
       }
 
       return { $ref: [...refs.basePath, refs.definitionPath, name].join('/') };
-    case 'relative':
+    }
+    case 'relative': {
       return { $ref: getRelativePath(refs.currentPath, item.path) };
+    }
     case 'none':
     case 'seen': {
       if (
@@ -181,6 +207,7 @@ const encodeDefinitionPathPart = (part: string) => {
 
   let encoded = encodedDefinitionPathPartPrefix;
   for (let i = 0; i < part.length; i++) {
+    // oxlint-disable-next-line unicorn/prefer-code-point -- preserve UTF-16 code-unit encoding
     encoded += part.charCodeAt(i).toString(16).padStart(4, '0');
   }
   return encoded;
@@ -189,7 +216,9 @@ const encodeDefinitionPathPart = (part: string) => {
 const getRelativePath = (pathA: string[], pathB: string[]) => {
   let i = 0;
   for (; i < pathA.length && i < pathB.length; i++) {
-    if (pathA[i] !== pathB[i]) break;
+    if (pathA[i] !== pathB[i]) {
+      break;
+    }
   }
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join('/');
 };
@@ -201,76 +230,109 @@ const selectParser = (
   forceResolution: boolean,
 ): JsonSchema7Type | undefined => {
   switch (typeName) {
-    case ZodFirstPartyTypeKind.ZodString:
+    case ZodFirstPartyTypeKind.ZodString: {
       return parseStringDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodNumber:
+    }
+    case ZodFirstPartyTypeKind.ZodNumber: {
       return parseNumberDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodObject:
+    }
+    case ZodFirstPartyTypeKind.ZodObject: {
       return parseObjectDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodBigInt:
+    }
+    case ZodFirstPartyTypeKind.ZodBigInt: {
       return parseBigintDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodBoolean:
+    }
+    case ZodFirstPartyTypeKind.ZodBoolean: {
       return parseBooleanDef();
-    case ZodFirstPartyTypeKind.ZodDate:
+    }
+    case ZodFirstPartyTypeKind.ZodDate: {
       return parseDateDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodUndefined:
+    }
+    case ZodFirstPartyTypeKind.ZodUndefined: {
       return parseUndefinedDef();
-    case ZodFirstPartyTypeKind.ZodNull:
+    }
+    case ZodFirstPartyTypeKind.ZodNull: {
       return parseNullDef(refs);
-    case ZodFirstPartyTypeKind.ZodArray:
+    }
+    case ZodFirstPartyTypeKind.ZodArray: {
       return parseArrayDef(def, refs);
+    }
     case ZodFirstPartyTypeKind.ZodUnion:
-    case ZodFirstPartyTypeKind.ZodDiscriminatedUnion:
+    case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
       return parseUnionDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodIntersection:
+    }
+    case ZodFirstPartyTypeKind.ZodIntersection: {
       return parseIntersectionDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodTuple:
+    }
+    case ZodFirstPartyTypeKind.ZodTuple: {
       return parseTupleDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodRecord:
+    }
+    case ZodFirstPartyTypeKind.ZodRecord: {
       return parseRecordDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodLiteral:
+    }
+    case ZodFirstPartyTypeKind.ZodLiteral: {
       return parseLiteralDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodEnum:
+    }
+    case ZodFirstPartyTypeKind.ZodEnum: {
       return parseEnumDef(def);
-    case ZodFirstPartyTypeKind.ZodNativeEnum:
+    }
+    case ZodFirstPartyTypeKind.ZodNativeEnum: {
       return parseNativeEnumDef(def);
-    case ZodFirstPartyTypeKind.ZodNullable:
+    }
+    case ZodFirstPartyTypeKind.ZodNullable: {
       return parseNullableDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodOptional:
+    }
+    case ZodFirstPartyTypeKind.ZodOptional: {
       return parseOptionalDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodMap:
+    }
+    case ZodFirstPartyTypeKind.ZodMap: {
       return parseMapDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodSet:
+    }
+    case ZodFirstPartyTypeKind.ZodSet: {
       return parseSetDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodLazy:
+    }
+    case ZodFirstPartyTypeKind.ZodLazy: {
       return parseDef(def.getter()._def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodPromise:
+    }
+    case ZodFirstPartyTypeKind.ZodPromise: {
       return parsePromiseDef(def, refs, forceResolution);
+    }
     case ZodFirstPartyTypeKind.ZodNaN:
-    case ZodFirstPartyTypeKind.ZodNever:
+    case ZodFirstPartyTypeKind.ZodNever: {
       return parseNeverDef();
-    case ZodFirstPartyTypeKind.ZodEffects:
+    }
+    case ZodFirstPartyTypeKind.ZodEffects: {
       return parseEffectsDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodAny:
+    }
+    case ZodFirstPartyTypeKind.ZodAny: {
       return parseAnyDef();
-    case ZodFirstPartyTypeKind.ZodUnknown:
+    }
+    case ZodFirstPartyTypeKind.ZodUnknown: {
       return parseUnknownDef();
-    case ZodFirstPartyTypeKind.ZodDefault:
+    }
+    case ZodFirstPartyTypeKind.ZodDefault: {
       return parseDefaultDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodBranded:
+    }
+    case ZodFirstPartyTypeKind.ZodBranded: {
       return parseBrandedDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodReadonly:
+    }
+    case ZodFirstPartyTypeKind.ZodReadonly: {
       return parseReadonlyDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodCatch:
+    }
+    case ZodFirstPartyTypeKind.ZodCatch: {
       return parseCatchDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodPipeline:
+    }
+    case ZodFirstPartyTypeKind.ZodPipeline: {
       return parsePipelineDef(def, refs, forceResolution);
+    }
     case ZodFirstPartyTypeKind.ZodFunction:
     case ZodFirstPartyTypeKind.ZodVoid:
-    case ZodFirstPartyTypeKind.ZodSymbol:
+    case ZodFirstPartyTypeKind.ZodSymbol: {
       return undefined;
-    default:
+    }
+    default: {
       return ((_: never) => undefined)(typeName);
+    }
   }
 };
 

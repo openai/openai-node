@@ -1,4 +1,5 @@
-const fs = require('fs');
+const fs = require('node:fs');
+
 const problems = Object.values(JSON.parse(fs.readFileSync('.attw.json', 'utf-8')).problems)
   .flat()
   .filter(
