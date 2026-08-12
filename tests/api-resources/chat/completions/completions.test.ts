@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
@@ -49,11 +49,19 @@ describe('resource completions', () => {
       max_tokens: 0,
       metadata: { foo: 'string' },
       modalities: ['text'],
+      moderation: {
+        model: 'model',
+        policy: {
+          input: { mode: 'score' },
+          output: { mode: 'score' },
+        },
+      },
       n: 1,
       parallel_tool_calls: true,
       prediction: { content: 'string', type: 'content' },
       presence_penalty: -2,
       prompt_cache_key: 'prompt-cache-key-1234',
+      prompt_cache_options: { mode: 'implicit', ttl: '30m' },
       prompt_cache_retention: 'in_memory',
       reasoning_effort: 'none',
       response_format: { type: 'text' },

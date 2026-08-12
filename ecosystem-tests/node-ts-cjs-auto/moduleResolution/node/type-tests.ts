@@ -9,5 +9,5 @@ async function typeTests() {
       model: 'whisper-1',
     })
     .asResponse();
-  response.body;
+  return response.body;
 }

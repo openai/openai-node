@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { InvalidWebhookSignatureError } from '../../error';
 import { APIResource } from '../../core/resource';
@@ -74,9 +74,8 @@ export class Webhooks extends APIResource {
       .map((part) => (part.startsWith('v1,') ? part.substring(3) : part));
 
     // Decode the secret if it starts with whsec_
-    const decodedSecret =
-      secret.startsWith('whsec_') ?
-        Buffer.from(secret.replace('whsec_', ''), 'base64')
+    const decodedSecret = secret.startsWith('whsec_')
+      ? Buffer.from(secret.replace('whsec_', ''), 'base64')
       : Buffer.from(secret, 'utf-8');
 
     // Create the signed payload: {webhook_id}.{timestamp}.{payload}
@@ -560,7 +559,76 @@ export namespace FineTuningJobSucceededWebhookEvent {
 }
 
 /**
- * Sent when Realtime API Receives a incoming SIP call.
+ * Sent when an incoming API SIP session is available for Live acceptance. The same
+ * pending session can also emit `realtime.call.incoming`; the first successful
+ * Realtime or Live accept endpoint selects the runtime surface.
+ */
+export interface LiveCallIncomingWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp (in seconds) of when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Event data payload.
+   */
+  data: LiveCallIncomingWebhookEvent.Data;
+
+  /**
+   * The type of the event. Always `live.call.incoming`.
+   */
+  type: 'live.call.incoming';
+
+  /**
+   * The object of the event. Always `event`.
+   */
+  object?: 'event';
+}
+
+export namespace LiveCallIncomingWebhookEvent {
+  /**
+   * Event data payload.
+   */
+  export interface Data {
+    /**
+     * The Transceiver `rtc_...` ID of the pending SIP session. The same value appears
+     * as `call_id` in `realtime.call.incoming`.
+     */
+    session_id: string;
+
+    /**
+     * Headers from the SIP Invite.
+     */
+    sip_headers: Array<Data.SipHeader>;
+  }
+
+  export namespace Data {
+    /**
+     * A header from the SIP Invite.
+     */
+    export interface SipHeader {
+      /**
+       * Name of the SIP Header.
+       */
+      name: string;
+
+      /**
+       * Value of the SIP Header.
+       */
+      value: string;
+    }
+  }
+}
+
+/**
+ * Sent when an incoming API SIP session is available for Realtime acceptance. The
+ * same pending session can also emit `live.call.incoming`; the first successful
+ * Realtime or Live accept endpoint selects the runtime surface.
  */
 export interface RealtimeCallIncomingWebhookEvent {
   /**
@@ -595,7 +663,8 @@ export namespace RealtimeCallIncomingWebhookEvent {
    */
   export interface Data {
     /**
-     * The unique ID of this call.
+     * The Transceiver `rtc_...` ID of the pending SIP session. The same value appears
+     * as `session_id` in `live.call.incoming`.
      */
     call_id: string;
 
@@ -805,6 +874,7 @@ export type UnwrapWebhookEvent =
   | FineTuningJobCancelledWebhookEvent
   | FineTuningJobFailedWebhookEvent
   | FineTuningJobSucceededWebhookEvent
+  | LiveCallIncomingWebhookEvent
   | RealtimeCallIncomingWebhookEvent
   | ResponseCancelledWebhookEvent
   | ResponseCompletedWebhookEvent
@@ -823,6 +893,7 @@ export declare namespace Webhooks {
     type FineTuningJobCancelledWebhookEvent as FineTuningJobCancelledWebhookEvent,
     type FineTuningJobFailedWebhookEvent as FineTuningJobFailedWebhookEvent,
     type FineTuningJobSucceededWebhookEvent as FineTuningJobSucceededWebhookEvent,
+    type LiveCallIncomingWebhookEvent as LiveCallIncomingWebhookEvent,
     type RealtimeCallIncomingWebhookEvent as RealtimeCallIncomingWebhookEvent,
     type ResponseCancelledWebhookEvent as ResponseCancelledWebhookEvent,
     type ResponseCompletedWebhookEvent as ResponseCompletedWebhookEvent,

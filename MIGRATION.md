@@ -8,7 +8,7 @@ The main changes are that the SDK now relies on the [builtin Web fetch API](http
 
 The minimum supported runtime and tooling versions are now:
 
-- Node.js 20 LTS (Most recent non-EOL Node version)
+- Node.js 22 LTS
 - TypeScript 4.9
 - Jest 28
 
@@ -83,6 +83,7 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.admin.organization.projects.serviceAccounts.retrieve()`
 - `client.admin.organization.projects.serviceAccounts.update()`
 - `client.admin.organization.projects.serviceAccounts.delete()`
+- `client.admin.organization.projects.serviceAccounts.apiKeys.create()`
 - `client.admin.organization.projects.apiKeys.retrieve()`
 - `client.admin.organization.projects.apiKeys.delete()`
 - `client.admin.organization.projects.rateLimits.updateRateLimit()`
@@ -95,6 +96,7 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.admin.organization.projects.roles.retrieve()`
 - `client.admin.organization.projects.roles.update()`
 - `client.admin.organization.projects.roles.delete()`
+- `client.admin.organization.projects.spendAlerts.retrieve()`
 - `client.admin.organization.projects.spendAlerts.update()`
 - `client.admin.organization.projects.spendAlerts.delete()`
 - `client.conversations.items.retrieve()`
@@ -154,6 +156,11 @@ client.example.list(undefined, { headers: { ... } });
 - `client.fineTuning.checkpoints.permissions.list()`
 - `client.vectorStores.list()`
 - `client.vectorStores.files.list()`
+- `client.beta.responses.retrieve()`
+- `client.beta.responses.delete()`
+- `client.beta.responses.cancel()`
+- `client.beta.responses.inputItems.list()`
+- `client.beta.responses.inputTokens.count()`
 - `client.beta.chatkit.threads.list()`
 - `client.beta.chatkit.threads.listItems()`
 - `client.beta.assistants.list()`
@@ -538,7 +545,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 ```jsonc
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
-  "lib": ["DOM", "DOM.Iterable", "ES2018"]
+  "lib": ["DOM", "DOM.Iterable", "ES2018"],
 }
 ```
 
@@ -548,7 +555,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 
@@ -570,7 +577,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
   "lib": ["ES2020"], // <- needed by @cloudflare/workers-types
-  "types": ["@cloudflare/workers-types"]
+  "types": ["@cloudflare/workers-types"],
 }
 ```
 
@@ -590,7 +597,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 

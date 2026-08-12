@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import { OpenAI } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
@@ -26,7 +26,7 @@ async function main() {
   });
 
   console.log(rsp.output_parsed);
-  console.log('answer: ', rsp.output_parsed?.final_answer);
+  console.log('answer:', rsp.output_parsed?.final_answer);
 }
 
 main().catch(console.error);
