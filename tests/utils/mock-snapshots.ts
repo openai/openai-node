@@ -1,7 +1,7 @@
 import OpenAI from 'openai/index';
-import { RequestInfo } from 'openai/internal/builtin-types';
+import type { RequestInfo } from 'openai/internal/builtin-types';
 import { mockFetch } from './mock-fetch';
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 
 const defaultFetch = fetch;
 
@@ -10,15 +10,15 @@ export async function makeSnapshotRequest<T>(
   snapshotIndex = 1,
 ): Promise<T> {
   if (process.env['UPDATE_API_SNAPSHOTS'] === '1') {
-    var capturedResponseContent: string | null = null;
+    let capturedResponseContent: string | null = null;
 
-    async function fetch(url: RequestInfo, init?: RequestInit) {
+    const snapshotFetch = async (url: RequestInfo, init?: RequestInit) => {
       const response = await defaultFetch(url, init);
       capturedResponseContent = await response.text();
       return new Response(capturedResponseContent, response);
-    }
+    };
 
-    const openai = new OpenAI({ fetch });
+    const openai = new OpenAI({ fetch: snapshotFetch });
 
     const result = await requestFn(openai);
     if (!capturedResponseContent) {
@@ -30,7 +30,8 @@ export async function makeSnapshotRequest<T>(
     return result;
   }
 
-  const qualifiedSnapshotName = [expect.getState().currentTestName, snapshotIndex].join(' ');
+  const testName = expect.getState().currentTestName?.replace(/ > /g, ' ');
+  const qualifiedSnapshotName = [testName, snapshotIndex].join(' ');
   const snapshotState = expect.getState()['snapshotState'];
   (snapshotState._uncheckedKeys as Set<string>).delete(qualifiedSnapshotName);
 
@@ -68,15 +69,15 @@ export async function makeStreamSnapshotRequest<T extends AsyncIterable<any>>(
   requestFn: (client: OpenAI) => T,
 ): Promise<T> {
   if (process.env['UPDATE_API_SNAPSHOTS'] === '1') {
-    var capturedResponseContent: string | null = null;
+    let capturedResponseContent: string | null = null;
 
-    async function fetch(url: RequestInfo, init?: RequestInit) {
+    const snapshotFetch = async (url: RequestInfo, init?: RequestInit) => {
       const response = await defaultFetch(url, init);
       capturedResponseContent = await response.text();
       return new Response(Readable.from(capturedResponseContent), response);
-    }
+    };
 
-    const openai = new OpenAI({ fetch });
+    const openai = new OpenAI({ fetch: snapshotFetch });
 
     const iterator = requestFn(openai);
     for await (const _ of iterator) {
@@ -92,7 +93,8 @@ export async function makeStreamSnapshotRequest<T extends AsyncIterable<any>>(
     return iterator;
   }
 
-  const qualifiedSnapshotName = `${expect.getState().currentTestName} 1`;
+  const testName = expect.getState().currentTestName?.replace(/ > /g, ' ');
+  const qualifiedSnapshotName = `${testName} 1`;
   const snapshotState = expect.getState()['snapshotState'];
   (snapshotState._uncheckedKeys as Set<string>).delete(qualifiedSnapshotName);
 

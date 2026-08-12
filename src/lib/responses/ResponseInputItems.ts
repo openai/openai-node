@@ -4,6 +4,7 @@ import type {
   ResponseOutputItem,
 } from '../../resources/responses/responses';
 
+/** A stored response input or output item that may be normalized for a later request. */
 export type ResponseInputItemLike = ResponseInputItem | ResponseOutputItem;
 
 type ResponseShellCallOutputInputItem = Extract<ResponseInputItem, { type: 'shell_call_output' }>;

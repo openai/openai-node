@@ -1,4 +1,4 @@
-import { parseResponse } from '../../src/lib/ResponsesParser';
+import { makeParseableResponseTool, maybeParseResponse, parseResponse } from '../../src/lib/ResponsesParser';
 import type { Response, ResponseCreateParamsBase } from '../../src/resources/responses/responses';
 
 const structuredTextParams = {
@@ -49,6 +49,21 @@ function makeResponse(status: Response['status'], text: string): Response {
   } as Response;
 }
 
+function makeToolCallResponse(arguments_: string): Response {
+  const response = makeResponse('completed', '');
+  response.output = [
+    {
+      type: 'function_call',
+      id: 'fc_123',
+      call_id: 'call_123',
+      name: 'get_weather',
+      arguments: arguments_,
+      status: 'completed',
+    },
+  ];
+  return response;
+}
+
 describe('ResponsesParser', () => {
   it('parses structured output for completed responses', () => {
     const response = parseResponse(
@@ -97,5 +112,31 @@ describe('ResponsesParser', () => {
     const response = parseResponse(raw, structuredTextParams);
 
     expect(response.output.slice(1)).toEqual(raw.output.slice(1));
+  });
+
+  it('auto-parses response tools when finalizing streamed responses', () => {
+    const tool = makeParseableResponseTool<any>(
+      {
+        type: 'function',
+        name: 'get_weather',
+        parameters: { type: 'object' },
+        strict: true,
+      },
+      {
+        callback: undefined,
+        parser: (content) => JSON.parse(content),
+      },
+    );
+
+    const response = maybeParseResponse(makeToolCallResponse('{"city":"Paris"}'), {
+      model: 'gpt-5.4-mini',
+      input: 'What is the weather?',
+      tools: [tool],
+    });
+
+    expect(response.output[0]).toMatchObject({
+      type: 'function_call',
+      parsed_arguments: { city: 'Paris' },
+    });
   });
 });

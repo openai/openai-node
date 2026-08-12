@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export type AllModels =
   | (string & {})
@@ -16,12 +16,16 @@ export type AllModels =
   | 'gpt-5-codex'
   | 'gpt-5-pro'
   | 'gpt-5-pro-2025-10-06'
-  | 'gpt-5.1-codex-max';
+  | 'gpt-5.1-codex-max'
+  | 'gpt-daybreak-blue-latest'
+  | 'gpt-daybreak-red-latest'
+  | 'gpt-5.6-cyber';
 
 export type ChatModel =
   | 'gpt-5.6-sol'
   | 'gpt-5.6-terra'
   | 'gpt-5.6-luna'
+  | 'gpt-5.5'
   | 'gpt-5.4'
   | 'gpt-5.4-mini'
   | 'gpt-5.4-nano'
@@ -261,7 +265,10 @@ export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string
  */
 export interface Reasoning {
   /**
-   * Controls which reasoning items are rendered back to the model on later turns.
+   * Controls which reasoning items are rendered back to the model on later turns. If
+   * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+   * model family defaults to `all_turns`; earlier models default to `current_turn`.
+   *
    * When returned on a response, this is the effective reasoning context mode used
    * for the response.
    */
@@ -431,4 +438,7 @@ export type ResponsesModel =
   | 'gpt-5-codex'
   | 'gpt-5-pro'
   | 'gpt-5-pro-2025-10-06'
-  | 'gpt-5.1-codex-max';
+  | 'gpt-5.1-codex-max'
+  | 'gpt-daybreak-blue-latest'
+  | 'gpt-daybreak-red-latest'
+  | 'gpt-5.6-cyber';

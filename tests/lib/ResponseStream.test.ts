@@ -1,10 +1,9 @@
+import { vi } from 'vitest';
 import OpenAI, { APIUserAbortError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
-
-jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
   it('replays prior events when resuming by ID so snapshots stay complete', async () => {
@@ -171,7 +170,7 @@ describe('.stream()', () => {
     const cancelled = new Promise<void>((resolve) => {
       resolveCancelled = resolve;
     });
-    const cancel = jest.fn(() => resolveCancelled());
+    const cancel = vi.fn(() => resolveCancelled());
     let pulls = 0;
     const readable = new ReadableStream({
       pull(controller) {
@@ -190,7 +189,7 @@ describe('.stream()', () => {
     await stream.emitted('response.created');
     await pullStarted;
 
-    const done = expect(stream.done()).rejects.toThrowError(APIUserAbortError);
+    const done = expect(stream.done()).rejects.toThrow(APIUserAbortError);
     stream.abort();
 
     await cancelled;
@@ -202,14 +201,13 @@ describe('.stream()', () => {
   it('standard text works', async () => {
     const deltas: string[] = [];
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.responses.stream({
-          model: 'gpt-4o-2024-08-06',
-          input: 'Say hello world',
-        }),
-      )
-    ).on('response.output_text.delta', (e) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.responses.stream({
+        model: 'gpt-4o-2024-08-06',
+        input: 'Say hello world',
+      }),
+    );
+    const stream = request.on('response.output_text.delta', (e) => {
       deltas.push(e.snapshot);
     });
 

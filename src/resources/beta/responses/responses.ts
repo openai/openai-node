@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as ResponsesAPI from './responses';
@@ -1101,6 +1101,7 @@ export interface BetaResponse {
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
+    | 'gpt-5.5'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
@@ -1193,6 +1194,9 @@ export interface BetaResponse {
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
     | 'gpt-5.1-codex-max'
+    | 'gpt-daybreak-blue-latest'
+    | 'gpt-daybreak-red-latest'
+    | 'gpt-5.6-cyber'
     | (string & {});
 
   /**
@@ -1330,7 +1334,7 @@ export interface BetaResponse {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * The prompt-caching options that were applied to the response. Supported for
@@ -1375,7 +1379,7 @@ export interface BetaResponse {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the processing type used for serving the request.
@@ -1385,9 +1389,13 @@ export interface BetaResponse {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -1395,7 +1403,7 @@ export interface BetaResponse {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -1632,7 +1640,10 @@ export namespace BetaResponse {
    */
   export interface Reasoning {
     /**
-     * Controls which reasoning items are rendered back to the model on later turns.
+     * Controls which reasoning items are rendered back to the model on later turns. If
+     * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+     * model family defaults to `all_turns`; earlier models default to `current_turn`.
+     *
      * When returned on a response, this is the effective reasoning context mode used
      * for the response.
      */
@@ -3124,6 +3135,7 @@ export interface BetaResponseError {
     | 'server_error'
     | 'rate_limit_exceeded'
     | 'invalid_prompt'
+    | 'data_residency_mismatch'
     | 'bio_policy'
     | 'vector_store_timeout'
     | 'invalid_image'
@@ -4053,6 +4065,16 @@ export interface BetaResponseFunctionToolCallOutputItem {
    * The identifier of the actor that created the item.
    */
   created_by?: string;
+
+  /**
+   * The name of the tool that produced the output.
+   */
+  name?: string;
+
+  /**
+   * The namespace of the tool that produced the output.
+   */
+  namespace?: string;
 }
 
 export namespace BetaResponseFunctionToolCallOutputItem {
@@ -5058,6 +5080,16 @@ export namespace BetaResponseInputItem {
     caller?: FunctionCallOutput.Direct | FunctionCallOutput.Program | null;
 
     /**
+     * The name of the tool that produced the output.
+     */
+    name?: string | null;
+
+    /**
+     * The namespace of the tool that produced the output.
+     */
+    namespace?: string | null;
+
+    /**
      * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
      * Populated when items are returned via API.
      */
@@ -5265,11 +5297,11 @@ export namespace BetaResponseInputItem {
       /**
        * Citations associated with the text content.
        */
-      annotations?: Array<Output.UnionMember0> | Array<Output.UnionMember1> | Array<Output.UnionMember2>;
+      annotations?: Array<Output.FileCitation | Output.URLCitation | Output.ContainerFileCitation>;
     }
 
     export namespace Output {
-      export interface UnionMember0 {
+      export interface FileCitation {
         /**
          * The ID of the file.
          */
@@ -5291,7 +5323,7 @@ export namespace BetaResponseInputItem {
         type: 'file_citation';
       }
 
-      export interface UnionMember1 {
+      export interface URLCitation {
         /**
          * The index of the last character of the citation in the message.
          */
@@ -5318,7 +5350,7 @@ export namespace BetaResponseInputItem {
         url: string;
       }
 
-      export interface UnionMember2 {
+      export interface ContainerFileCitation {
         /**
          * The ID of the container.
          */
@@ -9611,7 +9643,8 @@ export interface BetaResponseTextConfig {
   /**
    * Constrains the verbosity of the model's response. Lower values will result in
    * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
+   * responses. Currently supported values are `low`, `medium`, and `high`. The
+   * default is `medium`.
    */
   verbosity?: 'low' | 'medium' | 'high' | null;
 }
@@ -10264,6 +10297,7 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-5.6-sol'
       | 'gpt-5.6-terra'
       | 'gpt-5.6-luna'
+      | 'gpt-5.5'
       | 'gpt-5.4'
       | 'gpt-5.4-mini'
       | 'gpt-5.4-nano'
@@ -10356,6 +10390,9 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-5-pro'
       | 'gpt-5-pro-2025-10-06'
       | 'gpt-5.1-codex-max'
+      | 'gpt-daybreak-blue-latest'
+      | 'gpt-daybreak-red-latest'
+      | 'gpt-5.6-cyber'
       | (string & {});
 
     /**
@@ -10392,7 +10429,7 @@ export namespace BetaResponsesClientEvent {
      * hit rates. Replaces the `user` field.
      * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
      */
-    prompt_cache_key?: string;
+    prompt_cache_key?: string | null;
 
     /**
      * Options for prompt caching. Supported for `gpt-5.6` and later models. By
@@ -10444,7 +10481,7 @@ export namespace BetaResponsesClientEvent {
      * identifying information.
      * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
      */
-    safety_identifier?: string;
+    safety_identifier?: string | null;
 
     /**
      * Specifies the processing type used for serving the request.
@@ -10454,9 +10491,13 @@ export namespace BetaResponsesClientEvent {
      *   will use 'default'.
      * - If set to 'default', then the request will be processed with the standard
      *   pricing and performance for the selected model.
-     * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-     *   '[priority](https://openai.com/api-priority-processing/)', then the request
-     *   will be processed with the corresponding service tier.
+     * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+     *   then the request will be processed with the Flex Processing service tier.
+     * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+     *   include the `service_tier=fast` or `service_tier=priority` parameter for
+     *   Responses or Chat Completions. The response will show `service_tier=priority`
+     *   regardless of if you specify `service_tier=fast` or `priority` in your
+     *   request.
      * - When not set, the default behavior is 'auto'.
      *
      * When the `service_tier` parameter is set, the response body will include the
@@ -10464,7 +10505,7 @@ export namespace BetaResponsesClientEvent {
      * request. This response value may be different from the value set in the
      * parameter.
      */
-    service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+    service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
     /**
      * Whether to store the generated model response for later retrieval via API.
@@ -10700,7 +10741,10 @@ export namespace BetaResponsesClientEvent {
      */
     export interface Reasoning {
       /**
-       * Controls which reasoning items are rendered back to the model on later turns.
+       * Controls which reasoning items are rendered back to the model on later turns. If
+       * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+       * model family defaults to `all_turns`; earlier models default to `current_turn`.
+       *
        * When returned on a response, this is the effective reasoning context mode used
        * for the response.
        */
@@ -11632,6 +11676,7 @@ export interface ResponseCreateParamsBase {
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
+    | 'gpt-5.5'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
@@ -11724,6 +11769,9 @@ export interface ResponseCreateParamsBase {
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
     | 'gpt-5.1-codex-max'
+    | 'gpt-daybreak-blue-latest'
+    | 'gpt-daybreak-red-latest'
+    | 'gpt-5.6-cyber'
     | (string & {});
 
   /**
@@ -11761,7 +11809,7 @@ export interface ResponseCreateParamsBase {
    * your cache hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * Body param: Options for prompt caching. Supported for `gpt-5.6` and later
@@ -11814,7 +11862,7 @@ export interface ResponseCreateParamsBase {
    * any identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Body param: Specifies the processing type used for serving the request.
@@ -11824,9 +11872,13 @@ export interface ResponseCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -11834,7 +11886,7 @@ export interface ResponseCreateParamsBase {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * Body param: Whether to store the generated model response for later retrieval
@@ -12079,7 +12131,10 @@ export namespace ResponseCreateParams {
    */
   export interface Reasoning {
     /**
-     * Controls which reasoning items are rendered back to the model on later turns.
+     * Controls which reasoning items are rendered back to the model on later turns. If
+     * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+     * model family defaults to `all_turns`; earlier models default to `current_turn`.
+     *
      * When returned on a response, this is the effective reasoning context mode used
      * for the response.
      */
@@ -12268,6 +12323,7 @@ export interface ResponseCompactParams {
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
+    | 'gpt-5.5'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
@@ -12360,6 +12416,9 @@ export interface ResponseCompactParams {
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
     | 'gpt-5.1-codex-max'
+    | 'gpt-daybreak-blue-latest'
+    | 'gpt-daybreak-red-latest'
+    | 'gpt-5.6-cyber'
     | (string & {})
     | null;
 
@@ -12411,9 +12470,23 @@ export interface ResponseCompactParams {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * Body param: The service tier to use for this request.
+   * Body param: Specifies the processing type used for serving the request. - If set
+   * to 'auto', then the request will be processed with the service tier configured
+   * in the Project settings. Unless otherwise configured, the Project will use
+   * 'default'. - If set to 'default', then the request will be processed with the
+   * standard pricing and performance for the selected model. - If set to
+   * '[flex](https://platform.openai.com/docs/guides/flex-processing)', then the
+   * request will be processed with the Flex Processing service tier. - To opt-in to
+   * [Fast mode](/api/docs/guides/fast-mode) at the request level, include the
+   * `service_tier=fast` or `service_tier=priority` parameter for Responses or Chat
+   * Completions. The response will show `service_tier=priority` regardless of if you
+   * specify `service_tier=fast` or `priority` in your request. - When not set, the
+   * default behavior is 'auto'. When the `service_tier` parameter is set, the
+   * response body will include the `service_tier` value based on the processing mode
+   * actually used to serve the request. This response value may be different from
+   * the value set in the parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'fast' | 'flex' | 'priority' | null;
 
   /**
    * Header param: Optional beta features to enable for this request.

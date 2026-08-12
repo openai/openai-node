@@ -1,26 +1,31 @@
 import { APIUserAbortError, OpenAIError } from '../error';
 
+/** An abortable event stream with typed listeners, asynchronous iteration, and lifecycle state. */
 export class EventStream<EventTypes extends BaseEvents> {
+  /** Controls the underlying request; aborting this controller cancels the stream. */
   controller: AbortController = new AbortController();
 
   #connectedPromise: Promise<void>;
-  #resolveConnectedPromise: () => void = () => {};
-  #rejectConnectedPromise: (error: OpenAIError) => void = () => {};
+  // oxlint-disable class-methods-use-this -- Deferred promise resolvers are intentionally per-instance mutable callbacks.
+  #resolveConnectedPromise: () => void = () => undefined;
+  #rejectConnectedPromise: (error: OpenAIError) => void = () => undefined;
 
   #endPromise: Promise<void>;
-  #resolveEndPromise: () => void = () => {};
-  #rejectEndPromise: (error: OpenAIError) => void = () => {};
+  #resolveEndPromise: () => void = () => undefined;
+  #rejectEndPromise: (error: OpenAIError) => void = () => undefined;
+  // oxlint-enable class-methods-use-this
 
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
   } = {};
-  #abortListeners: Array<{ signal: AbortSignal; listener: () => void }> = [];
+  #abortListeners: { signal: AbortSignal; listener: () => void }[] = [];
 
   #ended = false;
   #errored = false;
   #aborted = false;
   #catchingPromiseCreated = false;
 
+  /** Creates an unstarted stream with independent connection and completion lifecycle promises. */
   constructor() {
     this.#connectedPromise = new Promise<void>((resolve, reject) => {
       this.#resolveConnectedPromise = resolve;
@@ -36,17 +41,27 @@ export class EventStream<EventTypes extends BaseEvents> {
     // we will manually cause an unhandled rejection error later
     // if the user hasn't registered any error listener or called
     // any promise-returning method.
-    this.#connectedPromise.catch(() => {});
-    this.#endPromise.catch(() => {});
+    this.#connectedPromise.catch(() => undefined);
+    this.#endPromise.catch(() => undefined);
   }
 
   protected _run(this: EventStream<EventTypes>, executor: () => Promise<any>) {
     // Unfortunately if we call `executor()` immediately we get runtime errors about
     // references to `this` before the `super()` constructor call returns.
     setTimeout(() => {
+      let failed = false;
+
       Promise.resolve()
         .then(executor)
+        .catch((error) => {
+          failed = true;
+          this.#handleError(error);
+        })
         .then(() => {
+          if (failed) {
+            return;
+          }
+
           try {
             this._emitFinal();
           } catch (error) {
@@ -54,34 +69,45 @@ export class EventStream<EventTypes extends BaseEvents> {
             return;
           }
           this._emit('end');
-        }, this.#handleError.bind(this));
+        });
     }, 0);
   }
 
   protected _connected(this: EventStream<EventTypes>) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
     this.#resolveConnectedPromise();
     this._emit('connect');
   }
 
+  /** Whether the stream has finished successfully, failed, or been aborted. */
   get ended(): boolean {
     return this.#ended;
   }
 
+  /** Whether an error or user cancellation has been observed. */
   get errored(): boolean {
     return this.#errored;
   }
 
+  /** Whether the stream ended because its request was cancelled. */
   get aborted(): boolean {
     return this.#aborted;
   }
 
+  /**
+   * Cancels the underlying request; {@link done} and {@link events} observe cancellation.
+   * Promises returned by {@link emitted} for other events may remain pending.
+   */
   abort() {
     this.controller.abort();
   }
 
   protected _listenForAbort(signal: AbortSignal | null | undefined) {
-    if (!signal || this.ended) return;
+    if (!signal || this.ended) {
+      return;
+    }
     if (signal.aborted) {
       this.controller.abort();
       return;
@@ -103,11 +129,10 @@ export class EventStream<EventTypes extends BaseEvents> {
    * No checks are made to see if the listener has already been added. Multiple calls passing
    * the same combination of event and listener will result in the listener being added, and
    * called, multiple times.
-   * @returns this ChatCompletionStream, so that calls can be chained
+   * @returns This stream, so that listener registration calls can be chained.
    */
   on<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
-    const listeners: EventListeners<EventTypes, Event> =
-      this.#listeners[event] || (this.#listeners[event] = []);
+    const listeners: EventListeners<EventTypes, Event> = (this.#listeners[event] ||= []);
     listeners.push({ listener });
     return this;
   }
@@ -117,24 +142,27 @@ export class EventStream<EventTypes extends BaseEvents> {
    * off() will remove, at most, one instance of a listener from the listener array. If any single
    * listener has been added multiple times to the listener array for the specified event, then
    * off() must be called multiple times to remove each instance.
-   * @returns this ChatCompletionStream, so that calls can be chained
+   * @returns This stream, so that listener registration calls can be chained.
    */
   off<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
     const listeners = this.#listeners[event];
-    if (!listeners) return this;
+    if (!listeners) {
+      return this;
+    }
     const index = listeners.findIndex((l) => l.listener === listener);
-    if (index >= 0) listeners.splice(index, 1);
+    if (index !== -1) {
+      listeners.splice(index, 1);
+    }
     return this;
   }
 
   /**
    * Adds a one-time listener function for the event. The next time the event is triggered,
    * this listener is removed and then invoked.
-   * @returns this ChatCompletionStream, so that calls can be chained
+   * @returns This stream, so that listener registration calls can be chained.
    */
   once<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
-    const listeners: EventListeners<EventTypes, Event> =
-      this.#listeners[event] || (this.#listeners[event] = []);
+    const listeners: EventListeners<EventTypes, Event> = (this.#listeners[event] ||= []);
     listeners.push({ listener, once: true });
     return this;
   }
@@ -142,9 +170,11 @@ export class EventStream<EventTypes extends BaseEvents> {
   /**
    * This is similar to `.once()`, but returns a Promise that resolves the next time
    * the event is triggered, instead of calling a listener callback.
-   * @returns a Promise that resolves the next time given event is triggered,
-   * or rejects if an error is emitted.  (If you request the 'error' event,
-   * returns a promise that resolves with the error).
+   * Events without arguments resolve to `undefined`, single-argument events resolve
+   * to that argument, and events with multiple arguments resolve to an argument tuple.
+   *
+   * @returns A promise for the next event, or a rejection if an error occurs first.
+   * Requesting the `error` event resolves with the emitted error instead.
    *
    * Example:
    *
@@ -153,14 +183,29 @@ export class EventStream<EventTypes extends BaseEvents> {
   emitted<Event extends keyof EventTypes>(
     event: Event,
   ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param] ? Param
-    : EventParameters<EventTypes, Event> extends [] ? void
-    : EventParameters<EventTypes, Event>
+    EventParameters<EventTypes, Event> extends [infer Param]
+      ? Param
+      : EventParameters<EventTypes, Event> extends []
+        ? void
+        : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;
-      if (event !== 'error') this.once('error', reject);
-      this.once(event, resolve as any);
+      const onError = (error: OpenAIError) => {
+        this.off(event, onEvent as EventListener<EventTypes, Event>);
+        reject(error);
+      };
+      const onEvent = (...values: unknown[]) => {
+        if (event !== 'error') {
+          this.off('error', onError);
+        }
+        resolve((values.length > 1 ? values : values[0]) as any);
+      };
+
+      if (event !== 'error') {
+        this.once('error', onError);
+      }
+      this.once(event, onEvent as EventListener<EventTypes, Event>);
     });
   }
 
@@ -199,18 +244,26 @@ export class EventStream<EventTypes extends BaseEvents> {
       }
     };
     const rejectReader = () => {
-      if (!failure || failureDelivered || !readQueue.length) return;
+      if (!failure || failureDelivered || !readQueue.length) {
+        return;
+      }
       failureDelivered = true;
       readQueue.shift()!.reject(failure);
     };
     const cleanup = () => {
       this.off(event, onEvent as EventListener<EventTypes, Event>);
       this.off('end', onEnd);
-      if (event !== 'error') this.off('error', onFailure);
-      if (event !== 'abort') this.off('abort', onFailure);
+      if (event !== 'error') {
+        this.off('error', onFailure);
+      }
+      if (event !== 'abort') {
+        this.off('abort', onFailure);
+      }
     };
     const onEvent = (...args: Parameters) => {
-      if (ended) return;
+      if (ended) {
+        return;
+      }
       const reader = readQueue.shift();
       if (reader) {
         reader.resolve({ value: args, done: false });
@@ -220,7 +273,9 @@ export class EventStream<EventTypes extends BaseEvents> {
     };
     const onFailure = (error: OpenAIError) => {
       failure = error;
-      if (!pushQueue.length) rejectReader();
+      if (!pushQueue.length) {
+        rejectReader();
+      }
     };
     const onEnd = () => {
       ended = true;
@@ -234,21 +289,29 @@ export class EventStream<EventTypes extends BaseEvents> {
     if (!ended) {
       this.on(event, onEvent as EventListener<EventTypes, Event>);
       this.on('end', onEnd);
-      if (event !== 'error') this.on('error', onFailure);
-      if (event !== 'abort') this.on('abort', onFailure);
+      if (event !== 'error') {
+        this.on('error', onFailure);
+      }
+      if (event !== 'abort') {
+        this.on('abort', onFailure);
+      }
     }
 
     return {
       next: () => {
         const value = pushQueue.shift();
-        if (value) return Promise.resolve({ value, done: false });
+        if (value) {
+          return Promise.resolve({ value, done: false });
+        }
 
         if (failure && !failureDelivered) {
           failureDelivered = true;
           return Promise.reject(failure);
         }
 
-        if (ended) return Promise.resolve(doneResult());
+        if (ended) {
+          return Promise.resolve(doneResult());
+        }
 
         return new Promise<Result>((resolve, reject) => {
           readQueue.push({ resolve, reject });
@@ -267,6 +330,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     };
   }
 
+  /** Resolves when the stream ends successfully or rejects when it fails or is aborted. */
   async done(): Promise<void> {
     this.#catchingPromiseCreated = true;
     await this.#endPromise;
@@ -293,8 +357,11 @@ export class EventStream<EventTypes extends BaseEvents> {
     return this._emit('error', new OpenAIError(String(error)));
   }
 
+  /** Dispatches a connection, failure, cancellation, or completion lifecycle event. */
   _emit<Event extends keyof BaseEvents>(event: Event, ...args: EventParameters<BaseEvents, Event>): void;
+  /** Dispatches a typed stream event to all listeners registered for that event. */
   _emit<Event extends keyof EventTypes>(event: Event, ...args: EventParameters<EventTypes, Event>): void;
+  /** Dispatches a stream event and performs the associated lifecycle transitions. */
   _emit<Event extends keyof EventTypes>(
     this: EventStream<EventTypes>,
     event: Event,
@@ -314,7 +381,9 @@ export class EventStream<EventTypes extends BaseEvents> {
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
       this.#listeners[event] = listeners.filter((l) => !l.once) as any;
-      listeners.forEach(({ listener }: any) => listener(...(args as any)));
+      for (const { listener } of listeners as any) {
+        listener(...(args as any));
+      }
     }
 
     if (event === 'abort') {
@@ -347,23 +416,34 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
   }
 
-  protected _emitFinal(): void {}
+  // oxlint-disable-next-line class-methods-use-this -- Subclasses override this instance hook.
+  protected _emitFinal(): void {
+    // Hook for subclasses.
+  }
 }
 
+/** The listener callback associated with one event name in a stream event map. */
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
-type EventListeners<Events, EventType extends keyof Events> = Array<{
+type EventListeners<Events, EventType extends keyof Events> = {
   listener: EventListener<Events, EventType>;
   once?: boolean;
-}>;
+}[];
 
-export type EventParameters<Events, EventType extends keyof Events> = {
-  [Event in EventType]: EventListener<Events, EventType> extends (...args: infer P) => any ? P : never;
-}[EventType];
+/** The positional listener arguments associated with a named event. */
+export type EventParameters<Events, EventType extends keyof Events> = Record<
+  EventType,
+  EventListener<Events, EventType> extends (...args: infer P) => any ? P : never
+>[EventType];
 
+/** Lifecycle events shared by all SDK streaming helpers. */
 export interface BaseEvents {
+  /** Called when the underlying request or readable stream is ready to produce events. */
   connect: () => void;
+  /** Called when the stream fails for a reason other than user cancellation. */
   error: (error: OpenAIError) => void;
+  /** Called when the underlying request is cancelled. */
   abort: (error: APIUserAbortError) => void;
+  /** Called after a successful completion, failure, or cancellation. */
   end: () => void;
 }

@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export {
   AdminAPIKeys,
@@ -82,6 +82,12 @@ export {
   type SpendAlertListParams,
   type OrganizationSpendAlertsPage,
 } from './spend-alerts';
+export {
+  SpendLimit,
+  type OrganizationSpendLimit,
+  type OrganizationSpendLimitDeleted,
+  type SpendLimitUpdateParams,
+} from './spend-limit';
 export {
   Usage,
   type UsageAudioSpeechesResponse,

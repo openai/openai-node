@@ -1,8 +1,12 @@
 import type { JestConfigWithTsJest } from 'ts-jest';
+import generatedTestPatterns from './scripts/generated-test-patterns.json';
 
 const config: JestConfigWithTsJest = {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
+  testMatch: generatedTestPatterns.map(
+    (pattern) => `<rootDir>/${pattern}${pattern.endsWith('.test.ts') ? '' : '/**/*.test.ts'}`,
+  ),
   transform: {
     '^.+\\.(t|j)sx?$': ['@swc/jest', { sourceMaps: 'inline' }],
   },
@@ -18,7 +22,6 @@ const config: JestConfigWithTsJest = {
     '<rootDir>/packages/',
   ],
   testPathIgnorePatterns: ['scripts', '<rootDir>/tests/live/'],
-  // prettierPath: require.resolve('prettier-2'),
 };
 
 export default config;

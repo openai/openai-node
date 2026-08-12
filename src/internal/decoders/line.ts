@@ -1,35 +1,54 @@
 import { concatBytes, decodeUTF8, encodeUTF8 } from '../utils/bytes';
 
+/** Text or UTF-8 bytes accepted by the incremental line decoder. */
 export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
 /**
- * A re-implementation of httpx's `LineDecoder` in Python that handles incrementally
- * reading lines from text.
+ * Incrementally decodes UTF-8 text into lines without losing partial characters
+ * or newline sequences that span multiple chunks.
  *
+ * Supports `\n`, `\r`, and `\r\n` line endings. Call {@link flush} after the
+ * final chunk to emit a trailing line that does not end with a newline.
+ *
+ * Based on the line decoder used by the Python `httpx` project:
  * https://github.com/encode/httpx/blob/920333ea98118e9cf617f246905d7b202510941c/httpx/_decoders.py#L258
  */
 export class LineDecoder {
   // prettier-ignore
+  /** Individual characters recognized as possible line terminators. */
   static NEWLINE_CHARS = new Set(['\n', '\r']);
+
+  /** Matches complete CRLF terminators as well as standalone CR and LF characters. */
   static NEWLINE_REGEXP = /\r\n|[\n\r]/g;
 
   #buffer: Uint8Array;
   #carriageReturnIndex: number | null;
 
+  /** Creates a decoder with no buffered bytes or pending carriage return. */
   constructor() {
     this.#buffer = new Uint8Array();
     this.#carriageReturnIndex = null;
   }
 
+  /**
+   * Appends a text or UTF-8 byte chunk and returns every newly completed line.
+   *
+   * Incomplete lines remain buffered for the next call. `null` and `undefined`
+   * are ignored and do not flush buffered content.
+   */
   decode(chunk: Bytes): string[] {
     if (chunk == null) {
       return [];
     }
 
-    const binaryChunk =
-      chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? encodeUTF8(chunk)
-      : chunk;
+    let binaryChunk: Uint8Array;
+    if (chunk instanceof ArrayBuffer) {
+      binaryChunk = new Uint8Array(chunk);
+    } else if (typeof chunk === 'string') {
+      binaryChunk = encodeUTF8(chunk);
+    } else {
+      binaryChunk = chunk;
+    }
 
     this.#buffer = concatBytes([this.#buffer, binaryChunk]);
 
@@ -54,7 +73,7 @@ export class LineDecoder {
       }
 
       const endIndex =
-        this.#carriageReturnIndex !== null ? patternIndex.preceding - 1 : patternIndex.preceding;
+        this.#carriageReturnIndex === null ? patternIndex.preceding : patternIndex.preceding - 1;
 
       const line = decodeUTF8(this.#buffer.subarray(0, endIndex));
       lines.push(line);
@@ -66,6 +85,7 @@ export class LineDecoder {
     return lines;
   }
 
+  /** Emits the remaining unterminated line, or returns an empty array when idle. */
   flush(): string[] {
     if (!this.#buffer.length) {
       return [];
@@ -75,12 +95,13 @@ export class LineDecoder {
 }
 
 /**
- * This function searches the buffer for the end patterns, (\r or \n)
- * and returns an object with the index preceding the matched newline and the
- * index after the newline char. `null` is returned if no new line is found.
+ * Searches for the next CR or LF byte and returns its zero-based position,
+ * the position immediately after it, and whether the byte was a carriage return.
+ * Returns `null` when no newline byte exists after the requested start index.
  *
  * ```ts
- * findNewLineIndex('abc\ndef') -> { preceding: 2, index: 3 }
+ * findNewlineIndex(new TextEncoder().encode('abc\ndef'), null)
+ * // => { preceding: 3, index: 4, carriage: false }
  * ```
  */
 function findNewlineIndex(
@@ -103,10 +124,13 @@ function findNewlineIndex(
   return null;
 }
 
+/**
+ * Finds the first blank-line separator used to delimit streamed event records.
+ *
+ * @returns The byte offset immediately after the first `\n\n`, `\r\r`, or
+ * `\r\n\r\n` separator, or `-1` when the buffer contains no complete separator.
+ */
 export function findDoubleNewlineIndex(buffer: Uint8Array): number {
-  // This function searches the buffer for the end patterns (\r\r, \n\n, \r\n\r\n)
-  // and returns the index right after the first occurrence of any pattern,
-  // or -1 if none of the patterns are found.
   const newline = 0x0a; // \n
   const carriage = 0x0d; // \r
 
