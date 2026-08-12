@@ -16,6 +16,9 @@ pmOnFail: error
 verifyDepsBeforeRun: error
 
 overrides:
+  # AWS core 3.977.0-3.977.5 are deprecated for a JSON Document parsing bug;
+  # stay on the last unaffected mature release until 3.977.6 clears cooldown.
+  '@aws-sdk/core@>=3.977.0 <3.977.6': 3.976.0
   # @typespec/ts-http-runtime@0.3.6 currently has incomplete registry metadata in
   # our registry mirror, which causes pnpm trust-policy warnings. Azure packages
   # accept 0.3.5 via their declared ranges, and 0.3.5 has clean metadata.
