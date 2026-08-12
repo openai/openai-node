@@ -56,7 +56,7 @@
     "p-all": "^3.0.0",
     "publint": "^0.3.22",
     "signal-exit": "^3.0.7",
-    "superstruct": "^1.0.4",
+    "superstruct": "^2.0.2",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.5.0",
     "tsconfig-paths": "^4.0.0",
