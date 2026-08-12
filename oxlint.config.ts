@@ -33,6 +33,58 @@ module.exports = defineConfig({
   ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...stainlessGeneratedFiles],
   overrides: [
     {
+      // This example intentionally shows both mutually exclusive Next.js router
+      // response styles in one place.
+      files: ['examples/chat-completions/stream-to-client-next.ts'],
+      rules: {
+        'no-unreachable': 'off',
+      },
+    },
+    {
+      // These loops deliberately inspect one inherited key or interrupt a stream
+      // to exercise cancellation; the queue-draining loop is also falsely flagged.
+      files: [
+        'ecosystem-tests/cli.ts',
+        'src/_vendor/zod-to-json-schema/util.ts',
+        'tests/internal/stream-utils.test.ts',
+        'tests/lib/streaming-core.test.ts',
+      ],
+      rules: {
+        'no-unreachable-loop': 'off',
+      },
+    },
+    {
+      // Separate pushes make the ordered response items and follow-up turn or
+      // paired program fixtures explicit.
+      files: ['examples/responses/manual-conversation-state.ts', 'tests/lib/ResponsesParser.test.ts'],
+      rules: {
+        'unicorn/prefer-single-call': 'off',
+      },
+    },
+    {
+      // Preserve the vendored module's existing named and default export topology.
+      files: ['src/_vendor/zod-to-json-schema/index.ts'],
+      rules: {
+        'unicorn/prefer-export-from': 'off',
+      },
+    },
+    {
+      // Streaming branches retain distinct logging behavior, and schema branches
+      // must preserve their mutation and annotation ordering.
+      files: ['src/core/streaming.ts', 'src/lib/transform.ts'],
+      rules: {
+        'oxc/branches-sharing-code': 'off',
+      },
+    },
+    {
+      // parseInt intentionally reads the first dotted Node.js version component;
+      // Number on the split array would produce NaN instead.
+      files: ['src/internal/uploads.ts'],
+      rules: {
+        'unicorn/prefer-number-coercion': 'off',
+      },
+    },
+    {
       // This mock must stay constructable because the websocket client invokes it
       // as a constructor; arrow callbacks cannot be constructors.
       files: ['tests/realtime-websocket.test.ts'],
