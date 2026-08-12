@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI, { toFile } from 'openai';
 
@@ -29,9 +29,11 @@ describe('resource transcriptions', () => {
       model: 'gpt-4o-transcribe',
       chunking_strategy: 'auto',
       include: ['logprobs'],
+      keywords: ['string'],
       known_speaker_names: ['string'],
       known_speaker_references: ['string'],
       language: 'language',
+      languages: ['string'],
       prompt: 'prompt',
       response_format: 'json',
       stream: false,

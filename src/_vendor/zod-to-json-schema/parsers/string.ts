@@ -1,7 +1,8 @@
 // @ts-nocheck
-import { ZodStringDef } from 'zod/v3';
-import { ErrorMessages, setResponseValueAndErrors } from '../errorMessages';
-import { Refs } from '../Refs';
+import type { ZodStringDef } from 'zod/v3';
+import type { ErrorMessages } from '../errorMessages';
+import { setResponseValueAndErrors } from '../errorMessages';
+import type { Refs } from '../Refs';
 
 let emojiRegex: RegExp | undefined;
 
@@ -21,7 +22,7 @@ export const zodPatterns = {
   /**
    * `a-z` was added to replicate /i flag
    */
-  email: /^(?!\.)(?!.*\.\.)([a-zA-Z0-9_'+\-\.]*)[a-zA-Z0-9_+-]@([a-zA-Z0-9][a-zA-Z0-9\-]*\.)+[a-zA-Z]{2,}$/,
+  email: /^(?!\.)(?!.*\.\.)([a-zA-Z0-9_'+\-.]*)[a-zA-Z0-9_+-]@([a-zA-Z0-9][a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}$/,
   /**
    * Constructed a valid Unicode RegExp
    *
@@ -35,7 +36,8 @@ export const zodPatterns = {
    */
   emoji: () => {
     if (emojiRegex === undefined) {
-      emojiRegex = RegExp('^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$', 'u');
+      const emojiPattern = '^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$';
+      emojiRegex = new RegExp(emojiPattern, 'u');
     }
     return emojiRegex;
   },
@@ -95,7 +97,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
   if (def.checks) {
     for (const check of def.checks) {
       switch (check.kind) {
-        case 'min':
+        case 'min': {
           setResponseValueAndErrors(
             res,
             'minLength',
@@ -104,7 +106,8 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
             refs,
           );
           break;
-        case 'max':
+        }
+        case 'max': {
           setResponseValueAndErrors(
             res,
             'maxLength',
@@ -114,55 +117,71 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           );
 
           break;
-        case 'email':
+        }
+        case 'email': {
           switch (refs.emailStrategy) {
-            case 'format:email':
+            case 'format:email': {
               addFormat(res, 'email', check.message, refs);
               break;
-            case 'format:idn-email':
+            }
+            case 'format:idn-email': {
               addFormat(res, 'idn-email', check.message, refs);
               break;
-            case 'pattern:zod':
+            }
+            case 'pattern:zod': {
               addPattern(res, zodPatterns.email, check.message, refs);
               break;
+            }
           }
 
           break;
-        case 'url':
+        }
+        case 'url': {
           addFormat(res, 'uri', check.message, refs);
           break;
-        case 'uuid':
+        }
+        case 'uuid': {
           addFormat(res, 'uuid', check.message, refs);
           break;
-        case 'regex':
+        }
+        case 'regex': {
           addPattern(res, check.regex, check.message, refs);
           break;
-        case 'cuid':
+        }
+        case 'cuid': {
           addPattern(res, zodPatterns.cuid, check.message, refs);
           break;
-        case 'cuid2':
+        }
+        case 'cuid2': {
           addPattern(res, zodPatterns.cuid2, check.message, refs);
           break;
-        case 'startsWith':
-          addPattern(res, RegExp(`^${processPattern(check.value)}`), check.message, refs);
+        }
+        case 'startsWith': {
+          addPattern(res, new RegExp(`^${processPattern(check.value)}`), check.message, refs);
           break;
-        case 'endsWith':
-          addPattern(res, RegExp(`${processPattern(check.value)}$`), check.message, refs);
+        }
+        case 'endsWith': {
+          addPattern(res, new RegExp(`${processPattern(check.value)}$`), check.message, refs);
           break;
+        }
 
-        case 'datetime':
+        case 'datetime': {
           addFormat(res, 'date-time', check.message, refs);
           break;
-        case 'date':
+        }
+        case 'date': {
           addFormat(res, 'date', check.message, refs);
           break;
-        case 'time':
+        }
+        case 'time': {
           addFormat(res, 'time', check.message, refs);
           break;
-        case 'duration':
+        }
+        case 'duration': {
           addFormat(res, 'duration', check.message, refs);
           break;
-        case 'length':
+        }
+        case 'length': {
           setResponseValueAndErrors(
             res,
             'minLength',
@@ -178,8 +197,9 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
             refs,
           );
           break;
+        }
         case 'includes': {
-          addPattern(res, RegExp(processPattern(check.value)), check.message, refs);
+          addPattern(res, new RegExp(processPattern(check.value)), check.message, refs);
           break;
         }
         case 'ip': {
@@ -191,9 +211,10 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           }
           break;
         }
-        case 'emoji':
+        case 'emoji': {
           addPattern(res, zodPatterns.emoji, check.message, refs);
           break;
+        }
         case 'ulid': {
           addPattern(res, zodPatterns.ulid, check.message, refs);
           break;
@@ -219,13 +240,16 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
         }
         case 'nanoid': {
           addPattern(res, zodPatterns.nanoid, check.message, refs);
+          break;
         }
         case 'toLowerCase':
         case 'toUpperCase':
-        case 'trim':
+        case 'trim': {
           break;
-        default:
-          ((_: never) => {})(check);
+        }
+        default: {
+          ((_: never) => undefined)(check);
+        }
       }
     }
   }
@@ -234,9 +258,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
 }
 
 const escapeNonAlphaNumeric = (value: string) =>
-  Array.from(value)
-    .map((c) => (/[a-zA-Z0-9]/.test(c) ? c : `\\${c}`))
-    .join('');
+  [...value].map((c) => (/[a-zA-Z0-9]/.test(c) ? c : `\\${c}`)).join('');
 
 const addFormat = (
   schema: JsonSchema7StringType,
@@ -315,7 +337,9 @@ const addPattern = (
 // Mutate z.string.regex() in a best attempt to accommodate for regex flags when applyRegexFlags is true
 const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): string => {
   const regex = typeof regexOrFunction === 'function' ? regexOrFunction() : regexOrFunction;
-  if (!refs.applyRegexFlags || !regex.flags) return regex.source;
+  if (!refs.applyRegexFlags || !regex.flags) {
+    return regex.source;
+  }
 
   // Currently handled flags
   const flags = {
@@ -341,7 +365,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
 
     if (flags.i) {
       if (inCharGroup) {
-        if (source[i].match(/[a-z]/)) {
+        if (/[a-z]/.test(source[i])) {
           if (inCharRange) {
             pattern += source[i];
             pattern += `${source[i - 2]}-${source[i]}`.toUpperCase();
@@ -354,7 +378,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
           }
           continue;
         }
-      } else if (source[i].match(/[a-z]/)) {
+      } else if (/[a-z]/.test(source[i])) {
         pattern += `[${source[i]}${source[i].toUpperCase()}]`;
         continue;
       }

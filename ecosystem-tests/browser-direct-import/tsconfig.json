@@ -10,6 +10,7 @@
     "skipLibCheck": false,
     "target": "es2015",
     "lib": ["es2017", "dom"],
+    "types": ["node"],
     "outDir": "dist",
     "rootDir": "./",
     "baseUrl": ".",

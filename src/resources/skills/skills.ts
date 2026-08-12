@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as ContentAPI from './content';
@@ -32,7 +32,9 @@ export class Skills extends APIResource {
   create(body: SkillCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Skill> {
     return this._client.post(
       '/skills',
-      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client, {
+        stripFilenames: false,
+      }),
     );
   }
 

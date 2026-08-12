@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
@@ -36,6 +36,7 @@ describe('resource inputTokens', () => {
             context: 'auto',
             effort: 'none',
             generate_summary: 'auto',
+            mode: 'standard',
             summary: 'auto',
           },
           text: {
@@ -49,8 +50,10 @@ describe('resource inputTokens', () => {
               parameters: { foo: 'bar' },
               strict: true,
               type: 'function',
+              allowed_callers: ['direct'],
               defer_loading: true,
               description: 'description',
+              output_schema: { foo: 'bar' },
             },
           ],
           truncation: 'auto',

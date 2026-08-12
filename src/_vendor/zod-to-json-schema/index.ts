@@ -1,3 +1,5 @@
+import { zodToJsonSchema } from './zodToJsonSchema';
+
 export * from './Options';
 export * from './Refs';
 export * from './errorMessages';
@@ -33,5 +35,5 @@ export * from './parsers/undefined';
 export * from './parsers/union';
 export * from './parsers/unknown';
 export * from './zodToJsonSchema';
-import { zodToJsonSchema } from './zodToJsonSchema';
+
 export default zodToJsonSchema;

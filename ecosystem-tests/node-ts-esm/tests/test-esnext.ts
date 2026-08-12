@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { distance } from 'fastest-levenshtein';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 
 // The tests in this file don't typecheck with "moduleResolution": "node"
 
@@ -43,7 +43,7 @@ expect.extend({
   },
 });
 
-it(`raw response`, async function () {
+it(`raw response`, async () => {
   const response = await client.chat.completions
     .create({
       model: 'gpt-4o-mini',
@@ -52,7 +52,7 @@ it(`raw response`, async function () {
     .asResponse();
 
   const chunks: string[] = [];
-  if (!response.body) throw new Error(`expected response.body to be defined`);
+  if (!response.body) {throw new Error(`expected response.body to be defined`);}
 
   const decoder = new TextDecoder();
 

@@ -1,6 +1,7 @@
-import { ZodDiscriminatedUnionDef, ZodLiteralDef, ZodTypeAny, ZodUnionDef } from 'zod/v3';
-import { JsonSchema7Type, parseDef } from '../parseDef';
-import { Refs } from '../Refs';
+import type { ZodDiscriminatedUnionDef, ZodLiteralDef, ZodTypeAny, ZodUnionDef } from 'zod/v3';
+import type { JsonSchema7Type } from '../parseDef';
+import { parseDef } from '../parseDef';
+import type { Refs } from '../Refs';
 
 export const primitiveMappings = {
   ZodString: 'string',
@@ -31,10 +32,11 @@ export function parseUnionDef(
   def: ZodUnionDef | ZodDiscriminatedUnionDef<any, any>,
   refs: Refs,
 ): JsonSchema7PrimitiveUnionType | JsonSchema7AnyOfType | undefined {
-  if (refs.target === 'openApi3') return asAnyOf(def, refs);
+  if (refs.target === 'openApi3') {
+    return asAnyOf(def, refs);
+  }
 
-  const options: readonly ZodTypeAny[] =
-    def.options instanceof Map ? Array.from(def.options.values()) : def.options;
+  const options: readonly ZodTypeAny[] = def.options instanceof Map ? [...def.options.values()] : def.options;
 
   // This blocks tries to look ahead a bit to produce nicer looking schemas with type array instead of anyOf.
   if (
@@ -42,10 +44,13 @@ export function parseUnionDef(
   ) {
     // all types in union are primitive and lack checks, so might as well squash into {type: [...]}
 
-    const types = options.reduce((types: JsonSchema7Primitive[], x) => {
+    const types: JsonSchema7Primitive[] = [];
+    for (const x of options) {
       const type = primitiveMappings[x._def.typeName as ZodPrimitive]; //Can be safely casted due to row 43
-      return type && !types.includes(type) ? [...types, type] : types;
-    }, []);
+      if (type && !types.includes(type)) {
+        types.push(type);
+      }
+    }
 
     return {
       type: types.length > 1 ? types : types[0]!,
@@ -53,46 +58,56 @@ export function parseUnionDef(
   } else if (options.every((x) => x._def.typeName === 'ZodLiteral' && !x.description)) {
     // all options literals
 
-    const types = options.reduce((acc: JsonSchema7Primitive[], x: { _def: ZodLiteralDef }) => {
+    const types: JsonSchema7Primitive[] = [];
+    for (const x of options as readonly { _def: ZodLiteralDef }[]) {
       const type = typeof x._def.value;
       switch (type) {
         case 'string':
         case 'number':
-        case 'boolean':
-          return [...acc, type];
-        case 'bigint':
-          return [...acc, 'integer' as const];
-        case 'object':
-          if (x._def.value === null) return [...acc, 'null' as const];
-        case 'symbol':
-        case 'undefined':
-        case 'function':
-        default:
-          return acc;
+        case 'boolean': {
+          types.push(type);
+          break;
+        }
+        case 'bigint': {
+          types.push('integer');
+          break;
+        }
+        case 'object': {
+          if (x._def.value === null) {
+            types.push('null');
+          }
+          break;
+        }
       }
-    }, []);
+    }
 
     if (types.length === options.length) {
       // all the literals are primitive, as far as null can be considered primitive
 
       const uniqueTypes = types.filter((x, i, a) => a.indexOf(x) === i);
+      const enumValues: (string | number | bigint | boolean | null)[] = [];
+      for (const x of options) {
+        if (!enumValues.includes(x._def.value)) {
+          enumValues.push(x._def.value);
+        }
+      }
       return {
         type: uniqueTypes.length > 1 ? uniqueTypes : uniqueTypes[0]!,
-        enum: options.reduce(
-          (acc, x) => {
-            return acc.includes(x._def.value) ? acc : [...acc, x._def.value];
-          },
-          [] as (string | number | bigint | boolean | null)[],
-        ),
+        enum: enumValues,
       };
     }
   } else if (options.every((x) => x._def.typeName === 'ZodEnum')) {
+    const enumValues: string[] = [];
+    for (const x of options) {
+      for (const value of x._def.values) {
+        if (!enumValues.includes(value)) {
+          enumValues.push(value);
+        }
+      }
+    }
     return {
       type: 'string',
-      enum: options.reduce(
-        (acc: string[], x) => [...acc, ...x._def.values.filter((x: string) => !acc.includes(x))],
-        [],
-      ),
+      enum: enumValues,
     };
   }
 
@@ -103,7 +118,7 @@ const asAnyOf = (
   def: ZodUnionDef | ZodDiscriminatedUnionDef<any, any>,
   refs: Refs,
 ): JsonSchema7PrimitiveUnionType | JsonSchema7AnyOfType | undefined => {
-  const anyOf = ((def.options instanceof Map ? Array.from(def.options.values()) : def.options) as any[])
+  const anyOf = ((def.options instanceof Map ? [...def.options.values()] : def.options) as any[])
     .map((x, i) =>
       parseDef(x._def, {
         ...refs,

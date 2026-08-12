@@ -38,14 +38,31 @@ export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
  */
 export type RawWebSocketData = string | ArrayBufferLike | ArrayBufferView | ArrayBufferView[];
 
-export type UnsentMessage<T> = { type: 'message'; message: T } | { type: 'raw'; data: RawWebSocketData };
+/** A queued application message or raw WebSocket frame that was never transmitted. */
+export type UnsentMessage<T> =
+  | {
+      /** Identifies a JSON-serialized application message. */
+      type: 'message';
+
+      /** The deserialized snapshot captured when the message was queued. */
+      message: T;
+    }
+  | {
+      /** Identifies an unencoded WebSocket frame. */
+      type: 'raw';
+
+      /** The string or copied binary payload captured when the frame was queued. */
+      data: RawWebSocketData;
+    };
 
 type QueueEntry =
   | { kind: 'json'; data: string; byteLength: number }
   | { kind: 'raw'; data: RawWebSocketData; byteLength: number };
 
 function toUint8Array(view: ArrayBufferView): Uint8Array {
-  if (view instanceof Uint8Array) return view;
+  if (view instanceof Uint8Array) {
+    return view;
+  }
   return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
 }
 
@@ -54,46 +71,64 @@ function toUint8Array(view: ArrayBufferView): Uint8Array {
  * `ws.send()` transmits the correct bytes.
  */
 export function flattenRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
-  if (Array.isArray(data)) return concatBytes(data.map(toUint8Array));
+  if (Array.isArray(data)) {
+    return concatBytes(data.map(toUint8Array));
+  }
   return data;
 }
 
 function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
-  if (typeof data === 'string') return data;
-  if (Array.isArray(data)) return concatBytes(data.map(toUint8Array));
+  if (typeof data === 'string') {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return concatBytes(data.map(toUint8Array));
+  }
   if (ArrayBuffer.isView(data)) {
     const copy = new Uint8Array(data.byteLength);
     copy.set(toUint8Array(data));
     return copy;
   }
+  // oxlint-disable-next-line unicorn/prefer-spread -- ArrayBufferLike.slice copies bytes while spread changes the return type.
   return data.slice(0);
 }
 
 function rawByteLength(data: RawWebSocketData): number {
-  if (typeof data === 'string') return encodeUTF8(data).byteLength;
-  if (Array.isArray(data)) return data.reduce((sum, buf) => sum + buf.byteLength, 0);
-  if ('byteLength' in data) return data.byteLength;
+  if (typeof data === 'string') {
+    return encodeUTF8(data).byteLength;
+  }
+  if (Array.isArray(data)) {
+    return data.reduce((sum, buf) => sum + buf.byteLength, 0);
+  }
+  if ('byteLength' in data) {
+    return data.byteLength;
+  }
   return 0;
 }
 
 /**
- * A bounded queue for outgoing WebSocket messages. JSON messages are
- * serialized on enqueue; raw messages are stored as-is. The queue enforces
- * a configurable byte-size limit and can return the original messages via
- * {@link drain} when the connection permanently closes.
+ * Buffers outgoing WebSocket messages while a connection is unavailable.
+ *
+ * JSON values are serialized immediately, and raw binary payloads are copied,
+ * so later caller mutations cannot change queued messages. A single oversized
+ * message is accepted when the queue is empty; further messages are rejected
+ * whenever they would exceed the configured byte budget.
  */
 export class SendQueue<T = unknown> {
   private _queue: QueueEntry[] = [];
-  private _bytes: number = 0;
+  private _bytes = 0;
   private _maxBytes: number;
 
-  constructor(maxBytes: number = 1_048_576) {
+  /** Creates a queue with a one-mebibyte default byte budget. */
+  constructor(maxBytes = 1_048_576) {
     this._maxBytes = maxBytes;
   }
 
   /**
-   * Serialize and enqueue a JSON message. Returns `true` if the message was
-   * accepted, `false` if it would exceed the byte-size limit.
+   * Serializes and snapshots a JSON message before queueing it.
+   *
+   * @returns `true` when accepted, including an oversized first message; `false`
+   * when adding it to a nonempty queue would exceed the byte budget.
    */
   enqueue(event: T): boolean {
     const data = JSON.stringify(event);
@@ -107,8 +142,11 @@ export class SendQueue<T = unknown> {
   }
 
   /**
-   * Enqueue raw data without serialization. Returns `true` if the data was
-   * accepted, `false` if it would exceed the byte-size limit.
+   * Queues a raw string or a defensive copy of a binary WebSocket payload.
+   * Fragmented typed-array payloads are flattened before storage.
+   *
+   * @returns `true` when accepted, including an oversized first frame; `false`
+   * when adding it to a nonempty queue would exceed the byte budget.
    */
   enqueueRaw(data: RawWebSocketData): boolean {
     const snapshot = snapshotRawData(data);
@@ -134,7 +172,7 @@ export class SendQueue<T = unknown> {
         send(pending[i]!.data);
       } catch (err) {
         const remaining = pending.slice(i);
-        this._queue = remaining.concat(this._queue);
+        this._queue = [...remaining, ...this._queue];
         this._bytes = this._queue.reduce((sum, item) => sum + item.byteLength, 0);
         throw err;
       }
@@ -147,7 +185,9 @@ export class SendQueue<T = unknown> {
    */
   drain(): UnsentMessage<T>[] {
     const unsent = this._queue.map((entry): UnsentMessage<T> => {
-      if (entry.kind === 'raw') return { type: 'raw', data: entry.data };
+      if (entry.kind === 'raw') {
+        return { type: 'raw', data: entry.data };
+      }
       return { type: 'message', message: JSON.parse(entry.data) as T };
     });
     this._queue = [];
@@ -156,38 +196,59 @@ export class SendQueue<T = unknown> {
   }
 }
 
-// RFC 6455 §7.4.1
+/**
+ * Reports whether an RFC 6455 close code represents a recoverable interruption.
+ *
+ * Network failures, service restarts, temporary server errors, and TLS
+ * handshake failures can be retried; normal closure, protocol violations,
+ * invalid payloads, and unrecognized codes cannot.
+ */
 export function isRecoverableClose(code: number): boolean {
   switch (code) {
-    case 1000:
-      return false; // Normal closure
-    case 1001:
-      return true; // Going away (server shutting down)
-    case 1002:
-      return false; // Protocol error
-    case 1003:
-      return false; // Unsupported data
-    case 1005:
-      return true; // No status code (abnormal)
-    case 1006:
-      return true; // Abnormal closure (network drop)
-    case 1007:
-      return false; // Invalid payload
-    case 1008:
-      return false; // Policy violation
-    case 1009:
-      return false; // Message too big
-    case 1010:
-      return false; // Missing extension
-    case 1011:
-      return true; // Internal server error
-    case 1012:
-      return true; // Service restart
-    case 1013:
-      return true; // Try again later
-    case 1015:
-      return true; // TLS handshake failure
-    default:
+    case 1000: {
       return false;
+    } // Normal closure
+    case 1001: {
+      return true;
+    } // Going away (server shutting down)
+    case 1002: {
+      return false;
+    } // Protocol error
+    case 1003: {
+      return false;
+    } // Unsupported data
+    case 1005: {
+      return true;
+    } // No status code (abnormal)
+    case 1006: {
+      return true;
+    } // Abnormal closure (network drop)
+    case 1007: {
+      return false;
+    } // Invalid payload
+    case 1008: {
+      return false;
+    } // Policy violation
+    case 1009: {
+      return false;
+    } // Message too big
+    case 1010: {
+      return false;
+    } // Missing extension
+    case 1011: {
+      return true;
+    } // Internal server error
+    case 1012: {
+      return true;
+    } // Service restart
+    case 1013: {
+      return true;
+    } // Try again later
+    case 1015: {
+      return true;
+    } // TLS handshake failure
+    default: {
+      return false;
+    }
   }
 }

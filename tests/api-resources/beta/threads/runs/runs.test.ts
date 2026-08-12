@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
@@ -37,7 +37,7 @@ describe('resource runs', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'gpt-5.4',
+      model: 'gpt-5.6-sol',
       parallel_tool_calls: true,
       reasoning_effort: 'none',
       response_format: 'auto',

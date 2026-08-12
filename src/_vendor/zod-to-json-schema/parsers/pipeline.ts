@@ -1,16 +1,18 @@
-import { ZodPipelineDef } from 'zod/v3';
-import { JsonSchema7Type, parseDef } from '../parseDef';
-import { Refs } from '../Refs';
-import { JsonSchema7AllOfType } from './intersection';
+import type { ZodPipelineDef } from 'zod/v3';
+import type { JsonSchema7Type } from '../parseDef';
+import { parseDef } from '../parseDef';
+import type { Refs } from '../Refs';
+import type { JsonSchema7AllOfType } from './intersection';
 
 export const parsePipelineDef = (
   def: ZodPipelineDef<any, any>,
   refs: Refs,
+  forceResolution: boolean,
 ): JsonSchema7AllOfType | JsonSchema7Type | undefined => {
   if (refs.pipeStrategy === 'input') {
-    return parseDef(def.in._def, refs);
+    return parseDef(def.in._def, refs, forceResolution);
   } else if (refs.pipeStrategy === 'output') {
-    return parseDef(def.out._def, refs);
+    return parseDef(def.out._def, refs, forceResolution);
   }
 
   const a = parseDef(def.in._def, {
