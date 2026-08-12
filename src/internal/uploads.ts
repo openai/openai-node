@@ -146,8 +146,9 @@ export function makeFile(
  * Infers a filename from an object's `name`, `url`, `filename`, or `path` value.
  *
  * Directory components separated by either `/` or `\\` are discarded unless an
- * explicitly supplied `name` or `filename` opts into preserving its path. Paths
- * inferred from URLs and filesystem streams always discard their directories.
+ * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
+ * paths use forward slashes. Paths inferred from URLs and filesystem streams always
+ * discard their directories.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
   if (typeof value !== 'object' || value === null) {
@@ -158,7 +159,7 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
     ('name' in value && value.name && String(value.name)) ||
     ('filename' in value && value.filename && String(value.filename));
   if (explicitName) {
-    return options?.stripFilename === false ? explicitName : basename(explicitName);
+    return options?.stripFilename === false ? normalizeFilenamePath(explicitName) : basename(explicitName);
   }
 
   const url = 'url' in value && value.url && String(value.url);
@@ -176,6 +177,10 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
 
 function basename(value: string): string | undefined {
   return value.split(/[\\/]/).pop() || undefined;
+}
+
+function normalizeFilenamePath(value: string): string {
+  return value.replace(/\\/g, '/');
 }
 
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
@@ -442,9 +447,11 @@ async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<Fo
 }
 
 function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
-  return isStreamingFile(value)
-    ? value.name
-    : (getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file');
+  if (isStreamingFile(value)) {
+    return options.stripFilenames === false ? normalizeFilenamePath(value.name) : value.name;
+  }
+
+  return getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
 }
 
 function getStreamingFileType(value: Uploadable): string {
