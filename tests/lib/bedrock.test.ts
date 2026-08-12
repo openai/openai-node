@@ -1,5 +1,7 @@
-import { BedrockOpenAI, NotFoundError, type BedrockClientOptions } from 'openai';
-import { type RequestInfo, type RequestInit } from 'openai/internal/builtin-types';
+import { vi } from 'vitest';
+import { BedrockOpenAI, NotFoundError } from 'openai';
+import type { BedrockClientOptions } from 'openai';
+import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 
 const RESPONSE_BODY = {
   id: 'resp_123',
@@ -77,7 +79,7 @@ describe('instantiate bedrock client', () => {
   const env = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...env };
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = undefined;
     process.env['AWS_BEDROCK_BASE_URL'] = undefined;
@@ -301,9 +303,9 @@ describe('instantiate bedrock client', () => {
       const status = authorizationHeaders.length === 1 ? 500 : 404;
       return new globalThis.Response(
         JSON.stringify(
-          status === 500 ?
-            { error: 'server error' }
-          : { error: { message: 'AWS does not support organization invites here' } },
+          status === 500
+            ? { error: 'server error' }
+            : { error: { message: 'AWS does not support organization invites here' } },
         ),
         {
           status,
@@ -329,11 +331,14 @@ describe('instantiate bedrock client', () => {
       const requestURL = new URL(url.toString());
       requests.push(`${init?.method} ${requestURL.pathname}`);
 
-      const body =
-        requestURL.pathname === '/openai/v1/responses/compact' ? COMPACTED_RESPONSE_BODY
-        : requestURL.pathname === '/openai/v1/responses/input_tokens' ? INPUT_TOKENS_BODY
-        : requestURL.pathname === '/openai/v1/responses/resp_123/input_items' ? INPUT_ITEMS_BODY
-        : RESPONSE_BODY;
+      let body: unknown = RESPONSE_BODY;
+      if (requestURL.pathname === '/openai/v1/responses/compact') {
+        body = COMPACTED_RESPONSE_BODY;
+      } else if (requestURL.pathname === '/openai/v1/responses/input_tokens') {
+        body = INPUT_TOKENS_BODY;
+      } else if (requestURL.pathname === '/openai/v1/responses/resp_123/input_items') {
+        body = INPUT_ITEMS_BODY;
+      }
 
       return new globalThis.Response(JSON.stringify(body), {
         status: 200,

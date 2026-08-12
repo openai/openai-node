@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import * as WS from 'ws';
 import { NodeWebSocket } from '../../../internal/ws-adapter-node';

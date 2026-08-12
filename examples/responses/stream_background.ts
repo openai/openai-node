@@ -14,12 +14,12 @@ async function main() {
   let id: string | null = null;
 
   for await (const event of runner) {
-    if (event.type == 'response.created') {
+    if (event.type === 'response.created') {
       id = event.response.id;
     }
 
     console.log('event', event);
-    if (event.sequence_number == 10) {
+    if (event.sequence_number === 10) {
       break;
     }
   }

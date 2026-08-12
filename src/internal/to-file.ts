@@ -1,21 +1,27 @@
-import { BlobPart, getName, makeFile, isAsyncIterable } from './uploads';
+import type { BlobPart } from './uploads';
+import { getName, makeFile, isAsyncIterable, checkFileSupport } from './uploads';
 import type { FilePropertyBag } from './builtin-types';
-import { checkFileSupport } from './uploads';
 
+/** Text, binary content, or a Blob-compatible value accepted inside a file stream. */
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | DataView;
 
 /**
- * Intended to match DOM Blob, node-fetch Blob, node:buffer Blob, etc.
- * Don't add arrayBuffer here, node-fetch doesn't have it
+ * Structural Blob compatibility across DOM, `node-fetch`, and Node.js runtimes.
+ *
+ * `arrayBuffer()` is intentionally checked separately because some older
+ * third-party Blob types do not declare it.
  */
 interface BlobLike {
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/size) */
+  /** Size of the Blob contents in bytes. */
   readonly size: number;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/type) */
+
+  /** MIME type associated with the Blob contents, or an empty string. */
   readonly type: string;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/text) */
+
+  /** Reads the Blob contents as UTF-8 text. */
   text(): Promise<string>;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/slice) */
+
+  /** Returns a Blob-compatible view of the requested byte range. */
   slice(start?: number, end?: number): BlobLike;
 }
 
@@ -32,12 +38,13 @@ const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Promise<Ar
   typeof value.arrayBuffer === 'function';
 
 /**
- * Intended to match DOM File, node:buffer File, undici File, etc.
+ * Structural File compatibility across DOM, `node:buffer`, and `undici` runtimes.
  */
 interface FileLike extends BlobLike {
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/lastModified) */
+  /** Last modification time as milliseconds since the Unix epoch. */
   readonly lastModified: number;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/name) */
+
+  /** Filename associated with the underlying File-compatible object. */
   readonly name?: string | undefined;
 }
 
@@ -52,10 +59,13 @@ const isFileLike = (value: any): value is FileLike & { arrayBuffer(): Promise<Ar
   isBlobLike(value);
 
 /**
- * Intended to match DOM Response, node-fetch Response, undici Response, etc.
+ * Structural fetch-response compatibility across browser and server runtimes.
  */
 export interface ResponseLike {
+  /** Absolute response URL used to infer a filename from its final path segment. */
   url: string;
+
+  /** Reads the response body into a Blob-compatible value. */
   blob(): Promise<BlobLike>;
 }
 
@@ -65,6 +75,24 @@ const isResponseLike = (value: any): value is ResponseLike =>
   typeof value.url === 'string' &&
   typeof value.blob === 'function';
 
+const hasFilePropertyOverrides = (value: FileLike, options: FilePropertyBag | undefined): boolean =>
+  (options?.type != null && options.type !== value.type) ||
+  (options?.lastModified != null && options.lastModified !== value.lastModified) ||
+  options?.endings != null;
+
+const canReuseNativeFile = (
+  value: File,
+  name: string | null | undefined,
+  options: FilePropertyBag | undefined,
+): boolean => (name == null || name === value.name) && !hasFilePropertyOverrides(value, options);
+
+/**
+ * File-compatible values that can be buffered into a native `File`.
+ *
+ * Includes existing files, fetch responses, binary buffers, Blob-compatible
+ * values, and async streams of file parts. Top-level strings are intentionally
+ * excluded so filesystem paths are not accidentally treated as file contents.
+ */
 export type ToFileInput =
   | FileLike
   | ResponseLike
@@ -72,13 +100,23 @@ export type ToFileInput =
   | AsyncIterable<BlobLikePart>;
 
 /**
- * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
- * @param value the raw content of the file. Can be an {@link Uploadable}, BlobLikePart, or AsyncIterable of BlobLikeParts
- * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
- * @param {Object=} options additional properties
- * @param {string=} options.type the MIME type of the content
- * @param {number=} options.lastModified the last modified timestamp
- * @returns a {@link File} with the given properties
+ * Buffers compatible content into a native {@link File} for an SDK upload.
+ *
+ * Existing native `File` objects are returned unchanged when their effective
+ * filename and metadata are unchanged. Renamed native files reuse the original
+ * file contents without buffering and retain their MIME type and modification
+ * time unless explicitly overridden. Other filenames are inferred from response
+ * URLs or input metadata when omitted, falling back to `unknown_file`. Responses,
+ * native or compatible `Blob` values, and compatible non-native files supply
+ * their MIME type unless `options.type` provides an explicit override.
+ *
+ * @param value An existing file, response, binary buffer, Blob-like object, async
+ * stream of file parts, or a promise resolving to one of those values.
+ * @param name Optional filename overriding inferred metadata or an existing filename.
+ * @param options Optional file metadata, including MIME type and modification time.
+ * @returns A native `File` containing the complete buffered input.
+ * @throws {Error} If the runtime lacks a global `File` constructor or the input
+ * cannot be converted into file contents.
  */
 export async function toFile(
   value: ToFileInput | PromiseLike<ToFileInput>,
@@ -90,37 +128,51 @@ export async function toFile(
   // If it's a promise, resolve it.
   value = await value;
 
-  // If we've been given a `File` we don't need to do anything
   if (isFileLike(value)) {
+    const fileOptions = {
+      ...options,
+      type: options?.type ?? value.type,
+      lastModified: options?.lastModified ?? value.lastModified,
+    };
+
     if (value instanceof File) {
-      return value;
+      if (canReuseNativeFile(value, name, options)) {
+        return value;
+      }
+
+      return makeFile([value], name ?? value.name, fileOptions);
     }
-    return makeFile([await value.arrayBuffer()], value.name);
+
+    return makeFile([await value.arrayBuffer()], name ?? value.name, fileOptions);
   }
 
   if (isResponseLike(value)) {
     const blob = await value.blob();
     name ||= new URL(value.url).pathname.split(/[\\/]/).pop();
 
-    return makeFile(await getBytes(blob), name, options);
+    const responseOptions =
+      options?.type === undefined && blob.type ? { ...options, type: blob.type } : options;
+    return makeFile(await getBytes(blob), name, responseOptions);
   }
 
   const parts = await getBytes(value);
 
   name ||= getName(value);
 
-  if (!options?.type) {
-    const type = parts.find((part) => typeof part === 'object' && 'type' in part && part.type);
-    if (typeof type === 'string') {
-      options = { ...options, type };
+  if (options?.type === undefined) {
+    const typedPart = parts.find(
+      (part): part is Blob => typeof part === 'object' && 'type' in part && !!part.type,
+    );
+    if (typedPart) {
+      options = { ...options, type: typedPart.type };
     }
   }
 
   return makeFile(parts, name, options);
 }
 
-async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Promise<Array<BlobPart>> {
-  let parts: Array<BlobPart> = [];
+async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Promise<BlobPart[]> {
+  const parts: BlobPart[] = [];
   if (
     typeof value === 'string' ||
     ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.
@@ -128,12 +180,12 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
   ) {
     parts.push(value);
   } else if (isBlobLike(value)) {
-    parts.push(value instanceof Blob ? value : await value.arrayBuffer());
+    parts.push(value instanceof Blob ? value : new Blob([await value.arrayBuffer()], { type: value.type }));
   } else if (
     isAsyncIterable(value) // includes Readable, ReadableStream, etc.
   ) {
     for await (const chunk of value) {
-      parts.push(...(await getBytes(chunk as BlobLikePart))); // TODO, consider validating?
+      parts.push(...(await getBytes(chunk as BlobLikePart)));
     }
   } else {
     const constructor = value?.constructor?.name;
@@ -148,7 +200,9 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
 }
 
 function propsForError(value: unknown): string {
-  if (typeof value !== 'object' || value === null) return '';
+  if (typeof value !== 'object' || value === null) {
+    return '';
+  }
   const props = Object.getOwnPropertyNames(value);
   return `; props: [${props.map((p) => `"${p}"`).join(', ')}]`;
 }

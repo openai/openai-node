@@ -1,5 +1,93 @@
 # Changelog
 
+## [7.4.0](https://github.com/openai/openai-node/compare/v7.3.0...v7.4.0) (2026-08-03)
+
+
+### Features
+
+* **api:** Add gpt-5.5 model and tool metadata fields ([#2049](https://github.com/openai/openai-node/issues/2049)) ([6d8fb53](https://github.com/openai/openai-node/commit/6d8fb5300c09d649d59aba1dc90da7503654800c))
+
+
+### Bug Fixes
+
+* defer release PR output parsing ([#2052](https://github.com/openai/openai-node/issues/2052)) ([395bdde](https://github.com/openai/openai-node/commit/395bdded61fd7288c7e9bb51c933b776a4193776))
+
+
+### Documentation
+
+* add HTTP mTLS transport examples ([#2029](https://github.com/openai/openai-node/issues/2029)) ([2cc5f96](https://github.com/openai/openai-node/commit/2cc5f96d4332bc12210cd751cd367f3908986587))
+
+
+### Build System
+
+* **deps-dev:** bump @smithy/hash-node from 4.3.5 to 4.4.15 ([#2064](https://github.com/openai/openai-node/issues/2064)) ([481b325](https://github.com/openai/openai-node/commit/481b325a0731e4fea477882f0d9d0cc293589ee0))
+* **deps-dev:** bump @types/web from 0.0.194 to 0.0.354 ([#2061](https://github.com/openai/openai-node/issues/2061)) ([f61f267](https://github.com/openai/openai-node/commit/f61f267c54e38b1f0ad3e86c4bae9ba615b63030))
+* **deps-dev:** bump publint from 0.2.12 to 0.3.22 ([#2058](https://github.com/openai/openai-node/issues/2058)) ([823d7df](https://github.com/openai/openai-node/commit/823d7df4cd6b1a03aa3db47dad6226f20b3305b1))
+* **deps:** bump dotenv from 16.6.1 to 17.4.2 ([#2065](https://github.com/openai/openai-node/issues/2065)) ([3576574](https://github.com/openai/openai-node/commit/35765741815eb6a714676cc50dfc645408d5857c))
+* **deps:** bump fast-uri from 3.1.4 to 3.1.5 in /ecosystem-tests/vercel-edge ([#2050](https://github.com/openai/openai-node/issues/2050)) ([590982f](https://github.com/openai/openai-node/commit/590982f4281f91b9c380c0591dd3107d59e428f1))
+* **deps:** bump ip-address from 10.2.0 to 10.4.0 in /ecosystem-tests/vercel-edge ([#2056](https://github.com/openai/openai-node/issues/2056)) ([4d927de](https://github.com/openai/openai-node/commit/4d927deaf14751acba19eac5a2118090fbb2407c))
+* migrate release workflow to upstream release-please ([#2048](https://github.com/openai/openai-node/issues/2048)) ([d41c272](https://github.com/openai/openai-node/commit/d41c2726394758bbdfd323d4a66e27f759460713))
+
+## 7.3.0 (2026-07-31)
+
+Full Changelog: [v7.2.0...v7.3.0](https://github.com/openai/openai-node/compare/v7.2.0...v7.3.0)
+
+### Features
+
+* **api:** content provenance checks ([c6f9339](https://github.com/openai/openai-node/commit/c6f9339df44ff0e2180300c1452047592a867dc5))
+
+
+### Chores
+
+* remove Brewfile setup path ([#2031](https://github.com/openai/openai-node/issues/2031)) ([6b63159](https://github.com/openai/openai-node/commit/6b631599de7d91f90767f9c6df1e9d53e36768b5))
+* remove JSR publishing ([#2037](https://github.com/openai/openai-node/issues/2037)) ([b1fc7df](https://github.com/openai/openai-node/commit/b1fc7df4659aaf2cac0c78d3f5b6814251de2b0b))
+
+
+### Documentation
+
+* organize SDK guides and repository metadata ([#2032](https://github.com/openai/openai-node/issues/2032)) ([275dff4](https://github.com/openai/openai-node/commit/275dff4de124bf7aaa566ddecd7ada88c91eef81))
+* remove root-level provider guides ([98a2ae7](https://github.com/openai/openai-node/commit/98a2ae7cd801c8d09fda10be698816c52ddec059))
+
+## 7.2.0 (2026-07-30)
+
+Full Changelog: [v7.1.0...v7.2.0](https://github.com/openai/openai-node/compare/v7.1.0...v7.2.0)
+
+### Features
+
+* **api:** fast tier ([84dffed](https://github.com/openai/openai-node/commit/84dffedd7f238abac249671409ad11bdddc80567))
+
+## 7.1.0 (2026-07-28)
+
+Full Changelog: [v7.0.0...v7.1.0](https://github.com/openai/openai-node/compare/v7.0.0...v7.1.0)
+
+### Features
+
+* **api:** transcription model updates ([b35ca14](https://github.com/openai/openai-node/commit/b35ca14883ed662c81fa75a058dbd1aab4de1db3))
+
+
+### Chores
+
+* **internal:** codegen related update ([ee871e5](https://github.com/openai/openai-node/commit/ee871e58616be2c9f16bfd26cef23ca024690839))
+
+## 7.0.0 (2026-07-27)
+
+Full Changelog: [v6.49.0...v7.0.0](https://github.com/openai/openai-node/compare/v6.49.0...v7.0.0)
+
+### ⚠ BREAKING CHANGES
+
+* require Node.js 22 and codify version support ([#2026](https://github.com/openai/openai-node/issues/2026))
+
+### Features
+
+* require Node.js 22 and codify version support ([#2026](https://github.com/openai/openai-node/issues/2026)) ([9185cdd](https://github.com/openai/openai-node/commit/9185cdd02fbf4b6cac7cbedce3417e33db3ea790))
+
+
+### Build System
+
+* **deps:** bump fast-uri in /ecosystem-tests/ts-browser-webpack ([#2027](https://github.com/openai/openai-node/issues/2027)) ([c6a46b8](https://github.com/openai/openai-node/commit/c6a46b838d9d8c099b1d903db3327e82ac400b60))
+* **deps:** bump fast-uri in /ecosystem-tests/vercel-edge ([#2024](https://github.com/openai/openai-node/issues/2024)) ([8e775cf](https://github.com/openai/openai-node/commit/8e775cf1b6aeb1011091b92d0fc759a559a02f5d))
+* **deps:** bump next from 15.5.20 to 15.5.21 ([#2025](https://github.com/openai/openai-node/issues/2025)) ([09f0b5e](https://github.com/openai/openai-node/commit/09f0b5eb4829e54f02e2b05c86178b182f40c88f))
+
 ## 6.49.0 (2026-07-23)
 
 Full Changelog: [v6.48.0...v6.49.0](https://github.com/openai/openai-node/compare/v6.48.0...v6.49.0)
@@ -29,7 +117,6 @@ Full Changelog: [v6.48.0...v6.49.0](https://github.com/openai/openai-node/compar
 
 ### Chores
 
-* exclude Brewfile from language detection ([#2006](https://github.com/openai/openai-node/issues/2006)) ([9bec333](https://github.com/openai/openai-node/commit/9bec3332133c115b0e728010ab614daf5516e35b))
 * refresh more ecosystem test dependencies ([#2003](https://github.com/openai/openai-node/issues/2003)) ([3cafa55](https://github.com/openai/openai-node/commit/3cafa553aeb7f10e9afb432ae5d4aaa1c6d42663))
 
 ## 6.48.0 (2026-07-17)

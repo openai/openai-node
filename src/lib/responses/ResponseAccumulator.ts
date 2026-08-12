@@ -1,13 +1,12 @@
-import {
-  type Response,
-  type ResponseOutputText,
-  type ResponseStreamEvent,
-} from '../../resources/responses/responses';
+import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../resources/responses/responses';
 import { OpenAIError } from '../../error';
 import { addOutputText } from '../ResponsesParser';
 
+/** A transport keepalive event that leaves the accumulated response unchanged. */
 type ResponseKeepAliveEvent = {
+  /** Identifies a non-content keepalive event emitted by the response transport. */
   type: 'keepalive';
+  /** Monotonically ordered event sequence number assigned by the response stream. */
   sequence_number: number;
 };
 
@@ -408,7 +407,7 @@ function getOutput(snapshot: Response, outputIndex: number): Response['output'][
   return output;
 }
 
-function getContent<T>(content: Array<T>, contentIndex: number): T {
+function getContent<T>(content: T[], contentIndex: number): T {
   const part = content[contentIndex];
   if (!part) {
     throw new OpenAIError(`missing content at index ${contentIndex}`);

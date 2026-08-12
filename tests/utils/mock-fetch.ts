@@ -1,4 +1,4 @@
-import { type Fetch, type RequestInfo, type RequestInit, type Response } from 'openai/internal/builtin-types';
+import type { Fetch, RequestInfo, RequestInit, Response } from 'openai/internal/builtin-types';
 
 /**
  * Creates a mock `fetch` function and a `handleRequest` function for intercepting `fetch` calls.
@@ -27,9 +27,13 @@ export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => P
 
   async function fetch(req: string | RequestInfo, init?: RequestInit): Promise<Response> {
     const handler = await handlerQueue.shift();
-    if (!handler) throw new Error('expected handler to be defined');
+    if (!handler) {
+      throw new Error('expected handler to be defined');
+    }
     const signal = init?.signal;
-    if (!signal) return await handler(req, init);
+    if (!signal) {
+      return await handler(req, init);
+    }
     return await Promise.race([
       handler(req, init),
       new Promise<Response>((resolve, reject) => {
@@ -50,12 +54,12 @@ export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => P
     return new Promise<void>((resolve, reject) => {
       fetchQueue.shift()?.(async (req, init) => {
         try {
-          return await handle(req, init);
+          const response = await handle(req, init);
+          resolve();
+          return response;
         } catch (err) {
           reject(err);
           return err as any;
-        } finally {
-          resolve();
         }
       });
     });

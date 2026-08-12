@@ -8,7 +8,7 @@ The main changes are that the SDK now relies on the [builtin Web fetch API](http
 
 The minimum supported runtime and tooling versions are now:
 
-- Node.js 20 LTS (Most recent non-EOL Node version)
+- Node.js 22 LTS
 - TypeScript 4.9
 - Jest 28
 
@@ -545,7 +545,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 ```jsonc
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
-  "lib": ["DOM", "DOM.Iterable", "ES2018"]
+  "lib": ["DOM", "DOM.Iterable", "ES2018"],
 }
 ```
 
@@ -555,7 +555,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 
@@ -577,7 +577,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
   "lib": ["ES2020"], // <- needed by @cloudflare/workers-types
-  "types": ["@cloudflare/workers-types"]
+  "types": ["@cloudflare/workers-types"],
 }
 ```
 
@@ -597,7 +597,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 

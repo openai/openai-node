@@ -3,7 +3,7 @@ import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/res
 
 describe('toResponseInputItems', () => {
   test('normalizes mixed response history items', () => {
-    const history: Array<ResponseInputItem | ResponseOutputItem> = [
+    const history: (ResponseInputItem | ResponseOutputItem)[] = [
       {
         type: 'function_call_output',
         call_id: 'function_call_123',
