@@ -78,8 +78,8 @@ importers:
         specifier: ^0.3.22
         version: 0.3.22
       signal-exit:
-        specifier: ^3.0.7
-        version: 3.0.7
+        specifier: ^4.1.0
+        version: 4.1.0
       superstruct:
         specifier: ^2.0.2
         version: 2.0.2
