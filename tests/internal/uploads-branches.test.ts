@@ -43,6 +43,8 @@ describe('streaming upload metadata', () => {
   test.each([
     [{ name: 'my-skill/SKILL.md' }, 'my-skill/SKILL.md'],
     [{ filename: 'my-skill/assets/data.json' }, 'my-skill/assets/data.json'],
+    [{ name: 'my-skill\\SKILL.md' }, 'my-skill/SKILL.md'],
+    [{ filename: 'my-skill\\assets\\data.json' }, 'my-skill/assets/data.json'],
     [{ url: 'https://example.com/private/remote.txt?signature=example#fragment' }, 'remote.txt'],
     [{ path: '/private/tmp/local.txt' }, 'local.txt'],
     [{ path: 'C:\\private\\nested\\local.txt' }, 'local.txt'],
