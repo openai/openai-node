@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../core/resource';
 import * as RolesAPI from './roles';
@@ -10,6 +10,8 @@ import {
   RoleListParams,
   RoleListResponse,
   RoleListResponsesPage,
+  RoleRetrieveParams,
+  RoleRetrieveResponse,
   Roles,
 } from './roles';
 import { APIPromise } from '../../../../core/api-promise';
@@ -277,10 +279,12 @@ export declare namespace Users {
   export {
     Roles as Roles,
     type RoleCreateResponse as RoleCreateResponse,
+    type RoleRetrieveResponse as RoleRetrieveResponse,
     type RoleListResponse as RoleListResponse,
     type RoleDeleteResponse as RoleDeleteResponse,
     type RoleListResponsesPage as RoleListResponsesPage,
     type RoleCreateParams as RoleCreateParams,
+    type RoleRetrieveParams as RoleRetrieveParams,
     type RoleListParams as RoleListParams,
     type RoleDeleteParams as RoleDeleteParams,
   };

@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../core/resource';
 import * as RolesAPI from '../roles';
@@ -24,6 +24,26 @@ export class Roles extends APIResource {
   create(projectID: string, body: RoleCreateParams, options?: RequestOptions): APIPromise<RolesAPI.Role> {
     return this._client.post(path`/projects/${projectID}/roles`, {
       body,
+      ...options,
+      __security: { adminAPIKeyAuth: true },
+    });
+  }
+
+  /**
+   * Retrieves a project role.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.roles.retrieve(
+   *     'role_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(roleID: string, params: RoleRetrieveParams, options?: RequestOptions): APIPromise<RolesAPI.Role> {
+    const { project_id } = params;
+    return this._client.get(path`/projects/${project_id}/roles/${roleID}`, {
       ...options,
       __security: { adminAPIKeyAuth: true },
     });
@@ -133,6 +153,13 @@ export interface RoleCreateParams {
   description?: string | null;
 }
 
+export interface RoleRetrieveParams {
+  /**
+   * The ID of the project.
+   */
+  project_id: string;
+}
+
 export interface RoleUpdateParams {
   /**
    * Path param: The ID of the project to update.
@@ -173,6 +200,7 @@ export declare namespace Roles {
   export {
     type RoleDeleteResponse as RoleDeleteResponse,
     type RoleCreateParams as RoleCreateParams,
+    type RoleRetrieveParams as RoleRetrieveParams,
     type RoleUpdateParams as RoleUpdateParams,
     type RoleListParams as RoleListParams,
     type RoleDeleteParams as RoleDeleteParams,

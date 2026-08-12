@@ -9,7 +9,7 @@ node scripts/utils/check-version.cjs
 # Build into dist and will publish the package from there,
 # so that src/resources/foo.ts becomes <package root>/resources/foo.js
 # This way importing from `"openai/resources/foo"` works
-# even with `"moduleResolution": "node"`
+# even with `"moduleResolution": "bundler"`
 
 rm -rf dist; mkdir dist
 # Copy src to dist/src and build from dist/src into dist, so that
@@ -18,25 +18,18 @@ cp -rp src README.md dist
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist; fi
 done
-if [ -e "bin/cli" ]; then
-  mkdir -p dist/bin
-  cp -p "bin/cli" dist/bin/;
-fi
-if [ -e "bin/migration-config.json" ]; then
-  mkdir -p dist/bin
-  cp -p "bin/migration-config.json" dist/bin/;
-fi
 # this converts the export map paths for the dist directory
 # and does a few other minor things
 node scripts/utils/make-dist-package-json.cjs > dist/package.json
 
 # build to .js/.mjs/.d.ts files
-./node_modules/.bin/tsc-multi
+node -r ts-node/register/transpile-only scripts/_vendor/tsc-multi/src/cli.ts
 # we need to patch index.js so that `new module.exports()` works for cjs backwards
 # compat. No way to get that from index.ts because it would cause compile errors
 # when building .mjs
 node scripts/utils/fix-index-exports.cjs
 cp tsconfig.dist-src.json dist/src/tsconfig.json
+cp tsconfig.dist-src.d.ts dist/src/tsconfig.dist-src.d.ts
 
 node scripts/utils/postprocess-files.cjs
 
@@ -44,8 +37,5 @@ node scripts/utils/postprocess-files.cjs
 # import the output ESM
 (cd dist && node -e 'require("openai")')
 (cd dist && node -e 'import("openai")' --input-type=module)
-
-if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && [ -e ./scripts/build-deno ]
-then
-  ./scripts/build-deno
-fi
+(cd dist && node -e 'require("openai/providers/bedrock")')
+(cd dist && node -e 'import("openai/providers/bedrock")' --input-type=module)

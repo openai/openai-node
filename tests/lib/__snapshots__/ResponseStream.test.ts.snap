@@ -1,7 +1,7 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`.stream() standard text works 1`] = `
-"data: {\"response\":{\"id\":\"resp_test_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"in_progress\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":0}},\"sequence_number\":0,\"type\":\"response.created\"}
+"data: {\"response\":{\"id\":\"resp_test_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[],\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"in_progress\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":0}},\"sequence_number\":0,\"type\":\"response.created\"}
 
 data: {\"item\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"in_progress\",\"content\":[]},\"output_index\":0,\"sequence_number\":1,\"type\":\"response.output_item.added\"}
 
@@ -15,7 +15,7 @@ data: {\"content_index\":0,\"item_id\":\"msg_1\",\"logprobs\":[],\"output_index\
 
 data: {\"item\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello world\",\"annotations\":[]}]},\"output_index\":0,\"sequence_number\":6,\"type\":\"response.output_item.done\"}
 
-data: {\"response\":{\"id\":\"resp_test_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello world\",\"annotations\":[]}]}],\"output_text\":\"Hello world\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"completed\",\"usage\":{\"input_tokens\":10,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":2,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":12}},\"sequence_number\":7,\"type\":\"response.completed\"}
+data: {\"response\":{\"id\":\"resp_test_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello world\",\"annotations\":[]}]}],\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"completed\",\"usage\":{\"input_tokens\":10,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":2,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":12}},\"sequence_number\":7,\"type\":\"response.completed\"}
 
 data: [DONE]
 
@@ -49,4 +49,3 @@ data: [DONE]
 
 "
 `;
-

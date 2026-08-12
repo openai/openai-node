@@ -1,15 +1,16 @@
-import { ZodBigIntDef } from 'zod/v3';
-import { Refs } from '../Refs';
-import { ErrorMessages, setResponseValueAndErrors } from '../errorMessages';
+import type { ZodBigIntDef } from 'zod/v3';
+import type { Refs } from '../Refs';
+import type { ErrorMessages } from '../errorMessages';
+import { setResponseValueAndErrors } from '../errorMessages';
 
 export type JsonSchema7BigintType = {
   type: 'integer';
   format: 'int64';
-  minimum?: BigInt;
-  exclusiveMinimum?: BigInt;
-  maximum?: BigInt;
-  exclusiveMaximum?: BigInt;
-  multipleOf?: BigInt;
+  minimum?: bigint;
+  exclusiveMinimum?: bigint;
+  maximum?: bigint;
+  exclusiveMaximum?: bigint;
+  multipleOf?: bigint;
   errorMessage?: ErrorMessages<JsonSchema7BigintType>;
 };
 
@@ -19,11 +20,13 @@ export function parseBigintDef(def: ZodBigIntDef, refs: Refs): JsonSchema7Bigint
     format: 'int64',
   };
 
-  if (!def.checks) return res;
+  if (!def.checks) {
+    return res;
+  }
 
   for (const check of def.checks) {
     switch (check.kind) {
-      case 'min':
+      case 'min': {
         if (refs.target === 'jsonSchema7') {
           if (check.inclusive) {
             setResponseValueAndErrors(res, 'minimum', check.value, check.message, refs);
@@ -37,7 +40,8 @@ export function parseBigintDef(def: ZodBigIntDef, refs: Refs): JsonSchema7Bigint
           setResponseValueAndErrors(res, 'minimum', check.value, check.message, refs);
         }
         break;
-      case 'max':
+      }
+      case 'max': {
         if (refs.target === 'jsonSchema7') {
           if (check.inclusive) {
             setResponseValueAndErrors(res, 'maximum', check.value, check.message, refs);
@@ -51,9 +55,11 @@ export function parseBigintDef(def: ZodBigIntDef, refs: Refs): JsonSchema7Bigint
           setResponseValueAndErrors(res, 'maximum', check.value, check.message, refs);
         }
         break;
-      case 'multipleOf':
+      }
+      case 'multipleOf': {
         setResponseValueAndErrors(res, 'multipleOf', check.value, check.message, refs);
         break;
+      }
     }
   }
   return res;

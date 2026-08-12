@@ -1,8 +1,9 @@
-import { ZodDateDef } from 'zod/v3';
-import { Refs } from '../Refs';
-import { ErrorMessages, setResponseValueAndErrors } from '../errorMessages';
-import { JsonSchema7NumberType } from './number';
-import { DateStrategy } from '../Options';
+import type { ZodDateDef } from 'zod/v3';
+import type { Refs } from '../Refs';
+import type { ErrorMessages } from '../errorMessages';
+import { setResponseValueAndErrors } from '../errorMessages';
+import type { JsonSchema7NumberType } from './number';
+import type { DateStrategy } from '../Options';
 
 export type JsonSchema7DateType =
   | {
@@ -31,18 +32,21 @@ export function parseDateDef(
 
   switch (strategy) {
     case 'string':
-    case 'format:date-time':
+    case 'format:date-time': {
       return {
         type: 'string',
         format: 'date-time',
       };
-    case 'format:date':
+    }
+    case 'format:date': {
       return {
         type: 'string',
         format: 'date',
       };
-    case 'integer':
+    }
+    case 'integer': {
       return integerDateParser(def, refs);
+    }
   }
 }
 
@@ -58,7 +62,7 @@ const integerDateParser = (def: ZodDateDef, refs: Refs) => {
 
   for (const check of def.checks) {
     switch (check.kind) {
-      case 'min':
+      case 'min': {
         setResponseValueAndErrors(
           res,
           'minimum',
@@ -67,7 +71,8 @@ const integerDateParser = (def: ZodDateDef, refs: Refs) => {
           refs,
         );
         break;
-      case 'max':
+      }
+      case 'max': {
         setResponseValueAndErrors(
           res,
           'maximum',
@@ -76,6 +81,7 @@ const integerDateParser = (def: ZodDateDef, refs: Refs) => {
           refs,
         );
         break;
+      }
     }
   }
 

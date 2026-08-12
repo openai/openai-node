@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
@@ -73,6 +73,13 @@ export interface InputTokenCountParams {
   parallel_tool_calls?: boolean | null;
 
   /**
+   * A model-owned style preset to apply to this request. Omit this parameter to use
+   * the model's default style. Supported values may expand over time. Values must be
+   * at most 64 characters.
+   */
+  personality?: (string & {}) | 'friendly' | 'pragmatic';
+
+  /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
@@ -105,6 +112,7 @@ export interface InputTokenCountParams {
     | ResponsesAPI.ToolChoiceFunction
     | ResponsesAPI.ToolChoiceMcp
     | ResponsesAPI.ToolChoiceCustom
+    | InputTokenCountParams.SpecificProgrammaticToolCallingParam
     | ResponsesAPI.ToolChoiceApplyPatch
     | ResponsesAPI.ToolChoiceShell
     | null;
@@ -116,11 +124,12 @@ export interface InputTokenCountParams {
   tools?: Array<ResponsesAPI.Tool> | null;
 
   /**
-   * The truncation strategy to use for the model response. - `auto`: If the input to
-   * this Response exceeds the model's context window size, the model will truncate
-   * the response to fit the context window by dropping items from the beginning of
-   * the conversation. - `disabled` (default): If the input size will exceed the
-   * context window size for a model, the request will fail with a 400 error.
+   * @deprecated The truncation strategy to use for the model response. - `auto`: If
+   * the input to this Response exceeds the model's context window size, the model
+   * will truncate the response to fit the context window by dropping items from the
+   * beginning of the conversation. - `disabled` (default): If the input size will
+   * exceed the context window size for a model, the request will fail with a 400
+   * error.
    */
   truncation?: 'auto' | 'disabled';
 }
@@ -154,9 +163,17 @@ export namespace InputTokenCountParams {
     /**
      * Constrains the verbosity of the model's response. Lower values will result in
      * more concise responses, while higher values will result in more verbose
-     * responses. Currently supported values are `low`, `medium`, and `high`.
+     * responses. Currently supported values are `low`, `medium`, and `high`. The
+     * default is `medium`.
      */
     verbosity?: 'low' | 'medium' | 'high' | null;
+  }
+
+  export interface SpecificProgrammaticToolCallingParam {
+    /**
+     * The tool to call. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
   }
 }
 

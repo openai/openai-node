@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
@@ -28,6 +28,25 @@ describe('resource roles', () => {
       permissions: ['string'],
       role_name: 'role_name',
       description: 'description',
+    });
+  });
+
+  test('retrieve: only required params', async () => {
+    const responsePromise = client.admin.organization.projects.roles.retrieve('role_id', {
+      project_id: 'project_id',
+    });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('retrieve: required and optional params', async () => {
+    const response = await client.admin.organization.projects.roles.retrieve('role_id', {
+      project_id: 'project_id',
     });
   });
 

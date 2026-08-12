@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export {
   Groups,
@@ -13,9 +13,11 @@ export {
 export {
   Roles,
   type RoleCreateResponse,
+  type RoleRetrieveResponse,
   type RoleListResponse,
   type RoleDeleteResponse,
   type RoleCreateParams,
+  type RoleRetrieveParams,
   type RoleListParams,
   type RoleDeleteParams,
   type RoleListResponsesPage,
@@ -24,8 +26,10 @@ export {
   Users,
   type OrganizationGroupUser,
   type UserCreateResponse,
+  type UserRetrieveResponse,
   type UserDeleteResponse,
   type UserCreateParams,
+  type UserRetrieveParams,
   type UserListParams,
   type UserDeleteParams,
   type OrganizationGroupUsersPage,

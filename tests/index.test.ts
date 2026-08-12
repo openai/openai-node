@@ -319,7 +319,7 @@ describe('instantiate client', () => {
 
     const spy = jest.spyOn(client, 'request');
 
-    await expect(client.get('/foo', { signal: controller.signal })).rejects.toThrowError(APIUserAbortError);
+    await expect(client.get('/foo', { signal: controller.signal })).rejects.toThrow(APIUserAbortError);
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
@@ -339,6 +339,39 @@ describe('instantiate client', () => {
 
     await client.patch('/foo');
     expect(capturedRequest?.method).toEqual('PATCH');
+  });
+
+  test('explains undici dispatcher and fetch version mismatch', async () => {
+    const undiciError = Object.assign(new Error('invalid onRequestStart method'), {
+      name: 'InvalidArgumentError',
+      code: 'UND_ERR_INVALID_ARG',
+    });
+    const fetchError = new TypeError('fetch failed');
+    (fetchError as any).cause = undiciError;
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      maxRetries: 0,
+      fetch: async () => {
+        throw fetchError;
+      },
+      fetchOptions: {
+        dispatcher: { dispatch() {} },
+      } as any,
+    });
+
+    await expect(client.get('/foo')).rejects.toThrow(
+      "If you are using undici's ProxyAgent, pass the fetch implementation from the same undici package",
+    );
+
+    try {
+      await client.get('/foo');
+      throw new Error('expected request to fail');
+    } catch (error) {
+      expect((error as any).cause).toBe(fetchError);
+    }
   });
 
   describe('baseUrl', () => {
@@ -581,6 +614,30 @@ describe('default encoder', () => {
     });
   }
 
+  test('keeps content-type for omitted optional request bodies', async () => {
+    const { req } = await client.buildRequest({
+      path: '/foo',
+      method: 'post',
+      body: undefined,
+    });
+
+    expect(req.headers).toBeInstanceOf(Headers);
+    expect(req.headers.get('content-type')).toEqual('application/json');
+    expect(req.body).toBe(undefined);
+  });
+
+  test('does not serialize null optional request bodies', async () => {
+    const { req } = await client.buildRequest({
+      path: '/foo',
+      method: 'post',
+      body: null,
+    });
+
+    expect(req.headers).toBeInstanceOf(Headers);
+    expect(req.headers.get('content-type')).toEqual(null);
+    expect(req.body).toBe(undefined);
+  });
+
   const encoder = new TextEncoder();
   const asyncIterable = (async function* () {
     yield encoder.encode('a\n');
@@ -627,8 +684,8 @@ describe('retries', () => {
       { signal }: RequestInit = {},
     ): Promise<Response> => {
       if (count++ === 0) {
-        return new Promise(
-          (resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('timed out'))),
+        return new Promise((resolve, reject) =>
+          signal?.addEventListener('abort', () => reject(new Error('timed out'))),
         );
       }
       return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
@@ -650,6 +707,35 @@ describe('retries', () => {
         .then((r) => r.text()),
     ).toEqual(JSON.stringify({ a: 1 }));
     expect(count).toEqual(3);
+  });
+
+  test('does not retry streaming request bodies', async () => {
+    let count = 0;
+    const testFetch = async (url: string | URL | Request, { body }: RequestInit = {}): Promise<Response> => {
+      count++;
+      expect(body).toBeInstanceOf(ReadableStream);
+      await new Response(body).text();
+      return new Response(undefined, { status: 429 });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+      maxRetries: 2,
+    });
+
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('streamed-content'));
+        controller.close();
+      },
+    });
+
+    await expect(client.request({ path: '/foo', method: 'post', body })).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(count).toEqual(1);
   });
 
   test('retry count header', async () => {

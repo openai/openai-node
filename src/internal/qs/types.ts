@@ -19,7 +19,7 @@ export type StringifyBaseOptions = {
     type: 'key' | 'value',
     format?: Format,
   ) => string;
-  filter?: Array<PropertyKey> | ((prefix: PropertyKey, value: any) => any);
+  filter?: PropertyKey[] | ((prefix: PropertyKey, value: any) => any);
   arrayFormat?: 'indices' | 'brackets' | 'repeat' | 'comma';
   indices?: boolean;
   sort?: ((a: PropertyKey, b: PropertyKey) => number) | null;

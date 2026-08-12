@@ -1,28 +1,41 @@
+/** Supplies a fresh external identity token for an OpenAI workload-identity exchange. */
 export interface SubjectTokenProvider {
+  /** Whether the provider returns a signed JWT or an OpenID Connect identity token. */
   tokenType: 'jwt' | 'id';
+
+  /** Returns a fresh subject token whenever the SDK needs to exchange or refresh its access token. */
   getToken: () => Promise<string>;
 }
 
+/** Configures federation from an external workload identity into an OpenAI service account. */
 export interface WorkloadIdentity {
-  /**Optional client identifier for token exchange compatibility.*/
+  /** Optional OAuth client identifier included in the token-exchange request. */
   clientId?: string;
 
-  /**Identity provider resource id in WIFAPI.*/
+  /** Identifier of the OpenAI identity-provider resource that trusts the external workload. */
   identityProviderId: string;
 
-  /**OpenAI Service account id to bind the verified external identity to.*/
+  /** Identifier of the OpenAI service account that receives the verified external identity. */
   serviceAccountId: string;
 
-  /**The provider configuration for obtaining the subject token.*/
+  /** Provider that obtains the external subject token for each token exchange. */
   provider: SubjectTokenProvider;
 
-  /**Optional buffer time in seconds to refresh the OpenAI token before it expires. Defaults to 1200 seconds (20 minutes).*/
+  /** Seconds before expiration when access-token refresh begins; defaults to 1,200 seconds. */
   refreshBufferSeconds?: number;
 }
 
+/** OAuth token-exchange response returned by the OpenAI workload-identity endpoint. */
 export interface TokenExchangeResponse {
+  /** OpenAI access token to use as the request's bearer credential. */
   access_token: string;
+
+  /** OAuth token-type URN describing the issued access token. */
   issued_token_type: string;
+
+  /** Authorization scheme associated with the access token, normally `Bearer`. */
   token_type: string;
+
+  /** Token lifetime in seconds; the SDK assumes 3,600 seconds when omitted. */
   expires_in?: number;
 }

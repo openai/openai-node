@@ -1,6 +1,6 @@
 import { combine, merge, is_buffer, assign_single_source } from 'openai/internal/qs/utils';
 
-describe('merge()', function () {
+describe('merge()', () => {
   // t.deepEqual(merge(null, true), [null, true], 'merges true into null');
   expect(merge(null, true)).toEqual([null, true]);
 
@@ -14,7 +14,7 @@ describe('merge()', function () {
   // );
   expect(merge({ a: 'b' }, { a: 'c' })).toEqual({ a: ['b', 'c'] });
 
-  var oneMerged = merge({ foo: 'bar' }, { foo: { first: '123' } });
+  const oneMerged = merge({ foo: 'bar' }, { foo: { first: '123' } });
   // t.deepEqual(
   // 	oneMerged,
   // 	{ foo: ['bar', { first: '123' }] },
@@ -22,7 +22,7 @@ describe('merge()', function () {
   // );
   expect(oneMerged).toEqual({ foo: ['bar', { first: '123' }] });
 
-  var twoMerged = merge({ foo: ['bar', { first: '123' }] }, { foo: { second: '456' } });
+  const twoMerged = merge({ foo: ['bar', { first: '123' }] }, { foo: { second: '456' } });
   // t.deepEqual(
   // 	twoMerged,
   // 	{ foo: { 0: 'bar', 1: { first: '123' }, second: '456' } },
@@ -30,7 +30,7 @@ describe('merge()', function () {
   // );
   expect(twoMerged).toEqual({ foo: { 0: 'bar', 1: { first: '123' }, second: '456' } });
 
-  var sandwiched = merge({ foo: ['bar', { first: '123', second: '456' }] }, { foo: 'baz' });
+  const sandwiched = merge({ foo: ['bar', { first: '123', second: '456' }] }, { foo: 'baz' });
   // t.deepEqual(
   // 	sandwiched,
   // 	{ foo: ['bar', { first: '123', second: '456' }, 'baz'] },
@@ -38,26 +38,26 @@ describe('merge()', function () {
   // );
   expect(sandwiched).toEqual({ foo: ['bar', { first: '123', second: '456' }, 'baz'] });
 
-  var nestedArrays = merge({ foo: ['baz'] }, { foo: ['bar', 'xyzzy'] });
+  const nestedArrays = merge({ foo: ['baz'] }, { foo: ['bar', 'xyzzy'] });
   // t.deepEqual(nestedArrays, { foo: ['baz', 'bar', 'xyzzy'] });
   expect(nestedArrays).toEqual({ foo: ['baz', 'bar', 'xyzzy'] });
 
-  var noOptionsNonObjectSource = merge({ foo: 'baz' }, 'bar');
+  const noOptionsNonObjectSource = merge({ foo: 'baz' }, 'bar');
   // t.deepEqual(noOptionsNonObjectSource, { foo: 'baz', bar: true });
   expect(noOptionsNonObjectSource).toEqual({ foo: 'baz', bar: true });
 
-  (typeof Object.defineProperty !== 'function' ? test.skip : test)(
+  (typeof Object.defineProperty === 'function' ? test : test.skip)(
     'avoids invoking array setters unnecessarily',
-    function () {
-      var setCount = 0;
-      var getCount = 0;
-      var observed: any[] = [];
+    () => {
+      let setCount = 0;
+      let getCount = 0;
+      const observed: any[] = [];
       Object.defineProperty(observed, 0, {
-        get: function () {
+        get() {
           getCount += 1;
           return { bar: 'baz' };
         },
-        set: function () {
+        set() {
           setCount += 1;
         },
       });
@@ -75,21 +75,21 @@ describe('merge()', function () {
   );
 });
 
-test('assign()', function () {
-  var target = { a: 1, b: 2 };
-  var source = { b: 3, c: 4 };
-  var result = assign_single_source(target, source);
+test('assign()', () => {
+  const target = { a: 1, b: 2 };
+  const source = { b: 3, c: 4 };
+  const result = assign_single_source(target, source);
 
   expect(result).toEqual(target);
   expect(target).toEqual({ a: 1, b: 3, c: 4 });
   expect(source).toEqual({ b: 3, c: 4 });
 });
 
-describe('combine()', function () {
-  test('both arrays', function () {
-    var a = [1];
-    var b = [2];
-    var combined = combine(a, b);
+describe('combine()', () => {
+  test('both arrays', () => {
+    const a = [1];
+    const b = [2];
+    const combined = combine(a, b);
 
     // st.deepEqual(a, [1], 'a is not mutated');
     // st.deepEqual(b, [2], 'b is not mutated');
@@ -103,13 +103,13 @@ describe('combine()', function () {
     expect(b).not.toEqual(combined);
   });
 
-  test('one array, one non-array', function () {
-    var aN = 1;
-    var a = [aN];
-    var bN = 2;
-    var b = [bN];
+  test('one array, one non-array', () => {
+    const aN = 1;
+    const a = [aN];
+    const bN = 2;
+    const b = [bN];
 
-    var combinedAnB = combine(aN, b);
+    const combinedAnB = combine(aN, b);
     // st.deepEqual(b, [bN], 'b is not mutated');
     // st.notEqual(aN, combinedAnB, 'aN + b !== aN');
     // st.notEqual(a, combinedAnB, 'aN + b !== a');
@@ -123,7 +123,7 @@ describe('combine()', function () {
     expect(combinedAnB).not.toEqual(b);
     expect(combinedAnB).toEqual([1, 2]);
 
-    var combinedABn = combine(a, bN);
+    const combinedABn = combine(a, bN);
     // st.deepEqual(a, [aN], 'a is not mutated');
     // st.notEqual(aN, combinedABn, 'a + bN !== aN');
     // st.notEqual(a, combinedABn, 'a + bN !== a');
@@ -138,8 +138,8 @@ describe('combine()', function () {
     expect(combinedABn).toEqual([1, 2]);
   });
 
-  test('neither is an array', function () {
-    var combined = combine(1, 2);
+  test('neither is an array', () => {
+    const combined = combine(1, 2);
     // st.notEqual(1, combined, '1 + 2 !== 1');
     // st.notEqual(2, combined, '1 + 2 !== 2');
     // st.deepEqual([1, 2], combined, 'both arguments are array-wrapped when not an array');
@@ -149,21 +149,21 @@ describe('combine()', function () {
   });
 });
 
-test('is_buffer()', function () {
-  for (const x of [null, undefined, true, false, '', 'abc', 42, 0, NaN, {}, [], function () {}, /a/g]) {
+test('is_buffer()', () => {
+  for (const x of [null, undefined, true, false, '', 'abc', 42, 0, Number.NaN, {}, [], () => {}, /a/g]) {
     // t.equal(is_buffer(x), false, inspect(x) + ' is not a buffer');
     expect(is_buffer(x)).toEqual(false);
   }
 
-  var fakeBuffer = { constructor: Buffer };
+  const fakeBuffer = { constructor: Buffer };
   // t.equal(is_buffer(fakeBuffer), false, 'fake buffer is not a buffer');
   expect(is_buffer(fakeBuffer)).toEqual(false);
 
-  var saferBuffer = Buffer.from('abc');
+  const saferBuffer = Buffer.from('abc');
   // t.equal(is_buffer(saferBuffer), true, 'SaferBuffer instance is a buffer');
   expect(is_buffer(saferBuffer)).toEqual(true);
 
-  var buffer = Buffer.from('abc');
+  const buffer = Buffer.from('abc');
   // t.equal(is_buffer(buffer), true, 'real Buffer instance is a buffer');
   expect(is_buffer(buffer)).toEqual(true);
 });

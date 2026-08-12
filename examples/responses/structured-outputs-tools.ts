@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import { OpenAI } from 'openai';
 import { zodResponsesFunction } from 'openai/helpers/zod';
