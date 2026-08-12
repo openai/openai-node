@@ -121,6 +121,22 @@ describe('stable realtime custom URL builder', () => {
     expect(result.searchParams.has('api-version')).toBe(false);
   });
 
+  test('preserves custom URL builders through normalized Azure connections', () => {
+    const customURL = new URL('wss://sap.example.com/azure/custom?existing=value');
+    const customBuilder = vi.fn(() => customURL);
+    const connection = getAzureRealtimeConnection(
+      { deploymentName: 'configured-deployment' },
+      { buildRealtimeURL: customBuilder },
+    );
+
+    const result = buildRealtimeURL(azureClient, connection);
+
+    expect(connection).toEqual({ model: 'configured-deployment', buildRealtimeURL: customBuilder });
+    expect(customBuilder).toHaveBeenCalledWith(azureClient, connection);
+    expect(result.toString()).toBe(customURL.toString());
+    expect(result.searchParams.has('model')).toBe(false);
+  });
+
   test.each([
     new URL('ws://sap.example.com/realtime'),
     new URL('https://sap.example.com/realtime'),

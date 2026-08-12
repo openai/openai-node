@@ -137,7 +137,6 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     return new OpenAIRealtimeWS(
       {
         ...connection,
-        ...(props.buildRealtimeURL ? { buildRealtimeURL: props.buildRealtimeURL } : {}),
         options: {
           ...props.options,
           headers: {

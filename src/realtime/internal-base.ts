@@ -295,6 +295,8 @@ export function getAzureRealtimeConnection(
   const hasDeploymentName = connection.deploymentName !== undefined;
   const hasCallID = connection.callID !== undefined;
   const hasIntent = connection.intent !== undefined;
+  const customURLBuilder = connection.buildRealtimeURL;
+  const normalizedOptions = customURLBuilder ? { buildRealtimeURL: customURLBuilder } : {};
 
   if (
     Number(hasDeploymentName) + Number(hasCallID) + Number(hasIntent) > 1 ||
@@ -306,16 +308,16 @@ export function getAzureRealtimeConnection(
   }
 
   if (hasCallID) {
-    return { callID: connection.callID! };
+    return { ...normalizedOptions, callID: connection.callID! };
   }
 
   if (hasIntent) {
-    return { intent: 'transcription' };
+    return { ...normalizedOptions, intent: 'transcription' };
   }
 
   const model = connection.deploymentName ?? client.deploymentName;
   if (!model) {
     throw new Error('No deployment name provided');
   }
-  return { model };
+  return { ...normalizedOptions, model };
 }

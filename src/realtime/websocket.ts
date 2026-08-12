@@ -194,7 +194,6 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     return new OpenAIRealtimeWebSocket(
       {
         ...connection,
-        ...(options.buildRealtimeURL ? { buildRealtimeURL: options.buildRealtimeURL } : {}),
         onURL,
         ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}),
         __resolvedApiKey: isApiKeyProvider,
