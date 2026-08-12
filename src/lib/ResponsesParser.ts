@@ -9,11 +9,12 @@ import type {
   Response,
   ResponseCreateParamsBase,
   ResponseCreateParamsNonStreaming,
+  ResponseFormatTextJSONSchemaConfig,
   ResponseFunctionToolCall,
   ResponseTextConfig,
   Tool,
 } from '../resources/responses/responses';
-import { isAutoParsableResponseFormat } from '../lib/parser';
+import { isParseableResponseFormat, parseResponseFormatContent } from '../lib/parser';
 import type { AutoParseableTextFormat } from '../lib/parser';
 
 /** Response tools, a compatible chat completion tool, or no tools. */
@@ -31,9 +32,26 @@ type TextConfigParams = {
   text?: ResponseTextConfig;
 };
 
-/** Infers the structured output type from an auto-parseable Responses API text format. */
-export type ExtractParsedContentFromParams<Params extends TextConfigParams> =
-  NonNullable<Params['text']>['format'] extends AutoParseableTextFormat<infer P> ? P : null;
+/** Infers parsed output for each member of a possibly optional text-format union. */
+type ParsedTextFormat<Format> = [Format] extends [never]
+  ? null
+  : Format extends AutoParseableTextFormat<infer ParsedT>
+    ? ParsedT
+    : Format extends ResponseFormatTextJSONSchemaConfig
+      ? unknown
+      : null;
+
+/**
+ * Resolves the type of `output_parsed` / `content[].parsed` for the given params.
+ *
+ * This must stay in sync with `isParseableResponseFormat()` and
+ * `parseResponseFormatContent()`: formats built by an SDK helper carry their parsed
+ * type in the brand, while a raw `{ type: 'json_schema' }` format is parsed with
+ * `JSON.parse()` and so can only be described as `unknown`.
+ */
+export type ExtractParsedContentFromParams<Params extends TextConfigParams> = ParsedTextFormat<
+  NonNullable<Params['text']>['format']
+>;
 
 /**
  * Adds parsed-output fields to a response, invoking parsers only when its request
@@ -147,21 +165,12 @@ function parseTextFormat<
   Params extends ResponseCreateParamsBase,
   ParsedT = ExtractParsedContentFromParams<Params>,
 >(params: Params, content: string): ParsedT | null {
-  if (params.text?.format?.type !== 'json_schema') {
-    return null;
-  }
-
-  if ('$parseRaw' in params.text.format) {
-    const text_format = params.text.format as unknown as AutoParseableTextFormat<ParsedT>;
-    return text_format.$parseRaw(content);
-  }
-
-  return JSON.parse(content);
+  return parseResponseFormatContent<ParsedT>(params.text?.format, content);
 }
 
 /** Returns whether the request includes an auto-parseable text format or strict function tool. */
 export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): boolean {
-  if (isAutoParsableResponseFormat(params.text?.format)) {
+  if (isParseableResponseFormat(params.text?.format)) {
     return true;
   }
 

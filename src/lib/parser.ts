@@ -38,9 +38,25 @@ export function isChatCompletionFunctionTool(tool: ToolCall): tool is ChatComple
   return tool !== undefined && 'function' in tool && tool.function !== undefined;
 }
 
-/** Infers the structured assistant-content type from an auto-parseable response format. */
+/** Infers parsed output for each member of a possibly optional response-format union. */
+type ParsedResponseFormat<Format> = [Format] extends [never]
+  ? null
+  : Format extends AutoParseableResponseFormat<infer ParsedT>
+    ? ParsedT
+    : Format extends ResponseFormatJSONSchema
+      ? unknown
+      : null;
+
+/**
+ * Resolves the type of `message.parsed` / `content[].parsed` for the given params.
+ *
+ * This must stay in sync with {@link isParseableResponseFormat} and
+ * {@link parseResponseFormatContent}: formats built by an SDK helper carry their
+ * parsed type in the brand, while a raw `{ type: 'json_schema' }` format is parsed
+ * with `JSON.parse()` and so can only be described as `unknown`.
+ */
 export type ExtractParsedContentFromParams<Params extends AnyChatCompletionCreateParams> =
-  Params['response_format'] extends AutoParseableResponseFormat<infer P> ? P : null;
+  ParsedResponseFormat<Params['response_format']>;
 
 /** A Chat Completions JSON Schema response format with an attached structured-output parser. */
 export type AutoParseableResponseFormat<ParsedT> = ResponseFormatJSONSchema & {
@@ -106,11 +122,53 @@ export function makeParseableTextFormat<ParsedT>(
   return obj as AutoParseableTextFormat<ParsedT>;
 }
 
-/** Returns whether a response or text format carries the SDK's structured-output parser marker. */
+/**
+ * Whether the given format was built by an SDK helper (e.g. `zodResponseFormat()`)
+ * and therefore carries its own `$parseRaw` callback.
+ *
+ * Prefer {@link isParseableResponseFormat} when deciding whether output should be
+ * parsed at all; raw `{ type: 'json_schema' }` formats are parsed too, but are not
+ * branded.
+ */
 export function isAutoParsableResponseFormat<ParsedT>(
   response_format: any,
 ): response_format is AutoParseableResponseFormat<ParsedT> {
   return response_format?.['$brand'] === 'auto-parseable-response-format';
+}
+
+/**
+ * The canonical definition of an auto-parseable response format, covering both the
+ * Chat Completions `response_format` and the Responses `text.format` shapes.
+ *
+ * Every gate that decides whether output should be parsed must go through this
+ * predicate so the runtime, the streaming events and
+ * {@link ExtractParsedContentFromParams} cannot drift apart.
+ */
+export function isParseableResponseFormat(format: unknown): boolean {
+  return isAutoParsableResponseFormat(format) || (format as { type?: string } | null)?.type === 'json_schema';
+}
+
+/**
+ * The canonical parser for auto-parseable response formats. This is the only place
+ * that chooses between an existing `$parseRaw` callback and generic `JSON.parse()`.
+ *
+ * Returns `null` for formats that are not auto-parseable.
+ */
+export function parseResponseFormatContent<ParsedT>(format: unknown, content: string): ParsedT | null {
+  if (!isParseableResponseFormat(format)) {
+    return null;
+  }
+
+  if (
+    typeof format === 'object' &&
+    format !== null &&
+    '$parseRaw' in format &&
+    typeof format.$parseRaw === 'function'
+  ) {
+    return format.$parseRaw(content) as ParsedT;
+  }
+
+  return JSON.parse(content) as ParsedT;
 }
 
 /** Type-level details used to infer a chat function tool's parser and execution callback. */
@@ -261,21 +319,7 @@ function parseResponseFormat<
   Params extends ChatCompletionCreateParams,
   ParsedT = ExtractParsedContentFromParams<Params>,
 >(params: Params, content: string): ParsedT | null {
-  if (params.response_format?.type !== 'json_schema') {
-    return null;
-  }
-
-  if (params.response_format?.type === 'json_schema') {
-    if ('$parseRaw' in params.response_format) {
-      const response_format = params.response_format as AutoParseableResponseFormat<ParsedT>;
-
-      return response_format.$parseRaw(content);
-    }
-
-    return JSON.parse(content);
-  }
-
-  return null;
+  return parseResponseFormatContent<ParsedT>(params.response_format, content);
 }
 
 function parseToolCall<Params extends ChatCompletionCreateParams>(
@@ -323,7 +367,7 @@ export function shouldParseToolCall(
 
 /** Returns whether the request contains an auto-parseable response format or strict function tool. */
 export function hasAutoParseableInput(params: AnyChatCompletionCreateParams): boolean {
-  if (isAutoParsableResponseFormat(params.response_format)) {
+  if (isParseableResponseFormat(params.response_format)) {
     return true;
   }
 

@@ -9,13 +9,13 @@ import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
-import type { AutoParseableResponseFormat } from '../lib/parser';
 import {
   hasAutoParseableInput,
-  isAutoParsableResponseFormat,
   isAutoParsableTool,
   isChatCompletionFunctionTool,
+  isParseableResponseFormat,
   maybeParseChatCompletion,
+  parseResponseFormatContent,
   shouldParseToolCall,
 } from '../lib/parser';
 import type { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
@@ -464,11 +464,14 @@ export class ChatCompletionStream<ParsedT = null>
     if (choiceSnapshot.message.content && !state.content_done) {
       state.content_done = true;
 
-      const responseFormat = this.#getAutoParseableResponseFormat();
-
       this._emit('content.done', {
         content: choiceSnapshot.message.content,
-        parsed: responseFormat ? responseFormat.$parseRaw(choiceSnapshot.message.content) : (null as any),
+        parsed: choiceSnapshot.message.refusal
+          ? null
+          : parseResponseFormatContent<ParsedT>(
+              this.#params?.response_format,
+              choiceSnapshot.message.content,
+            ),
       });
     }
 
@@ -582,15 +585,6 @@ export class ChatCompletionStream<ParsedT = null>
       return lastChatCompletion;
     }
     throw new OpenAIError(`request ended without sending any chunks`);
-  }
-
-  #getAutoParseableResponseFormat(): AutoParseableResponseFormat<ParsedT> | null {
-    const responseFormat = this.#params?.response_format;
-    if (isAutoParsableResponseFormat<ParsedT>(responseFormat)) {
-      return responseFormat;
-    }
-
-    return null;
   }
 
   #accumulateChatCompletion(chunk: ChatCompletionChunk): ChatCompletionSnapshot {
@@ -714,7 +708,7 @@ export class ChatCompletionStream<ParsedT = null>
       if (content) {
         choice.message.content = (choice.message.content || '') + content;
 
-        if (!choice.message.refusal && this.#getAutoParseableResponseFormat()) {
+        if (!choice.message.refusal && isParseableResponseFormat(this.#params?.response_format)) {
           // The partial parser does not accept whitespace-only input.
           choice.message.parsed = choice.message.content.trim() ? partialParse(choice.message.content) : null;
         }

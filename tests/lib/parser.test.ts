@@ -1,7 +1,18 @@
 import { z as z4 } from 'zod/v4';
 import { z as z3 } from 'zod/v3';
+import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import {
+  isParseableResponseFormat,
+  makeParseableResponseFormat,
+  maybeParseChatCompletion,
+  parseResponseFormatContent,
+} from '../../src/lib/parser';
+import type { AutoParseableResponseFormat, ExtractParsedContentFromParams } from '../../src/lib/parser';
+import type { ChatCompletionStreamParams } from '../../src/lib/ChatCompletionStream';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
+import { compareType } from '../utils/typing';
 
 describe.each([
   { version: 'v3', z: z3 },
@@ -1404,3 +1415,213 @@ describe.each([
     });
   });
 });
+
+describe('maybeParseChatCompletion', () => {
+  it('parses raw json_schema response_format', () => {
+    const rawCompletion = {
+      id: 'chatcmpl-123',
+      object: 'chat.completion' as const,
+      created: 1_677_652_288,
+      model: 'gpt-4o-2024-08-06',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop' as const,
+          logprobs: null,
+          message: {
+            role: 'assistant' as const,
+            content: '{"city":"San Francisco","units":"c"}',
+            refusal: null,
+          },
+        },
+      ],
+    };
+
+    const parsed = maybeParseChatCompletion(rawCompletion, {
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: 'hello' }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'location',
+          schema: { type: 'object' },
+        },
+      },
+    });
+
+    expect(parsed.choices[0]?.message.parsed).toEqual({
+      city: 'San Francisco',
+      units: 'c',
+    });
+  });
+});
+
+describe('isParseableResponseFormat', () => {
+  it('accepts branded helper formats', () => {
+    expect(isParseableResponseFormat(zodResponseFormat(z4.object({ city: z4.string() }), 'location'))).toBe(
+      true,
+    );
+  });
+
+  it('accepts raw json_schema formats', () => {
+    expect(
+      isParseableResponseFormat({ type: 'json_schema', json_schema: { name: 'location', schema: {} } }),
+    ).toBe(true);
+  });
+
+  it('rejects formats that produce no parsed output', () => {
+    expect(isParseableResponseFormat({ type: 'json_object' })).toBe(false);
+    expect(isParseableResponseFormat({ type: 'text' })).toBe(false);
+    expect(isParseableResponseFormat(null)).toBe(false);
+  });
+});
+
+describe('parseResponseFormatContent', () => {
+  it('uses the branded callback instead of generic JSON when present', () => {
+    const parseRaw = vi.fn(() => ({ branded: true }));
+    const format = makeParseableResponseFormat(
+      { type: 'json_schema', json_schema: { name: 'location', schema: {} } },
+      parseRaw,
+    );
+
+    expect(parseResponseFormatContent(format, '{"city":"San Francisco"}')).toEqual({ branded: true });
+    expect(parseRaw).toHaveBeenCalledWith('{"city":"San Francisco"}');
+  });
+
+  it('preserves unbranded custom parsers on raw json_schema formats', () => {
+    const parseRaw = vi.fn((raw: string) => ({ raw }));
+
+    expect(
+      parseResponseFormatContent(
+        {
+          type: 'json_schema',
+          json_schema: { name: 'location', schema: {} },
+          $parseRaw: parseRaw,
+        },
+        'not valid JSON',
+      ),
+    ).toEqual({ raw: 'not valid JSON' });
+    expect(parseRaw).toHaveBeenCalledWith('not valid JSON');
+  });
+
+  it('falls back to generic JSON for raw json_schema formats', () => {
+    expect(
+      parseResponseFormatContent(
+        { type: 'json_schema', json_schema: { name: 'location', schema: {} } },
+        '{"city":"San Francisco"}',
+      ),
+    ).toEqual({ city: 'San Francisco' });
+  });
+
+  it('returns null for non-parseable formats', () => {
+    const parseRaw = vi.fn();
+
+    expect(parseResponseFormatContent({ type: 'json_object' }, '{"city":"San Francisco"}')).toBeNull();
+    expect(parseResponseFormatContent(undefined, '{"city":"San Francisco"}')).toBeNull();
+    expect(parseResponseFormatContent({ type: 'text', $parseRaw: parseRaw }, 'ordinary text')).toBeNull();
+    expect(parseRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExtractParsedContentFromParams', () => {
+  interface BaseParams {
+    model: string;
+    messages: [];
+  }
+
+  it('resolves raw json_schema formats to unknown', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format: {
+            type: 'json_schema';
+            json_schema: { name: 'location'; schema: { type: 'object' } };
+          };
+        }
+      >,
+      unknown
+    >(true);
+  });
+
+  it('resolves branded helper formats to the helper output type', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format: ReturnType<typeof zodResponseFormat<z4.ZodObject<{ city: z4.ZodString }>>>;
+        }
+      >,
+      { city: string }
+    >(true);
+  });
+
+  it('resolves publicly typed streaming params with possible raw schemas to unknown', () => {
+    compareType<ExtractParsedContentFromParams<ChatCompletionStreamParams>, unknown>(true);
+  });
+
+  it('preserves known helper output when branded formats are optional', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format?: AutoParseableResponseFormat<{ city: string }>;
+        }
+      >,
+      { city: string } | null
+    >(true);
+  });
+
+  it('preserves known helper output across non-structured format unions', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format: AutoParseableResponseFormat<{ city: string }> | { type: 'text' };
+        }
+      >,
+      { city: string } | null
+    >(true);
+  });
+
+  it('resolves formats without parsed output to null', () => {
+    compareType<ExtractParsedContentFromParams<BaseParams>, null>(true);
+    compareType<
+      ExtractParsedContentFromParams<BaseParams & { response_format: { type: 'json_object' } }>,
+      null
+    >(true);
+    compareType<ExtractParsedContentFromParams<BaseParams & { response_format: { type: 'text' } }>, null>(
+      true,
+    );
+  });
+});
+
+// Compile-time only; `tsc` covers this file, and the function is never called.
+async function _chatCompletionsParsedTypes(client: OpenAI) {
+  const rawSchemaCompletion = await client.chat.completions.parse({
+    model: 'gpt-4o-2024-08-06',
+    messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+    response_format: { type: 'json_schema', json_schema: { name: 'location', schema: { type: 'object' } } },
+  });
+  compareType<(typeof rawSchemaCompletion)['choices'][number]['message']['parsed'], unknown>(true);
+
+  const rawSchemaStream = await client.chat.completions
+    .stream({
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+      response_format: { type: 'json_schema', json_schema: { name: 'location', schema: { type: 'object' } } },
+    })
+    .finalChatCompletion();
+  compareType<(typeof rawSchemaStream)['choices'][number]['message']['parsed'], unknown>(true);
+
+  const typedParams: ChatCompletionStreamParams = {
+    model: 'gpt-4o-2024-08-06',
+    messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+    response_format: { type: 'json_schema', json_schema: { name: 'location', schema: { type: 'object' } } },
+  };
+  const typedSchemaStream = await client.chat.completions.stream(typedParams).finalChatCompletion();
+  compareType<(typeof typedSchemaStream)['choices'][number]['message']['parsed'], unknown>(true);
+
+  const jsonObjectCompletion = await client.chat.completions.parse({
+    model: 'gpt-4o-2024-08-06',
+    messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+    response_format: { type: 'json_object' },
+  });
+  compareType<(typeof jsonObjectCompletion)['choices'][number]['message']['parsed'], null>(true);
+}
