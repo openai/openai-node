@@ -4,6 +4,7 @@ import type { Uploadable } from 'openai';
 interface RecordedRequest {
   url: string;
   body: unknown;
+  headers: Headers;
   authorization: string | null;
 }
 
@@ -23,6 +24,7 @@ function createClient(): { client: OpenAI; requests: RecordedRequest[] } {
       requests.push({
         url: String(url),
         body: init?.body,
+        headers: new Headers(init?.headers),
         authorization: new Headers(init?.headers).get('authorization'),
       });
 
@@ -31,6 +33,18 @@ function createClient(): { client: OpenAI; requests: RecordedRequest[] } {
   });
 
   return { client, requests };
+}
+
+async function parseUploadedFiles(request: RecordedRequest | undefined): Promise<File[]> {
+  if (!request) {
+    throw new Error('Expected a recorded skill upload request');
+  }
+
+  const form = await new Response(request.body as FormData | ReadableStream, {
+    headers: request.headers,
+  }).formData();
+
+  return form.getAll('files[]') as File[];
 }
 
 const skillEndpoints = [
@@ -67,6 +81,19 @@ describe.each(skillEndpoints)('$name', ({ path, create }) => {
     ]);
   });
 
+  test('normalizes Windows-style paths in buffered multipart uploads', async () => {
+    const { client, requests } = createClient();
+
+    await create(client, [
+      new File(['manifest'], 'my-skill\\SKILL.md', { type: 'text/markdown' }),
+      new File(['asset'], 'my-skill\\assets\\data.txt', { type: 'text/plain' }),
+    ]);
+
+    const files = await parseUploadedFiles(requests[0]);
+    expect(files.map((file) => file.name)).toEqual(['my-skill/SKILL.md', 'my-skill/assets/data.txt']);
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual(['manifest', 'asset']);
+  });
+
   test('preserves browser directory paths when native files are explicitly renamed', async () => {
     const { client, requests } = createClient();
     const selectedFile: File & { webkitRelativePath?: string } = new File(['manifest'], 'SKILL.md', {
@@ -99,17 +126,36 @@ describe.each(skillEndpoints)('$name', ({ path, create }) => {
     expect(body).toContain('filename="my-skill/assets/data.txt"');
     expect(body).toContain('streamed asset');
   });
-});
 
-test('continues stripping directory names for ordinary file uploads', async () => {
-  const { client, requests } = createClient();
+  test('normalizes Windows-style paths in mixed buffered and streaming multipart uploads', async () => {
+    const { client, requests } = createClient();
 
-  await client.files.create({
-    file: new File(['contents'], 'private-directory/input.jsonl'),
-    purpose: 'assistants',
+    await create(client, [
+      new File(['manifest'], 'my-skill\\SKILL.md', { type: 'text/markdown' }),
+      toStreamingFile(skillAssetChunks(), 'my-skill\\assets\\data.txt', { type: 'text/plain' }),
+    ]);
+
+    const files = await parseUploadedFiles(requests[0]);
+    expect(files.map((file) => file.name)).toEqual(['my-skill/SKILL.md', 'my-skill/assets/data.txt']);
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'manifest',
+      'streamed asset',
+    ]);
   });
-
-  expect(requests).toHaveLength(1);
-  const form = requests[0]?.body as FormData;
-  expect((form.get('file') as File).name).toBe('input.jsonl');
 });
+
+test.each(['private-directory/input.jsonl', 'private-directory\\input.jsonl'])(
+  'continues stripping directory names for ordinary file uploads: %s',
+  async (filename) => {
+    const { client, requests } = createClient();
+
+    await client.files.create({
+      file: new File(['contents'], filename),
+      purpose: 'assistants',
+    });
+
+    expect(requests).toHaveLength(1);
+    const form = requests[0]?.body as FormData;
+    expect((form.get('file') as File).name).toBe('input.jsonl');
+  },
+);

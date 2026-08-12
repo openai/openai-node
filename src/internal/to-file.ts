@@ -75,8 +75,16 @@ const isResponseLike = (value: any): value is ResponseLike =>
   typeof value.url === 'string' &&
   typeof value.blob === 'function';
 
-const hasFilePropertyOverrides = (options: FilePropertyBag | undefined): boolean =>
-  options?.type != null || options?.lastModified != null || options?.endings != null;
+const hasFilePropertyOverrides = (value: FileLike, options: FilePropertyBag | undefined): boolean =>
+  (options?.type != null && options.type !== value.type) ||
+  (options?.lastModified != null && options.lastModified !== value.lastModified) ||
+  options?.endings != null;
+
+const canReuseNativeFile = (
+  value: File,
+  name: string | null | undefined,
+  options: FilePropertyBag | undefined,
+): boolean => (name == null || name === value.name) && !hasFilePropertyOverrides(value, options);
 
 /**
  * File-compatible values that can be buffered into a native `File`.
@@ -94,12 +102,13 @@ export type ToFileInput =
 /**
  * Buffers compatible content into a native {@link File} for an SDK upload.
  *
- * Existing native `File` objects are returned unchanged when no filename or file
- * metadata override is supplied. Renamed or copied files retain their original
- * MIME type and modification time unless explicitly overridden. Other filenames
- * are inferred from response URLs or input metadata when omitted, falling back
- * to `unknown_file`. Responses, native or compatible `Blob` values, and compatible
- * non-native files supply their MIME type unless `options.type` provides an explicit override.
+ * Existing native `File` objects are returned unchanged when their effective
+ * filename and metadata are unchanged. Renamed native files reuse the original
+ * file contents without buffering and retain their MIME type and modification
+ * time unless explicitly overridden. Other filenames are inferred from response
+ * URLs or input metadata when omitted, falling back to `unknown_file`. Responses,
+ * native or compatible `Blob` values, and compatible non-native files supply
+ * their MIME type unless `options.type` provides an explicit override.
  *
  * @param value An existing file, response, binary buffer, Blob-like object, async
  * stream of file parts, or a promise resolving to one of those values.
@@ -119,17 +128,22 @@ export async function toFile(
   // If it's a promise, resolve it.
   value = await value;
 
-  // If we've been given a native `File` and no overrides, we don't need to do anything.
   if (isFileLike(value)) {
-    if (value instanceof File && name == null && !hasFilePropertyOverrides(options)) {
-      return value;
-    }
-
-    return makeFile([await value.arrayBuffer()], name ?? value.name, {
+    const fileOptions = {
       ...options,
       type: options?.type ?? value.type,
       lastModified: options?.lastModified ?? value.lastModified,
-    });
+    };
+
+    if (value instanceof File) {
+      if (canReuseNativeFile(value, name, options)) {
+        return value;
+      }
+
+      return makeFile([value], name ?? value.name, fileOptions);
+    }
+
+    return makeFile([await value.arrayBuffer()], name ?? value.name, fileOptions);
   }
 
   if (isResponseLike(value)) {

@@ -269,6 +269,40 @@ describe('toFile', () => {
     await expect(toFile(input, null, {})).resolves.toBe(input);
   });
 
+  it('does not copy native File objects when their filename and metadata are unchanged', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'application/jsonl', lastModified: 1234 });
+
+    await expect(toFile(input, 'input.jsonl')).resolves.toBe(input);
+    await expect(toFile(input, undefined, { type: 'application/jsonl' })).resolves.toBe(input);
+    await expect(
+      toFile(input, 'input.jsonl', { type: 'application/jsonl', lastModified: 1234 }),
+    ).resolves.toBe(input);
+  });
+
+  it.each([
+    { label: 'filename', name: 'my-skill/SKILL.md', options: undefined },
+    { label: 'MIME type', name: undefined, options: { type: 'application/x-ndjson' } },
+    { label: 'modification time', name: undefined, options: { lastModified: 5678 } },
+    {
+      label: 'filename and metadata',
+      name: 'my-skill/SKILL.md',
+      options: { type: 'application/x-ndjson', lastModified: 5678 },
+    },
+  ])('updates a native File $label without buffering its contents', async ({ name, options }) => {
+    const input = new File(['manifest'], 'SKILL.md', { type: 'text/markdown', lastModified: 1234 });
+    const arrayBuffer = vi
+      .spyOn(input, 'arrayBuffer')
+      .mockRejectedValue(new Error('Native File contents must not be buffered'));
+
+    const file = await toFile(input, name, options);
+
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(file.name).toBe(name ?? 'SKILL.md');
+    expect(file.type).toBe(options?.type ?? 'text/markdown');
+    expect(file.lastModified).toBe(options?.lastModified ?? 1234);
+    await expect(file.text()).resolves.toBe('manifest');
+  });
+
   it('renames native File objects while preserving their MIME type and modification time', async () => {
     const input = new File(['manifest'], 'SKILL.md', { type: 'text/markdown', lastModified: 1234 });
 
@@ -321,6 +355,19 @@ describe('toFile', () => {
     expect(file.name).toEqual('foreign.jsonl');
     expect(file.type).toEqual('application/jsonl');
     expect(file.lastModified).toEqual(1234);
+    await expect(file.arrayBuffer()).resolves.toEqual(new Uint8Array([1, 2]).buffer);
+  });
+
+  it('continues buffering structural non-native File-compatible objects', async () => {
+    const input = foreignFileLike();
+    const arrayBuffer = vi.spyOn(input, 'arrayBuffer');
+
+    const file = await toFile(input, 'renamed.jsonl');
+
+    expect(arrayBuffer).toHaveBeenCalledTimes(1);
+    expect(file.name).toBe('renamed.jsonl');
+    expect(file.type).toBe('application/jsonl');
+    expect(file.lastModified).toBe(1234);
     await expect(file.arrayBuffer()).resolves.toEqual(new Uint8Array([1, 2]).buffer);
   });
 
