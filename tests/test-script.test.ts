@@ -21,6 +21,23 @@ const generatedTopLevelTests = generatedTestPatterns
   .filter((pattern) => pattern.endsWith('.test.ts'))
   .map((pattern) => path.basename(pattern));
 
+function toBashPath(path: string): string {
+  if (process.platform !== 'win32') {
+    return path;
+  }
+  return path
+    .replace(/^[A-Za-z]:[\\/]/u, (prefix) => `/${prefix.charAt(0).toLowerCase()}/`)
+    .split('\\')
+    .join('/');
+}
+
+function toBashArgument(arg: string): string {
+  if (process.platform !== 'win32' || !/^[A-Za-z]:[\\/]/u.test(arg)) {
+    return arg;
+  }
+  return arg.split('\\').join('/');
+}
+
 describe('scripts/test', () => {
   let fixtureDir: string;
 
@@ -67,20 +84,30 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
   function runTestScript(args: string[], suite = 'all'): { jestArgs: string[]; vitestArgs: string[] } {
     const jestArgsFile = path.join(fixtureDir, 'jest-args');
     const vitestArgsFile = path.join(fixtureDir, 'vitest-args');
-    const result = spawnSync(path.join(fixtureDir, 'scripts/test'), args, {
-      encoding: 'utf-8',
-      env: {
-        ...process.env,
-        JEST_ARGS_FILE: jestArgsFile,
-        OPENAI_TEST_SUITE: suite,
-        PATH: `${path.join(fixtureDir, 'bin')}:${process.env['PATH']}`,
-        VITEST_ARGS_FILE: vitestArgsFile,
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        'PATH="$1:$PATH"; shift; exec "$@"',
+        'bash',
+        toBashPath(path.join(fixtureDir, 'bin')),
+        toBashPath(path.join(fixtureDir, 'scripts/test')),
+        ...args.map(toBashArgument),
+      ],
+      {
+        encoding: 'utf-8',
+        env: {
+          ...process.env,
+          JEST_ARGS_FILE: toBashPath(jestArgsFile),
+          OPENAI_TEST_SUITE: suite,
+          VITEST_ARGS_FILE: toBashPath(vitestArgsFile),
+        },
       },
-    });
+    );
 
     if (result.status !== 0) {
       throw new Error(
-        `scripts/test exited with ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+        `scripts/test exited with ${result.status}\nerror:\n${result.error?.message}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
       );
     }
 
@@ -158,11 +185,15 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
   });
 
   test.each([
-    { label: 'relative', testPath: './tests/index.test.ts' },
-    { label: 'absolute', testPath: path.join(process.cwd(), 'tests/index.test.ts') },
-  ])('routes $label generated path filters only to Jest', ({ testPath }) => {
+    { label: 'relative', testPath: './tests/index.test.ts', expectedTestPath: './tests/index.test.ts' },
+    {
+      label: 'absolute',
+      testPath: path.join(process.cwd(), 'tests/index.test.ts'),
+      expectedTestPath: toBashArgument(path.join(process.cwd(), 'tests/index.test.ts')),
+    },
+  ])('routes $label generated path filters only to Jest', ({ testPath, expectedTestPath }) => {
     expect(runTestScript([testPath])).toEqual({
-      jestArgs: ['--runInBand', testPath],
+      jestArgs: ['--runInBand', expectedTestPath],
       vitestArgs: [],
     });
   });
