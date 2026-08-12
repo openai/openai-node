@@ -25,7 +25,7 @@ importers:
         version: 4.4.15
       '@smithy/protocol-http':
         specifier: ^5.4.5
-        version: 5.4.5
+        version: 5.5.16
       '@smithy/signature-v4':
         specifier: ^5.4.5
         version: 5.6.12
@@ -1252,8 +1252,8 @@ packages:
     resolution: {integrity: sha512-ZAFvHXrEk6K180EVhmZVg8GU5pUH5BSFqRs27JW3j1qEFx9YyYwWFx17x/MHcjALYimGAji7qEOlF1++be+G5A==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/protocol-http@5.4.5':
-    resolution: {integrity: sha512-jOD+4WNWQLntiLJn3r82C7BLheEbRCKTbU5U5bskZmT7nwRiGkh0IghuHwHRZ1ZEFXpHltQxxp9/koOPsdluJg==}
+  '@smithy/protocol-http@5.5.16':
+    resolution: {integrity: sha512-iPaxIe9mTyidyhM6WF2/gSLPezyCwSlZcqlDBj2KCoSS994iw4yf1se1xmZkWsY98ZpwjDR/ZMubOSVx+Nrokw==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/signature-v4@5.6.12':
@@ -4748,9 +4748,9 @@ snapshots:
       '@smithy/types': 4.14.3
       tslib: 2.8.1
 
-  '@smithy/protocol-http@5.4.5':
+  '@smithy/protocol-http@5.5.16':
     dependencies:
-      '@smithy/core': 3.24.6
+      '@smithy/core': 3.31.1
       tslib: 2.8.1
 
   '@smithy/signature-v4@5.6.12':
