@@ -1,9 +1,7 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { APIResource } from '../../../core/resource';
-import { APIPromise } from '../../../core/api-promise';
+import type { APIPromise } from '../../../core/api-promise';
 import { buildHeaders } from '../../../internal/headers';
-import { RequestOptions } from '../../../internal/request-options';
+import type { RequestOptions } from '../../../internal/request-options';
 
 export class Sessions extends APIResource {
   /**
@@ -94,7 +92,7 @@ export interface Session {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: Array<'text' | 'audio'>;
+  modalities?: ('text' | 'audio')[];
 
   /**
    * The Realtime model used for this session.
@@ -135,7 +133,7 @@ export interface Session {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: Array<Session.Tool>;
+  tools?: Session.Tool[];
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing
@@ -375,7 +373,7 @@ export interface SessionCreateResponse {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: Array<'text' | 'audio'>;
+  modalities?: ('text' | 'audio')[];
 
   /**
    * The format of output audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
@@ -403,7 +401,7 @@ export interface SessionCreateResponse {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: Array<SessionCreateResponse.Tool>;
+  tools?: SessionCreateResponse.Tool[];
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing
@@ -601,7 +599,7 @@ export interface SessionCreateParams {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: Array<'text' | 'audio'>;
+  modalities?: ('text' | 'audio')[];
 
   /**
    * The Realtime model used for this session.
@@ -642,7 +640,7 @@ export interface SessionCreateParams {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: Array<SessionCreateParams.Tool>;
+  tools?: SessionCreateParams.Tool[];
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing

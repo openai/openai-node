@@ -2,7 +2,7 @@ const requireConfig = require('node:module').createRequire(__filename);
 
 const { defineConfig } = requireConfig('oxlint');
 const core = requireConfig('ultracite/oxlint/core').default;
-const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
+const generatedFiles = requireConfig('./scripts/generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = ['func-style', 'sort-keys'];
@@ -17,7 +17,7 @@ module.exports = defineConfig({
     // Preserve intentional paired null-or-undefined checks while enforcing strict
     // equality for every other comparison.
     eqeqeq: ['error', 'always', { null: 'ignore' }],
-    'jsdoc/check-tag-names': ['error', { definedTags: ['jest-environment'] }],
+    'jsdoc/check-tag-names': ['error', { definedTags: ['jest-environment', 'unit'] }],
     'no-restricted-imports': [
       'error',
       {
@@ -30,7 +30,7 @@ module.exports = defineConfig({
       },
     ],
   },
-  ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...stainlessGeneratedFiles],
+  ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...generatedFiles],
   overrides: [
     {
       // This example intentionally shows both mutually exclusive Next.js router
@@ -63,7 +63,7 @@ module.exports = defineConfig({
     },
     {
       // Preserve the vendored module's existing named and default export topology.
-      files: ['src/_vendor/zod-to-json-schema/index.ts'],
+      files: ['src/_vendor/zod-to-json-schema/index.ts', 'src/resources/beta/realtime/realtime.ts'],
       rules: {
         'unicorn/prefer-export-from': 'off',
       },
@@ -139,6 +139,15 @@ module.exports = defineConfig({
         'src/realtime/websocket.ts',
         'src/beta/realtime/ws.ts',
         'src/providers/bedrock/aws.ts',
+        'src/core/api-promise.ts',
+        'src/core/error.ts',
+        'src/core/pagination.ts',
+        'src/internal/builtin-types.ts',
+        'src/internal/parse.ts',
+        'src/internal/shim-types.ts',
+        'src/internal/shims.ts',
+        'src/internal/detect-platform.ts',
+        'src/internal/errors.ts',
       ],
       rules: {
         'typescript/no-explicit-any': 'off',
@@ -173,6 +182,8 @@ module.exports = defineConfig({
         'tests/lib/ResponseAccumulator.test.ts',
         'tests/lib/ResponseStream.test.ts',
         'tests/test-script.test.ts',
+        'src/internal/parse.ts',
+        'src/internal/utils/log.ts',
       ],
       rules: {
         'no-use-before-define': ['error', { functions: false }],
@@ -235,6 +246,8 @@ module.exports = defineConfig({
         'src/resources.ts',
         'src/streaming.ts',
         'src/uploads.ts',
+        'src/internal/utils.ts',
+        'src/resources/beta/realtime.ts',
       ],
       rules: {
         'oxc/no-barrel-file': 'off',
@@ -249,6 +262,10 @@ module.exports = defineConfig({
         'src/_vendor/zod-to-json-schema/parsers/never.ts',
         'src/_vendor/zod-to-json-schema/parsers/undefined.ts',
         'src/_vendor/zod-to-json-schema/parsers/unknown.ts',
+        'src/core/error.ts',
+        'src/internal/utils/values.ts',
+        'src/resources/beta/realtime/realtime.ts',
+        'src/resources/beta/realtime/sessions.ts',
       ],
       rules: {
         'typescript/ban-types': 'off',
@@ -310,6 +327,9 @@ module.exports = defineConfig({
         'ecosystem-tests/node-ts-esm/tests/test.ts',
         'ecosystem-tests/node-ts4.5-jest28/tests/test.ts',
         'src/lib/ChatCompletionStream.ts',
+        'src/resources/beta/realtime/realtime.ts',
+        'src/resources/beta/realtime/sessions.ts',
+        'src/resources/beta/realtime/transcription-sessions.ts',
       ],
       rules: {
         'typescript/no-namespace': 'off',
@@ -339,6 +359,7 @@ module.exports = defineConfig({
         'tests/_vendor/partial-json-parser/partial-json-parsing.test.ts',
         'tests/lib/ChatCompletionRunFunctions.test.ts',
         'tests/realtime-websocket.test.ts',
+        'src/core/pagination.ts',
       ],
       rules: {
         'unicorn/prefer-at': 'off',
@@ -421,6 +442,7 @@ module.exports = defineConfig({
         'src/core/streaming.ts',
         'src/helpers/standard-schema.ts',
         'src/lib/EventStream.ts',
+        'src/core/api-promise.ts',
       ],
       rules: {
         'promise/prefer-await-to-then': 'off',
@@ -443,6 +465,7 @@ module.exports = defineConfig({
         'tests/path.test.ts',
         'tests/qs/stringify.test.ts',
         'tests/utils/mock-snapshots.ts',
+        'src/internal/utils/uuid.ts',
       ],
       rules: {
         'unicorn/prefer-string-replace-all': 'off',
@@ -470,6 +493,8 @@ module.exports = defineConfig({
         'tests/lib/ChatCompletionRunFunctions.test.ts',
         'tests/lib/responsesWebSocket.test.ts',
         'tests/lib/workload-identity.test.ts',
+        'src/internal/utils/sleep.ts',
+        'tests/index.test.ts',
       ],
       rules: {
         'no-promise-executor-return': 'off',
@@ -500,6 +525,8 @@ module.exports = defineConfig({
         'tests/lib/streaming-core.test.ts',
         'tests/qs/stringify.test.ts',
         'tests/sdk-behavior.test.ts',
+        'src/core/error.ts',
+        'src/internal/utils/values.ts',
       ],
       rules: {
         'unicorn/no-useless-undefined': 'off',
@@ -536,6 +563,8 @@ module.exports = defineConfig({
         'tests/lib/responsesWebSocket.test.ts',
         'tests/lib/workload-identity.test.ts',
         'tests/utils/mock-fetch.ts',
+        'src/internal/utils/sleep.ts',
+        'tests/index.test.ts',
       ],
       rules: {
         'promise/avoid-new': 'off',
@@ -555,6 +584,7 @@ module.exports = defineConfig({
         'src/_vendor/zod-to-json-schema/parsers/string.ts',
         'src/providers/bedrock/aws.ts',
         'vitest.config.mts',
+        'src/internal/detect-platform.ts',
       ],
       rules: {
         'prefer-named-capture-group': 'off',
@@ -590,6 +620,11 @@ module.exports = defineConfig({
         'tests/qs/stringify.test.ts',
         'tests/uploads.test.ts',
         'tests/utils/mock-fetch.ts',
+        'src/core/error.ts',
+        'src/internal/detect-platform.ts',
+        'src/internal/errors.ts',
+        'src/internal/shim-types.ts',
+        'src/internal/types.ts',
       ],
       rules: {
         'typescript/prefer-ts-expect-error': 'off',
@@ -636,6 +671,7 @@ module.exports = defineConfig({
         'src/_vendor/partial-json-parser/parser.ts',
         'src/internal/qs/utils.ts',
         'tests/benchmarks/streaming.bench.ts',
+        'src/internal/utils/uuid.ts',
       ],
       rules: {
         'no-bitwise': 'off',
@@ -661,6 +697,9 @@ module.exports = defineConfig({
         'src/lib/chatCompletionUtils.ts',
         'src/lib/responses/ResponseAccumulator.ts',
         'src/lib/responses/ResponseStream.ts',
+        'src/core/pagination.ts',
+        'src/internal/detect-platform.ts',
+        'src/internal/utils/values.ts',
       ],
       rules: {
         'no-eq-null': 'off',
@@ -693,6 +732,7 @@ module.exports = defineConfig({
         'tests/qs/stringify.test.ts',
         'tests/streaming.test.ts',
         'tests/test-script.test.ts',
+        'tests/index.test.ts',
       ],
       rules: {
         'unicorn/consistent-function-scoping': 'off',
@@ -727,6 +767,7 @@ module.exports = defineConfig({
         'src/core/streaming.ts',
         'src/lib/AbstractChatCompletionRunner.ts',
         'tests/lib/responsesWebSocket.test.ts',
+        'src/core/pagination.ts',
       ],
       rules: {
         'no-await-in-loop': 'off',
@@ -814,6 +855,7 @@ module.exports = defineConfig({
         'tests/lib/responsesWebSocket.test.ts',
         'tests/lib/workload-identity.test.ts',
         'tests/ws.test.ts',
+        'tests/index.test.ts',
       ],
       rules: {
         'no-plusplus': 'off',
@@ -850,6 +892,11 @@ module.exports = defineConfig({
         'tests/qs/stringify.test.ts',
         'tests/uploads.test.ts',
         'tests/utils/mock-fetch.ts',
+        'src/core/error.ts',
+        'src/internal/detect-platform.ts',
+        'src/internal/errors.ts',
+        'src/internal/shim-types.ts',
+        'src/internal/types.ts',
       ],
       rules: {
         'typescript/ban-ts-comment': 'off',
@@ -890,6 +937,10 @@ module.exports = defineConfig({
         'tests/lib/pagination.test.ts',
         'tests/realtime-websocket.test.ts',
         'tests/responsesTools.test.ts',
+        'src/internal/headers.ts',
+        'src/internal/parse.ts',
+        'src/internal/request-options.ts',
+        'src/internal/utils/log.ts',
       ],
       rules: {
         'typescript/consistent-type-definitions': 'off',
@@ -1098,6 +1149,7 @@ module.exports = defineConfig({
         'tests/lib/responsesWebSocket.test.ts',
         'tests/lib/workload-identity.test.ts',
         'tests/realtime-websocket.test.ts',
+        'tests/index.test.ts',
       ],
       rules: {
         'typescript/no-non-null-assertion': 'off',
@@ -1120,6 +1172,9 @@ module.exports = defineConfig({
         'src/lib/parser.ts',
         'src/lib/responses/ResponseAccumulator.ts',
         'src/lib/responses/ResponseStream.ts',
+        'src/internal/request-options.ts',
+        'src/internal/utils/log.ts',
+        'src/resources/beta/realtime/realtime.ts',
       ],
       rules: {
         'import/no-cycle': 'off',
@@ -1136,7 +1191,6 @@ module.exports = defineConfig({
         'scripts/_vendor/tsc-multi/src/transformer.ts',
         'scripts/_vendor/tsc-multi/src/worker/worker.ts',
         'scripts/check-node-version-policy.ts',
-        'scripts/stainless-generated-files.cjs',
         'scripts/test-packed-package.ts',
         'scripts/utils/check-version.cjs',
         'scripts/utils/fix-index-exports.cjs',
@@ -1174,6 +1228,8 @@ module.exports = defineConfig({
         'tests/sdk-behavior.test.ts',
         'tests/utils/mock-snapshots.ts',
         'vitest.config.mts',
+        'src/internal/detect-platform.ts',
+        'src/internal/utils/values.ts',
       ],
       rules: {
         'require-unicode-regexp': 'off',
@@ -1335,6 +1391,7 @@ module.exports = defineConfig({
         'tests/lib/responsesWebSocket.test.ts',
         'tests/responsesItems.test.ts',
         'tests/responsesTools.test.ts',
+        'tests/stringifyQuery.test.ts',
       ],
       rules: {
         'unicorn/filename-case': 'off',
@@ -1401,6 +1458,130 @@ module.exports = defineConfig({
       ],
       rules: {
         'no-param-reassign': 'off',
+      },
+    },
+    {
+      // This public Promise subclass must retain its lazy thenable contract and
+      // constructor parameter properties; changing either alters runtime behavior.
+      files: ['src/core/api-promise.ts'],
+      rules: {
+        'typescript/parameter-properties': 'off',
+        'unicorn/no-thenable': 'off',
+      },
+    },
+    {
+      // The public error hierarchy preserves its historical Error.name values,
+      // exported class colocation, forward references, and broad Object acceptance.
+      files: ['src/core/error.ts'],
+      rules: {
+        'max-classes-per-file': 'off',
+        'no-use-before-define': 'off',
+        'no-useless-constructor': 'off',
+        'typescript/no-wrapper-object-types': 'off',
+        'unicorn/custom-error-definition': 'off',
+      },
+    },
+    {
+      // Existing pagination classes share one public module and constructor/type
+      // surface; splitting them would change import and declaration topology.
+      files: ['src/core/pagination.ts'],
+      rules: {
+        'class-methods-use-this': 'off',
+        'max-classes-per-file': 'off',
+        'typescript/no-this-alias': 'off',
+        'unicorn/no-this-assignment': 'off',
+      },
+    },
+    {
+      // Cross-runtime feature detection must guard potentially undeclared globals
+      // with typeof; direct identifier access throws on unsupported platforms.
+      files: ['src/internal/detect-platform.ts'],
+      rules: {
+        'no-use-before-define': 'off',
+        'unicorn/no-typeof-undefined': 'off',
+      },
+    },
+    {
+      // Dynamic parent-node_modules type probes and cross-runtime type shims
+      // cannot become static imports without changing consumer type acquisition.
+      files: ['src/internal/shim-types.ts', 'src/internal/types.ts'],
+      rules: {
+        'jsdoc/check-tag-names': 'off',
+        'typescript/consistent-type-imports': 'off',
+      },
+    },
+    {
+      // This utility intentionally accepts all non-nullish Object-compatible
+      // values, preserving its historical exported assignability.
+      files: ['src/internal/utils/values.ts'],
+      rules: {
+        'no-useless-return': 'off',
+        'prefer-const': 'off',
+        'prefer-object-has-own': 'off',
+        'unicorn/prefer-number-coercion': 'off',
+        'typescript/no-wrapper-object-types': 'off',
+      },
+    },
+    {
+      // Binary encoding operates on UTF-16 code units and byte values; switching
+      // to Unicode code points would corrupt surrogate-pair and byte handling.
+      files: ['src/internal/utils/base64.ts'],
+      rules: {
+        'unicorn/prefer-code-point': 'off',
+      },
+    },
+    {
+      // Unsupported stream environments historically throw Error, not TypeError;
+      // changing the constructor would break callers that classify failures.
+      files: ['src/internal/shims.ts'],
+      rules: {
+        'unicorn/prefer-type-error': 'off',
+      },
+    },
+    {
+      // Preserve the constructability and inferred name of the historical
+      // exported UUID function expression while its live binding self-replaces.
+      files: ['src/internal/utils/uuid.ts'],
+      rules: {
+        'func-names': 'off',
+      },
+    },
+    {
+      // These lazily initialized exports intentionally replace their own live
+      // bindings; making them const would change runtime behavior.
+      files: ['src/internal/utils/uuid.ts', 'src/internal/utils/values.ts'],
+      rules: {
+        'import/no-mutable-exports': 'off',
+      },
+    },
+    {
+      // Realtime resources preserve public declaration-merging namespace exports
+      // and their explicit type/value export topology for existing consumers.
+      files: [
+        'src/resources/beta/realtime/realtime.ts',
+        'src/resources/beta/realtime/sessions.ts',
+        'src/resources/beta/realtime/transcription-sessions.ts',
+      ],
+      rules: {
+        'no-useless-rename': 'off',
+      },
+    },
+    {
+      // Namespace-qualified recursive realtime references intentionally import
+      // the current public module to preserve generated declaration shapes.
+      files: ['src/resources/beta/realtime/realtime.ts'],
+      rules: {
+        'import/no-self-import': 'off',
+      },
+    },
+    {
+      // Raw Response fixtures must preserve their explicit headers and runtime
+      // support; Response.json adds Content-Type and is not equivalent.
+      files: ['tests/index.test.ts'],
+      rules: {
+        'class-methods-use-this': 'off',
+        'max-classes-per-file': ['error', { max: 2 }],
+        'unicorn/prefer-response-static-json': 'off',
       },
     },
     {

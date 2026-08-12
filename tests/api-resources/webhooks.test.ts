@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import OpenAI from 'openai';
 
 const client = new OpenAI({
@@ -11,7 +9,7 @@ describe('resource webhooks', () => {
   // all this data is taken from a real webhook event
   const payload = `{"id": "evt_685c059ae3a481909bdc86819b066fb6", "object": "event", "created_at": 1750861210, "type": "response.completed", "data": {"id": "resp_123"}}`;
   const webhookSignature = 'v1,gUAg4R2hWouRZqRQG4uJypNS8YK885G838+EHb4nKBY=';
-  const testTimestamp = 1750861210;
+  const testTimestamp = 1_750_861_210;
   const webhookTimestamp = testTimestamp.toString();
   const webhookId = 'wh_685c059ae39c8190af8c71ed1022a24d';
   const headers = new Headers({
@@ -22,7 +20,8 @@ describe('resource webhooks', () => {
   const secret = 'whsec_RdvaYFYUXuIFuEbvZHwMfYFhUf7aMYjYcmM24+Aj40c=';
 
   // Mock time to match our test timestamp
-  const mockNow = testTimestamp * 1000; // Convert to milliseconds
+  // Convert the mocked timestamp to milliseconds.
+  const mockNow = testTimestamp * 1000;
 
   beforeEach(() => {
     jest.spyOn(global.Date, 'now').mockImplementation(() => mockNow);
@@ -40,7 +39,7 @@ describe('resource webhooks', () => {
       expect(unwrapped).toEqual({
         id: 'evt_685c059ae3a481909bdc86819b066fb6',
         object: 'event',
-        created_at: 1750861210,
+        created_at: 1_750_861_210,
         type: 'response.completed',
         data: { id: 'resp_123' },
       });
@@ -111,7 +110,8 @@ describe('resource webhooks', () => {
 
     it('should throw for timestamp too old', async () => {
       // Create a timestamp that is older than 5 minutes from our mocked "now" time
-      const oldTimestamp = (testTimestamp - 400).toString(); // 6 minutes 40 seconds ago
+      // 6 minutes and 40 seconds ago.
+      const oldTimestamp = (testTimestamp - 400).toString();
       const oldHeaders = new Headers({
         'webhook-signature': 'v1,dummy_signature',
         'webhook-timestamp': oldTimestamp,
@@ -125,7 +125,8 @@ describe('resource webhooks', () => {
 
     it('should throw for timestamp too new', async () => {
       // Create a timestamp that is in the future beyond tolerance
-      const futureTimestamp = (testTimestamp + 400).toString(); // 6 minutes 40 seconds in the future
+      // 6 minutes and 40 seconds in the future.
+      const futureTimestamp = (testTimestamp + 400).toString();
       const futureHeaders = new Headers({
         'webhook-signature': 'v1,dummy_signature',
         'webhook-timestamp': futureTimestamp,
@@ -151,7 +152,8 @@ describe('resource webhooks', () => {
 
     it('should pass with custom tolerance', async () => {
       // Create a timestamp that would normally be too old with default tolerance
-      const oldTimestamp = (testTimestamp - 400).toString(); // 6 minutes 40 seconds ago
+      // 6 minutes and 40 seconds ago.
+      const oldTimestamp = (testTimestamp - 400).toString();
       const oldHeaders = new Headers({
         'webhook-signature': 'v1,dummy_signature',
         'webhook-timestamp': oldTimestamp,

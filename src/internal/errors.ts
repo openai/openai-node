@@ -1,33 +1,44 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 export function isAbortError(err: unknown) {
   return (
     typeof err === 'object' &&
     err !== null &&
     // Spec-compliant fetch implementations
-    (('name' in err && (err as any).name === 'AbortError') ||
+    (('name' in err && err.name === 'AbortError') ||
       // Expo fetch
-      ('message' in err && String((err as any).message).includes('FetchRequestCanceledException')))
+      ('message' in err && String(err.message).includes('FetchRequestCanceledException')))
   );
 }
 
 export const castToError = (err: any): Error => {
-  if (err instanceof Error) return err;
+  if (err instanceof Error) {
+    return err;
+  }
   if (typeof err === 'object' && err !== null) {
     try {
       if (Object.prototype.toString.call(err) === '[object Error]') {
+        const errorLike = err as { message?: string; cause?: unknown; stack?: string; name?: string };
         // @ts-ignore - not all envs have native support for cause yet
-        const error = new Error(err.message, err.cause ? { cause: err.cause } : {});
-        if (err.stack) error.stack = err.stack;
-        // @ts-ignore - not all envs have native support for cause yet
-        if (err.cause && !error.cause) error.cause = err.cause;
-        if (err.name) error.name = err.name;
+        const error = new Error(errorLike.message, errorLike.cause ? { cause: errorLike.cause } : {});
+        if (errorLike.stack) {
+          error.stack = errorLike.stack;
+        }
+        if (errorLike.cause && !(error as Error & { cause?: unknown }).cause) {
+          // @ts-ignore - not all environments have native support for cause yet.
+          error.cause = errorLike.cause;
+        }
+        if (errorLike.name) {
+          error.name = errorLike.name;
+        }
         return error;
       }
-    } catch {}
+    } catch {
+      // Fall through when a cross-runtime error shape cannot be inspected.
+    }
     try {
       return new Error(JSON.stringify(err));
-    } catch {}
+    } catch {
+      // Fall through when the value cannot be serialized.
+    }
   }
-  return new Error(err);
+  return new Error(err as string | undefined);
 };

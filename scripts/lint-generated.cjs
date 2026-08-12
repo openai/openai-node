@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-const generatedFiles = require('./stainless-generated-files.cjs');
+const generatedFiles = require('./generated-files.cjs');
 
 const oxlint = path.join(repositoryRoot, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const generatedConfig = path.join(repositoryRoot, 'oxlint.generated.config.json');

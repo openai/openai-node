@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 /**
  * This module provides internal shims and utility functions for environments where certain Node.js or global types may not be available.
  *
@@ -23,8 +21,8 @@ export function getDefaultFetch(): Fetch {
 type ReadableStreamArgs = ConstructorParameters<typeof ReadableStream>;
 
 export function makeReadableStream(...args: ReadableStreamArgs): ReadableStream {
-  const ReadableStream = (globalThis as any).ReadableStream;
-  if (typeof ReadableStream === 'undefined') {
+  const { ReadableStream } = globalThis as any;
+  if (ReadableStream === undefined) {
     // Note: All of the platforms / runtimes we officially support already define
     // `ReadableStream` as a global, so this should only ever be hit on unsupported runtimes.
     throw new Error(
@@ -36,11 +34,13 @@ export function makeReadableStream(...args: ReadableStreamArgs): ReadableStream 
 }
 
 export function ReadableStreamFrom<T>(iterable: Iterable<T> | AsyncIterable<T>): ReadableStream<T> {
-  let iter: AsyncIterator<T> | Iterator<T> =
+  const iter: AsyncIterator<T> | Iterator<T> =
     Symbol.asyncIterator in iterable ? iterable[Symbol.asyncIterator]() : iterable[Symbol.iterator]();
 
   return makeReadableStream({
-    start() {},
+    start() {
+      // Stream setup is intentionally deferred until pull.
+    },
     async pull(controller: any) {
       const { done, value } = await iter.next();
       if (done) {
@@ -62,18 +62,24 @@ export function ReadableStreamFrom<T>(iterable: Iterable<T> | AsyncIterable<T>):
  * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1627354490
  */
 export function ReadableStreamToAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
-  if (stream[Symbol.asyncIterator]) return stream;
+  if (stream[Symbol.asyncIterator]) {
+    return stream;
+  }
 
   const reader = stream.getReader();
   return {
     async next() {
       try {
         const result = await reader.read();
-        if (result?.done) reader.releaseLock(); // release lock when stream becomes closed
+        if (result?.done) {
+          // Release the lock when the stream becomes closed.
+          reader.releaseLock();
+        }
         return result;
-      } catch (e) {
-        reader.releaseLock(); // release lock when stream becomes errored
-        throw e;
+      } catch (error) {
+        // Release the lock when the stream becomes errored.
+        reader.releaseLock();
+        throw error;
       }
     },
     async return() {
@@ -93,7 +99,9 @@ export function ReadableStreamToAsyncIterable<T>(stream: any): AsyncIterableIter
  * See https://undici.nodejs.org/#/?id=garbage-collection
  */
 export async function CancelReadableStream(stream: any): Promise<void> {
-  if (stream === null || typeof stream !== 'object') return;
+  if (stream === null || typeof stream !== 'object') {
+    return;
+  }
 
   if (stream[Symbol.asyncIterator]) {
     await stream[Symbol.asyncIterator]().return?.();

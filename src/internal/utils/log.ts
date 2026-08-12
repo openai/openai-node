@@ -1,8 +1,6 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { hasOwn } from './values';
-import { type OpenAI } from '../../client';
-import { RequestOptions } from '../request-options';
+import type { OpenAI } from '../../client';
+import type { RequestOptions } from '../request-options';
 
 type LogFn = (message: string, ...rest: unknown[]) => void;
 export type Logger = {
@@ -40,15 +38,16 @@ export const parseLogLevel = (
   return undefined;
 };
 
-function noop() {}
+function noop() {
+  // Disabled log levels intentionally do nothing.
+}
 
 function makeLogFn(fnLevel: keyof Logger, logger: Logger | undefined, logLevel: LogLevel) {
   if (!logger || levelNumbers[fnLevel] > levelNumbers[logLevel]) {
     return noop;
-  } else {
-    // Don't wrap logger functions, we want the stacktrace intact!
-    return logger[fnLevel].bind(logger);
   }
+  // Don't wrap logger functions, we want the stacktrace intact!
+  return logger[fnLevel].bind(logger);
 }
 
 const noopLogger = {
@@ -58,10 +57,12 @@ const noopLogger = {
   debug: noop,
 };
 
-let cachedLoggers = /* @__PURE__ */ new WeakMap<Logger, [LogLevel, Logger]>();
+const cachedLoggers =
+  /* @__PURE__ */
+  new WeakMap<Logger, [LogLevel, Logger]>();
 
 export function loggerFor(client: OpenAI): Logger {
-  const logger = client.logger;
+  const { logger } = client;
   const logLevel = client.logLevel ?? 'off';
   if (!logger) {
     return noopLogger;
@@ -98,7 +99,8 @@ export const formatRequestDetails = (details: {
 }) => {
   if (details.options) {
     details.options = { ...details.options };
-    delete details.options['headers']; // redundant + leaks internals
+    // Header options are redundant here and would leak internal details.
+    delete details.options['headers'];
   }
   if (details.headers) {
     details.headers = Object.fromEntries(

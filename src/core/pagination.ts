@@ -1,11 +1,9 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { OpenAIError } from './error';
-import { FinalRequestOptions } from '../internal/request-options';
-import { defaultParseResponse, WithRequestID } from '../internal/parse';
+import type { FinalRequestOptions } from '../internal/request-options';
+import type { APIResponseProps, WithRequestID } from '../internal/parse';
+import { defaultParseResponse } from '../internal/parse';
 import { APIPromise } from './api-promise';
-import { type OpenAI } from '../client';
-import { type APIResponseProps } from '../internal/parse';
+import type { OpenAI } from '../client';
 import { maybeObj } from '../internal/utils/values';
 
 export type PageRequestOptions = Pick<FinalRequestOptions, 'query' | 'headers' | 'body' | 'path' | 'method'>;
@@ -30,7 +28,9 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
 
   hasNextPage(): boolean {
     const items = this.getPaginatedItems();
-    if (!items.length) return false;
+    if (!items.length) {
+      return false;
+    }
     return this.nextPageRequestOptions() != null;
   }
 
@@ -87,11 +87,11 @@ export class PagePromise<
     super(
       client,
       request,
-      async (client, props) =>
+      async (requestClient, props) =>
         new Page(
-          client,
+          requestClient,
           props.response,
-          await defaultParseResponse(client, props),
+          await defaultParseResponse(requestClient, props),
           props.options,
         ) as WithRequestID<PageClass>,
     );
@@ -103,6 +103,7 @@ export class PagePromise<
    *    for await (const item of client.items.list()) {
    *      console.log(item)
    *    }
+   * @yields {Item} Each item from the current page and all subsequent pages.
    */
   async *[Symbol.asyncIterator](): AsyncGenerator<Item> {
     const page = await this;
@@ -113,7 +114,7 @@ export class PagePromise<
 }
 
 export interface PageResponse<Item> {
-  data: Array<Item>;
+  data: Item[];
 
   object: string;
 }
@@ -122,7 +123,7 @@ export interface PageResponse<Item> {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item> {
-  data: Array<Item>;
+  data: Item[];
 
   object: string;
 
@@ -143,7 +144,7 @@ export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item>
 }
 
 export interface CursorPageResponse<Item> {
-  data: Array<Item>;
+  data: Item[];
 
   has_more: boolean;
 }
@@ -158,7 +159,7 @@ export class CursorPage<Item extends { id: string }>
   extends AbstractPage<Item>
   implements CursorPageResponse<Item>
 {
-  data: Array<Item>;
+  data: Item[];
 
   has_more: boolean;
 
@@ -204,7 +205,7 @@ export class CursorPage<Item extends { id: string }>
 }
 
 export interface ConversationCursorPageResponse<Item> {
-  data: Array<Item>;
+  data: Item[];
 
   has_more: boolean;
 
@@ -221,7 +222,7 @@ export class ConversationCursorPage<Item>
   extends AbstractPage<Item>
   implements ConversationCursorPageResponse<Item>
 {
-  data: Array<Item>;
+  data: Item[];
 
   has_more: boolean;
 
@@ -269,7 +270,7 @@ export class ConversationCursorPage<Item>
 }
 
 export interface NextCursorPageResponse<Item> {
-  data: Array<Item>;
+  data: Item[];
 
   has_more: boolean;
 
@@ -283,7 +284,7 @@ export interface NextCursorPageParams {
 }
 
 export class NextCursorPage<Item> extends AbstractPage<Item> implements NextCursorPageResponse<Item> {
-  data: Array<Item>;
+  data: Item[];
 
   has_more: boolean;
 

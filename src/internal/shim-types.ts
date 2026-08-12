@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 /**
  * Shims for types that we can't always rely on being available globally.
  *
@@ -9,10 +7,10 @@
 
 type NeverToAny<T> = T extends never ? any : T;
 
-/** @ts-ignore */
+// @ts-ignore Runtime-specific stream globals may not be available.
 type _DOMReadableStream<R = any> = globalThis.ReadableStream<R>;
 
-/** @ts-ignore */
+// @ts-ignore Runtime-specific stream modules may not be available.
 type _NodeReadableStream<R = any> = import('stream/web').ReadableStream<R>;
 
 type _ConditionalNodeReadableStream<R = any> = typeof globalThis extends { ReadableStream: any }

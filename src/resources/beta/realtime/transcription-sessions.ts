@@ -1,9 +1,7 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { APIResource } from '../../../core/resource';
-import { APIPromise } from '../../../core/api-promise';
+import type { APIPromise } from '../../../core/api-promise';
 import { buildHeaders } from '../../../internal/headers';
-import { RequestOptions } from '../../../internal/request-options';
+import type { RequestOptions } from '../../../internal/request-options';
 
 export class TranscriptionSessions extends APIResource {
   /**
@@ -59,7 +57,7 @@ export interface TranscriptionSession {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: Array<'text' | 'audio'>;
+  modalities?: ('text' | 'audio')[];
 
   /**
    * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
@@ -159,7 +157,7 @@ export interface TranscriptionSessionCreateParams {
    *
    * - `item.input_audio_transcription.logprobs`
    */
-  include?: Array<string>;
+  include?: string[];
 
   /**
    * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
@@ -188,7 +186,7 @@ export interface TranscriptionSessionCreateParams {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: Array<'text' | 'audio'>;
+  modalities?: ('text' | 'audio')[];
 
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be

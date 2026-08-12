@@ -145,8 +145,8 @@ This repository uses [Ultracite](https://www.ultracite.ai/) with
 [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) to format and lint its code.
 The Ultracite presets live in `oxfmt.config.ts` and `oxlint.config.ts`, with
 repository-specific formatting options, import rules, fixture exceptions, and
-generated-file lint exclusions layered on top. Files with a Stainless- or
-Castiron-generated header are formatted and checked only for unused imports and
+generated-file lint exclusions layered on top. Files with a Castiron-generated
+header are formatted and checked only for unused imports and
 restricted SDK package imports; handwritten files in the same directories remain
 checked. Existing handwritten patterns are explicitly
 exempted from incompatible Ultracite rules, while the remaining preset rules stay

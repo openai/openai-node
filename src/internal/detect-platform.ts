@@ -1,17 +1,12 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { VERSION } from '../version';
 
-export const isRunningInBrowser = () => {
-  return (
-    // @ts-ignore
-    typeof window !== 'undefined' &&
-    // @ts-ignore
-    typeof window.document !== 'undefined' &&
-    // @ts-ignore
-    typeof navigator !== 'undefined'
-  );
-};
+export const isRunningInBrowser = () =>
+  // @ts-ignore
+  typeof window !== 'undefined' &&
+  // @ts-ignore
+  typeof window.document !== 'undefined' &&
+  // @ts-ignore
+  typeof navigator !== 'undefined';
 
 type DetectedPlatform = 'deno' | 'node' | 'edge' | 'unknown';
 
@@ -27,7 +22,7 @@ function getDetectedPlatform(): DetectedPlatform {
   }
   if (
     Object.prototype.toString.call(
-      typeof (globalThis as any).process !== 'undefined' ? (globalThis as any).process : 0,
+      typeof (globalThis as any).process === 'undefined' ? 0 : (globalThis as any).process,
     ) === '[object process]'
   ) {
     return 'node';
@@ -49,14 +44,14 @@ type PlatformName =
   | `Other:${string}`
   | 'Unknown';
 type Browser = 'ie' | 'edge' | 'chrome' | 'firefox' | 'safari';
-type PlatformProperties = {
+interface PlatformProperties {
   'X-Stainless-Lang': 'js';
   'X-Stainless-Package-Version': string;
   'X-Stainless-OS': PlatformName;
   'X-Stainless-Arch': Arch;
   'X-Stainless-Runtime': 'node' | 'deno' | 'edge' | `browser:${Browser}` | 'unknown';
   'X-Stainless-Runtime-Version': string;
-};
+}
 const getPlatformProperties = (): PlatformProperties => {
   const detectedPlatform = getDetectedPlatform();
   if (detectedPlatform === 'deno') {
@@ -104,7 +99,7 @@ const getPlatformProperties = (): PlatformProperties => {
     };
   }
 
-  // TODO add support for Cloudflare workers, etc.
+  // Additional runtimes, including Cloudflare workers, are reported as unknown.
   return {
     'X-Stainless-Lang': 'js',
     'X-Stainless-Package-Version': VERSION,
@@ -115,10 +110,10 @@ const getPlatformProperties = (): PlatformProperties => {
   };
 };
 
-type BrowserInfo = {
+interface BrowserInfo {
   browser: Browser;
   version: string;
-};
+}
 
 declare const navigator: { userAgent: string } | undefined;
 
@@ -132,7 +127,7 @@ function getBrowserInfo(): BrowserInfo | null {
   const browserPatterns = [
     { key: 'edge' as const, pattern: /Edge(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
     { key: 'ie' as const, pattern: /MSIE(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
-    { key: 'ie' as const, pattern: /Trident(?:.*rv\:(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: 'ie' as const, pattern: /Trident(?:.*rv:(\d+)\.(\d+)(?:\.(\d+))?)?/ },
     { key: 'chrome' as const, pattern: /Chrome(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
     { key: 'firefox' as const, pattern: /Firefox(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
     { key: 'safari' as const, pattern: /(?:Version\W+(\d+)\.(\d+)(?:\.(\d+))?)?(?:\W+Mobile\S*)?\W+Safari/ },
@@ -158,11 +153,21 @@ const normalizeArch = (arch: string): Arch => {
   // - https://nodejs.org/api/process.html#processarch
   // Deno docs:
   // - https://doc.deno.land/deno/stable/~/Deno.build
-  if (arch === 'x32') return 'x32';
-  if (arch === 'x86_64' || arch === 'x64') return 'x64';
-  if (arch === 'arm') return 'arm';
-  if (arch === 'aarch64' || arch === 'arm64') return 'arm64';
-  if (arch) return `other:${arch}`;
+  if (arch === 'x32') {
+    return 'x32';
+  }
+  if (arch === 'x86_64' || arch === 'x64') {
+    return 'x64';
+  }
+  if (arch === 'arm') {
+    return 'arm';
+  }
+  if (arch === 'aarch64' || arch === 'arm64') {
+    return 'arm64';
+  }
+  if (arch) {
+    return `other:${arch}`;
+  }
   return 'unknown';
 };
 
@@ -173,24 +178,38 @@ const normalizePlatform = (platform: string): PlatformName => {
   // - https://doc.deno.land/deno/stable/~/Deno.build
   // - https://github.com/denoland/deno/issues/14799
 
-  platform = platform.toLowerCase();
+  const normalizedPlatform = platform.toLowerCase();
 
   // NOTE: this iOS check is untested and may not work
   // Node does not work natively on IOS, there is a fork at
   // https://github.com/nodejs-mobile/nodejs-mobile
   // however it is unknown at the time of writing how to detect if it is running
-  if (platform.includes('ios')) return 'iOS';
-  if (platform === 'android') return 'Android';
-  if (platform === 'darwin') return 'MacOS';
-  if (platform === 'win32') return 'Windows';
-  if (platform === 'freebsd') return 'FreeBSD';
-  if (platform === 'openbsd') return 'OpenBSD';
-  if (platform === 'linux') return 'Linux';
-  if (platform) return `Other:${platform}`;
+  if (normalizedPlatform.includes('ios')) {
+    return 'iOS';
+  }
+  if (normalizedPlatform === 'android') {
+    return 'Android';
+  }
+  if (normalizedPlatform === 'darwin') {
+    return 'MacOS';
+  }
+  if (normalizedPlatform === 'win32') {
+    return 'Windows';
+  }
+  if (normalizedPlatform === 'freebsd') {
+    return 'FreeBSD';
+  }
+  if (normalizedPlatform === 'openbsd') {
+    return 'OpenBSD';
+  }
+  if (normalizedPlatform === 'linux') {
+    return 'Linux';
+  }
+  if (normalizedPlatform) {
+    return `Other:${normalizedPlatform}`;
+  }
   return 'Unknown';
 };
 
 let _platformHeaders: PlatformProperties;
-export const getPlatformHeaders = () => {
-  return (_platformHeaders ??= getPlatformProperties());
-};
+export const getPlatformHeaders = () => (_platformHeaders ??= getPlatformProperties());

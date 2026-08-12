@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 export type PromiseOrValue<T> = T | Promise<T>;
 export type HTTPMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
@@ -56,17 +54,23 @@ type OverloadedParameters<T> = T extends {
  *
  * [1]: https://www.typescriptlang.org/tsconfig/#typeAcquisition
  */
-/** @ts-ignore For users with \@types/node */ /* prettier-ignore */
+// @ts-ignore For users with @types/node
+// prettier-ignore
 type UndiciTypesRequestInit = NotAny<import('../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/undici-types/index.d.ts').RequestInit>;
-/** @ts-ignore For users with undici */ /* prettier-ignore */
+// @ts-ignore For users with undici
+// prettier-ignore
 type UndiciRequestInit = NotAny<import('../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/undici/index.d.ts').RequestInit>;
-/** @ts-ignore For users with \@types/bun */ /* prettier-ignore */
+// @ts-ignore For users with @types/bun
+// prettier-ignore
 type BunRequestInit = globalThis.FetchRequestInit;
-/** @ts-ignore For users with node-fetch@2 */ /* prettier-ignore */
+// @ts-ignore For users with node-fetch@2
+// prettier-ignore
 type NodeFetch2RequestInit = NotAny<import('../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit>;
-/** @ts-ignore For users with node-fetch@3, doesn't need file extension because types are at ./@types/index.d.ts */ /* prettier-ignore */
+// @ts-ignore For users with node-fetch@3, doesn't need file extension because types are at ./@types/index.d.ts
+// prettier-ignore
 type NodeFetch3RequestInit =  NotAny<import('../node_modules/node-fetch').RequestInit> | NotAny<import('../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/node-fetch').RequestInit>;
-/** @ts-ignore For users who use Deno */ /* prettier-ignore */
+// @ts-ignore For users who use Deno
+// prettier-ignore
 type FetchRequestInit = NonNullable<OverloadedParameters<typeof fetch>[1]>;
 
 type RequestInits =
@@ -78,12 +82,12 @@ type RequestInits =
   | NotAny<RequestInit>
   | NotAny<FetchRequestInit>;
 
-type RuntimeFetchOptions = {
+interface RuntimeFetchOptions {
   dispatcher?: unknown;
   agent?: unknown;
   client?: unknown;
   proxy?: unknown;
-};
+}
 
 /**
  * This type contains `RequestInit` options that may be available on the current runtime,

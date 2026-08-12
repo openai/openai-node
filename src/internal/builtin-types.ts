@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 export type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 /**
@@ -43,7 +41,7 @@ type _BodyInit = RequestInit['body'];
  * An alias to the builtin `Array<T>` type so we can
  * easily alias it in import statements if there are name clashes.
  */
-type _Array<T> = Array<T>;
+type _Array<T> = T[];
 
 /**
  * An alias to the builtin `Record<K, T>` type so we can

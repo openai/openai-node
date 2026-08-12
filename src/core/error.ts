@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { castToError } from '../internal/errors';
 import type { OAuthErrorCode } from '../resources/shared';
 
@@ -37,13 +35,12 @@ export class APIError<
   }
 
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
-    const msg = error?.message
-      ? typeof error.message === 'string'
-        ? error.message
-        : JSON.stringify(error.message)
-      : error
-        ? JSON.stringify(error)
-        : message;
+    let msg = message;
+    if (error?.message) {
+      msg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
+    } else if (error) {
+      msg = JSON.stringify(error);
+    }
 
     if (status && msg) {
       return `${status} ${msg}`;
@@ -114,9 +111,11 @@ export class APIUserAbortError extends APIError<undefined, undefined, undefined>
 export class APIConnectionError extends APIError<undefined, undefined, undefined> {
   constructor({ message, cause }: { message?: string | undefined; cause?: Error | undefined }) {
     super(undefined, undefined, message || 'Connection error.', undefined);
-    // in some environments the 'cause' property is already declared
-    // @ts-ignore
-    if (cause) this.cause = cause;
+    if (cause) {
+      // in some environments the 'cause' property is already declared
+      // @ts-ignore - Error.cause is not part of every supported TypeScript lib.
+      this.cause = cause;
+    }
   }
 }
 
