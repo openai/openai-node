@@ -180,3 +180,85 @@ describe('OpenAI client request behavior', () => {
     expect(req.body).toBe('search=hello%20world&limit=2');
   });
 });
+
+describe('JSON response parsing', () => {
+  test.each([
+    ['application/json', undefined],
+    ['application/json; charset=utf-8', undefined],
+    ['application/vnd.openai+json', undefined],
+    ['application/json', '0'],
+  ])('accepts an empty %s response with content-length %s', async (contentType, contentLength) => {
+    const response = new Response('', {
+      headers: {
+        'content-type': contentType,
+        ...(contentLength === undefined ? {} : { 'content-length': contentLength }),
+      },
+    });
+    const fetch = vi.fn(async () => response);
+    const client = new OpenAI({ apiKey: 'test-key', fetch });
+
+    await expect(client.realtime.calls.hangup('call_123')).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/realtime/calls/call_123/hangup',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  test('accepts an empty streaming JSON response without a content-length header', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.close();
+      },
+    });
+    const response = new Response(stream, { headers: { 'content-type': 'application/json' } });
+    const client = new OpenAI({ apiKey: 'test-key', fetch: vi.fn(async () => response) });
+
+    expect(response.body).not.toBeNull();
+    expect(response.headers.has('content-length')).toBe(false);
+    await expect(client.realtime.calls.hangup('call_123')).resolves.toBeUndefined();
+  });
+
+  test('accepts a genuinely bodyless JSON response without a content-length header', async () => {
+    const response = new Response(null, { headers: { 'content-type': 'application/json' } });
+    const client = new OpenAI({ apiKey: 'test-key', fetch: vi.fn(async () => response) });
+
+    expect(response.body).toBeNull();
+    expect(response.headers.has('content-length')).toBe(false);
+    await expect(client.realtime.calls.hangup('call_123')).resolves.toBeUndefined();
+  });
+
+  test.each([
+    ['object', '{"id":"response_123","deleted":true}', { id: 'response_123', deleted: true }],
+    ['array', '[1,2]', [1, 2]],
+    ['string', '"value"', 'value'],
+    ['number', '0', 0],
+    ['boolean', 'false', false],
+    ['null', 'null', null],
+  ])('preserves nonempty JSON %s values', async (_description, body, expected) => {
+    const response = new Response(body, {
+      headers: { 'content-type': 'application/json', 'x-request-id': 'req_123' },
+    });
+    const client = new OpenAI({ apiKey: 'test-key', fetch: vi.fn(async () => response) });
+
+    const parsed = await client.get('/items');
+
+    expect(parsed).toEqual(expected);
+    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
+      expect(parsed).toMatchObject({ _request_id: 'req_123' });
+    }
+  });
+
+  test.each(['{invalid', '   ', '\n\t'])('rejects malformed nonempty JSON: %j', async (body) => {
+    const response = new Response(body, { headers: { 'content-type': 'application/json' } });
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch: vi.fn(async () => response) });
+
+    await expect(client.get('/items')).rejects.toBeInstanceOf(SyntaxError);
+  });
+
+  test('preserves the null result for genuine HTTP 204 responses', async () => {
+    const response = new Response(null, { status: 204 });
+    const client = new OpenAI({ apiKey: 'test-key', fetch: vi.fn(async () => response) });
+
+    await expect(client.get('/items')).resolves.toBeNull();
+  });
+});
