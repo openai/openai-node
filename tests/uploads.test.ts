@@ -8,6 +8,28 @@ class MyClass {
   name = 'foo';
 }
 
+function foreignFileLike(): Blob & { name: string; lastModified: number } {
+  return Object.assign(new Blob([new Uint8Array([1, 2])], { type: 'application/jsonl' }), {
+    name: 'foreign.jsonl',
+    lastModified: 1234,
+  });
+}
+
+function foreignBlobLike(
+  contents: string,
+  type: string,
+): Pick<Blob, 'size' | 'type' | 'text' | 'slice' | 'arrayBuffer'> {
+  const blob = new Blob([contents], { type });
+
+  return {
+    size: blob.size,
+    type: blob.type,
+    text: blob.text.bind(blob),
+    slice: blob.slice.bind(blob),
+    arrayBuffer: blob.arrayBuffer.bind(blob),
+  };
+}
+
 function mockResponse({ url, content }: { url: string; content?: Blob }): ResponseLike {
   return {
     url,
@@ -41,6 +63,43 @@ describe('toFile', () => {
     expect(file.name).toEqual('audio.mp3');
   });
 
+  it('infers the MIME type from a Response body', async () => {
+    const response = mockResponse({
+      url: 'https://example.com/my/audio.mp3',
+      content: new Blob(['audio contents'], { type: 'audio/mpeg' }),
+    });
+
+    const file = await toFile(response);
+
+    expect(file.name).toBe('audio.mp3');
+    expect(file.type).toBe('audio/mpeg');
+    await expect(file.text()).resolves.toBe('audio contents');
+  });
+
+  it('prefers an explicit MIME type over a Response body type', async () => {
+    const response = mockResponse({
+      url: 'https://example.com/my/audio.mp3',
+      content: new Blob(['audio contents'], { type: 'audio/mpeg' }),
+    });
+
+    const file = await toFile(response, 'override.wav', { type: 'audio/wav' });
+
+    expect(file.name).toBe('override.wav');
+    expect(file.type).toBe('audio/wav');
+  });
+
+  it('allows an explicit empty MIME type to override a Response body type', async () => {
+    const response = mockResponse({
+      url: 'https://example.com/my/audio.mp3',
+      content: new Blob(['audio contents'], { type: 'audio/mpeg' }),
+    });
+
+    const file = await toFile(response, undefined, { type: '' });
+
+    expect(file.name).toBe('audio.mp3');
+    expect(file.type).toBe('');
+  });
+
   it('extracts a file name from a File', async () => {
     const input = new File(['foo'], 'input.jsonl');
     const file = await toFile(input);
@@ -55,6 +114,26 @@ describe('toFile', () => {
     expect(file.name).toBe('contents.txt');
     expect(file.type).toBe('text/plain');
     await expect(file.text()).resolves.toBe('contents');
+  });
+
+  it('infers the MIME type of a non-native Blob-compatible input', async () => {
+    const input = foreignBlobLike('foreign contents', 'application/foreign');
+
+    const file = await toFile(input, 'foreign.bin');
+
+    expect(file.name).toBe('foreign.bin');
+    expect(file.type).toBe('application/foreign');
+    await expect(file.text()).resolves.toBe('foreign contents');
+  });
+
+  it('honors explicit MIME overrides for non-native Blob-compatible inputs', async () => {
+    const input = foreignBlobLike('foreign contents', 'application/foreign');
+
+    const override = await toFile(input, 'foreign.bin', { type: 'application/custom' });
+    const empty = await toFile(input, 'foreign.bin', { type: '' });
+
+    expect(override.type).toBe('application/custom');
+    expect(empty.type).toBe('');
   });
 
   it('prefers an explicit MIME type over the input Blob type', async () => {
@@ -82,6 +161,37 @@ describe('toFile', () => {
     expect(file.lastModified).toBe(42);
   });
 
+  it('infers a MIME type from typed Blob chunks in an async stream', async () => {
+    const chunks = {
+      async *[Symbol.asyncIterator]() {
+        yield new Uint8Array([65]);
+        yield new Blob(['B'], { type: 'text/plain' });
+      },
+    };
+
+    const file = await toFile(chunks, 'chunks.txt');
+
+    expect(file.name).toBe('chunks.txt');
+    expect(file.type).toBe('text/plain');
+    await expect(file.text()).resolves.toBe('AB');
+  });
+
+  it('infers a MIME type from non-native Blob-compatible chunks in an async stream', async () => {
+    const foreignChunk = foreignBlobLike('foreign contents', 'application/foreign');
+    const chunks = {
+      async *[Symbol.asyncIterator]() {
+        yield new Uint8Array([65]);
+        yield foreignChunk;
+      },
+    };
+
+    const file = await toFile(chunks, 'foreign.bin');
+
+    expect(file.name).toBe('foreign.bin');
+    expect(file.type).toBe('application/foreign');
+    await expect(file.text()).resolves.toBe('Aforeign contents');
+  });
+
   it('preserves the filename and MIME type of a non-native File-compatible input', async () => {
     const input = Object.assign(new Blob(['foreign contents'], { type: 'text/plain' }), {
       name: 'foreign.txt',
@@ -92,6 +202,7 @@ describe('toFile', () => {
 
     expect(file.name).toBe('foreign.txt');
     expect(file.type).toBe('text/plain');
+    expect(file.lastModified).toBe(123);
     await expect(file.text()).resolves.toBe('foreign contents');
   });
 
@@ -149,6 +260,78 @@ describe('toFile', () => {
     expect(file).toBe(input);
     expect(file.name).toEqual('input.jsonl');
     expect(file.type).toBe('jsonl');
+  });
+
+  it('does not copy File objects for empty options', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'jsonl', lastModified: 1234 });
+
+    await expect(toFile(input, undefined, {})).resolves.toBe(input);
+    await expect(toFile(input, null, {})).resolves.toBe(input);
+  });
+
+  it('renames native File objects while preserving their MIME type and modification time', async () => {
+    const input = new File(['manifest'], 'SKILL.md', { type: 'text/markdown', lastModified: 1234 });
+
+    const file = await toFile(input, 'my-skill/SKILL.md');
+
+    expect(file).not.toBe(input);
+    expect(file.name).toBe('my-skill/SKILL.md');
+    expect(file.type).toBe('text/markdown');
+    expect(file.lastModified).toBe(1234);
+    await expect(file.text()).resolves.toBe('manifest');
+  });
+
+  it('applies native File MIME overrides without changing its filename or modification time', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'application/jsonl', lastModified: 1234 });
+
+    const file = await toFile(input, undefined, { type: 'application/x-ndjson' });
+
+    expect(file).not.toBe(input);
+    expect(file.name).toBe('input.jsonl');
+    expect(file.type).toBe('application/x-ndjson');
+    expect(file.lastModified).toBe(1234);
+  });
+
+  it('honors empty MIME and zero modification-time overrides for native File objects', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'application/jsonl', lastModified: 1234 });
+
+    const file = await toFile(input, undefined, { type: '', lastModified: 0 });
+
+    expect(file).not.toBe(input);
+    expect(file.name).toBe('input.jsonl');
+    expect(file.type).toBe('');
+    expect(file.lastModified).toBe(0);
+  });
+
+  it('copies File objects when metadata overrides are requested', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'jsonl', lastModified: 1234 });
+    const file = await toFile(input, 'override.jsonl', {
+      type: 'application/x-ndjson',
+      lastModified: 5678,
+    });
+    expect(file).not.toBe(input);
+    expect(file.name).toEqual('override.jsonl');
+    expect(file.type).toEqual('application/x-ndjson');
+    expect(file.lastModified).toEqual(5678);
+    await expect(file.text()).resolves.toEqual('foo');
+  });
+
+  it('preserves metadata from File-like objects', async () => {
+    const file = await toFile(foreignFileLike());
+    expect(file.name).toEqual('foreign.jsonl');
+    expect(file.type).toEqual('application/jsonl');
+    expect(file.lastModified).toEqual(1234);
+    await expect(file.arrayBuffer()).resolves.toEqual(new Uint8Array([1, 2]).buffer);
+  });
+
+  it('allows File-like metadata to be overridden', async () => {
+    const file = await toFile(foreignFileLike(), 'override.jsonl', {
+      type: 'application/x-ndjson',
+      lastModified: 5678,
+    });
+    expect(file.name).toEqual('override.jsonl');
+    expect(file.type).toEqual('application/x-ndjson');
+    expect(file.lastModified).toEqual(5678);
   });
 
   it('is assignable to File and Blob', async () => {

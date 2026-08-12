@@ -75,6 +75,9 @@ const isResponseLike = (value: any): value is ResponseLike =>
   typeof value.url === 'string' &&
   typeof value.blob === 'function';
 
+const hasFilePropertyOverrides = (options: FilePropertyBag | undefined): boolean =>
+  options?.type != null || options?.lastModified != null || options?.endings != null;
+
 /**
  * File-compatible values that can be buffered into a native `File`.
  *
@@ -91,14 +94,16 @@ export type ToFileInput =
 /**
  * Buffers compatible content into a native {@link File} for an SDK upload.
  *
- * Existing native `File` objects are returned unchanged. Other filenames are
- * inferred from response URLs or input metadata when omitted, falling back to
- * `unknown_file`. A native `Blob` or compatible non-native `File` supplies its
- * MIME type unless `options.type` provides an explicit override.
+ * Existing native `File` objects are returned unchanged when no filename or file
+ * metadata override is supplied. Renamed or copied files retain their original
+ * MIME type and modification time unless explicitly overridden. Other filenames
+ * are inferred from response URLs or input metadata when omitted, falling back
+ * to `unknown_file`. Responses, native or compatible `Blob` values, and compatible
+ * non-native files supply their MIME type unless `options.type` provides an explicit override.
  *
  * @param value An existing file, response, binary buffer, Blob-like object, async
  * stream of file parts, or a promise resolving to one of those values.
- * @param name Optional filename overriding inferred metadata for newly created files.
+ * @param name Optional filename overriding inferred metadata or an existing filename.
  * @param options Optional file metadata, including MIME type and modification time.
  * @returns A native `File` containing the complete buffered input.
  * @throws {Error} If the runtime lacks a global `File` constructor or the input
@@ -114,22 +119,26 @@ export async function toFile(
   // If it's a promise, resolve it.
   value = await value;
 
-  // If we've been given a `File` we don't need to do anything
+  // If we've been given a native `File` and no overrides, we don't need to do anything.
   if (isFileLike(value)) {
-    if (value instanceof File) {
+    if (value instanceof File && name == null && !hasFilePropertyOverrides(options)) {
       return value;
     }
 
-    const fileOptions =
-      options?.type === undefined && value.type ? { ...options, type: value.type } : options;
-    return makeFile([await value.arrayBuffer()], name ?? value.name, fileOptions);
+    return makeFile([await value.arrayBuffer()], name ?? value.name, {
+      ...options,
+      type: options?.type ?? value.type,
+      lastModified: options?.lastModified ?? value.lastModified,
+    });
   }
 
   if (isResponseLike(value)) {
     const blob = await value.blob();
     name ||= new URL(value.url).pathname.split(/[\\/]/).pop();
 
-    return makeFile(await getBytes(blob), name, options);
+    const responseOptions =
+      options?.type === undefined && blob.type ? { ...options, type: blob.type } : options;
+    return makeFile(await getBytes(blob), name, responseOptions);
   }
 
   const parts = await getBytes(value);
@@ -157,7 +166,7 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
   ) {
     parts.push(value);
   } else if (isBlobLike(value)) {
-    parts.push(value instanceof Blob ? value : await value.arrayBuffer());
+    parts.push(value instanceof Blob ? value : new Blob([await value.arrayBuffer()], { type: value.type }));
   } else if (
     isAsyncIterable(value) // includes Readable, ReadableStream, etc.
   ) {

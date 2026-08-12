@@ -1,4 +1,4 @@
-import OpenAI, { toStreamingFile } from 'openai';
+import OpenAI, { toFile, toStreamingFile } from 'openai';
 import type { Uploadable } from 'openai';
 
 interface RecordedRequest {
@@ -65,6 +65,22 @@ describe.each(skillEndpoints)('$name', ({ path, create }) => {
       'my-skill/SKILL.md',
       'my-skill/assets/data.txt',
     ]);
+  });
+
+  test('preserves browser directory paths when native files are explicitly renamed', async () => {
+    const { client, requests } = createClient();
+    const selectedFile: File & { webkitRelativePath?: string } = new File(['manifest'], 'SKILL.md', {
+      type: 'text/markdown',
+      lastModified: 1234,
+    });
+    Object.defineProperty(selectedFile, 'webkitRelativePath', { value: 'my-skill/SKILL.md' });
+
+    await create(client, [await toFile(selectedFile, selectedFile.webkitRelativePath)]);
+
+    const form = requests[0]?.body as FormData;
+    const uploaded = form.get('files[]') as File;
+    expect(uploaded.name).toBe('my-skill/SKILL.md');
+    expect(uploaded.type).toBe('text/markdown');
   });
 
   test('preserves directory names for mixed buffered and streaming uploads', async () => {
