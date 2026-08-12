@@ -223,12 +223,39 @@ describe('playAudio input and process errors', () => {
     await expect(playAudio(Readable.from(['audio']))).rejects.toThrow('ffplay was not found');
   });
 
+  test('rejects bodyless responses without spawning an ffplay process', async () => {
+    const response = new Response(null, { status: 204 });
+
+    await expect(playAudio(response)).rejects.toThrow('Cannot play audio from a response without a body');
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects consumed responses without spawning an ffplay process', async () => {
+    const response = new Response('audio');
+    await response.arrayBuffer();
+
+    await expect(playAudio(response)).rejects.toThrow('Invalid state: ReadableStream is locked');
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects a File stream failure before spawning an ffplay process', async () => {
+    const audio = new File(['audio'], 'audio.wav', { type: 'audio/wav' });
+    const failure = new Error('Cannot open audio stream');
+    vi.spyOn(audio, 'stream').mockImplementation(() => {
+      throw failure;
+    });
+
+    await expect(playAudio(audio)).rejects.toBe(failure);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   test('rejects asynchronous ffplay process errors', async () => {
     const { ffplay } = mockFfplay();
     const source = new PassThrough();
     const playback = playAudio(source);
     const failure = new Error('ffplay was not found');
 
+    expect(ffplay.listenerCount('error')).toBe(1);
     ffplay.emit('error', failure);
 
     await expect(playback).rejects.toBe(failure);

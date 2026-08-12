@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 import type { MockedFunction } from 'vitest';
 import { spawn } from 'node:child_process';
-import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { playAudio } from 'openai/helpers/audio';
 
@@ -74,23 +73,5 @@ describe('playAudio', () => {
     await expect(playAudio(response)).rejects.toThrow('stream failed');
 
     expect(ffplay.kill).toHaveBeenCalled();
-  });
-
-  it('rejects when ffplay cannot be spawned', async () => {
-    const ffplay = Object.assign(new EventEmitter(), {
-      stdin: new Writable({
-        write(_chunk, _encoding, callback) {
-          callback();
-        },
-      }),
-      kill: jest.fn(),
-    });
-    spawnMock.mockReturnValue(ffplay as any);
-
-    const promise = playAudio(Readable.from(['hello']));
-    const error = new Error('spawn ffplay ENOENT');
-
-    expect(() => ffplay.emit('error', error)).not.toThrow();
-    await expect(promise).rejects.toBe(error);
   });
 });
