@@ -76,12 +76,12 @@ type RequestInits =
   | NotAny<RequestInit>
   | NotAny<FetchRequestInit>;
 
-interface RuntimeFetchOptions {
+type RuntimeFetchOptions = {
   dispatcher?: unknown;
   agent?: unknown;
   client?: unknown;
   proxy?: unknown;
-}
+};
 
 /**
  * This type contains `RequestInit` options that may be available on the current runtime,

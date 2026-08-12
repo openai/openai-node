@@ -3,13 +3,11 @@ import { OpenAIError } from '../../core/error';
 // https://url.spec.whatwg.org/#url-scheme-string
 const startsWithSchemeRegexp = /^[a-z][a-z0-9+.-]*:/i;
 
-export const isAbsoluteURL = (url: string): boolean => startsWithSchemeRegexp.test(url);
-
-export let isArray = (val: unknown): val is unknown[] => {
-  const { isArray: detectArray } = Array;
-  isArray = detectArray;
-  return detectArray(val);
+export const isAbsoluteURL = (url: string): boolean => {
+  return startsWithSchemeRegexp.test(url);
 };
+
+export let isArray = (val: unknown): val is unknown[] => ((isArray = Array.isArray), isArray(val));
 export let isReadonlyArray = isArray as (val: unknown) => val is readonly unknown[];
 
 /** Returns an object if the given value isn't an object, otherwise returns as-is */
@@ -23,14 +21,8 @@ export function maybeObj(x: unknown): object {
 
 // https://stackoverflow.com/a/34491287
 export function isEmptyObj(obj: Object | null | undefined): boolean {
-  if (!obj) {
-    return true;
-  }
-  for (const key in obj) {
-    if (typeof key === 'string') {
-      return false;
-    }
-  }
+  if (!obj) return true;
+  for (const _k in obj) return false;
   return true;
 }
 
@@ -62,34 +54,22 @@ export const validatePositiveInteger = (name: string, n: unknown): number => {
 };
 
 export const coerceInteger = (value: unknown): number => {
-  if (typeof value === 'number') {
-    return Math.round(value);
-  }
-  if (typeof value === 'string') {
-    return Number.parseInt(value, 10);
-  }
+  if (typeof value === 'number') return Math.round(value);
+  if (typeof value === 'string') return parseInt(value, 10);
 
   throw new OpenAIError(`Could not coerce ${value} (type: ${typeof value}) into a number`);
 };
 
 export const coerceFloat = (value: unknown): number => {
-  if (typeof value === 'number') {
-    return value;
-  }
-  if (typeof value === 'string') {
-    return Number.parseFloat(value);
-  }
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return parseFloat(value);
 
   throw new OpenAIError(`Could not coerce ${value} (type: ${typeof value}) into a number`);
 };
 
 export const coerceBoolean = (value: unknown): boolean => {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-  if (typeof value === 'string') {
-    return value === 'true';
-  }
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value === 'true';
   return Boolean(value);
 };
 
@@ -117,7 +97,7 @@ export const maybeCoerceBoolean = (value: unknown): boolean | undefined => {
 export const safeJSON = (text: string) => {
   try {
     return JSON.parse(text);
-  } catch {
+  } catch (err) {
     return undefined;
   }
 };

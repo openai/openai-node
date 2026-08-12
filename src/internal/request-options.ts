@@ -1,8 +1,9 @@
-import type { HeadersLike, NullableHeaders } from './headers';
+import { NullableHeaders } from './headers';
 
 import type { BodyInit } from './builtin-types';
-import type { Stream } from '../core/streaming';
+import { Stream } from '../core/streaming';
 import type { HTTPMethod, MergedRequestInit } from './types';
+import { type HeadersLike } from './headers';
 
 export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
 
@@ -83,9 +84,11 @@ export type RequestOptions = {
 export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };
 export type RequestEncoder = (request: { headers: NullableHeaders; body: unknown }) => EncodedContent;
 
-export const FallbackEncoder: RequestEncoder = ({ body }) => ({
-  bodyHeaders: {
-    'content-type': 'application/json',
-  },
-  body: JSON.stringify(body),
-});
+export const FallbackEncoder: RequestEncoder = ({ headers, body }) => {
+  return {
+    bodyHeaders: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  };
+};

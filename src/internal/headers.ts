@@ -9,16 +9,13 @@ export type HeadersLike =
   | null
   | NullableHeaders;
 
-// Keep the pure annotation attached to the call for downstream bundlers.
-const brand_privateNullableHeaders =
-  /* @__PURE__ */
-  Symbol('brand.privateNullableHeaders');
-const httpTokenHeaderName = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/u;
+const brand_privateNullableHeaders = /* @__PURE__ */ Symbol('brand.privateNullableHeaders');
+const httpTokenHeaderName = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
 /**
+ * @internal
  * Users can pass explicit nulls to unset default headers. When we parse them
  * into a standard headers type we need to preserve that information.
- * @internal
  */
 export type NullableHeaders = {
   /** Brand check, prevent users from creating a NullableHeaders. */
@@ -30,9 +27,7 @@ export type NullableHeaders = {
 };
 
 function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [string, string | null]> {
-  if (!headers) {
-    return;
-  }
+  if (!headers) return;
 
   if (brand_privateNullableHeaders in headers) {
     const { values, nulls } = headers;
@@ -53,17 +48,13 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
     shouldClear = true;
     iter = Object.entries(headers ?? {});
   }
-  for (const row of iter) {
-    const [name] = row;
-    if (typeof name !== 'string') {
-      throw new TypeError('expected header name to be a string');
-    }
+  for (let row of iter) {
+    const name = row[0];
+    if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
     const values = isReadonlyArray(row[1]) ? row[1] : [row[1]];
     let didClear = false;
     for (const value of values) {
-      if (value === undefined) {
-        continue;
-      }
+      if (value === undefined) continue;
 
       // Objects keys always overwrite older headers, they never append.
       // Yield a null to clear the header before adding the new values.
@@ -102,4 +93,7 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
   return { [brand_privateNullableHeaders]: true, values: targetHeaders, nulls: nullHeaders };
 };
 
-export const isEmptyHeaders = (headers: HeadersLike) => iterateHeaders(headers).next().done === true;
+export const isEmptyHeaders = (headers: HeadersLike) => {
+  for (const _ of iterateHeaders(headers)) return false;
+  return true;
+};

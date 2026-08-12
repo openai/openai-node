@@ -3,42 +3,29 @@ export function isAbortError(err: unknown) {
     typeof err === 'object' &&
     err !== null &&
     // Spec-compliant fetch implementations
-    (('name' in err && err.name === 'AbortError') ||
+    (('name' in err && (err as any).name === 'AbortError') ||
       // Expo fetch
-      ('message' in err && String(err.message).includes('FetchRequestCanceledException')))
+      ('message' in err && String((err as any).message).includes('FetchRequestCanceledException')))
   );
 }
 
 export const castToError = (err: any): Error => {
-  if (err instanceof Error) {
-    return err;
-  }
+  if (err instanceof Error) return err;
   if (typeof err === 'object' && err !== null) {
     try {
       if (Object.prototype.toString.call(err) === '[object Error]') {
-        const errorLike = err as { message?: string; cause?: unknown; stack?: string; name?: string };
         // @ts-ignore - not all envs have native support for cause yet
-        const error = new Error(errorLike.message, errorLike.cause ? { cause: errorLike.cause } : {});
-        if (errorLike.stack) {
-          error.stack = errorLike.stack;
-        }
-        if (errorLike.cause && !(error as Error & { cause?: unknown }).cause) {
-          // @ts-ignore - not all environments have native support for cause yet.
-          error.cause = errorLike.cause;
-        }
-        if (errorLike.name) {
-          error.name = errorLike.name;
-        }
+        const error = new Error(err.message, err.cause ? { cause: err.cause } : {});
+        if (err.stack) error.stack = err.stack;
+        // @ts-ignore - not all envs have native support for cause yet
+        if (err.cause && !error.cause) error.cause = err.cause;
+        if (err.name) error.name = err.name;
         return error;
       }
-    } catch {
-      // Fall through when a cross-runtime error shape cannot be inspected.
-    }
+    } catch {}
     try {
       return new Error(JSON.stringify(err));
-    } catch {
-      // Fall through when the value cannot be serialized.
-    }
+    } catch {}
   }
-  return new Error(err as string | undefined);
+  return new Error(err);
 };

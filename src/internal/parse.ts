@@ -1,6 +1,6 @@
 import type { FinalRequestOptions } from './request-options';
 import { Stream } from '../core/streaming';
-import type { OpenAI } from '../client';
+import { type OpenAI } from '../client';
 import { formatRequestDetails, loggerFor } from './utils/log';
 import type { AbstractPage } from '../pagination';
 
@@ -90,7 +90,7 @@ export async function defaultParseResponse<T>(
   return body;
 }
 
-export type WithRequestID<T> = T extends any[] | Response | AbstractPage<any>
+export type WithRequestID<T> = T extends Array<any> | Response | AbstractPage<any>
   ? T
   : T extends Record<string, any>
     ? T & { _request_id?: string | null }

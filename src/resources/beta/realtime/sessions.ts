@@ -1,7 +1,7 @@
 import { APIResource } from '../../../core/resource';
-import type { APIPromise } from '../../../core/api-promise';
+import { APIPromise } from '../../../core/api-promise';
 import { buildHeaders } from '../../../internal/headers';
-import type { RequestOptions } from '../../../internal/request-options';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class Sessions extends APIResource {
   /**
@@ -92,7 +92,7 @@ export interface Session {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: ('text' | 'audio')[];
+  modalities?: Array<'text' | 'audio'>;
 
   /**
    * The Realtime model used for this session.
@@ -133,7 +133,7 @@ export interface Session {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: Session.Tool[];
+  tools?: Array<Session.Tool>;
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing
@@ -373,7 +373,7 @@ export interface SessionCreateResponse {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: ('text' | 'audio')[];
+  modalities?: Array<'text' | 'audio'>;
 
   /**
    * The format of output audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
@@ -401,7 +401,7 @@ export interface SessionCreateResponse {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: SessionCreateResponse.Tool[];
+  tools?: Array<SessionCreateResponse.Tool>;
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing
@@ -599,7 +599,7 @@ export interface SessionCreateParams {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: ('text' | 'audio')[];
+  modalities?: Array<'text' | 'audio'>;
 
   /**
    * The Realtime model used for this session.
@@ -640,7 +640,7 @@ export interface SessionCreateParams {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: SessionCreateParams.Tool[];
+  tools?: Array<SessionCreateParams.Tool>;
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing

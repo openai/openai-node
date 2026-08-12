@@ -41,7 +41,7 @@ type _BodyInit = RequestInit['body'];
  * An alias to the builtin `Array<T>` type so we can
  * easily alias it in import statements if there are name clashes.
  */
-type _Array<T> = T[];
+type _Array<T> = Array<T>;
 
 /**
  * An alias to the builtin `Record<K, T>` type so we can

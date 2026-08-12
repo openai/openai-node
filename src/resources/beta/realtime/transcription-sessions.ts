@@ -1,7 +1,7 @@
 import { APIResource } from '../../../core/resource';
-import type { APIPromise } from '../../../core/api-promise';
+import { APIPromise } from '../../../core/api-promise';
 import { buildHeaders } from '../../../internal/headers';
-import type { RequestOptions } from '../../../internal/request-options';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class TranscriptionSessions extends APIResource {
   /**
@@ -57,7 +57,7 @@ export interface TranscriptionSession {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: ('text' | 'audio')[];
+  modalities?: Array<'text' | 'audio'>;
 
   /**
    * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
@@ -157,7 +157,7 @@ export interface TranscriptionSessionCreateParams {
    *
    * - `item.input_audio_transcription.logprobs`
    */
-  include?: string[];
+  include?: Array<string>;
 
   /**
    * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
@@ -186,7 +186,7 @@ export interface TranscriptionSessionCreateParams {
    * The set of modalities the model can respond with. To disable audio, set this to
    * ["text"].
    */
-  modalities?: ('text' | 'audio')[];
+  modalities?: Array<'text' | 'audio'>;
 
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be

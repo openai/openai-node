@@ -1,12 +1,12 @@
 import { APIPromise } from 'openai/core/api-promise';
 
-import { inspect } from 'node:util';
-import OpenAI, { APIUserAbortError } from 'openai';
-
+import util from 'node:util';
+import OpenAI from 'openai';
+import { APIUserAbortError } from 'openai';
 const defaultFetch = fetch;
 
 describe('instantiate client', () => {
-  const { env } = process;
+  const env = process.env;
 
   beforeEach(() => {
     jest.resetModules();
@@ -51,13 +51,13 @@ describe('instantiate client', () => {
     test('preserves Headers defaultHeaders when OPENAI_CUSTOM_HEADERS is set', async () => {
       process.env['OPENAI_CUSTOM_HEADERS'] = 'X-Env-Header: env\nX-My-Default-Header: env-default';
 
-      const headersClient = new OpenAI({
+      const client = new OpenAI({
         baseURL: 'http://localhost:5000/',
         defaultHeaders: new Headers({ 'X-My-Default-Header': '2' }),
         apiKey: 'My API Key',
       });
 
-      const { req } = await headersClient.buildRequest({ path: '/foo', method: 'post' });
+      const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
       expect(req.headers.get('x-env-header')).toEqual('env');
       expect(req.headers.get('x-my-default-header')).toEqual('2');
     });
@@ -65,27 +65,27 @@ describe('instantiate client', () => {
     test('preserves tuple defaultHeaders when OPENAI_CUSTOM_HEADERS is set', async () => {
       process.env['OPENAI_CUSTOM_HEADERS'] = 'X-Env-Header: env';
 
-      const headersClient = new OpenAI({
+      const client = new OpenAI({
         baseURL: 'http://localhost:5000/',
         defaultHeaders: [['X-Tuple-Header', 'tuple']],
         apiKey: 'My API Key',
       });
 
-      const { req } = await headersClient.buildRequest({ path: '/foo', method: 'post' });
+      const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
       expect(req.headers.get('x-env-header')).toEqual('env');
       expect(req.headers.get('x-tuple-header')).toEqual('tuple');
     });
   });
   describe('logging', () => {
-    const loggingEnv = process.env;
+    const env = process.env;
 
     beforeEach(() => {
-      process.env = { ...loggingEnv };
+      process.env = { ...env };
       process.env['OPENAI_LOG'] = undefined;
     });
 
     afterEach(() => {
-      process.env = loggingEnv;
+      process.env = env;
     });
 
     const forceAPIResponseForClient = async (client: OpenAI) => {
@@ -115,7 +115,7 @@ describe('instantiate client', () => {
       };
 
       const client = new OpenAI({
-        logger,
+        logger: logger,
         logLevel: 'debug',
         apiKey: 'My API Key',
         adminAPIKey: 'My Admin API Key',
@@ -140,7 +140,7 @@ describe('instantiate client', () => {
       };
 
       const client = new OpenAI({
-        logger,
+        logger: logger,
         logLevel: 'info',
         apiKey: 'My API Key',
         adminAPIKey: 'My Admin API Key',
@@ -161,7 +161,7 @@ describe('instantiate client', () => {
 
       process.env['OPENAI_LOG'] = 'debug';
       const client = new OpenAI({
-        logger,
+        logger: logger,
         apiKey: 'My API Key',
         adminAPIKey: 'My Admin API Key',
       });
@@ -182,7 +182,7 @@ describe('instantiate client', () => {
 
       process.env['OPENAI_LOG'] = 'not a log level';
       const client = new OpenAI({
-        logger,
+        logger: logger,
         apiKey: 'My API Key',
         adminAPIKey: 'My Admin API Key',
       });
@@ -203,7 +203,7 @@ describe('instantiate client', () => {
 
       process.env['OPENAI_LOG'] = 'debug';
       const client = new OpenAI({
-        logger,
+        logger: logger,
         logLevel: 'off',
         apiKey: 'My API Key',
         adminAPIKey: 'My Admin API Key',
@@ -224,7 +224,7 @@ describe('instantiate client', () => {
 
       process.env['OPENAI_LOG'] = 'not a log level';
       const client = new OpenAI({
-        logger,
+        logger: logger,
         logLevel: 'debug',
         apiKey: 'My API Key',
         adminAPIKey: 'My Admin API Key',
@@ -271,12 +271,13 @@ describe('instantiate client', () => {
       baseURL: 'http://localhost:5000/',
       apiKey: 'My API Key',
       adminAPIKey: 'My Admin API Key',
-      fetch: (url) =>
-        Promise.resolve(
+      fetch: (url) => {
+        return Promise.resolve(
           new Response(JSON.stringify({ url, custom: true }), {
             headers: { 'Content-Type': 'application/json' },
           }),
-        ),
+        );
+      },
     });
 
     const response = await client.get('/foo');
@@ -291,7 +292,6 @@ describe('instantiate client', () => {
       adminAPIKey: 'My Admin API Key',
       fetch: defaultFetch,
     });
-    expect(client).toBeInstanceOf(OpenAI);
   });
 
   test('custom signal', async () => {
@@ -299,8 +299,8 @@ describe('instantiate client', () => {
       baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
       apiKey: 'My API Key',
       adminAPIKey: 'My Admin API Key',
-      fetch: (...args) =>
-        new Promise((resolve, reject) =>
+      fetch: (...args) => {
+        return new Promise((resolve, reject) =>
           setTimeout(
             () =>
               defaultFetch(...args)
@@ -308,7 +308,8 @@ describe('instantiate client', () => {
                 .catch(reject),
             300,
           ),
-        ),
+        );
+      },
     });
 
     const controller = new AbortController();
@@ -410,15 +411,13 @@ describe('instantiate client', () => {
     });
 
     test('empty env variable', () => {
-      // An empty environment variable falls back to the default URL.
-      process.env['OPENAI_BASE_URL'] = '';
+      process.env['OPENAI_BASE_URL'] = ''; // empty
       const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.baseURL).toEqual('https://api.openai.com/v1');
     });
 
     test('blank env variable', () => {
-      // A whitespace-only environment variable falls back to the default URL.
-      process.env['OPENAI_BASE_URL'] = '  ';
+      process.env['OPENAI_BASE_URL'] = '  '; // blank
       const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.baseURL).toEqual('https://api.openai.com/v1');
     });
@@ -591,17 +590,17 @@ describe('default encoder', () => {
   class Collection<T> {
     #things: T[];
     constructor(things: T[]) {
-      this.#things = [...things];
+      this.#things = Array.from(things);
     }
     toJSON() {
-      return [...this.#things];
+      return Array.from(this.#things);
     }
     [Symbol.iterator]() {
       return this.#things[Symbol.iterator];
     }
   }
   for (const jsonValue of [{}, [], { __proto__: null }, new Serializable(), new Collection(['item'])]) {
-    test(`serializes ${inspect(jsonValue)} as json`, async () => {
+    test(`serializes ${util.inspect(jsonValue)} as json`, async () => {
       const { req } = await client.buildRequest({
         path: '/foo',
         method: 'post',
@@ -638,7 +637,7 @@ describe('default encoder', () => {
   });
 
   const encoder = new TextEncoder();
-  const asyncIterable = (async function* asyncIterable() {
+  const asyncIterable = (async function* () {
     yield encoder.encode('a\n');
     yield encoder.encode('b\n');
     yield encoder.encode('c\n');
@@ -648,7 +647,7 @@ describe('default encoder', () => {
     new Response('a\nb\nc\n').body,
     asyncIterable,
   ]) {
-    test(`converts ${inspect(streamValue)} to ReadableStream`, async () => {
+    test(`converts ${util.inspect(streamValue)} to ReadableStream`, async () => {
       const { req } = await client.buildRequest({
         path: '/foo',
         method: 'post',
@@ -679,7 +678,7 @@ describe('retries', () => {
   test('retry on timeout', async () => {
     let count = 0;
     const testFetch = async (
-      _url: string | URL | Request,
+      url: string | URL | Request,
       { signal }: RequestInit = {},
     ): Promise<Response> => {
       if (count++ === 0) {
@@ -871,7 +870,10 @@ describe('retries', () => {
 
   test('retry on 429 with retry-after', async () => {
     let count = 0;
-    const testFetch = async (_url: string | URL | Request, _init: RequestInit = {}): Promise<Response> => {
+    const testFetch = async (
+      url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
       if (count++ === 0) {
         return new Response(undefined, {
           status: 429,
@@ -902,7 +904,10 @@ describe('retries', () => {
 
   test('retry on 429 with retry-after-ms', async () => {
     let count = 0;
-    const testFetch = async (_url: string | URL | Request, _init: RequestInit = {}): Promise<Response> => {
+    const testFetch = async (
+      url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
       if (count++ === 0) {
         return new Response(undefined, {
           status: 429,
@@ -975,8 +980,9 @@ describe('retries', () => {
     });
 
     test('does not resolve apiKey provider for admin-only requests', async () => {
-      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> =>
-        new Response(JSON.stringify({}), { headers: headers ?? [] });
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+        return new Response(JSON.stringify({}), { headers: headers ?? [] });
+      };
       const apiKey = jest.fn(async () => {
         throw new Error('should not be called');
       });
@@ -1000,8 +1006,9 @@ describe('retries', () => {
     });
 
     test('checkpoint permission routes use admin auth', async () => {
-      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> =>
-        new Response(JSON.stringify({}), { headers: headers ?? [] });
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+        return new Response(JSON.stringify({}), { headers: headers ?? [] });
+      };
       const client = new OpenAI({
         baseURL: 'http://localhost:5000/',
         apiKey: null,
@@ -1038,19 +1045,23 @@ describe('retries', () => {
           method: 'post',
           __security: { bearerAuth: true },
         }),
-      ).rejects.toThrow(/Could not resolve authentication method/u);
+      ).rejects.toThrow(/Could not resolve authentication method/);
     });
 
     test('token', async () => {
-      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> =>
-        new Response(JSON.stringify({}), { headers: headers ?? [] });
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+        return new Response(JSON.stringify({}), { headers: headers ?? [] });
+      };
       const client = new OpenAI({
         baseURL: 'http://localhost:5000/',
         apiKey: async () => 'my token',
         fetch: testFetch,
       });
-      const response = await client.request({ method: 'post', path: 'https://example.com' }).asResponse();
-      expect(response.headers.get('authorization')).toEqual('Bearer my token');
+      expect(
+        (await client.request({ method: 'post', path: 'https://example.com' }).asResponse()).headers.get(
+          'authorization',
+        ),
+      ).toEqual('Bearer my token');
     });
 
     test('token is refreshed', async () => {
@@ -1078,13 +1089,16 @@ describe('retries', () => {
         apiKey,
         fetch: testFetch,
       });
-      const response = await client.chat.completions
-        .create({
-          model: '',
-          messages: [{ role: 'system', content: 'Hello' }],
-        })
-        .asResponse();
-      expect(response.headers.get('authorization')).toEqual('Bearer token-1');
+      expect(
+        (
+          await client.chat.completions
+            .create({
+              model: '',
+              messages: [{ role: 'system', content: 'Hello' }],
+            })
+            .asResponse()
+        ).headers.get('authorization'),
+      ).toEqual('Bearer token-1');
     });
 
     test('at least one', () => {

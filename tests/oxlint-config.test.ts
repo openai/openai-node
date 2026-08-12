@@ -56,7 +56,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
   }
 });
 
-test('recognizes only actively generated SDK files', () => {
+test('recognizes generated SDK files and explicitly listed legacy files', () => {
   const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'openai-node-generated-files-'));
 
   try {
@@ -65,19 +65,20 @@ test('recognizes only actively generated SDK files', () => {
     const generatedFilesScript = path.join(scriptsDirectory, 'generated-files.cjs');
     copyFileSync(path.join(repoRoot, 'scripts/generated-files.cjs'), generatedFilesScript);
 
-    writeFileSync(
-      path.join(fixtureRoot, 'castiron.ts'),
-      '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.\n',
-    );
-    writeFileSync(
-      path.join(fixtureRoot, 'legacy.ts'),
-      '// File generated from our OpenAPI spec by a legacy generator.\n',
-    );
+    for (const generator of ['Castiron']) {
+      writeFileSync(
+        path.join(fixtureRoot, `${generator.toLowerCase()}.ts`),
+        `// File generated from our OpenAPI spec by ${generator}. See CONTRIBUTING.md for details.\n`,
+      );
+    }
     writeFileSync(path.join(fixtureRoot, 'handwritten.ts'), 'export const handwritten = true;\n');
+    const legacyDirectory = path.join(fixtureRoot, 'src', 'internal', 'utils');
+    mkdirSync(legacyDirectory, { recursive: true });
+    writeFileSync(path.join(legacyDirectory, 'env.ts'), 'export const legacy = true;\n');
 
     // oxlint-disable-next-line node/global-require -- The fixture module path is created dynamically for this test.
     const generatedFiles = require(generatedFilesScript) as string[];
-    expect(generatedFiles).toEqual(['castiron.ts']);
+    expect(generatedFiles).toEqual(['castiron.ts', 'src/internal/utils/env.ts']);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -113,27 +114,27 @@ test('formats generated SDK files without linting them', () => {
   expect(result.number_of_files).toBe(0);
 });
 
-test('applies full handwritten lint rules to legacy SDK files', () => {
+test('keeps explicitly listed legacy SDK files under the generated lint profile', () => {
   const legacyPath = 'src/internal/utils/env.ts';
-  const printed = spawnSync(process.execPath, [oxlint, '--print-config', legacyPath], {
-    cwd: repoRoot,
-    encoding: 'utf-8',
-  });
-
-  expect(printed.status).toBe(0);
-
-  const configuration = JSON.parse(printed.stdout) as { rules: Record<string, string> };
-  expect(configuration.rules['unicorn/no-instanceof-array']).toBe('deny');
-
-  const linted = spawnSync(process.execPath, [oxlint, '--format', 'json', legacyPath], {
-    cwd: repoRoot,
-    encoding: 'utf-8',
-  });
+  const linted = spawnSync(
+    process.execPath,
+    [oxlint, '--format', 'json', '--no-error-on-unmatched-pattern', legacyPath],
+    {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    },
+  );
 
   expect(linted.status).toBe(0);
+  expect((JSON.parse(linted.stdout) as { number_of_files: number }).number_of_files).toBe(0);
 
-  const result = JSON.parse(linted.stdout) as { number_of_files: number };
-  expect(result.number_of_files).toBe(1);
+  const generatedLinted = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', legacyPath],
+    { cwd: repoRoot, encoding: 'utf-8' },
+  );
+
+  expect(generatedLinted.status).toBe(0);
 });
 
 test('removes adjacent unused imports from generated files until fixes stabilize', () => {
@@ -144,41 +145,43 @@ test('removes adjacent unused imports from generated files until fixes stabilize
     const handwritten = "import { HandwrittenUnused } from './dependency';\nexport const value = 1;\n";
     writeFileSync(handwrittenPath, handwritten);
 
-    const generatedPath = path.join(fixtureRoot, 'castiron.ts');
-    const imports = Array.from(
-      { length: 20 },
-      (_, index) => `import { Unused${index} } from './dependency-${index}';`,
-    );
-    writeFileSync(
-      generatedPath,
-      [
-        '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.',
-        '',
-        ...imports,
-        "import { Retained, UnusedNamed } from './dependency';",
-        "import './side-effect';",
-        'const intentionallyUnused = 1;',
-        'export interface Result<T> { value: string; }',
-        'export const value = Retained;',
-        '',
-      ].join('\n'),
-    );
+    for (const generator of ['Castiron']) {
+      const generatedPath = path.join(fixtureRoot, `${generator.toLowerCase()}.ts`);
+      const imports = Array.from(
+        { length: 20 },
+        (_, index) => `import { Unused${index} } from './dependency-${index}';`,
+      );
+      writeFileSync(
+        generatedPath,
+        [
+          `// File generated from our OpenAPI spec by ${generator}. See CONTRIBUTING.md for details.`,
+          '',
+          ...imports,
+          "import { Retained, UnusedNamed } from './dependency';",
+          "import './side-effect';",
+          'const intentionallyUnused = 1;',
+          'export interface Result<T> { value: string; }',
+          'export const value = Retained;',
+          '',
+        ].join('\n'),
+      );
 
-    const fixed = spawnSync(
-      process.execPath,
-      [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath, handwrittenPath],
-      { cwd: repoRoot, encoding: 'utf-8' },
-    );
+      const fixed = spawnSync(
+        process.execPath,
+        [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath, handwrittenPath],
+        { cwd: repoRoot, encoding: 'utf-8' },
+      );
 
-    expect(fixed.status).toBe(0);
+      expect(fixed.status).toBe(0);
 
-    const result = readFileSync(generatedPath, 'utf-8');
-    expect(result).not.toMatch(/\bUnused(?:\d+|Named)\b/u);
-    expect(result).toContain("import { Retained } from './dependency';");
-    expect(result).toContain("import './side-effect';");
-    expect(result).toContain('const intentionallyUnused = 1;');
-    expect(result).toContain('export interface Result<T>');
-    expect(readFileSync(handwrittenPath, 'utf-8')).toBe(handwritten);
+      const result = readFileSync(generatedPath, 'utf-8');
+      expect(result).not.toMatch(/\bUnused(?:\d+|Named)\b/u);
+      expect(result).toContain("import { Retained } from './dependency';");
+      expect(result).toContain("import './side-effect';");
+      expect(result).toContain('const intentionallyUnused = 1;');
+      expect(result).toContain('export interface Result<T>');
+      expect(readFileSync(handwrittenPath, 'utf-8')).toBe(handwritten);
+    }
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

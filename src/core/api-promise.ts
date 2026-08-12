@@ -1,8 +1,12 @@
-import type { OpenAI } from '../client';
+import { type OpenAI } from '../client';
 
-import type { PromiseOrValue } from '../internal/types';
-import { defaultParseResponse, addRequestID } from '../internal/parse';
-import type { APIResponseProps, WithRequestID } from '../internal/parse';
+import { type PromiseOrValue } from '../internal/types';
+import {
+  type APIResponseProps,
+  defaultParseResponse,
+  type WithRequestID,
+  addRequestID,
+} from '../internal/parse';
 
 /**
  * A subclass of `Promise` providing additional helper methods

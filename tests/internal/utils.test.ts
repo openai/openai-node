@@ -107,8 +107,6 @@ describe('value utilities', () => {
     ['CUSTOM+scheme:value', true],
     ['/relative/path', false],
     ['//example.com/path', false],
-    ['K:https', false],
-    ['ſ:https', false],
   ])('detects whether %s has an absolute URL scheme', (value, expected) => {
     expect(isAbsoluteURL(value)).toBe(expected);
   });

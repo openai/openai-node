@@ -8,10 +8,6 @@ echo "==> Detecting breaking changes"
 
 git cat-file -e "$1^{tree}"
 
-# Check the current source before restoring historical tests, which may retain
-# obsolete generated headers and formatting that no longer match current rules.
-./scripts/lint
-
 while IFS= read -r test_path; do
   [[ "$test_path" == *.test.ts ]] || continue
   git checkout "$1" -- "$test_path" 2>/dev/null || true
@@ -37,6 +33,7 @@ fs.writeFileSync(file, contents);
 EOF
 fi
 
-# TypeScript performs the API compatibility check against every historical
-# resource test, including files that current lint rules no longer ignore.
+# Generated tests are excluded from linting, so TypeScript performs the API
+# compatibility check against every historical resource test.
+./scripts/lint
 pnpm exec tsc

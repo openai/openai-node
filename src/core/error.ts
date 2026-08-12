@@ -35,12 +35,13 @@ export class APIError<
   }
 
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
-    let msg = message;
-    if (error?.message) {
-      msg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
-    } else if (error) {
-      msg = JSON.stringify(error);
-    }
+    const msg = error?.message
+      ? typeof error.message === 'string'
+        ? error.message
+        : JSON.stringify(error.message)
+      : error
+        ? JSON.stringify(error)
+        : message;
 
     if (status && msg) {
       return `${status} ${msg}`;
@@ -111,11 +112,9 @@ export class APIUserAbortError extends APIError<undefined, undefined, undefined>
 export class APIConnectionError extends APIError<undefined, undefined, undefined> {
   constructor({ message, cause }: { message?: string | undefined; cause?: Error | undefined }) {
     super(undefined, undefined, message || 'Connection error.', undefined);
-    if (cause) {
-      // in some environments the 'cause' property is already declared
-      // @ts-ignore - Error.cause is not part of every supported TypeScript lib.
-      this.cause = cause;
-    }
+    // in some environments the 'cause' property is already declared
+    // @ts-ignore
+    if (cause) this.cause = cause;
   }
 }
 
