@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { AzureOpenAI, APIUserAbortError } from 'openai';
+import { AzureOpenAI, APIUserAbortError, toStreamingFile } from 'openai';
 import type { AzureClientOptions } from 'openai';
 import type { RequestInit, RequestInfo, Response } from 'openai/internal/builtin-types';
 
@@ -470,6 +470,18 @@ describe('azure request building', () => {
         });
       });
 
+      test('uses the client-level deployment for image edits', async () => {
+        expect(
+          await client.images.edit({
+            model: 'request-model',
+            image: new File([], 'image.png'),
+            prompt: 'prompt',
+          }),
+        ).toMatchObject({
+          url: `https://example.com/openai/deployments/${deployment}/images/edits?api-version=${apiVersion}`,
+        });
+      });
+
       test('handles assistants', async () => {
         expect(
           await client.beta.assistants.create({
@@ -591,6 +603,87 @@ describe('azure request building', () => {
           }),
         ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
+        });
+      });
+
+      test('handles image edit', async () => {
+        expect(
+          await client.images.edit({
+            model: deployment,
+            image: new File([], ''),
+            prompt: 'prompt',
+          }),
+        ).toMatchObject({
+          url: `https://example.com/openai/deployments/${deployment}/images/edits?api-version=${apiVersion}`,
+        });
+      });
+
+      test('routes streaming image uploads to the request model deployment', async () => {
+        async function* imageBytes(): AsyncGenerator<Uint8Array> {
+          yield new Uint8Array([1, 2, 3]);
+        }
+
+        expect(
+          await client.images.edit({
+            model: deployment,
+            image: toStreamingFile(imageBytes(), 'image.png', { type: 'image/png' }),
+            prompt: 'prompt',
+          }),
+        ).toMatchObject({
+          url: `https://example.com/openai/deployments/${deployment}/images/edits?api-version=${apiVersion}`,
+        });
+      });
+
+      test('preserves existing request metadata when setting the image deployment', async () => {
+        const buildRequest = vi.spyOn(client, 'buildRequest');
+
+        try {
+          await client.images.edit(
+            { model: deployment, image: new File([], 'image.png'), prompt: 'prompt' },
+            { __metadata: { requestID: 'request_123', model: 'stale-deployment' } },
+          );
+
+          expect(buildRequest).toHaveBeenCalledWith(
+            expect.objectContaining({ __metadata: { requestID: 'request_123', model: deployment } }),
+            expect.objectContaining({ retryCount: 0 }),
+          );
+        } finally {
+          buildRequest.mockRestore();
+        }
+      });
+
+      test('preserves a metadata deployment when the image request omits its model', async () => {
+        expect(
+          await client.images.edit(
+            { image: new File([], 'image.png'), prompt: 'prompt' },
+            { __metadata: { model: deployment } },
+          ),
+        ).toMatchObject({
+          url: `https://example.com/openai/deployments/${deployment}/images/edits?api-version=${apiVersion}`,
+        });
+      });
+
+      test('does not invent a deployment when the image request omits its model', async () => {
+        expect(
+          await client.images.edit({ image: new File([], 'image.png'), prompt: 'prompt' }),
+        ).toMatchObject({
+          url: `https://example.com/openai/images/edits?api-version=${apiVersion}`,
+        });
+      });
+
+      test('does not route a nullable streaming image model to a null deployment', async () => {
+        async function* imageBytes(): AsyncGenerator<Uint8Array> {
+          yield new Uint8Array([1, 2, 3]);
+        }
+
+        expect(
+          await client.images.edit({
+            model: null,
+            image: toStreamingFile(imageBytes(), 'image.png', { type: 'image/png' }),
+            prompt: 'prompt',
+          }),
+        ).toMatchObject({
+          url: `https://example.com/openai/images/edits?api-version=${apiVersion}`,
         });
       });
 
