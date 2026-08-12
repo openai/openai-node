@@ -1165,6 +1165,7 @@ export class OpenAI {
       idempotencyHeaders[this.idempotencyHeader] = options.idempotencyKey;
     }
 
+    const helperMethod = options.__metadata?.['helperMethod'];
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1173,6 +1174,7 @@ export class OpenAI {
         'X-Stainless-Retry-Count': String(retryCount),
         ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
+        ...(typeof helperMethod === 'string' ? { 'X-Stainless-Helper-Method': helperMethod } : {}),
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },

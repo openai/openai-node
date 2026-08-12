@@ -552,13 +552,14 @@ describe('AssistantStream run-step lifecycle', () => {
 });
 
 describe('AssistantStream factories and async iteration', () => {
-  test('creates a run stream with helper headers and a controlled abort signal', async () => {
+  test('creates a run stream with helper metadata and preserves Headers instances', async () => {
     const runs = { create: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
+    const headers = new Headers({ 'x-custom': 'value' });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
       runs as any,
       { assistant_id: 'assistant_123' },
-      { headers: { 'x-custom': 'value' } },
+      { headers, __metadata: { requestID: 'request_123' } },
     );
 
     await expect(runner.finalRun()).resolves.toMatchObject({ id: 'run_123' });
@@ -566,18 +567,20 @@ describe('AssistantStream factories and async iteration', () => {
       'thread_123',
       { assistant_id: 'assistant_123', stream: true },
       expect.objectContaining({
-        headers: { 'x-custom': 'value', 'X-Stainless-Helper-Method': 'stream' },
+        headers,
+        __metadata: { requestID: 'request_123', helperMethod: 'stream' },
         signal: runner.controller.signal,
       }),
     );
   });
 
-  test('creates a thread-and-run stream with helper headers', async () => {
+  test('creates a thread-and-run stream with helper metadata and preserves tuple headers', async () => {
     const threads = { createAndRun: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
+    const headers: [string, string][] = [['x-custom', 'value']];
     const runner = AssistantStream.createThreadAssistantStream(
       { assistant_id: 'assistant_123' },
       threads as any,
-      { headers: { 'x-custom': 'value' } },
+      { headers },
     );
 
     await runner.done();
@@ -585,13 +588,14 @@ describe('AssistantStream factories and async iteration', () => {
     expect(threads.createAndRun).toHaveBeenCalledWith(
       { assistant_id: 'assistant_123', stream: true },
       expect.objectContaining({
-        headers: { 'x-custom': 'value', 'X-Stainless-Helper-Method': 'stream' },
+        headers,
+        __metadata: { helperMethod: 'stream' },
         signal: runner.controller.signal,
       }),
     );
   });
 
-  test('creates a tool-output stream with helper headers', async () => {
+  test('creates a tool-output stream with helper metadata and preserves custom headers', async () => {
     const runs = { submitToolOutputs: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const runner = AssistantStream.createToolAssistantStream(
       'run_123',
@@ -606,7 +610,8 @@ describe('AssistantStream factories and async iteration', () => {
       'run_123',
       { thread_id: 'thread_123', tool_outputs: [], stream: true },
       expect.objectContaining({
-        headers: { 'x-custom': 'value', 'X-Stainless-Helper-Method': 'stream' },
+        headers: { 'x-custom': 'value' },
+        __metadata: { helperMethod: 'stream' },
         signal: runner.controller.signal,
       }),
     );

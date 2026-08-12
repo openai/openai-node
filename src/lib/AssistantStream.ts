@@ -219,7 +219,7 @@ export class AssistantStream
     runner._run(() =>
       runner._runToolAssistantStream(runId, runs, params, {
         ...options,
-        headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
+        __metadata: { ...options?.__metadata, helperMethod: 'stream' },
       }),
     );
     return runner;
@@ -261,7 +261,7 @@ export class AssistantStream
     runner._run(() =>
       runner._threadAssistantStream(params, thread, {
         ...options,
-        headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
+        __metadata: { ...options?.__metadata, helperMethod: 'stream' },
       }),
     );
     return runner;
@@ -278,7 +278,7 @@ export class AssistantStream
     runner._run(() =>
       runner._runAssistantStream(threadId, runs, params, {
         ...options,
-        headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
+        __metadata: { ...options?.__metadata, helperMethod: 'stream' },
       }),
     );
     return runner;
