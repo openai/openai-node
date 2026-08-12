@@ -18,21 +18,21 @@ import type { AzureRealtimeConnectionConfig, RealtimeConnectionConfig } from './
  * and register an SDK `error` listener for API or transport failures.
  */
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
-  /** Secure Realtime WebSocket URL, including the selected model or existing call ID. */
+  /** Secure Realtime WebSocket URL with its model, transcription intent, or call ID. */
   url: URL;
 
   /** Underlying `ws.WebSocket` instance for connection lifecycle and transport events. */
   socket: WS.WebSocket;
 
   /**
-   * Immediately opens a model-backed Realtime session or attaches to an existing call.
+   * Immediately opens a model or transcription session, or attaches to an existing call.
    *
    * Pass an existing OpenAI client as the second argument to reuse its endpoint
    * and static credentials. Clients with function-based credentials must use
    * {@link OpenAIRealtimeWS.create}; Azure clients should use
    * {@link OpenAIRealtimeWS.azure}.
    *
-   * @param props Exactly one of `model` or `callID`, plus optional `ws` client settings.
+   * @param props Exactly one model, transcription intent, or call ID, plus `ws` client settings.
    * @param client Existing client whose endpoint and API key should be reused.
    */
   constructor(
@@ -98,7 +98,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
    * Use this factory instead of the constructor when the client's `apiKey` is a function.
    *
    * @param client OpenAI client that owns the endpoint and refreshable or static credential.
-   * @param props Exactly one of `model` or `callID`, plus optional `ws` client settings.
+   * @param props Exactly one model, transcription intent, or call ID, plus `ws` client settings.
    */
   static async create(
     client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
@@ -111,14 +111,14 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   }
 
   /**
-   * Opens an Azure OpenAI Realtime deployment session or existing sideband call.
+   * Opens an Azure deployment or transcription session, or an existing sideband call.
    *
    * Static Azure API keys are sent in the `api-key` header; function-based
    * credentials are resolved first and sent as bearer credentials. The client's
-   * configured deployment is used unless `deploymentName` or `callID` is supplied.
+   * configured deployment is used unless a deployment, transcription intent, or call ID is supplied.
    *
    * @param client Azure OpenAI client that supplies the endpoint and credential.
-   * @param props Optional deployment override or call ID and `ws` connection settings.
+   * @param props Deployment, transcription intent, or call ID, plus `ws` connection settings.
    * @throws {Error} If the Azure credential or required deployment is unavailable.
    */
   static async azure(

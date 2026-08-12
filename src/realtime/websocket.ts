@@ -48,7 +48,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
    * {@link OpenAIRealtimeWebSocket.azure}. An ephemeral credential whose value
    * starts with `ek_` is permitted in browser runtimes automatically.
    *
-   * @param props Exactly one of `model` or `callID` and optional browser-safety settings.
+   * @param props Exactly one model, transcription intent, or call ID, plus browser-safety settings.
    * @param client Existing client whose endpoint and API key should be reused.
    * @throws {OpenAIError} If browser access would expose an unapproved credential.
    */
@@ -140,7 +140,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
    * Use this factory instead of the constructor when the client's `apiKey` is a function.
    *
    * @param client OpenAI client that owns the endpoint and refreshable or static credential.
-   * @param props Exactly one of `model` or `callID` and optional browser-safety settings.
+   * @param props Exactly one model, transcription intent, or call ID, plus browser-safety settings.
    */
   static async create(
     client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
@@ -153,13 +153,13 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   }
 
   /**
-   * Opens a native Azure OpenAI Realtime deployment session or existing sideband call.
+   * Opens a native Azure deployment or transcription session, or an existing sideband call.
    *
    * Azure credentials are included only in the initial connection URL and are
    * redacted from the exposed `url` property immediately after connection setup.
    *
    * @param client Azure OpenAI client that supplies the endpoint and credential.
-   * @param options Optional deployment override or call ID and browser-safety settings.
+   * @param options Deployment, transcription intent, or call ID, plus browser-safety settings.
    * @throws {Error} If the Azure credential or required deployment is unavailable.
    */
   static async azure(
