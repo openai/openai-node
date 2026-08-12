@@ -71,7 +71,7 @@ export class FileBatches extends APIResource {
     body: FileBatchCreateParams,
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
-    const batch = await this.create(vectorStoreId, body);
+    const batch = await this.create(vectorStoreId, body, options);
     return await this.poll(vectorStoreId, batch.id, options);
   }
 
@@ -190,9 +190,13 @@ export class FileBatches extends APIResource {
     // Wait for all processing to complete.
     await allSettledWithThrow(workers);
 
-    return await this.createAndPoll(vectorStoreId, {
-      file_ids: allFileIds,
-    });
+    return await this.createAndPoll(
+      vectorStoreId,
+      {
+        file_ids: allFileIds,
+      },
+      options,
+    );
   }
 }
 
