@@ -529,11 +529,10 @@ describe('.stream()', () => {
       stream.once('abort', () => resolve());
     });
 
-    for await (const event of stream) {
-      expect(event).toEqual(created);
-      await pullStarted;
-      break;
-    }
+    const iterator = stream[Symbol.asyncIterator]();
+    await expect(iterator.next()).resolves.toEqual({ value: created, done: false });
+    await pullStarted;
+    await iterator.return?.();
 
     await cancelled;
     await aborted;
