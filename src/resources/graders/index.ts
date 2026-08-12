@@ -1,7 +1,8 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export {
   GraderModels,
+  type GraderInputs,
   type LabelModelGrader,
   type MultiGrader,
   type PythonGrader,

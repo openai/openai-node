@@ -1,120 +1,242 @@
+import { partialParse } from '../_vendor/partial-json-parser/parser';
 import {
-  OpenAIError,
   APIUserAbortError,
-  LengthFinishReasonError,
   ContentFilterFinishReasonError,
+  LengthFinishReasonError,
+  OpenAIError,
 } from '../error';
+import type OpenAI from '../index';
+import type { RequestOptions } from '../internal/request-options';
+import type { ReadableStream } from '../internal/shim-types';
+import { uuid4 } from '../internal/utils/uuid';
+import type { AutoParseableResponseFormat } from '../lib/parser';
 import {
-  ChatCompletionTokenLogprob,
-  type ChatCompletion,
-  type ChatCompletionChunk,
-  type ChatCompletionCreateParams,
-  type ChatCompletionCreateParamsStreaming,
-  type ChatCompletionCreateParamsBase,
-  type ChatCompletionRole,
-} from '../resources/chat/completions/completions';
-import {
-  AbstractChatCompletionRunner,
-  type AbstractChatCompletionRunnerEvents,
-} from './AbstractChatCompletionRunner';
-import { type ReadableStream } from '../internal/shim-types';
-import { Stream } from '../streaming';
-import OpenAI from '../index';
-import { ParsedChatCompletion } from '../resources/chat/completions';
-import {
-  AutoParseableResponseFormat,
   hasAutoParseableInput,
   isAutoParsableResponseFormat,
   isAutoParsableTool,
+  isChatCompletionFunctionTool,
   maybeParseChatCompletion,
   shouldParseToolCall,
 } from '../lib/parser';
-import { partialParse } from '../_vendor/partial-json-parser/parser';
-import { RequestOptions } from '../internal/request-options';
+import type { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
+import type {
+  ChatCompletionAudio,
+  ChatCompletion,
+  ChatCompletionChunk,
+  ChatCompletionCreateParams,
+  ChatCompletionCreateParamsBase,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
+  ChatCompletionRole,
+  ChatCompletionTokenLogprob,
+} from '../resources/chat/completions/completions';
+import { Stream } from '../streaming';
+import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
+import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
 
+/** An incremental assistant-text event and its accumulated state. */
 export interface ContentDeltaEvent {
+  /** The new text received in this chunk. */
   delta: string;
+  /** All assistant text received for this choice, including `delta`. */
   snapshot: string;
+  /** The partially parsed structured output when an auto-parseable response format is supplied. */
   parsed: unknown | null;
 }
 
+/** The completed assistant-text content and its fully parsed structured value. */
 export interface ContentDoneEvent<ParsedT = null> {
+  /** The complete assistant text for the finished choice. */
   content: string;
+  /** The fully parsed structured output, or `null` when no parser was supplied. */
   parsed: ParsedT | null;
 }
 
+/** An incremental refusal-text event and its accumulated state. */
 export interface RefusalDeltaEvent {
+  /** The new refusal text received in this chunk. */
   delta: string;
+  /** All refusal text received for this choice, including `delta`. */
   snapshot: string;
 }
 
+/** The complete refusal text emitted when the refusal finishes. */
 export interface RefusalDoneEvent {
+  /** The model's complete refusal message. */
   refusal: string;
 }
 
+/** An incremental function-tool argument event and its accumulated JSON state. */
 export interface FunctionToolCallArgumentsDeltaEvent {
+  /** The name of the function being called. */
   name: string;
 
+  /** The position of this tool call within the assistant message. */
   index: number;
 
+  /** The complete argument JSON received so far, including `arguments_delta`. */
   arguments: string;
 
+  /** The partially parsed arguments when the matching tool supports parsing. */
   parsed_arguments: unknown;
 
+  /** The new argument JSON fragment received in this chunk. */
   arguments_delta: string;
 }
 
+/** The final raw and parsed arguments for a completed function-tool call. */
 export interface FunctionToolCallArgumentsDoneEvent {
+  /** The name of the function being called. */
   name: string;
 
+  /** The position of this tool call within the assistant message. */
   index: number;
 
+  /** The complete JSON argument string produced for the tool call. */
   arguments: string;
 
+  /** The fully parsed arguments when the matching tool supports parsing. */
   parsed_arguments: unknown;
 }
 
+/** Newly received assistant-content token probabilities and their accumulated snapshot. */
 export interface LogProbsContentDeltaEvent {
-  content: Array<ChatCompletionTokenLogprob>;
-  snapshot: Array<ChatCompletionTokenLogprob>;
+  /** Token probabilities received in the current chunk. */
+  content: ChatCompletionTokenLogprob[];
+  /** All assistant-content token probabilities received for this choice. */
+  snapshot: ChatCompletionTokenLogprob[];
 }
 
+/** The complete assistant-content token probabilities for a finished choice. */
 export interface LogProbsContentDoneEvent {
-  content: Array<ChatCompletionTokenLogprob>;
+  /** Every assistant-content token probability produced for this choice. */
+  content: ChatCompletionTokenLogprob[];
 }
 
+/** Newly received refusal-token probabilities and their accumulated snapshot. */
 export interface LogProbsRefusalDeltaEvent {
-  refusal: Array<ChatCompletionTokenLogprob>;
-  snapshot: Array<ChatCompletionTokenLogprob>;
+  /** Refusal-token probabilities received in the current chunk. */
+  refusal: ChatCompletionTokenLogprob[];
+  /** All refusal-token probabilities received for this choice. */
+  snapshot: ChatCompletionTokenLogprob[];
 }
 
+/** The complete refusal-token probabilities for a finished choice. */
 export interface LogProbsRefusalDoneEvent {
-  refusal: Array<ChatCompletionTokenLogprob>;
+  /** Every refusal-token probability produced for this choice. */
+  refusal: ChatCompletionTokenLogprob[];
 }
 
+/** Event listeners supported by a streamed Chat Completions helper. */
 export interface ChatCompletionStreamEvents<ParsedT = null> extends AbstractChatCompletionRunnerEvents {
+  /** Called with each new text fragment and the complete text accumulated so far. */
   content: (contentDelta: string, contentSnapshot: string) => void;
+  /** Called with each raw API chunk and its accumulated chat-completion snapshot. */
   chunk: (chunk: ChatCompletionChunk, snapshot: ChatCompletionSnapshot) => void;
 
+  /** Called when assistant text arrives, including any partially parsed output. */
   'content.delta': (props: ContentDeltaEvent) => void;
+  /** Called once the assistant text is complete and can be fully parsed. */
   'content.done': (props: ContentDoneEvent<ParsedT>) => void;
 
+  /** Called when another fragment of a model refusal arrives. */
   'refusal.delta': (props: RefusalDeltaEvent) => void;
+  /** Called once the model's complete refusal is available. */
   'refusal.done': (props: RefusalDoneEvent) => void;
 
+  /** Called when another JSON argument fragment arrives for a function tool. */
   'tool_calls.function.arguments.delta': (props: FunctionToolCallArgumentsDeltaEvent) => void;
+  /** Called once a function tool's complete arguments are available. */
   'tool_calls.function.arguments.done': (props: FunctionToolCallArgumentsDoneEvent) => void;
 
+  /** Called when assistant-content token probabilities arrive. */
   'logprobs.content.delta': (props: LogProbsContentDeltaEvent) => void;
+  /** Called once all assistant-content token probabilities are available. */
   'logprobs.content.done': (props: LogProbsContentDoneEvent) => void;
 
+  /** Called when refusal-token probabilities arrive. */
   'logprobs.refusal.delta': (props: LogProbsRefusalDeltaEvent) => void;
+  /** Called once all refusal-token probabilities are available. */
   'logprobs.refusal.done': (props: LogProbsRefusalDoneEvent) => void;
 }
 
+/** Chat completion request parameters accepted by the streaming convenience helper. */
 export type ChatCompletionStreamParams = Omit<ChatCompletionCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
+
+/** A conversation message embedded in a serialized chat completion stream. */
+type ChatCompletionReadableStreamMessage = {
+  /** Identifies this readable-stream item as a serialized conversation message. */
+  type: 'message';
+  /** The conversation message to restore while replaying the serialized stream. */
+  message: ChatCompletionMessageParam;
+  /** Tool-call identifiers to restore on the preceding assistant completion. */
+  tool_call_ids?: string[];
+};
+
+// Keep message records readable as empty chunks by older SDKs. Their finalizer
+// overwrites `object`, so the encoded payload does not leak into completions.
+const CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX = 'chat.completion.chunk.message:';
+
+/** A serialized conversation message disguised as a backwards-compatible empty completion chunk. */
+type ChatCompletionReadableStreamMessageChunk = Pick<ChatCompletionChunk, 'id' | 'created' | 'model'> & {
+  /** Empty choices keep the encoded message compatible with older completion-stream readers. */
+  choices: [];
+  /** Reserved object prefix followed by the JSON-encoded conversation-message payload. */
+  object: `${typeof CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX}${string}`;
+};
+
+/** A raw completion chunk or serialized message preserved in a transportable stream. */
+export type ChatCompletionReadableStreamItem =
+  | ChatCompletionChunk
+  | ChatCompletionReadableStreamMessage
+  | ChatCompletionReadableStreamMessageChunk;
+
+/** Encodes a tool-result message as a backwards-compatible, empty completion chunk. */
+export function makeChatCompletionReadableStreamMessageChunk(
+  chunk: ChatCompletionChunk,
+  message: ChatCompletionMessageParam,
+  toolCallIds?: string[],
+): ChatCompletionReadableStreamMessageChunk {
+  const payload: ChatCompletionReadableStreamMessage = {
+    type: 'message',
+    message,
+    ...(toolCallIds ? { tool_call_ids: toolCallIds } : {}),
+  };
+
+  return {
+    id: chunk.id,
+    choices: [],
+    created: chunk.created,
+    model: chunk.model,
+    object: `${CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX}${JSON.stringify(payload)}`,
+  };
+}
+
+function isChatCompletionReadableStreamMessage(
+  item: ChatCompletionReadableStreamItem,
+): item is ChatCompletionReadableStreamMessage | ChatCompletionReadableStreamMessageChunk {
+  return (
+    ('type' in item && item.type === 'message' && 'message' in item) ||
+    ('object' in item &&
+      typeof item.object === 'string' &&
+      item.object.startsWith(CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX))
+  );
+}
+
+function getChatCompletionReadableStreamMessage(
+  item: ChatCompletionReadableStreamMessage | ChatCompletionReadableStreamMessageChunk,
+): ChatCompletionReadableStreamMessage {
+  if ('type' in item) {
+    return item;
+  }
+
+  return JSON.parse(
+    item.object.slice(CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX.length),
+  ) as ChatCompletionReadableStreamMessage;
+}
 
 interface ChoiceEventState {
   content_done: boolean;
@@ -125,20 +247,25 @@ interface ChoiceEventState {
   done_tool_calls: Set<number>;
 }
 
+/** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 export class ChatCompletionStream<ParsedT = null>
   extends AbstractChatCompletionRunner<ChatCompletionStreamEvents<ParsedT>, ParsedT>
   implements AsyncIterable<ChatCompletionChunk>
 {
   #params: ChatCompletionCreateParams | null;
+  #audioDoneChoiceIndexes: Set<number>;
   #choiceEventStates: ChoiceEventState[];
   #currentChatCompletionSnapshot: ChatCompletionSnapshot | undefined;
 
+  /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ChatCompletionCreateParams | null) {
     super();
     this.#params = params;
+    this.#audioDoneChoiceIndexes = new Set();
     this.#choiceEventStates = [];
   }
 
+  /** The latest accumulated completion, or `undefined` before a chunk arrives or after finalization. */
   get currentChatCompletionSnapshot(): ChatCompletionSnapshot | undefined {
     return this.#currentChatCompletionSnapshot;
   }
@@ -147,8 +274,8 @@ export class ChatCompletionStream<ParsedT = null>
    * Intended for use on the frontend, consuming a stream produced with
    * `.toReadableStream()` on the backend.
    *
-   * Note that messages sent to the model do not appear in `.on('message')`
-   * in this context.
+   * Original input messages are not included in the serialized stream. Tool-result
+   * messages explicitly serialized by a streaming tool runner are replayed.
    */
   static fromReadableStream(stream: ReadableStream): ChatCompletionStream<null> {
     const runner = new ChatCompletionStream(null);
@@ -156,6 +283,7 @@ export class ChatCompletionStream<ParsedT = null>
     return runner;
   }
 
+  /** Starts a streaming chat completion request and returns its event-driven helper. */
   static createChatCompletion<ParsedT>(
     client: OpenAI,
     params: ChatCompletionStreamParams,
@@ -173,7 +301,10 @@ export class ChatCompletionStream<ParsedT = null>
   }
 
   #beginRequest() {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
+    this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
   }
 
@@ -196,34 +327,37 @@ export class ChatCompletionStream<ParsedT = null>
   }
 
   #addChunk(this: ChatCompletionStream<ParsedT>, chunk: ChatCompletionChunk) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
 
     const completion = this.#accumulateChatCompletion(chunk);
     this._emit('chunk', chunk, completion);
 
     for (const choice of chunk.choices) {
       const choiceSnapshot = completion.choices[choice.index]!;
+      const { delta } = choice;
 
       if (
-        choice.delta.content != null &&
+        delta?.content != null &&
         choiceSnapshot.message?.role === 'assistant' &&
         choiceSnapshot.message?.content
       ) {
-        this._emit('content', choice.delta.content, choiceSnapshot.message.content);
+        this._emit('content', delta.content, choiceSnapshot.message.content);
         this._emit('content.delta', {
-          delta: choice.delta.content,
+          delta: delta.content,
           snapshot: choiceSnapshot.message.content,
           parsed: choiceSnapshot.message.parsed,
         });
       }
 
       if (
-        choice.delta.refusal != null &&
+        delta?.refusal != null &&
         choiceSnapshot.message?.role === 'assistant' &&
         choiceSnapshot.message?.refusal
       ) {
         this._emit('refusal.delta', {
-          delta: choice.delta.refusal,
+          delta: delta.refusal,
           snapshot: choiceSnapshot.message.refusal,
         });
       }
@@ -252,7 +386,7 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
 
-      for (const toolCall of choice.delta.tool_calls ?? []) {
+      for (const toolCall of delta?.tool_calls ?? []) {
         if (state.current_tool_call_index !== toolCall.index) {
           this.#emitContentDoneEvents(choiceSnapshot);
 
@@ -265,7 +399,7 @@ export class ChatCompletionStream<ParsedT = null>
         state.current_tool_call_index = toolCall.index;
       }
 
-      for (const toolCallDelta of choice.delta.tool_calls ?? []) {
+      for (const toolCallDelta of delta?.tool_calls ?? []) {
         const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallDelta.index];
         if (!toolCallSnapshot?.type) {
           continue;
@@ -303,17 +437,21 @@ export class ChatCompletionStream<ParsedT = null>
 
     if (toolCallSnapshot.type === 'function') {
       const inputTool = this.#params?.tools?.find(
-        (tool) => tool.type === 'function' && tool.function.name === toolCallSnapshot.function.name,
-      );
+        (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === toolCallSnapshot.function.name,
+      ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
+
+      let parsedArguments: unknown = null;
+      if (isAutoParsableTool(inputTool)) {
+        parsedArguments = inputTool.$parseRaw(toolCallSnapshot.function.arguments);
+      } else if (inputTool?.function.strict) {
+        parsedArguments = JSON.parse(toolCallSnapshot.function.arguments);
+      }
 
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,
         arguments: toolCallSnapshot.function.arguments,
-        parsed_arguments:
-          isAutoParsableTool(inputTool) ? inputTool.$parseRaw(toolCallSnapshot.function.arguments)
-          : inputTool?.function.strict ? JSON.parse(toolCallSnapshot.function.arguments)
-          : null,
+        parsed_arguments: parsedArguments,
       });
     } else {
       assertNever(toolCallSnapshot.type);
@@ -361,9 +499,11 @@ export class ChatCompletionStream<ParsedT = null>
     if (!snapshot) {
       throw new OpenAIError(`request ended without sending any chunks`);
     }
+    const audioDoneChoiceIndexes = this.#audioDoneChoiceIndexes;
+    this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
     this.#choiceEventStates = [];
-    return finalizeChatCompletion(snapshot, this.#params);
+    return finalizeChatCompletion(snapshot, this.#params, audioDoneChoiceIndexes);
   }
 
   protected override async _createChatCompletion(
@@ -371,12 +511,7 @@ export class ChatCompletionStream<ParsedT = null>
     params: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
-    super._createChatCompletion;
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
 
     const stream = await client.chat.completions.create(
@@ -397,28 +532,56 @@ export class ChatCompletionStream<ParsedT = null>
     readableStream: ReadableStream,
     options?: RequestOptions,
   ): Promise<ChatCompletion> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
     this._connected();
-    const stream = Stream.fromReadableStream<ChatCompletionChunk>(readableStream, this.controller);
+    const stream = Stream.fromReadableStream<ChatCompletionReadableStreamItem>(
+      readableStream,
+      this.controller,
+    );
     let chatId;
-    for await (const chunk of stream) {
-      if (chatId && chatId !== chunk.id) {
+    for await (const item of stream) {
+      if (isChatCompletionReadableStreamMessage(item)) {
+        const message = getChatCompletionReadableStreamMessage(item);
+        if (this.#currentChatCompletionSnapshot) {
+          const toolCalls = this.#currentChatCompletionSnapshot.choices[0]?.message.tool_calls;
+          for (const [index, id] of message.tool_call_ids?.entries() ?? []) {
+            const toolCall = toolCalls?.[index];
+            if (toolCall && id) {
+              toolCall.id = id;
+            }
+          }
+
+          this._addChatCompletion(this.#endRequest());
+          chatId = undefined;
+        }
+        this._addMessage(message.message);
+        continue;
+      }
+
+      const chunk = item;
+
+      if (chatId && chunk.id && chatId !== chunk.id) {
         // A new request has been made.
         this._addChatCompletion(this.#endRequest());
       }
 
       this.#addChunk(chunk);
-      chatId = chunk.id;
+      if (chunk.id) {
+        chatId = chunk.id;
+      }
     }
     if (stream.controller.signal?.aborted) {
       throw new APIUserAbortError();
     }
-    return this._addChatCompletion(this.#endRequest());
+    if (this.#currentChatCompletionSnapshot) {
+      return this._addChatCompletion(this.#endRequest());
+    }
+    const lastChatCompletion = this._chatCompletions[this._chatCompletions.length - 1];
+    if (lastChatCompletion) {
+      return lastChatCompletion;
+    }
+    throw new OpenAIError(`request ended without sending any chunks`);
   }
 
   #getAutoParseableResponseFormat(): AutoParseableResponseFormat<ParsedT> | null {
@@ -434,24 +597,26 @@ export class ChatCompletionStream<ParsedT = null>
     let snapshot = this.#currentChatCompletionSnapshot;
     const { choices, ...rest } = chunk;
     if (!snapshot) {
-      snapshot = this.#currentChatCompletionSnapshot = {
+      const newSnapshot: ChatCompletionSnapshot = {
         ...rest,
         choices: [],
       };
-    } else {
+      this.#currentChatCompletionSnapshot = newSnapshot;
+      snapshot = newSnapshot;
+    } else if (chunk.id) {
       Object.assign(snapshot, rest);
     }
 
     for (const { delta, finish_reason, index, logprobs = null, ...other } of chunk.choices) {
       let choice = snapshot.choices[index];
       if (!choice) {
-        choice = snapshot.choices[index] = { finish_reason, index, message: {}, logprobs, ...other };
+        const newChoice = { finish_reason, index, message: {}, logprobs, ...other };
+        snapshot.choices[index] = newChoice;
+        choice = newChoice;
       }
 
       if (logprobs) {
-        if (!choice.logprobs) {
-          choice.logprobs = Object.assign({}, logprobs);
-        } else {
+        if (choice.logprobs) {
           const { content, refusal, ...rest } = logprobs;
           assertIsEmpty(rest);
           Object.assign(choice.logprobs, rest);
@@ -465,6 +630,8 @@ export class ChatCompletionStream<ParsedT = null>
             choice.logprobs.refusal ??= [];
             choice.logprobs.refusal.push(...refusal);
           }
+        } else {
+          choice.logprobs = { ...logprobs };
         }
       }
 
@@ -484,47 +651,96 @@ export class ChatCompletionStream<ParsedT = null>
 
       Object.assign(choice, other);
 
-      if (!delta) continue; // Shouldn't happen; just in case.
+      if (!delta) {
+        continue;
+      } // Shouldn't happen; just in case.
 
-      const { content, refusal, function_call, role, tool_calls, ...rest } = delta;
+      this.#audioDoneChoiceIndexes.delete(index);
+      const { audio, content, refusal, function_call, role, tool_calls, ...rest } = delta as typeof delta & {
+        audio?: Partial<ChatCompletionAudio> | null;
+      };
       assertIsEmpty(rest);
       Object.assign(choice.message, rest);
+      if (
+        audio?.expires_at != null &&
+        audio.id == null &&
+        audio.data == null &&
+        audio.transcript == null &&
+        content == null &&
+        refusal == null &&
+        function_call == null &&
+        role == null &&
+        tool_calls == null &&
+        Object.keys(rest).length === 0
+      ) {
+        this.#audioDoneChoiceIndexes.add(index);
+      }
 
       if (refusal) {
         choice.message.refusal = (choice.message.refusal || '') + refusal;
       }
 
-      if (role) choice.message.role = role;
+      if (role) {
+        choice.message.role = role;
+      }
+      if (audio) {
+        const audioSnapshot = (choice.message.audio ??= {});
+        if (audio.id != null) {
+          audioSnapshot.id = audio.id;
+        }
+        if (audio.data != null) {
+          audioSnapshot.data = (audioSnapshot.data ?? '') + audio.data;
+        }
+        if (audio.transcript != null) {
+          audioSnapshot.transcript = (audioSnapshot.transcript ?? '') + audio.transcript;
+        }
+        if (audio.expires_at != null) {
+          audioSnapshot.expires_at = audio.expires_at;
+        }
+      }
       if (function_call) {
-        if (!choice.message.function_call) {
-          choice.message.function_call = function_call;
-        } else {
-          if (function_call.name) choice.message.function_call.name = function_call.name;
+        if (choice.message.function_call) {
+          if (function_call.name) {
+            choice.message.function_call.name = function_call.name;
+          }
           if (function_call.arguments) {
             choice.message.function_call.arguments ??= '';
             choice.message.function_call.arguments += function_call.arguments;
           }
+        } else {
+          choice.message.function_call = function_call;
         }
       }
       if (content) {
         choice.message.content = (choice.message.content || '') + content;
 
         if (!choice.message.refusal && this.#getAutoParseableResponseFormat()) {
-          choice.message.parsed = partialParse(choice.message.content);
+          // The partial parser does not accept whitespace-only input.
+          choice.message.parsed = choice.message.content.trim() ? partialParse(choice.message.content) : null;
         }
       }
 
       if (tool_calls) {
-        if (!choice.message.tool_calls) choice.message.tool_calls = [];
+        if (!choice.message.tool_calls) {
+          choice.message.tool_calls = [];
+        }
 
         for (const { index, id, type, function: fn, ...rest } of tool_calls) {
           const tool_call = (choice.message.tool_calls[index] ??=
             {} as ChatCompletionSnapshot.Choice.Message.ToolCall);
           Object.assign(tool_call, rest);
-          if (id) tool_call.id = id;
-          if (type) tool_call.type = type;
-          if (fn) tool_call.function ??= { name: fn.name ?? '', arguments: '' };
-          if (fn?.name) tool_call.function!.name = fn.name;
+          if (id) {
+            tool_call.id = id;
+          }
+          if (type) {
+            tool_call.type = type;
+          }
+          if (fn) {
+            tool_call.function ??= { name: fn.name ?? '', arguments: '' };
+          }
+          if (fn?.name) {
+            tool_call.function!.name = fn.name;
+          }
           if (fn?.arguments) {
             tool_call.function!.arguments += fn.arguments;
 
@@ -538,6 +754,7 @@ export class ChatCompletionStream<ParsedT = null>
     return snapshot;
   }
 
+  /** Iterates over raw API chunks; stopping iteration early aborts the underlying request. */
   [Symbol.asyncIterator](this: ChatCompletionStream<ParsedT>): AsyncIterator<ChatCompletionChunk> {
     const pushQueue: ChatCompletionChunk[] = [];
     const readQueue: {
@@ -599,6 +816,7 @@ export class ChatCompletionStream<ParsedT = null>
     };
   }
 
+  /** Serializes raw completion chunks into a readable stream for transfer to another runtime. */
   toReadableStream(): ReadableStream {
     const stream = new Stream(this[Symbol.asyncIterator].bind(this), this.controller);
     return stream.toReadableStream();
@@ -608,6 +826,7 @@ export class ChatCompletionStream<ParsedT = null>
 function finalizeChatCompletion<ParsedT>(
   snapshot: ChatCompletionSnapshot,
   params: ChatCompletionCreateParams | null,
+  audioDoneChoiceIndexes: ReadonlySet<number>,
 ): ParsedChatCompletion<ParsedT> {
   const { id, choices, created, model, system_fingerprint, ...rest } = snapshot;
   const completion: ChatCompletion = {
@@ -615,11 +834,16 @@ function finalizeChatCompletion<ParsedT>(
     id,
     choices: choices.map(
       ({ message, finish_reason, index, logprobs, ...choiceRest }): ChatCompletion.Choice => {
-        if (!finish_reason) {
+        const { content = null, function_call, tool_calls, audio, ...messageRest } = message;
+        // Audio streams can end with an expires_at-only chunk after the
+        // generated audio, without a separate finish_reason.
+        const finishReason =
+          finish_reason ?? (audioDoneChoiceIndexes.has(index) && isCompleteAudio(audio) ? 'stop' : null);
+        if (!finishReason) {
           throw new OpenAIError(`missing finish_reason for choice ${index}`);
         }
 
-        const { content = null, function_call, tool_calls, ...messageRest } = message;
+        const audioResponse = audio ? { audio: audio as ChatCompletionAudio } : {};
         const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
         if (!role) {
           throw new OpenAIError(`missing role for choice ${index}`);
@@ -638,12 +862,13 @@ function finalizeChatCompletion<ParsedT>(
           return {
             ...choiceRest,
             message: {
+              ...audioResponse,
               content,
               function_call: { arguments: args, name },
               role,
               refusal: message.refusal ?? null,
             },
-            finish_reason,
+            finish_reason: finishReason,
             index,
             logprobs,
           };
@@ -653,19 +878,17 @@ function finalizeChatCompletion<ParsedT>(
           return {
             ...choiceRest,
             index,
-            finish_reason,
+            finish_reason: finishReason,
             logprobs,
             message: {
               ...messageRest,
+              ...audioResponse,
               role,
               content,
               refusal: message.refusal ?? null,
               tool_calls: tool_calls.map((tool_call, i) => {
                 const { function: fn, type, id, ...toolRest } = tool_call;
                 const { arguments: args, name, ...fnRest } = fn || {};
-                if (id == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].id\n${str(snapshot)}`);
-                }
                 if (type == null) {
                   throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
                 }
@@ -680,15 +903,20 @@ function finalizeChatCompletion<ParsedT>(
                   );
                 }
 
-                return { ...toolRest, id, type, function: { ...fnRest, name, arguments: args } };
+                return {
+                  ...toolRest,
+                  id: id || `call_${uuid4()}`,
+                  type,
+                  function: { ...fnRest, name, arguments: args },
+                };
               }),
             },
           };
         }
         return {
           ...choiceRest,
-          message: { ...messageRest, content, role, refusal: message.refusal ?? null },
-          finish_reason,
+          message: { ...messageRest, ...audioResponse, content, role, refusal: message.refusal ?? null },
+          finish_reason: finishReason,
           index,
           logprobs,
         };
@@ -703,13 +931,19 @@ function finalizeChatCompletion<ParsedT>(
   return maybeParseChatCompletion(completion, params);
 }
 
+function isCompleteAudio(
+  audio: Partial<ChatCompletionAudio> | null | undefined,
+): audio is ChatCompletionAudio {
+  return audio?.id != null && audio.data != null && audio.transcript != null && audio.expires_at != null;
+}
+
 function str(x: unknown) {
   return JSON.stringify(x);
 }
 
 /**
- * Represents a streamed chunk of a chat completion response returned by model,
- * based on the provided input.
+ * The chat completion accumulated from every streamed chunk received so far.
+ * Fields within each choice can remain incomplete until generation finishes.
  */
 export interface ChatCompletionSnapshot {
   /**
@@ -721,7 +955,7 @@ export interface ChatCompletionSnapshot {
    * A list of chat completion choices. Can be more than one if `n` is greater
    * than 1.
    */
-  choices: Array<ChatCompletionSnapshot.Choice>;
+  choices: ChatCompletionSnapshot.Choice[];
 
   /**
    * The Unix timestamp (in seconds) of when the chat completion was created.
@@ -729,7 +963,7 @@ export interface ChatCompletionSnapshot {
   created: number;
 
   /**
-   * The model to generate the completion.
+   * The model generating the completion.
    */
   model: string;
 
@@ -746,10 +980,12 @@ export interface ChatCompletionSnapshot {
   system_fingerprint?: string;
 }
 
+/** Nested shapes used by an in-progress chat completion snapshot. */
 export namespace ChatCompletionSnapshot {
+  /** One in-progress assistant choice and the metadata accumulated for it. */
   export interface Choice {
     /**
-     * A chat completion delta generated by streamed model responses.
+     * The assistant message accumulated from streamed model response deltas.
      */
     message: Choice.Message;
 
@@ -757,8 +993,8 @@ export namespace ChatCompletionSnapshot {
      * The reason the model stopped generating tokens. This will be `stop` if the model
      * hit a natural stop point or a provided stop sequence, `length` if the maximum
      * number of tokens specified in the request was reached, `content_filter` if
-     * content was omitted due to a flag from our content filters, or `function_call`
-     * if the model called a function.
+     * content was omitted due to a flag from our content filters, `tool_calls` if
+     * the model called a tool, or the deprecated `function_call` value.
      */
     finish_reason: ChatCompletion.Choice['finish_reason'] | null;
 
@@ -773,18 +1009,24 @@ export namespace ChatCompletionSnapshot {
     index: number;
   }
 
+  /** Nested message shapes belonging to an in-progress completion choice. */
   export namespace Choice {
     /**
-     * A chat completion delta generated by streamed model responses.
+     * The assistant message accumulated from streamed response deltas.
      */
     export interface Message {
       /**
-       * The contents of the chunk message.
+       * The assistant text accumulated for this message so far.
        */
       content?: string | null;
 
+      /** Audio fields received so far; individual fields can remain absent until generation finishes. */
+      audio?: Partial<ChatCompletionAudio> | null;
+
+      /** The model's refusal text accumulated so far, when the request is refused. */
       refusal?: string | null;
 
+      /** A best-effort partial parse of structured assistant content. */
       parsed?: unknown | null;
 
       /**
@@ -793,7 +1035,8 @@ export namespace ChatCompletionSnapshot {
        */
       function_call?: Message.FunctionCall;
 
-      tool_calls?: Array<Message.ToolCall>;
+      /** Function-tool calls accumulated so far; arguments may still contain incomplete JSON. */
+      tool_calls?: Message.ToolCall[];
 
       /**
        * The role of the author of this message.
@@ -801,13 +1044,16 @@ export namespace ChatCompletionSnapshot {
       role?: ChatCompletionRole;
     }
 
+    /** Nested function-call shapes belonging to an in-progress assistant message. */
     export namespace Message {
+      /** A function-tool call whose name, identifier, and arguments are streamed incrementally. */
       export interface ToolCall {
         /**
          * The ID of the tool call.
          */
         id: string;
 
+        /** The function name and the complete or partial JSON arguments received so far. */
         function: ToolCall.Function;
 
         /**
@@ -816,7 +1062,9 @@ export namespace ChatCompletionSnapshot {
         type: 'function';
       }
 
+      /** Function details nested under an in-progress tool call. */
       export namespace ToolCall {
+        /** The name and incrementally accumulated arguments of a function-tool call. */
         export interface Function {
           /**
            * The arguments to call the function with, as generated by the model in JSON
@@ -826,6 +1074,7 @@ export namespace ChatCompletionSnapshot {
            */
           arguments: string;
 
+          /** A best-effort partial parse of `arguments` for strict or auto-parseable tools. */
           parsed_arguments?: unknown;
 
           /**
@@ -857,15 +1106,17 @@ export namespace ChatCompletionSnapshot {
   }
 }
 
-type AssertIsEmpty<T extends {}> = keyof T extends never ? T : never;
+type AssertIsEmpty<T extends object> = keyof T extends never ? T : never;
 
 /**
  * Ensures the given argument is an empty object, useful for
  * asserting that all known properties on an object have been
  * destructured.
  */
-function assertIsEmpty<T extends {}>(obj: AssertIsEmpty<T>): asserts obj is AssertIsEmpty<T> {
-  return;
+function assertIsEmpty<T extends object>(obj: AssertIsEmpty<T>): asserts obj is AssertIsEmpty<T> {
+  void obj;
 }
 
-function assertNever(_x: never) {}
+function assertNever(_x: never) {
+  return _x;
+}

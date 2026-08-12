@@ -1,10 +1,13 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Checkpoints extends APIResource {
   /**
    * List checkpoints for a fine-tuning job.
@@ -27,7 +30,7 @@ export class Checkpoints extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`,
       CursorPage<FineTuningJobCheckpoint>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }

@@ -6,3 +6,4 @@ export * from './utils/env';
 export * from './utils/log';
 export * from './utils/uuid';
 export * from './utils/sleep';
+export * from './utils/query';

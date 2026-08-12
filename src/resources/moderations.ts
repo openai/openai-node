@@ -1,16 +1,19 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 
+/**
+ * Given text and/or image inputs, classifies if those inputs are potentially harmful.
+ */
 export class Moderations extends APIResource {
   /**
    * Classifies if text and/or image inputs are potentially harmful. Learn more in
    * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
    */
   create(body: ModerationCreateParams, options?: RequestOptions): APIPromise<ModerationCreateResponse> {
-    return this._client.post('/moderations', { body, ...options });
+    return this._client.post('/moderations', { body, ...options, __security: { bearerAuth: true } });
   }
 }
 

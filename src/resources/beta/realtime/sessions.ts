@@ -26,6 +26,7 @@ export class Sessions extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }
@@ -150,7 +151,7 @@ export interface Session {
    * set to `null` to turn off, in which case the client must manually trigger model
    * response. Server VAD means that the model will detect the start and end of
    * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjuction with VAD) to
+   * is more advanced and uses a turn detection model (in conjunction with VAD) to
    * semantically estimate whether the user has finished speaking, then dynamically
    * sets a timeout based on this probability. For example, if user audio trails off
    * with "uhhm", the model will score a low probability of turn end and wait longer
@@ -162,22 +163,9 @@ export interface Session {
   /**
    * The voice the model uses to respond. Voice cannot be changed during the session
    * once the model has responded with audio at least once. Current voice options are
-   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
-   * `shimmer`, and `verse`.
+   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
    */
-  voice?:
-    | (string & {})
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'fable'
-    | 'onyx'
-    | 'nova'
-    | 'sage'
-    | 'shimmer'
-    | 'verse';
+  voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
 
 export namespace Session {
@@ -282,7 +270,7 @@ export namespace Session {
    * set to `null` to turn off, in which case the client must manually trigger model
    * response. Server VAD means that the model will detect the start and end of
    * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjuction with VAD) to
+   * is more advanced and uses a turn detection model (in conjunction with VAD) to
    * semantically estimate whether the user has finished speaking, then dynamically
    * sets a timeout based on this probability. For example, if user audio trails off
    * with "uhhm", the model will score a low probability of turn end and wait longer
@@ -338,7 +326,7 @@ export namespace Session {
 }
 
 /**
- * A new Realtime session configuration, with an ephermeral key. Default TTL for
+ * A new Realtime session configuration, with an ephemeral key. Default TTL for
  * keys is one minute.
  */
 export interface SessionCreateResponse {
@@ -436,21 +424,9 @@ export interface SessionCreateResponse {
   /**
    * The voice the model uses to respond. Voice cannot be changed during the session
    * once the model has responded with audio at least once. Current voice options are
-   * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
    */
-  voice?:
-    | (string & {})
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'fable'
-    | 'onyx'
-    | 'nova'
-    | 'sage'
-    | 'shimmer'
-    | 'verse';
+  voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
 
 export namespace SessionCreateResponse {
@@ -682,7 +658,7 @@ export interface SessionCreateParams {
    * set to `null` to turn off, in which case the client must manually trigger model
    * response. Server VAD means that the model will detect the start and end of
    * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjuction with VAD) to
+   * is more advanced and uses a turn detection model (in conjunction with VAD) to
    * semantically estimate whether the user has finished speaking, then dynamically
    * sets a timeout based on this probability. For example, if user audio trails off
    * with "uhhm", the model will score a low probability of turn end and wait longer
@@ -694,22 +670,9 @@ export interface SessionCreateParams {
   /**
    * The voice the model uses to respond. Voice cannot be changed during the session
    * once the model has responded with audio at least once. Current voice options are
-   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
-   * `shimmer`, and `verse`.
+   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
    */
-  voice?:
-    | (string & {})
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'fable'
-    | 'onyx'
-    | 'nova'
-    | 'sage'
-    | 'shimmer'
-    | 'verse';
+  voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
 
 export namespace SessionCreateParams {
@@ -843,7 +806,7 @@ export namespace SessionCreateParams {
    * set to `null` to turn off, in which case the client must manually trigger model
    * response. Server VAD means that the model will detect the start and end of
    * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjuction with VAD) to
+   * is more advanced and uses a turn detection model (in conjunction with VAD) to
    * semantically estimate whether the user has finished speaking, then dynamically
    * sets a timeout based on this probability. For example, if user audio trails off
    * with "uhhm", the model will score a low probability of turn end and wait longer

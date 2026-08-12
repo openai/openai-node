@@ -1,10 +1,10 @@
 .prism.log
+.stdy.log
 node_modules
 yarn-error.log
 codegen.log
-Brewfile.lock.json
 dist
-dist-deno
+/oidc
 /*.tgz
 .idea/
 tmp
@@ -12,3 +12,7 @@ tmp
 ecosystem-tests/deno/package.json
 ecosystem-tests/*/openai.tgz
 .dev.vars
+.eslintcache
+oidc
+/benchmark-results.json
+/benchmark-environment.json

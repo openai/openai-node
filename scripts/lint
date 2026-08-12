@@ -4,20 +4,6 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "==> Running eslint"
-./node_modules/.bin/eslint .
+node ./scripts/lint-generated.cjs --check
 
-echo "==> Building"
-./scripts/build
-
-echo "==> Checking types"
-./node_modules/typescript/bin/tsc
-
-echo "==> Running Are The Types Wrong?"
-./node_modules/.bin/attw --pack dist -f json >.attw.json || true
-node scripts/utils/attw-report.cjs
-
-echo "==> Running publint"
-./node_modules/.bin/publint dist
-echo "==> Running jsr publish --dry-run"
-(cd dist-deno && npx jsr publish --dry-run --allow-dirty)
+PATH="$PWD/node_modules/.bin:$PATH" exec ./node_modules/.bin/ultracite check

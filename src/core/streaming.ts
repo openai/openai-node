@@ -1,40 +1,56 @@
-import { OpenAIError } from './error';
-import { type ReadableStream } from '../internal/shim-types';
-import { makeReadableStream } from '../internal/shims';
+import { OpenAIError, APIError } from './error';
+import type { ReadableStream } from '../internal/shim-types';
+import { makeReadableStream, ReadableStreamToAsyncIterable } from '../internal/shims';
 import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
-import { ReadableStreamToAsyncIterable } from '../internal/shims';
 import { isAbortError } from '../internal/errors';
 import { encodeUTF8 } from '../internal/utils/bytes';
 import { loggerFor } from '../internal/utils/log';
 import type { OpenAI } from '../client';
 
-import { APIError } from './error';
-
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+/** A decoded server-sent event before its JSON payload has been parsed. */
 export type ServerSentEvent = {
+  /** Explicit SSE event name, or `null` when the event has no `event:` field. */
   event: string | null;
+  /** Joined contents of the event's `data:` fields. */
   data: string;
+  /** Original event lines retained for diagnostics when parsing fails. */
   raw: string[];
 };
 
+/**
+ * A single-consumption asynchronous API response stream.
+ *
+ * Use {@link Stream.tee} when two consumers need the same events. Breaking out of
+ * a response-backed stream early aborts its request; branches created by `tee()`
+ * instead share {@link Stream.controller} for explicit cancellation.
+ */
 export class Stream<Item> implements AsyncIterable<Item> {
+  /** Abort controller for the underlying request and all branches created with `tee()`. */
   controller: AbortController;
   #client: OpenAI | undefined;
+  private iterator: () => AsyncIterator<Item>;
 
-  constructor(
-    private iterator: () => AsyncIterator<Item>,
-    controller: AbortController,
-    client?: OpenAI,
-  ) {
+  /** Wraps an asynchronous event iterator and the controller that owns its request. */
+  constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: OpenAI) {
+    this.iterator = iterator;
     this.controller = controller;
     this.#client = client;
   }
 
+  /**
+   * Decodes an SSE response into parsed JSON events.
+   *
+   * The resulting stream can be consumed only once, ignores events after `[DONE]`, and
+   * surfaces API error payloads as `APIError` instances. When
+   * `synthesizeEventData` is enabled, each item also includes its SSE event name.
+   */
   static fromSSEResponse<Item>(
     response: Response,
     controller: AbortController,
     client?: OpenAI,
+    synthesizeEventData?: boolean,
   ): Stream<Item> {
     let consumed = false;
     const logger = client ? loggerFor(client) : console;
@@ -47,24 +63,20 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let done = false;
       try {
         for await (const sse of _iterSSEMessages(response, controller)) {
-          if (done) continue;
+          if (done) {
+            continue;
+          }
 
           if (sse.data.startsWith('[DONE]')) {
             done = true;
             continue;
           }
 
-          if (
-            sse.event === null ||
-            sse.event.startsWith('response.') ||
-            sse.event.startsWith('image_edit.') ||
-            sse.event.startsWith('image_generation.') ||
-            sse.event.startsWith('transcript.')
-          ) {
+          if (sse.event === null || !sse.event.startsWith('thread.')) {
             let data;
 
             try {
-              data = JSON.parse(sse.data);
+              data = JSON.parse(sse.data) as any;
             } catch (e) {
               logger.error(`Could not parse message into JSON:`, sse.data);
               logger.error(`From chunk:`, sse.raw);
@@ -75,7 +87,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               throw new APIError(undefined, data.error, undefined, response.headers);
             }
 
-            yield data;
+            yield synthesizeEventData ? { event: sse.event, data } : data;
           } else {
             let data;
             try {
@@ -85,21 +97,25 @@ export class Stream<Item> implements AsyncIterable<Item> {
               console.error(`From chunk:`, sse.raw);
               throw e;
             }
-            // TODO: Is this where the error should be thrown?
-            if (sse.event == 'error') {
+            // SSE error events surface as APIError instances.
+            if (sse.event === 'error') {
               throw new APIError(undefined, data.error, data.message, undefined);
             }
-            yield { event: sse.event, data: data } as any;
+            yield { event: sse.event, data } as any;
           }
         }
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (isAbortError(e)) return;
+        if (isAbortError(e)) {
+          return;
+        }
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
-        if (!done) controller.abort();
+        if (!done) {
+          controller.abort();
+        }
       }
     }
 
@@ -119,16 +135,54 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
     async function* iterLines(): AsyncGenerator<string, void, unknown> {
       const lineDecoder = new LineDecoder();
+      const reader = readableStream.getReader();
+      let closed = false;
+      let cancelPromise: Promise<void> | undefined;
+      const cancel = () => {
+        cancelPromise ??= reader.cancel();
+        cancelPromise.catch(() => undefined);
+      };
 
-      const iter = ReadableStreamToAsyncIterable<Bytes>(readableStream);
-      for await (const chunk of iter) {
-        for (const line of lineDecoder.decode(chunk)) {
+      controller.signal.addEventListener('abort', cancel, { once: true });
+      try {
+        if (controller.signal.aborted) {
+          cancel();
+          return;
+        }
+
+        while (true) {
+          const { value: chunk, done } = await reader.read();
+          if (done) {
+            closed = true;
+            break;
+          }
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          for (const line of lineDecoder.decode(chunk)) {
+            if (controller.signal.aborted) {
+              return;
+            }
+            yield line;
+          }
+        }
+
+        if (controller.signal.aborted) {
+          return;
+        }
+        for (const line of lineDecoder.flush()) {
+          if (controller.signal.aborted) {
+            return;
+          }
           yield line;
         }
-      }
-
-      for (const line of lineDecoder.flush()) {
-        yield line;
+      } finally {
+        controller.signal.removeEventListener('abort', cancel);
+        if (!closed) {
+          cancel();
+        }
+        reader.releaseLock();
       }
     }
 
@@ -140,23 +194,32 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let done = false;
       try {
         for await (const line of iterLines()) {
-          if (done) continue;
-          if (line) yield JSON.parse(line);
+          if (done) {
+            continue;
+          }
+          if (line) {
+            yield JSON.parse(line) as Item;
+          }
         }
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (isAbortError(e)) return;
+        if (controller.signal.aborted || isAbortError(e)) {
+          return;
+        }
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
-        if (!done) controller.abort();
+        if (!done) {
+          controller.abort();
+        }
       }
     }
 
     return new Stream(iterator, controller, client);
   }
 
+  /** Starts consuming this stream; attempting to consume it again throws. */
   [Symbol.asyncIterator](): AsyncIterator<Item> {
     return this.iterator();
   }
@@ -166,22 +229,20 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * independently read from at different speeds.
    */
   tee(): [Stream<Item>, Stream<Item>] {
-    const left: Array<Promise<IteratorResult<Item>>> = [];
-    const right: Array<Promise<IteratorResult<Item>>> = [];
+    const left: Promise<IteratorResult<Item>>[] = [];
+    const right: Promise<IteratorResult<Item>>[] = [];
     const iterator = this.iterator();
 
-    const teeIterator = (queue: Array<Promise<IteratorResult<Item>>>): AsyncIterator<Item> => {
-      return {
-        next: () => {
-          if (queue.length === 0) {
-            const result = iterator.next();
-            left.push(result);
-            right.push(result);
-          }
-          return queue.shift()!;
-        },
-      };
-    };
+    const teeIterator = (queue: Promise<IteratorResult<Item>>[]): AsyncIterator<Item> => ({
+      next: () => {
+        if (queue.length === 0) {
+          const result = iterator.next();
+          left.push(result);
+          right.push(result);
+        }
+        return queue.shift()!;
+      },
+    });
 
     return [
       new Stream(() => teeIterator(left), this.controller, this.#client),
@@ -195,17 +256,18 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * which can be turned back into a Stream with `Stream.fromReadableStream()`.
    */
   toReadableStream(): ReadableStream {
-    const self = this;
     let iter: AsyncIterator<Item>;
 
     return makeReadableStream({
-      async start() {
-        iter = self[Symbol.asyncIterator]();
+      start: async () => {
+        iter = this[Symbol.asyncIterator]();
       },
       async pull(ctrl: any) {
         try {
           const { value, done } = await iter.next();
-          if (done) return ctrl.close();
+          if (done) {
+            return ctrl.close();
+          }
 
           const bytes = encodeUTF8(JSON.stringify(value) + '\n');
 
@@ -221,6 +283,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
   }
 }
 
+/**
+ * Decodes complete SSE records from a response and aborts when its body is absent.
+ *
+ * @yields {ServerSentEvent} Each decoded server-sent event in wire order.
+ */
 export async function* _iterSSEMessages(
   response: Response,
   controller: AbortController,
@@ -228,7 +295,7 @@ export async function* _iterSSEMessages(
   if (!response.body) {
     controller.abort();
     if (
-      typeof (globalThis as any).navigator !== 'undefined' &&
+      (globalThis as any).navigator !== undefined &&
       (globalThis as any).navigator.product === 'ReactNative'
     ) {
       throw new OpenAIError(
@@ -245,19 +312,25 @@ export async function* _iterSSEMessages(
   for await (const sseChunk of iterSSEChunks(iter)) {
     for (const line of lineDecoder.decode(sseChunk)) {
       const sse = sseDecoder.decode(line);
-      if (sse) yield sse;
+      if (sse) {
+        yield sse;
+      }
     }
   }
 
   for (const line of lineDecoder.flush()) {
     const sse = sseDecoder.decode(line);
-    if (sse) yield sse;
+    if (sse) {
+      yield sse;
+    }
   }
 }
 
 /**
  * Given an async iterable iterator, iterates over it and yields full
  * SSE chunks, i.e. yields when a double new-line is encountered.
+ *
+ * @yields {Uint8Array} A complete SSE chunk.
  */
 async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGenerator<Uint8Array> {
   let data = new Uint8Array();
@@ -267,12 +340,16 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
       continue;
     }
 
-    const binaryChunk =
-      chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? encodeUTF8(chunk)
-      : chunk;
+    let binaryChunk: Uint8Array;
+    if (chunk instanceof ArrayBuffer) {
+      binaryChunk = new Uint8Array(chunk);
+    } else if (typeof chunk === 'string') {
+      binaryChunk = encodeUTF8(chunk);
+    } else {
+      binaryChunk = chunk;
+    }
 
-    let newData = new Uint8Array(data.length + binaryChunk.length);
+    const newData = new Uint8Array(data.length + binaryChunk.length);
     newData.set(data);
     newData.set(binaryChunk, data.length);
     data = newData;
@@ -291,23 +368,24 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
 
 class SSEDecoder {
   private data: string[];
-  private event: string | null;
+  private event: string | null = null;
   private chunks: string[];
 
   constructor() {
-    this.event = null;
     this.data = [];
     this.chunks = [];
   }
 
   decode(line: string) {
     if (line.endsWith('\r')) {
-      line = line.substring(0, line.length - 1);
+      line = line.slice(0, -1);
     }
 
     if (!line) {
       // empty line and we didn't previously encounter any messages
-      if (!this.event && !this.data.length) return null;
+      if (!this.event && !this.data.length) {
+        return null;
+      }
 
       const sse: ServerSentEvent = {
         event: this.event,
@@ -328,10 +406,11 @@ class SSEDecoder {
       return null;
     }
 
-    let [fieldname, _, value] = partition(line, ':');
+    const [fieldname, , initialValue] = partition(line, ':');
+    let value = initialValue;
 
     if (value.startsWith(' ')) {
-      value = value.substring(1);
+      value = value.slice(1);
     }
 
     if (fieldname === 'event') {
@@ -347,7 +426,7 @@ class SSEDecoder {
 function partition(str: string, delimiter: string): [string, string, string] {
   const index = str.indexOf(delimiter);
   if (index !== -1) {
-    return [str.substring(0, index), delimiter, str.substring(index + delimiter.length)];
+    return [str.slice(0, index), delimiter, str.slice(index + delimiter.length)];
   }
 
   return [str, '', ''];

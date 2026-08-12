@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "==> Detecting breaking changes"
+
+git cat-file -e "$1^{tree}"
+
+while IFS= read -r test_path; do
+  [[ "$test_path" == *.test.ts ]] || continue
+  git checkout "$1" -- "$test_path" 2>/dev/null || true
+done < <(git ls-tree -r --name-only "$1" -- tests/api-resources tests/index.test.ts)
+
+if [ -e tests/api-resources/embeddings.test.ts ]; then
+  node <<'EOF'
+const fs = require('fs');
+const file = 'tests/api-resources/embeddings.test.ts';
+const contents = fs.readFileSync(file, 'utf8')
+  .replaceAll('response.data?.at(0)?.embedding.at(0)', 'response.data?.[0]?.embedding[0]')
+  .replaceAll('response.data?.at(0)?.embedding', 'response.data?.[0]?.embedding');
+fs.writeFileSync(file, contents);
+EOF
+fi
+
+if [ -e tests/index.test.ts ]; then
+  node <<'EOF'
+const fs = require('fs');
+const file = 'tests/index.test.ts';
+const contents = fs.readFileSync(file, 'utf8').replaceAll('.toThrowError(', '.toThrow(');
+fs.writeFileSync(file, contents);
+EOF
+fi
+
+# Generated tests are excluded from linting, so TypeScript performs the API
+# compatibility check against every historical resource test.
+./scripts/lint
+pnpm exec tsc

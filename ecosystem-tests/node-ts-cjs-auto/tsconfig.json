@@ -9,6 +9,7 @@
     /* Language and Environment */
     "target": "ES2015",
     "lib": ["ES2015"],
+    "types": ["jest", "node"],
     "jsx": "react",
 
     /* Modules */

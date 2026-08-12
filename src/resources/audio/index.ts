@@ -1,15 +1,19 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export { Audio, type AudioModel, type AudioResponseFormat } from './audio';
 export { Speech, type SpeechModel, type SpeechCreateParams } from './speech';
 export {
   Transcriptions,
   type Transcription,
+  type TranscriptionDiarized,
+  type TranscriptionDiarizedSegment,
   type TranscriptionInclude,
+  type TranscriptionLanguage,
   type TranscriptionSegment,
   type TranscriptionStreamEvent,
   type TranscriptionTextDeltaEvent,
   type TranscriptionTextDoneEvent,
+  type TranscriptionTextSegmentEvent,
   type TranscriptionVerbose,
   type TranscriptionWord,
   type TranscriptionCreateResponse,

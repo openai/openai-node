@@ -1,12 +1,17 @@
 import type { RequestInit } from './internal/builtin-types';
+import type { NullableHeaders } from './internal/headers';
+import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
-import { FinalRequestOptions } from './internal/request-options';
+import type { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
-import { ClientOptions, OpenAI } from './client';
-import { buildHeaders, NullableHeaders } from './internal/headers';
+import { OpenAI } from './client';
+import type { ClientOptions } from './client';
 
 /** API Client for interfacing with the Azure OpenAI API. */
-export interface AzureClientOptions extends ClientOptions {
+export interface AzureClientOptions extends Omit<ClientOptions, 'provider'> {
+  /** AzureOpenAI does not support third-party provider configuration. */
+  provider?: never;
+
   /**
    * Defaults to process.env['OPENAI_API_VERSION'].
    */
@@ -18,8 +23,9 @@ export interface AzureClientOptions extends ClientOptions {
   endpoint?: string | undefined;
 
   /**
-   * A model deployment, if given, sets the base client URL to include `/deployments/{deployment}`.
-   * Note: this means you won't be able to use non-deployment endpoints. Not supported with Assistants APIs.
+   * Azure model deployment inserted into supported deployment-scoped request
+   * paths. The client's base URL remains unchanged, so non-deployment endpoints
+   * remain available.
    */
   deployment?: string | undefined;
 
@@ -37,26 +43,27 @@ export interface AzureClientOptions extends ClientOptions {
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
-  private _azureADTokenProvider: (() => Promise<string>) | undefined;
+  /** Azure deployment configured for deployment-scoped model requests. */
   deploymentName: string | undefined;
-  apiVersion: string = '';
+  /** Azure OpenAI API version included in requests made by this client. */
+  apiVersion = '';
 
   /**
    * API Client for interfacing with the Azure OpenAI API.
    *
-   * @param {string | undefined} [opts.apiVersion=process.env['OPENAI_API_VERSION'] ?? undefined]
-   * @param {string | undefined} [opts.endpoint=process.env['AZURE_OPENAI_ENDPOINT'] ?? undefined] - Your Azure endpoint, including the resource, e.g. `https://example-resource.azure.openai.com/`
-   * @param {string | undefined} [opts.apiKey=process.env['AZURE_OPENAI_API_KEY'] ?? undefined]
-   * @param {string | undefined} opts.deployment - A model deployment, if given, sets the base client URL to include `/deployments/{deployment}`.
-   * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
-   * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL']] - Sets the base URL for the API, e.g. `https://example-resource.azure.openai.com/openai/`.
-   * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
-   * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
+   * @param {string | undefined} [opts.apiVersion] - Defaults to `process.env['OPENAI_API_VERSION'] ?? undefined`.
+   * @param {string | undefined} [opts.endpoint] - Your Azure endpoint, including the resource, e.g. `https://example-resource.azure.openai.com/`. Defaults to `process.env['AZURE_OPENAI_ENDPOINT'] ?? undefined`.
+   * @param {string | undefined} [opts.apiKey] - Defaults to `process.env['AZURE_OPENAI_API_KEY'] ?? undefined`.
+   * @param {string | undefined} opts.deployment - Azure model deployment inserted into supported deployment-scoped request paths.
+   * @param {string | null | undefined} [opts.organization] - Defaults to `process.env['OPENAI_ORG_ID'] ?? null`.
+   * @param {string} [opts.baseURL] - Sets the base URL for the API, e.g. `https://example-resource.azure.openai.com/openai/`. Defaults to `process.env['OPENAI_BASE_URL']`.
+   * @param {number} [opts.timeout] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out. Defaults to 10 minutes.
+   * @param {() => Promise<string>} [opts.azureADTokenProvider] - Returns a fresh Microsoft Entra access token for each request; cannot be combined with `apiKey`.
    * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
-   * @param {number} [opts.maxRetries=2] - The maximum number of times the client will retry a request.
+   * @param {number} [opts.maxRetries] - The maximum number of times the client will retry a request. Defaults to `2`.
    * @param {Headers} opts.defaultHeaders - Default headers to include with every request to the API.
    * @param {DefaultQuery} opts.defaultQuery - Default query parameters to include with every request to the API.
-   * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
+   * @param {boolean} [opts.dangerouslyAllowBrowser] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers. Defaults to `false`.
    */
   constructor({
     baseURL = readEnv('OPENAI_BASE_URL'),
@@ -90,9 +97,6 @@ export class AzureOpenAI extends OpenAI {
       );
     }
 
-    // define a sentinel value to avoid any typing issues
-    apiKey ??= API_KEY_SENTINEL;
-
     opts.defaultQuery = { ...opts.defaultQuery, 'api-version': apiVersion };
 
     if (!baseURL) {
@@ -106,29 +110,44 @@ export class AzureOpenAI extends OpenAI {
         );
       }
 
-      baseURL = `${endpoint}/openai`;
-    } else {
-      if (endpoint) {
-        throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
+      let endpointEnd = endpoint.length;
+      while (endpointEnd > 0 && endpoint[endpointEnd - 1] === '/') {
+        endpointEnd--;
       }
+      baseURL = `${endpoint.slice(0, endpointEnd)}/openai`;
+    } else if (endpoint) {
+      throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
     }
 
     super({
-      apiKey,
+      apiKey: azureADTokenProvider ?? apiKey,
       baseURL,
       ...opts,
-      ...(dangerouslyAllowBrowser !== undefined ? { dangerouslyAllowBrowser } : {}),
+      ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
     });
 
-    this._azureADTokenProvider = azureADTokenProvider;
     this.apiVersion = apiVersion;
     this.deploymentName = deployment;
   }
 
+  /** Builds an Azure request and inserts its deployment into model-scoped endpoint paths. */
   override async buildRequest(
     options: FinalRequestOptions,
-    props: { retryCount?: number } = {},
-  ): Promise<{ req: RequestInit & { headers: Headers }; url: string; timeout: number }> {
+    props: {
+      /** Number of retries already attempted for the current request. */
+      retryCount?: number;
+    } = {},
+  ): Promise<{
+    /** Fetch request options after authentication, headers, and the body are prepared. */
+    req: RequestInit & {
+      /** Fully resolved request headers sent to Azure OpenAI. */
+      headers: Headers;
+    };
+    /** Absolute deployment-aware request URL. */
+    url: string;
+    /** Request timeout in milliseconds. */
+    timeout: number;
+  }> {
     if (_deployments_endpoints.has(options.path) && options.method === 'post' && options.body !== undefined) {
       if (!isObj(options.body)) {
         throw new Error('Expected request body to be an object');
@@ -141,45 +160,15 @@ export class AzureOpenAI extends OpenAI {
     return super.buildRequest(options, props);
   }
 
-  async _getAzureADToken(): Promise<string | undefined> {
-    if (typeof this._azureADTokenProvider === 'function') {
-      const token = await this._azureADTokenProvider();
-      if (!token || typeof token !== 'string') {
-        throw new Errors.OpenAIError(
-          `Expected 'azureADTokenProvider' argument to return a string but it returned ${token}`,
-        );
-      }
-      return token;
+  protected override async authHeaders(
+    opts: FinalRequestOptions,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<NullableHeaders | undefined> {
+    const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
+    if (security.bearerAuth && typeof this._options.apiKey === 'string') {
+      return buildHeaders([{ 'api-key': this.apiKey }]);
     }
-    return undefined;
-  }
-
-  protected override async authHeaders(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    return;
-  }
-
-  protected override async prepareOptions(opts: FinalRequestOptions): Promise<void> {
-    opts.headers = buildHeaders([opts.headers]);
-
-    /**
-     * The user should provide a bearer token provider if they want
-     * to use Azure AD authentication. The user shouldn't set the
-     * Authorization header manually because the header is overwritten
-     * with the Azure AD token if a bearer token provider is provided.
-     */
-    if (opts.headers.values.get('Authorization') || opts.headers.values.get('api-key')) {
-      return super.prepareOptions(opts);
-    }
-
-    const token = await this._getAzureADToken();
-    if (token) {
-      opts.headers.values.set('Authorization', `Bearer ${token}`);
-    } else if (this.apiKey !== API_KEY_SENTINEL) {
-      opts.headers.values.set('api-key', this.apiKey);
-    } else {
-      throw new Errors.OpenAIError('Unable to handle auth');
-    }
-    return super.prepareOptions(opts);
+    return super.authHeaders(opts, security);
   }
 }
 
@@ -194,5 +183,3 @@ const _deployments_endpoints = new Set([
   '/batches',
   '/images/edits',
 ]);
-
-const API_KEY_SENTINEL = '<Missing Key>';

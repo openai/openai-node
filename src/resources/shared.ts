@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export type AllModels =
   | (string & {})
@@ -12,9 +12,43 @@ export type AllModels =
   | 'o4-mini-deep-research'
   | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
-  | 'computer-use-preview-2025-03-11';
+  | 'computer-use-preview-2025-03-11'
+  | 'gpt-5-codex'
+  | 'gpt-5-pro'
+  | 'gpt-5-pro-2025-10-06'
+  | 'gpt-5.1-codex-max'
+  | 'gpt-daybreak-blue-latest'
+  | 'gpt-daybreak-red-latest'
+  | 'gpt-5.6-cyber';
 
 export type ChatModel =
+  | 'gpt-5.6-sol'
+  | 'gpt-5.6-terra'
+  | 'gpt-5.6-luna'
+  | 'gpt-5.5'
+  | 'gpt-5.4'
+  | 'gpt-5.4-mini'
+  | 'gpt-5.4-nano'
+  | 'gpt-5.4-mini-2026-03-17'
+  | 'gpt-5.4-nano-2026-03-17'
+  | 'gpt-5.3-chat-latest'
+  | 'gpt-5.2'
+  | 'gpt-5.2-2025-12-11'
+  | 'gpt-5.2-chat-latest'
+  | 'gpt-5.2-pro'
+  | 'gpt-5.2-pro-2025-12-11'
+  | 'gpt-5.1'
+  | 'gpt-5.1-2025-11-13'
+  | 'gpt-5.1-codex'
+  | 'gpt-5.1-mini'
+  | 'gpt-5.1-chat-latest'
+  | 'gpt-5'
+  | 'gpt-5-mini'
+  | 'gpt-5-nano'
+  | 'gpt-5-2025-08-07'
+  | 'gpt-5-mini-2025-08-07'
+  | 'gpt-5-nano-2025-08-07'
+  | 'gpt-5-chat-latest'
   | 'gpt-4.1'
   | 'gpt-4.1-mini'
   | 'gpt-4.1-nano'
@@ -82,7 +116,8 @@ export interface ComparisonFilter {
   key: string;
 
   /**
-   * Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`.
+   * Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`,
+   * `nin`.
    *
    * - `eq`: equals
    * - `ne`: not equal
@@ -90,14 +125,16 @@ export interface ComparisonFilter {
    * - `gte`: greater than or equal
    * - `lt`: less than
    * - `lte`: less than or equal
+   * - `in`: in
+   * - `nin`: not in
    */
-  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin';
 
   /**
    * The value to compare against the attribute key; supports string, number, or
    * boolean types.
    */
-  value: string | number | boolean;
+  value: string | number | boolean | Array<string | number>;
 }
 
 /**
@@ -114,6 +151,43 @@ export interface CompoundFilter {
    * Type of operation: `and` or `or`.
    */
   type: 'and' | 'or';
+}
+
+/**
+ * The input format for the custom tool. Default is unconstrained text.
+ */
+export type CustomToolInputFormat = CustomToolInputFormat.Text | CustomToolInputFormat.Grammar;
+
+export namespace CustomToolInputFormat {
+  /**
+   * Unconstrained free-form text.
+   */
+  export interface Text {
+    /**
+     * Unconstrained text format. Always `text`.
+     */
+    type: 'text';
+  }
+
+  /**
+   * A grammar defined by the user.
+   */
+  export interface Grammar {
+    /**
+     * The grammar definition.
+     */
+    definition: string;
+
+    /**
+     * The syntax of the grammar definition. One of `lark` or `regex`.
+     */
+    syntax: 'lark' | 'regex';
+
+    /**
+     * Grammar format. Always `grammar`.
+     */
+    type: 'grammar';
+  }
 }
 
 export interface ErrorObject {
@@ -155,7 +229,7 @@ export interface FunctionDefinition {
    * set to true, the model will follow the exact schema defined in the `parameters`
    * field. Only a subset of JSON Schema is supported when `strict` is `true`. Learn
    * more about Structured Outputs in the
-   * [function calling guide](docs/guides/function-calling).
+   * [function calling guide](https://platform.openai.com/docs/guides/function-calling).
    */
   strict?: boolean | null;
 }
@@ -181,20 +255,32 @@ export type FunctionParameters = { [key: string]: unknown };
  */
 export type Metadata = { [key: string]: string };
 
+export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
+
 /**
- * **o-series models only**
+ * **gpt-5 and o-series models only**
  *
  * Configuration options for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
  */
 export interface Reasoning {
   /**
-   * **o-series models only**
+   * Controls which reasoning items are rendered back to the model on later turns. If
+   * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+   * model family defaults to `all_turns`; earlier models default to `current_turn`.
    *
-   * Constrains effort on reasoning for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
-   * result in faster responses and fewer tokens used on reasoning in a response.
+   * When returned on a response, this is the effective reasoning context mode used
+   * for the response.
+   */
+  context?: 'auto' | 'current_turn' | 'all_turns' | null;
+
+  /**
+   * Constrains effort on reasoning for reasoning models. Currently supported values
+   * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+   * reasoning effort can result in faster responses and fewer tokens used on
+   * reasoning in a response. Not all reasoning models support every value. See the
+   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * model-specific support.
    */
   effort?: ReasoningEffort | null;
 
@@ -208,22 +294,32 @@ export interface Reasoning {
   generate_summary?: 'auto' | 'concise' | 'detailed' | null;
 
   /**
+   * Controls the reasoning execution mode for the request.
+   *
+   * When returned on a response, this is the effective execution mode.
+   */
+  mode?: (string & {}) | 'standard' | 'pro';
+
+  /**
    * A summary of the reasoning performed by the model. This can be useful for
    * debugging and understanding the model's reasoning process. One of `auto`,
    * `concise`, or `detailed`.
+   *
+   * `concise` is supported for `computer-use-preview` models and all reasoning
+   * models after `gpt-5`.
    */
   summary?: 'auto' | 'concise' | 'detailed' | null;
 }
 
 /**
- * **o-series models only**
- *
- * Constrains effort on reasoning for
- * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
- * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
- * result in faster responses and fewer tokens used on reasoning in a response.
+ * Constrains effort on reasoning for reasoning models. Currently supported values
+ * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+ * reasoning effort can result in faster responses and fewer tokens used on
+ * reasoning in a response. Not all reasoning models support every value. See the
+ * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+ * model-specific support.
  */
-export type ReasoningEffort = 'low' | 'medium' | 'high' | null;
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
 
 /**
  * JSON object response format. An older method of generating JSON responses. Using
@@ -298,6 +394,34 @@ export interface ResponseFormatText {
   type: 'text';
 }
 
+/**
+ * A custom grammar for the model to follow when generating text. Learn more in the
+ * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars).
+ */
+export interface ResponseFormatTextGrammar {
+  /**
+   * The custom grammar for the model to follow.
+   */
+  grammar: string;
+
+  /**
+   * The type of response format being defined. Always `grammar`.
+   */
+  type: 'grammar';
+}
+
+/**
+ * Configure the model to generate valid Python code. See the
+ * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars)
+ * for more details.
+ */
+export interface ResponseFormatTextPython {
+  /**
+   * The type of response format being defined. Always `python`.
+   */
+  type: 'python';
+}
+
 export type ResponsesModel =
   | (string & {})
   | ChatModel
@@ -310,4 +434,11 @@ export type ResponsesModel =
   | 'o4-mini-deep-research'
   | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
-  | 'computer-use-preview-2025-03-11';
+  | 'computer-use-preview-2025-03-11'
+  | 'gpt-5-codex'
+  | 'gpt-5-pro'
+  | 'gpt-5-pro-2025-10-06'
+  | 'gpt-5.1-codex-max'
+  | 'gpt-daybreak-blue-latest'
+  | 'gpt-daybreak-red-latest'
+  | 'gpt-5.6-cyber';

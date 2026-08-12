@@ -1,37 +1,48 @@
 // @ts-check
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const distDir =
-  process.env['DIST_PATH'] ?
-    path.resolve(process.env['DIST_PATH'])
+const distDir = process.env['DIST_PATH']
+  ? path.resolve(process.env['DIST_PATH'])
   : path.resolve(__dirname, '..', '..', 'dist');
 
 async function* walk(dir) {
   for await (const d of await fs.promises.opendir(dir)) {
     const entry = path.join(dir, d.name);
-    if (d.isDirectory()) yield* walk(entry);
-    else if (d.isFile()) yield entry;
+    if (d.isDirectory()) {
+      yield* walk(entry);
+    } else if (d.isFile()) {
+      yield entry;
+    }
   }
 }
 
 async function postprocess() {
   for await (const file of walk(distDir)) {
-    if (!/(\.d)?[cm]?ts$/.test(file)) continue;
+    if (!/(\.d)?[cm]?ts$/.test(file)) {
+      continue;
+    }
 
-    const code = await fs.promises.readFile(file, 'utf8');
+    const code = await fs.promises.readFile(file, 'utf-8');
 
     // strip out lib="dom", types="node", and types="react" references; these
     // are needed at build time, but would pollute the user's TS environment
-    const transformed = code.replace(
+    let transformed = code.replaceAll(
       /^ *\/\/\/ *<reference +(lib="dom"|types="(node|react)").*?\n/gm,
       // replace with same number of characters to avoid breaking source maps
       (match) => ' '.repeat(match.length - 1) + '\n',
     );
 
+    if (/\.d\.[cm]?ts$/.test(file)) {
+      transformed = transformed.replaceAll(
+        /\/\*\* @ts-ignore ([^*]+?) \*\/ type /g,
+        '// @ts-ignore $1\ntype ',
+      );
+    }
+
     if (transformed !== code) {
       console.error(`wrote ${path.relative(process.cwd(), file)}`);
-      await fs.promises.writeFile(file, transformed, 'utf8');
+      await fs.promises.writeFile(file, transformed, 'utf-8');
     }
   }
 

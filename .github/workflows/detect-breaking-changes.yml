@@ -1,0 +1,55 @@
+# Compares pull requests with their base revision to catch exported API breaks
+# that ordinary unit tests can miss.
+name: CI
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+  merge_group:
+    types:
+      - checks_requested
+
+jobs:
+  detect_breaking_changes:
+    runs-on: 'ubuntu-latest'
+    name: detect-breaking-changes
+    if: github.repository == 'openai/openai-node'
+    permissions:
+      contents: read
+    env:
+      BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+      FETCH_DEPTH: 0
+    steps:
+      - name: Calculate fetch-depth
+        if: github.event_name == 'pull_request'
+        env:
+          PR_COMMITS: ${{ github.event.pull_request.commits }}
+        run: |
+          echo "FETCH_DEPTH=$((PR_COMMITS + 1))" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          # Keep the checkout shallow; fetch the exact comparison base below.
+          fetch-depth: ${{ env.FETCH_DEPTH }}
+
+      - name: Fetch comparison base
+        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: |
+          ./scripts/bootstrap
+
+      - name: Detect breaking changes
+        run: |
+          # The detector discovers tests from the base revision, including removed resources.
+          ./scripts/detect-breaking-changes "$BASE_SHA"

@@ -1,9 +1,10 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -30,6 +31,7 @@ describe('resource uploads', () => {
       filename: 'filename',
       mime_type: 'mime_type',
       purpose: 'assistants',
+      expires_after: { anchor: 'created_at', seconds: 3600 },
     });
   });
 

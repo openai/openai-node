@@ -76,21 +76,21 @@ export const coerceBoolean = (value: unknown): boolean => {
 };
 
 export const maybeCoerceInteger = (value: unknown): number | undefined => {
-  if (value === undefined) {
+  if (value == null) {
     return undefined;
   }
   return coerceInteger(value);
 };
 
 export const maybeCoerceFloat = (value: unknown): number | undefined => {
-  if (value === undefined) {
+  if (value == null) {
     return undefined;
   }
   return coerceFloat(value);
 };
 
 export const maybeCoerceBoolean = (value: unknown): boolean | undefined => {
-  if (value === undefined) {
+  if (value == null) {
     return undefined;
   }
   return coerceBoolean(value);

@@ -1,32 +1,42 @@
-import {
+import type {
+  ParsedResponse,
+  Response,
+  ResponseCreateParamsBase,
+  ResponseCreateParamsStreaming,
+  ResponseStreamEvent,
   ResponseTextConfig,
-  type ParsedResponse,
-  type Response,
-  type ResponseCreateParamsBase,
-  type ResponseCreateParamsStreaming,
-  type ResponseStreamEvent,
 } from '../../resources/responses/responses';
-import { RequestOptions } from '../../internal/request-options';
+import type { RequestOptions } from '../../internal/request-options';
+import type { ReadableStream } from '../../internal/shim-types';
 import { APIUserAbortError, OpenAIError } from '../../error';
-import OpenAI from '../../index';
-import { type BaseEvents, EventStream } from '../EventStream';
-import { type ResponseFunctionCallArgumentsDeltaEvent, type ResponseTextDeltaEvent } from './EventTypes';
-import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';
+import type OpenAI from '../../index';
+import { EventStream } from '../EventStream';
+import type { BaseEvents } from '../EventStream';
+import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
+import { accumulateResponse } from './ResponseAccumulator';
+import type { ParseableToolsParams } from '../ResponsesParser';
+import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
 
+/** Parameters for starting a new response stream or replaying an existing response. */
 export type ResponseStreamParams = ResponseCreateAndStreamParams | ResponseStreamByIdParams;
 
+/** Response-creation parameters accepted by the streaming convenience helper. */
 export type ResponseCreateAndStreamParams = Omit<ResponseCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
 
+/** Parameters for replaying an existing response and optionally filtering emitted events. */
 export type ResponseStreamByIdParams = {
   /**
    * The ID of the response to stream.
    */
   response_id: string;
   /**
-   * If provided, the stream will start after the event with the given sequence number.
+   * If provided, events with a sequence number less than or equal to this value
+   * will not be emitted. The helper still replays them internally to build a
+   * complete snapshot for later events and `finalResponse()`.
    */
   starting_after?: number;
   /**
@@ -45,22 +55,37 @@ export type ResponseStreamByIdParams = {
   tools?: ParseableToolsParams;
 };
 
+/** Raw Responses API events, lifecycle notifications, and snapshot-enhanced delta listeners. */
 type ResponseEvents = BaseEvents &
   Omit<
     {
-      [K in ResponseStreamEvent['type']]: (event: Extract<ResponseStreamEvent, { type: K }>) => void;
+      [K in ResponseStreamEvent['type']]: (
+        event: Extract<
+          ResponseStreamEvent,
+          {
+            /** Event discriminator that selects the listener's precise server-event payload. */
+            type: K;
+          }
+        >,
+      ) => void;
     },
     'response.output_text.delta' | 'response.function_call_arguments.delta'
   > & {
+    /** Called for every raw response event that passes the replay sequence filter. */
     event: (event: ResponseStreamEvent) => void;
+    /** Called with each text fragment and the complete text accumulated for its content part. */
     'response.output_text.delta': (event: ResponseTextDeltaEvent) => void;
+    /** Called with each argument fragment and the complete JSON accumulated for its function call. */
     'response.function_call_arguments.delta': (event: ResponseFunctionCallArgumentsDeltaEvent) => void;
   };
 
+/** Response request parameters retained to parse structured output and tool arguments. */
 export type ResponseStreamingParams = Omit<ResponseCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
 
+/** Streams Responses API events while accumulating the latest response and parsed output. */
 export class ResponseStream<ParsedT = null>
   extends EventStream<ResponseEvents>
   implements AsyncIterable<ResponseStreamEvent>
@@ -69,11 +94,13 @@ export class ResponseStream<ParsedT = null>
   #currentResponseSnapshot: Response | undefined;
   #finalResponse: ParsedResponse<ParsedT> | undefined;
 
+  /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ResponseStreamingParams | null) {
     super();
     this.#params = params;
   }
 
+  /** Starts a new response stream or replays an existing response by its identifier. */
   static createResponse<ParsedT>(
     client: OpenAI,
     params: ResponseStreamParams,
@@ -89,13 +116,24 @@ export class ResponseStream<ParsedT = null>
     return runner;
   }
 
+  /** Consumes serialized response events from a readable stream in another runtime. */
+  static fromReadableStream(stream: ReadableStream): ResponseStream<null> {
+    const runner = new ResponseStream(null);
+    runner._run(() => runner._fromReadableStream(stream));
+    return runner;
+  }
+
   #beginRequest() {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
     this.#currentResponseSnapshot = undefined;
   }
 
   #addEvent(this: ResponseStream<ParsedT>, event: ResponseStreamEvent, starting_after: number | null) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
 
     const maybeEmit = (name: string, event: ResponseStreamEvent & { snapshot?: string }) => {
       if (starting_after == null || event.sequence_number > starting_after) {
@@ -103,7 +141,8 @@ export class ResponseStream<ParsedT = null>
       }
     };
 
-    const response = this.#accumulateResponse(event);
+    const response = accumulateResponse(event, this.#currentResponseSnapshot);
+    this.#currentResponseSnapshot = response;
     maybeEmit('event', event);
 
     switch (event.type) {
@@ -141,9 +180,10 @@ export class ResponseStream<ParsedT = null>
         }
         break;
       }
-      default:
+      default: {
         maybeEmit(event.type, event);
         break;
+      }
     }
   }
 
@@ -167,16 +207,14 @@ export class ResponseStream<ParsedT = null>
     params: ResponseStreamParams,
     options?: RequestOptions,
   ): Promise<ParsedResponse<ParsedT>> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
 
     let stream: Stream<ResponseStreamEvent> | undefined;
     let starting_after: number | null = null;
     if ('response_id' in params) {
+      // Keep the full replay so that `accumulateResponse()` sees `response.created` and can build
+      // complete snapshots before locally filtering events at `starting_after`.
       stream = await client.responses.retrieve(
         params.response_id,
         { stream: true },
@@ -200,69 +238,24 @@ export class ResponseStream<ParsedT = null>
     return this.#endRequest();
   }
 
-  #accumulateResponse(event: ResponseStreamEvent): Response {
-    let snapshot = this.#currentResponseSnapshot;
-    if (!snapshot) {
-      if (event.type !== 'response.created') {
-        throw new OpenAIError(
-          `When snapshot hasn't been set yet, expected 'response.created' event, got ${event.type}`,
-        );
-      }
-      snapshot = this.#currentResponseSnapshot = event.response;
-      return snapshot;
+  protected async _fromReadableStream(
+    readableStream: ReadableStream,
+    options?: RequestOptions,
+  ): Promise<ParsedResponse<ParsedT>> {
+    this._listenForAbort(options?.signal);
+    this.#beginRequest();
+    this._connected();
+    const stream = Stream.fromReadableStream<ResponseStreamEvent>(readableStream, this.controller);
+    for await (const event of stream) {
+      this.#addEvent(event, null);
     }
-
-    switch (event.type) {
-      case 'response.output_item.added': {
-        snapshot.output.push(event.item);
-        break;
-      }
-      case 'response.content_part.added': {
-        const output = snapshot.output[event.output_index];
-        if (!output) {
-          throw new OpenAIError(`missing output at index ${event.output_index}`);
-        }
-        if (output.type === 'message') {
-          output.content.push(event.part);
-        }
-        break;
-      }
-      case 'response.output_text.delta': {
-        const output = snapshot.output[event.output_index];
-        if (!output) {
-          throw new OpenAIError(`missing output at index ${event.output_index}`);
-        }
-        if (output.type === 'message') {
-          const content = output.content[event.content_index];
-          if (!content) {
-            throw new OpenAIError(`missing content at index ${event.content_index}`);
-          }
-          if (content.type !== 'output_text') {
-            throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
-          }
-          content.text += event.delta;
-        }
-        break;
-      }
-      case 'response.function_call_arguments.delta': {
-        const output = snapshot.output[event.output_index];
-        if (!output) {
-          throw new OpenAIError(`missing output at index ${event.output_index}`);
-        }
-        if (output.type === 'function_call') {
-          output.arguments += event.delta;
-        }
-        break;
-      }
-      case 'response.completed': {
-        this.#currentResponseSnapshot = event.response;
-        break;
-      }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError();
     }
-
-    return snapshot;
+    return this.#endRequest();
   }
 
+  /** Iterates over response events; stopping iteration early aborts the underlying request. */
   [Symbol.asyncIterator](this: ResponseStream<ParsedT>): AsyncIterator<ResponseStreamEvent> {
     const pushQueue: ResponseStreamEvent[] = [];
     const readQueue: {
@@ -325,13 +318,17 @@ export class ResponseStream<ParsedT = null>
   }
 
   /**
-   * @returns a promise that resolves with the final Response, or rejects
-   * if an error occurred or the stream ended prematurely without producing a REsponse.
+   * Waits for the stream to end and returns its latest accumulated response.
+   *
+   * A clean end after at least one response event resolves even when the response is
+   * incomplete. Network errors, cancellation, and streams without a response reject.
    */
   async finalResponse(): Promise<ParsedResponse<ParsedT>> {
     await this.done();
     const response = this.#finalResponse;
-    if (!response) throw new OpenAIError('stream ended without producing a ChatCompletion');
+    if (!response) {
+      throw new OpenAIError('stream ended without producing a Response');
+    }
     return response;
   }
 }

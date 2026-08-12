@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../core/resource';
 import * as RunsAPI from './runs';
@@ -42,6 +42,8 @@ import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStrea
 import { path } from '../../../../internal/utils/path';
 
 /**
+ * Build Assistants that can call models and use tools.
+ *
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
 export class Runs extends APIResource {
@@ -75,6 +77,8 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
+      __security: { bearerAuth: true },
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -88,6 +92,7 @@ export class Runs extends APIResource {
     return this._client.get(path`/threads/${thread_id}/runs/${runID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -102,6 +107,7 @@ export class Runs extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -119,6 +125,7 @@ export class Runs extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -132,6 +139,7 @@ export class Runs extends APIResource {
     return this._client.post(path`/threads/${thread_id}/runs/${runID}/cancel`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -259,6 +267,8 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
+      __security: { bearerAuth: true },
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -502,7 +512,7 @@ export interface Run {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   truncation_strategy: Run.TruncationStrategy | null;
 
@@ -581,7 +591,7 @@ export namespace Run {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   export interface TruncationStrategy {
     /**
@@ -723,12 +733,12 @@ export interface RunCreateParamsBase {
   parallel_tool_calls?: boolean;
 
   /**
-   * Body param: **o-series models only**
-   *
-   * Constrains effort on reasoning for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
-   * result in faster responses and fewer tokens used on reasoning in a response.
+   * Body param: Constrains effort on reasoning for reasoning models. Currently
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and
+   * `max`. Reducing reasoning effort can result in faster responses and fewer tokens
+   * used on reasoning in a response. Not all reasoning models support every value.
+   * See the [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -800,7 +810,7 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: Controls for how a thread will be truncated prior to the run. Use
-   * this to control the intial context window of the run.
+   * this to control the initial context window of the run.
    */
   truncation_strategy?: RunCreateParams.TruncationStrategy | null;
 }
@@ -863,7 +873,7 @@ export namespace RunCreateParams {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   export interface TruncationStrategy {
     /**

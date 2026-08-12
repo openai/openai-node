@@ -1,6 +1,6 @@
-import { ZodSchema, ZodTypeDef } from 'zod';
-import { Refs, Seen } from './Refs';
-import { JsonSchema7Type } from './parseDef';
+import type { ZodSchema, ZodTypeDef } from 'zod/v3';
+import type { Refs, Seen } from './Refs';
+import type { JsonSchema7Type } from './parseDef';
 
 export type Targets = 'jsonSchema7' | 'jsonSchema2019-09' | 'openApi3';
 
@@ -61,11 +61,10 @@ const defaultOptions: Omit<Options, 'definitions' | 'basePath'> = {
 
 export const getDefaultOptions = <Target extends Targets>(
   options: Partial<Options<Target>> | string | undefined,
-) => {
+) =>
   // We need to add `definitions` here as we may mutate it
-  return (
-    typeof options === 'string' ?
-      {
+  (typeof options === 'string'
+    ? {
         ...defaultOptions,
         basePath: ['#'],
         definitions: {},
@@ -77,4 +76,3 @@ export const getDefaultOptions = <Target extends Targets>(
         definitions: {},
         ...options,
       }) as Options<Target>;
-};

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 export const config = {
@@ -11,13 +12,13 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   const text: string[] = [];
 
   const stream = await openai.completions.create({
-    prompt: 'Say this is a test',
+    prompt: 'Reply with exactly this text and nothing else: This is a test',
     model: 'gpt-3.5-turbo-instruct',
     stream: true,
   });
@@ -27,4 +28,4 @@ export default async (request: NextRequest) => {
   }
 
   return NextResponse.json({ text: text.join('') });
-};
+}

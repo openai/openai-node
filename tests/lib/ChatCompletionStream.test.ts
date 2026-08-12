@@ -1,11 +1,340 @@
+import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { ChatCompletionTokenLogprob } from 'openai/resources';
-import { z } from 'zod';
+import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
+import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
+import type { ChatCompletionTokenLogprob } from 'openai/resources';
+import { Stream } from 'openai/streaming';
+import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
-jest.setTimeout(1000 * 30);
-
 describe('.stream()', () => {
+  it('emits finalization failures as errors', async () => {
+    const chunk: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-test',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'user', content: 'hello' },
+          finish_reason: 'stop',
+          logprobs: null,
+        },
+      ],
+    };
+
+    const client = {
+      chat: {
+        completions: {
+          create: vi.fn(async () => ({
+            controller: new AbortController(),
+            async *[Symbol.asyncIterator]() {
+              yield chunk;
+            },
+          })),
+        },
+      },
+    } as unknown as OpenAI;
+
+    const stream = ChatCompletionStream.createChatCompletion(client, {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+    });
+    const errors: Error[] = [];
+    stream.on('error', (error) => errors.push(error));
+
+    await expect(stream.done()).rejects.toThrow(
+      'stream ended without producing a ChatCompletionMessage with role=assistant',
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toBe(
+      'stream ended without producing a ChatCompletionMessage with role=assistant',
+    );
+  });
+
+  it('removes the caller abort listener after the stream finishes', async () => {
+    const callerController = new AbortController();
+    const addEventListenerSpy = vi.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = vi.spyOn(callerController.signal, 'removeEventListener');
+
+    const chunk: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-test',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'assistant', content: 'hello' },
+          finish_reason: 'stop',
+          logprobs: null,
+        },
+      ],
+    };
+
+    const client = {
+      chat: {
+        completions: {
+          create: vi.fn(async () => ({
+            controller: new AbortController(),
+            async *[Symbol.asyncIterator]() {
+              yield chunk;
+            },
+          })),
+        },
+      },
+    } as unknown as OpenAI;
+
+    const stream = ChatCompletionStream.createChatCompletion(
+      client,
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Say hello' }],
+      },
+      { signal: callerController.signal },
+    );
+
+    await expect(stream.finalContent()).resolves.toBe('hello');
+
+    const abortListener = addEventListenerSpy.mock.calls.find(([event]) => event === 'abort')?.[1];
+    expect(abortListener).toEqual(expect.any(Function));
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  it('handles Azure async filter chunks without deltas', async () => {
+    const chunks: OpenAI.Chat.ChatCompletionChunk[] = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: { role: 'assistant', content: 'hello' },
+            finish_reason: null,
+            logprobs: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: 'stop',
+            logprobs: null,
+          },
+        ],
+      },
+      {
+        id: '',
+        object: '',
+        created: 0,
+        model: '',
+        choices: [
+          {
+            index: 0,
+            finish_reason: null,
+            content_filter_results: {},
+          },
+        ],
+      } as unknown as OpenAI.Chat.ChatCompletionChunk,
+    ];
+    const readable = new Stream(async function* readable() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).resolves.toMatchObject({
+      id: 'chatcmpl-test',
+      created: 1,
+      model: 'gpt-test',
+      choices: [{ message: { content: 'hello' } }],
+    });
+  });
+
+  it('finalizes audio streams that end with an expires_at-only chunk', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { transcript: 'hel' } },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: {
+              role: 'assistant',
+              content: null,
+              refusal: null,
+              audio: { id: 'audio-test', data: 'abc' },
+            },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { transcript: 'lo', data: 'def' } },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { expires_at: 2 } },
+          },
+        ],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    const readable = new Stream(async function* readable() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).resolves.toMatchObject({
+      id: 'chatcmpl-test',
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: null,
+            refusal: null,
+            audio: {
+              id: 'audio-test',
+              data: 'abcdef',
+              transcript: 'hello',
+              expires_at: 2,
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it('does not infer a finish_reason if audio continues after expires_at', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: {
+              role: 'assistant',
+              audio: {
+                id: 'audio-test',
+                data: 'abc',
+                transcript: 'hello',
+              },
+            },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { expires_at: 2 } },
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { data: 'def' } },
+            finish_reason: null,
+          },
+        ],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    const readable = new Stream(async function* readable() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow('missing finish_reason for choice 0');
+  });
+
+  it('still rejects non-audio streams without a finish_reason', async () => {
+    const chunk: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-test',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'assistant', content: 'hello' },
+          finish_reason: null,
+          logprobs: null,
+        },
+      ],
+    };
+    const readable = new Stream(async function* readable() {
+      yield chunk;
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow('missing finish_reason for choice 0');
+  });
+
   it('works', async () => {
     const stream = await makeStreamSnapshotRequest((openai) =>
       openai.chat.completions.stream({
@@ -26,7 +355,8 @@ describe('.stream()', () => {
       }),
     );
 
-    expect((await stream.finalChatCompletion()).choices[0]).toMatchInlineSnapshot(`
+    const completion = await stream.finalChatCompletion();
+    expect(completion.choices[0]).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
         "index": 0,
@@ -44,36 +374,77 @@ describe('.stream()', () => {
     `);
   });
 
-  it('emits content logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+  it('is robust against leading newline chunks', async () => {
+    const stream = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: "What's the weather like in SF?",
+          },
+        ],
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.chat.completions.stream({
-          model: 'gpt-4o-2024-08-06',
-          messages: [
-            {
-              role: 'user',
-              content: "What's the weather like in SF?",
-            },
-          ],
-          logprobs: true,
-          response_format: zodResponseFormat(
-            z.object({
-              city: z.string(),
-              units: z.enum(['c', 'f']).default('f'),
-            }),
-            'location',
-          ),
-        }),
-      )
-    ).on('logprobs.content.done', (props) => {
+    const completion = await stream.finalChatCompletion();
+    expect(completion.choices[0]).toMatchInlineSnapshot(`
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "
+
+      {"city":"San Francisco","units":"c"}",
+          "parsed": {
+            "city": "San Francisco",
+            "units": "c",
+          },
+          "refusal": null,
+          "role": "assistant",
+        },
+      }
+    `);
+  });
+
+  it('emits content logprobs events', async () => {
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: "What's the weather like in SF?",
+          },
+        ],
+        logprobs: true,
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+    const stream = request.on('logprobs.content.done', (props) => {
       if (!capturedLogProbs?.length) {
         capturedLogProbs = props.content;
       }
     });
 
-    const choice = (await stream.finalChatCompletion()).choices[0];
+    const completion = await stream.finalChatCompletion();
+    const choice = completion.choices[0];
     expect(choice).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
@@ -204,35 +575,35 @@ describe('.stream()', () => {
   });
 
   it('emits refusal logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.chat.completions.stream({
-          model: 'gpt-4o-2024-08-06',
-          messages: [
-            {
-              role: 'user',
-              content: 'how do I make anthrax?',
-            },
-          ],
-          logprobs: true,
-          response_format: zodResponseFormat(
-            z.object({
-              city: z.string(),
-              units: z.enum(['c', 'f']).default('f'),
-            }),
-            'location',
-          ),
-        }),
-      )
-    ).on('logprobs.refusal.done', (props) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: 'a bad question',
+          },
+        ],
+        logprobs: true,
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+    const stream = request.on('logprobs.refusal.done', (props) => {
       if (!capturedLogProbs?.length) {
         capturedLogProbs = props.refusal;
       }
     });
 
-    const choice = (await stream.finalChatCompletion()).choices[0];
+    const completion = await stream.finalChatCompletion();
+    const choice = completion.choices[0];
     expect(choice).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",

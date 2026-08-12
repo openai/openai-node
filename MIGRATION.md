@@ -4,17 +4,11 @@ This guide outlines the changes and steps needed to migrate your codebase to the
 
 The main changes are that the SDK now relies on the [builtin Web fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) instead of `node-fetch` and has zero dependencies.
 
-## Migration CLI
-
-Most programs will only need minimal changes, but to assist there is a migration tool that will automatically update your code for the new version.
-To use it, upgrade the `openai` package, then run `./node_modules/.bin/openai migrate ./your/src/folders` to update your code.
-To preview the changes without writing them to disk, run the tool with `--dry`.
-
 ## Environment requirements
 
 The minimum supported runtime and tooling versions are now:
 
-- Node.js 20 LTS (Most recent non-EOL Node version)
+- Node.js 22 LTS
 - TypeScript 4.9
 - Jest 28
 
@@ -73,6 +67,40 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.beta.threads.messages.retrieve()`
 - `client.beta.threads.messages.update()`
 - `client.beta.threads.messages.delete()`
+- `client.admin.organization.users.roles.retrieve()`
+- `client.admin.organization.users.roles.delete()`
+- `client.admin.organization.groups.users.retrieve()`
+- `client.admin.organization.groups.users.delete()`
+- `client.admin.organization.groups.roles.retrieve()`
+- `client.admin.organization.groups.roles.delete()`
+- `client.admin.organization.projects.users.retrieve()`
+- `client.admin.organization.projects.users.update()`
+- `client.admin.organization.projects.users.delete()`
+- `client.admin.organization.projects.users.roles.create()`
+- `client.admin.organization.projects.users.roles.retrieve()`
+- `client.admin.organization.projects.users.roles.list()`
+- `client.admin.organization.projects.users.roles.delete()`
+- `client.admin.organization.projects.serviceAccounts.retrieve()`
+- `client.admin.organization.projects.serviceAccounts.update()`
+- `client.admin.organization.projects.serviceAccounts.delete()`
+- `client.admin.organization.projects.serviceAccounts.apiKeys.create()`
+- `client.admin.organization.projects.apiKeys.retrieve()`
+- `client.admin.organization.projects.apiKeys.delete()`
+- `client.admin.organization.projects.rateLimits.updateRateLimit()`
+- `client.admin.organization.projects.groups.retrieve()`
+- `client.admin.organization.projects.groups.delete()`
+- `client.admin.organization.projects.groups.roles.create()`
+- `client.admin.organization.projects.groups.roles.retrieve()`
+- `client.admin.organization.projects.groups.roles.list()`
+- `client.admin.organization.projects.groups.roles.delete()`
+- `client.admin.organization.projects.roles.retrieve()`
+- `client.admin.organization.projects.roles.update()`
+- `client.admin.organization.projects.roles.delete()`
+- `client.admin.organization.projects.spendAlerts.retrieve()`
+- `client.admin.organization.projects.spendAlerts.update()`
+- `client.admin.organization.projects.spendAlerts.delete()`
+- `client.conversations.items.retrieve()`
+- `client.conversations.items.delete()`
 - `client.evals.runs.retrieve()`
 - `client.evals.runs.delete()`
 - `client.evals.runs.cancel()`
@@ -81,6 +109,9 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.containers.files.retrieve()`
 - `client.containers.files.delete()`
 - `client.containers.files.content.retrieve()`
+- `client.skills.versions.retrieve()`
+- `client.skills.versions.delete()`
+- `client.skills.versions.content.retrieve()`
 
 </details>
 
@@ -111,7 +142,9 @@ client.example.list(undefined, { headers: { ... } });
 + client.example.list({}, { headers: { ... } });
 ```
 
-This affects the following methods:
+<details>
+
+<summary>This affects the following methods</summary>
 
 - `client.chat.completions.list()`
 - `client.chat.completions.messages.list()`
@@ -120,19 +153,58 @@ This affects the following methods:
 - `client.fineTuning.jobs.listEvents()`
 - `client.fineTuning.jobs.checkpoints.list()`
 - `client.fineTuning.checkpoints.permissions.retrieve()`
+- `client.fineTuning.checkpoints.permissions.list()`
 - `client.vectorStores.list()`
 - `client.vectorStores.files.list()`
+- `client.beta.responses.retrieve()`
+- `client.beta.responses.delete()`
+- `client.beta.responses.cancel()`
+- `client.beta.responses.inputItems.list()`
+- `client.beta.responses.inputTokens.count()`
+- `client.beta.chatkit.threads.list()`
+- `client.beta.chatkit.threads.listItems()`
 - `client.beta.assistants.list()`
 - `client.beta.threads.create()`
 - `client.beta.threads.runs.list()`
 - `client.beta.threads.messages.list()`
 - `client.batches.list()`
+- `client.admin.organization.auditLogs.list()`
+- `client.admin.organization.adminAPIKeys.list()`
+- `client.admin.organization.invites.list()`
+- `client.admin.organization.users.list()`
+- `client.admin.organization.users.roles.list()`
+- `client.admin.organization.groups.list()`
+- `client.admin.organization.groups.users.list()`
+- `client.admin.organization.groups.roles.list()`
+- `client.admin.organization.roles.list()`
+- `client.admin.organization.spendAlerts.list()`
+- `client.admin.organization.certificates.retrieve()`
+- `client.admin.organization.certificates.list()`
+- `client.admin.organization.projects.list()`
+- `client.admin.organization.projects.users.list()`
+- `client.admin.organization.projects.serviceAccounts.list()`
+- `client.admin.organization.projects.apiKeys.list()`
+- `client.admin.organization.projects.rateLimits.listRateLimits()`
+- `client.admin.organization.projects.groups.list()`
+- `client.admin.organization.projects.roles.list()`
+- `client.admin.organization.projects.spendAlerts.list()`
+- `client.admin.organization.projects.certificates.list()`
 - `client.responses.retrieve()`
 - `client.responses.inputItems.list()`
+- `client.responses.inputTokens.count()`
+- `client.realtime.calls.reject()`
+- `client.conversations.create()`
+- `client.conversations.items.list()`
 - `client.evals.list()`
 - `client.evals.runs.list()`
 - `client.containers.list()`
 - `client.containers.files.list()`
+- `client.skills.create()`
+- `client.skills.list()`
+- `client.skills.versions.create()`
+- `client.skills.versions.list()`
+- `client.videos.list()`
+- `client.videos.downloadContent()`
 
 ### HTTP method naming
 
@@ -383,14 +455,14 @@ The `beta.chat` namespace has been removed. All chat completion methods that wer
 
 ```ts
 // Before
-client.beta.chat.completions.parse()
-client.beta.chat.completions.stream()
-client.beta.chat.completions.runTools()
+client.beta.chat.completions.parse();
+client.beta.chat.completions.stream();
+client.beta.chat.completions.runTools();
 
 // After
-client.chat.completions.parse()
-client.chat.completions.stream()
-client.chat.completions.runTools()
+client.chat.completions.parse();
+client.chat.completions.stream();
+client.chat.completions.runTools();
 ```
 
 Additionally, related types have been moved:
@@ -435,12 +507,14 @@ openai.chat.completions
 ```
 
 The following event names have been changed:
+
 - `functionCall` → `functionToolCall`
 - `functionCallResult` → `functionToolCallResult`
 - `finalFunctionCall` → `finalFunctionToolCall`
 - `finalFunctionCallResult` → `finalFunctionToolCallResult`
 
 Additionally, the following methods have been renamed:
+
 - `runner.finalFunctionCall()` → `runner.finalFunctionToolCall()`
 - `runner.finalFunctionCallResult()` → `runner.finalFunctionToolCallResult()`
 
@@ -471,7 +545,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 ```jsonc
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
-  "lib": ["DOM", "DOM.Iterable", "ES2018"]
+  "lib": ["DOM", "DOM.Iterable", "ES2018"],
 }
 ```
 
@@ -481,7 +555,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 
@@ -503,7 +577,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
   "lib": ["ES2020"], // <- needed by @cloudflare/workers-types
-  "types": ["@cloudflare/workers-types"]
+  "types": ["@cloudflare/workers-types"],
 }
 ```
 
@@ -523,7 +597,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 

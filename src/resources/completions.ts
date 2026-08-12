@@ -1,20 +1,26 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import * as CompletionsAPI from './completions';
-import * as CompletionsCompletionsAPI from './chat/completions/completions';
+import * as ChatCompletionsAPI from './chat/completions/completions';
 import { APIPromise } from '../core/api-promise';
 import { Stream } from '../core/streaming';
 import { RequestOptions } from '../internal/request-options';
 
+/**
+ * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
+ */
 export class Completions extends APIResource {
   /**
    * Creates a completion for the provided prompt and parameters.
    *
+   * Returns a completion object, or a sequence of completion objects if the request
+   * is streamed.
+   *
    * @example
    * ```ts
    * const completion = await client.completions.create({
-   *   model: 'string',
+   *   model: 'gpt-3.5-turbo-instruct',
    *   prompt: 'This is a test.',
    * });
    * ```
@@ -29,9 +35,12 @@ export class Completions extends APIResource {
     body: CompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<Completion> | APIPromise<Stream<Completion>> {
-    return this._client.post('/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<Completion>
-      | APIPromise<Stream<Completion>>;
+    return this._client.post('/completions', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<Completion> | APIPromise<Stream<Completion>>;
   }
 }
 
@@ -177,6 +186,11 @@ export namespace CompletionUsage {
     audio_tokens?: number;
 
     /**
+     * The unadjusted number of prompt tokens written to cache.
+     */
+    cache_write_tokens?: number;
+
+    /**
      * Cached tokens present in the prompt.
      */
     cached_tokens?: number;
@@ -318,7 +332,7 @@ export interface CompletionCreateParamsBase {
   /**
    * Options for streaming response. Only set this when you set `stream: true`.
    */
-  stream_options?: CompletionsCompletionsAPI.ChatCompletionStreamOptions | null;
+  stream_options?: ChatCompletionsAPI.ChatCompletionStreamOptions | null;
 
   /**
    * The suffix that comes after a completion of inserted text.
