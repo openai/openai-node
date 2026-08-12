@@ -207,8 +207,9 @@ export type AzureRealtimeConnectionConfig =
 /**
  * Builds the secure WebSocket URL for a model or transcription session, or a sideband call.
  *
- * Azure model sessions preserve their deployment and API-version query parameters;
- * transcription sessions and sideband calls use the versioned GA Realtime endpoint.
+ * All Azure sessions use the versioned GA Realtime endpoint. Model-backed
+ * sessions select their deployment with `model`, transcription sessions use
+ * `intent`, and sideband connections use `call_id`.
  *
  * @throws {Error} If exactly one valid model, transcription intent, or call ID is not supplied.
  */
@@ -236,7 +237,7 @@ export function buildRealtimeURL(
   }
 
   let url: URL;
-  if (azure && (hasCallID || hasIntent)) {
+  if (azure) {
     url = new URL(baseURL);
     const basePath = url.pathname.replace(/\/+/g, '/').replace(/\/+$/, '');
     const versionedPath = basePath.endsWith('/v1') ? basePath : `${basePath}/v1`;
@@ -250,16 +251,7 @@ export function buildRealtimeURL(
 
   url.protocol = 'wss';
   // Sideband control connections attach to an existing call via `call_id`.
-  if (azure) {
-    if (hasCallID) {
-      url.searchParams.set('call_id', config.callID!);
-    } else if (hasIntent) {
-      url.searchParams.set('intent', 'transcription');
-    } else {
-      url.searchParams.set('api-version', client.apiVersion);
-      url.searchParams.set('deployment', config.model!);
-    }
-  } else if (hasCallID) {
+  if (hasCallID) {
     url.searchParams.set('call_id', config.callID!);
   } else if (hasIntent) {
     url.searchParams.set('intent', 'transcription');

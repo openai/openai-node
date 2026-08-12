@@ -32,7 +32,7 @@ const azureEndpointClient = new AzureOpenAI({
 describe.each([
   ['stable', buildRealtimeURL],
   ['beta', buildBetaRealtimeURL],
-] as const)('%s realtime URL builder', (_label, buildRealtimeURL) => {
+] as const)('%s realtime URL builder', (label, buildRealtimeURL) => {
   test('uses model for standard OpenAI connections', () => {
     expect(buildRealtimeURL(openAIClient, { model: 'gpt-realtime' }).toString()).toBe(
       'wss://example.com/custom/path/realtime?model=gpt-realtime',
@@ -51,10 +51,13 @@ describe.each([
     );
   });
 
-  test('uses deployment for Azure connections', () => {
-    expect(buildRealtimeURL(azureClient, { model: 'my-deployment' }).toString()).toBe(
-      `wss://example.com/openai/realtime?api-version=${apiVersion}&deployment=my-deployment`,
-    );
+  test('routes Azure model connections using its API generation', () => {
+    const expectedURL =
+      label === 'stable'
+        ? 'wss://example.com/openai/v1/realtime?model=my-deployment'
+        : `wss://example.com/openai/realtime?api-version=${apiVersion}&deployment=my-deployment`;
+
+    expect(buildRealtimeURL(azureClient, { model: 'my-deployment' }).toString()).toBe(expectedURL);
   });
 
   test('rejects missing connection target', () => {
@@ -69,6 +72,14 @@ describe.each([
 });
 
 describe('stable realtime transcription', () => {
+  test('uses the Azure GA model endpoint for every supported client base URL', () => {
+    for (const client of [azureClient, azureV1Client, azureEndpointClient]) {
+      expect(buildRealtimeURL(client, { model: 'my-deployment' }).toString()).toBe(
+        'wss://example.com/openai/v1/realtime?model=my-deployment',
+      );
+    }
+  });
+
   test('uses transcription intent without a model for OpenAI connections', () => {
     expect(buildRealtimeURL(openAIClient, { intent: 'transcription' }).toString()).toBe(
       'wss://example.com/custom/path/realtime?intent=transcription',
@@ -101,6 +112,15 @@ describe('stable realtime transcription', () => {
     expect(
       getAzureRealtimeConnection({ deploymentName: 'configured-deployment' }, { intent: 'transcription' }),
     ).toEqual({ intent: 'transcription' });
+  });
+
+  test('uses configured Azure deployments and honors explicit overrides', () => {
+    const client = { deploymentName: 'configured-deployment' };
+
+    expect(getAzureRealtimeConnection(client, {})).toEqual({ model: 'configured-deployment' });
+    expect(getAzureRealtimeConnection(client, { deploymentName: 'override-deployment' })).toEqual({
+      model: 'override-deployment',
+    });
   });
 
   test.each([
