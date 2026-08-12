@@ -1,4 +1,4 @@
-# Runs the repository's normal lint, build, test, example, and ecosystem checks.
+# Runs the repository's normal lint, build, test, benchmark, example, and ecosystem checks.
 # These checks catch generated-code, packaging, runtime, and integration
 # regressions; policy-document alignment lives in node-version-policy.yml.
 name: CI
@@ -160,6 +160,41 @@ jobs:
             echo "::error::Node.js test matrix result: $TEST_RESULT"
             exit 1
           fi
+
+  benchmarks:
+    timeout-minutes: 20
+    name: performance benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: Run Vitest performance benchmarks
+        run: pnpm bench:json
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vitest-benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmark-results.json
+          if-no-files-found: error
+          retention-days: 30
 
   examples:
     timeout-minutes: 10
