@@ -2,7 +2,28 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
     cooldown:
-      default-days: 7
+      default-days: 8
+  - package-ecosystem: npm
+    directories:
+      - /ecosystem-tests/browser-direct-import
+      - /ecosystem-tests/cloudflare-worker
+      - /ecosystem-tests/node-js
+      - /ecosystem-tests/node-ts-cjs
+      - /ecosystem-tests/node-ts-cjs-auto
+      - /ecosystem-tests/node-ts-cjs-web
+      - /ecosystem-tests/node-ts-esm
+      - /ecosystem-tests/node-ts-esm-auto
+      - /ecosystem-tests/node-ts-esm-web
+      - /ecosystem-tests/node-ts4.5-jest28
+      - /ecosystem-tests/ts-browser-webpack
+      - /ecosystem-tests/vercel-edge
+    open-pull-requests-limit: 5
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 8
+    versioning-strategy: lockfile-only

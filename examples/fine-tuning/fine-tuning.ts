@@ -7,9 +7,9 @@
  * - https://platform.openai.com/docs/guides/fine-tuning
  */
 
-import fs from 'fs';
+import fs from 'node:fs';
 import OpenAI from 'openai';
-import { FineTuningJobEvent } from 'openai/resources/fine-tuning';
+import type { FineTuningJobEvent } from 'openai/resources/fine-tuning';
 
 // Gets the API Key from the environment variable `OPENAI_API_KEY`
 const client = new OpenAI();
@@ -18,7 +18,7 @@ async function main() {
   console.log(`Uploading file`);
 
   let file = await client.files.create({
-    file: fs.createReadStream('./examples/fine-tuning-data.jsonl'),
+    file: fs.createReadStream('./examples/fine-tuning/fine-tuning-data.jsonl'),
     purpose: 'fine-tune',
   });
   console.log(`Uploaded file with ID: ${file.id}`);
@@ -49,13 +49,20 @@ async function main() {
 
   const events: Record<string, FineTuningJobEvent> = {};
 
-  while (fineTune.status == 'running' || fineTune.status == 'queued') {
+  while (fineTune.status === 'running' || fineTune.status === 'queued') {
     fineTune = await client.fineTuning.jobs.retrieve(fineTune.id);
     console.log(`${fineTune.status}`);
 
     const { data } = await client.fineTuning.jobs.listEvents(fineTune.id, { limit: 100 });
-    for (const event of data.reverse()) {
-      if (event.id in events) continue;
+    for (let index = data.length - 1; index >= 0; index -= 1) {
+      const event = data[index];
+      if (event === undefined) {
+        continue;
+      }
+
+      if (event.id in events) {
+        continue;
+      }
       events[event.id] = event;
       const timestamp = new Date(event.created_at * 1000);
       console.log(`- ${timestamp.toLocaleTimeString()}: ${event.message}`);

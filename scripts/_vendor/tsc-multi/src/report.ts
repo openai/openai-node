@@ -1,4 +1,4 @@
-import { Writable } from 'stream';
+import type { Writable } from 'node:stream';
 import type ts from 'typescript';
 
 type Formatter = (input: string) => string;

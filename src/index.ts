@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 export { OpenAI as default } from './client';
 
 export { type Uploadable, toFile, toStreamingFile } from './core/uploads';
@@ -25,5 +23,5 @@ export {
   SubjectTokenProviderError,
 } from './core/error';
 
-export { AzureOpenAI } from './azure';
+export { AzureOpenAI, type AzureClientOptions } from './azure';
 export { BedrockOpenAI, type BedrockClientOptions } from './bedrock';

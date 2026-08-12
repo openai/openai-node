@@ -1,12 +1,7 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
-import util from 'util';
 import OpenAI from 'openai';
-import {
-  ChatCompletionMessage,
-  ChatCompletionChunk,
-  ChatCompletionMessageParam,
-} from 'openai/resources/chat';
+import type { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/chat';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
@@ -48,17 +43,21 @@ const functions: OpenAI.Chat.ChatCompletionCreateParams.Function[] = [
 async function callFunction(function_call: ChatCompletionMessage.FunctionCall): Promise<any> {
   const args = JSON.parse(function_call.arguments!);
   switch (function_call.name) {
-    case 'list':
+    case 'list': {
       return await list(args['genre']);
+    }
 
-    case 'search':
+    case 'search': {
       return await search(args['name']);
+    }
 
-    case 'get':
+    case 'get': {
       return await get(args['id']);
+    }
 
-    default:
+    default: {
       throw new Error('No function found');
+    }
   }
 }
 
@@ -80,25 +79,15 @@ async function main() {
   console.log();
 
   while (true) {
-    const stream = await openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages,
-      functions: functions,
-      stream: true,
+      functions,
     });
 
-    // Since the stream returns chunks, we need to build up the ChatCompletionMessage object.
-    // We implement this logic in messageReducer, which coalesces deltas into the message.
-    // `lineRewriter()` allows us to rewrite the last output with new text, which is one
-    // way of forwarding the streamed output to a visual interface.
-    const writeLine = lineRewriter();
-    let message = {} as ChatCompletionMessage;
-    for await (const chunk of stream) {
-      message = messageReducer(message, chunk);
-      writeLine(message);
-    }
-    console.log();
+    const message = completion.choices[0]!.message;
     messages.push(message);
+    console.log(message);
 
     // If there is no function call, we're done and can exit this loop
     if (!message.function_call) {
@@ -117,34 +106,6 @@ async function main() {
     console.log(newMessage);
     console.log();
   }
-}
-
-function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChunk): ChatCompletionMessage {
-  const reduce = (acc: any, delta: any) => {
-    acc = { ...acc };
-    for (const [key, value] of Object.entries(delta)) {
-      if (acc[key] === undefined || acc[key] === null) {
-        acc[key] = value;
-      } else if (typeof acc[key] === 'string' && typeof value === 'string') {
-        (acc[key] as string) += value;
-      } else if (typeof acc[key] === 'object' && !Array.isArray(acc[key])) {
-        acc[key] = reduce(acc[key], value);
-      }
-    }
-    return acc;
-  };
-
-  return reduce(previous, item.choices[0]!.delta) as ChatCompletionMessage;
-}
-
-function lineRewriter() {
-  let lastMessageLength = 0;
-  return function write(value: any) {
-    process.stdout.cursorTo(0);
-    process.stdout.moveCursor(0, -Math.floor((lastMessageLength - 1) / process.stdout.columns));
-    lastMessageLength = util.formatWithOptions({ colors: false, breakLength: Infinity }, value).length;
-    process.stdout.write(util.formatWithOptions({ colors: true, breakLength: Infinity }, value));
-  };
 }
 
 const db = [

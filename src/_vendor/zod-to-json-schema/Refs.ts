@@ -1,6 +1,7 @@
 import type { ZodTypeDef } from 'zod/v3';
-import { getDefaultOptions, Options, Targets } from './Options';
-import { JsonSchema7Type } from './parseDef';
+import type { Options, Targets } from './Options';
+import { getDefaultOptions } from './Options';
+import type { JsonSchema7Type } from './parseDef';
 import { zodDef } from './util';
 
 export type Refs = {
@@ -24,12 +25,12 @@ export type Seen = {
 export const getRefs = (options?: string | Partial<Options<Targets>>): Refs => {
   const _options = getDefaultOptions(options);
   const currentPath =
-    _options.name !== undefined
-      ? [..._options.basePath, _options.definitionPath, _options.name]
-      : _options.basePath;
+    _options.name === undefined
+      ? _options.basePath
+      : [..._options.basePath, _options.definitionPath, _options.name];
   return {
     ..._options,
-    currentPath: currentPath,
+    currentPath,
     propertyPath: undefined,
     seenRefs: new Set(),
     seen: new Map(

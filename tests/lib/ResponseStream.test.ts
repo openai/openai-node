@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import OpenAI, { APIUserAbortError } from 'openai';
+import OpenAI, { APIError, APIUserAbortError, OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
@@ -154,6 +154,392 @@ describe('.stream()', () => {
     });
   });
 
+  it('converts an error event into an APIError', async () => {
+    const events: ResponseStreamEvent[] = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      },
+      {
+        type: 'error',
+        sequence_number: 1,
+        code: 'server_error',
+        message: 'The server had an error while processing your request.',
+        param: null,
+      },
+    ];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    const listenerErrors: OpenAIError[] = [];
+    stream.on('error', (error) => listenerErrors.push(error));
+
+    const rejection = await stream.finalResponse().then(
+      () => {
+        throw new Error('expected finalResponse() to reject');
+      },
+      (error: unknown) => error,
+    );
+
+    expect(rejection).toBeInstanceOf(OpenAIError);
+    expect(rejection).toBeInstanceOf(APIError);
+    expect((rejection as APIError).message).toBe('The server had an error while processing your request.');
+    expect((rejection as APIError).code).toBe('server_error');
+    // `.on('error')` must observe the converted error, not the raw stream frame.
+    expect(listenerErrors).toHaveLength(1);
+    expect(listenerErrors[0]).toBe(rejection);
+  });
+
+  it('converts an initial error event into an APIError', async () => {
+    const event = {
+      type: 'error',
+      sequence_number: 0,
+      code: 'server_error',
+      message: 'The server had an error before creating a response.',
+      param: 'input',
+    } satisfies ResponseStreamEvent;
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents([event]));
+
+    const rejection = await stream.finalResponse().then(
+      () => {
+        throw new Error('expected finalResponse() to reject');
+      },
+      (error: unknown) => error,
+    );
+
+    expect(rejection).toBeInstanceOf(APIError);
+    expect(rejection).toMatchObject({
+      message: 'The server had an error before creating a response.',
+      code: 'server_error',
+      param: 'input',
+    });
+  });
+
+  it.each([false, true])(
+    'preserves nested provider errors after a response was created: %s',
+    async (createdFirst) => {
+      const created = {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      } satisfies ResponseStreamEvent;
+      const payload = {
+        type: 'invalid_request_error',
+        code: 'rate_limit_exceeded',
+        message: 'The provider rejected the streamed response.',
+        param: 'input',
+        headers: { 'retry-after': '300' },
+      };
+      const error = {
+        type: 'error',
+        sequence_number: createdFirst ? 1 : 0,
+        error: payload,
+      };
+      const events = createdFirst ? [created, error] : [error];
+      const readable = ReadableStreamFrom(
+        events.map((event) => new TextEncoder().encode(`${JSON.stringify(event)}\n`)),
+      );
+      const stream = ResponseStream.fromReadableStream(readable);
+      const emittedEvents: ResponseStreamEvent[] = [];
+      const emittedErrors: OpenAIError[] = [];
+      stream.on('event', (event) => emittedEvents.push(event));
+      stream.on('error', (streamError) => emittedErrors.push(streamError));
+
+      const rejection = await stream.finalResponse().then(
+        () => {
+          throw new Error('expected finalResponse() to reject');
+        },
+        (streamError: unknown) => streamError,
+      );
+
+      expect(rejection).toBeInstanceOf(APIError);
+      expect(rejection).toMatchObject({
+        message: payload.message,
+        code: payload.code,
+        param: payload.param,
+        type: payload.type,
+        error: payload,
+        status: undefined,
+        headers: undefined,
+      });
+      expect(emittedErrors).toEqual([rejection]);
+      expect(emittedEvents).toEqual(createdFirst ? [created] : []);
+    },
+  );
+
+  it('propagates real nested SSE errors to a delayed async iterator', async () => {
+    const encoder = new TextEncoder();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const readable = new ReadableStream<Uint8Array>({
+      start(readableController) {
+        controller = readableController;
+      },
+    });
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const payload = {
+      type: 'invalid_request_error',
+      code: 'rate_limit_exceeded',
+      message: 'The model is currently over capacity.',
+      param: 'input',
+      headers: { 'retry-after': '300' },
+    };
+    const error = { type: 'error', sequence_number: 1, error: payload };
+    const openai = new OpenAI({
+      apiKey: 'My API Key',
+      fetch: async () =>
+        new Response(readable, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream', 'x-request-id': 'req_nested_stream' },
+        }),
+    });
+    const stream = openai.responses.stream({ model: 'gpt-4o', input: 'Hello' });
+    const errorEmitted = stream.emitted('error');
+    const received: ResponseStreamEvent[] = [];
+    let resolveCreatedRead!: () => void;
+    const createdRead = new Promise<void>((resolve) => {
+      resolveCreatedRead = resolve;
+    });
+    let releaseCreatedRead!: () => void;
+    const createdReadReleased = new Promise<void>((resolve) => {
+      releaseCreatedRead = resolve;
+    });
+    const consuming = (async () => {
+      for await (const event of stream) {
+        received.push(event);
+        resolveCreatedRead();
+        await createdReadReleased;
+      }
+    })();
+
+    controller.enqueue(encoder.encode(`event: response.created\ndata: ${JSON.stringify(created)}\n\n`));
+    await createdRead;
+    controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(error)}\n\n`));
+    const emittedError = await errorEmitted;
+    releaseCreatedRead();
+
+    await expect(consuming).rejects.toBe(emittedError);
+    expect(emittedError).toBeInstanceOf(APIError);
+    expect(emittedError).toMatchObject({
+      message: payload.message,
+      code: payload.code,
+      param: payload.param,
+      type: payload.type,
+      requestID: 'req_nested_stream',
+      error: payload,
+    });
+    expect(received).toEqual([created]);
+  });
+
+  it('converts documented flat SSE error events before accumulating them', async () => {
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const error = {
+      type: 'error',
+      sequence_number: 1,
+      code: 'provider_error',
+      message: 'The provider returned a documented flat error.',
+      param: 'model',
+    } satisfies ResponseStreamEvent;
+    const openai = new OpenAI({
+      apiKey: 'My API Key',
+      fetch: async () =>
+        new Response([created, error].map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }),
+    });
+    const stream = openai.responses.stream({ model: 'gpt-4o', input: 'Hello' });
+    const received: ResponseStreamEvent[] = [];
+    stream.on('event', (event) => received.push(event));
+
+    await expect(stream.finalResponse()).rejects.toMatchObject({
+      message: error.message,
+      code: error.code,
+      param: error.param,
+    });
+    expect(received).toEqual([created]);
+  });
+
+  it('rejects async iteration when an error event arrives with no pending read', async () => {
+    const encoder = new TextEncoder();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const readable = new ReadableStream<Uint8Array>({
+      start(readableController) {
+        controller = readableController;
+      },
+    });
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const error = {
+      type: 'error',
+      sequence_number: 1,
+      code: 'server_error',
+      message: 'The server had an error while streaming a response.',
+      param: null,
+    } satisfies ResponseStreamEvent;
+    let resolveCreatedRead!: () => void;
+    const createdRead = new Promise<void>((resolve) => {
+      resolveCreatedRead = resolve;
+    });
+    let releaseCreatedRead!: () => void;
+    const createdReadReleased = new Promise<void>((resolve) => {
+      releaseCreatedRead = resolve;
+    });
+    const stream = ResponseStream.fromReadableStream(readable);
+    const errorEmitted = stream.emitted('error');
+    const received: ResponseStreamEvent[] = [];
+    const consuming = (async () => {
+      for await (const event of stream) {
+        received.push(event);
+        resolveCreatedRead();
+        await createdReadReleased;
+      }
+    })();
+
+    controller.enqueue(encoder.encode(JSON.stringify(created) + '\n'));
+    await createdRead;
+    controller.enqueue(encoder.encode(JSON.stringify(error) + '\n'));
+    controller.close();
+    const emittedError = await errorEmitted;
+    releaseCreatedRead();
+
+    await expect(consuming).rejects.toBe(emittedError);
+    expect(emittedError).toBeInstanceOf(APIError);
+    expect(emittedError).toMatchObject({
+      message: 'The server had an error while streaming a response.',
+      code: 'server_error',
+      param: null,
+    });
+    expect(received).toEqual([created]);
+  });
+
+  it('drains queued response events before surfacing a nested stream error', async () => {
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const inProgress = {
+      type: 'response.in_progress',
+      sequence_number: 1,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const payload = {
+      type: 'server_error',
+      code: 'server_error',
+      message: 'The response failed after queued events.',
+      param: null,
+    };
+    const error = { type: 'error', sequence_number: 2, error: payload };
+    const readable = ReadableStreamFrom(
+      [created, inProgress, error].map((event) => new TextEncoder().encode(`${JSON.stringify(event)}\n`)),
+    );
+    const stream = ResponseStream.fromReadableStream(readable);
+    const iterator = stream[Symbol.asyncIterator]();
+    const errorEmitted = stream.emitted('error');
+    const emittedError = await errorEmitted;
+
+    await expect(iterator.next()).resolves.toEqual({ value: created, done: false });
+    await expect(iterator.next()).resolves.toEqual({ value: inProgress, done: false });
+    await expect(iterator.next()).rejects.toBe(emittedError);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  it('finishes immediately when iteration begins after the stream has ended', async () => {
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents([created]));
+
+    await stream.finalResponse();
+
+    await expect(stream[Symbol.asyncIterator]().next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  it('preserves failed response snapshots when no separate error event is sent', async () => {
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const failed = {
+      type: 'response.failed',
+      sequence_number: 1,
+      response: makeResponse({
+        status: 'failed',
+        error: { code: 'server_error', message: 'The response failed.' },
+      }),
+    } satisfies ResponseStreamEvent;
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents([created, failed]));
+    const received: ResponseStreamEvent[] = [];
+
+    for await (const event of stream) {
+      received.push(event);
+    }
+
+    await expect(stream.finalResponse()).resolves.toMatchObject({
+      status: 'failed',
+      error: { code: 'server_error', message: 'The response failed.' },
+    });
+    expect(received).toEqual([created, failed]);
+  });
+
+  it('cancels a stalled readable stream when iteration stops early', async () => {
+    const encoder = new TextEncoder();
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    let resolvePullStarted!: () => void;
+    const pullStarted = new Promise<void>((resolve) => {
+      resolvePullStarted = resolve;
+    });
+    let resolveCancelled!: () => void;
+    const cancelled = new Promise<void>((resolve) => {
+      resolveCancelled = resolve;
+    });
+    const cancel = vi.fn(() => resolveCancelled());
+    let pulls = 0;
+    const readable = new ReadableStream({
+      pull(controller) {
+        if (pulls++ === 0) {
+          controller.enqueue(encoder.encode(`${JSON.stringify(created)}\n`));
+          return;
+        }
+
+        resolvePullStarted();
+        return new Promise<void>(() => {});
+      },
+      cancel,
+    });
+    const stream = ResponseStream.fromReadableStream(readable);
+    const aborted = new Promise<void>((resolve) => {
+      stream.once('abort', () => resolve());
+    });
+
+    const iterator = stream[Symbol.asyncIterator]();
+    await expect(iterator.next()).resolves.toEqual({ value: created, done: false });
+    await pullStarted;
+    await iterator.return?.();
+
+    await cancelled;
+    await aborted;
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(stream.aborted).toBe(true);
+  }, 5000);
+
   it('cancels a stalled readable stream when aborted', async () => {
     const encoder = new TextEncoder();
     const created = {
@@ -189,7 +575,7 @@ describe('.stream()', () => {
     await stream.emitted('response.created');
     await pullStarted;
 
-    const done = expect(stream.done()).rejects.toThrowError(APIUserAbortError);
+    const done = expect(stream.done()).rejects.toThrow(APIUserAbortError);
     stream.abort();
 
     await cancelled;
@@ -201,14 +587,13 @@ describe('.stream()', () => {
   it('standard text works', async () => {
     const deltas: string[] = [];
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.responses.stream({
-          model: 'gpt-4o-2024-08-06',
-          input: 'Say hello world',
-        }),
-      )
-    ).on('response.output_text.delta', (e) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.responses.stream({
+        model: 'gpt-4o-2024-08-06',
+        input: 'Say hello world',
+      }),
+    );
+    const stream = request.on('response.output_text.delta', (e) => {
       deltas.push(e.snapshot);
     });
 
@@ -252,6 +637,56 @@ describe('.stream()', () => {
       expect(final.output[1].content[0]).toMatchObject({ type: 'output_text', text: 'The answer is 42' });
     }
     expect(final.output_text).toBe('The answer is 42');
+  });
+
+  it('surfaces a mid-stream error when events are buffered before consumption', async () => {
+    // Two valid events, then a malformed delta that references a missing output
+    // index so accumulation throws mid-stream (the stream itself closes cleanly,
+    // so the two earlier events are delivered).
+    const validEvents: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: { id: 'msg_1', type: 'message', role: 'assistant', status: 'in_progress', content: [] },
+      },
+    ];
+    const malformedEvent = {
+      type: 'response.output_text.delta',
+      sequence_number: 2,
+      item_id: 'msg_1',
+      output_index: 99,
+      content_index: 0,
+      delta: 'boom',
+      logprobs: [],
+    } as unknown as ResponseStreamEvent;
+
+    const stream = ResponseStream.fromReadableStream(
+      readableStreamFromEvents([...validEvents, malformedEvent]),
+    );
+    // Grab the iterator (registering its listeners) but do not consume yet, so
+    // the valid events and the error land while no reader is waiting: they
+    // buffer in the iterator's internal queue instead of rejecting a pending
+    // reader.
+    const iterator = stream[Symbol.asyncIterator]();
+    // Wait for the stream's terminal signal so the events and the error have
+    // definitely been emitted before we start reading.
+    await expect(stream.done()).rejects.toThrow('missing output at index 99');
+
+    await expect(iterator.next()).resolves.toEqual({ value: validEvents[0], done: false });
+    await expect(iterator.next()).resolves.toEqual({ value: validEvents[1], done: false });
+
+    const failure = await iterator.next().then(
+      () => {
+        throw new Error('Expected the response iterator to reject');
+      },
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError).message).toBe('missing output at index 99');
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 });
 

@@ -1,7 +1,7 @@
-import { resolve, dirname, extname, relative } from 'path';
+import nodePath = require('node:path');
 import type ts from 'typescript';
 import { trimSuffix } from './utils';
-import assert from 'assert';
+import assert from 'node:assert';
 
 const JS_EXT = '.js';
 const MJS_EXT = '.mjs';
@@ -53,14 +53,14 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
 
   function isDirectory(sourceFile: ts.SourceFile, path: string): boolean {
     const sourcePath = sourceFile.fileName;
-    const fullPath = resolve(dirname(sourcePath), path);
+    const fullPath = nodePath.resolve(nodePath.dirname(sourcePath), path);
 
     return sys.directoryExists(fullPath);
   }
 
   function fileExists(sourceFile: ts.SourceFile, path: string): boolean {
     const sourcePath = sourceFile.fileName;
-    const fullPath = resolve(dirname(sourcePath), path);
+    const fullPath = nodePath.resolve(nodePath.dirname(sourcePath), path);
 
     return sys.fileExists(fullPath);
   }
@@ -70,9 +70,11 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
     sourceFile: ts.SourceFile,
     node: T,
   ): ts.LiteralExpression | T {
-    if (!isStringLiteral(node) || !isRelativePath(node.text)) return node;
+    if (!isStringLiteral(node) || !isRelativePath(node.text)) {
+      return node;
+    }
 
-    const ext = extname(node.text);
+    const ext = nodePath.extname(node.text);
 
     if (ext === MJS_EXT || ext === CJS_EXT) {
       return node;
@@ -101,7 +103,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
     let sourceFile: ts.SourceFile;
 
     function getRelativeImport(mod: string) {
-      const r = relative(dirname(sourceFile.fileName), mod);
+      const r = nodePath.relative(nodePath.dirname(sourceFile.fileName), mod);
       return /^\.?\.?\//.test(r) ? r : './' + r;
     }
 
@@ -165,7 +167,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
 
       // ESM export
       if (isExportDeclaration(node)) {
-        if (!node.moduleSpecifier) return node;
+        if (!node.moduleSpecifier) {
+          return node;
+        }
 
         return factory.updateExportDeclaration(
           node,
@@ -180,7 +184,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
       // ESM dynamic import
       if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
         const [firstArg, ...restArg] = node.arguments;
-        if (!firstArg) return node;
+        if (!firstArg) {
+          return node;
+        }
 
         return factory.updateCallExpression(node, node.expression, node.typeArguments, [
           updateModuleSpecifier(ctx, sourceFile, firstArg),
@@ -195,7 +201,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
         node.expression.escapedText === 'require'
       ) {
         const [firstArg, ...restArgs] = node.arguments;
-        if (!firstArg) return node;
+        if (!firstArg) {
+          return node;
+        }
 
         return factory.updateCallExpression(node, node.expression, node.typeArguments, [
           resolvedShareHelpers && tslibRequires.has(node)
@@ -220,7 +228,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
     };
 
     const pureClassAssignment = (sourceFile: ts.SourceFile) => {
-      if (!options.pureClassAssignment) return sourceFile;
+      if (!options.pureClassAssignment) {
+        return sourceFile;
+      }
       const newStatements = [];
       const classes: Record<
         string,
@@ -271,6 +281,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
       }
       return ctx.factory.updateSourceFile(
         sourceFile,
+        // oxlint-disable unicorn/no-nested-ternary, no-nested-ternary -- Preserve the vendored transformer AST construction shape.
         newStatements.map((group) =>
           Array.isArray(group)
             ? group.length === 1 &&
@@ -312,6 +323,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
                 ])
             : group,
         ),
+        // oxlint-enable unicorn/no-nested-ternary, no-nested-ternary
       );
     };
 
@@ -326,9 +338,8 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
             return pureClassAssignment(visitNode(file, visitor) as ts.SourceFile);
           }),
         ) as any;
-      } else {
-        assert(false);
       }
+      assert.ok(false);
     };
   };
 }

@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import type { bedrock } from 'openai/providers/bedrock/aws';
 
 const originalEnv = process.env;
 const optionalDependencies = [
@@ -10,7 +12,9 @@ const optionalDependencies = [
 
 beforeEach(() => {
   vi.resetModules();
-  for (const dependency of optionalDependencies) vi.doUnmock(dependency);
+  for (const dependency of optionalDependencies) {
+    vi.doUnmock(dependency);
+  }
 
   process.env = { ...originalEnv };
   delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
@@ -30,14 +34,14 @@ afterEach(() => {
 });
 
 function jsonResponse(body: unknown = {}): Response {
-  return new Response(JSON.stringify(body), {
+  return Response.json(body, {
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
 async function loadBedrockModules(): Promise<{
-  OpenAI: typeof import('openai').default;
-  bedrock: typeof import('openai/providers/bedrock/aws').bedrock;
+  OpenAI: typeof OpenAI;
+  bedrock: typeof bedrock;
 }> {
   const openai = await import('openai');
   const bedrockProvider = await import('openai/providers/bedrock/aws');

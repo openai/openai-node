@@ -20,7 +20,11 @@
 		"wrangler": "^4.110.0"
 	},
 	"overrides": {
+		"@speed-highlight/core": "1.2.17",
 		"miniflare": {
+			".": "4.20260730.0",
+			"sharp": "0.35.3",
+			"undici": "7.29.0",
 			"ws": "8.21.0"
 		}
 	}

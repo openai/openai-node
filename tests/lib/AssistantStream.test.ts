@@ -45,6 +45,124 @@ describe('AssistantStream delta accumulation', () => {
     });
   });
 
+  test('preserves accumulator identity and ordinary object prototypes', () => {
+    const nested = { text: 'hello' };
+    const accumulator = { nested };
+
+    const result = AssistantStream.accumulateDelta(accumulator, {
+      nested: { text: ' world' },
+      status: 'ready',
+    });
+
+    expect(result).toBe(accumulator);
+    expect(result['nested']).toBe(nested);
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(result['nested'])).toBe(Object.prototype);
+    expect(result).toEqual({ nested: { text: 'hello world' }, status: 'ready' });
+    expect(Object.getOwnPropertyDescriptor(result, 'status')).toEqual({
+      configurable: true,
+      enumerable: true,
+      value: 'ready',
+      writable: true,
+    });
+  });
+
+  test('creates own fields without changing ordinary inherited values', () => {
+    const inherited = { label: 'inherited' };
+    const accumulator: Record<string, unknown> = Object.create(inherited);
+
+    const result = AssistantStream.accumulateDelta(accumulator, { label: 'updated', status: 'ready' });
+
+    expect(result).toBe(accumulator);
+    expect(Object.getPrototypeOf(result)).toBe(inherited);
+    expect(inherited.label).toBe('inherited');
+    expect(result['label']).toBe('updated');
+    expect(result['status']).toBe('ready');
+    expect(Object.getOwnPropertyDescriptor(result, 'label')).toMatchObject({ value: 'updated' });
+  });
+
+  test('preserves null-prototype accumulators during ordinary nested updates', () => {
+    const nested: Record<string, string> = Object.create(null);
+    nested['text'] = 'hello';
+
+    const accumulator: Record<string, unknown> = Object.create(null);
+    accumulator['details'] = nested;
+
+    const result = AssistantStream.accumulateDelta(accumulator, {
+      details: { text: ' world' },
+      status: 'ready',
+    });
+
+    expect(result).toBe(accumulator);
+    expect(result['details']).toBe(nested);
+    expect(Object.getPrototypeOf(result)).toBeNull();
+    expect(Object.getPrototypeOf(result['details'])).toBeNull();
+    expect(result['details']['text']).toBe('hello world');
+    expect(result['status']).toBe('ready');
+  });
+
+  test('preserves newly inserted nested objects and arrays', () => {
+    const metadata = { profile: { name: 'Ada' } };
+    const entries = [{ index: 0, details: { text: 'hello' } }];
+    const accumulator = {};
+
+    const result = AssistantStream.accumulateDelta(accumulator, { metadata, entries });
+
+    expect(result).toBe(accumulator);
+    expect(result['metadata']).toBe(metadata);
+    expect(result['entries']).toBe(entries);
+    expect(result).toEqual({
+      metadata: { profile: { name: 'Ada' } },
+      entries: [{ index: 0, details: { text: 'hello' } }],
+    });
+  });
+
+  test('validates newly inserted nested arrays before mutating the accumulator', () => {
+    const failure = new Error('Nested value is unavailable');
+    const unreadable = {
+      get value(): never {
+        throw failure;
+      },
+    };
+    const accumulator = { text: 'hello' };
+
+    expect(() =>
+      AssistantStream.accumulateDelta(accumulator, {
+        text: ' world',
+        entries: [{ index: 0, details: { nested: unreadable } }],
+      }),
+    ).toThrow(failure);
+
+    expect(accumulator).toEqual({ text: 'hello' });
+    expect(Object.getOwnPropertyDescriptor(accumulator, 'entries')).toBeUndefined();
+  });
+
+  test.each(['__proto__', 'constructor', 'prototype'])(
+    'rejects the reserved %s property before mutating any accumulator path',
+    (key) => {
+      const deltas = [
+        { text: ' updated', [key]: 'blocked' },
+        { text: ' updated', metadata: { details: { [key]: 'blocked' } } },
+        {
+          text: ' updated',
+          entries: [
+            { index: 0, text: ' updated' },
+            { index: 1, details: { [key]: 'blocked' } },
+          ],
+        },
+      ];
+
+      for (const delta of deltas) {
+        const accumulator = { text: 'original', entries: [{ index: 0, text: 'first' }] };
+
+        expect(() => AssistantStream.accumulateDelta(accumulator, delta)).toThrow(
+          `Assistant stream delta contains an unsafe property: ${key}`,
+        );
+        expect(accumulator).toEqual({ text: 'original', entries: [{ index: 0, text: 'first' }] });
+      }
+    },
+  );
+
   test('replaces null values and special index or type properties', () => {
     expect(
       AssistantStream.accumulateDelta(
@@ -100,6 +218,69 @@ describe('AssistantStream delta accumulation', () => {
 });
 
 describe('AssistantStream snapshots and message lifecycle', () => {
+  test.each(['__proto__', 'constructor', 'prototype'])(
+    'rejects the reserved %s property in newly inserted message content',
+    async (key) => {
+      const message = { id: 'msg_123', role: 'assistant', content: [] };
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: message },
+        {
+          event: 'thread.message.delta',
+          data: {
+            id: 'msg_123',
+            delta: {
+              content: [{ index: 0, type: 'text', text: { value: 'hello', [key]: 'blocked' } }],
+            },
+          },
+        },
+      ]);
+
+      await expect(runner.done()).rejects.toThrow(`unsafe property: ${key}`);
+      expect(runner.currentMessageSnapshot()).toEqual(message);
+    },
+  );
+
+  test.each(['invalid', -1, 1.5, null])(
+    'rejects the invalid content index %j without mutating the message snapshot',
+    async (index) => {
+      const message = {
+        id: 'msg_123',
+        role: 'assistant',
+        content: [{ type: 'text', text: { value: 'original', annotations: [] } }],
+      };
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: message },
+        {
+          event: 'thread.message.delta',
+          data: {
+            id: 'msg_123',
+            delta: {
+              content: [
+                { index: 0, type: 'text', text: { value: ' updated' } },
+                { index, type: 'text', text: { value: 'ignored', annotations: [] } },
+              ],
+            },
+          },
+        },
+      ]);
+
+      await expect(runner.done()).rejects.toThrow('invalid content index');
+      expect(runner.currentMessageSnapshot()).toEqual(message);
+    },
+  );
+
+  test('emits the finalized run exactly once', async () => {
+    const finalRun = completedRun();
+    const runner = assistantStream([finalRun]);
+    const listener = vi.fn();
+
+    runner.on('run', listener);
+
+    await runner.done();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(finalRun.data);
+  });
   test('accumulates message content and exposes current and final snapshots', async () => {
     const initialMessage = { id: 'msg_123', role: 'assistant', status: 'in_progress', content: [] };
     const finalMessage = {
@@ -371,13 +552,14 @@ describe('AssistantStream run-step lifecycle', () => {
 });
 
 describe('AssistantStream factories and async iteration', () => {
-  test('creates a run stream with helper headers and a controlled abort signal', async () => {
+  test('creates a run stream with helper metadata and preserves Headers instances', async () => {
     const runs = { create: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
+    const headers = new Headers({ 'x-custom': 'value' });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
       runs as any,
       { assistant_id: 'assistant_123' },
-      { headers: { 'x-custom': 'value' } },
+      { headers, __metadata: { requestID: 'request_123' } },
     );
 
     await expect(runner.finalRun()).resolves.toMatchObject({ id: 'run_123' });
@@ -385,18 +567,20 @@ describe('AssistantStream factories and async iteration', () => {
       'thread_123',
       { assistant_id: 'assistant_123', stream: true },
       expect.objectContaining({
-        headers: { 'x-custom': 'value', 'X-Stainless-Helper-Method': 'stream' },
+        headers,
+        __metadata: { requestID: 'request_123', helperMethod: 'stream' },
         signal: runner.controller.signal,
       }),
     );
   });
 
-  test('creates a thread-and-run stream with helper headers', async () => {
+  test('creates a thread-and-run stream with helper metadata and preserves tuple headers', async () => {
     const threads = { createAndRun: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
+    const headers: [string, string][] = [['x-custom', 'value']];
     const runner = AssistantStream.createThreadAssistantStream(
       { assistant_id: 'assistant_123' },
       threads as any,
-      { headers: { 'x-custom': 'value' } },
+      { headers },
     );
 
     await runner.done();
@@ -404,13 +588,14 @@ describe('AssistantStream factories and async iteration', () => {
     expect(threads.createAndRun).toHaveBeenCalledWith(
       { assistant_id: 'assistant_123', stream: true },
       expect.objectContaining({
-        headers: { 'x-custom': 'value', 'X-Stainless-Helper-Method': 'stream' },
+        headers,
+        __metadata: { helperMethod: 'stream' },
         signal: runner.controller.signal,
       }),
     );
   });
 
-  test('creates a tool-output stream with helper headers', async () => {
+  test('creates a tool-output stream with helper metadata and preserves custom headers', async () => {
     const runs = { submitToolOutputs: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const runner = AssistantStream.createToolAssistantStream(
       'run_123',
@@ -425,7 +610,8 @@ describe('AssistantStream factories and async iteration', () => {
       'run_123',
       { thread_id: 'thread_123', tool_outputs: [], stream: true },
       expect.objectContaining({
-        headers: { 'x-custom': 'value', 'X-Stainless-Helper-Method': 'stream' },
+        headers: { 'x-custom': 'value' },
+        __metadata: { helperMethod: 'stream' },
         signal: runner.controller.signal,
       }),
     );
@@ -471,6 +657,38 @@ describe('AssistantStream factories and async iteration', () => {
     aborted._emit('abort', abortError);
 
     await expect(pendingAbort).rejects.toBe(abortError);
+  });
+
+  test('drains cloned queued events before rejecting a terminal stream error', async () => {
+    const runner = new AssistantStream();
+    const iterator = runner[Symbol.asyncIterator]();
+    const event = completedRun('run_original');
+    const error = new OpenAIError('stream failed after an event');
+
+    runner._emit('event', event as AssistantStreamEvent);
+    event.data.id = 'run_mutated_after_emit';
+    runner._emit('error', error);
+
+    await expect(iterator.next()).resolves.toEqual({
+      value: completedRun('run_original'),
+      done: false,
+    });
+    await expect(iterator.next()).rejects.toBe(error);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  test('drains queued events before rejecting a terminal stream abort', async () => {
+    const runner = new AssistantStream();
+    const iterator = runner[Symbol.asyncIterator]();
+    const event = completedRun();
+    const error = new APIUserAbortError();
+
+    runner._emit('event', event as AssistantStreamEvent);
+    runner._emit('abort', error);
+
+    await expect(iterator.next()).resolves.toEqual({ value: event, done: false });
+    await expect(iterator.next()).rejects.toBe(error);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 
   test('closes pending event reads when an otherwise idle stream ends', async () => {
@@ -532,19 +750,21 @@ describe('AssistantStream factories and async iteration', () => {
       let runner: AssistantStream;
 
       switch (kind) {
-        case 'run':
+        case 'run': {
           runner = AssistantStream.createAssistantStream(
             'thread_123',
             { create: vi.fn().mockResolvedValue(stream) } as any,
             { assistant_id: 'assistant_123' },
           );
           break;
-        case 'thread':
+        }
+        case 'thread': {
           runner = AssistantStream.createThreadAssistantStream({ assistant_id: 'assistant_123' }, {
             createAndRun: vi.fn().mockResolvedValue(stream),
           } as any);
           break;
-        case 'tool':
+        }
+        case 'tool': {
           runner = AssistantStream.createToolAssistantStream(
             'run_123',
             { submitToolOutputs: vi.fn().mockResolvedValue(stream) } as any,
@@ -552,6 +772,7 @@ describe('AssistantStream factories and async iteration', () => {
             undefined,
           );
           break;
+        }
       }
 
       await expect(runner.done()).rejects.toThrow(APIUserAbortError);

@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import type { FinalRequestOptions } from './request-options';
 import { Stream } from '../core/streaming';
 import { type OpenAI } from '../client';
@@ -64,7 +62,16 @@ export async function defaultParseResponse<T>(
         return undefined as T;
       }
 
-      const json = await response.json();
+      const bodyText = await response.text();
+      if (!bodyText) {
+        // Some servers respond with an empty body and a JSON content-type but
+        // without a `content-length: 0` header (e.g. over HTTP/2 or with chunked
+        // transfer encoding). Treat this the same as an explicit `content-length: 0`
+        // instead of letting `JSON.parse` throw an opaque `SyntaxError`.
+        return undefined as T;
+      }
+
+      const json = JSON.parse(bodyText);
       return addRequestID(json as T, response);
     }
 
@@ -102,7 +109,9 @@ export async function defaultParseResponse<T>(
  * its own is reported unchanged even if an abort landed in the meantime.
  */
 function asAbortError(error: unknown, signal: AbortSignal): unknown {
-  if (!signal.aborted || error !== signal.reason || isAbortError(error)) return error;
+  if (!signal.aborted || error !== signal.reason || isAbortError(error)) {
+    return error;
+  }
 
   const message = 'This operation was aborted';
   const DOMExceptionCtor = (globalThis as any).DOMException;

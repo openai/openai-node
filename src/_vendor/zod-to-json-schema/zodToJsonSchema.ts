@@ -1,6 +1,7 @@
-import { ZodSchema } from 'zod/v3';
-import { Options, Targets } from './Options';
-import { JsonSchema7Type, parseDef } from './parseDef';
+import type { ZodSchema } from 'zod/v3';
+import type { Options, Targets } from './Options';
+import type { JsonSchema7Type } from './parseDef';
+import { parseDef } from './parseDef';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
@@ -9,18 +10,23 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   options?: Partial<Options<Target>> | string,
 ): (Target extends 'jsonSchema7' ? JsonSchema7Type : object) & {
   $schema?: string;
-  definitions?: {
-    [key: string]: Target extends 'jsonSchema7'
+  definitions?: Record<
+    string,
+    Target extends 'jsonSchema7'
       ? JsonSchema7Type
       : Target extends 'jsonSchema2019-09'
         ? JsonSchema7Type
-        : object;
-  };
+        : object
+  >;
 } => {
   const refs = getRefs(options);
 
-  const name =
-    typeof options === 'string' ? options : options?.nameStrategy === 'title' ? undefined : options?.name;
+  let name: string | undefined;
+  if (typeof options === 'string') {
+    name = options;
+  } else if (options?.nameStrategy !== 'title') {
+    name = options?.name;
+  }
 
   const main =
     parseDef(
@@ -60,7 +66,9 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       const newDefinitions = Object.entries(refs.definitions).filter(
         ([key]) => !processedDefinitions.has(key),
       );
-      if (newDefinitions.length === 0) break;
+      if (newDefinitions.length === 0) {
+        break;
+      }
 
       for (const [key, schema] of newDefinitions) {
         definitions[key] =
@@ -76,39 +84,37 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     return definitions;
   })();
 
-  const combined: ReturnType<typeof zodToJsonSchema<Target>> =
-    name === undefined
-      ? definitions
+  let combined: ReturnType<typeof zodToJsonSchema<Target>>;
+  if (name === undefined) {
+    combined = definitions
+      ? {
+          ...main,
+          [refs.definitionPath]: definitions,
+        }
+      : main;
+  } else if (refs.nameStrategy === 'duplicate-ref') {
+    combined = {
+      ...main,
+      ...(definitions || refs.seenRefs.size
         ? {
-            ...main,
-            [refs.definitionPath]: definitions,
-          }
-        : main
-      : refs.nameStrategy === 'duplicate-ref'
-        ? {
-            ...main,
-            ...(definitions || refs.seenRefs.size
-              ? {
-                  [refs.definitionPath]: {
-                    ...definitions,
-                    // only actually duplicate the schema definition if it was ever referenced
-                    // otherwise the duplication is completely pointless
-                    ...(refs.seenRefs.size ? { [name]: main } : undefined),
-                  },
-                }
-              : undefined),
-          }
-        : {
-            $ref: [
-              ...(refs.$refStrategy === 'relative' ? [] : refs.basePath),
-              refs.definitionPath,
-              name,
-            ].join('/'),
             [refs.definitionPath]: {
               ...definitions,
-              [name]: main,
+              // only actually duplicate the schema definition if it was ever referenced
+              // otherwise the duplication is completely pointless
+              ...(refs.seenRefs.size ? { [name]: main } : undefined),
             },
-          };
+          }
+        : undefined),
+    };
+  } else {
+    combined = {
+      $ref: [...(refs.$refStrategy === 'relative' ? [] : refs.basePath), refs.definitionPath, name].join('/'),
+      [refs.definitionPath]: {
+        ...definitions,
+        [name]: main,
+      },
+    };
+  }
 
   if (refs.target === 'jsonSchema7') {
     combined.$schema = 'http://json-schema.org/draft-07/schema#';

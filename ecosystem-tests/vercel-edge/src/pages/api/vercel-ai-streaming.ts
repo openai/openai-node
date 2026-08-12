@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
-import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai';
-import { NextRequest } from 'next/server';
+import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
+import type { UIMessage } from 'ai';
+import type { NextRequest } from 'next/server';
 
 export const config = {
   runtime: 'edge',
@@ -10,7 +11,7 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   const { messages }: { messages: UIMessage[] } = await request.json();
@@ -21,14 +22,18 @@ export default async (request: NextRequest) => {
       .join('');
 
     switch (message.role) {
-      case 'system':
+      case 'system': {
         return { role: 'system', content };
-      case 'assistant':
+      }
+      case 'assistant': {
         return { role: 'assistant', content };
-      case 'user':
+      }
+      case 'user': {
         return { role: 'user', content };
-      default:
+      }
+      default: {
         throw new Error('Unsupported message role');
+      }
     }
   });
 
@@ -45,7 +50,7 @@ export default async (request: NextRequest) => {
 
       for await (const chunk of completion) {
         const delta = chunk.choices[0]?.delta.content;
-        if (delta) writer.write({ type: 'text-delta', id: textPartID, delta });
+        if (delta) {writer.write({ type: 'text-delta', id: textPartID, delta });}
       }
 
       writer.write({ type: 'text-end', id: textPartID });
@@ -53,4 +58,4 @@ export default async (request: NextRequest) => {
   });
 
   return createUIMessageStreamResponse({ stream });
-};
+}

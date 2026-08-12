@@ -20,19 +20,21 @@ const hex_table = /* @__PURE__ */ (() => {
   return array;
 })();
 
-function compact_queue<T extends Record<string, any>>(queue: Array<{ obj: T; prop: string }>) {
+function compact_queue<T extends Record<string, any>>(queue: { obj: T; prop: string }[]) {
   while (queue.length > 1) {
     const item = queue.pop();
-    if (!item) continue;
+    if (!item) {
+      continue;
+    }
 
     const obj = item.obj[item.prop];
 
     if (isArray(obj)) {
       const compacted: unknown[] = [];
 
-      for (let j = 0; j < obj.length; ++j) {
-        if (typeof obj[j] !== 'undefined') {
-          compacted.push(obj[j]);
+      for (const value of obj) {
+        if (value !== undefined) {
+          compacted.push(value);
         }
       }
 
@@ -45,7 +47,7 @@ function compact_queue<T extends Record<string, any>>(queue: Array<{ obj: T; pro
 function array_to_object(source: any[], options: { plainObjects: boolean }) {
   const obj = options && options.plainObjects ? Object.create(null) : {};
   for (let i = 0; i < source.length; ++i) {
-    if (typeof source[i] !== 'undefined') {
+    if (source[i] !== undefined) {
       obj[i] = source[i];
     }
   }
@@ -77,6 +79,7 @@ export function merge(
   }
 
   if (!target || typeof target !== 'object') {
+    // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
     return [target].concat(source);
   }
 
@@ -87,38 +90,38 @@ export function merge(
   }
 
   if (isArray(target) && isArray(source)) {
-    source.forEach(function (item, i) {
-      if (has(target, i)) {
-        const targetItem = target[i];
-        if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
-          target[i] = merge(targetItem, item, options);
+    const sourceLength = source.length;
+    for (let i = 0; i < sourceLength; i += 1) {
+      if (i in source) {
+        const item = source[i];
+        if (has(target, i)) {
+          const targetItem = target[i];
+          if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
+            target[i] = merge(targetItem, item, options);
+          } else {
+            target.push(item);
+          }
         } else {
-          target.push(item);
+          target[i] = item;
         }
-      } else {
-        target[i] = item;
       }
-    });
+    }
     return target;
   }
 
-  return Object.keys(source).reduce(function (acc, key) {
+  for (const key of Object.keys(source)) {
     const value = source[key];
 
-    if (has(acc, key)) {
-      acc[key] = merge(acc[key], value, options);
-    } else {
-      acc[key] = value;
-    }
-    return acc;
-  }, mergeTarget);
+    mergeTarget[key] = has(mergeTarget, key) ? merge(mergeTarget[key], value, options) : value;
+  }
+  return mergeTarget;
 }
 
 export function assign_single_source(target: any, source: any) {
-  return Object.keys(source).reduce(function (acc, key) {
-    acc[key] = source[key];
-    return acc;
-  }, target);
+  for (const key of Object.keys(source)) {
+    target[key] = source[key];
+  }
+  return target;
 }
 
 export function decode(str: string, _: any, charset: string) {
@@ -130,7 +133,7 @@ export function decode(str: string, _: any, charset: string) {
   // utf-8
   try {
     return decodeURIComponent(strWithoutPlus);
-  } catch (e) {
+  } catch {
     return strWithoutPlus;
   }
 }
@@ -158,9 +161,10 @@ export const encode: (
   }
 
   if (charset === 'iso-8859-1') {
-    return escape(string).replace(/%u[0-9a-f]{4}/gi, function ($0) {
-      return '%26%23' + parseInt($0.slice(2), 16) + '%3B';
-    });
+    return escape(string).replace(
+      /%u[0-9a-f]{4}/gi,
+      ($0) => '%26%23' + Number.parseInt($0.slice(2), 16) + '%3B',
+    );
   }
 
   let out = '';
@@ -169,6 +173,7 @@ export const encode: (
     const arr = [];
 
     for (let i = 0; i < segment.length; ++i) {
+      // oxlint-disable-next-line unicorn/prefer-code-point -- combine UTF-16 surrogate code units below
       let c = segment.charCodeAt(i);
       if (
         c === 0x2d || // -
@@ -189,19 +194,20 @@ export const encode: (
         continue;
       }
 
-      if (c < 0x800) {
+      if (c < 0x8_00) {
         arr[arr.length] = hex_table[0xc0 | (c >> 6)]! + hex_table[0x80 | (c & 0x3f)];
         continue;
       }
 
-      if (c < 0xd800 || c >= 0xe000) {
+      if (c < 0xd8_00 || c >= 0xe0_00) {
         arr[arr.length] =
           hex_table[0xe0 | (c >> 12)]! + hex_table[0x80 | ((c >> 6) & 0x3f)] + hex_table[0x80 | (c & 0x3f)];
         continue;
       }
 
       i += 1;
-      c = 0x10000 + (((c & 0x3ff) << 10) | (segment.charCodeAt(i) & 0x3ff));
+      // oxlint-disable-next-line unicorn/prefer-code-point -- combine UTF-16 surrogate code units manually
+      c = 0x1_00_00 + (((c & 0x3_ff) << 10) | (segment.charCodeAt(i) & 0x3_ff));
 
       arr[arr.length] =
         hex_table[0xf0 | (c >> 18)]! +
@@ -218,19 +224,17 @@ export const encode: (
 
 export function compact(value: any) {
   const queue = [{ obj: { o: value }, prop: 'o' }];
-  const refs = [];
+  const refs: object[] = [];
 
-  for (let i = 0; i < queue.length; ++i) {
-    const item = queue[i];
+  for (const item of queue) {
     // @ts-ignore
     const obj = item.obj[item.prop];
 
     const keys = Object.keys(obj);
-    for (let j = 0; j < keys.length; ++j) {
-      const key = keys[j]!;
+    for (const key of keys) {
       const val = obj[key];
-      if (typeof val === 'object' && val !== null && refs.indexOf(val) === -1) {
-        queue.push({ obj: obj, prop: key });
+      if (typeof val === 'object' && val !== null && !refs.includes(val)) {
+        queue.push({ obj, prop: key });
         refs.push(val);
       }
     }
@@ -254,14 +258,15 @@ export function is_buffer(obj: any) {
 }
 
 export function combine(a: any, b: any) {
+  // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
   return [].concat(a, b);
 }
 
 export function maybe_map<T>(val: T[], fn: (v: T) => T) {
   if (isArray(val)) {
     const mapped = [];
-    for (let i = 0; i < val.length; i += 1) {
-      mapped.push(fn(val[i]!));
+    for (const item of val) {
+      mapped.push(fn(item));
     }
     return mapped;
   }

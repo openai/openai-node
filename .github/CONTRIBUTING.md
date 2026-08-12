@@ -41,16 +41,16 @@ modify the contents of the `src/lib/` and `examples/` directories.
 All files in the `examples/` directory are not modified by the generator and can be freely edited or added to.
 
 ```ts
-// add an example to examples/<your-example>.ts
+// add an example to examples/<category>/<your-example>.ts
 
 #!/usr/bin/env -S npm run tsn -- -T
 …
 ```
 
 ```sh
-$ chmod +x examples/<your-example>.ts
+$ chmod +x examples/<category>/<your-example>.ts
 # run the example against your api
-$ npm run tsn -- -T examples/<your-example>.ts
+$ npm run tsn -- -T examples/<category>/<your-example>.ts
 ```
 
 ## Using the repository from source
@@ -145,12 +145,18 @@ This repository uses [Ultracite](https://www.ultracite.ai/) with
 [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) to format and lint its code.
 The Ultracite presets live in `oxfmt.config.ts` and `oxlint.config.ts`, with
 repository-specific formatting options, import rules, fixture exceptions, and
-generated-file lint exclusions layered on top. Files with a Stainless- or
-Castiron-generated header are formatted and checked only for unused imports and
-restricted SDK package imports; handwritten files in the same directories remain
-checked. Existing handwritten patterns are explicitly
+generated-file lint exclusions layered on top. Files with a Castiron-generated
+header and explicitly listed legacy SDK files are formatted and checked only for
+unused imports and restricted SDK package imports; other handwritten files in the
+same directories remain checked. Existing handwritten patterns are explicitly
 exempted from incompatible Ultracite rules, while the remaining preset rules stay
 enabled.
+
+Handwritten SDK exports, their public class members, configuration fields, and
+event payload properties must have accurate JSDoc so that their behavior is
+available through editor hover. Describe meaningful defaults, prerequisites,
+failure modes, and lifecycle semantics rather than repeating TypeScript types.
+Generated SDK files and vendored dependencies are excluded.
 
 To check formatting and lint rules:
 

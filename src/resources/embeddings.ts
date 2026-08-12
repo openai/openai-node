@@ -1,9 +1,13 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 import { loggerFor, toFloat32Array } from '../internal/utils';
+
+type Base64EmbeddingResponse = Omit<CreateEmbeddingResponse, 'data'> & {
+  data: Array<Omit<Embedding, 'embedding'> & { embedding: string }>;
+};
 
 /**
  * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
@@ -21,7 +25,15 @@ export class Embeddings extends APIResource {
    *   });
    * ```
    */
-  create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse> {
+  create(
+    body: EmbeddingCreateParams & { encoding_format: 'base64' },
+    options?: RequestOptions,
+  ): APIPromise<Base64EmbeddingResponse>;
+  create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse>;
+  create(
+    body: EmbeddingCreateParams,
+    options?: RequestOptions,
+  ): APIPromise<CreateEmbeddingResponse | Base64EmbeddingResponse> {
     const hasUserProvidedEncodingFormat = !!body.encoding_format;
     // No encoding_format specified, defaulting to base64 for performance reasons
     // See https://github.com/openai/openai-node/pull/1312

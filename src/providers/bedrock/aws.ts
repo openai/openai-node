@@ -10,38 +10,56 @@ import {
   normalizeOptionalString,
   resolveBedrockBearerAuth,
   resolveBedrockEndpoint,
-  type BedrockBearerOptions,
-  type BedrockEndpointOptions,
-  type BedrockRequestAuth,
 } from '../../internal/bedrock';
-import { createProvider, type Provider, type ProviderRequestContext } from '../../internal/provider';
+import type {
+  BedrockBearerOptions,
+  BedrockEndpointOptions,
+  BedrockRequestAuth,
+} from '../../internal/bedrock';
+import { createProvider } from '../../internal/provider';
+import type { Provider, ProviderRequestContext } from '../../internal/provider';
 import type { FinalizedRequestInit } from '../../internal/types';
 
 const BEDROCK_SERVICE = 'bedrock-mantle';
 
+/** AWS credentials used to sign an Amazon Bedrock request with Signature Version 4. */
 export interface AwsCredentialIdentity {
+  /** AWS access-key identifier associated with the signing identity. */
   accessKeyId: string;
+
+  /** Secret access key paired with the AWS access-key identifier. */
   secretAccessKey: string;
+
+  /** Session token required by temporary AWS credentials, when present. */
   sessionToken?: string;
+
+  /** Expiration timestamp supplied by a refreshable temporary-credential provider. */
   expiration?: Date;
 }
 
+/** Resolves current AWS signing credentials before a Bedrock request attempt. */
 export type AwsCredentialsProvider = () => AwsCredentialIdentity | Promise<AwsCredentialIdentity>;
 
+/**
+ * Configures a Bedrock endpoint and exactly one explicit bearer or AWS credential mode.
+ *
+ * When no explicit credential mode is supplied, `AWS_BEARER_TOKEN_BEDROCK` is
+ * preferred, followed by the default AWS credential-provider chain.
+ */
 export interface BedrockProviderOptions extends BedrockEndpointOptions, BedrockBearerOptions {
-  /** Explicit AWS access key ID. Must be paired with secretAccessKey. */
+  /** Explicit AWS access-key identifier; must be paired with `secretAccessKey`. */
   accessKeyId?: string | undefined;
 
-  /** Explicit AWS secret access key. Must be paired with accessKeyId. */
+  /** Explicit AWS secret access key; must be paired with `accessKeyId`. */
   secretAccessKey?: string | undefined;
 
-  /** Optional session token for explicit temporary AWS credentials. */
+  /** Session token for explicit temporary AWS credentials; requires both access-key fields. */
   sessionToken?: string | undefined;
 
-  /** Explicit AWS shared-config profile. */
+  /** AWS shared-config profile; cannot be combined with another explicit credential mode. */
   profile?: string | undefined;
 
-  /** A refreshable provider returning AWS credentials. */
+  /** Refreshable signing-credential provider invoked for each request attempt, including retries. */
   credentialProvider?: AwsCredentialsProvider | undefined;
 }
 
@@ -53,7 +71,9 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
       'The `accessKeyId` and `secretAccessKey` options must be provided together. A `sessionToken` may only be used with both.',
     );
   }
-  if (!hasAccessKey) return undefined;
+  if (!hasAccessKey) {
+    return undefined;
+  }
 
   if (
     typeof options.accessKeyId !== 'string' ||
@@ -83,19 +103,24 @@ function requestTarget(parsedURL: URL): { path: string; query: Record<string, st
   const query: Record<string, string | string[]> = {};
   for (const [name, value] of parsedURL.searchParams) {
     const existing = query[name];
-    query[name] =
-      existing === undefined
-        ? value
-        : typeof existing === 'string'
-          ? [existing, value]
-          : [...existing, value];
+    if (existing === undefined) {
+      query[name] = value;
+    } else if (typeof existing === 'string') {
+      query[name] = [existing, value];
+    } else {
+      query[name] = [...existing, value];
+    }
   }
   return { path: parsedURL.pathname, query };
 }
 
 function signableBody(body: BodyInit | null | undefined): string | ArrayBuffer | ArrayBufferView | undefined {
-  if (body === undefined || body === null) return undefined;
-  if (typeof body === 'string' || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body;
+  if (body === undefined || body === null) {
+    return undefined;
+  }
+  if (typeof body === 'string' || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+    return body;
+  }
   throw new Errors.OpenAIError(
     "The SDK's Bedrock SigV4 mode requires a replayable request body. Buffer the body before sending or use bearer authentication.",
   );
@@ -117,22 +142,27 @@ function validateCredentialIdentity(identity: AwsCredentialIdentity): AwsCredent
   return identity;
 }
 
+type BedrockSigV4AuthOptions = {
+  region: string;
+  staticCredentials?: AwsCredentialIdentity | undefined;
+  profile?: string | undefined;
+  credentialProvider?: AwsCredentialsProvider | undefined;
+  usesDefaultChain: boolean;
+};
+
 class BedrockSigV4Auth implements BedrockRequestAuth {
   private signer: SignatureV4 | undefined;
   private resolvedCredentialsProvider: (() => Promise<AwsCredentialIdentity>) | undefined;
+  private readonly options: BedrockSigV4AuthOptions;
 
-  constructor(
-    private readonly options: {
-      region: string;
-      staticCredentials?: AwsCredentialIdentity | undefined;
-      profile?: string | undefined;
-      credentialProvider?: AwsCredentialsProvider | undefined;
-      usesDefaultChain: boolean;
-    },
-  ) {}
+  constructor(options: BedrockSigV4AuthOptions) {
+    this.options = options;
+  }
 
   private credentialsProvider(): () => Promise<AwsCredentialIdentity> {
-    if (this.resolvedCredentialsProvider) return this.resolvedCredentialsProvider;
+    if (this.resolvedCredentialsProvider) {
+      return this.resolvedCredentialsProvider;
+    }
 
     if (this.options.staticCredentials) {
       const credentials = this.options.staticCredentials;
@@ -190,7 +220,7 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
         method,
         ...requestTarget(parsedURL),
         headers: Object.fromEntries(headers.entries()),
-        ...(body !== undefined ? { body } : {}),
+        ...(body === undefined ? {} : { body }),
       });
     } catch (cause) {
       const message = this.options.usesDefaultChain
@@ -205,7 +235,22 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
   }
 }
 
-/** Configure the standard OpenAI client for Amazon Bedrock using bearer or AWS authentication. */
+/**
+ * Configures the standard OpenAI client for Amazon Bedrock bearer or AWS SigV4 authentication.
+ *
+ * Explicit bearer credentials, static AWS credentials, a shared-config profile,
+ * and a credential provider are mutually exclusive. Without explicit
+ * credentials, `AWS_BEARER_TOKEN_BEDROCK` takes precedence over the default AWS
+ * credential chain. The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`.
+ *
+ * This entrypoint requires `@aws-sdk/credential-provider-node`,
+ * `@smithy/hash-node`, and `@smithy/signature-v4`. AWS signing is available in
+ * Node.js-compatible server runtimes and requires replayable request bodies.
+ *
+ * @param options Bedrock endpoint and optional explicit authentication settings.
+ * @returns A provider accepted by `new OpenAI({ provider })`.
+ * @throws {OpenAIError} If endpoint settings or credential modes are invalid or ambiguous.
+ */
 export function bedrock(options: BedrockProviderOptions = {}): Provider {
   const staticCredentials = validateStaticCredentials(options);
   const profile = normalizeOptionalString(options.profile);

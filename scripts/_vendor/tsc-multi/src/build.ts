@@ -1,15 +1,15 @@
-import { fork } from 'child_process';
-import { join } from 'path';
-import { Config, Target } from './config';
-import { WorkerOptions } from './worker/types';
-import { Stream } from 'stream';
+import { fork } from 'node:child_process';
+import path = require('node:path');
+import type { Config, Target } from './config';
+import type { WorkerOptions } from './worker/types';
+import type { Stream } from 'node:stream';
 import { trimPrefix } from './utils';
 import { getReportStyles } from './report';
-import onExit from 'signal-exit';
+import { onExit } from 'signal-exit';
 import pAll from 'p-all';
 import debug from './debug';
 
-const WORKER_PATH = join(__dirname, 'worker/entry.ts');
+const WORKER_PATH = path.join(__dirname, 'worker/entry.ts');
 const TS_NODE_REGISTER = require.resolve('ts-node/register/transpile-only');
 const WORKER_TS_NODE_ENV = {
   TS_NODE_SKIP_PROJECT: 'true',
@@ -114,8 +114,8 @@ export async function build({
       const prefix = `[${trimPrefix(extname || DEFAULT_EXTNAME, '.')}]: `;
       const prefixStyle = reportStyles[i % reportStyles.length];
 
-      return () => {
-        return runWorker({
+      return () =>
+        runWorker({
           ...options,
           projects,
           stdout,
@@ -127,7 +127,6 @@ export async function build({
           reportPrefix: prefixStyle(prefix),
           transpileOnly,
         });
-      };
     }),
     { concurrency: maxWorkers },
   );

@@ -21,7 +21,7 @@ type BenchmarkPayload = {
 type BenchmarkFixture = {
   label: string;
   chunks: Uint8Array[];
-  expected: Array<{ data: string; payload: BenchmarkPayload }>;
+  expected: { data: string; payload: BenchmarkPayload }[];
 };
 
 const BENCHMARK_OPTIONS = {
@@ -32,18 +32,18 @@ const BENCHMARK_OPTIONS = {
 } as const;
 
 const FIXTURE_SPECS: readonly FixtureSpec[] = [
-  { label: '1 KiB event / 1-byte chunks', payloadBytes: 1_024, chunkBytes: 1 },
-  { label: '1 KiB event / 64-byte chunks', payloadBytes: 1_024, chunkBytes: 64 },
-  { label: '1 KiB event / 1 KiB chunks', payloadBytes: 1_024, chunkBytes: 1_024 },
-  { label: '8 KiB event / 1-byte chunks', payloadBytes: 8_192, chunkBytes: 1 },
-  { label: '8 KiB event / 64-byte chunks', payloadBytes: 8_192, chunkBytes: 64 },
-  { label: '8 KiB event / 1 KiB chunks', payloadBytes: 8_192, chunkBytes: 1_024 },
+  { label: '1 KiB event / 1-byte chunks', payloadBytes: 1024, chunkBytes: 1 },
+  { label: '1 KiB event / 64-byte chunks', payloadBytes: 1024, chunkBytes: 64 },
+  { label: '1 KiB event / 1 KiB chunks', payloadBytes: 1024, chunkBytes: 1024 },
+  { label: '8 KiB event / 1-byte chunks', payloadBytes: 8192, chunkBytes: 1 },
+  { label: '8 KiB event / 64-byte chunks', payloadBytes: 8192, chunkBytes: 64 },
+  { label: '8 KiB event / 1 KiB chunks', payloadBytes: 8192, chunkBytes: 1024 },
   { label: '16 KiB event / 1-byte chunks', payloadBytes: 16_384, chunkBytes: 1 },
-  { label: '16 KiB event / 1 KiB chunks', payloadBytes: 16_384, chunkBytes: 1_024 },
+  { label: '16 KiB event / 1 KiB chunks', payloadBytes: 16_384, chunkBytes: 1024 },
   { label: '64 short events / 64-byte chunks', payloadBytes: 128, chunkBytes: 64, eventCount: 64 },
-  { label: '64 short events / 1 KiB chunks', payloadBytes: 128, chunkBytes: 1_024, eventCount: 64 },
-  { label: 'CRLF delimiter / 1-byte chunks', payloadBytes: 1_024, chunkBytes: 1, lineEnding: '\r\n' },
-  { label: 'CR delimiter / 1-byte chunks', payloadBytes: 1_024, chunkBytes: 1, lineEnding: '\r' },
+  { label: '64 short events / 1 KiB chunks', payloadBytes: 128, chunkBytes: 1024, eventCount: 64 },
+  { label: 'CRLF delimiter / 1-byte chunks', payloadBytes: 1024, chunkBytes: 1, lineEnding: '\r\n' },
+  { label: 'CR delimiter / 1-byte chunks', payloadBytes: 1024, chunkBytes: 1, lineEnding: '\r' },
 ];
 
 const FIXTURES = FIXTURE_SPECS.map(createFixture);

@@ -1,11 +1,12 @@
 import type ts from 'typescript';
 import debug from './debug';
-import { createReporter, Reporter } from '../report';
+import type { Reporter } from '../report';
+import { createReporter } from '../report';
 import { mergeCustomTransformers, trimSuffix, isIncrementalCompilation } from '../utils';
 import { createTransformer } from '../transformer';
-import { WorkerOptions } from './types';
-import { dirname, extname, join, resolve } from 'path';
-import assert from 'assert';
+import type { WorkerOptions } from './types';
+import nodePath = require('node:path');
+import assert from 'node:assert';
 import { helpers } from '../helpers';
 
 const JS_EXT = '.js';
@@ -24,18 +25,18 @@ type TS = typeof ts;
 
 function loadCompiler(cwd: string, name = 'typescript'): TS {
   const path = require.resolve(name, { paths: [cwd, __dirname] });
+  // oxlint-disable-next-line node/global-require -- The compiler package is selected at runtime from worker options.
   return require(path);
 }
 
 export class Worker {
+  private readonly data: WorkerOptions;
   private readonly ts: TS;
   private readonly system: ts.System;
   private readonly reporter: Reporter;
 
-  constructor(
-    private readonly data: WorkerOptions,
-    system?: ts.System,
-  ) {
+  constructor(data: WorkerOptions, system?: ts.System) {
+    this.data = data;
     this.ts = loadCompiler(data.cwd, data.compiler);
     this.system = this.createSystem(system || this.ts.sys);
     this.reporter = createReporter({
@@ -63,25 +64,33 @@ export class Worker {
   }
 
   private getJSPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, JS_EXT) + this.data.extname;
   }
 
   private getJSMapPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, JS_MAP_EXT) + this.data.extname + MAP_EXT;
   }
 
   private getDTSPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, DTS_EXT) + extnameDeclMap[this.data.extname];
   }
 
   private getDTSMapPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, DTS_MAP_EXT) + extnameDeclMap[this.data.extname] + MAP_EXT;
   }
@@ -150,18 +159,21 @@ export class Worker {
     return {
       ...sys,
       fileExists: (inputPath) => {
-        return getReadPaths(inputPath).reduce<boolean>(
-          (result, path) => result || sys.fileExists(path),
-          false,
-        );
+        for (const path of getReadPaths(inputPath)) {
+          if (sys.fileExists(path)) {
+            return true;
+          }
+        }
+        return false;
       },
       readFile: (inputPath, encoding) => {
-        return (
-          getReadPaths(inputPath).reduce<string | undefined | null>(
-            (result, path) => result ?? sys.readFile(path, encoding),
-            null,
-          ) ?? undefined
-        );
+        for (const path of getReadPaths(inputPath)) {
+          const result = sys.readFile(path, encoding);
+          if (result !== undefined && result !== null) {
+            return result;
+          }
+        }
+        return undefined;
       },
       writeFile: (path, data, writeByteOrderMark) => {
         const newPath = this.rewritePath(path);
@@ -266,16 +278,22 @@ export class Worker {
     };
 
     host.getParsedCommandLine = (path: string) => {
-      const basePath = trimSuffix(path, extname(path));
-      const { options } = this.ts.convertCompilerOptionsFromJson(this.data.target, dirname(path), path);
+      const basePath = trimSuffix(path, nodePath.extname(path));
+      const { options } = this.ts.convertCompilerOptionsFromJson(
+        this.data.target,
+        nodePath.dirname(path),
+        path,
+      );
 
       const config = this.ts.getParsedCommandLineOfConfigFile(path, options, parseConfigFileHost);
-      if (!config) return;
+      if (!config) {
+        return;
+      }
 
       if (this.data.shareHelpers) {
         const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
         config.options.importHelpers = true;
-        resolvedShareHelpers = resolve(root, this.data.shareHelpers);
+        resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);
       }
 
       // Set separated tsbuildinfo paths to avoid that multiple workers to
@@ -309,7 +327,7 @@ export class Worker {
 
         if (this.data.shareHelpers) {
           const out = program.getCompilerOptions().outDir;
-          assert(out, 'outDir must be set when specifying shareHelpers');
+          assert.ok(out, 'outDir must be set when specifying shareHelpers');
           const write = writeFile || this.system.writeFile;
           this.writeHelpers(helpersNeeded, write, out, program.getCompilerOptions());
         }
@@ -327,7 +345,7 @@ export class Worker {
     out: string,
     compilerOptions: ts.CompilerOptions,
   ) {
-    assert(this.data.shareHelpers);
+    assert.ok(this.data.shareHelpers);
     const helperDeps = [...helpersNeeded].filter((e) => helpers[e]);
     let helperLength = 0;
     while (helperLength !== helperDeps.length) {
@@ -341,7 +359,7 @@ export class Worker {
       }
     }
     write(
-      resolve(out, this.data.shareHelpers),
+      nodePath.resolve(out, this.data.shareHelpers),
       this.ts.transpileModule(
         helperDeps.map((name) => helpers[name].code).join('\n\n') +
           `\n\nexport { ${[...helpersNeeded].join(', ')} };\n`,
@@ -366,7 +384,7 @@ export class Worker {
   private transpileProject(projectPath: string) {
     const tsConfigPath = this.system.fileExists(projectPath)
       ? projectPath
-      : join(projectPath, 'tsconfig.json');
+      : nodePath.join(projectPath, 'tsconfig.json');
     const { options } = this.ts.convertCompilerOptionsFromJson(this.data.target, projectPath, tsConfigPath);
 
     const parseConfigFileHost: ts.ParseConfigFileHost = {
@@ -375,18 +393,20 @@ export class Worker {
     };
 
     const config = this.ts.getParsedCommandLineOfConfigFile(tsConfigPath, options, parseConfigFileHost);
-    if (!config) return;
+    if (!config) {
+      return;
+    }
 
     let resolvedShareHelpers: string | undefined;
     if (this.data.shareHelpers) {
       const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
       config.options.importHelpers = true;
-      resolvedShareHelpers = resolve(root, this.data.shareHelpers);
+      resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);
     }
 
     const helpersNeeded = new Set<string>();
 
-    // TODO: Merge custom transformers
+    // Custom transformers are not merged with the generated transformer.
     const transformers: ts.CustomTransformers = {
       after: [
         createTransformer({
@@ -430,7 +450,7 @@ export class Worker {
 
     if (this.data.shareHelpers) {
       const out = config.options.outDir;
-      assert(out, 'outDir must be set when specifying shareHelpers');
+      assert.ok(out, 'outDir must be set when specifying shareHelpers');
       this.writeHelpers(helpersNeeded, this.system.writeFile, out, config.options);
     }
   }

@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import type { BatchCancelledWebhookEvent, UnwrapWebhookEvent } from '../src/resources/webhooks';
 import type { Conversation, ConversationDeletedResource } from '../src/resources/conversations';
 

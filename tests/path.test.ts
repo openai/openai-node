@@ -27,8 +27,12 @@ describe('path template tag function', () => {
     ];
 
     function paramPermutations(len: number): string[][] {
-      if (len === 0) return [];
-      if (len === 1) return testParams.map((e) => [e]);
+      if (len === 0) {
+        return [];
+      }
+      if (len === 1) {
+        return testParams.map((e) => [e]);
+      }
       const rest = paramPermutations(len - 1);
       return testParams.flatMap((e) => rest.map((r) => [e, ...r]));
     }
@@ -38,12 +42,15 @@ describe('path template tag function', () => {
 
     const emptyObject = {};
     const mathObject = Math;
+    // oxlint-disable-next-line no-new-wrappers, unicorn/new-for-builtins -- intentionally test a boxed Number path parameter
     const numberObject = new Number();
+    // oxlint-disable-next-line no-new-wrappers, unicorn/new-for-builtins -- intentionally test a boxed String path parameter
     const stringObject = new String();
     const basicClass = new (class {
       readonly kind = 'class';
     })();
     const classWithToString = new (class {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture intentionally exercises an instance toString protocol.
       toString() {
         return 'ok';
       }
@@ -113,6 +120,7 @@ describe('path template tag function', () => {
     const crossRealmString = new newRealm.String();
     const crossRealmClass = new (class extends newRealm.Object {})();
     const crossRealmClassWithToString = new (class extends newRealm.Object {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture intentionally exercises an instance toString protocol.
       toString() {
         return 'ok';
       }
@@ -143,11 +151,7 @@ describe('path template tag function', () => {
     expect(rawPath`${crossRealmString}/`).toBe('/');
     expect(rawPath`/${crossRealmClassWithToString}`).toBe('/ok');
 
-    const results: {
-      [pathParts: string]: {
-        [params: string]: { valid: boolean; result?: string; error?: string };
-      };
-    } = {};
+    const results: Record<string, Record<string, { valid: boolean; result?: string; error?: string }>> = {};
 
     for (const pathParts of testCases) {
       const pathResults: Record<string, { valid: boolean; result?: string; error?: string }> = {};
@@ -437,7 +441,7 @@ describe('encodeURIPath', () => {
   const testCases: string[] = [
     '',
     // Every ASCII character
-    ...Array.from({ length: 0x7f }, (_, i) => String.fromCharCode(i)),
+    ...Array.from({ length: 0x7f }, (_, i) => String.fromCodePoint(i)),
     // Unicode BMP codepoint
     'å',
     // Unicode supplementary codepoint

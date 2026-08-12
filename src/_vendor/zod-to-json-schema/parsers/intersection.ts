@@ -1,7 +1,8 @@
-import { ZodIntersectionDef } from 'zod/v3';
-import { JsonSchema7Type, parseDef } from '../parseDef';
-import { Refs } from '../Refs';
-import { JsonSchema7StringType } from './string';
+import type { ZodIntersectionDef } from 'zod/v3';
+import type { JsonSchema7Type } from '../parseDef';
+import { parseDef } from '../parseDef';
+import type { Refs } from '../Refs';
+import type { JsonSchema7StringType } from './string';
 
 export type JsonSchema7AllOfType = {
   allOf: JsonSchema7Type[];
@@ -11,7 +12,9 @@ export type JsonSchema7AllOfType = {
 const isJsonSchema7AllOfType = (
   type: JsonSchema7Type | JsonSchema7StringType,
 ): type is JsonSchema7AllOfType => {
-  if ('type' in type && type.type === 'string') return false;
+  if ('type' in type && type.type === 'string') {
+    return false;
+  }
   return 'allOf' in type;
 };
 
@@ -35,7 +38,7 @@ export function parseIntersectionDef(
 
   const mergedAllOf: JsonSchema7Type[] = [];
   // If either of the schemas is an allOf, merge them into a single allOf
-  allOf.forEach((schema) => {
+  for (const schema of allOf) {
     if (isJsonSchema7AllOfType(schema)) {
       mergedAllOf.push(...schema.allOf);
       if (schema.unevaluatedProperties === undefined) {
@@ -54,7 +57,7 @@ export function parseIntersectionDef(
       }
       mergedAllOf.push(nestedSchema);
     }
-  });
+  }
   return mergedAllOf.length
     ? {
         allOf: mergedAllOf,

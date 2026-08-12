@@ -1,4 +1,5 @@
 import type { JSONSchema, JSONSchemaDefinition } from './jsonschema';
+import { hasOwn } from '../internal/utils';
 
 const JSON_SCHEMA_ANNOTATION_KEYWORDS = new Set([
   '$comment',
@@ -86,6 +87,7 @@ const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
   'type',
 ]);
 
+/** Visits a nested schema together with its root-relative path and containing schema keyword. */
 type JSONSchemaChildVisitor = (schema: unknown, path: string[], keyword: string) => void;
 
 /**
@@ -119,17 +121,29 @@ export function forEachJSONSchemaChild(
 
   for (const keyword of JSON_SCHEMA_MAP_SCHEMA_KEYWORDS) {
     const children = record[keyword];
-    if (!isObject(children)) continue;
+    if (!isObject(children)) {
+      continue;
+    }
 
     for (const [key, child] of Object.entries(children)) {
       // Draft 7 dependencies also permits property dependency arrays. They
       // are not schemas and must not be traversed as literal JSON payloads.
-      if (keyword === 'dependencies' && !isSchemaDefinition(child)) continue;
+      if (keyword === 'dependencies' && !isSchemaDefinition(child)) {
+        continue;
+      }
       visit(child, [...path, keyword, key], keyword);
     }
   }
 }
 
+/**
+ * Returns a cloned schema normalized for strict Structured Outputs.
+ *
+ * Object properties become required, object schemas are closed to additional
+ * properties, and representable local references and intersections are preserved.
+ *
+ * @throws {Error} If the schema cannot be represented without changing its validation semantics.
+ */
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const schemaCopy = structuredClone(schema);
   // JSON serialization omits undefined object properties. Drop optional
@@ -442,10 +456,7 @@ function planPromotedRootAnyOfDefinitionRenames(
     let aliasIndex = 0;
 
     for (const [name, definition] of Object.entries(branchDefinitions)) {
-      if (
-        !Object.prototype.hasOwnProperty.call(rootDefinitions, name) ||
-        schemasEqual(rootDefinitions[name], definition)
-      ) {
+      if (!hasOwn(rootDefinitions, name) || schemasEqual(rootDefinitions[name], definition)) {
         continue;
       }
 
@@ -593,25 +604,25 @@ function isNullable(schema: JSONSchemaDefinition, root: JSONSchema, seenRefs = n
     return false;
   }
 
-  if (schema.allOf !== undefined) {
-    if (!Array.isArray(schema.allOf) || !schema.allOf.every((variant) => isNullable(variant, root))) {
-      return false;
-    }
+  if (
+    schema.allOf !== undefined &&
+    (!Array.isArray(schema.allOf) || !schema.allOf.every((variant) => isNullable(variant, root)))
+  ) {
+    return false;
   }
 
-  if (schema.anyOf !== undefined) {
-    if (!Array.isArray(schema.anyOf) || !schema.anyOf.some((variant) => isNullable(variant, root))) {
-      return false;
-    }
+  if (
+    schema.anyOf !== undefined &&
+    (!Array.isArray(schema.anyOf) || !schema.anyOf.some((variant) => isNullable(variant, root)))
+  ) {
+    return false;
   }
 
-  if (schema.oneOf !== undefined) {
-    if (
-      !Array.isArray(schema.oneOf) ||
-      schema.oneOf.filter((variant) => isNullable(variant, root)).length !== 1
-    ) {
-      return false;
-    }
+  if (
+    schema.oneOf !== undefined &&
+    (!Array.isArray(schema.oneOf) || schema.oneOf.filter((variant) => isNullable(variant, root)).length !== 1)
+  ) {
+    return false;
   }
 
   // Conditional and negated schemas need a full JSON Schema evaluator to prove
@@ -695,7 +706,7 @@ function ensureStrictJsonSchema(
   const properties = jsonSchema.properties;
   if (hasObjectShape(jsonSchema)) {
     for (const key of required) {
-      if (!isObject(properties) || !Object.prototype.hasOwnProperty.call(properties, key)) {
+      if (!isObject(properties) || !hasOwn(properties, key)) {
         throw new Error(
           `Object schema at \`${
             path.join('/') || '<root>'
@@ -723,7 +734,7 @@ function ensureStrictJsonSchema(
   const items = jsonSchema.items;
   const additionalItems = jsonSchema.additionalItems;
   if (Array.isArray(items)) {
-    throw new Error(
+    throw new TypeError(
       `Schema at \`${
         path.join('/') || '<root>'
       }\` uses tuple-form \`items\`, which cannot be represented in strict Structured Outputs.`,
@@ -739,27 +750,25 @@ function ensureStrictJsonSchema(
 
   // Handle intersections (allOf)
   const allOf = jsonSchema.allOf;
-  if (Array.isArray(allOf)) {
-    if (allOf.length === 1 && hasOnlyAnnotationSiblings(jsonSchema, 'allOf')) {
-      const branch = allOf[0]!;
-      if (branch === false) {
-        throw new Error(
-          `Schema at \`${
-            path.join('/') || '<root>'
-          }\` uses \`allOf: [false]\`, which cannot be represented in strict Structured Outputs.`,
-        );
-      }
-      if (branch === true) {
-        // true is the neutral schema for an intersection, so removing this
-        // branch preserves validation while retaining the parent annotations.
-        delete jsonSchema.allOf;
-      } else {
-        const resolved = ensureStrictJsonSchema(branch, [...path, 'allOf', '0'], root);
-        const annotations = { ...jsonSchema };
-        delete annotations.allOf;
-        Object.assign(jsonSchema, resolved, annotations);
-        delete jsonSchema.allOf;
-      }
+  if (Array.isArray(allOf) && allOf.length === 1 && hasOnlyAnnotationSiblings(jsonSchema, 'allOf')) {
+    const branch = allOf[0]!;
+    if (branch === false) {
+      throw new Error(
+        `Schema at \`${
+          path.join('/') || '<root>'
+        }\` uses \`allOf: [false]\`, which cannot be represented in strict Structured Outputs.`,
+      );
+    }
+    if (branch === true) {
+      // true is the neutral schema for an intersection, so removing this
+      // branch preserves validation while retaining the parent annotations.
+      delete jsonSchema.allOf;
+    } else {
+      const resolved = ensureStrictJsonSchema(branch, [...path, 'allOf', '0'], root);
+      const annotations = { ...jsonSchema };
+      delete annotations.allOf;
+      Object.assign(jsonSchema, resolved, annotations);
+      delete jsonSchema.allOf;
     }
   }
 
@@ -852,18 +861,24 @@ function resolvePointerPart(resolved: unknown, part: string): unknown | undefine
     }
 
     const index = Number(part);
-    if (!Object.prototype.hasOwnProperty.call(resolved, index)) {
+    if (!hasOwn(resolved, index)) {
       return undefined;
     }
     return resolved[index];
   }
 
-  if (!isObject(resolved) || !Object.prototype.hasOwnProperty.call(resolved, part)) {
+  if (!isObject(resolved) || !hasOwn(resolved, part)) {
     return undefined;
   }
   return resolved[part];
 }
 
+/**
+ * Resolves a local JSON Pointer through schema-bearing keywords only.
+ *
+ * Returns `undefined` for external references, malformed pointers, missing
+ * targets, and pointers into literal values such as `default` or `enum`.
+ */
 export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | undefined {
   const parts = parseLocalRef(ref);
   if (parts === undefined) {
@@ -922,7 +937,7 @@ export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefini
   return isSchemaDefinition(resolved) ? resolved : undefined;
 }
 
-function isObject<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
+function isObject<T>(obj: T | any[]): obj is Extract<T, Record<string, any>> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
@@ -1016,6 +1031,7 @@ function isArrayOnlySchema(
   );
 }
 
+/** Returns whether a schema contains only a reference, reusable definitions, and annotations. */
 export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
   return Object.keys(schema).every(
     // Definition maps do not add sibling validation constraints, and keeping
@@ -1152,6 +1168,11 @@ function normalizeAnyOfFalseBranches(jsonSchema: JSONSchema): void {
   }
 }
 
+/**
+ * Rejects nested schema resource identifiers that would change local reference scope.
+ *
+ * @throws {Error} If a nested subschema defines its own `$id`.
+ */
 export function assertNoNestedSchemaIds(schema: JSONSchema): void {
   const visit = (value: JSONSchemaDefinition, path: string[]): void => {
     if (typeof value === 'boolean' || !isObject(value)) {
@@ -1298,7 +1319,7 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
         }
 
         const branchIndex = Number(branchIndexPart);
-        if (!Object.prototype.hasOwnProperty.call(branches, branchIndex)) {
+        if (!hasOwn(branches, branchIndex)) {
           return ref;
         }
 
@@ -1392,7 +1413,7 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
     }
 
     let alias = '__openai_strict_allOf_ref_' + aliasIndex++;
-    while (Object.prototype.hasOwnProperty.call(definitions, alias)) {
+    while (hasOwn(definitions, alias)) {
       alias = '__openai_strict_allOf_ref_' + aliasIndex++;
     }
     definitions[alias] = structuredClone(target);
@@ -1469,7 +1490,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
     }
 
     let alias = '__openai_strict_allOf_property_ref_' + aliasIndex++;
-    while (Object.prototype.hasOwnProperty.call(definitions, alias)) {
+    while (hasOwn(definitions, alias)) {
       alias = '__openai_strict_allOf_property_ref_' + aliasIndex++;
     }
     definitions[alias] = structuredClone(target);
@@ -1755,7 +1776,7 @@ function mergeObjectAllOf(
     }
   }
 
-  const branches: Array<{ schema: JSONSchema; sourcePath: string[] | undefined }> = [];
+  const branches: { schema: JSONSchema; sourcePath: string[] | undefined }[] = [];
   if (parentHasObjectShape) {
     branches.push({ schema: jsonSchema, sourcePath: path });
   }
@@ -1799,11 +1820,11 @@ function mergeObjectAllOf(
   const mergedProperties = Object.create(null) as Record<string, JSONSchemaDefinition>;
   const mergedRequired = new Set<string>();
   const closedPropertySets: Set<string>[] = [];
-  const propertyEntries: Array<{
+  const propertyEntries: {
     key: string;
     propertySchema: JSONSchemaDefinition;
     sourcePath: string[] | undefined;
-  }> = [];
+  }[] = [];
   let sawProperties = false;
   let sawRequired = false;
   let hasExplicitObjectType = false;
@@ -1811,7 +1832,9 @@ function mergeObjectAllOf(
 
   const mergeAnnotations = (schema: JSONSchema) => {
     for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
-      if (!(keyword in schema)) continue;
+      if (!(keyword in schema)) {
+        continue;
+      }
       // Annotation keywords do not affect Draft 7 validation. Preserve the
       // first value (the outer schema, then earlier branches) instead of
       // rejecting an otherwise exactly mergeable intersection.
@@ -1823,7 +1846,9 @@ function mergeObjectAllOf(
 
   mergeAnnotations(jsonSchema);
   for (const resolvedEntry of resolvedEntries) {
-    if (resolvedEntry === undefined) continue;
+    if (resolvedEntry === undefined) {
+      continue;
+    }
     for (const entry of resolvedEntry.refChain) {
       mergeAnnotations(entry);
     }
@@ -1831,7 +1856,9 @@ function mergeObjectAllOf(
 
   for (const { schema: branch, sourcePath } of branches) {
     for (const keyword of Object.keys(branch)) {
-      if (keyword === 'allOf' && branch === jsonSchema) continue;
+      if (keyword === 'allOf' && branch === jsonSchema) {
+        continue;
+      }
       if (
         (keyword === '$defs' || keyword === 'definitions') &&
         isObject((branch as Record<string, unknown>)[keyword])
@@ -1876,7 +1903,9 @@ function mergeObjectAllOf(
         fail();
       }
       sawRequired = true;
-      for (const key of branch.required) mergedRequired.add(key);
+      for (const key of branch.required) {
+        mergedRequired.add(key);
+      }
     }
 
     if ('additionalProperties' in branch) {
@@ -1891,18 +1920,20 @@ function mergeObjectAllOf(
   // closed property sets before merging schemas so optional declarations
   // excluded by another closed branch are discarded, while required excluded
   // properties remain unrepresentable and fail closed.
-  const allowedClosedProperties =
-    closedPropertySets.length === 0
-      ? undefined
-      : closedPropertySets
-          .slice(1)
-          .reduce(
-            (allowed, keys) => new Set([...allowed].filter((key) => keys.has(key))),
-            new Set(closedPropertySets[0]),
-          );
+  let allowedClosedProperties: Set<string> | undefined;
+  if (closedPropertySets.length > 0) {
+    allowedClosedProperties = new Set(closedPropertySets[0]);
+    for (const keys of closedPropertySets.slice(1)) {
+      for (const key of allowedClosedProperties) {
+        if (!keys.has(key)) {
+          allowedClosedProperties.delete(key);
+        }
+      }
+    }
+  }
+  const closedProperties = allowedClosedProperties;
   const excludesRequiredProperty =
-    allowedClosedProperties !== undefined &&
-    [...mergedRequired].some((key) => !allowedClosedProperties.has(key));
+    closedProperties !== undefined && [...mergedRequired].some((key) => !closedProperties.has(key));
   const collapsesToNull = excludesRequiredProperty && !hasExplicitObjectType && hasExplicitNullableObjectType;
   const discardedPropertyPaths = propertyEntries
     .filter(
@@ -1935,10 +1966,7 @@ function mergeObjectAllOf(
     if (allowedClosedProperties !== undefined && !allowedClosedProperties.has(key)) {
       continue;
     }
-    if (
-      Object.prototype.hasOwnProperty.call(mergedProperties, key) &&
-      !schemasEqual(mergedProperties[key], propertySchema)
-    ) {
+    if (hasOwn(mergedProperties, key) && !schemasEqual(mergedProperties[key], propertySchema)) {
       fail();
     }
     mergedProperties[key] = propertySchema;
@@ -1947,9 +1975,15 @@ function mergeObjectAllOf(
   if (hasExplicitObjectType || hasExplicitNullableObjectType) {
     merged.type = hasExplicitObjectType ? 'object' : ['object', 'null'];
   }
-  if (sawProperties) merged.properties = Object.fromEntries(Object.entries(mergedProperties));
-  if (sawRequired) merged.required = [...mergedRequired];
-  if (closedPropertySets.length > 0) merged.additionalProperties = false;
+  if (sawProperties) {
+    merged.properties = Object.fromEntries(Object.entries(mergedProperties));
+  }
+  if (sawRequired) {
+    merged.required = [...mergedRequired];
+  }
+  if (closedPropertySets.length > 0) {
+    merged.additionalProperties = false;
+  }
 
   for (const keyword of Object.keys(jsonSchema)) {
     delete (jsonSchema as any)[keyword];
@@ -2000,8 +2034,10 @@ function schemasEqual(left: unknown, right: unknown): boolean {
 
   const leftRecord = left as Record<string, unknown>;
   const rightRecord = right as Record<string, unknown>;
-  const leftKeys = Object.keys(leftRecord).sort();
-  const rightKeys = Object.keys(rightRecord).sort();
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  leftKeys.sort();
+  rightKeys.sort();
 
   if (leftKeys.length !== rightKeys.length) {
     return false;

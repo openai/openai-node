@@ -4,7 +4,8 @@
 // response with express and the stream async iterator.
 
 import OpenAI from 'openai';
-import express, { Request, Response } from 'express';
+import type { Request, Response } from 'express';
+import express from 'express';
 
 const openai = new OpenAI();
 const app = express();
@@ -28,29 +29,27 @@ app.use(express.text());
 //     }
 //   })
 //
-app.post('/', async (req: Request, res: Response) => {
-  try {
-    console.log('Received request:', req.body);
+const handleRequest = async (req: Request, res: Response) => {
+  console.log('Received request:', req.body);
 
-    const stream = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      stream: true,
-      messages: [{ role: 'user', content: req.body }],
-    });
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-3.5-turbo',
+    stream: true,
+    messages: [{ role: 'user', content: req.body }],
+  });
 
-    res.header('Content-Type', 'text/plain');
+  res.header('Content-Type', 'text/plain');
 
-    // Sends each content stream chunk-by-chunk, such that the client
-    // ultimately receives a single string.
-    for await (const chunk of stream) {
-      res.write(chunk.choices[0]?.delta.content || '');
-    }
-
-    res.end();
-  } catch (e) {
-    console.error(e);
+  // Sends each content stream chunk-by-chunk, such that the client
+  // ultimately receives a single string.
+  for await (const chunk of stream) {
+    res.write(chunk.choices[0]?.delta.content || '');
   }
-});
+
+  res.end();
+};
+
+app.post('/', (req: Request, res: Response) => handleRequest(req, res).catch(console.error));
 
 app.listen('3000', () => {
   console.log('Started proxy express server');

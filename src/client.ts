@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
@@ -795,8 +795,13 @@ export class OpenAI {
 
     const security = options.__security ?? { bearerAuth: true };
     // `req.signal`, not `options.signal`: `prepareRequest` hooks run above and may
-    // have replaced it, and that replacement is what reaches `fetch`.
-    const controller = createRequestController(req.signal);
+    // have replaced it, and that replacement is what reaches `fetch`. A custom
+    // `fetchWithAuth` can still replace that signal later, so retain the existing
+    // forwarding behavior for subclasses that override that request boundary.
+    const controller =
+      this.fetchWithAuth === OpenAI.prototype.fetchWithAuth
+        ? createRequestController(req.signal)
+        : new AbortController();
     const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
     const headersTime = Date.now();
 
@@ -1177,6 +1182,7 @@ export class OpenAI {
       idempotencyHeaders[this.idempotencyHeader] = options.idempotencyKey;
     }
 
+    const helperMethod = options.__metadata?.['helperMethod'];
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1185,6 +1191,7 @@ export class OpenAI {
         'X-Stainless-Retry-Count': String(retryCount),
         ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
+        ...(typeof helperMethod === 'string' ? { 'X-Stainless-Helper-Method': helperMethod } : {}),
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },

@@ -1,4 +1,5 @@
-import { vi, type Mock } from 'vitest';
+import { vi } from 'vitest';
+import type { Mock } from 'vitest';
 
 import {
   k8sServiceAccountTokenProvider,
@@ -17,7 +18,7 @@ describe('Kubernetes Service Account Token Provider', () => {
   });
 
   test('reads token from file', async () => {
-    const fsPromises = await import('fs/promises');
+    const fsPromises = await import('node:fs/promises');
     (fsPromises.readFile as Mock).mockResolvedValue('  my-k8s-token  \n');
 
     const provider = k8sServiceAccountTokenProvider('/custom/path/token');
@@ -25,7 +26,7 @@ describe('Kubernetes Service Account Token Provider', () => {
     const token = await provider.getToken();
 
     expect(token).toBe('my-k8s-token');
-    expect(fsPromises.readFile).toHaveBeenCalledWith('/custom/path/token', 'utf8');
+    expect(fsPromises.readFile).toHaveBeenCalledWith('/custom/path/token', 'utf-8');
   });
 
   test('uses default path when none provided', async () => {
@@ -34,7 +35,7 @@ describe('Kubernetes Service Account Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on file read failure', async () => {
-    const fsPromises = await import('fs/promises');
+    const fsPromises = await import('node:fs/promises');
     (fsPromises.readFile as Mock).mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
     const provider = k8sServiceAccountTokenProvider('/nonexistent/path');
@@ -62,11 +63,11 @@ describe('Azure IMDS Token Provider', () => {
       const headers = new Headers(init?.headers);
       expect(headers.get('Metadata')).toBe('true');
 
-      return new Response(
-        JSON.stringify({
+      return Response.json(
+        {
           access_token: 'azure-token',
           expires_in: '3600',
-        }),
+        },
         { status: 200 },
       );
     }) as typeof fetch;
@@ -83,7 +84,7 @@ describe('Azure IMDS Token Provider', () => {
       const urlObj = new URL(url);
       expect(urlObj.searchParams.get('resource')).toBe('https://cognitiveservices.azure.com/');
 
-      return new Response(JSON.stringify({ access_token: 'azure-token' }), { status: 200 });
+      return Response.json({ access_token: 'azure-token' }, { status: 200 });
     }) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider('https://cognitiveservices.azure.com/');
@@ -96,10 +97,10 @@ describe('Azure IMDS Token Provider', () => {
     global.fetch = vi.fn(async (url: string) => {
       expect(url).toContain('api-version=2019-08-01');
 
-      return new Response(
-        JSON.stringify({
+      return Response.json(
+        {
           access_token: 'azure-token',
-        }),
+        },
         { status: 200 },
       );
     }) as typeof fetch;
@@ -113,14 +114,14 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('uses the configured fetch implementation', async () => {
-    const customFetch = vi.fn(async () => {
-      return new Response(
-        JSON.stringify({
+    const customFetch = vi.fn(async () =>
+      Response.json(
+        {
           access_token: 'azure-token',
-        }),
+        },
         { status: 200 },
-      );
-    }) as typeof fetch;
+      ),
+    ) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider(undefined, {
       fetch: customFetch,
@@ -131,9 +132,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on failed request', async () => {
-    global.fetch = vi.fn(async () => {
-      return new Response('Not found', { status: 404 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(async () => new Response('Not found', { status: 404 })) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);
@@ -141,9 +140,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError when access_token missing', async () => {
-    global.fetch = vi.fn(async () => {
-      return new Response(JSON.stringify({ expires_in: '3600' }), { status: 200 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(async () => Response.json({ expires_in: '3600' }, { status: 200 })) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);
@@ -181,9 +178,7 @@ describe('GCP Metadata Server Token Provider', () => {
   });
 
   test('uses the configured fetch implementation', async () => {
-    const customFetch = vi.fn(async () => {
-      return new Response('gcp-id-token', { status: 200 });
-    }) as typeof fetch;
+    const customFetch = vi.fn(async () => new Response('gcp-id-token', { status: 200 })) as typeof fetch;
 
     const provider = gcpIDTokenProvider('https://api.openai.com', {
       fetch: customFetch,
@@ -194,9 +189,7 @@ describe('GCP Metadata Server Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on failed request', async () => {
-    global.fetch = vi.fn(async () => {
-      return new Response('Unauthorized', { status: 401 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(async () => new Response('Unauthorized', { status: 401 })) as typeof fetch;
 
     const provider = gcpIDTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);

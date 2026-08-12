@@ -1,12 +1,12 @@
-import { resolve } from 'node:path';
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 import generatedTestPatterns from './scripts/generated-test-patterns.json';
 
 export default defineConfig({
   resolve: {
     alias: [
-      { find: /^openai$/, replacement: resolve(__dirname, 'src/index.ts') },
-      { find: /^openai\/(.*)$/, replacement: resolve(__dirname, 'src/$1') },
+      { find: /^openai$/, replacement: path.resolve(__dirname, 'src/index.ts') },
+      { find: /^openai\/(.*)$/, replacement: path.resolve(__dirname, 'src/$1') },
     ],
   },
   test: {

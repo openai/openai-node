@@ -15,10 +15,10 @@ async function main() {
     if (err instanceof NotFoundError) {
       console.log(`Caught NotFoundError!`);
       console.log(err);
-      console.log(`message: `, err.message);
-      console.log(`code: `, err.code);
-      console.log(`type: `, err.type);
-      console.log(`param: `, err.param);
+      console.log(`message:`, err.message);
+      console.log(`code:`, err.code);
+      console.log(`type:`, err.type);
+      console.log(`param:`, err.param);
     } else {
       console.log(`Raised unknown error`);
       throw err;

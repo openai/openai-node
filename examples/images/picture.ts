@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import OpenAI, { toFile } from 'openai';
 
 const openai = new OpenAI();
@@ -10,18 +10,14 @@ const inputImages = process.argv.slice(2);
 /**
  * Run without arguments to generate an image:
  *
- *   ./examples/picture.ts
+ *   ./examples/images/picture.ts
  *
  * Pass one or more PNG, JPEG, or WebP files to create an edited image:
  *
- *   ./examples/picture.ts image-1.png image-2.png
+ *   ./examples/images/picture.ts image-1.png image-2.png
  */
 async function main() {
-  if (inputImages.length === 0) {
-    await createImage();
-  } else {
-    await createImageEdit(inputImages);
-  }
+  await (inputImages.length === 0 ? createImage() : createImageEdit(inputImages));
 }
 
 async function createImage() {
@@ -53,15 +49,19 @@ async function createImageEdit(imageFiles: string[]) {
 
 function imageContentType(file: string): string {
   switch (path.extname(file).toLowerCase()) {
-    case '.png':
+    case '.png': {
       return 'image/png';
+    }
     case '.jpg':
-    case '.jpeg':
+    case '.jpeg': {
       return 'image/jpeg';
-    case '.webp':
+    }
+    case '.webp': {
       return 'image/webp';
-    default:
+    }
+    default: {
       throw new Error(`Unsupported image type for ${file}. Use a PNG, JPEG, or WebP file.`);
+    }
   }
 }
 

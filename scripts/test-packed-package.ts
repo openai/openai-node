@@ -1,10 +1,17 @@
-(() => {
-  const assert = require('node:assert/strict');
-  const childProcess = require('node:child_process');
-  const fs = require('node:fs');
-  const os = require('node:os');
-  const path = require('node:path');
+import type { Dirent } from 'node:fs';
 
+const packedPackageAssert = require('node:assert/strict');
+const packedPackageChildProcess = require('node:child_process');
+const packedPackageFs = require('node:fs');
+const packedPackageOs = require('node:os');
+const packedPackagePath = require('node:path');
+
+(() => {
+  const assert = packedPackageAssert;
+  const childProcess = packedPackageChildProcess;
+  const fs = packedPackageFs;
+  const os = packedPackageOs;
+  const path = packedPackagePath;
   interface PackageMetadata {
     engines?: {
       node?: string;
@@ -28,15 +35,15 @@
   const run = (command: string, args: string[], options: RunOptions = {}): string =>
     childProcess.execFileSync(command, args, {
       cwd: temporaryDirectory,
-      encoding: 'utf8',
+      encoding: 'utf-8',
       stdio: 'pipe',
       ...options,
     });
   const readPackage = (file: string): PackageMetadata =>
-    JSON.parse(fs.readFileSync(file, 'utf8')) as PackageMetadata;
+    JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
   const findSourceMaps = (directory: string): string[] => {
     const maps: string[] = [];
-    const entries = fs.readdirSync(directory, { withFileTypes: true }) as import('node:fs').Dirent[];
+    const entries = fs.readdirSync(directory, { withFileTypes: true }) as Dirent[];
     for (const entry of entries) {
       const resolved = path.join(directory, entry.name);
       if (entry.isDirectory() && entry.name !== 'node_modules') {
@@ -182,9 +189,10 @@
     );
 
     const mappedSources = new Map<string, string>();
-    const sourceMaps = findSourceMaps(installedPackageRoot).sort();
+    const sourceMaps = findSourceMaps(installedPackageRoot);
+    sourceMaps.sort();
     for (const mapPath of sourceMaps) {
-      const sourceMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')) as SourceMap;
+      const sourceMap = JSON.parse(fs.readFileSync(mapPath, 'utf-8')) as SourceMap;
       for (const source of sourceMap.sources) {
         const resolvedSource: string = path.resolve(
           path.dirname(mapPath),
@@ -227,10 +235,10 @@
 
     // Zod/AWS helpers require optional peers; Node-only helpers require @types/node.
     // Validate every other mapped source without installing either in this consumer.
-    const browserSafeSources = Array.from(mappedSources.entries())
+    const browserSafeSources = [...mappedSources.entries()]
       .filter(([source]) => !requiresOptionalPeer(source))
-      .map(([, source]) => source)
-      .sort();
+      .map(([, source]) => source);
+    browserSafeSources.sort();
     const sourceNavigationConfig = path.join(temporaryDirectory, 'source-navigation.tsconfig.json');
     fs.writeFileSync(
       sourceNavigationConfig,

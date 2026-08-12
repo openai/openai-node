@@ -34062,6 +34062,7 @@ components:
         file:
           description: |
             The audio file object (not file name) to transcribe, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
+            The request must include enough format metadata for the file to be identified. We recommend an extension-bearing filename and an appropriate content type.
           type: string
           x-oaiTypeLabel: file
           format: binary
@@ -34369,7 +34370,7 @@ components:
       properties:
         file:
           description: |
-            The audio file object (not file name) translate, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
+            The audio file object (not file name) translate, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm. The request must include enough format metadata for the file to be identified. We recommend an extension-bearing filename and an appropriate content type.
           type: string
           x-oaiTypeLabel: file
           format: binary
@@ -41080,6 +41081,9 @@ components:
         - gpt-5-pro
         - gpt-5-pro-2025-10-06
         - gpt-5.1-codex-max
+        - gpt-daybreak-blue-latest
+        - gpt-daybreak-red-latest
+        - gpt-5.6-cyber
     ModelIdsShared:
       example: gpt-5.4
       anyOf:
@@ -61674,7 +61678,6 @@ components:
           description: The namespace name used in tool calls (for example, `crm`).
         description:
           type: string
-          minLength: 1
           description: A description of the namespace shown to the model.
         tools:
           items:
@@ -62651,8 +62654,8 @@ components:
           - type: 'null'
       type: object
       required:
-      - call_id
       - type
+      - call_id
       - output
       title: Function tool call output
       description: The output of a function tool call.
@@ -66541,7 +66544,6 @@ components:
           description: The namespace name used in tool calls (for example, `crm`).
         description:
           type: string
-          minLength: 1
           description: A description of the namespace shown to the model.
         tools:
           items:
@@ -69679,8 +69681,8 @@ components:
           - type: 'null'
       type: object
       required:
-      - call_id
       - type
+      - call_id
       - output
       title: Function tool call output
       description: The output of a function tool call.
@@ -70938,6 +70940,9 @@ components:
         - gpt-5-pro
         - gpt-5-pro-2025-10-06
         - gpt-5.1-codex-max
+        - gpt-daybreak-blue-latest
+        - gpt-daybreak-red-latest
+        - gpt-5.6-cyber
     BetaModelIdsShared:
       example: gpt-5.4
       anyOf:

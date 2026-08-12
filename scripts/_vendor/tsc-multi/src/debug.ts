@@ -1,4 +1,4 @@
-import { debuglog } from 'util';
+import { debuglog } from 'node:util';
 
 type DebugLogger = ((formatter: string, ...args: unknown[]) => void) & {
   extend(name: string): DebugLogger;

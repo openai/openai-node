@@ -102,8 +102,9 @@ await client.webhooks.verifySignature(
 
 The default tolerance is 300 seconds. Timestamp validation rejects events that are too far in the past
 or future, so keep the receiving server's clock synchronized. Verification also requires the
-`webhook-id`, `webhook-timestamp`, and `webhook-signature` headers and a runtime that provides both
-Web Crypto and a Node-compatible `Buffer` global.
+`webhook-id`, `webhook-timestamp`, and `webhook-signature` headers and a runtime that provides
+Web Crypto, `TextEncoder`, and either `atob` or a Node-compatible `Buffer` global. This includes
+server-side edge runtimes that provide standard Web APIs without Node.js globals.
 
 ## Framework integration
 
