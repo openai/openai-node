@@ -148,16 +148,21 @@ jobs:
   test_matrix:
     name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
     if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
-    needs: [test]
+    needs: [test, benchmarks]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - name: Tests (all)
         env:
           TEST_RESULT: ${{ needs.test.result }}
+          BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}
         run: |
           if [ "$TEST_RESULT" != "success" ]; then
             echo "::error::Node.js test matrix result: $TEST_RESULT"
+            exit 1
+          fi
+          if [ "$BENCHMARKS_RESULT" != "success" ]; then
+            echo "::error::Performance benchmarks result: $BENCHMARKS_RESULT"
             exit 1
           fi
 
