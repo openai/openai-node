@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as AudioAPI from './audio';
@@ -39,7 +39,10 @@ export class Translations extends APIResource {
   ): APIPromise<TranslationCreateResponse | string> {
     return this._client.post(
       '/audio/translations',
-      multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }, this._client),
+      multipartFormRequestOptions(
+        { body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } },
+        this._client,
+      ),
     );
   }
 }
@@ -77,7 +80,9 @@ export interface TranslationCreateParams<
 > {
   /**
    * The audio file object (not file name) translate, in one of these formats: flac,
-   * mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
+   * mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm. The request must include enough
+   * format metadata for the file to be identified. We recommend an extension-bearing
+   * filename and an appropriate content type.
    */
   file: Uploadable;
 

@@ -16,7 +16,7 @@ const array_prefix_generators = {
   },
 };
 
-const push_to_array = function (arr: any[], value_or_array: any) {
+const push_to_array = function push_to_array(arr: any[], value_or_array: any) {
   Array.prototype.push.apply(arr, isArray(value_or_array) ? value_or_array : [value_or_array]);
 };
 
@@ -82,18 +82,18 @@ function inner_stringify(
   let tmp_sc = sideChannel;
   let step = 0;
   let find_flag = false;
-  while ((tmp_sc = tmp_sc.get(sentinel)) !== void undefined && !find_flag) {
+  while ((tmp_sc = tmp_sc.get(sentinel)) !== undefined && !find_flag) {
     // Where object last appeared in the ref tree
     const pos = tmp_sc.get(object);
     step += 1;
-    if (typeof pos !== 'undefined') {
+    if (pos !== undefined) {
       if (pos === step) {
         throw new RangeError('Cyclic object value');
       } else {
         find_flag = true; // Break while
       }
     }
-    if (typeof tmp_sc.get(sentinel) === 'undefined') {
+    if (tmp_sc.get(sentinel) === undefined) {
       step = 0;
     }
   }
@@ -103,7 +103,7 @@ function inner_stringify(
   } else if (obj instanceof Date) {
     obj = serializeDate?.(obj);
   } else if (generateArrayPrefix === 'comma' && isArray(obj)) {
-    obj = maybe_map(obj, function (value) {
+    obj = maybe_map(obj, (value) => {
       if (value instanceof Date) {
         return serializeDate?.(value);
       }
@@ -113,8 +113,8 @@ function inner_stringify(
 
   if (obj === null) {
     if (strictNullHandling) {
-      return encoder && !encodeValuesOnly ?
-          // @ts-expect-error
+      return encoder && !encodeValuesOnly
+        ? // @ts-expect-error
           encoder(prefix, defaults.encoder, charset, 'key', format)
         : prefix;
     }
@@ -124,10 +124,10 @@ function inner_stringify(
 
   if (is_non_nullish_primitive(obj) || is_buffer(obj)) {
     if (encoder) {
-      const key_value =
-        encodeValuesOnly ? prefix
-          // @ts-expect-error
-        : encoder(prefix, defaults.encoder, charset, 'key', format);
+      const key_value = encodeValuesOnly
+        ? prefix
+        : // @ts-expect-error
+          encoder(prefix, defaults.encoder, charset, 'key', format);
       return [
         formatter?.(key_value) +
           '=' +
@@ -140,7 +140,7 @@ function inner_stringify(
 
   const values: string[] = [];
 
-  if (typeof obj === 'undefined') {
+  if (obj === undefined) {
     return values;
   }
 
@@ -151,12 +151,15 @@ function inner_stringify(
       // @ts-expect-error values only
       obj = maybe_map(obj, encoder);
     }
-    obj_keys = [{ value: obj.length > 0 ? obj.join(',') || null : void undefined }];
+    obj_keys = [{ value: obj.length > 0 ? obj.join(',') || null : undefined }];
   } else if (isArray(filter)) {
     obj_keys = filter;
   } else {
     const keys = Object.keys(obj);
-    obj_keys = sort ? keys.sort(sort) : keys;
+    if (sort) {
+      keys.sort(sort);
+    }
+    obj_keys = keys;
   }
 
   const encoded_prefix = encodeDotInKeys ? String(prefix).replace(/\./g, '%2E') : String(prefix);
@@ -168,11 +171,10 @@ function inner_stringify(
     return adjusted_prefix + '[]';
   }
 
-  for (let j = 0; j < obj_keys.length; ++j) {
-    const key = obj_keys[j];
+  for (const key of obj_keys) {
     const value =
       // @ts-ignore
-      typeof key === 'object' && typeof key.value !== 'undefined' ? key.value : obj[key as any];
+      typeof key === 'object' && key.value !== undefined ? key.value : obj[key as any];
 
     if (skipNulls && value === null) {
       continue;
@@ -180,16 +182,18 @@ function inner_stringify(
 
     // @ts-ignore
     const encoded_key = allowDots && encodeDotInKeys ? (key as any).replace(/\./g, '%2E') : key;
-    const key_prefix =
-      isArray(obj) ?
-        typeof generateArrayPrefix === 'function' ?
-          generateArrayPrefix(adjusted_prefix, encoded_key)
-        : adjusted_prefix
-      : adjusted_prefix + (allowDots ? '.' + encoded_key : '[' + encoded_key + ']');
+    let key_prefix: string;
+    if (isArray(obj)) {
+      key_prefix =
+        typeof generateArrayPrefix === 'function'
+          ? generateArrayPrefix(adjusted_prefix, encoded_key)
+          : adjusted_prefix;
+    } else {
+      key_prefix = adjusted_prefix + (allowDots ? '.' + encoded_key : '[' + encoded_key + ']');
+    }
 
     sideChannel.set(object, step);
-    const valueSideChannel = new WeakMap();
-    valueSideChannel.set(sentinel, sideChannel);
+    const valueSideChannel = new WeakMap([[sentinel, sideChannel]]);
     push_to_array(
       values,
       inner_stringify(
@@ -222,25 +226,25 @@ function inner_stringify(
 function normalize_stringify_options(
   opts: StringifyOptions = defaults,
 ): NonNullableProperties<Omit<StringifyOptions, 'indices'>> & { indices?: boolean } {
-  if (typeof opts.allowEmptyArrays !== 'undefined' && typeof opts.allowEmptyArrays !== 'boolean') {
+  if (opts.allowEmptyArrays !== undefined && typeof opts.allowEmptyArrays !== 'boolean') {
     throw new TypeError('`allowEmptyArrays` option can only be `true` or `false`, when provided');
   }
 
-  if (typeof opts.encodeDotInKeys !== 'undefined' && typeof opts.encodeDotInKeys !== 'boolean') {
+  if (opts.encodeDotInKeys !== undefined && typeof opts.encodeDotInKeys !== 'boolean') {
     throw new TypeError('`encodeDotInKeys` option can only be `true` or `false`, when provided');
   }
 
-  if (opts.encoder !== null && typeof opts.encoder !== 'undefined' && typeof opts.encoder !== 'function') {
+  if (opts.encoder !== null && opts.encoder !== undefined && typeof opts.encoder !== 'function') {
     throw new TypeError('Encoder has to be a function.');
   }
 
   const charset = opts.charset || defaults.charset;
-  if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
+  if (opts.charset !== undefined && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
     throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
   }
 
   let format = default_format;
-  if (typeof opts.format !== 'undefined') {
+  if (opts.format !== undefined) {
     if (!has(formatters, opts.format)) {
       throw new TypeError('Unknown format option provided.');
     }
@@ -266,34 +270,34 @@ function normalize_stringify_options(
     throw new TypeError('`commaRoundTrip` must be a boolean, or absent');
   }
 
-  const allowDots =
-    typeof opts.allowDots === 'undefined' ?
-      !!opts.encodeDotInKeys === true ?
-        true
-      : defaults.allowDots
-    : !!opts.allowDots;
+  let allowDots: boolean;
+  if (opts.allowDots === undefined) {
+    allowDots = !!opts.encodeDotInKeys === true ? true : defaults.allowDots;
+  } else {
+    allowDots = !!opts.allowDots;
+  }
 
   return {
     addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults.addQueryPrefix,
     // @ts-ignore
-    allowDots: allowDots,
+    allowDots,
     allowEmptyArrays:
       typeof opts.allowEmptyArrays === 'boolean' ? !!opts.allowEmptyArrays : defaults.allowEmptyArrays,
-    arrayFormat: arrayFormat,
-    charset: charset,
+    arrayFormat,
+    charset,
     charsetSentinel:
       typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
     commaRoundTrip: !!opts.commaRoundTrip,
-    delimiter: typeof opts.delimiter === 'undefined' ? defaults.delimiter : opts.delimiter,
+    delimiter: opts.delimiter === undefined ? defaults.delimiter : opts.delimiter,
     encode: typeof opts.encode === 'boolean' ? opts.encode : defaults.encode,
     encodeDotInKeys:
       typeof opts.encodeDotInKeys === 'boolean' ? opts.encodeDotInKeys : defaults.encodeDotInKeys,
     encoder: typeof opts.encoder === 'function' ? opts.encoder : defaults.encoder,
     encodeValuesOnly:
       typeof opts.encodeValuesOnly === 'boolean' ? opts.encodeValuesOnly : defaults.encodeValuesOnly,
-    filter: filter,
-    format: format,
-    formatter: formatter,
+    filter,
+    format,
+    formatter,
     serializeDate: typeof opts.serializeDate === 'function' ? opts.serializeDate : defaults.serializeDate,
     skipNulls: typeof opts.skipNulls === 'boolean' ? opts.skipNulls : defaults.skipNulls,
     // @ts-ignore
@@ -336,9 +340,7 @@ export function stringify(object: any, opts: StringifyOptions = {}) {
   }
 
   const sideChannel = new WeakMap();
-  for (let i = 0; i < obj_keys.length; ++i) {
-    const key = obj_keys[i]!;
-
+  for (const key of obj_keys) {
     if (options.skipNulls && obj[key] === null) {
       continue;
     }
@@ -372,13 +374,12 @@ export function stringify(object: any, opts: StringifyOptions = {}) {
   let prefix = options.addQueryPrefix === true ? '?' : '';
 
   if (options.charsetSentinel) {
-    if (options.charset === 'iso-8859-1') {
-      // encodeURIComponent('&#10003;'), the "numeric entity" representation of a checkmark
-      prefix += 'utf8=%26%2310003%3B&';
-    } else {
-      // encodeURIComponent('✓')
-      prefix += 'utf8=%E2%9C%93&';
-    }
+    prefix +=
+      options.charset === 'iso-8859-1'
+        ? // encodeURIComponent('&#10003;'), the "numeric entity" representation of a checkmark
+          'utf8=%26%2310003%3B&'
+        : // encodeURIComponent('✓')
+          'utf8=%E2%9C%93&';
   }
 
   return joined.length > 0 ? prefix + joined : '';

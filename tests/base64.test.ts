@@ -45,9 +45,9 @@ describe.each(['Buffer', 'atob'])('with %s', (mode) => {
       },
     ];
 
-    testCases.forEach(({ input, expected }) => {
+    for (const { input, expected } of testCases) {
       expect(toBase64(input)).toBe(expected);
-    });
+    }
   });
 
   test('fromBase64', () => {
@@ -73,8 +73,8 @@ describe.each(['Buffer', 'atob'])('with %s', (mode) => {
       },
     ];
 
-    testCases.forEach(({ input, expected }) => {
+    for (const { input, expected } of testCases) {
       expect(fromBase64(input)).toEqual(expected);
-    });
+    }
   });
 });

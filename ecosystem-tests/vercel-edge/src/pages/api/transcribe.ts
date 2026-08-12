@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server';
 import OpenAI, { toFile } from 'openai';
-import { TranscriptionCreateParams } from 'openai/resources/audio';
+import type { TranscriptionCreateParams } from 'openai/resources/audio';
 
 export const config = {
   runtime: 'edge',
@@ -12,7 +13,7 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   async function typeTests() {
@@ -33,4 +34,4 @@ export default async (request: NextRequest) => {
   const transcription = await openai.audio.transcriptions.create(params);
 
   return NextResponse.json(transcription);
-};
+}

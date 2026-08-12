@@ -1,11 +1,7 @@
 {
   "tasks": {
-    "install": "deno install --node-modules-dir main_test.ts -f",
-    "check": "deno lint && deno check main_test.ts",
-    "test": "deno test --allow-env --allow-net --allow-read --node-modules-dir"
-  },
-  "imports": {
-    "openai": "../../deno/mod.ts",
-    "openai/": "../../deno/"
+    "install": "npm install --ignore-scripts --no-package-lock --no-audit --no-fund --no-save ./openai.tgz",
+    "check": "deno lint && deno check --unstable-byonm main_test.ts",
+    "test": "deno test --unstable-byonm --allow-env --allow-net --allow-read"
   }
 }

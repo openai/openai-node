@@ -1,9 +1,10 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI, { toFile } from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -28,9 +29,11 @@ describe('resource transcriptions', () => {
       model: 'gpt-4o-transcribe',
       chunking_strategy: 'auto',
       include: ['logprobs'],
+      keywords: ['string'],
       known_speaker_names: ['string'],
       known_speaker_references: ['string'],
       language: 'language',
+      languages: ['string'],
       prompt: 'prompt',
       response_format: 'json',
       stream: false,

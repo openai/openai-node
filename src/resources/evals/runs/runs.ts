@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
@@ -31,7 +31,11 @@ export class Runs extends APIResource {
    * schema specified in the config of the evaluation.
    */
   create(evalID: string, body: RunCreateParams, options?: RequestOptions): APIPromise<RunCreateResponse> {
-    return this._client.post(path`/evals/${evalID}/runs`, { body, ...options });
+    return this._client.post(path`/evals/${evalID}/runs`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -43,7 +47,10 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<RunRetrieveResponse> {
     const { eval_id } = params;
-    return this._client.get(path`/evals/${eval_id}/runs/${runID}`, options);
+    return this._client.get(path`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -57,6 +64,7 @@ export class Runs extends APIResource {
     return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, {
       query,
       ...options,
+      __security: { bearerAuth: true },
     });
   }
 
@@ -65,7 +73,10 @@ export class Runs extends APIResource {
    */
   delete(runID: string, params: RunDeleteParams, options?: RequestOptions): APIPromise<RunDeleteResponse> {
     const { eval_id } = params;
-    return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, options);
+    return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -73,7 +84,10 @@ export class Runs extends APIResource {
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<RunCancelResponse> {
     const { eval_id } = params;
-    return this._client.post(path`/evals/${eval_id}/runs/${runID}`, options);
+    return this._client.post(path`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
@@ -291,19 +305,12 @@ export namespace CreateEvalCompletionsRunDataSource {
     max_completion_tokens?: number;
 
     /**
-     * Constrains effort on reasoning for
-     * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-     * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-     * Reducing reasoning effort can result in faster responses and fewer tokens used
-     * on reasoning in a response.
-     *
-     * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-     *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-     *   calls are supported for all reasoning values in gpt-5.1.
-     * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-     *   support `none`.
-     * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-     * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+     * Constrains effort on reasoning for reasoning models. Currently supported values
+     * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+     * reasoning effort can result in faster responses and fewer tokens used on
+     * reasoning in a response. Not all reasoning models support every value. See the
+     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * model-specific support.
      */
     reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -600,19 +607,12 @@ export namespace RunCreateResponse {
       model?: string | null;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -753,19 +753,12 @@ export namespace RunCreateResponse {
       max_completion_tokens?: number;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1103,19 +1096,12 @@ export namespace RunRetrieveResponse {
       model?: string | null;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1256,19 +1242,12 @@ export namespace RunRetrieveResponse {
       max_completion_tokens?: number;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1603,19 +1582,12 @@ export namespace RunListResponse {
       model?: string | null;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1756,19 +1728,12 @@ export namespace RunListResponse {
       max_completion_tokens?: number;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2114,19 +2079,12 @@ export namespace RunCancelResponse {
       model?: string | null;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2267,19 +2225,12 @@ export namespace RunCancelResponse {
       max_completion_tokens?: number;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2564,19 +2515,12 @@ export namespace RunCreateParams {
       model?: string | null;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2717,19 +2661,12 @@ export namespace RunCreateParams {
       max_completion_tokens?: number;
 
       /**
-       * Constrains effort on reasoning for
-       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-       * Reducing reasoning effort can result in faster responses and fewer tokens used
-       * on reasoning in a response.
-       *
-       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-       *   calls are supported for all reasoning values in gpt-5.1.
-       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-       *   support `none`.
-       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+       * Constrains effort on reasoning for reasoning models. Currently supported values
+       * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+       * reasoning effort can result in faster responses and fewer tokens used on
+       * reasoning in a response. Not all reasoning models support every value. See the
+       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 

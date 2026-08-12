@@ -1,73 +1,107 @@
 import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
-import { APIError, OAuthError } from '../core/error';
+import { APIError, OAuthError, OpenAIError } from '../core/error';
 
 interface CachedToken {
   token: string;
   expiresAt: number;
 }
 
-const SUBJECT_TOKEN_TYPES: Record<string, string> = {
+const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], string> = {
   jwt: 'urn:ietf:params:oauth:token-type:jwt',
   id: 'urn:ietf:params:oauth:token-type:id_token',
 };
 
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 
+/**
+ * Exchanges external workload-identity tokens for cached OpenAI access tokens.
+ *
+ * Concurrent token exchanges are shared. Valid cached tokens are returned while
+ * a proactive refresh runs in the background; expired or missing tokens wait
+ * for a successful exchange before they are returned.
+ */
 export class WorkloadIdentityAuth {
   private cachedToken: CachedToken | null = null;
   private refreshPromise: Promise<string> | null = null;
+  private tokenGeneration = 0;
   private readonly config: WorkloadIdentity;
   private readonly tokenExchangeUrl: string = 'https://auth.openai.com/oauth/token';
   private readonly fetch: Fetch;
 
+  /**
+   * Creates a workload-identity token cache and OAuth token-exchange client.
+   *
+   * @param config External identity provider, OpenAI service account, and refresh settings.
+   * @param fetch Optional fetch implementation for calls to the OpenAI token endpoint.
+   */
   constructor(config: WorkloadIdentity, fetch?: Fetch) {
     this.config = config;
     this.fetch = fetch ?? Shims.getDefaultFetch();
   }
 
+  /**
+   * Returns a valid OpenAI access token, exchanging or refreshing credentials as needed.
+   *
+   * Cached tokens nearing expiration are returned immediately while a background
+   * refresh runs. Concurrent callers share the same in-flight token exchange.
+   *
+   * @throws {OAuthError} When the token endpoint rejects the subject token or identity.
+   * @throws {APIError} When another unsuccessful HTTP response prevents token exchange.
+   * @throws {OpenAIError} When a successful exchange does not include an access token.
+   */
   async getToken(): Promise<string> {
-    if (!this.cachedToken || this.isTokenExpired(this.cachedToken)) {
+    if (!this.cachedToken || WorkloadIdentityAuth.isTokenExpired(this.cachedToken)) {
       if (this.refreshPromise) {
         return await this.refreshPromise;
       }
 
-      this.refreshPromise = this.refreshToken();
+      const refreshPromise = this.refreshToken(this.tokenGeneration);
+      this.refreshPromise = refreshPromise;
 
       try {
-        const token = await this.refreshPromise;
-        return token;
+        return await refreshPromise;
       } finally {
-        this.refreshPromise = null;
+        if (this.refreshPromise === refreshPromise) {
+          this.refreshPromise = null;
+        }
       }
     }
 
     if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
-      this.refreshPromise = this.refreshToken().finally(() => {
-        this.refreshPromise = null;
+      const refreshPromise = this.refreshToken(this.tokenGeneration).finally(() => {
+        if (this.refreshPromise === refreshPromise) {
+          this.refreshPromise = null;
+        }
       });
+      this.refreshPromise = refreshPromise;
+      void refreshPromise.catch(() => null);
     }
 
     return this.cachedToken.token;
   }
 
-  private async refreshToken(): Promise<string> {
+  private async refreshToken(generation: number): Promise<string> {
     const subjectToken = await this.config.provider.getToken();
+    const body: Record<string, string> = {
+      grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
+      subject_token: subjectToken,
+      subject_token_type: SUBJECT_TOKEN_TYPES[this.config.provider.tokenType],
+      identity_provider_id: this.config.identityProviderId,
+      service_account_id: this.config.serviceAccountId,
+    };
+
+    if (this.config.clientId) {
+      body['client_id'] = this.config.clientId;
+    }
 
     const response = await this.fetch(this.tokenExchangeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
-        client_id: this.config.clientId,
-        subject_token: subjectToken,
-        subject_token_type: SUBJECT_TOKEN_TYPES[this.config.provider.tokenType],
-        identity_provider_id: this.config.identityProviderId,
-        service_account_id: this.config.serviceAccountId,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -76,7 +110,9 @@ export class WorkloadIdentityAuth {
 
       try {
         body = JSON.parse(errorText);
-      } catch {}
+      } catch {
+        // Ignore non-JSON error bodies.
+      }
 
       if (response.status === 400 || response.status === 401 || response.status === 403) {
         throw new OAuthError(response.status as 400 | 401 | 403, body, response.headers);
@@ -89,19 +125,32 @@ export class WorkloadIdentityAuth {
       );
     }
 
-    const tokenResponse = (await response.json()) as TokenExchangeResponse;
-    const expiresIn = tokenResponse.expires_in || 3600;
+    const tokenResponse: unknown = await response.json();
+    if (
+      typeof tokenResponse !== 'object' ||
+      tokenResponse === null ||
+      !('access_token' in tokenResponse) ||
+      typeof tokenResponse.access_token !== 'string' ||
+      tokenResponse.access_token.trim().length === 0
+    ) {
+      throw new OpenAIError("Token exchange response missing 'access_token' field");
+    }
+
+    const accessToken = tokenResponse.access_token;
+    const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
     const expiresAt = Date.now() + expiresIn * 1000;
 
-    this.cachedToken = {
-      token: tokenResponse.access_token,
-      expiresAt,
-    };
+    if (this.tokenGeneration === generation) {
+      this.cachedToken = {
+        token: accessToken,
+        expiresAt,
+      };
+    }
 
-    return tokenResponse.access_token;
+    return accessToken;
   }
 
-  private isTokenExpired(cachedToken: CachedToken): boolean {
+  private static isTokenExpired(cachedToken: CachedToken): boolean {
     return Date.now() >= cachedToken.expiresAt;
   }
 
@@ -111,7 +160,9 @@ export class WorkloadIdentityAuth {
     return Date.now() >= cachedToken.expiresAt - bufferMs;
   }
 
+  /** Discards the cached access token so the next request performs a fresh exchange. */
   invalidateToken(): void {
+    this.tokenGeneration += 1;
     this.cachedToken = null;
     this.refreshPromise = null;
   }

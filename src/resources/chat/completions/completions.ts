@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as ChatCompletionsAPI from './completions';
@@ -15,8 +15,15 @@ import { path } from '../../../internal/utils/path';
 import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
-import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
-import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
+import {
+  ChatCompletionToolRunnerParamsWithContext,
+  ChatCompletionToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionRunner';
+import {
+  ChatCompletionStreamingToolRunnerParamsWithContext,
+  ChatCompletionStreamingToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionStreamingRunner';
+import { type RunnableToolFunctionWithContext } from '../../../lib/RunnableFunction';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
@@ -71,9 +78,12 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<ChatCompletion>
-      | APIPromise<Stream<ChatCompletionChunk>>;
+    return this._client.post('/chat/completions', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 
   /**
@@ -87,7 +97,10 @@ export class Completions extends APIResource {
    * ```
    */
   retrieve(completionID: string, options?: RequestOptions): APIPromise<ChatCompletion> {
-    return this._client.get(path`/chat/completions/${completionID}`, options);
+    return this._client.get(path`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -108,7 +121,11 @@ export class Completions extends APIResource {
     body: ChatCompletionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> {
-    return this._client.post(path`/chat/completions/${completionID}`, { body, ...options });
+    return this._client.post(path`/chat/completions/${completionID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -127,7 +144,11 @@ export class Completions extends APIResource {
     query: ChatCompletionListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ChatCompletionsPage, ChatCompletion> {
-    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, { query, ...options });
+    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -141,7 +162,10 @@ export class Completions extends APIResource {
    * ```
    */
   delete(completionID: string, options?: RequestOptions): APIPromise<ChatCompletionDeleted> {
-    return this._client.delete(path`/chat/completions/${completionID}`, options);
+    return this._client.delete(path`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(
@@ -171,17 +195,55 @@ export class Completions extends APIResource {
    * [the docs](https://github.com/openai/openai-node#automated-function-calls)
    */
   runTools<
-    Params extends ChatCompletionToolRunnerParams<any>,
+    ToolContext,
+    Params extends Omit<
+      ChatCompletionToolRunnerParamsWithContext<any, ToolContext>,
+      'toolContext' | 'tools'
+    > = Omit<ChatCompletionToolRunnerParamsWithContext<any, ToolContext>, 'toolContext' | 'tools'>,
+    ParsedT = ExtractParsedContentFromParams<
+      Params & ChatCompletionToolRunnerParamsWithContext<any, ToolContext>
+    >,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionRunner<ParsedT>;
+
+  runTools<
+    ToolContext,
+    Params extends Omit<
+      ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>,
+      'toolContext' | 'tools'
+    > = Omit<ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>, 'toolContext' | 'tools'>,
+    ParsedT = ExtractParsedContentFromParams<
+      Params & ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>
+    >,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionStreamingRunner<ParsedT>;
+
+  runTools<
+    Params extends ChatCompletionToolRunnerParamsWithoutContext<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
   >(body: Params, options?: RunnerOptions): ChatCompletionRunner<ParsedT>;
 
   runTools<
-    Params extends ChatCompletionStreamingToolRunnerParams<any>,
+    Params extends ChatCompletionStreamingToolRunnerParamsWithoutContext<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
   >(body: Params, options?: RunnerOptions): ChatCompletionStreamingRunner<ParsedT>;
 
   runTools<
-    Params extends ChatCompletionToolRunnerParams<any> | ChatCompletionStreamingToolRunnerParams<any>,
+    Params extends
+      | ChatCompletionToolRunnerParamsWithoutContext<any>
+      | ChatCompletionToolRunnerParamsWithContext<any, any>
+      | ChatCompletionStreamingToolRunnerParamsWithoutContext<any>
+      | ChatCompletionStreamingToolRunnerParamsWithContext<any, any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
   >(
     body: Params,
@@ -190,12 +252,16 @@ export class Completions extends APIResource {
     if (body.stream) {
       return ChatCompletionStreamingRunner.runTools(
         this._client,
-        body as ChatCompletionStreamingToolRunnerParams<any>,
+        body as ChatCompletionStreamingToolRunnerParamsWithContext<any, any>,
         options,
       );
     }
 
-    return ChatCompletionRunner.runTools(this._client, body as ChatCompletionToolRunnerParams<any>, options);
+    return ChatCompletionRunner.runTools(
+      this._client,
+      body as ChatCompletionToolRunnerParamsWithContext<any, any>,
+      options,
+    );
   }
 
   /**
@@ -238,8 +304,16 @@ export {
   type RunnableFunctionWithoutParse,
   ParsingToolFunction,
 } from '../../../lib/RunnableFunction';
-export { type ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
-export { type ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
+export {
+  type ChatCompletionToolRunnerParams,
+  type ChatCompletionToolRunnerParamsWithContext,
+  type ChatCompletionToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionRunner';
+export {
+  type ChatCompletionStreamingToolRunnerParams,
+  type ChatCompletionStreamingToolRunnerParamsWithContext,
+  type ChatCompletionStreamingToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionStreamingRunner';
 export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 export { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 
@@ -279,6 +353,12 @@ export interface ChatCompletion {
   object: 'chat.completion';
 
   /**
+   * Moderation results for the request input and generated output, if moderated
+   * completions were requested.
+   */
+  moderation?: ChatCompletion.Moderation | null;
+
+  /**
    * Specifies the processing type used for serving the request.
    *
    * - If set to 'auto', then the request will be processed with the service tier
@@ -286,9 +366,13 @@ export interface ChatCompletion {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -296,7 +380,7 @@ export interface ChatCompletion {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * @deprecated This fingerprint represents the backend configuration that the model
@@ -321,7 +405,8 @@ export namespace ChatCompletion {
      * number of tokens specified in the request was reached, `content_filter` if
      * content was omitted due to a flag from our content filters, `tool_calls` if the
      * model called a tool, or `function_call` (deprecated) if the model called a
-     * function.
+     * function. Read the [Model Spec](https://model-spec.openai.com/2025-12-18.html)
+     * for more.
      */
     finish_reason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'function_call';
 
@@ -355,6 +440,182 @@ export namespace ChatCompletion {
        * A list of message refusal tokens with log probability information.
        */
       refusal: Array<ChatCompletionsAPI.ChatCompletionTokenLogprob> | null;
+    }
+  }
+
+  /**
+   * Moderation results for the request input and generated output, if moderated
+   * completions were requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the request input.
+     */
+    input: Moderation.ModerationResults | Moderation.Error;
+
+    /**
+     * Moderation for the generated output.
+     */
+    output: Moderation.ModerationResults | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
+    }
+
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
     }
   }
 }
@@ -559,6 +820,12 @@ export interface ChatCompletionChunk {
   object: 'chat.completion.chunk';
 
   /**
+   * Moderation results for the request input and generated output. Present on the
+   * moderation chunk when moderated completions are requested.
+   */
+  moderation?: ChatCompletionChunk.Moderation | null;
+
+  /**
    * Specifies the processing type used for serving the request.
    *
    * - If set to 'auto', then the request will be processed with the service tier
@@ -566,9 +833,13 @@ export interface ChatCompletionChunk {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -576,7 +847,7 @@ export interface ChatCompletionChunk {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * @deprecated This fingerprint represents the backend configuration that the model
@@ -723,6 +994,182 @@ export namespace ChatCompletionChunk {
       refusal: Array<ChatCompletionsAPI.ChatCompletionTokenLogprob> | null;
     }
   }
+
+  /**
+   * Moderation results for the request input and generated output. Present on the
+   * moderation chunk when moderated completions are requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the request input.
+     */
+    input: Moderation.ModerationResults | Moderation.Error;
+
+    /**
+     * Moderation for the generated output.
+     */
+    output: Moderation.ModerationResults | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
+    }
+
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
+    }
+  }
 }
 
 /**
@@ -747,6 +1194,13 @@ export namespace ChatCompletionContentPart {
      * The type of the content part. Always `file`.
      */
     type: 'file';
+
+    /**
+     * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+     * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+     * token block.
+     */
+    prompt_cache_breakpoint?: File.PromptCacheBreakpoint;
   }
 
   export namespace File {
@@ -767,6 +1221,18 @@ export namespace ChatCompletionContentPart {
        */
       filename?: string;
     }
+
+    /**
+     * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+     * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+     * token block.
+     */
+    export interface PromptCacheBreakpoint {
+      /**
+       * The breakpoint mode. Always `explicit`.
+       */
+      mode: 'explicit';
+    }
   }
 }
 
@@ -780,6 +1246,13 @@ export interface ChatCompletionContentPartImage {
    * The type of the content part.
    */
   type: 'image_url';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ChatCompletionContentPartImage.PromptCacheBreakpoint;
 }
 
 export namespace ChatCompletionContentPartImage {
@@ -795,6 +1268,18 @@ export namespace ChatCompletionContentPartImage {
      */
     detail?: 'auto' | 'low' | 'high';
   }
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -807,6 +1292,13 @@ export interface ChatCompletionContentPartInputAudio {
    * The type of the content part. Always `input_audio`.
    */
   type: 'input_audio';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ChatCompletionContentPartInputAudio.PromptCacheBreakpoint;
 }
 
 export namespace ChatCompletionContentPartInputAudio {
@@ -820,6 +1312,18 @@ export namespace ChatCompletionContentPartInputAudio {
      * The format of the encoded audio data. Currently supports "wav" and "mp3".
      */
     format: 'wav' | 'mp3';
+  }
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
   }
 }
 
@@ -849,6 +1353,27 @@ export interface ChatCompletionContentPartText {
    * The type of the content part.
    */
   type: 'text';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ChatCompletionContentPartText.PromptCacheBreakpoint;
+}
+
+export namespace ChatCompletionContentPartText {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -1377,8 +1902,7 @@ export interface ChatCompletionTokenLogprob {
 
   /**
    * List of the most likely tokens and their log probability, at this token
-   * position. In rare cases, there may be fewer than the number of requested
-   * `top_logprobs` returned.
+   * position. The number of entries may be fewer than the requested `top_logprobs`.
    */
   top_logprobs: Array<ChatCompletionTokenLogprob.TopLogprob>;
 }
@@ -1626,6 +2150,11 @@ export interface ChatCompletionCreateParamsBase {
   modalities?: Array<'text' | 'audio'> | null;
 
   /**
+   * Configuration for running moderation on the request input and generated output.
+   */
+  moderation?: ChatCompletionCreateParams.Moderation | null;
+
+  /**
    * How many chat completion choices to generate for each input message. Note that
    * you will be charged based on the number of generated tokens across all of the
    * choices. Keep `n` as `1` to minimize costs.
@@ -1657,30 +2186,49 @@ export interface ChatCompletionCreateParamsBase {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  prompt_cache_options?: ChatCompletionCreateParams.PromptCacheOptions;
+
+  /**
+   * @deprecated Deprecated. Use `prompt_cache_options.ttl` instead.
+   *
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * This field expresses a maximum retention policy, while
+   * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
+   * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
+   * models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * Constrains effort on reasoning for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-   * Reducing reasoning effort can result in faster responses and fewer tokens used
-   * on reasoning in a response.
-   *
-   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-   *   calls are supported for all reasoning values in gpt-5.1.
-   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-   *   support `none`.
-   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+   * Constrains effort on reasoning for reasoning models. Currently supported values
+   * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+   * reasoning effort can result in faster responses and fewer tokens used on
+   * reasoning in a response. Not all reasoning models support every value. See the
+   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1709,7 +2257,7 @@ export interface ChatCompletionCreateParamsBase {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * @deprecated This feature is in Beta. If specified, our system will make a best
@@ -1728,9 +2276,13 @@ export interface ChatCompletionCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -1738,7 +2290,7 @@ export interface ChatCompletionCreateParamsBase {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * Not supported with latest reasoning models `o3` and `o4-mini`.
@@ -1803,8 +2355,9 @@ export interface ChatCompletionCreateParamsBase {
   tools?: Array<ChatCompletionTool>;
 
   /**
-   * An integer between 0 and 20 specifying the number of most likely tokens to
-   * return at each token position, each with an associated log probability.
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
    * `logprobs` must be set to `true` if this parameter is used.
    */
   top_logprobs?: number | null;
@@ -1831,7 +2384,8 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * Constrains the verbosity of the model's response. Lower values will result in
    * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
+   * responses. Currently supported values are `low`, `medium`, and `high`. The
+   * default is `medium`.
    */
   verbosity?: 'low' | 'medium' | 'high' | null;
 
@@ -1870,6 +2424,85 @@ export namespace ChatCompletionCreateParams {
      * Omitting `parameters` defines a function with an empty parameter list.
      */
     parameters?: Shared.FunctionParameters;
+  }
+
+  /**
+   * Configuration for running moderation on the request input and generated output.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
+
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    policy?: Moderation.Policy | null;
+  }
+
+  export namespace Moderation {
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    export interface Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      input?: Policy.Input | null;
+
+      /**
+       * The moderation policy for the response output.
+       */
+      output?: Policy.Output | null;
+    }
+
+    export namespace Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      export interface Input {
+        mode: 'score' | 'block';
+      }
+
+      /**
+       * The moderation policy for the response output.
+       */
+      export interface Output {
+        mode: 'score' | 'block';
+      }
+    }
+  }
+
+  /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Controls whether OpenAI automatically creates an implicit cache breakpoint.
+     * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
+     * and writes up to the latest three explicit breakpoints in the request. With
+     * `explicit`, OpenAI does not create an implicit breakpoint and writes up to the
+     * latest four explicit breakpoints. If there are no explicit breakpoints, the
+     * request does not use prompt caching.
+     */
+    mode?: 'implicit' | 'explicit';
+
+    /**
+     * The minimum lifetime applied to every implicit and explicit cache breakpoint
+     * written by the request. Defaults to `30m`, which is currently the only supported
+     * value. The backend may retain cache entries for longer.
+     */
+    ttl?: '30m';
   }
 
   /**
