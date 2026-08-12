@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import OpenAI, { AzureOpenAI } from 'openai';
 import { buildRealtimeURL as buildBetaRealtimeURL } from 'openai/beta/realtime/internal-base';
 import { buildRealtimeURL, getAzureRealtimeConnection } from 'openai/realtime/internal-base';
@@ -69,6 +71,83 @@ describe.each([
       'Pass exactly one of `model`',
     );
   });
+});
+
+describe('stable realtime custom URL builder', () => {
+  test('passes the client and validated connection to the override and uses its exact URL', () => {
+    const customURL = new URL('wss://sap.example.com/deployments/custom/realtime?existing=value');
+    const customBuilder = vi.fn(() => customURL);
+    const connection = { model: 'gpt-realtime', buildRealtimeURL: customBuilder };
+
+    const result = buildRealtimeURL(openAIClient, connection);
+
+    expect(customBuilder).toHaveBeenCalledTimes(1);
+    expect(customBuilder).toHaveBeenCalledWith(openAIClient, connection);
+    expect(result.toString()).toBe('wss://sap.example.com/deployments/custom/realtime?existing=value');
+    expect(result.searchParams.has('model')).toBe(false);
+    expect(result).not.toBe(customURL);
+
+    result.searchParams.set('added', 'later');
+    expect(customURL.toString()).toBe('wss://sap.example.com/deployments/custom/realtime?existing=value');
+  });
+
+  test.each([{ callID: 'rtc_123' }, { intent: 'transcription' as const }])(
+    'does not add default routing parameters for a custom connection %#',
+    (target) => {
+      const customURL = new URL('wss://sap.example.com/custom?existing=value');
+
+      const result = buildRealtimeURL(openAIClient, {
+        ...target,
+        buildRealtimeURL: () => customURL,
+      });
+
+      expect(result.toString()).toBe(customURL.toString());
+      expect(result.searchParams.has('call_id')).toBe(false);
+      expect(result.searchParams.has('intent')).toBe(false);
+    },
+  );
+
+  test('does not add Azure deployment or API-version parameters to a custom URL', () => {
+    const customURL = new URL('wss://sap.example.com/azure/custom?existing=value');
+
+    const result = buildRealtimeURL(azureClient, {
+      model: 'my-deployment',
+      buildRealtimeURL: () => customURL,
+    });
+
+    expect(result.toString()).toBe(customURL.toString());
+    expect(result.searchParams.has('model')).toBe(false);
+    expect(result.searchParams.has('deployment')).toBe(false);
+    expect(result.searchParams.has('api-version')).toBe(false);
+  });
+
+  test.each([
+    new URL('ws://sap.example.com/realtime'),
+    new URL('https://sap.example.com/realtime'),
+    'not a valid URL' as unknown as URL,
+  ])('rejects insecure or malformed custom URLs %#', (customURL) => {
+    expect(() =>
+      buildRealtimeURL(openAIClient, {
+        model: 'gpt-realtime',
+        buildRealtimeURL: () => customURL,
+      }),
+    ).toThrow();
+  });
+
+  test.each([{}, { model: 'gpt-realtime', callID: 'rtc_123' }, { model: '', intent: 'transcription' }])(
+    'validates the connection target before invoking a custom builder %#',
+    (target) => {
+      const customBuilder = vi.fn(() => new URL('wss://sap.example.com/realtime'));
+
+      expect(() =>
+        buildRealtimeURL(openAIClient, {
+          ...target,
+          buildRealtimeURL: customBuilder,
+        } as any),
+      ).toThrow('Pass exactly one of `model`');
+      expect(customBuilder).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('stable realtime transcription', () => {

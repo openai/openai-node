@@ -108,6 +108,22 @@ For an Azure Realtime GA call, pass `callID` to the Azure factory instead:
 const rt = await OpenAIRealtimeWS.azure(azureClient, { callID: 'rtc_123456' });
 ```
 
+To connect to a deployment that requires an exact WebSocket URL, such as SAP AI Core, provide a `buildRealtimeURL` callback. Both `OpenAIRealtimeWS` and `OpenAIRealtimeWebSocket` accept this option in their constructors, `create()` factories, and Azure factories:
+
+```ts
+import OpenAI from 'openai';
+import { OpenAIRealtimeWS } from 'openai/realtime/ws';
+
+const client = new OpenAI();
+const rt = await OpenAIRealtimeWS.create(client, {
+  model: 'gpt-realtime',
+  buildRealtimeURL: () =>
+    new URL('wss://sap-ai-core.example.com/v2/inference/deployments/my-deployment/realtime'),
+});
+```
+
+The callback receives the client and validated connection target and returns the final `wss:` URL. Exactly one of `model`, `callID`, or transcription `intent` is still required, but the SDK does not add routing parameters such as `model` to the returned URL. Use only a trusted endpoint because connection credentials are sent to it. For native Azure WebSocket connections, the required authentication query parameter is still added before connecting and redacted from the exposed URL afterward.
+
 A full example can be found in [`examples/realtime/websocket.ts`](../examples/realtime/websocket.ts).
 
 ### Realtime error handling
