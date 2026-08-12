@@ -265,17 +265,14 @@ export class ResponseStream<ParsedT = null>
 
   /** Iterates over response events; stopping iteration early aborts the underlying request. */
   [Symbol.asyncIterator](this: ResponseStream<ParsedT>): AsyncIterator<ResponseStreamEvent> {
-    const iterator = this.events('event');
-    return {
-      next: async () => {
-        const result = await iterator.next();
-        return result.done ? { value: undefined, done: true } : { value: result.value[0], done: false };
+    return this._createIterator<ResponseStreamEvent>(
+      (push) => {
+        const onEvent = (event: ResponseStreamEvent) => push(event);
+        this.on('event', onEvent);
+        return () => this.off('event', onEvent);
       },
-      return: async () => {
-        this.abort();
-        return { value: undefined, done: true };
-      },
-    };
+      { onReturn: () => this.abort() },
+    );
   }
 
   /**

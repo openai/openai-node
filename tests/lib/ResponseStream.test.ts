@@ -638,6 +638,56 @@ describe('.stream()', () => {
     }
     expect(final.output_text).toBe('The answer is 42');
   });
+
+  it('surfaces a mid-stream error when events are buffered before consumption', async () => {
+    // Two valid events, then a malformed delta that references a missing output
+    // index so accumulation throws mid-stream (the stream itself closes cleanly,
+    // so the two earlier events are delivered).
+    const validEvents: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: { id: 'msg_1', type: 'message', role: 'assistant', status: 'in_progress', content: [] },
+      },
+    ];
+    const malformedEvent = {
+      type: 'response.output_text.delta',
+      sequence_number: 2,
+      item_id: 'msg_1',
+      output_index: 99,
+      content_index: 0,
+      delta: 'boom',
+      logprobs: [],
+    } as unknown as ResponseStreamEvent;
+
+    const stream = ResponseStream.fromReadableStream(
+      readableStreamFromEvents([...validEvents, malformedEvent]),
+    );
+    // Grab the iterator (registering its listeners) but do not consume yet, so
+    // the valid events and the error land while no reader is waiting: they
+    // buffer in the iterator's internal queue instead of rejecting a pending
+    // reader.
+    const iterator = stream[Symbol.asyncIterator]();
+    // Wait for the stream's terminal signal so the events and the error have
+    // definitely been emitted before we start reading.
+    await expect(stream.done()).rejects.toThrow('missing output at index 99');
+
+    await expect(iterator.next()).resolves.toEqual({ value: validEvents[0], done: false });
+    await expect(iterator.next()).resolves.toEqual({ value: validEvents[1], done: false });
+
+    const failure = await iterator.next().then(
+      () => {
+        throw new Error('Expected the response iterator to reject');
+      },
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError).message).toBe('missing output at index 99');
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
 });
 
 function readableStreamFromEvents(events: ResponseStreamEvent[]) {

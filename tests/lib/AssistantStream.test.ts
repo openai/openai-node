@@ -659,6 +659,38 @@ describe('AssistantStream factories and async iteration', () => {
     await expect(pendingAbort).rejects.toBe(abortError);
   });
 
+  test('drains cloned queued events before rejecting a terminal stream error', async () => {
+    const runner = new AssistantStream();
+    const iterator = runner[Symbol.asyncIterator]();
+    const event = completedRun('run_original');
+    const error = new OpenAIError('stream failed after an event');
+
+    runner._emit('event', event as AssistantStreamEvent);
+    event.data.id = 'run_mutated_after_emit';
+    runner._emit('error', error);
+
+    await expect(iterator.next()).resolves.toEqual({
+      value: completedRun('run_original'),
+      done: false,
+    });
+    await expect(iterator.next()).rejects.toBe(error);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  test('drains queued events before rejecting a terminal stream abort', async () => {
+    const runner = new AssistantStream();
+    const iterator = runner[Symbol.asyncIterator]();
+    const event = completedRun();
+    const error = new APIUserAbortError();
+
+    runner._emit('event', event as AssistantStreamEvent);
+    runner._emit('abort', error);
+
+    await expect(iterator.next()).resolves.toEqual({ value: event, done: false });
+    await expect(iterator.next()).rejects.toBe(error);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
   test('closes pending event reads when an otherwise idle stream ends', async () => {
     const runner = new AssistantStream();
     const pending = runner[Symbol.asyncIterator]().next();

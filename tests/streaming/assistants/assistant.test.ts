@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import { Stream } from 'openai/streaming';
@@ -95,5 +95,59 @@ describe('assistant tests', () => {
     }
 
     expect(deltas).toEqual(['E', 'ddy']);
+  });
+
+  test('surfaces a mid-stream error when events are buffered before consumption', async () => {
+    const encoder = new TextEncoder();
+    const events = [
+      {
+        event: 'thread.message.created',
+        data: {
+          id: 'msg_1',
+          content: [],
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_1',
+          delta: {
+            content: [{ index: 0, type: 'text', text: { value: 'hi', annotations: [] } }],
+          },
+        },
+      },
+    ];
+    // Yield valid events, then throw to error the stream after they have been
+    // delivered (mimics a connection drop mid-run).
+    async function* eventsWithFailure() {
+      for (const event of events) {
+        yield encoder.encode(JSON.stringify(event) + '\n');
+      }
+      throw new Error('assistant boom');
+    }
+
+    const input = ReadableStreamFrom(eventsWithFailure());
+    const assistantStream = AssistantStream.fromReadableStream(input);
+    // Grab the iterator (registering its listeners) but do not consume yet, so
+    // the valid events and the error land while no reader is waiting: they
+    // buffer in the iterator's internal queue instead of rejecting a pending
+    // reader.
+    const iterator = assistantStream[Symbol.asyncIterator]();
+    // Wait for the stream's terminal signal so the events and the error have
+    // definitely been emitted before we start reading.
+    const failure: unknown = await assistantStream.done().catch((error: unknown) => error);
+
+    await expect(iterator.next()).resolves.toMatchObject({
+      done: false,
+      value: { event: 'thread.message.created' },
+    });
+    await expect(iterator.next()).resolves.toMatchObject({
+      done: false,
+      value: { event: 'thread.message.delta' },
+    });
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError).message).toBe('assistant boom');
+    await expect(iterator.next()).rejects.toBe(failure);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 });
