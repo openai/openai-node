@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 import { _iterSSEMessages } from 'openai/core/streaming';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 
@@ -15,7 +15,7 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
 
     event = await stream.next();
@@ -33,7 +33,7 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toBeNull();
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
 
@@ -52,7 +52,7 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('foo');
     expect(event.value.data).toEqual('');
 
@@ -73,12 +73,12 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('foo');
     expect(event.value.data).toEqual('');
 
     event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('ping');
     expect(event.value.data).toEqual('');
 
@@ -101,12 +101,12 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('foo');
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
 
     event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('ping');
     expect(JSON.parse(event.value.data)).toEqual({ bar: false });
 
@@ -130,7 +130,7 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('ping');
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
     expect(event.value.data).toEqual('{\n"foo":\n\n\ntrue}');
@@ -151,7 +151,7 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('ping');
     expect(JSON.parse(event.value.data)).toEqual({ foo: 'my long\n\ncontent' });
 
@@ -176,15 +176,15 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(JSON.parse(event.value.data)).toEqual({ content: 'culpa ' });
 
     event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(JSON.parse(event.value.data)).toEqual({ content: Buffer.from([0xe2, 0x80, 0xa8]).toString() });
 
     event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(JSON.parse(event.value.data)).toEqual({ content: 'foo' });
 
     event = await stream.next();
@@ -209,7 +209,7 @@ describe('streaming decoding', () => {
     ]();
 
     let event = await stream.next();
-    assert(event.value);
+    assert.ok(event.value);
     expect(event.value.event).toEqual('completion');
     expect(JSON.parse(event.value.data)).toEqual({ content: 'известни' });
 

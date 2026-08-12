@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
@@ -19,7 +19,6 @@ import type { WorkloadIdentity } from './auth/types';
 import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
-  AbstractPage,
   type ConversationCursorPageParams,
   ConversationCursorPageResponse,
   type CursorPageParams,
@@ -50,6 +49,11 @@ import {
   CompletionUsage,
   Completions,
 } from './resources/completions';
+import {
+  ContentProvenanceCheck,
+  ContentProvenanceCheckCreateParams,
+  ContentProvenanceChecks,
+} from './resources/content-provenance-checks';
 import {
   CreateEmbeddingResponse,
   Embedding,
@@ -431,10 +435,10 @@ export class OpenAI {
 
     const {
       baseURL = provider ? null : readEnv('OPENAI_BASE_URL'),
-      apiKey = provider ? null : readEnv('OPENAI_API_KEY') ?? null,
-      adminAPIKey = provider ? null : readEnv('OPENAI_ADMIN_KEY') ?? null,
-      organization = provider ? null : readEnv('OPENAI_ORG_ID') ?? null,
-      project = provider ? null : readEnv('OPENAI_PROJECT_ID') ?? null,
+      apiKey = provider ? null : (readEnv('OPENAI_API_KEY') ?? null),
+      adminAPIKey = provider ? null : (readEnv('OPENAI_ADMIN_KEY') ?? null),
+      organization = provider ? null : (readEnv('OPENAI_ORG_ID') ?? null),
+      project = provider ? null : (readEnv('OPENAI_PROJECT_ID') ?? null),
       webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
       workloadIdentity,
       ...opts
@@ -469,7 +473,7 @@ export class OpenAI {
     }
 
     this.baseURL = options.baseURL!;
-    this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT /* 10 minutes */;
+    this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT; /* 10 minutes */
     this.logger = options.logger ?? console;
     const defaultLogLevel = 'warn';
     // Set default logLevel early so that we can log a warning in parseLogLevel.
@@ -669,9 +673,8 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url =
-      isAbsoluteURL(path) ?
-        new URL(path)
+    const url = isAbsoluteURL(path)
+      ? new URL(path)
       : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
 
     const defaultQuery = this.defaultQuery();
@@ -822,8 +825,9 @@ export class OpenAI {
         );
         return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
       }
-      const terminalMessage =
-        hasStreamingBody ? 'error; streaming body cannot be retried' : 'error; no more retries left';
+      const terminalMessage = hasStreamingBody
+        ? 'error; streaming body cannot be retried'
+        : 'error; no more retries left';
       loggerFor(this).info(
         `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${terminalMessage}`,
       );
@@ -905,9 +909,9 @@ export class OpenAI {
         );
       }
 
-      const retryMessage =
-        shouldRetry ?
-          hasStreamingBody ? `error; streaming body cannot be retried`
+      const retryMessage = shouldRetry
+        ? hasStreamingBody
+          ? `error; streaming body cannot be retried`
           : `error; no more retries left`
         : `error; not retryable`;
 
@@ -955,9 +959,9 @@ export class OpenAI {
   ): Pagination.PagePromise<PageClass, Item> {
     return this.requestAPIList(
       Page,
-      opts && 'then' in opts ?
-        opts.then((opts) => ({ method: 'get', path, ...opts }))
-      : { method: 'get', path, ...opts },
+      opts && 'then' in opts
+        ? opts.then((opts) => ({ method: 'get', path, ...opts }))
+        : { method: 'get', path, ...opts },
     );
   }
 
@@ -1161,6 +1165,7 @@ export class OpenAI {
       idempotencyHeaders[this.idempotencyHeader] = options.idempotencyKey;
     }
 
+    const helperMethod = options.__metadata?.['helperMethod'];
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1169,12 +1174,13 @@ export class OpenAI {
         'X-Stainless-Retry-Count': String(retryCount),
         ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
+        ...(typeof helperMethod === 'string' ? { 'X-Stainless-Helper-Method': helperMethod } : {}),
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      this._provider ? undefined : (
-        await this.authHeaders(options, options.__security ?? { bearerAuth: true })
-      ),
+      this._provider
+        ? undefined
+        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,
@@ -1304,6 +1310,7 @@ export class OpenAI {
    * Given a prompt and/or an input image, the model will generate a new image.
    */
   images: API.Images = new API.Images(this);
+  contentProvenanceChecks: API.ContentProvenanceChecks = new API.ContentProvenanceChecks(this);
   audio: API.Audio = new API.Audio(this);
   /**
    * Given text and/or image inputs, classifies if those inputs are potentially harmful.
@@ -1347,6 +1354,7 @@ OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
 OpenAI.Files = Files;
 OpenAI.Images = Images;
+OpenAI.ContentProvenanceChecks = ContentProvenanceChecks;
 OpenAI.Audio = Audio;
 OpenAI.Moderations = Moderations;
 OpenAI.Models = Models;
@@ -1514,6 +1522,12 @@ export declare namespace OpenAI {
     type ImageGenerateParams as ImageGenerateParams,
     type ImageGenerateParamsNonStreaming as ImageGenerateParamsNonStreaming,
     type ImageGenerateParamsStreaming as ImageGenerateParamsStreaming,
+  };
+
+  export {
+    ContentProvenanceChecks as ContentProvenanceChecks,
+    type ContentProvenanceCheck as ContentProvenanceCheck,
+    type ContentProvenanceCheckCreateParams as ContentProvenanceCheckCreateParams,
   };
 
   export { Audio as Audio, type AudioModel as AudioModel, type AudioResponseFormat as AudioResponseFormat };

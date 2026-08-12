@@ -1,12 +1,12 @@
-import fc from 'fast-check';
+import { assert, json, property } from 'fast-check';
 import { MalformedJSON, partialParse } from 'openai/_vendor/partial-json-parser/parser';
 
 describe('partial parsing', () => {
   test('should parse complete json', () => {
     expect(partialParse('{"__proto__": 0}')).toEqual(JSON.parse('{"__proto__": 0}'));
 
-    fc.assert(
-      fc.property(fc.json({ depthSize: 'large', noUnicodeString: false }), (jsonString) => {
+    assert(
+      property(json({ depthSize: 'large', noUnicodeString: false }), (jsonString) => {
         const parsedNormal = JSON.parse(jsonString);
         const parsedPartial = partialParse(jsonString);
         expect(parsedPartial).toEqual(parsedNormal);
@@ -36,12 +36,12 @@ describe('partial parsing', () => {
   });
 
   test('should only throw errors parsing numbers', () =>
-    fc.assert(
-      fc.property(fc.json({ depthSize: 'large', noUnicodeString: false }), (jsonString) => {
+    assert(
+      property(json({ depthSize: 'large', noUnicodeString: false }), (jsonString) => {
         for (let i = 1; i < jsonString.length; i++) {
           // speedup
           i += Math.floor(Math.random() * 3);
-          const substring = jsonString.substring(0, i);
+          const substring = jsonString.slice(0, i);
 
           // since we don't allow partial parsing for numbers
           if (

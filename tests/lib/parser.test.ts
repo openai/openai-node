@@ -1,18 +1,18 @@
 import { z as z4 } from 'zod/v4';
 import { z as z3 } from 'zod/v3';
-import OpenAI from 'openai';
+import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import {
   isParseableResponseFormat,
   makeParseableResponseFormat,
   maybeParseChatCompletion,
   parseResponseFormatContent,
-  type ExtractParsedContentFromParams,
 } from '../../src/lib/parser';
+import type { AutoParseableResponseFormat, ExtractParsedContentFromParams } from '../../src/lib/parser';
+import type { ChatCompletionStreamParams } from '../../src/lib/ChatCompletionStream';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
 import { compareType } from '../utils/typing';
-
-jest.setTimeout(1000 * 30);
 
 describe.each([
   { version: 'v3', z: z3 },
@@ -1258,14 +1258,14 @@ describe.each([
     });
 
     test('ref schemas with `.transform()`', async () => {
-      let Inner = z.object({
+      const Inner = z.object({
         baz:
-          version === 'v3' ?
-            z.boolean().transform((v: any) => v ?? true)
-          : z
-              .boolean()
-              .transform((v: any) => v ?? true)
-              .pipe(z.boolean()),
+          version === 'v3'
+            ? z.boolean().transform((v: any) => v ?? true)
+            : z
+                .boolean()
+                .transform((v: any) => v ?? true)
+                .pipe(z.boolean()),
       });
       const Outer = z.object({
         first: Inner,
@@ -1421,7 +1421,7 @@ describe('maybeParseChatCompletion', () => {
     const rawCompletion = {
       id: 'chatcmpl-123',
       object: 'chat.completion' as const,
-      created: 1677652288,
+      created: 1_677_652_288,
       model: 'gpt-4o-2024-08-06',
       choices: [
         {
@@ -1472,14 +1472,13 @@ describe('isParseableResponseFormat', () => {
   it('rejects formats that produce no parsed output', () => {
     expect(isParseableResponseFormat({ type: 'json_object' })).toBe(false);
     expect(isParseableResponseFormat({ type: 'text' })).toBe(false);
-    expect(isParseableResponseFormat(undefined)).toBe(false);
     expect(isParseableResponseFormat(null)).toBe(false);
   });
 });
 
 describe('parseResponseFormatContent', () => {
   it('uses the branded callback instead of generic JSON when present', () => {
-    const parseRaw = jest.fn(() => ({ branded: true }));
+    const parseRaw = vi.fn(() => ({ branded: true }));
     const format = makeParseableResponseFormat(
       { type: 'json_schema', json_schema: { name: 'location', schema: {} } },
       parseRaw,
@@ -1487,6 +1486,22 @@ describe('parseResponseFormatContent', () => {
 
     expect(parseResponseFormatContent(format, '{"city":"San Francisco"}')).toEqual({ branded: true });
     expect(parseRaw).toHaveBeenCalledWith('{"city":"San Francisco"}');
+  });
+
+  it('preserves unbranded custom parsers on raw json_schema formats', () => {
+    const parseRaw = vi.fn((raw: string) => ({ raw }));
+
+    expect(
+      parseResponseFormatContent(
+        {
+          type: 'json_schema',
+          json_schema: { name: 'location', schema: {} },
+          $parseRaw: parseRaw,
+        },
+        'not valid JSON',
+      ),
+    ).toEqual({ raw: 'not valid JSON' });
+    expect(parseRaw).toHaveBeenCalledWith('not valid JSON');
   });
 
   it('falls back to generic JSON for raw json_schema formats', () => {
@@ -1499,19 +1514,29 @@ describe('parseResponseFormatContent', () => {
   });
 
   it('returns null for non-parseable formats', () => {
+    const parseRaw = vi.fn();
+
     expect(parseResponseFormatContent({ type: 'json_object' }, '{"city":"San Francisco"}')).toBeNull();
     expect(parseResponseFormatContent(undefined, '{"city":"San Francisco"}')).toBeNull();
+    expect(parseResponseFormatContent({ type: 'text', $parseRaw: parseRaw }, 'ordinary text')).toBeNull();
+    expect(parseRaw).not.toHaveBeenCalled();
   });
 });
 
 describe('ExtractParsedContentFromParams', () => {
-  type BaseParams = { model: string; messages: [] };
+  interface BaseParams {
+    model: string;
+    messages: [];
+  }
 
   it('resolves raw json_schema formats to unknown', () => {
     compareType<
       ExtractParsedContentFromParams<
         BaseParams & {
-          response_format: { type: 'json_schema'; json_schema: { name: 'location'; schema: {} } };
+          response_format: {
+            type: 'json_schema';
+            json_schema: { name: 'location'; schema: { type: 'object' } };
+          };
         }
       >,
       unknown
@@ -1526,6 +1551,32 @@ describe('ExtractParsedContentFromParams', () => {
         }
       >,
       { city: string }
+    >(true);
+  });
+
+  it('resolves publicly typed streaming params with possible raw schemas to unknown', () => {
+    compareType<ExtractParsedContentFromParams<ChatCompletionStreamParams>, unknown>(true);
+  });
+
+  it('preserves known helper output when branded formats are optional', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format?: AutoParseableResponseFormat<{ city: string }>;
+        }
+      >,
+      { city: string } | null
+    >(true);
+  });
+
+  it('preserves known helper output across non-structured format unions', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format: AutoParseableResponseFormat<{ city: string }> | { type: 'text' };
+        }
+      >,
+      { city: string } | null
     >(true);
   });
 
@@ -1558,6 +1609,14 @@ async function _chatCompletionsParsedTypes(client: OpenAI) {
     })
     .finalChatCompletion();
   compareType<(typeof rawSchemaStream)['choices'][number]['message']['parsed'], unknown>(true);
+
+  const typedParams: ChatCompletionStreamParams = {
+    model: 'gpt-4o-2024-08-06',
+    messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+    response_format: { type: 'json_schema', json_schema: { name: 'location', schema: { type: 'object' } } },
+  };
+  const typedSchemaStream = await client.chat.completions.stream(typedParams).finalChatCompletion();
+  compareType<(typeof typedSchemaStream)['choices'][number]['message']['parsed'], unknown>(true);
 
   const jsonObjectCompletion = await client.chat.completions.parse({
     model: 'gpt-4o-2024-08-06',

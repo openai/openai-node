@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as SpeechAPI from './speech';
@@ -13,6 +13,7 @@ import {
   TranscriptionDiarized,
   TranscriptionDiarizedSegment,
   TranscriptionInclude,
+  TranscriptionLanguage,
   TranscriptionSegment,
   TranscriptionStreamEvent,
   TranscriptionTextDeltaEvent,
@@ -39,6 +40,7 @@ export class Audio extends APIResource {
 
 export type AudioModel =
   | 'whisper-1'
+  | 'gpt-transcribe'
   | 'gpt-4o-transcribe'
   | 'gpt-4o-mini-transcribe'
   | 'gpt-4o-mini-transcribe-2025-12-15'
@@ -66,6 +68,7 @@ export declare namespace Audio {
     type TranscriptionDiarized as TranscriptionDiarized,
     type TranscriptionDiarizedSegment as TranscriptionDiarizedSegment,
     type TranscriptionInclude as TranscriptionInclude,
+    type TranscriptionLanguage as TranscriptionLanguage,
     type TranscriptionSegment as TranscriptionSegment,
     type TranscriptionStreamEvent as TranscriptionStreamEvent,
     type TranscriptionTextDeltaEvent as TranscriptionTextDeltaEvent,

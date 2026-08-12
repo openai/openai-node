@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import * as ImagesAPI from './images';
@@ -55,7 +55,13 @@ export class Images extends APIResource {
     return this._client.post(
       '/images/edits',
       multipartFormRequestOptions(
-        { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+        {
+          body,
+          ...options,
+          stream: body.stream ?? false,
+          __metadata: { ...options?.__metadata, ...(body.model == null ? {} : { model: body.model }) },
+          __security: { bearerAuth: true },
+        },
         this._client,
       ),
     ) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>>;

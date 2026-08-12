@@ -10,8 +10,11 @@ import type { ResponseStreamParams } from './lib/responses/ResponseStream';
 import * as API from './resources/index';
 import type * as ResponsesAPI from './resources/responses/responses';
 
-export interface BedrockClientOptions
-  extends Omit<ClientOptions, 'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity'> {
+/** Configures Amazon Bedrock's OpenAI-compatible endpoint and bearer-token authentication. */
+export interface BedrockClientOptions extends Omit<
+  ClientOptions,
+  'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity'
+> {
   /**
    * Bedrock bearer token used for authentication.
    *
@@ -105,9 +108,9 @@ export class BedrockOpenAI extends OpenAI {
   /**
    * API Client for interfacing with Amazon Bedrock's OpenAI-compatible endpoint.
    *
-   * @param {string | null | undefined} [opts.apiKey=process.env['AWS_BEARER_TOKEN_BEDROCK'] ?? null]
-   * @param {string | null | undefined} [opts.baseURL=process.env['AWS_BEDROCK_BASE_URL'] ?? derived from opts.awsRegion or AWS_REGION/AWS_DEFAULT_REGION]
-   * @param {string | undefined} [opts.awsRegion=process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'] ?? undefined]
+   * @param {string | null | undefined} [opts.apiKey] - Defaults to `process.env['AWS_BEARER_TOKEN_BEDROCK'] ?? null`.
+   * @param {string | null | undefined} [opts.baseURL] - Defaults to `process.env['AWS_BEDROCK_BASE_URL']`, or is derived from `opts.awsRegion`, `AWS_REGION`, or `AWS_DEFAULT_REGION`.
+   * @param {string | undefined} [opts.awsRegion] - Defaults to `process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'] ?? undefined`.
    * @param {ApiKeySetter | undefined} opts.bedrockTokenProvider - A function that returns a Bedrock bearer token and is invoked before each request.
    */
   constructor({
@@ -179,9 +182,10 @@ export class BedrockOpenAI extends OpenAI {
     return super.authHeaders(opts, security);
   }
 
+  /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */
   override withOptions(options: Partial<BedrockClientOptions>): this {
     const bedrockTokenProvider =
-      options.apiKey !== undefined ? undefined : options.bedrockTokenProvider ?? this.bedrockTokenProvider;
+      options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
 
     return super.withOptions({
       ...options,

@@ -1,7 +1,9 @@
-import { ZodSetDef } from 'zod/v3';
-import { ErrorMessages, setResponseValueAndErrors } from '../errorMessages';
-import { JsonSchema7Type, parseDef } from '../parseDef';
-import { Refs } from '../Refs';
+import type { ZodSetDef } from 'zod/v3';
+import type { ErrorMessages } from '../errorMessages';
+import { setResponseValueAndErrors } from '../errorMessages';
+import type { JsonSchema7Type } from '../parseDef';
+import { parseDef } from '../parseDef';
+import type { Refs } from '../Refs';
 
 export type JsonSchema7SetType = {
   type: 'array';

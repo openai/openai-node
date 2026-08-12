@@ -1,28 +1,25 @@
+# Runs the repository's normal lint, build, test, example, and ecosystem checks.
+# These checks catch generated-code, packaging, runtime, and integration
+# regressions; policy-document alignment lives in node-version-policy.yml.
 name: CI
 on:
   push:
     branches:
       - '**'
+      - '!gh-readonly-queue/**'
       - '!integrated/**'
-      - '!stl-preview-head/**'
-      - '!stl-preview-base/**'
-      - '!generated'
-      - '!codegen/**'
-      - 'codegen/stl/**'
   pull_request:
-    branches-ignore:
-      - 'stl-preview-head/**'
-      - 'stl-preview-base/**'
-
-env:
-  LATEST_LTS_NODE_VERSION: '24'
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types:
+      - checks_requested
 
 jobs:
   lint:
     timeout-minutes: 10
     name: lint
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
     steps:
@@ -34,23 +31,25 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
 
-      - name: Check types
+      - name: Check formatting and lint rules
         run: ./scripts/lint
+
+      - name: Check types
+        run: pnpm exec tsc
 
   build:
     timeout-minutes: 5
     name: build
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -60,7 +59,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Bootstrap
@@ -69,38 +68,52 @@ jobs:
       - name: Check build
         run: ./scripts/build
 
-      - name: Get GitHub OIDC Token
-        if: |-
-          github.repository == 'stainless-sdks/openai-typescript' &&
-          !startsWith(github.ref, 'refs/heads/stl/')
-        id: github-oidc
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        with:
-          script: core.setOutput('github_token', await core.getIDToken());
+      - name: Check published source types with TypeScript 4.9
+        run: ./node_modules/typescript-4-9/bin/tsc --project dist/src/tsconfig.json --noEmit
 
-      - name: Upload tarball
-        if: |-
-          github.repository == 'stainless-sdks/openai-typescript' &&
-          !startsWith(github.ref, 'refs/heads/stl/')
-        env:
-          URL: https://pkg.stainless.com/s
-          AUTH: ${{ steps.github-oidc.outputs.github_token }}
-          SHA: ${{ github.sha }}
-        run: ./scripts/utils/upload-artifact.sh
+      - name: Check published source types with TypeScript 6
+        run: ./node_modules/typescript/bin/tsc --project dist/src/tsconfig.json --noEmit
+
+      - name: Check package types
+        run: |
+          pnpm exec attw --pack dist -f json > .attw.json || true
+          node scripts/utils/attw-report.cjs
+
+      - name: Check published package
+        run: pnpm exec publint dist
+
+  node_matrix:
+    name: Read Node.js test matrix
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.policy.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Read policy matrix
+        id: policy
+        run: echo "matrix=$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)" >> "$GITHUB_OUTPUT"
+
   test:
+    name: test (${{ matrix.node-version }})
+    needs: node_matrix
     timeout-minutes: 10
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    continue-on-error: ${{ matrix.experimental }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        # The GitHub-hosted Node 26 alias currently resolves to 26.3.0, where
-        # this full Steady-backed test job surfaced a multipart connection reset.
-        # Pin to 26.2.0 so this still covers Node 26 without changing generated
-        # API-resource tests for a CI-specific failure.
-        node-version: ['20', '22', '24', '26.2.0']
+      matrix: ${{ fromJSON(needs.node_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -112,7 +125,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Bootstrap
@@ -126,10 +139,16 @@ jobs:
       - name: Run tests
         run: ./scripts/test
 
+      - name: Test packed npm package
+        if: matrix.experimental == false
+        run: |
+          ./scripts/build
+          node --experimental-strip-types scripts/test-packed-package.ts
+
   test_matrix:
-    name: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && 'test matrix' || 'test matrix (not run)' }}
-    if: ${{ always() && (github.event_name == 'push' || github.event.pull_request.head.repo.fork) }}
-    needs: test
+    name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
+    needs: [test]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -145,8 +164,13 @@ jobs:
   examples:
     timeout-minutes: 10
     name: examples
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: github.repository == 'openai/openai-node'
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.repository == 'openai/openai-node' &&
+        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
+        github.head_ref != 'release-please--branches--main--components--openai'
+      }}
     environment: ci
     permissions:
       contents: read
@@ -160,7 +184,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies
@@ -173,7 +197,7 @@ jobs:
             echo "Skipping examples because OPENAI_API_KEY is not set"
             exit 0
           fi
-          pnpm tsn examples/demo.ts
+          pnpm tsn examples/chat-completions/demo.ts
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
@@ -181,6 +205,11 @@ jobs:
     name: ecosystem tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: >-
+      ${{
+        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
+        github.head_ref != 'release-please--branches--main--components--openai'
+      }}
     environment: ci
     permissions:
       contents: read
@@ -194,7 +223,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - uses: denoland/setup-deno@11b63cf76cfcafb4e43f97b6cad24d8e8438f62d # v1

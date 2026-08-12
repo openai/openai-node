@@ -1,9 +1,9 @@
-import { readFile } from 'fs/promises';
-import ts from 'typescript';
+import { readFile } from 'node:fs/promises';
+import type ts from 'typescript';
 
 export function trimPrefix(input: string, prefix: string): string {
   if (input.startsWith(prefix)) {
-    return input.substring(prefix.length);
+    return input.slice(prefix.length);
   }
 
   return input;
@@ -11,14 +11,14 @@ export function trimPrefix(input: string, prefix: string): string {
 
 export function trimSuffix(input: string, suffix: string): string {
   if (input.endsWith(suffix)) {
-    return input.substring(0, input.length - suffix.length);
+    return input.slice(0, input.length - suffix.length);
   }
 
   return input;
 }
 
 export async function readJSON(path: string): Promise<any> {
-  const content = await readFile(path, 'utf8');
+  const content = await readFile(path, 'utf-8');
   return JSON.parse(content);
 }
 
@@ -26,7 +26,9 @@ export async function tryReadJSON(path: string): Promise<any> {
   try {
     return await readJSON(path);
   } catch (err: any) {
-    if (err.code === 'ENOENT') return {};
+    if (err.code === 'ENOENT') {
+      return {};
+    }
     throw err;
   }
 }
