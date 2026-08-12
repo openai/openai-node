@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
     cooldown:
@@ -20,6 +21,7 @@ updates:
       - /ecosystem-tests/node-ts4.5-jest28
       - /ecosystem-tests/ts-browser-webpack
       - /ecosystem-tests/vercel-edge
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
     cooldown:
