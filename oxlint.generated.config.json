@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "off"
+  },
+  "rules": {
+    "no-unused-vars": [
+      "warn",
+      {
+        "args": "none",
+        "caughtErrors": "none",
+        "fix": {
+          "imports": "safe-fix",
+          "variables": "off"
+        }
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "^openai(/.*)?",
+            "message": "Use a relative import, not a package import."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["tests/**", "examples/**", "ecosystem-tests/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

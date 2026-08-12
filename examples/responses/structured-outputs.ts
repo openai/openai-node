@@ -26,7 +26,7 @@ async function main() {
   });
 
   console.log(rsp.output_parsed);
-  console.log('answer: ', rsp.output_parsed?.final_answer);
+  console.log('answer:', rsp.output_parsed?.final_answer);
 }
 
 main().catch(console.error);

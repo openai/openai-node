@@ -1,5 +1,7 @@
 import OpenAI from 'openai';
+import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
+import { Stream } from 'openai/streaming';
 
 const openai = new OpenAI({
   apiKey: 'My API Key',
@@ -43,5 +45,55 @@ describe('assistant tests', () => {
     const atIndex2 = acc.tool_calls.filter((t: any) => t.index === 2);
     expect(atIndex2).toHaveLength(1);
     expect(atIndex2[0].function.arguments).toBe('{"x":1}');
+  });
+
+  test('toReadableStream preserves queued message deltas', async () => {
+    const encoder = new TextEncoder();
+    const events = [
+      {
+        event: 'thread.message.created',
+        data: {
+          id: 'msg_1',
+          content: [],
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_1',
+          delta: {
+            content: [{ index: 0, type: 'text', text: { value: 'E', annotations: [] } }],
+          },
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_1',
+          delta: {
+            content: [{ index: 0, type: 'text', text: { value: 'ddy' } }],
+          },
+        },
+      },
+      {
+        event: 'thread.run.completed',
+        data: { id: 'run_1' },
+      },
+    ];
+    const input = ReadableStreamFrom(events.map((event) => encoder.encode(JSON.stringify(event) + '\n')));
+    const assistantStream = AssistantStream.fromReadableStream(input);
+    const readable = assistantStream.toReadableStream();
+
+    await assistantStream.done();
+
+    const output = Stream.fromReadableStream<any>(readable, new AbortController());
+    const deltas: string[] = [];
+    for await (const event of output) {
+      if (event.event === 'thread.message.delta') {
+        deltas.push(event.data.delta.content[0].text.value);
+      }
+    }
+
+    expect(deltas).toEqual(['E', 'ddy']);
   });
 });

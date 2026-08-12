@@ -1,4 +1,4 @@
-import {
+import type {
   RealtimeClientEvent,
   RealtimeServerEvent,
   RealtimeErrorEvent,
@@ -6,9 +6,14 @@ import {
 } from '../resources/realtime/realtime';
 import { EventEmitter } from '../lib/EventEmitter';
 import { OpenAIError } from '../error';
-import OpenAI, { AzureOpenAI } from '../index';
+import type OpenAI from '../index';
+import { AzureOpenAI } from '../index';
 
+/** An API-reported or client-side error encountered by an active Realtime connection. */
 export class OpenAIRealtimeError extends OpenAIError {
+  /** Stable error name used to identify Realtime connection failures. */
+  override name = 'OpenAIRealtimeError';
+
   /**
    * The error data that the API sent back in an `error` event.
    */
@@ -19,6 +24,12 @@ export class OpenAIRealtimeError extends OpenAIError {
    */
   event_id?: string | undefined;
 
+  /**
+   * Creates a Realtime error, preserving server-provided details when available.
+   *
+   * @param message Human-readable API or connection error description.
+   * @param event Server error event, or `null` for a client-side failure.
+   */
   constructor(message: string, event: RealtimeErrorEvent | null) {
     super(message);
 
@@ -27,37 +38,72 @@ export class OpenAIRealtimeError extends OpenAIError {
   }
 }
 
+/** Materializes mapped Realtime listener properties without changing their public types. */
+// oxlint-disable-next-line typescript/ban-types -- The empty intersection materializes the mapped event shape without changing its public type.
 type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
 
+/**
+ * Maps Realtime server event types to their corresponding strongly typed listener callbacks.
+ *
+ * The `event` listener observes every server event, `error` receives normalized
+ * API or transport failures, and other keys match non-error server event types.
+ */
 type RealtimeEvents = Simplify<
   {
+    /** Receives every server event before its event-specific listener is notified. */
     event: (event: RealtimeServerEvent) => void;
+
+    /** Receives API-reported errors and client-side WebSocket failures. */
     error: (error: OpenAIRealtimeError) => void;
   } & {
+    /** Dispatches each non-error server event with the payload matching its event type. */
     [EventType in Exclude<RealtimeServerEvent['type'], 'error'>]: (
-      event: Extract<RealtimeServerEvent, { type: EventType }>,
+      event: Extract<
+        RealtimeServerEvent,
+        {
+          /** Server-event discriminator associated with this specific listener. */
+          type: EventType;
+        }
+      >,
     ) => unknown;
   }
 >;
 
+/**
+ * Typed event emitter shared by Realtime WebSocket client implementations.
+ *
+ * Listen for `event` to receive all server events, or subscribe to a specific
+ * server event's `type`. Always register an `error` listener; otherwise API and
+ * transport failures are reported as unhandled promise rejections.
+ */
 export abstract class OpenAIRealtimeEmitter extends EventEmitter<RealtimeEvents> {
   /**
-   * Send an event to the API.
+   * Serializes and sends a client event over the active WebSocket connection.
+   *
+   * Wait until the underlying socket is open before calling this method.
+   * Serialization and transport failures are delivered to the `error` event.
    */
   abstract send(event: RealtimeClientEvent): void;
 
   /**
-   * Close the websocket connection.
+   * Closes the WebSocket with status code `1000` and reason `OK` by default.
+   *
+   * Connection-closing failures are delivered to the `error` event.
    */
-  abstract close(props?: { code: number; reason: string }): void;
+  abstract close(props?: {
+    /** WebSocket close status code; defaults to `1000`. */
+    code: number;
+
+    /** WebSocket close reason; defaults to `OK`. */
+    reason: string;
+  }): void;
 
   protected _onError(event: null, message: string, cause: any): void;
   protected _onError(event: RealtimeErrorEvent, message?: string | undefined): void;
   protected _onError(event: RealtimeErrorEvent | null, message?: string | undefined, cause?: any): void {
-    message =
-      event?.error ?
-        `${event.error.message} code=${event.error.code} param=${event.error.param} type=${event.error.type} event_id=${event.error.event_id}`
-      : message ?? 'unknown error';
+    message = event?.error
+      ? `${event.error.message} code=${event.error.code} param=${event.error.param} type=${event.error.type} event_id=${event.error.event_id}`
+      : (message ?? 'unknown error');
 
     if (!this._hasListener('error')) {
       const error = new OpenAIRealtimeError(
@@ -79,62 +125,93 @@ export abstract class OpenAIRealtimeEmitter extends EventEmitter<RealtimeEvents>
   }
 }
 
+/** Reports whether the client is an Azure OpenAI client with Azure-specific Realtime routing. */
 export function isAzure(client: Pick<OpenAI, 'apiKey' | 'baseURL'>): client is AzureOpenAI {
   return client instanceof AzureOpenAI;
 }
 
+/** Starts a model or transcription session, or attaches to exactly one existing call. */
 export type RealtimeConnectionConfig =
   | {
       /**
        * Start a new Realtime session using the given model.
        */
       model: string;
+
+      /** Transcription intent; cannot be supplied when starting a model-backed session. */
       intent?: undefined;
+
+      /** Existing call identifier; cannot be supplied when starting a model-backed session. */
       callID?: undefined;
     }
   | {
-      /**
-       * Connect to the Realtime API with transcription intent.
-       */
+      /** Starts a transcription-only Realtime session without selecting a model. */
       intent: 'transcription';
+
+      /** Model name; cannot be supplied when starting a transcription-only session. */
       model?: undefined;
+
+      /** Existing call identifier; cannot be supplied with transcription intent. */
       callID?: undefined;
     }
   | {
+      /** Model name; cannot be supplied when attaching to an existing call. */
       model?: undefined;
+
+      /** Transcription intent; cannot be supplied when attaching to an existing call. */
       intent?: undefined;
+
       /**
        * Attach to an in-progress Realtime call over a sideband control connection.
        */
       callID: string;
     };
 
+/** Starts an Azure deployment or transcription session, or attaches to an existing call. */
 export type AzureRealtimeConnectionConfig =
   | {
       /**
        * Override the deployment configured on the Azure client.
        */
       deploymentName?: string;
+
+      /** Transcription intent; cannot be combined with a model deployment. */
       intent?: undefined;
+
+      /** Existing call identifier; cannot be combined with `deploymentName`. */
       callID?: undefined;
     }
   | {
-      /**
-       * Connect to the Azure Realtime API with transcription intent.
-       */
+      /** Starts a transcription-only Azure Realtime session without a deployment. */
       intent: 'transcription';
+
+      /** Deployment override; cannot be supplied with transcription intent. */
       deploymentName?: undefined;
+
+      /** Existing call identifier; cannot be supplied with transcription intent. */
       callID?: undefined;
     }
   | {
+      /** Deployment override; cannot be supplied when attaching to an existing call. */
       deploymentName?: undefined;
+
+      /** Transcription intent; cannot be supplied when attaching to an existing call. */
       intent?: undefined;
+
       /**
        * Attach to an in-progress Azure Realtime call over a sideband control connection.
        */
       callID: string;
     };
 
+/**
+ * Builds the secure WebSocket URL for a model or transcription session, or a sideband call.
+ *
+ * Azure model sessions use deployment and API-version query parameters; Azure
+ * sideband calls use the versioned GA Realtime endpoint.
+ *
+ * @throws {Error} If exactly one valid model, transcription intent, or call ID is not supplied.
+ */
 export function buildRealtimeURL(
   client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   connection: string | RealtimeConnectionConfig,
@@ -143,11 +220,16 @@ export function buildRealtimeURL(
     typeof connection === 'string' ? { model: connection } : connection;
   const baseURL = client.baseURL;
   const azure = isAzure(client);
-  const hasModel = !!config.model;
-  const hasCallID = !!config.callID;
-  const hasIntent = config.intent === 'transcription';
+  const hasModel = config.model !== undefined;
+  const hasCallID = config.callID !== undefined;
+  const hasIntent = config.intent !== undefined;
 
-  if ([hasModel, hasCallID, hasIntent].filter(Boolean).length !== 1) {
+  if (
+    Number(hasModel) + Number(hasCallID) + Number(hasIntent) !== 1 ||
+    (hasModel && !config.model) ||
+    (hasCallID && !config.callID) ||
+    (hasIntent && config.intent !== 'transcription')
+  ) {
     throw new Error(
       'Pass exactly one of `model`, `callID`, or transcription `intent` when opening a Realtime WebSocket.',
     );
@@ -174,32 +256,38 @@ export function buildRealtimeURL(
     } else {
       url.searchParams.set('api-version', client.apiVersion);
       if (hasIntent) {
-        url.searchParams.set('intent', config.intent!);
+        url.searchParams.set('intent', 'transcription');
       } else {
         url.searchParams.set('deployment', config.model!);
       }
     }
+  } else if (hasCallID) {
+    url.searchParams.set('call_id', config.callID!);
+  } else if (hasIntent) {
+    url.searchParams.set('intent', 'transcription');
   } else {
-    if (hasCallID) {
-      url.searchParams.set('call_id', config.callID!);
-    } else if (hasIntent) {
-      url.searchParams.set('intent', config.intent!);
-    } else {
-      url.searchParams.set('model', config.model!);
-    }
+    url.searchParams.set('model', config.model!);
   }
   return url;
 }
 
+/**
+ * Resolves an Azure deployment, transcription intent, or an existing Realtime call.
+ *
+ * @throws {Error} If connection targets conflict, intent is invalid, or no deployment is available.
+ */
 export function getAzureRealtimeConnection(
   client: Pick<AzureOpenAI, 'deploymentName'>,
   connection: AzureRealtimeConnectionConfig,
 ): RealtimeConnectionConfig {
   const hasDeploymentName = connection.deploymentName !== undefined;
   const hasCallID = connection.callID !== undefined;
-  const hasIntent = connection.intent === 'transcription';
+  const hasIntent = connection.intent !== undefined;
 
-  if ([hasDeploymentName, hasCallID, hasIntent].filter(Boolean).length > 1) {
+  if (
+    Number(hasDeploymentName) + Number(hasCallID) + Number(hasIntent) > 1 ||
+    (hasIntent && connection.intent !== 'transcription')
+  ) {
     throw new Error(
       'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
     );
@@ -210,7 +298,7 @@ export function getAzureRealtimeConnection(
   }
 
   if (hasIntent) {
-    return { intent: connection.intent! };
+    return { intent: 'transcription' };
   }
 
   const model = connection.deploymentName ?? client.deploymentName;

@@ -24,8 +24,12 @@ async function main() {
   const agents = new Map<string, string>();
   let currentItemID: string | undefined;
   for await (const message of ws) {
-    if (message.type === 'error') throw message.error;
-    if (message.type !== 'message') continue;
+    if (message.type === 'error') {
+      throw message.error;
+    }
+    if (message.type !== 'message') {
+      continue;
+    }
 
     const event = message.message;
     if (event.type === 'response.output_item.added' && event.item.type === 'message') {

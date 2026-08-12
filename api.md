@@ -145,6 +145,16 @@ Methods:
 - <code title="post /images/edits">client.images.<a href="./src/resources/images.ts">edit</a>({ ...params }) -> ImagesResponse</code>
 - <code title="post /images/generations">client.images.<a href="./src/resources/images.ts">generate</a>({ ...params }) -> ImagesResponse</code>
 
+# ContentProvenanceChecks
+
+Types:
+
+- <code><a href="./src/resources/content-provenance-checks.ts">ContentProvenanceCheck</a></code>
+
+Methods:
+
+- <code title="post /content_provenance_checks">client.contentProvenanceChecks.<a href="./src/resources/content-provenance-checks.ts">create</a>({ ...params }) -> ContentProvenanceCheck</code>
+
 # Audio
 
 Types:
@@ -160,6 +170,7 @@ Types:
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarized</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarizedSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionInclude</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionLanguage</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionStreamEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDeltaEvent</a></code>
@@ -956,6 +967,19 @@ Methods:
 - <code title="get /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">retrieve</a>() -> OrganizationDataRetention</code>
 - <code title="post /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">update</a>({ ...params }) -> OrganizationDataRetention</code>
 
+### SpendLimit
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/spend-limit.ts">OrganizationSpendLimit</a></code>
+- <code><a href="./src/resources/admin/organization/spend-limit.ts">OrganizationSpendLimitDeleted</a></code>
+
+Methods:
+
+- <code title="get /organization/spend_limit">client.admin.organization.spendLimit.<a href="./src/resources/admin/organization/spend-limit.ts">retrieve</a>() -> OrganizationSpendLimit</code>
+- <code title="post /organization/spend_limit">client.admin.organization.spendLimit.<a href="./src/resources/admin/organization/spend-limit.ts">update</a>({ ...params }) -> OrganizationSpendLimit</code>
+- <code title="delete /organization/spend_limit">client.admin.organization.spendLimit.<a href="./src/resources/admin/organization/spend-limit.ts">delete</a>() -> OrganizationSpendLimitDeleted</code>
+
 ### SpendAlerts
 
 Types:
@@ -1040,17 +1064,27 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ProjectServiceAccount</a></code>
-- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ServiceAccountCreateResponse</a></code>
-- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ServiceAccountDeleteResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">ProjectServiceAccount</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">ServiceAccountCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">ServiceAccountDeleteResponse</a></code>
 
 Methods:
 
-- <code title="post /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">create</a>(projectID, { ...params }) -> ServiceAccountCreateResponse</code>
-- <code title="get /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">retrieve</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
-- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">update</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
-- <code title="get /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">list</a>(projectID, { ...params }) -> ProjectServiceAccountsPage</code>
-- <code title="delete /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">delete</a>(serviceAccountID, { ...params }) -> ServiceAccountDeleteResponse</code>
+- <code title="post /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">create</a>(projectID, { ...params }) -> ServiceAccountCreateResponse</code>
+- <code title="get /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">retrieve</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
+- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">update</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
+- <code title="get /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">list</a>(projectID, { ...params }) -> ProjectServiceAccountsPage</code>
+- <code title="delete /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">delete</a>(serviceAccountID, { ...params }) -> ServiceAccountDeleteResponse</code>
+
+##### APIKeys
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/api-keys.ts">APIKeyCreateResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}/api_keys">client.admin.organization.projects.serviceAccounts.apiKeys.<a href="./src/resources/admin/organization/projects/service-accounts/api-keys.ts">create</a>(serviceAccountID, { ...params }) -> APIKeyCreateResponse</code>
 
 #### APIKeys
 
@@ -1154,6 +1188,19 @@ Methods:
 
 - <code title="get /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">retrieve</a>(projectID) -> ProjectDataRetention</code>
 - <code title="post /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">update</a>(projectID, { ...params }) -> ProjectDataRetention</code>
+
+#### SpendLimit
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/spend-limit.ts">ProjectSpendLimit</a></code>
+- <code><a href="./src/resources/admin/organization/projects/spend-limit.ts">ProjectSpendLimitDeleted</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/spend_limit">client.admin.organization.projects.spendLimit.<a href="./src/resources/admin/organization/projects/spend-limit.ts">retrieve</a>(projectID) -> ProjectSpendLimit</code>
+- <code title="post /organization/projects/{project_id}/spend_limit">client.admin.organization.projects.spendLimit.<a href="./src/resources/admin/organization/projects/spend-limit.ts">update</a>(projectID, { ...params }) -> ProjectSpendLimit</code>
+- <code title="delete /organization/projects/{project_id}/spend_limit">client.admin.organization.projects.spendLimit.<a href="./src/resources/admin/organization/projects/spend-limit.ts">delete</a>(projectID) -> ProjectSpendLimitDeleted</code>
 
 #### SpendAlerts
 

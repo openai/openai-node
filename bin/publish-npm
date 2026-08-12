@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 
-set -eux
+set -euo pipefail
+
+set +e
+bash ./bin/check-npm-version
+VERSION_STATUS=$?
+set -e
+if [[ $VERSION_STATUS -eq 0 ]]; then
+  exit 0
+elif [[ $VERSION_STATUS -ne 1 ]]; then
+  exit "$VERSION_STATUS"
+fi
 
 if [[ ${NPM_TOKEN:-} ]]; then
   npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
@@ -26,20 +36,21 @@ VERSION="$(jq -r -e '.version' ./package.json)"
 #     "detail": "'the_package' is not in this registry..."
 #   }
 # }
-NPM_INFO="$(npm view "$PACKAGE_NAME" version --json 2>/dev/null || true)"
+set +e
+NPM_INFO="$(npm view "$PACKAGE_NAME" version --json 2>/dev/null)"
+NPM_STATUS=$?
+set -e
 
 # Check if we got an E404 error
-if echo "$NPM_INFO" | jq -e '.error.code == "E404"' > /dev/null 2>&1; then
+if [[ $NPM_STATUS -eq 0 ]]; then
+  LAST_VERSION="$(jq -r -e '.' <<< "$NPM_INFO")"
+elif echo "$NPM_INFO" | jq -e '.error.code == "E404"' > /dev/null 2>&1; then
   # Package doesn't exist yet, no last version
   LAST_VERSION=""
-elif echo "$NPM_INFO" | jq -e '.error' > /dev/null 2>&1; then
-  # Report other errors
+else
   echo "ERROR: npm returned unexpected data:"
   echo "$NPM_INFO"
   exit 1
-else
-  # Success - get the version
-  LAST_VERSION=$(echo "$NPM_INFO" | jq -r '.') # strip quotes
 fi
 
 # Check if current version is pre-release (e.g. alpha / beta / rc)

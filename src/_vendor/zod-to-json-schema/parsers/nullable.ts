@@ -1,7 +1,8 @@
-import { ZodNullableDef } from 'zod/v3';
-import { JsonSchema7Type, parseDef } from '../parseDef';
-import { Refs } from '../Refs';
-import { JsonSchema7NullType } from './null';
+import type { ZodNullableDef } from 'zod/v3';
+import type { JsonSchema7Type } from '../parseDef';
+import { parseDef } from '../parseDef';
+import type { Refs } from '../Refs';
+import type { JsonSchema7NullType } from './null';
 import { primitiveMappings } from './union';
 
 export type JsonSchema7NullableType =
@@ -43,7 +44,9 @@ export function parseNullableDef(
       forceResolution,
     );
 
-    if (base && '$ref' in base) return { allOf: [base], nullable: true } as any;
+    if (base && '$ref' in base) {
+      return { allOf: [base], nullable: true } as any;
+    }
 
     return base && ({ ...base, nullable: true } as any);
   }

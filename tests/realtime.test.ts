@@ -1,9 +1,6 @@
 import OpenAI, { AzureOpenAI } from 'openai';
 import { buildRealtimeURL as buildBetaRealtimeURL } from 'openai/beta/realtime/internal-base';
-import {
-  buildRealtimeURL as buildRealtimeURL,
-  getAzureRealtimeConnection,
-} from 'openai/realtime/internal-base';
+import { buildRealtimeURL, getAzureRealtimeConnection } from 'openai/realtime/internal-base';
 import type { OpenAIRealtimeWebSocket as BetaOpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
 import type { OpenAIRealtimeWS as BetaOpenAIRealtimeWS } from 'openai/beta/realtime/ws';
 import type { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
@@ -86,35 +83,38 @@ describe.each([
     );
   });
 
-  test('rejects model and transcription intent together', () => {
-    expect(() =>
-      buildRealtimeURL(openAIClient, { model: 'gpt-4o-transcribe', intent: 'transcription' } as any),
-    ).toThrow(
+  test.each([
+    { model: 'gpt-realtime', intent: 'transcription' },
+    { callID: 'rtc_123', intent: 'transcription' },
+    { model: '', intent: 'transcription' },
+    { callID: '', intent: 'transcription' },
+    { model: 'gpt-realtime', intent: 'unsupported' },
+    { callID: 'rtc_123', intent: 'unsupported' },
+    { intent: 'unsupported' },
+  ])('rejects invalid or conflicting transcription targets %#', (connection) => {
+    expect(() => buildRealtimeURL(openAIClient, connection as any)).toThrow(
       'Pass exactly one of `model`, `callID`, or transcription `intent` when opening a Realtime WebSocket.',
     );
   });
 });
 
-test('stable Azure helper maps transcription intent without deployment', () => {
-  expect(getAzureRealtimeConnection(azureClient, { intent: 'transcription' })).toEqual({
+test('stable Azure helper maps transcription intent without using a deployment', () => {
+  expect(
+    getAzureRealtimeConnection({ deploymentName: 'configured-deployment' }, { intent: 'transcription' }),
+  ).toEqual({
     intent: 'transcription',
   });
 });
 
-test('stable Azure helper rejects deployment and transcription intent together', () => {
+test.each([
+  { deploymentName: 'my-deployment', intent: 'transcription' },
+  { deploymentName: '', intent: 'transcription' },
+  { callID: 'rtc_123', intent: 'transcription' },
+  { callID: 'rtc_123', intent: 'unsupported' },
+  { intent: 'unsupported' },
+])('stable Azure helper rejects invalid or conflicting connection targets %#', (connection) => {
   expect(() =>
-    getAzureRealtimeConnection(azureClient, {
-      deploymentName: 'my-deployment',
-      intent: 'transcription',
-    } as any),
-  ).toThrow(
-    'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
-  );
-});
-
-test('stable Azure helper rejects call_id and transcription intent together', () => {
-  expect(() =>
-    getAzureRealtimeConnection(azureClient, { callID: 'rtc_123', intent: 'transcription' } as any),
+    getAzureRealtimeConnection({ deploymentName: 'configured-deployment' }, connection as any),
   ).toThrow(
     'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
   );

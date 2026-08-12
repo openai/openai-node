@@ -12,12 +12,12 @@ Types:
 - <code><a href="./src/resources/webhooks.ts">FineTuningJobCancelledWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">FineTuningJobFailedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">FineTuningJobSucceededWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">LiveCallIncomingWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">RealtimeCallIncomingWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">ResponseCancelledWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">ResponseCompletedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">ResponseFailedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">ResponseIncompleteWebhookEvent</a></code>
-- <code><a href="./src/resources/webhooks.ts">SafetyIdentifierBlockedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">UnwrapWebhookEvent</a></code>
 
 Methods:
