@@ -115,6 +115,15 @@ describe('findDoubleNewlineIndex', () => {
     expect(findDoubleNewlineIndex(new TextEncoder().encode('\r\n\r\n'))).toBe(4);
   });
 
+  test.each([
+    ['\\r\\n followed by \\n', 'foo\r\n\nbar', 6],
+    ['\\n followed by \\r\\n', 'foo\n\r\nbar', 6],
+    ['\\r\\n followed by \\r', 'foo\r\n\rbar', 6],
+    ['\\r followed by \\r\\n', 'foo\r\r\nbar', 6],
+  ])('finds mixed line endings: %s', (_description, input, expected) => {
+    expect(findDoubleNewlineIndex(new TextEncoder().encode(input))).toBe(expected);
+  });
+
   test('returns -1 when no double newline found', () => {
     expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\nbar'))).toBe(-1);
     expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\rbar'))).toBe(-1);
@@ -124,6 +133,7 @@ describe('findDoubleNewlineIndex', () => {
 
   test('handles incomplete patterns', () => {
     expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\r\n\r'))).toBe(-1);
+    expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\n\r'))).toBe(-1);
     expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\r\n'))).toBe(-1);
   });
 });

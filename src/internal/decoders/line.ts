@@ -127,33 +127,39 @@ function findNewlineIndex(
 /**
  * Finds the first blank-line separator used to delimit streamed event records.
  *
- * @returns The byte offset immediately after the first `\n\n`, `\r\r`, or
- * `\r\n\r\n` separator, or `-1` when the buffer contains no complete separator.
+ * @returns The byte offset immediately after the first pair of consecutive
+ * line endings, or `-1` when the buffer contains no complete separator.
  */
 export function findDoubleNewlineIndex(buffer: Uint8Array): number {
-  const newline = 0x0a; // \n
-  const carriage = 0x0d; // \r
-
   for (let i = 0; i < buffer.length - 1; i++) {
-    if (buffer[i] === newline && buffer[i + 1] === newline) {
-      // \n\n
-      return i + 2;
-    }
-    if (buffer[i] === carriage && buffer[i + 1] === carriage) {
-      // \r\r
-      return i + 2;
-    }
-    if (
-      buffer[i] === carriage &&
-      buffer[i + 1] === newline &&
-      i + 3 < buffer.length &&
-      buffer[i + 2] === carriage &&
-      buffer[i + 3] === newline
-    ) {
-      // \r\n\r\n
-      return i + 4;
+    const firstEndingLength = lineEndingLength(buffer, i);
+    if (firstEndingLength > 0) {
+      const secondEndingIndex = i + firstEndingLength;
+      const secondEndingLength = lineEndingLength(buffer, secondEndingIndex);
+      if (secondEndingLength > 0) {
+        const secondEndingCouldBecomeCRLF =
+          buffer[secondEndingIndex] === 0x0d && secondEndingIndex === buffer.length - 1;
+        const isUnambiguousDoubleCR = buffer[i] === 0x0d && firstEndingLength === 1;
+        if (secondEndingCouldBecomeCRLF && !isUnambiguousDoubleCR) {
+          continue;
+        }
+        return secondEndingIndex + secondEndingLength;
+      }
     }
   }
 
   return -1;
+}
+
+function lineEndingLength(buffer: Uint8Array, index: number): number {
+  const newline = 0x0a; // \n
+  const carriage = 0x0d; // \r
+
+  if (buffer[index] === newline) {
+    return 1;
+  }
+  if (buffer[index] === carriage) {
+    return buffer[index + 1] === newline ? 2 : 1;
+  }
+  return 0;
 }

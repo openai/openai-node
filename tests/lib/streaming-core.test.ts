@@ -308,6 +308,30 @@ describe('_iterSSEMessages', () => {
     ]);
   });
 
+  test('decodes events separated by mixed line endings', async () => {
+    let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          streamController = controller;
+        },
+      }),
+    );
+    const events = _iterSSEMessages(response, new AbortController());
+    const first = events.next();
+
+    streamController?.enqueue(encoder.encode('data: first\r\n\n'));
+    await expect(first).resolves.toMatchObject({ done: false, value: { event: null, data: 'first' } });
+
+    streamController?.enqueue(encoder.encode('data: second\n\r\n'));
+    streamController?.close();
+    await expect(events.next()).resolves.toMatchObject({
+      done: false,
+      value: { event: null, data: 'second' },
+    });
+    await expect(events.next()).resolves.toMatchObject({ done: true });
+  });
+
   test('finds consecutive events after scanning an earlier fragmented prefix', async () => {
     const response = new Response(
       ReadableStreamFrom([
