@@ -43,6 +43,7 @@ jobs:
             const fs = require("node:fs");
             const os = require("node:os");
             const fixtures = [
+              "tests/benchmarks/request-preparation.bench.ts",
               "tests/benchmarks/streaming.bench.ts",
               "tests/benchmarks/structured-output-and-embeddings.bench.ts",
               "tests/api-resources/embeddings-base64-response.json",
