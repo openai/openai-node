@@ -49,7 +49,7 @@
   "dependencies": {
     "fast-glob": "^3.3.2",
     "p-all": "^3.0.0",
-    "signal-exit": "^3.0.7",
+    "signal-exit": "^4.1.0",
     "superstruct": "^1.0.4",
     "tslib": "^2.8.1",
     "yargs": "^17.7.2"
@@ -60,7 +60,6 @@
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29.5.14",
     "@types/node": "^18.19.64",
-    "@types/signal-exit": "^3.0.4",
     "@types/tmp": "^0.2.6",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^5.62.0",

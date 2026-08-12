@@ -5,7 +5,7 @@ import type { WorkerOptions } from './worker/types';
 import type { Stream } from 'node:stream';
 import { trimPrefix } from './utils';
 import { getReportStyles } from './report';
-import onExit from 'signal-exit';
+import { onExit } from 'signal-exit';
 import pAll from 'p-all';
 import debug from './debug';
 
