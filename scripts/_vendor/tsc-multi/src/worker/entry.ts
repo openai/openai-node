@@ -1,7 +1,7 @@
-import { text } from 'stream/consumers';
+import { text } from 'node:stream/consumers';
 import debug from './debug';
 import { Worker } from './worker';
-import { WorkerOptions } from './types';
+import type { WorkerOptions } from './types';
 
 async function loadWorkerData(): Promise<WorkerOptions> {
   const stdin = await text(process.stdin);

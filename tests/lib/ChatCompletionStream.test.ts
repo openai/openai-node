@@ -1,13 +1,46 @@
-import OpenAI from 'openai';
+import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
-import { ChatCompletionTokenLogprob } from 'openai/resources';
+import type { ChatCompletionTokenLogprob } from 'openai/resources';
 import { Stream } from 'openai/streaming';
 import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
-jest.setTimeout(1000 * 30);
+function mockStreamingClient(chunks: OpenAI.Chat.ChatCompletionChunk[]): OpenAI {
+  return {
+    chat: {
+      completions: {
+        create: vi.fn(async () => ({
+          controller: new AbortController(),
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+              yield chunk;
+            }
+          },
+        })),
+      },
+    },
+  } as unknown as OpenAI;
+}
+
+function contentChunks(...contents: string[]): OpenAI.Chat.ChatCompletionChunk[] {
+  return contents.map((content, index) => ({
+    id: 'chatcmpl-test',
+    object: 'chat.completion.chunk',
+    created: 1,
+    model: 'gpt-test',
+    choices: [
+      {
+        index: 0,
+        delta: index === 0 ? { role: 'assistant', content } : { content },
+        finish_reason: index === contents.length - 1 ? 'stop' : null,
+        logprobs: null,
+      },
+    ],
+  }));
+}
 
 describe('.stream()', () => {
   it('emits finalization failures as errors', async () => {
@@ -29,7 +62,7 @@ describe('.stream()', () => {
     const client = {
       chat: {
         completions: {
-          create: jest.fn(async () => ({
+          create: vi.fn(async () => ({
             controller: new AbortController(),
             async *[Symbol.asyncIterator]() {
               yield chunk;
@@ -57,8 +90,8 @@ describe('.stream()', () => {
 
   it('removes the caller abort listener after the stream finishes', async () => {
     const callerController = new AbortController();
-    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
-    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+    const addEventListenerSpy = vi.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = vi.spyOn(callerController.signal, 'removeEventListener');
 
     const chunk: OpenAI.Chat.ChatCompletionChunk = {
       id: 'chatcmpl-test',
@@ -78,7 +111,7 @@ describe('.stream()', () => {
     const client = {
       chat: {
         completions: {
-          create: jest.fn(async () => ({
+          create: vi.fn(async () => ({
             controller: new AbortController(),
             async *[Symbol.asyncIterator]() {
               yield chunk;
@@ -149,8 +182,10 @@ describe('.stream()', () => {
         ],
       } as unknown as OpenAI.Chat.ChatCompletionChunk,
     ];
-    const readable = new Stream(async function* () {
-      for (const chunk of chunks) yield chunk;
+    const readable = new Stream(async function* readable() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
@@ -222,8 +257,10 @@ describe('.stream()', () => {
         ],
       },
     ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
-    const readable = new Stream(async function* () {
-      for (const chunk of chunks) yield chunk;
+    const readable = new Stream(async function* readable() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
@@ -297,8 +334,10 @@ describe('.stream()', () => {
         ],
       },
     ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
-    const readable = new Stream(async function* () {
-      for (const chunk of chunks) yield chunk;
+    const readable = new Stream(async function* readable() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
@@ -321,7 +360,7 @@ describe('.stream()', () => {
         },
       ],
     };
-    const readable = new Stream(async function* () {
+    const readable = new Stream(async function* readable() {
       yield chunk;
     }, new AbortController()).toReadableStream();
 
@@ -350,7 +389,8 @@ describe('.stream()', () => {
       }),
     );
 
-    expect((await stream.finalChatCompletion()).choices[0]).toMatchInlineSnapshot(`
+    const completion = await stream.finalChatCompletion();
+    expect(completion.choices[0]).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
         "index": 0,
@@ -388,7 +428,8 @@ describe('.stream()', () => {
       }),
     );
 
-    expect((await stream.finalChatCompletion()).choices[0]).toMatchInlineSnapshot(`
+    const completion = await stream.finalChatCompletion();
+    expect(completion.choices[0]).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
         "index": 0,
@@ -409,35 +450,35 @@ describe('.stream()', () => {
   });
 
   it('emits content logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.chat.completions.stream({
-          model: 'gpt-4o-2024-08-06',
-          messages: [
-            {
-              role: 'user',
-              content: "What's the weather like in SF?",
-            },
-          ],
-          logprobs: true,
-          response_format: zodResponseFormat(
-            z.object({
-              city: z.string(),
-              units: z.enum(['c', 'f']).default('f'),
-            }),
-            'location',
-          ),
-        }),
-      )
-    ).on('logprobs.content.done', (props) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: "What's the weather like in SF?",
+          },
+        ],
+        logprobs: true,
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+    const stream = request.on('logprobs.content.done', (props) => {
       if (!capturedLogProbs?.length) {
         capturedLogProbs = props.content;
       }
     });
 
-    const choice = (await stream.finalChatCompletion()).choices[0];
+    const completion = await stream.finalChatCompletion();
+    const choice = completion.choices[0];
     expect(choice).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
@@ -568,35 +609,35 @@ describe('.stream()', () => {
   });
 
   it('emits refusal logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.chat.completions.stream({
-          model: 'gpt-4o-2024-08-06',
-          messages: [
-            {
-              role: 'user',
-              content: 'a bad question',
-            },
-          ],
-          logprobs: true,
-          response_format: zodResponseFormat(
-            z.object({
-              city: z.string(),
-              units: z.enum(['c', 'f']).default('f'),
-            }),
-            'location',
-          ),
-        }),
-      )
-    ).on('logprobs.refusal.done', (props) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: 'a bad question',
+          },
+        ],
+        logprobs: true,
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+    const stream = request.on('logprobs.refusal.done', (props) => {
       if (!capturedLogProbs?.length) {
         capturedLogProbs = props.refusal;
       }
     });
 
-    const choice = (await stream.finalChatCompletion()).choices[0];
+    const completion = await stream.finalChatCompletion();
+    const choice = completion.choices[0];
     expect(choice).toMatchInlineSnapshot(`
       {
         "finish_reason": "stop",
@@ -752,5 +793,188 @@ describe('.stream()', () => {
       }
     `);
     expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.refusal?.length);
+  });
+
+  it('parses stream events for raw json_schema response formats', async () => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('{"city":', '"SF"}')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'location', schema: { type: 'object' } },
+        },
+      },
+    );
+
+    const deltaParsed: unknown[] = [];
+    let doneParsed: unknown;
+    stream.on('content.delta', (event) => deltaParsed.push(event.parsed));
+    stream.on('content.done', (event) => (doneParsed = event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    // Partial events parse incrementally, and the final event agrees with the
+    // finalized completion rather than reporting `null`.
+    expect(deltaParsed).toEqual([{}, { city: 'SF' }]);
+    expect(doneParsed).toEqual({ city: 'SF' });
+    expect(completion.choices[0]?.message.parsed).toEqual({ city: 'SF' });
+  });
+
+  it('parses stream events for branded response formats', async () => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('{"city":', '"SF"}')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: zodResponseFormat(z.object({ city: z.string() }), 'location'),
+      },
+    );
+
+    const deltaParsed: unknown[] = [];
+    let doneParsed: unknown;
+    stream.on('content.delta', (event) => deltaParsed.push(event.parsed));
+    stream.on('content.done', (event) => (doneParsed = event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(deltaParsed).toEqual([{}, { city: 'SF' }]);
+    expect(doneParsed).toEqual({ city: 'SF' });
+    expect(completion.choices[0]?.message.parsed).toEqual({ city: 'SF' });
+  });
+
+  it('preserves unbranded custom parsers for structured stream completion', async () => {
+    const parseRaw = vi.fn((content: string) => ({ transformed: JSON.parse(content) }));
+    const responseFormat = {
+      type: 'json_schema' as const,
+      json_schema: { name: 'location', schema: { type: 'object' } },
+      $parseRaw: parseRaw,
+    };
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('{"city":', '"SF"}')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: responseFormat,
+      },
+    );
+
+    const doneParsed: unknown[] = [];
+    stream.on('content.done', (event) => doneParsed.push(event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(doneParsed).toEqual([{ transformed: { city: 'SF' } }]);
+    expect(completion.choices[0]?.message.parsed).toEqual({ transformed: { city: 'SF' } });
+    expect(parseRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['length', 'content_filter'] as const)(
+    'rejects unfinished raw-schema output with the %s finish reason',
+    async (finishReason) => {
+      const chunks = contentChunks('{"city":');
+      const choice = chunks[0]?.choices[0];
+      if (!choice) {
+        throw new Error('Expected a completion choice');
+      }
+      choice.finish_reason = finishReason;
+      const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'location', schema: { type: 'object' } },
+        },
+      });
+
+      await expect(stream.finalChatCompletion()).rejects.toThrow(
+        finishReason === 'length' ? /length limit/u : /content filter/u,
+      );
+    },
+  );
+
+  it('keeps raw-schema refusal content unparsed and emits the refusal', async () => {
+    const chunks = contentChunks('not valid JSON');
+    const choice = chunks[0]?.choices[0];
+    if (!choice) {
+      throw new Error('Expected a completion choice');
+    }
+    choice.delta.refusal = 'Request refused';
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'location', schema: { type: 'object' } },
+      },
+    });
+
+    const doneParsed: unknown[] = [];
+    const refusals: string[] = [];
+    stream.on('content.done', (event) => doneParsed.push(event.parsed));
+    stream.on('refusal.done', (event) => refusals.push(event.refusal));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(doneParsed).toEqual([null]);
+    expect(refusals).toEqual(['Request refused']);
+    expect(completion.choices[0]?.message).toMatchObject({
+      parsed: null,
+      refusal: 'Request refused',
+    });
+  });
+
+  it('keeps partially accumulated JSON unparsed when a later chunk refuses the request', async () => {
+    const chunks = contentChunks('{"city":', '"SF"}');
+    const refusalChoice = chunks[1]?.choices[0];
+    if (!refusalChoice) {
+      throw new Error('Expected a completion choice');
+    }
+    refusalChoice.delta.refusal = 'Request refused';
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'location', schema: { type: 'object' } },
+      },
+    });
+
+    const doneParsed: unknown[] = [];
+    const refusals: string[] = [];
+    stream.on('content.done', (event) => doneParsed.push(event.parsed));
+    stream.on('refusal.done', (event) => refusals.push(event.refusal));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(doneParsed).toEqual([null]);
+    expect(refusals).toEqual(['Request refused']);
+    expect(completion.choices[0]?.message).toMatchObject({
+      parsed: null,
+      refusal: 'Request refused',
+    });
+  });
+
+  it('leaves stream events unparsed for response formats without parsed output', async () => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('{"city":', '"SF"}')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: { type: 'json_object' },
+      },
+    );
+
+    const deltaParsed: unknown[] = [];
+    let doneParsed: unknown;
+    stream.on('content.delta', (event) => deltaParsed.push(event.parsed));
+    stream.on('content.done', (event) => (doneParsed = event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(deltaParsed).toEqual([undefined, undefined]);
+    expect(doneParsed).toBeNull();
+    expect(completion.choices[0]?.message.parsed).toBeNull();
   });
 });

@@ -1,3 +1,6 @@
+import { vi } from 'vitest';
+import { hasOwn } from 'openai/internal/utils/values';
+
 import {
   zodFunction,
   zodRealtimeFunction,
@@ -11,10 +14,14 @@ import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 
 function collectRefs(value: unknown, refs: string[] = []): string[] {
-  if (!value || typeof value !== 'object') return refs;
+  if (!value || typeof value !== 'object') {
+    return refs;
+  }
 
   const maybeRef = (value as { $ref?: unknown }).$ref;
-  if (typeof maybeRef === 'string') refs.push(maybeRef);
+  if (typeof maybeRef === 'string') {
+    refs.push(maybeRef);
+  }
 
   for (const child of Object.values(value)) {
     collectRefs(child, refs);
@@ -24,16 +31,24 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
 }
 
 function countEnumValues(value: unknown): number {
-  if (!value || typeof value !== 'object') return 0;
+  if (!value || typeof value !== 'object') {
+    return 0;
+  }
   if (Array.isArray(value)) {
-    return value.reduce((total, child) => total + countEnumValues(child), 0);
+    let total = 0;
+    for (const child of value) {
+      total += countEnumValues(child);
+    }
+    return total;
   }
 
   const record = value as Record<string, unknown>;
   const enumValues = Array.isArray(record['enum']) ? record['enum'].length : 0;
-  return (
-    enumValues + Object.values(record).reduce<number>((total, child) => total + countEnumValues(child), 0)
-  );
+  let nestedEnumValues = 0;
+  for (const child of Object.values(record)) {
+    nestedEnumValues += countEnumValues(child);
+  }
+  return enumValues + nestedEnumValues;
 }
 
 function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
@@ -43,17 +58,21 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
     .split('/')
     .map((token) => token.replace(/~1/g, '/').replace(/~0/g, '~'));
 
-  return tokens.reduce<unknown>((value, token) => {
+  let value: unknown = root;
+  for (const token of tokens) {
     expect(value).not.toBeNull();
     expect(typeof value).toBe('object');
-    expect(Object.prototype.hasOwnProperty.call(value, token)).toBe(true);
-    return (value as Record<string, unknown>)[token];
-  }, root);
+    expect(hasOwn(value as object, token)).toBe(true);
+    value = (value as Record<string, unknown>)[token];
+  }
+  return value;
 }
 
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
   const visit = (value: unknown, resolving: Set<string>) => {
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== 'object') {
+      return;
+    }
 
     const ref = (value as Record<string, unknown>)['$ref'];
     if (typeof ref === 'string') {
@@ -620,8 +639,8 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Zod field at \`#/definitions/schema/properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Zod field at `#/definitions/schema/properties/optional` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     } else {
       expect(() =>
@@ -633,8 +652,8 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Schema field at \`properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Schema field at `properties/optional` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     }
   });
@@ -648,8 +667,8 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Zod field at \`#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Zod field at `#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     } else {
       expect(() =>
@@ -659,14 +678,14 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Schema field at \`properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Schema field at `properties/foo/properties/bar/items/properties/can_be_missing` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     }
   });
 
   it('does not warn on union nullable fields', () => {
-    const consoleSpy = jest.spyOn(console, 'warn');
+    const consoleSpy = vi.spyOn(console, 'warn');
     consoleSpy.mockClear();
 
     zodResponseFormat(
@@ -753,8 +772,7 @@ describe.each([
     });
 
     it('preserves intentional recursion through lazy types', () => {
-      let recursive: zv3.ZodTypeAny;
-      recursive = z.lazy(() =>
+      const recursive: zv3.ZodTypeAny = z.lazy(() =>
         z.object({
           value: z.string(),
           children: z.array(recursive),

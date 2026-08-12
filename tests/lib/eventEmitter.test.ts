@@ -1,7 +1,9 @@
+import { vi } from 'vitest';
 import { EventEmitter } from 'openai/lib/EventEmitter';
 
 type TestEvents = {
   foo: (value: string) => void;
+  pair: (value: string, index: number) => void;
   error: (err: Error) => void;
 };
 
@@ -11,6 +13,9 @@ class TestEmitter extends EventEmitter<TestEvents> {
   }
   emitError(err: Error) {
     this._emit('error', err);
+  }
+  emitPair(value: string, index: number) {
+    this._emit('pair', value, index);
   }
   hasListener(event: keyof TestEvents) {
     return this._hasListener(event);
@@ -41,5 +46,68 @@ describe('EventEmitter.emitted', () => {
     const error = new Error('oops');
     emitter.emitError(error);
     await expect(promise).resolves.toBe(error);
+  });
+
+  test('resolves all arguments from a multi-argument event as a tuple', async () => {
+    const emitter = new TestEmitter();
+    const promise = emitter.emitted('pair');
+
+    emitter.emitPair('value', 3);
+
+    await expect(promise).resolves.toEqual(['value', 3]);
+    expect(emitter.hasListener('error')).toBe(false);
+  });
+});
+
+describe('EventEmitter listeners', () => {
+  test('invokes repeated listeners in registration order', () => {
+    const emitter = new TestEmitter();
+    const values: string[] = [];
+    const repeated = (value: string) => values.push(`repeated:${value}`);
+
+    expect(emitter.on('foo', repeated)).toBe(emitter);
+    emitter.on('foo', (value) => values.push(`second:${value}`));
+    emitter.on('foo', repeated);
+    emitter.emitFoo('value');
+
+    expect(values).toEqual(['repeated:value', 'second:value', 'repeated:value']);
+  });
+
+  test('removes one matching listener at a time without affecting unknown listeners', () => {
+    const emitter = new TestEmitter();
+    const listener = vi.fn();
+
+    expect(emitter.off('foo', listener)).toBe(emitter);
+    emitter.on('foo', listener).on('foo', listener);
+    emitter.off('foo', () => {});
+    emitter.off('foo', listener);
+    emitter.emitFoo('first');
+    emitter.off('foo', listener);
+    emitter.emitFoo('second');
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith('first');
+    expect(emitter.hasListener('foo')).toBe(false);
+  });
+
+  test('automatically removes one-time listeners after their first invocation', () => {
+    const emitter = new TestEmitter();
+    const listener = vi.fn();
+
+    expect(emitter.once('foo', listener)).toBe(emitter);
+    expect(emitter.hasListener('foo')).toBe(true);
+    emitter.emitFoo('first');
+    emitter.emitFoo('second');
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith('first');
+    expect(emitter.hasListener('foo')).toBe(false);
+  });
+
+  test('safely emits events without registered listeners', () => {
+    const emitter = new TestEmitter();
+
+    expect(emitter.hasListener('foo')).toBeFalsy();
+    expect(() => emitter.emitFoo('ignored')).not.toThrow();
   });
 });

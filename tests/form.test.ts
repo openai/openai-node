@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+
 import { multipartFormRequestOptions, createForm, toStreamingFile } from 'openai/internal/uploads';
 import { buildHeaders } from 'openai/internal/headers';
 import { toFile } from 'openai/core/uploads';
@@ -52,7 +54,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form.entries())).toEqual([]);
+    expect([...form.entries()]).toEqual([]);
 
     const form2 = await createForm(
       {
@@ -63,7 +65,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form2.entries())).toEqual([['bar[foo]', 'string']]);
+    expect([...form2.entries()]).toEqual([['bar[foo]', 'string']]);
   });
 
   test('nested undefined array item is stripped', async () => {
@@ -73,7 +75,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form.entries())).toEqual([]);
+    expect([...form.entries()]).toEqual([]);
 
     const form2 = await createForm(
       {
@@ -81,7 +83,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form2.entries())).toEqual([['bar[]', 'foo']]);
+    expect([...form2.entries()]).toEqual([['bar[]', 'foo']]);
   });
 
   test('streams multipart file content lazily', async () => {
@@ -138,5 +140,55 @@ describe('form data validation', () => {
 
     const encoded = await new Response(options.body as ReadableStream).text();
     expect(encoded).toContain('blob-content');
+  });
+
+  test('file names strip path separators by default', async () => {
+    const form = await createForm(
+      {
+        file: new File(['Some content'], 'my-skill/SKILL.md'),
+      },
+      fetch,
+    );
+
+    expect((form.get('file') as File).name).toBe('SKILL.md');
+  });
+
+  test('file names can preserve path separators for APIs that require directories', async () => {
+    const form = await createForm(
+      {
+        files: [new File(['Some content'], 'my-skill/SKILL.md')],
+      },
+      fetch,
+      { stripFilenames: false },
+    );
+
+    expect((form.get('files[]') as File).name).toBe('my-skill/SKILL.md');
+  });
+
+  test('path-preserving mode still strips inferred Response URL filenames', async () => {
+    const response = new Response('Some content', { status: 200 });
+    Object.defineProperty(response, 'url', { value: 'https://example.com/my-skill/SKILL.md' });
+
+    const form = await createForm(
+      {
+        files: [response],
+      },
+      fetch,
+      { stripFilenames: false },
+    );
+
+    expect((form.get('files[]') as File).name).toBe('SKILL.md');
+  });
+
+  test('path-preserving mode still strips inferred ReadStream paths', async () => {
+    const form = await createForm(
+      {
+        files: [fs.createReadStream('tests/uploads.test.ts')],
+      },
+      fetch,
+      { stripFilenames: false },
+    );
+
+    expect((form.get('files[]') as File).name).toBe('uploads.test.ts');
   });
 });

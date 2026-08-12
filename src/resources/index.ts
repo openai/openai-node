@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export * from './chat/index';
 export * from './shared';
@@ -33,6 +33,11 @@ export {
   type ContainerListParams,
   type ContainerListResponsesPage,
 } from './containers/containers';
+export {
+  ContentProvenanceChecks,
+  type ContentProvenanceCheck,
+  type ContentProvenanceCheckCreateParams,
+} from './content-provenance-checks';
 export { Conversations } from './conversations/conversations';
 export {
   Embeddings,

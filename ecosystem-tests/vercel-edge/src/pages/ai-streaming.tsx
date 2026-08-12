@@ -1,6 +1,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 
 const transport = new DefaultChatTransport({ api: '/api/vercel-ai-streaming' });
 
@@ -10,7 +11,7 @@ export default function Chat() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim()) {return;}
 
     void sendMessage({ text: input });
     setInput('');

@@ -1,5 +1,7 @@
+import { vi } from 'vitest';
 import OpenAI from 'openai';
-import { createProvider, type ProviderRuntime } from 'openai/internal/provider';
+import { createProvider } from 'openai/internal/provider';
+import type { ProviderRuntime } from 'openai/internal/provider';
 import { formatRequestDetails } from 'openai/internal/utils/log';
 
 const originalEnv = process.env;
@@ -51,9 +53,9 @@ describe('provider', () => {
       },
     });
 
-    const callApiKey = jest.spyOn(client, '_callApiKey');
-    const authHeaders = jest.spyOn(client as any, 'authHeaders');
-    const validateHeaders = jest.spyOn(client as any, 'validateHeaders');
+    const callApiKey = vi.spyOn(client, '_callApiKey');
+    const authHeaders = vi.spyOn(client as any, 'authHeaders');
+    const validateHeaders = vi.spyOn(client as any, 'validateHeaders');
 
     await client.request({ method: 'get', path: '/models' });
 
@@ -62,7 +64,7 @@ describe('provider', () => {
       'https://provider.example/v1/models',
     );
     expect(requestedURL).toBe('https://provider.example/v1/models');
-    expect((requestedInit?.headers as Headers).get('authorization')).toBe('Provider token');
+    expect((requestedInit?.headers as Headers | undefined)?.get('authorization')).toBe('Provider token');
     expect(callApiKey).not.toHaveBeenCalled();
     expect(authHeaders).not.toHaveBeenCalled();
     expect(validateHeaders).not.toHaveBeenCalled();
@@ -118,7 +120,7 @@ describe('provider', () => {
     process.env['OPENAI_ADMIN_KEY'] = 'openai-admin-key';
     process.env['OPENAI_BASE_URL'] = 'https://openai.example/v1';
 
-    const configure = jest.fn(() => ({
+    const configure = vi.fn(() => ({
       name: 'test-provider',
       baseURL: 'https://provider.example/v1',
     }));
@@ -163,6 +165,7 @@ describe('provider', () => {
     let attempt = 0;
 
     class TestClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture exercises an overridable instance hook.
       protected override async prepareRequest(request: RequestInit): Promise<void> {
         order.push('subclass');
         (request.headers as Headers).set('x-prepared-by', 'subclass');
@@ -179,7 +182,7 @@ describe('provider', () => {
       }),
       maxRetries: 1,
       fetch: async (_url, init) => {
-        if ((init?.headers as Headers).get('x-attempt') === '1') {
+        if (new Headers(init?.headers).get('x-attempt') === '1') {
           return new Response(undefined, {
             status: 429,
             headers: { 'Retry-After-Ms': '1' },
@@ -201,13 +204,11 @@ describe('provider', () => {
     );
   });
 
-  test('shares provider definitions across duplicate module instances', () => {
+  test('shares provider definitions across duplicate module instances', async () => {
     const configuredProvider = provider({ baseURL: 'https://shared.example/v1' });
-
-    jest.isolateModules(() => {
-      const duplicate = require('openai/internal/provider') as typeof import('openai/internal/provider');
-      expect(duplicate.configureProvider(configuredProvider).baseURL).toBe('https://shared.example/v1');
-    });
+    vi.resetModules();
+    const duplicate = await import('openai/internal/provider');
+    expect(duplicate.configureProvider(configuredProvider).baseURL).toBe('https://shared.example/v1');
   });
 
   test('preserves standard OpenAI authentication when no provider is configured', async () => {

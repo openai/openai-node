@@ -30,7 +30,7 @@ function expectSimilar(received: string, expected: string, maxDistance: number) 
   throw new Error(message);
 }
 
-export default async (request: NextApiRequest, response: NextApiResponse) => {
+export default async function handler(request: NextApiRequest, response: NextApiResponse) {
   try {
     console.error('creating client');
     const client = new OpenAI();
@@ -47,9 +47,9 @@ export default async (request: NextApiRequest, response: NextApiResponse) => {
       console.error('running', description);
       try {
         await handler();
-        console.error('passed ', description);
+        console.error('passed', description);
       } catch (error) {
-        console.error('failed ', description, error);
+        console.error('failed', description, error);
         response.status(500).end('Internal Server Error');
         return;
       }
@@ -60,4 +60,4 @@ export default async (request: NextApiRequest, response: NextApiResponse) => {
     console.error(error instanceof Error ? error.stack : String(error));
     response.status(500).end('Internal Server Error');
   }
-};
+}

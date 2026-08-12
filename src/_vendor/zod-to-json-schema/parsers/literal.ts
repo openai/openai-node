@@ -1,5 +1,5 @@
-import { ZodLiteralDef } from 'zod/v3';
-import { Refs } from '../Refs';
+import type { ZodLiteralDef } from 'zod/v3';
+import type { Refs } from '../Refs';
 
 export type JsonSchema7LiteralType =
   | {
