@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../core/resource';
 import * as APIKeysAPI from './api-keys';
@@ -57,19 +57,6 @@ import {
   RoleUpdateParams,
   Roles,
 } from './roles';
-import * as ServiceAccountsAPI from './service-accounts';
-import {
-  ProjectServiceAccount,
-  ProjectServiceAccountsPage,
-  ServiceAccountCreateParams,
-  ServiceAccountCreateResponse,
-  ServiceAccountDeleteParams,
-  ServiceAccountDeleteResponse,
-  ServiceAccountListParams,
-  ServiceAccountRetrieveParams,
-  ServiceAccountUpdateParams,
-  ServiceAccounts,
-} from './service-accounts';
 import * as SpendAlertsAPI from './spend-alerts';
 import {
   ProjectSpendAlert,
@@ -78,9 +65,17 @@ import {
   SpendAlertCreateParams,
   SpendAlertDeleteParams,
   SpendAlertListParams,
+  SpendAlertRetrieveParams,
   SpendAlertUpdateParams,
   SpendAlerts,
 } from './spend-alerts';
+import * as SpendLimitAPI from './spend-limit';
+import {
+  ProjectSpendLimit,
+  ProjectSpendLimitDeleted,
+  SpendLimit,
+  SpendLimitUpdateParams,
+} from './spend-limit';
 import * as GroupsAPI from './groups/groups';
 import {
   GroupCreateParams,
@@ -92,6 +87,19 @@ import {
   ProjectGroup,
   ProjectGroupsPage,
 } from './groups/groups';
+import * as ServiceAccountsAPI from './service-accounts/service-accounts';
+import {
+  ProjectServiceAccount,
+  ProjectServiceAccountsPage,
+  ServiceAccountCreateParams,
+  ServiceAccountCreateResponse,
+  ServiceAccountDeleteParams,
+  ServiceAccountDeleteResponse,
+  ServiceAccountListParams,
+  ServiceAccountRetrieveParams,
+  ServiceAccountUpdateParams,
+  ServiceAccounts,
+} from './service-accounts/service-accounts';
 import * as UsersAPI from './users/users';
 import {
   ProjectUser,
@@ -126,6 +134,7 @@ export class Projects extends APIResource {
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
 
@@ -324,6 +333,7 @@ Projects.HostedToolPermissions = HostedToolPermissions;
 Projects.Groups = Groups;
 Projects.Roles = Roles;
 Projects.DataRetention = DataRetention;
+Projects.SpendLimit = SpendLimit;
 Projects.SpendAlerts = SpendAlerts;
 Projects.Certificates = Certificates;
 
@@ -420,11 +430,19 @@ export declare namespace Projects {
   };
 
   export {
+    SpendLimit as SpendLimit,
+    type ProjectSpendLimit as ProjectSpendLimit,
+    type ProjectSpendLimitDeleted as ProjectSpendLimitDeleted,
+    type SpendLimitUpdateParams as SpendLimitUpdateParams,
+  };
+
+  export {
     SpendAlerts as SpendAlerts,
     type ProjectSpendAlert as ProjectSpendAlert,
     type ProjectSpendAlertDeleted as ProjectSpendAlertDeleted,
     type ProjectSpendAlertsPage as ProjectSpendAlertsPage,
     type SpendAlertCreateParams as SpendAlertCreateParams,
+    type SpendAlertRetrieveParams as SpendAlertRetrieveParams,
     type SpendAlertUpdateParams as SpendAlertUpdateParams,
     type SpendAlertListParams as SpendAlertListParams,
     type SpendAlertDeleteParams as SpendAlertDeleteParams,

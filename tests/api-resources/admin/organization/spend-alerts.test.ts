@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
@@ -36,6 +36,17 @@ describe('resource spendAlerts', () => {
       },
       threshold_amount: 0,
     });
+  });
+
+  test('retrieve', async () => {
+    const responsePromise = client.admin.organization.spendAlerts.retrieve('alert_id');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('update: only required params', async () => {

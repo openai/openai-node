@@ -1,10 +1,10 @@
-import fs from 'fs/promises';
+import fs from 'node:fs/promises';
 import execa from 'execa';
 import yargs from 'yargs';
-import assert from 'assert';
-import path from 'path';
-import { createServer } from 'http';
-import { connect } from 'net';
+import assert from 'node:assert';
+import path from 'node:path';
+import { createServer } from 'node:http';
+import { connect } from 'node:net';
 
 const TAR_NAME = 'openai.tgz';
 const PACK_FOLDER = '.pack';
@@ -97,18 +97,55 @@ const projectRunners = {
       await run('bun', ['test']);
     }
   },
-  // deno: async () => {
-  //   // we don't need to explicitly install the package here
-  //   // because our deno setup relies on `rootDir/deno` to exist
-  //   // which is an artifact produced from our build process
-  //   await run('deno', ['task', 'install']);
-  //   await run('deno', ['task', 'check']);
-  //
-  //   if (state.live) await run('deno', ['task', 'test']);
-  // },
+  deno: async () => {
+    const packageJson = {
+      name: 'openai-deno-ecosystem-test',
+      private: true,
+    };
+    await fs.writeFile('package.json', JSON.stringify(packageJson, null, 2) + '\n');
+
+    if (state.fromNpm) {
+      await run('npm', [
+        'install',
+        '--ignore-scripts',
+        '--no-package-lock',
+        '--no-audit',
+        '--no-fund',
+        '--no-save',
+        state.fromNpm,
+      ]);
+    } else {
+      const packFile = getPackFile();
+      await fs.copyFile(packFile, `./${TAR_NAME}`);
+      await run('deno', ['task', 'install']);
+    }
+
+    // Deno's BYONM resolver requires package.json to declare the npm
+    // dependency. For the default path, add that declaration only after npm
+    // installs the local tarball so it cannot substitute a registry package.
+    const installedPackage = JSON.parse(await fs.readFile('node_modules/openai/package.json', 'utf-8'));
+    assert.ok(typeof installedPackage.version === 'string');
+    await fs.writeFile(
+      'package.json',
+      JSON.stringify(
+        {
+          ...packageJson,
+          dependencies: { openai: installedPackage.version },
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+
+    await run('deno', ['task', 'check']);
+
+    if (state.live) {
+      await run('deno', ['task', 'test']);
+    }
+  },
 };
 
-let projectNames = Object.keys(projectRunners) as Array<keyof typeof projectRunners>;
+let projectNames = Object.keys(projectRunners) as (keyof typeof projectRunners)[];
 const projectNamesSet = new Set(projectNames);
 
 async function startProxy() {
@@ -119,9 +156,7 @@ async function startProxy() {
   proxy.on('connect', (req, clientSocket, head) => {
     console.log('got proxied connection');
     const serverSocket = connect(443, 'api.openai.com', () => {
-      clientSocket.write(
-        'HTTP/1.1 200 Connection Established\r\n' + 'Proxy-agent: Node.js-Proxy\r\n' + '\r\n',
-      );
+      clientSocket.write('HTTP/1.1 200 Connection Established\r\nProxy-agent: Node.js-Proxy\r\n\r\n');
       serverSocket.write(head);
       serverSocket.pipe(clientSocket);
       clientSocket.pipe(serverSocket);
@@ -131,7 +166,7 @@ async function startProxy() {
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
 
   const address = proxy.address();
-  assert(address && typeof address !== 'string');
+  assert.ok(address && typeof address !== 'string');
   process.env['ECOSYSTEM_TESTS_PROXY'] = 'http://127.0.0.1:' + address.port;
 
   return () => {
@@ -225,16 +260,16 @@ async function main() {
   // Some projects, e.g. Deno can be slow to run, so offer the option to skip them. Example:
   //   --skip=deno node-ts-cjs
   if (args.skip.length > 0) {
-    args.skip.forEach((projectName, idx) => {
+    for (const [idx, projectName] of args.skip.entries()) {
       // Ensure the inputted project name is lower case
       args.skip[idx] = (projectName + '').toLowerCase();
-    });
+    }
 
-    projectNames = projectNames.filter((projectName) => (args.skip as string[]).indexOf(projectName) < 0);
+    projectNames = projectNames.filter((projectName) => !(args.skip as string[]).includes(projectName));
 
-    args.skip.forEach((projectName) => {
+    for (const projectName of args.skip) {
       projectNamesSet.delete(projectName as any);
-    });
+    }
   }
 
   const tmpFolderPath = path.resolve(process.cwd(), 'tmp');
@@ -253,11 +288,16 @@ async function main() {
   const positionalArgs = args._.filter(Boolean);
 
   // For some reason `yargs` doesn't pick up the positional args correctly
-  const projectsToRun = (
-    args.projects?.length ? args.projects
-    : positionalArgs.length ?
-      positionalArgs.filter((n) => typeof n === 'string' && (projectNamesSet as Set<string>).has(n))
-    : projectNames) as typeof projectNames;
+  let projectsToRun: typeof projectNames;
+  if (args.projects?.length) {
+    projectsToRun = args.projects as typeof projectNames;
+  } else if (positionalArgs.length) {
+    projectsToRun = positionalArgs.filter(
+      (n) => typeof n === 'string' && (projectNamesSet as Set<string>).has(n),
+    ) as typeof projectNames;
+  } else {
+    projectsToRun = projectNames;
+  }
   console.error(`running projects: ${projectsToRun}`);
 
   const failed: typeof projectNames = [];
@@ -292,6 +332,8 @@ async function main() {
         console.error('Error: Cleanup of file artifacts failed for project', projectName, err);
       });
     }
+
+    await fs.rm(path.join(tmpFolderPath, 'puppeteer-cache'), { recursive: true, force: true });
   }
 
   async function runCleanupAndExit() {
@@ -325,33 +367,35 @@ async function main() {
       const queue = [...projectsToRun];
       const runningProjects = new Set();
 
-      const cursorLeft = '\x1B[G';
-      const eraseLine = '\x1B[2K';
+      const cursorLeft = '\u001B[G';
+      const eraseLine = '\u001B[2K';
 
       let progressDisplayed = false;
-      function clearProgress() {
+      const clearProgress = () => {
         if (progressDisplayed) {
           process.stderr.write(cursorLeft + eraseLine);
           progressDisplayed = false;
         }
-      }
+      };
       const spinner = ['|', '/', '-', '\\'];
 
-      function showProgress() {
+      const showProgress = () => {
         clearProgress();
         progressDisplayed = true;
         const spin = spinner[Math.floor(Date.now() / 500) % spinner.length];
         process.stderr.write(
-          `${spin} Running ${[...runningProjects].join(', ')}`.substring(0, process.stdout.columns - 3) +
-            '...',
+          `${spin} Running ${[...runningProjects].join(', ')}`.slice(
+            0,
+            Math.max(0, process.stdout.columns - 3),
+          ) + '...',
         );
-      }
+      };
 
       const progressInterval = setInterval(showProgress, process.stdout.isTTY ? 500 : 5000);
       showProgress();
 
       await Promise.all(
-        [...Array(jobs).keys()].map(async () => {
+        Array.from({ length: jobs }, (_, index) => index).map(async () => {
           while (queue.length) {
             const project = queue.shift();
             if (!project) {
@@ -365,7 +409,7 @@ async function main() {
               await withRetry(
                 async () => {
                   const child = execa(
-                    'yarn',
+                    'pnpm',
                     [
                       'tsn',
                       __filename,
@@ -380,7 +424,7 @@ async function main() {
                     ],
                     {
                       stdio: 'pipe',
-                      encoding: 'utf8',
+                      encoding: 'utf-8',
                       maxBuffer: 100 * 1024 * 1024,
                       env: {
                         DISABLE_V8_COMPILE_CACHE: process.env['DISABLE_V8_COMPILE_CACHE'] ?? '1',
@@ -396,7 +440,7 @@ async function main() {
                 args.retryDelay,
                 isLikelyNodeCrash,
               );
-            } catch (error) {
+            } catch {
               failed.push(project);
             } finally {
               runningProjects.delete(project);
@@ -409,7 +453,9 @@ async function main() {
             for (const { data } of chunks) {
               process.stdout.write(data);
             }
-            if (IS_CI) console.log('::endgroup::');
+            if (IS_CI) {
+              console.log('::endgroup::');
+            }
           }
         }),
       );
@@ -417,30 +463,31 @@ async function main() {
       clearInterval(progressInterval);
       clearProgress();
     } else {
-      for (const project of projectsToRun) {
+      const runProject = async (project: (typeof projectsToRun)[number]): Promise<void> => {
         const fn = projectRunners[project];
+        console.error('\n');
+        console.error(banner(`▶️ ${project}`));
+        console.error('\n');
 
-        await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
+        try {
+          await withRetry(fn, project, state.retry, state.retryDelay);
           console.error('\n');
-          console.error(banner(`▶️ ${project}`));
-          console.error('\n');
-
-          try {
-            await withRetry(fn, project, state.retry, state.retryDelay);
-            console.error('\n');
-            console.error(`✅ ${project}`);
-          } catch (err) {
-            if (err && (err as any).shortMessage) {
-              console.error((err as any).shortMessage);
-            } else {
-              console.error(err);
-            }
-            console.error('\n');
-            console.error(`❌ ${project}`);
-            failed.push(project);
+          console.error(`✅ ${project}`);
+        } catch (err) {
+          if (err && (err as any).shortMessage) {
+            console.error((err as any).shortMessage);
+          } else {
+            console.error(err);
           }
           console.error('\n');
-        });
+          console.error(`❌ ${project}`);
+          failed.push(project);
+        }
+        console.error('\n');
+      };
+
+      for (const project of projectsToRun) {
+        await withChdir(path.join(rootDir, 'ecosystem-tests', project), runProject.bind(undefined, project));
       }
     }
   } finally {
@@ -471,7 +518,9 @@ async function withRetry(
     try {
       return await fn();
     } catch (err) {
-      if (retriesLeft <= 0 || !shouldRetry(err)) throw err;
+      if (retriesLeft <= 0 || !shouldRetry(err)) {
+        throw err;
+      }
       retriesLeft -= 1;
       console.error(
         `${identifier} failed due to ${errorMessage(
@@ -512,7 +561,9 @@ function centerPad(text: string, width = text.length, char = ' '): string {
 
 function banner(name: string, width = 80): string {
   function line(text = ''): string {
-    if (text) text = centerPad(text, width - 40);
+    if (text) {
+      text = centerPad(text, width - 40);
+    }
     return centerPad(text, width, '/');
   }
   return [line(), line(), line(' '), line(name), line(' '), line(), line()].join('\n');
@@ -530,9 +581,7 @@ async function buildPackage() {
   }
 
   // Run our build script to ensure all of our build artifacts are up to date.
-  // This matters the most for deno as it directly relies on build artifacts
-  // instead of the pack file
-  await run('yarn', ['build']);
+  await run('pnpm', ['build']);
 
   const proc = await run('npm', ['pack', '--ignore-scripts', '--json'], {
     cwd: path.join(process.cwd(), 'dist'),
@@ -540,8 +589,8 @@ async function buildPackage() {
   });
 
   const pack = JSON.parse(proc.stdout);
-  assert(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
-  assert(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
+  assert.ok(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
+  assert.ok(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
 
   const filename = path.join('dist', (pack[0] as any).filename);
   console.error({ filename });
@@ -559,7 +608,9 @@ async function installPackage() {
   try {
     // Ensure that there is a clean node_modules folder.
     await run('rm', ['-rf', `./node_modules`]);
-  } catch (err) {}
+  } catch {
+    // Best-effort cleanup; installation below can continue.
+  }
 
   const packFile = getPackFile();
   await fs.copyFile(packFile, `./${TAR_NAME}`);
@@ -587,8 +638,12 @@ async function run(command: string, args: string[], config?: RunOpts): Promise<e
   } catch (error) {
     if (error instanceof Object && !state.verbose) {
       const { stderr, stdout } = error as any;
-      if (stderr) process.stderr.write(stderr);
-      if (stdout) process.stderr.write(stdout);
+      if (stderr) {
+        process.stderr.write(stderr);
+      }
+      if (stdout) {
+        process.stderr.write(stdout);
+      }
     }
     throw error;
   }
@@ -609,7 +664,7 @@ async function pathExists(path: string) {
   try {
     await fs.access(path);
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -635,18 +690,16 @@ export const packageDir = async (): Promise<string> => {
 // so that they can be restored when the script either finishes or is
 // terminated
 const fileCache = (() => {
-  const filesToCache: Array<string> = ['package.json', 'package-lock.json', 'deno.lock', 'bun.lockb'];
+  const filesToCache: string[] = ['package.json', 'package-lock.json', 'deno.lock', 'bun.lockb'];
+  const generatedFilesToRemove = new Set(['deno/package.json']);
 
   return {
     // Copy existing files from each ecosystem-tests project folder to the ./tmp folder
     cacheFiles: async (tmpFolderPath: string) => {
-      for (let i = 0; i < projectNames.length; i++) {
-        const projectName = (projectNames as any)[i] as string;
+      for (const projectName of projectNames) {
         const projectPath = path.resolve(process.cwd(), 'ecosystem-tests', projectName);
 
-        for (let j = 0; j < filesToCache.length; j++) {
-          const fileName = filesToCache[j] || '';
-
+        for (const fileName of filesToCache) {
           const filePath = path.resolve(projectPath, fileName);
           if (await fileExists(filePath)) {
             const tmpProjectPath = path.resolve(tmpFolderPath, projectName);
@@ -662,18 +715,17 @@ const fileCache = (() => {
 
     // Restore the original files to each ecosystem-tests project folder from the ./tmp folder
     restoreFiles: async (tmpFolderPath: string) => {
-      for (let i = 0; i < projectNames.length; i++) {
-        const projectName = (projectNames as any)[i] as string;
-
+      for (const projectName of projectNames) {
         const projectPath = path.resolve(process.cwd(), 'ecosystem-tests', projectName);
         const tmpProjectPath = path.resolve(tmpFolderPath, projectName);
 
-        for (let j = 0; j < filesToCache.length; j++) {
-          const fileName = filesToCache[j] || '';
-
-          const filePath = path.resolve(tmpProjectPath, fileName);
-          if (await fileExists(filePath)) {
-            await fs.rename(filePath, path.resolve(projectPath, fileName));
+        for (const fileName of filesToCache) {
+          const cachedFilePath = path.resolve(tmpProjectPath, fileName);
+          const projectFilePath = path.resolve(projectPath, fileName);
+          if (await fileExists(cachedFilePath)) {
+            await fs.rename(cachedFilePath, projectFilePath);
+          } else if (generatedFilesToRemove.has(path.join(projectName, fileName))) {
+            await fs.rm(projectFilePath, { force: true });
           }
         }
         await fs.rmdir(tmpProjectPath);

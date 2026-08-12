@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as TranscriptionsAPI from './transcriptions';
@@ -78,6 +78,12 @@ export interface Transcription {
    * The transcribed text.
    */
   text: string;
+
+  /**
+   * The languages detected in the audio. Returned by `gpt-transcribe`. An empty
+   * array indicates that no language could be reliably detected.
+   */
+  languages?: Array<TranscriptionLanguage>;
 
   /**
    * The log probabilities of the tokens in the transcription. Only returned with the
@@ -307,6 +313,16 @@ export interface TranscriptionDiarizedSegment {
 
 export type TranscriptionInclude = 'logprobs';
 
+/**
+ * A language detected in transcribed audio.
+ */
+export interface TranscriptionLanguage {
+  /**
+   * The code of a language detected in the audio.
+   */
+  code: string;
+}
+
 export interface TranscriptionSegment {
   /**
    * Unique identifier of the segment.
@@ -439,6 +455,12 @@ export interface TranscriptionTextDoneEvent {
    * The type of the event. Always `transcript.text.done`.
    */
   type: 'transcript.text.done';
+
+  /**
+   * The languages detected in the audio. Returned by `gpt-transcribe`. An empty
+   * array indicates that no language could be reliably detected.
+   */
+  languages?: Array<TranscriptionLanguage>;
 
   /**
    * The log probabilities of the individual tokens in the transcription. Only
@@ -643,12 +665,14 @@ export interface TranscriptionCreateParamsBase<
 > {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:
-   * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
+   * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm. The request must include
+   * enough format metadata for the file to be identified. We recommend an
+   * extension-bearing filename and an appropriate content type.
    */
   file: Uploadable;
 
   /**
-   * ID of the model to use. The options are `gpt-4o-transcribe`,
+   * ID of the model to use. The options are `gpt-transcribe`, `gpt-4o-transcribe`,
    * `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`, `whisper-1`
    * (which is powered by our open source Whisper V2 model), and
    * `gpt-4o-transcribe-diarize`.
@@ -676,6 +700,12 @@ export interface TranscriptionCreateParamsBase<
   include?: Array<TranscriptionInclude>;
 
   /**
+   * Words or phrases to guide transcription of the input audio. Supported by
+   * `gpt-transcribe`.
+   */
+  keywords?: Array<string>;
+
+  /**
    * Optional list of speaker names that correspond to the audio samples provided in
    * `known_speaker_references[]`. Each entry should be a short identifier (for
    * example `customer` or `agent`). Up to 4 speakers are supported.
@@ -697,6 +727,13 @@ export interface TranscriptionCreateParamsBase<
    * format will improve accuracy and latency.
    */
   language?: string;
+
+  /**
+   * Possible languages of the input audio, in
+   * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format.
+   * Supported by `gpt-transcribe`.
+   */
+  languages?: Array<string>;
 
   /**
    * An optional text to guide the model's style or continue a previous audio
@@ -815,6 +852,7 @@ export declare namespace Transcriptions {
     type TranscriptionDiarized as TranscriptionDiarized,
     type TranscriptionDiarizedSegment as TranscriptionDiarizedSegment,
     type TranscriptionInclude as TranscriptionInclude,
+    type TranscriptionLanguage as TranscriptionLanguage,
     type TranscriptionSegment as TranscriptionSegment,
     type TranscriptionStreamEvent as TranscriptionStreamEvent,
     type TranscriptionTextDeltaEvent as TranscriptionTextDeltaEvent,

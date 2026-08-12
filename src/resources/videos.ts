@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
@@ -355,7 +355,7 @@ export interface VideoEditParams {
 
 export namespace VideoEditParams {
   /**
-   * Reference to the completed video.
+   * Reference to the completed video to edit.
    */
   export interface VideoReferenceInputParam {
     /**

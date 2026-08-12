@@ -1,10 +1,10 @@
 # OpenAI TypeScript and JavaScript API Library
 
-[![NPM version](<https://img.shields.io/npm/v/openai.svg?label=npm%20(stable)>)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai) [![JSR Version](https://jsr.io/badges/@openai/openai)](https://jsr.io/@openai/openai)
+[![NPM version](<https://img.shields.io/npm/v/openai.svg?label=npm%20(stable)>)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
 
 This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
-It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
+It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi).
 
 To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
@@ -14,22 +14,17 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install openai
 ```
 
-### Installation from JSR
+### Installation with Deno
 
-```sh
-deno add jsr:@openai/openai
-npx jsr add @openai/openai
-```
-
-These commands will make the module importable from the `@openai/openai` scope. You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
+Deno can import the package directly from npm:
 
 ```ts
-import OpenAI from 'jsr:@openai/openai';
+import OpenAI from 'npm:openai';
 ```
 
 ## Usage
 
-The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples).
+The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/main/examples).
 
 The primary API for interacting with OpenAI models is the [Responses API](https://platform.openai.com/docs/api-reference/responses). You can generate text from the model with the code below.
 
@@ -49,6 +44,18 @@ const response = await client.responses.create({
 console.log(response.output_text);
 ```
 
+### Multi-turn conversations
+
+When you manage Responses API conversation history manually, preserve output items in order. Filtering
+`response.output` to messages can drop required reasoning or tool-call items and cause the next request to
+fail.
+
+Use the SDK's `toResponseInputItems()` helper to normalize all replayable output items before adding them to
+the next request. For simple continuation, you can pass `previous_response_id` instead.
+
+See the [manual conversation state example](examples/responses/manual-conversation-state.ts) and
+[conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state).
+
 The previous standard (supported indefinitely) for generating text is the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat). You can use that API to generate text from the model with the code below.
 
 ```ts
@@ -67,6 +74,37 @@ const completion = await client.chat.completions.create({
 });
 
 console.log(completion.choices[0].message.content);
+```
+
+## Vision
+
+Use the Responses API to analyze images and generate text about visual content.
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+});
+
+const response = await client.responses.create({
+  model: 'gpt-5.5',
+  input: [
+    {
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'What is in this image?' },
+        {
+          type: 'input_image',
+          image_url:
+            'https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg',
+        },
+      ],
+    },
+  ],
+});
+
+console.log(response.output_text);
 ```
 
 ## Workload Identity Authentication
@@ -164,7 +202,7 @@ const client = new OpenAI({
 
 ## Streaming responses
 
-We provide support for streaming responses using Server Sent Events (SSE).
+We provide support for streaming responses using Server-Sent Events (SSE).
 
 ```ts
 import OpenAI from 'openai';
@@ -189,11 +227,11 @@ Request parameters that correspond to file uploads can be passed in many differe
 - `File` (or an object with the same structure)
 - a `fetch` `Response` (or an object with the same structure)
 - an `fs.ReadStream`
-- the return value of our `toFile` helper
+- the return value of our `toFile` or `toStreamingFile` helpers
 
 ```ts
 import fs from 'fs';
-import OpenAI, { toFile } from 'openai';
+import OpenAI, { toFile, toStreamingFile } from 'openai';
 
 const client = new OpenAI();
 
@@ -216,6 +254,13 @@ await client.files.create({
 });
 await client.files.create({
   file: await toFile(new Uint8Array([0, 1, 2]), 'input.jsonl'),
+  purpose: 'fine-tune',
+});
+
+// `toFile()` creates a web File, so it must buffer stream inputs before sending them.
+// Use `toStreamingFile()` to stream an arbitrary web, Node, or cloud-storage stream directly:
+await client.files.create({
+  file: toStreamingFile(myReadableStream, 'input.jsonl', { type: 'application/jsonl' }),
   purpose: 'fine-tune',
 });
 ```
@@ -334,106 +379,6 @@ Error codes are as follows:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
-## Request IDs
-
-> For more information on debugging requests, see [these docs](https://platform.openai.com/docs/api-reference/debugging-requests)
-
-All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
-
-```ts
-const completion = await client.chat.completions.create({
-  messages: [{ role: 'user', content: 'Say this is a test' }],
-  model: 'gpt-5.5',
-});
-console.log(completion._request_id); // req_123
-```
-
-You can also access the Request ID using the `.withResponse()` method:
-
-```ts
-const { data: stream, request_id } = await openai.chat.completions
-  .create({
-    model: 'gpt-5.5',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    stream: true,
-  })
-  .withResponse();
-```
-
-## Realtime API
-
-The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
-
-```ts
-import { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
-
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
-
-rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
-```
-
-For more information see [realtime.md](realtime.md).
-
-## Microsoft Azure OpenAI
-
-To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
-class instead of the `OpenAI` class.
-
-> [!IMPORTANT]
-> The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
-> won't always be correct.
-
-```ts
-import { AzureOpenAI } from 'openai';
-import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
-
-const credential = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
-const openai = new AzureOpenAI({ azureADTokenProvider });
-
-const result = await openai.chat.completions.create({
-  model: 'gpt-5.5',
-  messages: [{ role: 'user', content: 'Say hello!' }],
-});
-
-console.log(result.choices[0]!.message?.content);
-```
-
-## Amazon Bedrock
-
-To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html), use the `BedrockOpenAI` class instead of the `OpenAI` class.
-
-```ts
-import { BedrockOpenAI } from 'openai';
-
-// gets the bearer token from AWS_BEARER_TOKEN_BEDROCK and the region from AWS_REGION/AWS_DEFAULT_REGION
-const client = new BedrockOpenAI();
-
-const response = await client.responses.create({
-  model: 'openai.gpt-5.4',
-  input: 'Say hello!',
-});
-
-console.log(response.output_text);
-```
-
-`BedrockOpenAI` configures AWS bearer auth and the Bedrock Mantle endpoint, then uses the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
-
-Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. For long-running apps, pass `bedrockTokenProvider` to refresh the Bedrock bearer token before each request.
-
-Set `AWS_BEARER_TOKEN_BEDROCK` to an [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html). To refresh tokens yourself, pass a provider instead of `apiKey`:
-
-```ts
-const client = new BedrockOpenAI({
-  awsRegion: 'us-west-2',
-  bedrockTokenProvider: async () => refreshBedrockToken(),
-});
-```
-
-For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).
-
 ### Retries
 
 Certain errors will be automatically retried 2 times by default, with a short exponential backoff.
@@ -542,7 +487,7 @@ const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
 rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 ```
 
-For more information see [realtime.md](realtime.md).
+For more information see [docs/realtime.md](docs/realtime.md).
 
 ## Microsoft Azure OpenAI
 
@@ -574,7 +519,47 @@ const result = await openai.chat.completions.create({
 console.log(result.choices[0]!.message?.content);
 ```
 
-For more information on support for the Azure API, see [azure.md](azure.md).
+For more information on support for the Azure API, see [docs/azure.md](docs/azure.md).
+
+## Amazon Bedrock
+
+To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html), configure the standard `OpenAI` client with the Bedrock provider:
+
+```ts
+import OpenAI from 'openai';
+import { bedrock } from 'openai/providers/bedrock/aws';
+
+const client = new OpenAI({
+  provider: bedrock({ region: 'us-west-2' }),
+});
+
+const response = await client.responses.create({
+  model: 'openai.gpt-5.4',
+  input: 'Say hello!',
+});
+
+console.log(response.output_text);
+```
+
+Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html). A model returned by the Models API may support a different Bedrock inference API instead.
+
+This uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`, and `AWS_BEDROCK_BASE_URL` can override the endpoint.
+
+The AWS entrypoint uses the standard AWS credential chain by default. It also accepts a named profile, static credentials, or a custom credential provider. Install its peer dependencies before importing it:
+
+```bash
+npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
+```
+
+The AWS entrypoint uses normal static imports so bundlers and serverless packagers can trace these dependencies. If one is missing, importing `openai/providers/bedrock/aws` fails immediately with the runtime's normal module-not-found error, for example:
+
+```text
+Cannot find module '@aws-sdk/credential-provider-node'
+```
+
+For Bedrock API key authentication, import `bedrock` from `openai/providers/bedrock` instead. That entrypoint has no AWS dependencies and works in browser-compatible runtimes when `dangerouslyAllowBrowser` is enabled. SigV4 authentication is supported in Node.js and compatible server runtimes and requires replayable request bodies. The legacy, bearer-only `BedrockOpenAI` class remains available for compatibility.
+
+For more information on support for Amazon Bedrock, see [docs/bedrock.md](docs/bedrock.md).
 
 ## Advanced Usage
 
@@ -641,7 +626,7 @@ may still be visible.
 #### Custom logger
 
 By default, this library logs to `globalThis.console`. You can also provide a custom logger.
-Most logging libraries are supported, including [pino](https://www.npmjs.com/package/pino), [winston](https://www.npmjs.com/package/winston), [bunyan](https://www.npmjs.com/package/bunyan), [consola](https://www.npmjs.com/package/consola), [signale](https://www.npmjs.com/package/signale), and [@std/log](https://jsr.io/@std/log). If your logger doesn't work, please open an issue.
+Most logging libraries are supported, including [pino](https://www.npmjs.com/package/pino), [winston](https://www.npmjs.com/package/winston), [bunyan](https://www.npmjs.com/package/bunyan), [consola](https://www.npmjs.com/package/consola), and [signale](https://www.npmjs.com/package/signale). If your logger doesn't work, please open an issue.
 
 When providing a custom logger, the `logLevel` option still controls which messages are emitted, messages
 below the configured level will not be sent to your logger.
@@ -739,7 +724,7 @@ const client = new OpenAI({
 To modify proxy behavior, you can provide custom `fetchOptions` that add runtime-specific proxy
 options to requests:
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/node.svg" align="top" width="18" height="21"> **Node** <sup>[[docs](https://github.com/nodejs/undici/blob/main/docs/docs/api/ProxyAgent.md#example---proxyagent-with-fetch)]</sup>
+**Node** <sup>[[docs](https://github.com/nodejs/undici/blob/main/docs/docs/api/ProxyAgent.md#example---proxyagent-with-fetch)]</sup>
 
 ```ts
 import OpenAI from 'openai';
@@ -756,7 +741,7 @@ const client = new OpenAI({
 
 Undici-specific options like `dispatcher` must be paired with the matching `fetch` implementation.
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/bun.svg" align="top" width="18" height="21"> **Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
+**Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
 
 ```ts
 import OpenAI from 'openai';
@@ -768,7 +753,7 @@ const client = new OpenAI({
 });
 ```
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/deno.svg" align="top" width="18" height="21"> **Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
+**Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
 
 ```ts
 import OpenAI from 'npm:openai';
@@ -780,6 +765,38 @@ const client = new OpenAI({
   },
 });
 ```
+
+### Mutual TLS
+
+The API mTLS beta combines your API key with a client certificate. For enrollment, certificate requirements, activation, and supported endpoints, see the [OpenAI Mutual TLS Beta Program](https://help.openai.com/en/articles/10876024-openai-mutual-tls-beta-program). Configure mTLS on your runtime's HTTP transport, then pass that transport to the SDK with `fetch` and `fetchOptions`. Set `baseURL` to the mTLS endpoint explicitly:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { Agent, fetch as undiciFetch } from 'undici';
+import OpenAI from 'openai';
+
+const dispatcher = new Agent({
+  connect: {
+    // One PEM chain: leaf certificate first, then required intermediates.
+    cert: await readFile('/path/to/client-cert-chain.pem'),
+    key: await readFile('/path/to/client-key.pem'),
+  },
+});
+
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'],
+  baseURL: 'https://mtls.api.openai.com/v1',
+  fetch: undiciFetch,
+  fetchOptions: {
+    dispatcher,
+    redirect: 'manual',
+  },
+});
+```
+
+Use `https://mtls-eu.api.openai.com/v1` for EU Data Residency. The example uses manual redirects so the certificate-bearing transport does not automatically follow a redirect to another host. Close transports your application creates when they are no longer needed.
+
+See the runnable [Node.js, Deno, and Bun mTLS examples](./examples/mtls/README.md) for certificate-chain setup, optional Node.js encrypted-key support, and runtime-specific transport cleanup.
 
 ## Frequently Asked Questions
 
@@ -801,14 +818,14 @@ TypeScript >= 4.9 is supported.
 
 The following runtimes are supported:
 
-- Node.js 20 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
+- Node.js 22 and 24 LTS. Node.js 22 is the minimum supported version.
 - Deno v1.28.0 or higher.
 - Bun 1.0 or later.
 - Cloudflare Workers.
 - Vercel Edge Runtime.
 - Jest 28 or greater with the `"node"` environment (`"jsdom"` is not supported at this time).
 - Nitro v2.6 or greater.
-- Web browsers: disabled by default to avoid exposing your secret API credentials. Enable browser support by explicitly setting `dangerouslyAllowBrowser` to true'.
+- Web browsers: disabled by default to avoid exposing your secret API credentials. Enable browser support by explicitly setting `dangerouslyAllowBrowser` to `true`.
   <details>
     <summary>More explanation</summary>
 
@@ -831,6 +848,12 @@ Note that React Native is not supported at this time.
 
 If you are interested in other runtime environments, please open or upvote an issue on GitHub.
 
+Node.js 20 reached end of life on April 30, 2026 and is no longer supported.
+Previously published SDK releases remain available, but receive no guaranteed
+fixes or security backports for unsupported Node.js versions. See the
+[Node.js version support policy](https://github.com/openai/openai-node/blob/main/NODE_VERSION_POLICY.md)
+for lifecycle, deprecation, and release rules.
+
 ## Contributing
 
-See [the contributing documentation](./CONTRIBUTING.md).
+See [the contributing documentation](./.github/CONTRIBUTING.md).

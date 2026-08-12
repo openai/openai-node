@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
@@ -39,6 +39,7 @@ describe('resource auditLogs', () => {
           limit: 0,
           project_ids: ['string'],
           resource_ids: ['string'],
+          tenant_only: true,
         },
         { path: '/_stainless_unknown_path' },
       ),

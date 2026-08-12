@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import { APIPromise } from '../../../core/api-promise';
@@ -31,6 +31,24 @@ export class SpendAlerts extends APIResource {
   create(body: SpendAlertCreateParams, options?: RequestOptions): APIPromise<OrganizationSpendAlert> {
     return this._client.post('/organization/spend_alerts', {
       body,
+      ...options,
+      __security: { adminAPIKeyAuth: true },
+    });
+  }
+
+  /**
+   * Retrieves an organization spend alert.
+   *
+   * @example
+   * ```ts
+   * const organizationSpendAlert =
+   *   await client.admin.organization.spendAlerts.retrieve(
+   *     'alert_id',
+   *   );
+   * ```
+   */
+  retrieve(alertID: string, options?: RequestOptions): APIPromise<OrganizationSpendAlert> {
+    return this._client.get(path`/organization/spend_alerts/${alertID}`, {
       ...options,
       __security: { adminAPIKeyAuth: true },
     });

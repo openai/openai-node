@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import * as ImagesAPI from './images';
@@ -59,7 +59,7 @@ export class Images extends APIResource {
           body,
           ...options,
           stream: body.stream ?? false,
-          __metadata: { model: body.model },
+          __metadata: { ...options?.__metadata, ...(body.model == null ? {} : { model: body.model }) },
           __security: { bearerAuth: true },
         },
         this._client,
