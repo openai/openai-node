@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import {
   type ExtractParsedContentFromParams,
@@ -43,8 +43,11 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
   | ResponseComputerToolCallOutputItem
+  | ResponseOutputItem.Program
+  | ResponseOutputItem.ProgramOutput
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseOutputItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
@@ -106,9 +109,12 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
     return (
-      this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as
-        | APIPromise<Response>
-        | APIPromise<Stream<ResponseStreamEvent>>
+      this._client.post('/responses', {
+        body,
+        ...options,
+        stream: body.stream ?? false,
+        __security: { bearerAuth: true },
+      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
@@ -153,6 +159,7 @@ export class Responses extends APIResource {
         query,
         ...options,
         stream: query?.stream ?? false,
+        __security: { bearerAuth: true },
       }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
@@ -177,6 +184,7 @@ export class Responses extends APIResource {
     return this._client.delete(path`/responses/${responseID}`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -212,7 +220,10 @@ export class Responses extends APIResource {
    * ```
    */
   cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post(path`/responses/${responseID}/cancel`, options);
+    return this._client.post(path`/responses/${responseID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -226,12 +237,12 @@ export class Responses extends APIResource {
    * @example
    * ```ts
    * const compactedResponse = await client.responses.compact({
-   *   model: 'gpt-5.4',
+   *   model: 'gpt-5.6-sol',
    * });
    * ```
    */
   compact(body: ResponseCompactParams, options?: RequestOptions): APIPromise<CompactedResponse> {
-    return this._client.post('/responses/compact', { body, ...options });
+    return this._client.post('/responses/compact', { body, ...options, __security: { bearerAuth: true } });
   }
 }
 
@@ -245,6 +256,11 @@ export interface ApplyPatchTool {
    * The type of the tool. Always `apply_patch`.
    */
   type: 'apply_patch';
+
+  /**
+   * The tool invocation context(s).
+   */
+  allowed_callers?: Array<'direct' | 'programmatic'> | null;
 }
 
 export interface CompactedResponse {
@@ -651,6 +667,11 @@ export interface CustomTool {
   type: 'custom';
 
   /**
+   * The tool invocation context(s).
+   */
+  allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+  /**
    * Whether this tool should be deferred and discovered via tool search.
    */
   defer_loading?: boolean;
@@ -785,6 +806,11 @@ export interface FunctionShellTool {
    */
   type: 'shell';
 
+  /**
+   * The tool invocation context(s).
+   */
+  allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
   environment?: ContainerAuto | LocalEnvironment | ContainerReference | null;
 }
 
@@ -805,7 +831,7 @@ export interface FunctionTool {
   parameters: { [key: string]: unknown } | null;
 
   /**
-   * Whether to enforce strict parameter validation. Default `true`.
+   * Whether strict parameter validation is enforced for this function tool.
    */
   strict: boolean | null;
 
@@ -813,6 +839,11 @@ export interface FunctionTool {
    * The type of the function tool. Always `function`.
    */
   type: 'function';
+
+  /**
+   * The tool invocation context(s).
+   */
+  allowed_callers?: Array<'direct' | 'programmatic'> | null;
 
   /**
    * Whether this function is deferred and loaded via tool search.
@@ -824,6 +855,12 @@ export interface FunctionTool {
    * call the function.
    */
   description?: string | null;
+
+  /**
+   * A JSON schema object describing the JSON value encoded in string outputs for
+   * this function.
+   */
+  output_schema?: { [key: string]: unknown } | null;
 }
 
 export interface InlineSkill {
@@ -929,14 +966,30 @@ export namespace NamespaceTool {
     type: 'function';
 
     /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
      * Whether this function should be deferred and discovered via tool search.
      */
     defer_loading?: boolean;
 
     description?: string | null;
 
+    /**
+     * A JSON Schema describing the JSON value encoded in string outputs for this
+     * function tool. This does not describe content-array outputs.
+     */
+    output_schema?: { [key: string]: unknown } | null;
+
     parameters?: unknown | null;
 
+    /**
+     * Whether to enforce strict parameter validation. If omitted, Responses attempts
+     * to use strict validation when the schema is compatible, and falls back to
+     * non-strict validation otherwise.
+     */
     strict?: boolean | null;
   }
 }
@@ -1033,6 +1086,7 @@ export interface Response {
     | ToolChoiceFunction
     | ToolChoiceMcp
     | ToolChoiceCustom
+    | Response.SpecificProgrammaticToolCallingParam
     | ToolChoiceApplyPatch
     | ToolChoiceShell;
 
@@ -1094,6 +1148,12 @@ export interface Response {
   max_output_tokens?: number | null;
 
   /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  moderation?: Response.Moderation | null;
+
+  /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
@@ -1112,13 +1172,32 @@ export interface Response {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
+   * The prompt-caching options that were applied to the response. Supported for
+   * `gpt-5.6` and later models.
+   */
+  prompt_cache_options?: Response.PromptCacheOptions;
+
+  /**
+   * @deprecated Deprecated. Use `prompt_cache_options.ttl` instead.
+   *
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * This field expresses a maximum retention policy, while
+   * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
+   * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
+   * models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -1138,7 +1217,7 @@ export interface Response {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the latency tier to use for processing the request. This parameter is
@@ -1149,15 +1228,19 @@ export interface Response {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -1173,6 +1256,13 @@ export interface Response {
    * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
    */
   text?: ResponseTextConfig;
+
+  /**
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
+   */
+  top_logprobs?: number | null;
 
   /**
    * The truncation strategy to use for the model response.
@@ -1213,6 +1303,13 @@ export namespace Response {
     reason?: 'max_output_tokens' | 'content_filter';
   }
 
+  export interface SpecificProgrammaticToolCallingParam {
+    /**
+     * The tool to call. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
+  }
+
   /**
    * The conversation that this response belonged to. Input items and output items
    * from this response were automatically added to this conversation.
@@ -1222,6 +1319,154 @@ export namespace Response {
      * The unique ID of the conversation that this response was associated with.
      */
     id: string;
+  }
+
+  /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the response input.
+     */
+    input: Moderation.ModerationResult | Moderation.Error;
+
+    /**
+     * Moderation for the response output.
+     */
+    output: Moderation.ModerationResult | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
+
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
+  }
+
+  /**
+   * The prompt-caching options that were applied to the response. Supported for
+   * `gpt-5.6` and later models.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Whether implicit prompt-cache breakpoints were enabled.
+     */
+    mode: 'implicit' | 'explicit';
+
+    /**
+     * The minimum lifetime applied to each cache breakpoint.
+     */
+    ttl: '30m';
   }
 }
 
@@ -1258,6 +1503,11 @@ export interface ResponseApplyPatchToolCall {
    * The type of the item. Always `apply_patch_call`.
    */
   type: 'apply_patch_call';
+
+  /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseApplyPatchToolCall.Direct | ResponseApplyPatchToolCall.Program | null;
 
   /**
    * The ID of the entity that created this tool call.
@@ -1320,6 +1570,19 @@ export namespace ResponseApplyPatchToolCall {
      */
     type: 'update_file';
   }
+
+  export interface Direct {
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    type: 'program';
+  }
 }
 
 /**
@@ -1348,6 +1611,11 @@ export interface ResponseApplyPatchToolCallOutput {
   type: 'apply_patch_call_output';
 
   /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseApplyPatchToolCallOutput.Direct | ResponseApplyPatchToolCallOutput.Program | null;
+
+  /**
    * The ID of the entity that created this tool call output.
    */
   created_by?: string;
@@ -1356,6 +1624,21 @@ export interface ResponseApplyPatchToolCallOutput {
    * Optional textual output returned by the apply patch tool.
    */
   output?: string | null;
+}
+
+export namespace ResponseApplyPatchToolCallOutput {
+  export interface Direct {
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    type: 'program';
+  }
 }
 
 /**
@@ -2284,9 +2567,29 @@ export interface ResponseCustomToolCall {
   id?: string;
 
   /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseCustomToolCall.Direct | ResponseCustomToolCall.Program | null;
+
+  /**
    * The namespace of the custom tool being called.
    */
   namespace?: string;
+}
+
+export namespace ResponseCustomToolCall {
+  export interface Direct {
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    type: 'program';
+  }
 }
 
 /**
@@ -2394,6 +2697,32 @@ export interface ResponseCustomToolCallOutput {
    * The unique ID of the custom tool call output in the OpenAI platform.
    */
   id?: string;
+
+  /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseCustomToolCallOutput.Direct | ResponseCustomToolCallOutput.Program | null;
+}
+
+export namespace ResponseCustomToolCallOutput {
+  export interface Direct {
+    /**
+     * The caller type. Always `direct`.
+     */
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    /**
+     * The caller type. Always `program`.
+     */
+    type: 'program';
+  }
 }
 
 /**
@@ -2428,6 +2757,8 @@ export interface ResponseError {
     | 'server_error'
     | 'rate_limit_exceeded'
     | 'invalid_prompt'
+    | 'data_residency_mismatch'
+    | 'bio_policy'
     | 'vector_store_timeout'
     | 'invalid_image'
     | 'invalid_image_format'
@@ -2859,6 +3190,11 @@ export interface ResponseFunctionShellToolCall {
   type: 'shell_call';
 
   /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseFunctionShellToolCall.Direct | ResponseFunctionShellToolCall.Program | null;
+
+  /**
    * The ID of the entity that created this tool call.
    */
   created_by?: string;
@@ -2880,6 +3216,19 @@ export namespace ResponseFunctionShellToolCall {
      * Optional timeout in milliseconds for the commands.
      */
     timeout_ms: number | null;
+  }
+
+  export interface Direct {
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    type: 'program';
   }
 }
 
@@ -2919,6 +3268,11 @@ export interface ResponseFunctionShellToolCallOutput {
    * The type of the shell call output. Always `shell_call_output`.
    */
   type: 'shell_call_output';
+
+  /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseFunctionShellToolCallOutput.Direct | ResponseFunctionShellToolCallOutput.Program | null;
 
   /**
    * The identifier of the actor that created the item.
@@ -2979,6 +3333,19 @@ export namespace ResponseFunctionShellToolCallOutput {
       type: 'exit';
     }
   }
+
+  export interface Direct {
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    type: 'program';
+  }
 }
 
 /**
@@ -3013,6 +3380,11 @@ export interface ResponseFunctionToolCall {
   id?: string;
 
   /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseFunctionToolCall.Direct | ResponseFunctionToolCall.Program | null;
+
+  /**
    * The namespace of the function to run.
    */
   namespace?: string;
@@ -3022,6 +3394,21 @@ export interface ResponseFunctionToolCall {
    * Populated when items are returned via API.
    */
   status?: 'in_progress' | 'completed' | 'incomplete';
+}
+
+export namespace ResponseFunctionToolCall {
+  export interface Direct {
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    type: 'program';
+  }
 }
 
 /**
@@ -3076,9 +3463,45 @@ export interface ResponseFunctionToolCallOutputItem {
   type: 'function_call_output';
 
   /**
+   * The execution context that produced this tool call.
+   */
+  caller?: ResponseFunctionToolCallOutputItem.Direct | ResponseFunctionToolCallOutputItem.Program | null;
+
+  /**
    * The identifier of the actor that created the item.
    */
   created_by?: string;
+
+  /**
+   * The name of the tool that produced the output.
+   */
+  name?: string;
+
+  /**
+   * The namespace of the tool that produced the output.
+   */
+  namespace?: string;
+}
+
+export namespace ResponseFunctionToolCallOutputItem {
+  export interface Direct {
+    /**
+     * The caller type. Always `direct`.
+     */
+    type: 'direct';
+  }
+
+  export interface Program {
+    /**
+     * The call ID of the program item that produced this tool call.
+     */
+    caller_id: string;
+
+    /**
+     * The caller type. Always `program`.
+     */
+    type: 'program';
+  }
 }
 
 /**
@@ -3118,11 +3541,6 @@ export namespace ResponseFunctionWebSearch {
    */
   export interface Search {
     /**
-     * [DEPRECATED] The search query.
-     */
-    query: string;
-
-    /**
      * The action type.
      */
     type: 'search';
@@ -3131,6 +3549,11 @@ export namespace ResponseFunctionWebSearch {
      * The search queries.
      */
     queries?: Array<string>;
+
+    /**
+     * @deprecated The search query.
+     */
+    query?: string;
 
     /**
      * The sources used in the search.
@@ -3328,6 +3751,8 @@ export interface ResponseInProgressEvent {
  * Specify additional output data to include in the model response. Currently
  * supported values are:
  *
+ * - `web_search_call.results`: Include the search results of the web search tool
+ *   call.
  * - `web_search_call.action.sources`: Include the sources of the web search tool
  *   call.
  * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
@@ -3424,11 +3849,13 @@ export interface ResponseInputFile {
   type: 'input_file';
 
   /**
-   * The detail level of the file to be sent to the model. Use `low` for the default
-   * rendering behavior, or `high` to render the file at higher quality. Defaults to
-   * `low`.
+   * The detail level of the file to be sent to the model. Use `auto` to let the
+   * system select the detail level; for GPT-5.6 and later models, `auto` uses
+   * high-quality rendering, which may increase input token usage. Use `low` for
+   * lower-cost rendering, or `high` to render the file at higher quality. Defaults
+   * to `auto`.
    */
-  detail?: 'low' | 'high';
+  detail?: 'auto' | 'low' | 'high';
 
   /**
    * The content of the file to be sent to the model.
@@ -3449,6 +3876,27 @@ export interface ResponseInputFile {
    * The name of the file to be sent to the model.
    */
   filename?: string;
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ResponseInputFile.PromptCacheBreakpoint;
+}
+
+export namespace ResponseInputFile {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -3461,11 +3909,13 @@ export interface ResponseInputFileContent {
   type: 'input_file';
 
   /**
-   * The detail level of the file to be sent to the model. Use `low` for the default
-   * rendering behavior, or `high` to render the file at higher quality. Defaults to
-   * `low`.
+   * The detail level of the file to be sent to the model. Use `auto` to let the
+   * system select the detail level; for GPT-5.6 and later models, `auto` uses
+   * high-quality rendering, which may increase input token usage. Use `low` for
+   * lower-cost rendering, or `high` to render the file at higher quality. Defaults
+   * to `auto`.
    */
-  detail?: 'low' | 'high';
+  detail?: 'auto' | 'low' | 'high';
 
   /**
    * The base64-encoded data of the file to be sent to the model.
@@ -3486,6 +3936,27 @@ export interface ResponseInputFileContent {
    * The name of the file to be sent to the model.
    */
   filename?: string | null;
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ResponseInputFileContent.PromptCacheBreakpoint | null;
+}
+
+export namespace ResponseInputFileContent {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -3514,6 +3985,27 @@ export interface ResponseInputImage {
    * encoded image in a data URL.
    */
   image_url?: string | null;
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ResponseInputImage.PromptCacheBreakpoint;
+}
+
+export namespace ResponseInputImage {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -3542,6 +4034,27 @@ export interface ResponseInputImageContent {
    * encoded image in a data URL.
    */
   image_url?: string | null;
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ResponseInputImageContent.PromptCacheBreakpoint | null;
+}
+
+export namespace ResponseInputImageContent {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -3563,6 +4076,7 @@ export type ResponseInputItem =
   | ResponseInputItem.FunctionCallOutput
   | ResponseInputItem.ToolSearchCall
   | ResponseToolSearchOutputItemParam
+  | ResponseInputItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
@@ -3579,7 +4093,10 @@ export type ResponseInputItem =
   | ResponseInputItem.McpCall
   | ResponseCustomToolCallOutput
   | ResponseCustomToolCall
-  | ResponseInputItem.ItemReference;
+  | ResponseInputItem.CompactionTrigger
+  | ResponseInputItem.ItemReference
+  | ResponseInputItem.Program
+  | ResponseInputItem.ProgramOutput;
 
 export namespace ResponseInputItem {
   /**
@@ -3696,10 +4213,46 @@ export namespace ResponseInputItem {
     id?: string | null;
 
     /**
+     * The execution context that produced this tool call.
+     */
+    caller?: FunctionCallOutput.Direct | FunctionCallOutput.Program | null;
+
+    /**
+     * The name of the tool that produced the output.
+     */
+    name?: string | null;
+
+    /**
+     * The namespace of the tool that produced the output.
+     */
+    namespace?: string | null;
+
+    /**
      * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
      * Populated when items are returned via API.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export namespace FunctionCallOutput {
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
   }
 
   export interface ToolSearchCall {
@@ -3732,6 +4285,28 @@ export namespace ResponseInputItem {
      * The status of the tool search call.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The role that provided the additional tools. Only `developer` is supported.
+     */
+    role: 'developer';
+
+    /**
+     * A list of additional tools made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The item type. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+
+    /**
+     * The unique ID of this additional tools item.
+     */
+    id?: string | null;
   }
 
   /**
@@ -3877,6 +4452,11 @@ export namespace ResponseInputItem {
     id?: string | null;
 
     /**
+     * The execution context that produced this tool call.
+     */
+    caller?: ShellCall.Direct | ShellCall.Program | null;
+
+    /**
      * The environment to execute the shell commands in.
      */
     environment?: ResponsesAPI.LocalEnvironment | ResponsesAPI.ContainerReference | null;
@@ -3909,6 +4489,25 @@ export namespace ResponseInputItem {
        */
       timeout_ms?: number | null;
     }
+
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
   }
 
   /**
@@ -3938,6 +4537,11 @@ export namespace ResponseInputItem {
     id?: string | null;
 
     /**
+     * The execution context that produced this tool call.
+     */
+    caller?: ShellCallOutput.Direct | ShellCallOutput.Program | null;
+
+    /**
      * The maximum number of UTF-8 characters captured for this shell call's combined
      * output.
      */
@@ -3947,6 +4551,27 @@ export namespace ResponseInputItem {
      * The status of the shell call output.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export namespace ShellCallOutput {
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
   }
 
   /**
@@ -3980,6 +4605,11 @@ export namespace ResponseInputItem {
      * via API.
      */
     id?: string | null;
+
+    /**
+     * The execution context that produced this tool call.
+     */
+    caller?: ApplyPatchCall.Direct | ApplyPatchCall.Program | null;
   }
 
   export namespace ApplyPatchCall {
@@ -4037,6 +4667,25 @@ export namespace ResponseInputItem {
        */
       type: 'update_file';
     }
+
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
   }
 
   /**
@@ -4065,10 +4714,36 @@ export namespace ResponseInputItem {
     id?: string | null;
 
     /**
+     * The execution context that produced this tool call.
+     */
+    caller?: ApplyPatchCallOutput.Direct | ApplyPatchCallOutput.Program | null;
+
+    /**
      * Optional human-readable log text from the apply patch tool (e.g., patch results
      * or errors).
      */
     output?: string | null;
+  }
+
+  export namespace ApplyPatchCallOutput {
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
   }
 
   /**
@@ -4242,6 +4917,16 @@ export namespace ResponseInputItem {
   }
 
   /**
+   * Compacts the current context. Must be the final input item.
+   */
+  export interface CompactionTrigger {
+    /**
+     * The type of the item. Always `compaction_trigger`.
+     */
+    type: 'compaction_trigger';
+  }
+
+  /**
    * An internal identifier for an item to reference.
    */
   export interface ItemReference {
@@ -4254,6 +4939,60 @@ export namespace ResponseInputItem {
      * The type of item to reference. Always `item_reference`.
      */
     type?: 'item_reference' | null;
+  }
+
+  export interface Program {
+    /**
+     * The unique ID of this program item.
+     */
+    id: string;
+
+    /**
+     * The stable call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The JavaScript source executed by programmatic tool calling.
+     */
+    code: string;
+
+    /**
+     * Opaque program replay fingerprint that must be round-tripped.
+     */
+    fingerprint: string;
+
+    /**
+     * The item type. Always `program`.
+     */
+    type: 'program';
+  }
+
+  export interface ProgramOutput {
+    /**
+     * The unique ID of this program output item.
+     */
+    id: string;
+
+    /**
+     * The call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The result produced by the program item.
+     */
+    result: string;
+
+    /**
+     * The terminal status of the program output.
+     */
+    status: 'completed' | 'incomplete';
+
+    /**
+     * The item type. Always `program_output`.
+     */
+    type: 'program_output';
   }
 }
 
@@ -4305,6 +5044,27 @@ export interface ResponseInputText {
    * The type of the input item. Always `input_text`.
    */
   type: 'input_text';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ResponseInputText.PromptCacheBreakpoint;
+}
+
+export namespace ResponseInputText {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -4320,6 +5080,27 @@ export interface ResponseInputTextContent {
    * The type of the input item. Always `input_text`.
    */
   type: 'input_text';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ResponseInputTextContent.PromptCacheBreakpoint | null;
+}
+
+export namespace ResponseInputTextContent {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -4336,7 +5117,10 @@ export type ResponseItem =
   | ResponseFunctionToolCallOutputItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseItem.AdditionalTools
   | ResponseReasoningItem
+  | ResponseItem.Program
+  | ResponseItem.ProgramOutput
   | ResponseCompactionItem
   | ResponseItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
@@ -4354,6 +5138,82 @@ export type ResponseItem =
   | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseItem {
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
+  export interface Program {
+    /**
+     * The unique ID of the program item.
+     */
+    id: string;
+
+    /**
+     * The stable call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The JavaScript source executed by programmatic tool calling.
+     */
+    code: string;
+
+    /**
+     * Opaque program replay fingerprint that must be round-tripped.
+     */
+    fingerprint: string;
+
+    /**
+     * The type of the item. Always `program`.
+     */
+    type: 'program';
+  }
+
+  export interface ProgramOutput {
+    /**
+     * The unique ID of the program output item.
+     */
+    id: string;
+
+    /**
+     * The call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The result produced by the program item.
+     */
+    result: string;
+
+    /**
+     * The terminal status of the program output item.
+     */
+    status: 'completed' | 'incomplete';
+
+    /**
+     * The type of the item. Always `program_output`.
+     */
+    type: 'program_output';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -4897,8 +5757,11 @@ export type ResponseOutputItem =
   | ResponseComputerToolCall
   | ResponseComputerToolCallOutputItem
   | ResponseReasoningItem
+  | ResponseOutputItem.Program
+  | ResponseOutputItem.ProgramOutput
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseOutputItem.AdditionalTools
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
@@ -4916,6 +5779,82 @@ export type ResponseOutputItem =
   | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseOutputItem {
+  export interface Program {
+    /**
+     * The unique ID of the program item.
+     */
+    id: string;
+
+    /**
+     * The stable call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The JavaScript source executed by programmatic tool calling.
+     */
+    code: string;
+
+    /**
+     * Opaque program replay fingerprint that must be round-tripped.
+     */
+    fingerprint: string;
+
+    /**
+     * The type of the item. Always `program`.
+     */
+    type: 'program';
+  }
+
+  export interface ProgramOutput {
+    /**
+     * The unique ID of the program output item.
+     */
+    id: string;
+
+    /**
+     * The call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The result produced by the program item.
+     */
+    result: string;
+
+    /**
+     * The terminal status of the program output item.
+     */
+    status: 'completed' | 'incomplete';
+
+    /**
+     * The type of the item. Always `program_output`.
+     */
+    type: 'program_output';
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -5584,8 +6523,9 @@ export interface ResponseReasoningItem {
   content?: Array<ResponseReasoningItem.Content>;
 
   /**
-   * The encrypted content of the reasoning item - populated when a response is
-   * generated with `reasoning.encrypted_content` in the `include` parameter.
+   * The encrypted content of the reasoning item. This is populated by default for
+   * reasoning items returned by `POST /v1/responses` and WebSocket `response.create`
+   * requests.
    */
   encrypted_content?: string | null;
 
@@ -5713,6 +6653,12 @@ export interface ResponseReasoningSummaryPartDoneEvent {
    * The type of the event. Always `response.reasoning_summary_part.done`.
    */
   type: 'response.reasoning_summary_part.done';
+
+  /**
+   * The completion status of the summary part. Omitted when the part completed
+   * normally and set to `incomplete` when generation was interrupted.
+   */
+  status?: 'incomplete';
 }
 
 export namespace ResponseReasoningSummaryPartDoneEvent {
@@ -6034,7 +6980,8 @@ export interface ResponseTextConfig {
   /**
    * Constrains the verbosity of the model's response. Lower values will result in
    * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
+   * responses. Currently supported values are `low`, `medium`, and `high`. The
+   * default is `medium`.
    */
   verbosity?: 'low' | 'medium' | 'high' | null;
 }
@@ -6097,7 +7044,7 @@ export namespace ResponseTextDeltaEvent {
     logprob: number;
 
     /**
-     * The log probability of the top 20 most likely tokens.
+     * The log probabilities of up to 20 of the most likely tokens.
      */
     top_logprobs?: Array<Logprob.TopLogprob>;
   }
@@ -6175,7 +7122,7 @@ export namespace ResponseTextDoneEvent {
     logprob: number;
 
     /**
-     * The log probability of the top 20 most likely tokens.
+     * The log probabilities of up to 20 of the most likely tokens.
      */
     top_logprobs?: Array<Logprob.TopLogprob>;
   }
@@ -6337,6 +7284,11 @@ export namespace ResponseUsage {
    * A detailed breakdown of the input tokens.
    */
   export interface InputTokensDetails {
+    /**
+     * The number of input tokens that were written to the cache.
+     */
+    cache_write_tokens: number;
+
     /**
      * The number of tokens that were retrieved from the cache.
      * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
@@ -6534,6 +7486,11 @@ export interface ResponsesClientEvent {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponsesClientEvent.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -6557,13 +7514,39 @@ export interface ResponsesClientEvent {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  prompt_cache_options?: ResponsesClientEvent.PromptCacheOptions;
+
+  /**
+   * @deprecated Deprecated. Use `prompt_cache_options.ttl` instead.
+   *
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * This field expresses a maximum retention policy, while
+   * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
+   * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
+   * models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -6583,7 +7566,7 @@ export interface ResponsesClientEvent {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the processing type used for serving the request.
@@ -6593,9 +7576,13 @@ export interface ResponsesClientEvent {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -6603,7 +7590,7 @@ export interface ResponsesClientEvent {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
@@ -6654,6 +7641,7 @@ export interface ResponsesClientEvent {
     | ToolChoiceFunction
     | ToolChoiceMcp
     | ToolChoiceCustom
+    | ResponsesClientEvent.SpecificProgrammaticToolCallingParam
     | ToolChoiceApplyPatch
     | ToolChoiceShell;
 
@@ -6681,8 +7669,9 @@ export interface ResponsesClientEvent {
   tools?: Array<Tool>;
 
   /**
-   * An integer between 0 and 20 specifying the number of most likely tokens to
-   * return at each token position, each with an associated log probability.
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
    */
   top_logprobs?: number | null;
 
@@ -6696,7 +7685,7 @@ export interface ResponsesClientEvent {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
@@ -6731,6 +7720,85 @@ export namespace ResponsesClientEvent {
   }
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
+
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    policy?: Moderation.Policy | null;
+  }
+
+  export namespace Moderation {
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    export interface Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      input?: Policy.Input | null;
+
+      /**
+       * The moderation policy for the response output.
+       */
+      output?: Policy.Output | null;
+    }
+
+    export namespace Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      export interface Input {
+        mode: 'score' | 'block';
+      }
+
+      /**
+       * The moderation policy for the response output.
+       */
+      export interface Output {
+        mode: 'score' | 'block';
+      }
+    }
+  }
+
+  /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Controls whether OpenAI automatically creates an implicit cache breakpoint.
+     * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
+     * and writes up to the latest three explicit breakpoints in the request. With
+     * `explicit`, OpenAI does not create an implicit breakpoint and writes up to the
+     * latest four explicit breakpoints. If there are no explicit breakpoints, the
+     * request does not use prompt caching.
+     */
+    mode?: 'implicit' | 'explicit';
+
+    /**
+     * The minimum lifetime applied to every implicit and explicit cache breakpoint
+     * written by the request. Defaults to `30m`, which is currently the only supported
+     * value. The backend may retain cache entries for longer.
+     */
+    ttl?: '30m';
+  }
+
+  /**
    * Options for streaming responses. Only set this when you set `stream: true`.
    */
   export interface StreamOptions {
@@ -6743,6 +7811,13 @@ export namespace ResponsesClientEvent {
      * you trust the network links between your application and the OpenAI API.
      */
     include_obfuscation?: boolean;
+  }
+
+  export interface SpecificProgrammaticToolCallingParam {
+    /**
+     * The tool to call. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
   }
 }
 
@@ -6832,6 +7907,7 @@ export type Tool =
   | WebSearchTool
   | Tool.Mcp
   | Tool.CodeInterpreter
+  | Tool.ProgrammaticToolCalling
   | Tool.ImageGeneration
   | Tool.LocalShell
   | FunctionShellTool
@@ -6859,6 +7935,11 @@ export namespace Tool {
     type: 'mcp';
 
     /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
      * List of allowed tool names or a filter object.
      */
     allowed_tools?: Array<string> | Mcp.McpToolFilter | null;
@@ -6872,8 +7953,8 @@ export namespace Tool {
 
     /**
      * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url` or `connector_id` must be provided. Learn more about service
-     * connectors
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
+     * service connectors
      * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
@@ -6919,10 +8000,16 @@ export namespace Tool {
     server_description?: string;
 
     /**
-     * The URL for the MCP server. One of `server_url` or `connector_id` must be
-     * provided.
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
      */
     server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
   }
 
   export namespace Mcp {
@@ -7014,6 +8101,11 @@ export namespace Tool {
      * The type of the code interpreter tool. Always `code_interpreter`.
      */
     type: 'code_interpreter';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
   }
 
   export namespace CodeInterpreter {
@@ -7046,6 +8138,13 @@ export namespace Tool {
     }
   }
 
+  export interface ProgrammaticToolCalling {
+    /**
+     * The type of the tool. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
+  }
+
   /**
    * A tool that generates images using the GPT image models.
    */
@@ -7061,8 +8160,18 @@ export namespace Tool {
     action?: 'generate' | 'edit' | 'auto';
 
     /**
-     * Background type for the generated image. One of `transparent`, `opaque`, or
-     * `auto`. Default: `auto`.
+     * Allows to set transparency for the background of the generated image(s). This
+     * parameter is only supported for GPT image models that support transparent
+     * backgrounds. Must be one of `transparent`, `opaque`, or `auto` (default value).
+     * When `auto` is used, the model will automatically determine the best background
+     * for the image.
+     *
+     * `gpt-image-2` and `gpt-image-2-2026-04-21` do not support transparent
+     * backgrounds. Requests with `background` set to `transparent` will return an
+     * error for these models; use `opaque` or `auto` instead.
+     *
+     * If `transparent`, the output format needs to support transparency, so it should
+     * be set to either `png` (default value) or `webp`.
      */
     background?: 'transparent' | 'opaque' | 'auto';
 
@@ -7083,7 +8192,14 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5';
+    model?:
+      | (string & {})
+      | 'gpt-image-1'
+      | 'gpt-image-1-mini'
+      | 'gpt-image-2'
+      | 'gpt-image-2-2026-04-21'
+      | 'gpt-image-1.5'
+      | 'chatgpt-image-latest';
 
     /**
      * Moderation level for the generated image. Default: `auto`.
@@ -7114,10 +8230,19 @@ export namespace Tool {
     quality?: 'low' | 'medium' | 'high' | 'auto';
 
     /**
-     * The size of the generated image. One of `1024x1024`, `1024x1536`, `1536x1024`,
-     * or `auto`. Default: `auto`.
+     * The size of the generated images. For `gpt-image-2` and
+     * `gpt-image-2-2026-04-21`, arbitrary resolutions are supported as `WIDTHxHEIGHT`
+     * strings, for example `1536x864`. Width and height must both be divisible by 16
+     * and the requested aspect ratio must be between 1:3 and 3:1. Resolutions above
+     * `2560x1440` are experimental, and the maximum supported resolution is
+     * `3840x2160`. The requested size must also satisfy the model's current pixel and
+     * edge limits. The standard sizes `1024x1024`, `1536x1024`, and `1024x1536` are
+     * supported by the GPT image models; `auto` is supported for models that allow
+     * automatic sizing. For `dall-e-2`, use one of `256x256`, `512x512`, or
+     * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
+     * `1024x1792`.
      */
-    size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
   }
 
   export namespace ImageGeneration {
@@ -7554,6 +8679,11 @@ export interface ResponseCreateParamsBase {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponseCreateParams.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -7577,13 +8707,39 @@ export interface ResponseCreateParamsBase {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  prompt_cache_options?: ResponseCreateParams.PromptCacheOptions;
+
+  /**
+   * @deprecated Deprecated. Use `prompt_cache_options.ttl` instead.
+   *
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * This field expresses a maximum retention policy, while
+   * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
+   * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
+   * models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -7603,7 +8759,7 @@ export interface ResponseCreateParamsBase {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the latency tier to use for processing the request. This parameter is
@@ -7614,15 +8770,19 @@ export interface ResponseCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
@@ -7673,6 +8833,7 @@ export interface ResponseCreateParamsBase {
     | ToolChoiceFunction
     | ToolChoiceMcp
     | ToolChoiceCustom
+    | ResponseCreateParams.SpecificProgrammaticToolCallingParam
     | ToolChoiceApplyPatch
     | ToolChoiceShell;
 
@@ -7700,6 +8861,13 @@ export interface ResponseCreateParamsBase {
   tools?: Array<Tool>;
 
   /**
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
+   */
+  top_logprobs?: number | null;
+
+  /**
    * An alternative to sampling with temperature, called nucleus sampling, where the
    * model considers the results of the tokens with top_p probability mass. So 0.1
    * means only the tokens comprising the top 10% probability mass are considered.
@@ -7709,7 +8877,7 @@ export interface ResponseCreateParamsBase {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
@@ -7744,6 +8912,85 @@ export namespace ResponseCreateParams {
   }
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
+
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    policy?: Moderation.Policy | null;
+  }
+
+  export namespace Moderation {
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    export interface Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      input?: Policy.Input | null;
+
+      /**
+       * The moderation policy for the response output.
+       */
+      output?: Policy.Output | null;
+    }
+
+    export namespace Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      export interface Input {
+        mode: 'score' | 'block';
+      }
+
+      /**
+       * The moderation policy for the response output.
+       */
+      export interface Output {
+        mode: 'score' | 'block';
+      }
+    }
+  }
+
+  /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Controls whether OpenAI automatically creates an implicit cache breakpoint.
+     * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
+     * and writes up to the latest three explicit breakpoints in the request. With
+     * `explicit`, OpenAI does not create an implicit breakpoint and writes up to the
+     * latest four explicit breakpoints. If there are no explicit breakpoints, the
+     * request does not use prompt caching.
+     */
+    mode?: 'implicit' | 'explicit';
+
+    /**
+     * The minimum lifetime applied to every implicit and explicit cache breakpoint
+     * written by the request. Defaults to `30m`, which is currently the only supported
+     * value. The backend may retain cache entries for longer.
+     */
+    ttl?: '30m';
+  }
+
+  /**
    * Options for streaming responses. Only set this when you set `stream: true`.
    */
   export interface StreamOptions {
@@ -7756,6 +9003,13 @@ export namespace ResponseCreateParams {
      * you trust the network links between your application and the OpenAI API.
      */
     include_obfuscation?: boolean;
+  }
+
+  export interface SpecificProgrammaticToolCallingParam {
+    /**
+     * The tool to call. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
   }
 
   export type ResponseCreateParamsNonStreaming = ResponsesAPI.ResponseCreateParamsNonStreaming;
@@ -7859,6 +9113,10 @@ export interface ResponseCompactParams {
    * available models.
    */
   model:
+    | 'gpt-5.6-sol'
+    | 'gpt-5.6-terra'
+    | 'gpt-5.6-luna'
+    | 'gpt-5.5'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
@@ -7951,6 +9209,9 @@ export interface ResponseCompactParams {
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
     | 'gpt-5.1-codex-max'
+    | 'gpt-daybreak-blue-latest'
+    | 'gpt-daybreak-red-latest'
+    | 'gpt-5.6-cyber'
     | (string & {})
     | null;
 
@@ -7981,9 +9242,73 @@ export interface ResponseCompactParams {
   prompt_cache_key?: string | null;
 
   /**
-   * How long to retain a prompt cache entry created by this request.
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  prompt_cache_options?: ResponseCompactParams.PromptCacheOptions | null;
+
+  /**
+   * @deprecated How long to retain a prompt cache entry created by this request.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
+
+  /**
+   * Specifies the processing type used for serving the request. - If set to 'auto',
+   * then the request will be processed with the service tier configured in the
+   * Project settings. Unless otherwise configured, the Project will use 'default'. -
+   * If set to 'default', then the request will be processed with the standard
+   * pricing and performance for the selected model. - If set to
+   * '[flex](https://platform.openai.com/docs/guides/flex-processing)', then the
+   * request will be processed with the Flex Processing service tier. - To opt-in to
+   * [Fast mode](/api/docs/guides/fast-mode) at the request level, include the
+   * `service_tier=fast` or `service_tier=priority` parameter for Responses or Chat
+   * Completions. The response will show `service_tier=priority` regardless of if you
+   * specify `service_tier=fast` or `priority` in your request. - When not set, the
+   * default behavior is 'auto'. When the `service_tier` parameter is set, the
+   * response body will include the `service_tier` value based on the processing mode
+   * actually used to serve the request. This response value may be different from
+   * the value set in the parameter.
+   */
+  service_tier?: 'auto' | 'default' | 'fast' | 'flex' | 'priority' | null;
+}
+
+export namespace ResponseCompactParams {
+  /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Controls whether OpenAI automatically creates an implicit cache breakpoint.
+     * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
+     * and writes up to the latest three explicit breakpoints in the request. With
+     * `explicit`, OpenAI does not create an implicit breakpoint and writes up to the
+     * latest four explicit breakpoints. If there are no explicit breakpoints, the
+     * request does not use prompt caching.
+     */
+    mode?: 'implicit' | 'explicit';
+
+    /**
+     * The minimum lifetime applied to every implicit and explicit cache breakpoint
+     * written by the request. Defaults to `30m`, which is currently the only supported
+     * value. The backend may retain cache entries for longer.
+     */
+    ttl?: '30m';
+  }
 }
 
 Responses.InputItems = InputItems;

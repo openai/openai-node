@@ -35,9 +35,9 @@ export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 		// start-server-and-test polls / to see if the server is up and running
-		if (url.pathname === '/') return new Response();
+		if (url.pathname === '/') {return new Response();}
 		// then the test code requests /test
-		if (url.pathname !== '/test') return new Response(null, { status: 404 });
+		if (url.pathname !== '/test') {return new Response(null, { status: 404 });}
 		try {
 			console.error('importing openai');
 			const { default: OpenAI } = await import('openai');
@@ -48,15 +48,15 @@ export default {
 			console.error('created client');
 
 			const tests: Test[] = [];
-			function it(description: string, handler: () => Promise<void>) {
+			const it = (description: string, handler: () => Promise<void>) => {
 				tests.push({ description, handler });
-			}
-			function expectEqual(a: any, b: any) {
+			};
+			const expectEqual = (a: any, b: any) => {
 				if (!Object.is(a, b)) {
 					throw new Error(`expected values to be equal: ${JSON.stringify({ a, b })}`);
 				}
-			}
-			function expectSimilar(received: string, expected: string, maxDistance: number) {
+			};
+			const expectSimilar = (received: string, expected: string, maxDistance: number) => {
 				const receivedDistance = distance(received, expected);
 				if (receivedDistance < maxDistance) {
 					return;
@@ -70,7 +70,7 @@ export default {
 				].join('\n');
 
 				throw new Error(message);
-			}
+			};
 
 			uploadWebApiTestCases({
 				client: client as any,
@@ -79,27 +79,21 @@ export default {
 				expectSimilar,
 			});
 
-			let allPassed = true;
-			const results = [];
-
 			for (const { description, handler } of tests) {
 				console.error('running', description);
-				let result;
 				try {
-					result = await handler();
-					console.error('passed ', description);
+					await handler();
+					console.error('passed', description);
 				} catch (error) {
-					console.error('failed ', description, error);
-					allPassed = false;
-					result = error instanceof Error ? error.stack : String(error);
+					console.error('failed', description, error);
+					return new Response('Internal Server Error', { status: 500 });
 				}
-				results.push(`${description}\n\n${String(result)}`);
 			}
 
-			return new Response(allPassed ? 'Passed!' : results.join('\n\n'));
+			return new Response('Passed!');
 		} catch (error) {
 			console.error(error instanceof Error ? error.stack : String(error));
-			return new Response(error instanceof Error ? error.stack : String(error), { status: 500 });
+			return new Response('Internal Server Error', { status: 500 });
 		}
 	},
 };

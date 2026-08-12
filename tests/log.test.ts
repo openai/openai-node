@@ -1,24 +1,29 @@
-import OpenAI, { ClientOptions } from 'openai/index';
+import { vi } from 'vitest';
+
+import type { ClientOptions } from 'openai/index';
+import OpenAI from 'openai/index';
 
 const opts: ClientOptions = {
   apiKey: 'example-api-key',
   baseURL: 'http://localhost:5000/',
   logLevel: 'debug',
-  fetch: (url) => {
-    return Promise.resolve(
-      new Response(JSON.stringify({ url, custom: true }), {
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-  },
+  fetch: (url) =>
+    Promise.resolve(
+      Response.json(
+        { url, custom: true },
+        {
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    ),
 };
 
 describe('debug()', () => {
   const env = process.env;
-  const spy = jest.spyOn(console, 'debug');
+  const spy = vi.spyOn(console, 'debug');
 
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...env };
     process.env['DEBUG'] = 'true';
   });
@@ -27,7 +32,7 @@ describe('debug()', () => {
     process.env = env;
   });
 
-  test('body request object with Authorization header', async function () {
+  test('body request object with Authorization header', async () => {
     const client = new OpenAI(opts);
     await client.post('/example', {});
 
@@ -42,7 +47,7 @@ describe('debug()', () => {
     );
   });
 
-  test('header object with Authorization header', async function () {
+  test('header object with Authorization header', async () => {
     // Test headers object with authorization header
     const client = new OpenAI({
       ...opts,
@@ -62,7 +67,7 @@ describe('debug()', () => {
     );
   });
 
-  test('input args are not mutated', async function () {
+  test('input args are not mutated', async () => {
     const authorizationTest = {
       authorization: 'fakeValue',
     };
@@ -88,7 +93,7 @@ describe('debug()', () => {
     );
   });
 
-  test('input headers are not mutated', async function () {
+  test('input headers are not mutated', async () => {
     const authorizationTest = {
       authorization: 'fakeValue',
     };

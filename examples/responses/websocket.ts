@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import OpenAI from 'openai';
 import type {
@@ -40,7 +40,7 @@ type SupplierShipment = {
 
 type SupplierETAOutput = {
   sku: string;
-  supplier_shipments: Array<SupplierShipment>;
+  supplier_shipments: SupplierShipment[];
 };
 
 type QualityAlert = {
@@ -52,7 +52,7 @@ type QualityAlert = {
 
 type QualityAlertsOutput = {
   sku: string;
-  alerts: Array<QualityAlert>;
+  alerts: QualityAlert[];
 };
 
 type ToolOutput = SKUInventoryOutput | SupplierETAOutput | QualityAlertsOutput;
@@ -66,7 +66,7 @@ type FunctionCallRequest = {
 type RunResponseResult = {
   text: string;
   responseID: string;
-  functionCalls: Array<FunctionCallRequest>;
+  functionCalls: FunctionCallRequest[];
 };
 
 type RunTurnResult = {
@@ -76,12 +76,10 @@ type RunTurnResult = {
 
 type OpenableSocket = {
   readyState: number;
-  on(event: 'open', listener: () => void): void;
+  on(event: 'open' | 'close', listener: () => void): void;
   on(event: 'error', listener: (err: Error) => void): void;
-  on(event: 'close', listener: () => void): void;
-  off(event: 'open', listener: () => void): void;
+  off(event: 'open' | 'close', listener: () => void): void;
   off(event: 'error', listener: (err: Error) => void): void;
-  off(event: 'close', listener: () => void): void;
 };
 
 type CLIArgs = {
@@ -93,7 +91,7 @@ type CLIArgs = {
 
 const BETA_HEADER_VALUE = 'responses_websockets=2026-02-06';
 
-const TOOLS: Array<FunctionTool> = [
+const TOOLS: FunctionTool[] = [
   {
     type: 'function',
     name: 'get_sku_inventory',
@@ -147,7 +145,7 @@ const TOOLS: Array<FunctionTool> = [
   },
 ];
 
-const DEMO_TURNS: Array<DemoTurn> = [
+const DEMO_TURNS: DemoTurn[] = [
   {
     tool_name: 'get_sku_inventory',
     prompt:
@@ -164,7 +162,7 @@ const DEMO_TURNS: Array<DemoTurn> = [
   },
 ];
 
-const parseArgs = (argv: Array<string>): CLIArgs => {
+const parseArgs = (argv: string[]): CLIArgs => {
   let model = 'gpt-5.2';
   let useBetaHeader = false;
   let showEvents = false;
@@ -173,7 +171,7 @@ const parseArgs = (argv: Array<string>): CLIArgs => {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (typeof arg !== 'string') {
-      throw new Error('Unexpected missing CLI argument');
+      throw new TypeError('Unexpected missing CLI argument');
     }
 
     if (arg === '--model') {
@@ -212,9 +210,8 @@ const parseArgs = (argv: Array<string>): CLIArgs => {
   return { model, useBetaHeader, showEvents, showToolIO };
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 const parseToolName = (name: string): ToolName => {
   if (name === 'get_sku_inventory' || name === 'get_supplier_eta' || name === 'get_quality_alerts') {
@@ -231,7 +228,7 @@ const parseSKUArguments = (rawArguments: string): SKUArguments => {
 
   const skuValue = parsed['sku'];
   if (typeof skuValue !== 'string') {
-    throw new Error(`Tool arguments must include a string \`sku\`: ${rawArguments}`);
+    throw new TypeError(`Tool arguments must include a string \`sku\`: ${rawArguments}`);
   }
 
   return { sku: skuValue };
@@ -343,10 +340,10 @@ const runResponse = async ({
   inputPayload: string | ResponseInput;
   toolChoice: ToolChoice;
   showEvents: boolean;
-}): Promise<RunResponseResult> => {
-  return await new Promise<RunResponseResult>((resolve, reject) => {
-    const textParts: Array<string> = [];
-    const functionCalls: Array<FunctionCallRequest> = [];
+}): Promise<RunResponseResult> =>
+  await new Promise<RunResponseResult>((resolve, reject) => {
+    const textParts: string[] = [];
+    const functionCalls: FunctionCallRequest[] = [];
 
     const finish = (responseID: string): void => {
       cleanup();
@@ -421,7 +418,6 @@ const runResponse = async ({
     };
     ws.send(createEvent);
   });
-};
 
 const runTurn = async ({
   ws,
@@ -440,7 +436,7 @@ const runTurn = async ({
   showEvents: boolean;
   showToolIO: boolean;
 }): Promise<RunTurnResult> => {
-  const accumulatedTextParts: Array<string> = [];
+  const accumulatedTextParts: string[] = [];
 
   let currentInput: string | ResponseInput = turnPrompt;
   let currentToolChoice: ToolChoice = { type: 'function', name: forcedToolName };
