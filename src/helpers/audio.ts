@@ -35,11 +35,13 @@ function isFile(stream: NodeJS.ReadableStream | Response | File): stream is File
 async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
-      const ffplay = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
-
       let source: NodeJS.ReadableStream;
       if (isResponse(stream)) {
-        const body = stream.body! as NodeReadableStream | NodeJS.ReadableStream;
+        const body = stream.body as NodeReadableStream | NodeJS.ReadableStream | null;
+        if (!body) {
+          throw new Error('Cannot play audio from a response without a body');
+        }
+
         source =
           'pipe' in body && typeof body.pipe === 'function'
             ? body
@@ -50,14 +52,15 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
         source = stream;
       }
 
+      const ffplay = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
+      ffplay.on('error', reject);
+
       pipeline(source, ffplay.stdin, (error) => {
         if (error) {
           ffplay.kill();
           reject(error);
         }
       });
-
-      ffplay.on('error', reject);
 
       ffplay.on('close', (code: number) => {
         if (code !== 0) {
@@ -81,7 +84,7 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
  *
  * @param input Audio data in a format recognized by `ffplay`.
  * @throws {Error} If playback is unsupported, `ffplay` cannot start or exits
- * unsuccessfully, or reading the audio input fails.
+ * unsuccessfully, the response has no body, or reading the audio input fails.
  */
 export async function playAudio(input: NodeJS.ReadableStream | Response | File): Promise<void> {
   if (isNode) {
