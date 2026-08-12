@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
+import type * as DetectPlatform from 'openai/internal/detect-platform';
 
-type PlatformModule = typeof import('openai/internal/detect-platform');
+type PlatformModule = typeof DetectPlatform;
 
 type PlatformGlobals = {
   Deno?: unknown;
@@ -28,8 +29,11 @@ async function withGlobals<T>(overrides: PlatformGlobals, run: (detection: Platf
     return run(detection);
   } finally {
     for (const [name, descriptor] of descriptors) {
-      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
-      else delete (globalThis as Record<string, unknown>)[name];
+      if (descriptor) {
+        Object.defineProperty(globalThis, name, descriptor);
+      } else {
+        delete (globalThis as Record<string, unknown>)[name];
+      }
     }
   }
 }

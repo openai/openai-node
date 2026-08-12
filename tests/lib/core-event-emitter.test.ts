@@ -3,6 +3,7 @@ import { EventEmitter, InternalEventEmitter } from 'openai/core/EventEmitter';
 
 type Events = {
   message: (value: string) => void;
+  pair: (value: string, index: number) => void;
   empty: () => void;
   error: (error: Error) => void;
 };
@@ -16,8 +17,20 @@ class TestEmitter extends EventEmitter<Events> {
     this._emit('empty');
   }
 
+  emitPair(value: string, index: number) {
+    this._emit('pair', value, index);
+  }
+
+  emitError(error: Error) {
+    this._emit('error', error);
+  }
+
   hasMessageListener() {
     return this._hasListener('message');
+  }
+
+  hasErrorListener() {
+    return this._hasListener('error');
   }
 }
 
@@ -86,6 +99,46 @@ describe('core EventEmitter', () => {
     emitter.emitMessage('unobserved');
 
     await expect(pending).resolves.toBeUndefined();
+  });
+
+  test('rejects pending emitted promises when an error occurs first', async () => {
+    const emitter = new TestEmitter();
+    const pending = emitter.emitted('message');
+    const failure = new Error('connection failed');
+
+    emitter.emitError(failure);
+
+    await expect(pending).rejects.toBe(failure);
+    expect(emitter.hasMessageListener()).toBe(false);
+  });
+
+  test('removes its error listener after the requested event arrives', async () => {
+    const emitter = new TestEmitter();
+    const pending = emitter.emitted('message');
+
+    emitter.emitMessage('received');
+
+    await expect(pending).resolves.toBe('received');
+    expect(emitter.hasErrorListener()).toBe(false);
+  });
+
+  test('resolves events with multiple arguments as their complete argument tuple', async () => {
+    const emitter = new TestEmitter();
+    const pending = emitter.emitted('pair');
+
+    emitter.emitPair('received', 2);
+
+    await expect(pending).resolves.toEqual(['received', 2]);
+  });
+
+  test('resolves rather than rejects when waiting for the error event itself', async () => {
+    const emitter = new TestEmitter();
+    const pending = emitter.emitted('error');
+    const failure = new Error('expected event');
+
+    emitter.emitError(failure);
+
+    await expect(pending).resolves.toBe(failure);
   });
 });
 

@@ -6,24 +6,20 @@ on:
   push:
     branches:
       - '**'
+      - '!gh-readonly-queue/**'
       - '!integrated/**'
-      - '!stl-preview-head/**'
-      - '!stl-preview-base/**'
-      - '!generated'
-      - '!codegen/**'
-      - 'codegen/stl/**'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches-ignore:
-      - 'stl-preview-head/**'
-      - 'stl-preview-base/**'
+  merge_group:
+    types:
+      - checks_requested
 
 jobs:
   lint:
     timeout-minutes: 10
     name: lint
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
     steps:
@@ -41,17 +37,19 @@ jobs:
       - name: Bootstrap
         run: ./scripts/bootstrap
 
-      - name: Check types
+      - name: Check formatting and lint rules
         run: ./scripts/lint
+
+      - name: Check types
+        run: pnpm exec tsc
 
   build:
     timeout-minutes: 5
     name: build
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -70,29 +68,24 @@ jobs:
       - name: Check build
         run: ./scripts/build
 
-      - name: Get GitHub OIDC Token
-        if: |-
-          github.repository == 'stainless-sdks/openai-typescript' &&
-          !startsWith(github.ref, 'refs/heads/stl/')
-        id: github-oidc
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        with:
-          script: core.setOutput('github_token', await core.getIDToken());
+      - name: Check published source types with TypeScript 4.9
+        run: ./node_modules/typescript-4-9/bin/tsc --project dist/src/tsconfig.json --noEmit
 
-      - name: Upload tarball
-        if: |-
-          github.repository == 'stainless-sdks/openai-typescript' &&
-          !startsWith(github.ref, 'refs/heads/stl/')
-        env:
-          URL: https://pkg.stainless.com/s
-          AUTH: ${{ steps.github-oidc.outputs.github_token }}
-          SHA: ${{ github.sha }}
-        run: ./scripts/utils/upload-artifact.sh
+      - name: Check published source types with TypeScript 6
+        run: ./node_modules/typescript/bin/tsc --project dist/src/tsconfig.json --noEmit
+
+      - name: Check package types
+        run: |
+          pnpm exec attw --pack dist -f json > .attw.json || true
+          node scripts/utils/attw-report.cjs
+
+      - name: Check published package
+        run: pnpm exec publint dist
 
   node_matrix:
     name: Read Node.js test matrix
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
     outputs:
@@ -113,8 +106,8 @@ jobs:
     name: test (${{ matrix.node-version }})
     needs: node_matrix
     timeout-minutes: 10
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     continue-on-error: ${{ matrix.experimental }}
     permissions:
       contents: read
@@ -153,8 +146,8 @@ jobs:
           node --experimental-strip-types scripts/test-packed-package.ts
 
   test_matrix:
-    name: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
-    if: ${{ always() && (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
+    name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
     needs: [test]
     runs-on: ubuntu-latest
     permissions: {}
@@ -171,8 +164,13 @@ jobs:
   examples:
     timeout-minutes: 10
     name: examples
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: github.repository == 'openai/openai-node'
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.repository == 'openai/openai-node' &&
+        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
+        github.head_ref != 'release-please--branches--main--components--openai'
+      }}
     environment: ci
     permissions:
       contents: read
@@ -199,7 +197,7 @@ jobs:
             echo "Skipping examples because OPENAI_API_KEY is not set"
             exit 0
           fi
-          pnpm tsn examples/demo.ts
+          pnpm tsn examples/chat-completions/demo.ts
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
@@ -207,6 +205,11 @@ jobs:
     name: ecosystem tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: >-
+      ${{
+        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
+        github.head_ref != 'release-please--branches--main--components--openai'
+      }}
     environment: ci
     permissions:
       contents: read

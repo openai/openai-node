@@ -545,7 +545,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 ```jsonc
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
-  "lib": ["DOM", "DOM.Iterable", "ES2018"]
+  "lib": ["DOM", "DOM.Iterable", "ES2018"],
 }
 ```
 
@@ -555,7 +555,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 
@@ -577,7 +577,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 {
   "target": "ES2018", // note: we recommend ES2020 or higher
   "lib": ["ES2020"], // <- needed by @cloudflare/workers-types
-  "types": ["@cloudflare/workers-types"]
+  "types": ["@cloudflare/workers-types"],
 }
 ```
 
@@ -597,7 +597,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 
 ```jsonc
 {
-  "target": "ES2018" // note: we recommend ES2020 or higher
+  "target": "ES2018", // note: we recommend ES2020 or higher
 }
 ```
 

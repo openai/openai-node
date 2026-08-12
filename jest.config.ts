@@ -22,7 +22,6 @@ const config: JestConfigWithTsJest = {
     '<rootDir>/packages/',
   ],
   testPathIgnorePatterns: ['scripts', '<rootDir>/tests/live/'],
-  // prettierPath: require.resolve('prettier-2'),
 };
 
 export default config;

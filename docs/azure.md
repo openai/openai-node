@@ -68,21 +68,29 @@ For OpenAI workload identity on Azure-managed infrastructure, see [Authenticatio
 
 ## Realtime API
 
-This SDK provides real-time streaming capabilities for Azure OpenAI through the `OpenAIRealtimeWS` and `OpenAIRealtimeWebSocket` clients described previously.
-
-To utilize the real-time features, begin by creating a fully configured `AzureOpenAI` client and passing it into either `OpenAIRealtimeWS.azure` or `OpenAIRealtimeWebSocket.azure`. For example:
+Use the stable Realtime API with your Azure v1 endpoint and deployment name. The
+`OpenAIRealtimeWS` and `OpenAIRealtimeWebSocket` helpers connect to the GA
+`/openai/v1/realtime` endpoint without a dated `api-version` query parameter:
 
 ```ts
-const cred = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const deploymentName = 'gpt-4o-realtime-preview-1001';
-const azureADTokenProvider = getBearerTokenProvider(cred, scope);
-const client = new AzureOpenAI({
-  azureADTokenProvider,
-  apiVersion: '2024-10-01-preview',
-  deployment: deploymentName,
+import OpenAI from 'openai';
+import { OpenAIRealtimeWS } from 'openai/realtime/ws';
+import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
+
+const endpoint = process.env['AZURE_OPENAI_ENDPOINT'];
+const deploymentName = process.env['AZURE_OPENAI_DEPLOYMENT'];
+if (!endpoint || !deploymentName) throw new Error('Missing Azure OpenAI configuration');
+
+const tokenProvider = getBearerTokenProvider(new DefaultAzureCredential(), 'https://ai.azure.com/.default');
+const client = new OpenAI({
+  baseURL: `${endpoint.replace(/\/+$/, '')}/openai/v1/`,
+  apiKey: tokenProvider,
 });
-const rt = await OpenAIRealtimeWS.azure(client);
+
+const rt = await OpenAIRealtimeWS.create(client, { model: deploymentName });
 ```
 
-Once the instance has been created, you can then begin sending requests and receiving streaming responses in real time.
+If you already have an `AzureOpenAI` client, `OpenAIRealtimeWS.azure(client)` and
+`OpenAIRealtimeWebSocket.azure(client)` also use the GA endpoint and the client's
+configured deployment. Pass `{ deploymentName: 'your-deployment' }` to override
+that deployment for a specific connection.

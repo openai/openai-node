@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import { OpenAIError } from './error';
 import { FinalRequestOptions } from '../internal/request-options';
 import { defaultParseResponse, WithRequestID } from '../internal/parse';
@@ -73,9 +71,9 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
  *    }
  */
 export class PagePromise<
-    PageClass extends AbstractPage<Item>,
-    Item = ReturnType<PageClass['getPaginatedItems']>[number],
-  >
+  PageClass extends AbstractPage<Item>,
+  Item = ReturnType<PageClass['getPaginatedItems']>[number],
+>
   extends APIPromise<PageClass>
   implements AsyncIterable<Item>
 {

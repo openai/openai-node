@@ -41,16 +41,16 @@ modify the contents of the `src/lib/` and `examples/` directories.
 All files in the `examples/` directory are not modified by the generator and can be freely edited or added to.
 
 ```ts
-// add an example to examples/<your-example>.ts
+// add an example to examples/<category>/<your-example>.ts
 
 #!/usr/bin/env -S npm run tsn -- -T
 …
 ```
 
 ```sh
-$ chmod +x examples/<your-example>.ts
+$ chmod +x examples/<category>/<your-example>.ts
 # run the example against your api
-$ npm run tsn -- -T examples/<your-example>.ts
+$ npm run tsn -- -T examples/<category>/<your-example>.ts
 ```
 
 ## Using the repository from source
@@ -79,8 +79,8 @@ $ pnpm link --global openai
 ## Running tests
 
 The test suite is split between handwritten unit tests, which run with Vitest,
-and Stainless-generated API-resource tests, which remain on Jest. Generated
-tests have a Stainless-generated comment at the top of the file and primarily
+and generated API-resource tests, which remain on Jest. Generated tests have a
+generator comment at the top of the file and primarily
 live in `tests/api-resources/`; a few generated client tests also live directly
 under `tests/`. Handwritten tests live in `tests/lib/`, `tests/helpers/`,
 `tests/auth/`, and the remaining unmarked test files. The existing Jest-based
@@ -140,10 +140,25 @@ trends but are too variable for blocking performance thresholds.
 
 ## Linting and formatting
 
-This repository uses [prettier](https://www.npmjs.com/package/prettier) and
-[eslint](https://www.npmjs.com/package/eslint) to format the code in the repository.
+This repository uses [Ultracite](https://www.ultracite.ai/) with
+[Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and
+[Oxlint](https://oxc.rs/docs/guide/usage/linter.html) to format and lint its code.
+The Ultracite presets live in `oxfmt.config.ts` and `oxlint.config.ts`, with
+repository-specific formatting options, import rules, fixture exceptions, and
+generated-file lint exclusions layered on top. Files with a Castiron-generated
+header and explicitly listed legacy SDK files are formatted and checked only for
+unused imports and restricted SDK package imports; other handwritten files in the
+same directories remain checked. Existing handwritten patterns are explicitly
+exempted from incompatible Ultracite rules, while the remaining preset rules stay
+enabled.
 
-To lint:
+Handwritten SDK exports, their public class members, configuration fields, and
+event payload properties must have accurate JSDoc so that their behavior is
+available through editor hover. Describe meaningful defaults, prerequisites,
+failure modes, and lifecycle semantics rather than repeating TypeScript types.
+Generated SDK files and vendored dependencies are excluded.
+
+To check formatting and lint rules:
 
 ```sh
 $ pnpm lint
@@ -152,13 +167,32 @@ $ pnpm lint
 To format and fix all lint issues automatically:
 
 ```sh
-$ pnpm fix
+$ pnpm format
 ```
+
+Install the recommended Oxc VS Code extension to enable the checked-in
+format-on-save and lint-autofix editor settings.
 
 ## Publishing and releases
 
 Changes made to this repository via the automated release PR pipeline should publish to npm automatically. If
 the changes aren't made through the automated pipeline, you may want to make releases manually.
+
+### Override an automated release version
+
+Do not edit an automated release PR title to change its version. The title must match the version generated in
+`package.json`, and CI rejects mismatches so that the package, changelog, tag, and release stay consistent.
+
+To select a different version, merge a conventional commit with a `Release-As: <version>` footer into `main`.
+For example:
+
+```text
+chore: set the next release version
+
+Release-As: 7.4.0
+```
+
+Release Please will then regenerate the release PR files and title with that version.
 
 ### Publish with a GitHub workflow
 

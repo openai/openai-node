@@ -4,8 +4,10 @@
   "compilerOptions": {
     "target": "es2020",
     "lib": ["es2020"],
+    "types": ["jest", "node"],
+    "rootDir": ".",
     "module": "commonjs",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "paths": {
       "openai/*": ["./src/*"],

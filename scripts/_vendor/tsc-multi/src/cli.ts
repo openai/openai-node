@@ -45,8 +45,8 @@ yargs(process.argv.slice(2))
   .command(
     '$0 [projects..]',
     'Build multiple TypeScript projects to multiple targets.',
-    (cmd) => {
-      return cmd
+    (cmd) =>
+      cmd
         .positional('projects', {
           array: true,
           type: 'string',
@@ -58,8 +58,7 @@ yargs(process.argv.slice(2))
           ['$0 --clean', 'Delete built files.'],
           ['$0 --config ./conf.json', 'Custom config path.'],
           ['$0 ./pkg-a ./pkg-b', 'Build multiple projects.'],
-        ]);
-    },
+        ]),
     async (args) => {
       const projects = args.projects || [];
       const config = await loadConfig({

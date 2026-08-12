@@ -1,8 +1,11 @@
-(() => {
-  const assert = require('node:assert/strict');
-  const fs = require('node:fs');
-  const path = require('node:path');
+const nodeVersionPolicyAssert = require('node:assert/strict');
+const nodeVersionPolicyFs = require('node:fs');
+const nodeVersionPolicyPath = require('node:path');
 
+(() => {
+  const assert = nodeVersionPolicyAssert;
+  const fs = nodeVersionPolicyFs;
+  const path = nodeVersionPolicyPath;
   interface PackageMetadata {
     engines?: {
       node?: string;
@@ -46,7 +49,7 @@
     policyStatuses.some((status) => status === value);
 
   const root = path.resolve(__dirname, '..');
-  const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf8');
+  const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf-8');
   const readJSON = <Value>(file: string): Value => JSON.parse(read(file)) as Value;
   const unique = <Value>(values: Value[]): Value[] => [...new Set(values)];
 
@@ -109,11 +112,11 @@
     [...policySupported, ...policyForward].every((version) => /^\d+$/.test(version)),
     'Policy matrix versions must be major lines',
   );
+  const sortedPolicyRows = [...policyRows];
+  sortedPolicyRows.sort((left, right) => Number(left.major) - Number(right.major));
   assert.deepEqual(
     policyRows.map(({ major: version }) => version),
-    [...policyRows]
-      .sort((left, right) => Number(left.major) - Number(right.major))
-      .map(({ major: version }) => version),
+    sortedPolicyRows.map(({ major: version }) => version),
     'NODE_VERSION_POLICY.md compatibility rows must be ordered by major',
   );
   assert(matrixEntries.length > 0, 'Policy produces an empty Node.js test matrix');

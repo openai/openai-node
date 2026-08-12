@@ -1,11 +1,11 @@
-import { vi, type MockedFunction } from 'vitest';
-
-vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
-
+import { vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
+
+vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 const spawnMock = spawn as MockedFunction<typeof spawn>;
 
@@ -13,7 +13,7 @@ function mockFfmpeg() {
   const ffmpeg = Object.assign(new EventEmitter(), {
     stdout: new PassThrough(),
     stderr: new PassThrough(),
-    kill: vi.fn(),
+    kill: vi.fn().mockReturnValue(true),
   });
   spawnMock.mockReturnValue(ffmpeg as any);
   return ffmpeg;
@@ -85,6 +85,44 @@ describe('recordAudio', () => {
     await recording;
   });
 
+  test('retains captured audio when an intentional abort exits with a nonzero code', async () => {
+    const ffmpeg = mockFfmpeg();
+    const controller = new AbortController();
+    const recording = recordAudio({ signal: controller.signal });
+
+    ffmpeg.stdout.write(Buffer.from('captured before abort'));
+    controller.abort();
+    ffmpeg.emit('close', 255);
+
+    const file = await recording;
+    expect(Buffer.from(await file.arrayBuffer()).toString()).toBe('captured before abort');
+  });
+
+  test('rejects a failed ffmpeg process when abort cannot deliver its termination signal', async () => {
+    const ffmpeg = mockFfmpeg();
+    ffmpeg.kill.mockReturnValue(false);
+    const controller = new AbortController();
+    const recording = recordAudio({ signal: controller.signal });
+
+    controller.abort();
+    expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
+    ffmpeg.emit('close', 2);
+
+    await expect(recording).rejects.toThrow('ffmpeg process exited with code 2');
+  });
+
+  test('immediately stops recording for an already-aborted signal', async () => {
+    const ffmpeg = mockFfmpeg();
+    const controller = new AbortController();
+    controller.abort();
+
+    const recording = recordAudio({ signal: controller.signal });
+
+    expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
+    ffmpeg.emit('close', 255);
+    await expect(recording).resolves.toBeInstanceOf(File);
+  });
+
   test('terminates ffmpeg when the configured timeout expires', async () => {
     const ffmpeg = mockFfmpeg();
     const timeoutController = new AbortController();
@@ -97,6 +135,20 @@ describe('recordAudio', () => {
 
     ffmpeg.emit('close', 0);
     await recording;
+  });
+
+  test('retains captured audio when a recording timeout exits with a nonzero code', async () => {
+    const ffmpeg = mockFfmpeg();
+    const timeoutController = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    const recording = recordAudio({ timeout: 50 });
+
+    ffmpeg.stdout.write(Buffer.from('captured before timeout'));
+    timeoutController.abort();
+    ffmpeg.emit('close', 255);
+
+    const file = await recording;
+    expect(Buffer.from(await file.arrayBuffer()).toString()).toBe('captured before timeout');
   });
 
   test.each([0, -10])('does not install a timeout for %i milliseconds', async (timeout) => {
@@ -129,6 +181,15 @@ describe('recordAudio', () => {
 
     await expect(recordAudio()).rejects.toThrow('ffmpeg was not found');
   });
+
+  test('rejects an unexpected unsuccessful ffmpeg exit', async () => {
+    const ffmpeg = mockFfmpeg();
+    const recording = recordAudio();
+
+    ffmpeg.emit('close', 2);
+
+    await expect(recording).rejects.toThrow('ffmpeg process exited with code 2');
+  });
 });
 
 describe('playAudio input and process errors', () => {
@@ -160,5 +221,44 @@ describe('playAudio input and process errors', () => {
     });
 
     await expect(playAudio(Readable.from(['audio']))).rejects.toThrow('ffplay was not found');
+  });
+
+  test('rejects bodyless responses without spawning an ffplay process', async () => {
+    const response = new Response(null, { status: 204 });
+
+    await expect(playAudio(response)).rejects.toThrow('Cannot play audio from a response without a body');
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects consumed responses without spawning an ffplay process', async () => {
+    const response = new Response('audio');
+    await response.arrayBuffer();
+
+    await expect(playAudio(response)).rejects.toThrow('Invalid state: ReadableStream is locked');
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects a File stream failure before spawning an ffplay process', async () => {
+    const audio = new File(['audio'], 'audio.wav', { type: 'audio/wav' });
+    const failure = new Error('Cannot open audio stream');
+    vi.spyOn(audio, 'stream').mockImplementation(() => {
+      throw failure;
+    });
+
+    await expect(playAudio(audio)).rejects.toBe(failure);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects asynchronous ffplay process errors', async () => {
+    const { ffplay } = mockFfplay();
+    const source = new PassThrough();
+    const playback = playAudio(source);
+    const failure = new Error('ffplay was not found');
+
+    expect(ffplay.listenerCount('error')).toBe(1);
+    ffplay.emit('error', failure);
+
+    await expect(playback).rejects.toBe(failure);
+    source.end();
   });
 });

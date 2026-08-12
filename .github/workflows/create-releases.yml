@@ -1,16 +1,184 @@
-# Watches the default branch for release-please output, then publishes newly
-# created SDK releases to npm.
+# Watches the default branch for release-please output and publishes newly
+# created SDK releases.
 name: Create releases
 on:
   push:
     branches:
       - main
+  pull_request:
+    types:
+      - edited
+      - opened
+      - ready_for_review
+      - reopened
+      - synchronize
 
 jobs:
+  validate-release-version:
+    name: validate release PR version
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.ref == 'release-please--branches--main--components--openai' &&
+        github.repository == 'openai/openai-node'
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Compare the release title with the generated version
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          bash ./bin/check-release-version "${PR_TITLE}"
+
   release:
     name: release
-    if: github.ref == 'refs/heads/main' && github.repository == 'openai/openai-node'
+    if: >-
+      ${{
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        github.repository == 'openai/openai-node'
+      }}
     runs-on: ubuntu-latest
+    environment: release
+    permissions: {}
+    steps:
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.OPENAI_SDKS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OPENAI_SDKS_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Validate pending release PR versions
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          bash ./bin/check-pending-release-versions
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: main
+
+      - name: Re-draft the updated release PR
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
+        run: |
+          RELEASE_PR="$(jq -er '.number' <<< "${RELEASE_PR_JSON}")"
+          if [[ "$(gh pr view "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')" == 'false' ]]; then
+            gh pr ready "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --undo
+          fi
+
+  publication-check:
+    name: check publication state
+    if: >-
+      ${{
+        always() &&
+        !cancelled() &&
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        github.repository == 'openai/openai-node'
+      }}
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      release_sha: ${{ steps.check.outputs.release_sha }}
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Check whether the current release needs publishing
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          package_version="$(jq -r -e '.version' package.json)"
+          release_tag="v${package_version}"
+
+          set +e
+          release_info="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${release_tag}" 2>&1)"
+          release_status=$?
+          set -e
+          if [[ ${release_status} -ne 0 ]]; then
+            if grep -q 'HTTP 404' <<< "${release_info}"; then
+              echo "No GitHub release exists for ${release_tag}; nothing to publish."
+              echo 'should_publish=false' >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+            echo "Unable to check for GitHub release ${release_tag}:"
+            echo "${release_info}"
+            exit 1
+          fi
+
+          release_target="$(jq -r -e '.target_commitish' <<< "${release_info}")"
+          if [[ ! "${release_target}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "GitHub release ${release_tag} does not identify an immutable commit: ${release_target}"
+            exit 1
+          fi
+
+          release_sha="$(bash ./bin/resolve-tag-commit "${release_tag}")"
+          if [[ "${release_sha}" != "${release_target}" ]]; then
+            echo "Release tag ${release_tag} resolves to ${release_sha}, not release commit ${release_target}."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "${release_sha}" "${GITHUB_SHA}"; then
+            echo "Release commit ${release_sha} is not reachable from protected main commit ${GITHUB_SHA}."
+            exit 1
+          fi
+
+          release_package_version="$(git show "${release_sha}:package.json" | jq -r -e '.version')"
+          if [[ "${release_package_version}" != "${package_version}" ]]; then
+            echo "Release commit ${release_sha} contains version ${release_package_version}, expected ${package_version}."
+            exit 1
+          fi
+
+          echo "release_sha=${release_sha}" >> "${GITHUB_OUTPUT}"
+
+          set +e
+          bash ./bin/check-npm-version
+          version_status=$?
+          set -e
+
+          if [[ ${version_status} -eq 0 ]]; then
+            echo 'should_publish=false' >> "${GITHUB_OUTPUT}"
+          elif [[ ${version_status} -eq 1 ]]; then
+            echo 'should_publish=true' >> "${GITHUB_OUTPUT}"
+          else
+            exit "${version_status}"
+          fi
+
+  publish:
+    name: publish
+    if: needs.publication-check.outputs.should_publish == 'true'
+    needs: publication-check
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-npm-${{ needs.publication-check.outputs.release_sha }}
+      cancel-in-progress: false
     environment: publish
     permissions:
       contents: read
@@ -18,30 +186,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - uses: stainless-api/trigger-release-please@bb6677c5a04578eec1ccfd9e1913b5b78ed64c61 # v1.4.0
-        id: release
         with:
-          repo: ${{ github.event.repository.full_name }}
-          stainless-api-key: ${{ secrets.STAINLESS_API_KEY }}
+          ref: ${{ needs.publication-check.outputs.release_sha }}
+
+      - name: Verify release commit
+        env:
+          RELEASE_SHA: ${{ needs.publication-check.outputs.release_sha }}
+        run: |
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_SHA}" ]]
 
       - name: Set up pnpm
-        if: ${{ steps.release.outputs.releases_created }}
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-
       - name: Set up Node
-        if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
           node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies
-        if: ${{ steps.release.outputs.releases_created }}
         run: |
           pnpm install --frozen-lockfile
 
       - name: Publish to NPM
-        if: ${{ steps.release.outputs.releases_created }}
         run: |
           bash ./bin/publish-npm

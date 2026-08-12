@@ -1,4 +1,5 @@
-import { vi, type Mock } from 'vitest';
+import { vi } from 'vitest';
+import type { Mock } from 'vitest';
 
 import OpenAI, { AzureOpenAI } from 'openai';
 import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtime/websocket';
@@ -19,7 +20,7 @@ type FakeNodeSocket = {
 };
 
 vi.mock('ws', () => ({
-  WebSocket: vi.fn().mockImplementation(function (url: URL, options: FakeNodeSocket['options']) {
+  WebSocket: vi.fn().mockImplementation(function WebSocket(url: URL, options: FakeNodeSocket['options']) {
     const listeners = new Map<string, Listener>();
 
     return {
@@ -39,11 +40,12 @@ class FakeBrowserSocket {
   readonly listeners = new Map<string, Listener>();
   readonly send = vi.fn();
   readonly close = vi.fn();
+  readonly url: string;
+  readonly protocols: string[];
 
-  constructor(
-    readonly url: string,
-    readonly protocols: string[],
-  ) {
+  constructor(url: string, protocols: string[]) {
+    this.url = url;
+    this.protocols = protocols;
     FakeBrowserSocket.instances.push(this);
   }
 
@@ -80,9 +82,9 @@ function createAzureClient(options: { tokenProvider?: boolean; deployment?: stri
   return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
     baseURL: 'https://azure.example.com/openai/',
-    ...(options.tokenProvider ?
-      { azureADTokenProvider: async () => 'azure-token' }
-    : { apiKey: 'azure-key' }),
+    ...(options.tokenProvider
+      ? { azureADTokenProvider: async () => 'azure-token' }
+      : { apiKey: 'azure-key' }),
     ...(options.deployment === undefined ? {} : { deployment: options.deployment }),
   });
 }
@@ -152,11 +154,17 @@ describe.each([
       );
       expect(new Realtime({ model: 'gpt-realtime' }, ephemeral).socket).toBe(lastBrowserSocket());
     } finally {
-      if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
-      else Reflect.deleteProperty(globalThis, 'window');
+      if (originalWindow) {
+        Object.defineProperty(globalThis, 'window', originalWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, 'window');
+      }
 
-      if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
-      else Reflect.deleteProperty(globalThis, 'navigator');
+      if (originalNavigator) {
+        Object.defineProperty(globalThis, 'navigator', originalNavigator);
+      } else {
+        Reflect.deleteProperty(globalThis, 'navigator');
+      }
     }
   });
 
@@ -220,17 +228,25 @@ describe.each([
 
   test('places Azure API keys in the URL and redacts them after opening', async () => {
     const realtime = await Realtime.azure(createAzureClient({ deployment: 'chat' }));
+    const connectionURL = new URL(lastBrowserSocket().url);
 
     expect(lastBrowserSocket().url).toContain('api-key=azure-key');
     expect(lastBrowserSocket().protocols).not.toContain('openai-insecure-api-key.azure-key');
     expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
+    expect(connectionURL.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
+    expect(connectionURL.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
+    expect(connectionURL.searchParams.has('api-version')).toBe(beta);
   });
 
   test('places rotating Azure credentials in Authorization and redacts them', async () => {
     const realtime = await Realtime.azure(createAzureClient({ deployment: 'chat', tokenProvider: true }));
+    const connectionURL = new URL(lastBrowserSocket().url);
 
-    expect(new URL(lastBrowserSocket().url).searchParams.get('Authorization')).toBe('Bearer azure-token');
+    expect(connectionURL.searchParams.get('Authorization')).toBe('Bearer azure-token');
     expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
+    expect(connectionURL.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
+    expect(connectionURL.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
+    expect(connectionURL.searchParams.has('api-version')).toBe(beta);
   });
 
   test('rejects Azure connections without a deployment', async () => {
@@ -242,6 +258,76 @@ describe.each([
     client.apiKey = null;
 
     await expect(Realtime.azure(client)).rejects.toThrow('Azure OpenAI Realtime requires an API key');
+  });
+});
+
+describe('stable browser realtime transcription', () => {
+  test('uses an explicit Azure model deployment without preview query parameters', async () => {
+    const realtime = await StableBrowserRealtime.azure(createAzureClient({ deployment: 'configured' }), {
+      deploymentName: 'override',
+    });
+    const connectionURL = new URL(lastBrowserSocket().url);
+
+    expect(connectionURL.pathname).toBe('/openai/v1/realtime');
+    expect(connectionURL.searchParams.get('model')).toBe('override');
+    expect(connectionURL.searchParams.has('api-version')).toBe(false);
+    expect(connectionURL.searchParams.has('deployment')).toBe(false);
+    expect(lastBrowserSocket().protocols).toEqual(['realtime']);
+    expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
+  });
+
+  test('opens authenticated transcription-only sessions without a model or beta protocol', () => {
+    const realtime = new StableBrowserRealtime({ intent: 'transcription' }, createClient());
+
+    expect(realtime.url.toString()).toBe('wss://example.com/v1/realtime?intent=transcription');
+    expect(lastBrowserSocket().protocols).toEqual(['realtime', 'openai-insecure-api-key.test-key']);
+  });
+
+  test.each([undefined, 'configured-deployment'])(
+    'opens Azure transcription without using deployment %s',
+    async (deployment) => {
+      const client = createAzureClient(deployment === undefined ? {} : { deployment });
+      const realtime = await StableBrowserRealtime.azure(client, { intent: 'transcription' });
+      const connectionURL = new URL(lastBrowserSocket().url);
+
+      expect(connectionURL.pathname).toBe('/openai/v1/realtime');
+      expect(connectionURL.searchParams.get('intent')).toBe('transcription');
+      expect(connectionURL.searchParams.has('api-version')).toBe(false);
+      expect(connectionURL.searchParams.has('deployment')).toBe(false);
+      expect(connectionURL.searchParams.get('api-key')).toBe('azure-key');
+      expect(lastBrowserSocket().protocols).toEqual(['realtime']);
+      expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
+    },
+  );
+
+  test('authenticates and redacts Azure token-provider transcription sessions', async () => {
+    const realtime = await StableBrowserRealtime.azure(createAzureClient({ tokenProvider: true }), {
+      intent: 'transcription',
+    });
+    const connectionURL = new URL(lastBrowserSocket().url);
+
+    expect(connectionURL.pathname).toBe('/openai/v1/realtime');
+    expect(connectionURL.searchParams.get('intent')).toBe('transcription');
+    expect(connectionURL.searchParams.has('api-version')).toBe(false);
+    expect(connectionURL.searchParams.has('deployment')).toBe(false);
+    expect(connectionURL.searchParams.get('Authorization')).toBe('Bearer azure-token');
+    expect(lastBrowserSocket().protocols).toEqual(['realtime']);
+    expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
+  });
+
+  test.each([
+    { deploymentName: 'chat', intent: 'transcription' },
+    { deploymentName: '', intent: 'transcription' },
+    { callID: 'rtc_123', intent: 'transcription' },
+    { callID: 'rtc_123', intent: 'unsupported' },
+    { intent: 'unsupported' },
+  ])('rejects conflicting Azure transcription targets before opening a socket %#', async (options) => {
+    await expect(
+      StableBrowserRealtime.azure(createAzureClient({ deployment: 'configured' }), options as any),
+    ).rejects.toThrow(
+      'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
+    );
+    expect(FakeBrowserSocket.instances).toHaveLength(0);
   });
 });
 
@@ -339,16 +425,24 @@ describe.each([
 
   test('authenticates Azure sessions with an API-key header', async () => {
     await Realtime.azure(createAzureClient({ deployment: 'chat' }));
+    const socket = lastNodeSocket();
 
-    expect(lastNodeSocket().options.headers).toMatchObject({ 'api-key': 'azure-key' });
-    expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
+    expect(socket.options.headers).toMatchObject({ 'api-key': 'azure-key' });
+    expect(socket.options.headers).not.toHaveProperty('Authorization');
+    expect(socket.url.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
+    expect(socket.url.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
+    expect(socket.url.searchParams.has('api-version')).toBe(beta);
   });
 
   test('authenticates Azure token-provider sessions with a bearer header', async () => {
     await Realtime.azure(createAzureClient({ deployment: 'chat', tokenProvider: true }));
+    const socket = lastNodeSocket();
 
-    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer azure-token' });
-    expect(lastNodeSocket().options.headers).not.toHaveProperty('api-key');
+    expect(socket.options.headers).toMatchObject({ Authorization: 'Bearer azure-token' });
+    expect(socket.options.headers).not.toHaveProperty('api-key');
+    expect(socket.url.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
+    expect(socket.url.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
+    expect(socket.url.searchParams.has('api-version')).toBe(beta);
   });
 
   test('requires an Azure deployment', async () => {
@@ -360,5 +454,89 @@ describe.each([
     client.apiKey = null;
 
     await expect(Realtime.azure(client)).rejects.toThrow('Azure OpenAI Realtime requires an API key');
+  });
+});
+
+describe('stable Node realtime transcription', () => {
+  test('uses an explicit Azure model deployment without preview headers or query parameters', async () => {
+    await StableNodeRealtime.azure(createAzureClient({ deployment: 'configured' }), {
+      deploymentName: 'override',
+      options: { headers: { 'X-Custom': 'value' } },
+    });
+    const socket = lastNodeSocket();
+
+    expect(socket.url.pathname).toBe('/openai/v1/realtime');
+    expect(socket.url.searchParams.get('model')).toBe('override');
+    expect(socket.url.searchParams.has('api-version')).toBe(false);
+    expect(socket.url.searchParams.has('deployment')).toBe(false);
+    expect(socket.options.headers).toMatchObject({ 'api-key': 'azure-key', 'X-Custom': 'value' });
+    expect(socket.options.headers).not.toHaveProperty('OpenAI-Beta');
+  });
+
+  test('opens authenticated transcription-only sessions without a beta header', () => {
+    const realtime = new StableNodeRealtime(
+      { intent: 'transcription', options: { headers: { 'X-Custom': 'value' } } },
+      createClient(),
+    );
+
+    expect(realtime.url.toString()).toBe('wss://example.com/v1/realtime?intent=transcription');
+    expect(lastNodeSocket().options.headers).toMatchObject({
+      Authorization: 'Bearer test-key',
+      'X-Custom': 'value',
+    });
+    expect(lastNodeSocket().options.headers).not.toHaveProperty('OpenAI-Beta');
+  });
+
+  test.each([undefined, 'configured-deployment'])(
+    'authenticates Azure transcription without using deployment %s',
+    async (deployment) => {
+      const client = createAzureClient(deployment === undefined ? {} : { deployment });
+      await StableNodeRealtime.azure(client, {
+        intent: 'transcription',
+        options: { headers: { 'X-Custom': 'value' } },
+      });
+      const socket = lastNodeSocket();
+
+      expect(socket.url.pathname).toBe('/openai/v1/realtime');
+      expect(socket.url.searchParams.get('intent')).toBe('transcription');
+      expect(socket.url.searchParams.has('api-version')).toBe(false);
+      expect(socket.url.searchParams.has('deployment')).toBe(false);
+      expect(socket.options.headers).toMatchObject({
+        'api-key': 'azure-key',
+        'X-Custom': 'value',
+      });
+      expect(socket.options.headers).not.toHaveProperty('Authorization');
+      expect(socket.options.headers).not.toHaveProperty('OpenAI-Beta');
+    },
+  );
+
+  test('authenticates Azure token-provider transcription with a bearer header', async () => {
+    await StableNodeRealtime.azure(createAzureClient({ tokenProvider: true }), {
+      intent: 'transcription',
+    });
+    const socket = lastNodeSocket();
+
+    expect(socket.url.pathname).toBe('/openai/v1/realtime');
+    expect(socket.url.searchParams.get('intent')).toBe('transcription');
+    expect(socket.url.searchParams.has('api-version')).toBe(false);
+    expect(socket.url.searchParams.has('deployment')).toBe(false);
+    expect(socket.options.headers).toMatchObject({ Authorization: 'Bearer azure-token' });
+    expect(socket.options.headers).not.toHaveProperty('api-key');
+    expect(socket.options.headers).not.toHaveProperty('OpenAI-Beta');
+  });
+
+  test.each([
+    { deploymentName: 'chat', intent: 'transcription' },
+    { deploymentName: '', intent: 'transcription' },
+    { callID: 'rtc_123', intent: 'transcription' },
+    { callID: 'rtc_123', intent: 'unsupported' },
+    { intent: 'unsupported' },
+  ])('rejects conflicting Azure transcription targets before opening a socket %#', async (options) => {
+    await expect(
+      StableNodeRealtime.azure(createAzureClient({ deployment: 'configured' }), options as any),
+    ).rejects.toThrow(
+      'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
+    );
+    expect(nodeSocketConstructor).not.toHaveBeenCalled();
   });
 });

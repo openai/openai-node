@@ -1,4 +1,5 @@
-import { vi, type MockedFunction } from 'vitest';
+import { vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
 
 import OpenAI from 'openai';
 import { AssistantStream } from 'openai/lib/AssistantStream';
@@ -66,9 +67,9 @@ describe('vector store file helpers', () => {
     ).resolves.toEqual(completed);
     expect(mockedSleep).toHaveBeenCalledWith(expected);
 
-    const headers = (retrieve.mock.calls[0]![2]?.headers as NullableHeaders).values;
-    expect(headers.get('X-Stainless-Poll-Helper')).toBe('true');
-    expect(headers.get('X-Stainless-Custom-Poll-Interval')).toBe(interval ? String(interval) : null);
+    const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
+    expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
+    expect(headers?.get('X-Stainless-Custom-Poll-Interval')).toBe(interval ? String(interval) : null);
   });
 
   test.each(['completed', 'failed'] as const)('returns a file in the %s terminal state', async (status) => {
@@ -112,18 +113,18 @@ describe('vector store file helpers', () => {
 });
 
 describe('vector store file batch helpers', () => {
-  test('creates a batch and polls its resulting identifier', async () => {
+  test('creates a batch and forwards request options through polling', async () => {
     const batches = createClient().vectorStores.fileBatches;
     const created = { id: 'batch_123', status: 'in_progress' };
     const completed = { ...created, status: 'completed' };
     const create = vi.spyOn(batches, 'create').mockImplementation(() => Promise.resolve(created) as any);
     const poll = vi.spyOn(batches, 'poll').mockResolvedValue(completed as any);
-    const options = { pollIntervalMs: 5 };
+    const options = { pollIntervalMs: 5, headers: { 'X-Test': 'yes' } };
 
     await expect(batches.createAndPoll('vs_123', { file_ids: ['file_123'] }, options)).resolves.toBe(
       completed,
     );
-    expect(create).toHaveBeenCalledWith('vs_123', { file_ids: ['file_123'] });
+    expect(create).toHaveBeenCalledWith('vs_123', { file_ids: ['file_123'] }, options);
     expect(poll).toHaveBeenCalledWith('vs_123', 'batch_123', options);
   });
 
@@ -145,8 +146,8 @@ describe('vector store file batch helpers', () => {
       batches.poll('vs_123', 'batch_123', interval ? { pollIntervalMs: interval } : {}),
     ).resolves.toEqual(completed);
     expect(mockedSleep).toHaveBeenCalledWith(expected);
-    const headers = (retrieve.mock.calls[0]![2]?.headers as NullableHeaders).values;
-    expect(headers.get('X-Stainless-Poll-Helper')).toBe('true');
+    const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
+    expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
   });
 
   test.each(['completed', 'failed', 'cancelled'] as const)(
@@ -167,7 +168,7 @@ describe('vector store file batch helpers', () => {
     await expect(batches.uploadAndPoll('vs_123', { files: [] })).rejects.toThrow('No `files` provided');
   });
 
-  test('uploads files concurrently and preserves previously uploaded identifiers', async () => {
+  test('uploads files concurrently, forwards options, and preserves existing identifiers', async () => {
     const client = createClient();
     const batches = client.vectorStores.fileBatches;
     const files = [new File(['a'], 'a.txt'), new File(['b'], 'b.txt'), new File(['c'], 'c.txt')];
@@ -177,14 +178,66 @@ describe('vector store file batch helpers', () => {
       .mockImplementation((async () => ({ id: `file_${++nextIdentifier}` })) as any);
     const result = { id: 'batch_123', status: 'completed' };
     const createAndPoll = vi.spyOn(batches, 'createAndPoll').mockResolvedValue(result as any);
+    const options = { maxConcurrency: 2, pollIntervalMs: 7, headers: { 'X-Test': 'yes' } };
 
-    await expect(
-      batches.uploadAndPoll('vs_123', { files, fileIds: ['existing'] }, { maxConcurrency: 2 }),
-    ).resolves.toBe(result);
+    await expect(batches.uploadAndPoll('vs_123', { files, fileIds: ['existing'] }, options)).resolves.toBe(
+      result,
+    );
     expect(upload).toHaveBeenCalledTimes(3);
-    expect(createAndPoll).toHaveBeenCalledWith('vs_123', {
-      file_ids: expect.arrayContaining(['existing', 'file_1', 'file_2', 'file_3']),
+
+    for (const file of files) {
+      expect(upload).toHaveBeenCalledWith({ file, purpose: 'assistants' }, options);
+    }
+
+    expect(createAndPoll).toHaveBeenCalledWith(
+      'vs_123',
+      { file_ids: expect.arrayContaining(['existing', 'file_1', 'file_2', 'file_3']) },
+      options,
+    );
+  });
+
+  test('preserves custom headers throughout batch uploads, creation, and polling', async () => {
+    const requests: { pathname: string; headers: Headers }[] = [];
+    const completed = {
+      id: 'batch_123',
+      object: 'vector_store.files_batch',
+      created_at: 0,
+      vector_store_id: 'vs_123',
+      status: 'completed',
+      file_counts: { in_progress: 0, completed: 1, failed: 0, cancelled: 0, total: 1 },
+    };
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com/v1/',
+      fetch: async (url, init) => {
+        const pathname = new URL(String(url)).pathname;
+
+        if (pathname.startsWith('/v1/')) {
+          requests.push({ pathname, headers: new Headers(init?.headers) });
+        }
+
+        return Response.json(pathname === '/v1/files' ? { id: 'file_123' } : completed);
+      },
     });
+
+    const result = await client.vectorStores.fileBatches.uploadAndPoll(
+      'vs_123',
+      { files: [new File(['contents'], 'sample.txt')] },
+      { pollIntervalMs: 7, headers: { 'X-Test': 'yes' } },
+    );
+
+    expect(result.id).toBe('batch_123');
+    expect(requests.map(({ pathname }) => pathname)).toEqual([
+      '/v1/files',
+      '/v1/vector_stores/vs_123/file_batches',
+      '/v1/vector_stores/vs_123/file_batches/batch_123',
+    ]);
+
+    for (const request of requests) {
+      expect(request.headers.get('X-Test')).toBe('yes');
+    }
+
+    expect(requests[2]?.headers.get('X-Stainless-Custom-Poll-Interval')).toBe('7');
   });
 
   test('propagates upload failures before creating a batch', async () => {
@@ -232,8 +285,8 @@ describe('assistant run helpers', () => {
 
       await expect(runs.poll('run_123', { thread_id: 'thread_123' })).resolves.toEqual(completed);
       expect(mockedSleep).toHaveBeenCalledWith(9);
-      const headers = (retrieve.mock.calls[0]![2]?.headers as NullableHeaders).values;
-      expect(headers.get('X-Stainless-Poll-Helper')).toBe('true');
+      const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
+      expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
     },
   );
 

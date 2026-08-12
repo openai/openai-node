@@ -69,7 +69,7 @@ type _StableFunctionToolMayOmitOutputSchema = Assert<
   IsAssignable<
     {
       name: string;
-      parameters: { [key: string]: unknown } | null;
+      parameters: Record<string, unknown> | null;
       strict: boolean | null;
       type: 'function';
     },
@@ -87,7 +87,7 @@ type _BetaFunctionToolMayOmitOutputSchema = Assert<
   IsAssignable<
     {
       name: string;
-      parameters: { [key: string]: unknown } | null;
+      parameters: Record<string, unknown> | null;
       strict: boolean | null;
       type: 'function';
     },
@@ -109,7 +109,7 @@ type _AutoParseableToolRemainsFunctionTool = Assert<
 type _ParseableToolsStillAcceptNull = Assert<IsAssignable<null, ParseableToolsParams>>;
 type _ParseableToolsStillAcceptChatTools = Assert<IsAssignable<ChatCompletionTool, ParseableToolsParams>>;
 type _ResponseCreateParamsWithToolsStillAcceptSharedTools = Assert<
-  IsAssignable<{ tools?: Array<Tool> }, Pick<ResponseCreateParamsWithTools, 'tools'>>
+  IsAssignable<{ tools?: Tool[] }, Pick<ResponseCreateParamsWithTools, 'tools'>>
 >;
 
 test('response tools and parser helpers stay backwards compatible', () => {

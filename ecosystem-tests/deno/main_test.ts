@@ -36,7 +36,7 @@ function assertSimilar(received: string, expected: string, maxDistance: number) 
   throw new AssertionError(message);
 }
 
-Deno.test(async function rawResponse() {
+Deno.test('rawResponse', async () => {
   const response = await client.chat.completions
     .create({
       model: 'gpt-4o-mini',
@@ -46,14 +46,14 @@ Deno.test(async function rawResponse() {
 
   // test that we can use web Response API
   const { body } = response;
-  if (!body) throw new Error('expected response.body to be defined');
+  if (!body) {throw new Error('expected response.body to be defined');}
 
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let result;
   do {
     result = await reader.read();
-    if (!result.done) chunks.push(result.value);
+    if (!result.done) {chunks.push(result.value);}
   } while (!result.done);
 
   reader.releaseLock();
@@ -69,7 +69,7 @@ Deno.test(async function rawResponse() {
   assertSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
 });
 
-Deno.test(async function streamingWorks() {
+Deno.test('streamingWorks', async () => {
   const stream = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
@@ -82,7 +82,7 @@ Deno.test(async function streamingWorks() {
   assertSimilar(chunks.map((c) => c.choices[0]?.delta.content || '').join(''), 'This is a test', 10);
 });
 
-Deno.test(async function handlesFile() {
+Deno.test('handlesFile', async () => {
   const file = await fetch(url)
     .then((x) => x.arrayBuffer())
     .then((x) => new File([x], filename));
@@ -90,7 +90,7 @@ Deno.test(async function handlesFile() {
   const result = await client.audio.transcriptions.create({ file, model });
   assertSimilar(result.text, correctAnswer, 12);
 });
-Deno.test(async function handlesResponse() {
+Deno.test('handlesResponse', async () => {
   const file = await fetch(url);
 
   const result = await client.audio.transcriptions.create({ file, model });
@@ -99,28 +99,28 @@ Deno.test(async function handlesResponse() {
 
 const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;
 
-Deno.test(async function toFileHandlesBlob() {
+Deno.test('toFileHandlesBlob', async () => {
   const result = await client.files.create({
     file: await toFile(new Blob([fineTune]), 'finetune.jsonl'),
     purpose: 'fine-tune',
   });
   assertEquals(result.filename, 'finetune.jsonl');
 });
-Deno.test(async function toFileHandlesUint8Array() {
+Deno.test('toFileHandlesUint8Array', async () => {
   const result = await client.files.create({
     file: await toFile(new TextEncoder().encode(fineTune), 'finetune.jsonl'),
     purpose: 'fine-tune',
   });
   assertEquals(result.filename, 'finetune.jsonl');
 });
-Deno.test(async function toFileHandlesArrayBuffer() {
+Deno.test('toFileHandlesArrayBuffer', async () => {
   const result = await client.files.create({
     file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
     purpose: 'fine-tune',
   });
   assertEquals(result.filename, 'finetune.jsonl');
 });
-Deno.test(async function toFileHandlesDataView() {
+Deno.test('toFileHandlesDataView', async () => {
   const result = await client.files.create({
     file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.jsonl'),
     purpose: 'fine-tune',

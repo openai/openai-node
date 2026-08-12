@@ -1,7 +1,6 @@
 import OpenAI, { OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
-import { AssistantStreamEvent } from 'openai/resources/beta/assistants';
 import { Stream } from 'openai/streaming';
 
 const openai = new OpenAI({
@@ -120,14 +119,14 @@ describe('assistant tests', () => {
     ];
     // Yield valid events, then throw to error the stream after they have been
     // delivered (mimics a connection drop mid-run).
-    const input = ReadableStreamFrom(
-      (async function* () {
-        for (const event of events) {
-          yield encoder.encode(JSON.stringify(event) + '\n');
-        }
-        throw new Error('assistant boom');
-      })(),
-    );
+    async function* eventsWithFailure() {
+      for (const event of events) {
+        yield encoder.encode(JSON.stringify(event) + '\n');
+      }
+      throw new Error('assistant boom');
+    }
+
+    const input = ReadableStreamFrom(eventsWithFailure());
     const assistantStream = AssistantStream.fromReadableStream(input);
     // Grab the iterator (registering its listeners) but do not consume yet, so
     // the valid events and the error land while no reader is waiting: they
@@ -136,21 +135,19 @@ describe('assistant tests', () => {
     const iterator = assistantStream[Symbol.asyncIterator]();
     // Wait for the stream's terminal signal so the events and the error have
     // definitely been emitted before we start reading.
-    await assistantStream.done().catch(() => {});
+    const failure: unknown = await assistantStream.done().catch((error: unknown) => error);
 
-    const collected: AssistantStreamEvent[] = [];
-    let caught: unknown = null;
-    try {
-      let result: IteratorResult<AssistantStreamEvent>;
-      while (!(result = await iterator.next()).done) {
-        collected.push(result.value);
-      }
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(collected.map((event) => event.event)).toEqual(['thread.message.created', 'thread.message.delta']);
-    expect(caught).toBeInstanceOf(OpenAIError);
-    expect((caught as OpenAIError).message).toBe('assistant boom');
+    await expect(iterator.next()).resolves.toMatchObject({
+      done: false,
+      value: { event: 'thread.message.created' },
+    });
+    await expect(iterator.next()).resolves.toMatchObject({
+      done: false,
+      value: { event: 'thread.message.delta' },
+    });
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError).message).toBe('assistant boom');
+    await expect(iterator.next()).rejects.toBe(failure);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 });

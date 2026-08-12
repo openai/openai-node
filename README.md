@@ -4,7 +4,7 @@
 
 This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
-It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
+It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi).
 
 To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
@@ -269,6 +269,9 @@ await client.files.create({
 
 Verifying webhook signatures is _optional but encouraged_.
 
+Webhook verification is asynchronous. Always `await` `unwrap()` or `verifySignature()` before trusting
+the event.
+
 For more information about webhooks, see [the API docs](https://platform.openai.com/docs/guides/webhooks).
 
 ### Parsing webhook payloads
@@ -290,7 +293,7 @@ export async function webhook(request: Request) {
   const body = await request.text();
 
   try {
-    const event = client.webhooks.unwrap(body, headersList);
+    const event = await client.webhooks.unwrap(body, headersList);
 
     switch (event.type) {
       case 'response.completed':
@@ -330,7 +333,7 @@ export async function webhook(request: Request) {
   const body = await request.text();
 
   try {
-    client.webhooks.verifySignature(body, headersList);
+    await client.webhooks.verifySignature(body, headersList);
 
     // Parse the body after verification
     const event = JSON.parse(body);
@@ -487,7 +490,7 @@ const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
 rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 ```
 
-For more information see [realtime.md](realtime.md).
+For more information see [docs/realtime.md](docs/realtime.md).
 
 ## Microsoft Azure OpenAI
 
@@ -519,7 +522,7 @@ const result = await openai.chat.completions.create({
 console.log(result.choices[0]!.message?.content);
 ```
 
-For more information on support for the Azure API, see [azure.md](azure.md).
+For more information on support for the Azure API, see [docs/azure.md](docs/azure.md).
 
 ## Amazon Bedrock
 
@@ -559,7 +562,7 @@ Cannot find module '@aws-sdk/credential-provider-node'
 
 For Bedrock API key authentication, import `bedrock` from `openai/providers/bedrock` instead. That entrypoint has no AWS dependencies and works in browser-compatible runtimes when `dangerouslyAllowBrowser` is enabled. SigV4 authentication is supported in Node.js and compatible server runtimes and requires replayable request bodies. The legacy, bearer-only `BedrockOpenAI` class remains available for compatibility.
 
-For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).
+For more information on support for Amazon Bedrock, see [docs/bedrock.md](docs/bedrock.md).
 
 ## Advanced Usage
 
@@ -724,7 +727,7 @@ const client = new OpenAI({
 To modify proxy behavior, you can provide custom `fetchOptions` that add runtime-specific proxy
 options to requests:
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/node.svg" align="top" width="18" height="21"> **Node** <sup>[[docs](https://github.com/nodejs/undici/blob/main/docs/docs/api/ProxyAgent.md#example---proxyagent-with-fetch)]</sup>
+**Node** <sup>[[docs](https://github.com/nodejs/undici/blob/main/docs/docs/api/ProxyAgent.md#example---proxyagent-with-fetch)]</sup>
 
 ```ts
 import OpenAI from 'openai';
@@ -741,7 +744,7 @@ const client = new OpenAI({
 
 Undici-specific options like `dispatcher` must be paired with the matching `fetch` implementation.
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/bun.svg" align="top" width="18" height="21"> **Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
+**Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
 
 ```ts
 import OpenAI from 'openai';
@@ -753,7 +756,7 @@ const client = new OpenAI({
 });
 ```
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/deno.svg" align="top" width="18" height="21"> **Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
+**Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
 
 ```ts
 import OpenAI from 'npm:openai';
@@ -856,4 +859,4 @@ for lifecycle, deprecation, and release rules.
 
 ## Contributing
 
-See [the contributing documentation](./CONTRIBUTING.md).
+See [the contributing documentation](./.github/CONTRIBUTING.md).

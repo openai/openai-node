@@ -1,6 +1,7 @@
 import { toStrictJsonSchema } from 'openai/lib/transform';
 import { detailedDiff } from 'deep-object-diff';
-import { JSONSchema } from 'openai/lib/jsonschema';
+import type { JSONSchema } from 'openai/lib/jsonschema';
+import { hasOwn } from 'openai/internal/utils/values';
 
 describe('toStrictJsonSchema', () => {
   describe('Root Schema Validation', () => {
@@ -1421,7 +1422,7 @@ describe('toStrictJsonSchema', () => {
           type: 'object',
           properties: {},
           if: { type: 'object' },
-          then: { type: 'object' },
+          [String('then')]: { type: 'object' },
           else: { type: 'object' },
           additionalProperties: false,
         },
@@ -2552,7 +2553,11 @@ describe('toStrictJsonSchema', () => {
       };
 
       const strict = toStrictJsonSchema(schema);
-      const properties = (strict.properties?.['value'] as JSONSchema).properties;
+      const valueSchema = strict.properties?.['value'] as JSONSchema | undefined;
+      if (!valueSchema) {
+        throw new Error('Expected value schema');
+      }
+      const properties = valueSchema.properties;
 
       expect(properties).toEqual(
         Object.fromEntries([
@@ -2562,7 +2567,7 @@ describe('toStrictJsonSchema', () => {
           ['other', { type: 'number' }],
         ]),
       );
-      expect(Object.prototype.hasOwnProperty.call(properties, '__proto__')).toBe(true);
+      expect(hasOwn(properties as object, '__proto__')).toBe(true);
     });
 
     test('merges matching object allOf properties with reordered schema keys', () => {

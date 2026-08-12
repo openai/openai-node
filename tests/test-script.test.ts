@@ -4,56 +4,68 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import jestConfig from '../jest.config';
 import generatedTestPatterns from '../scripts/generated-test-patterns.json';
 
-const testScriptPath = join(process.cwd(), 'scripts/test');
-const generatedTestPatternsPath = join(process.cwd(), 'scripts/generated-test-patterns.json');
-const generatedTopLevelTests = readdirSync(join(process.cwd(), 'tests')).filter(
-  (file) =>
-    file.endsWith('.test.ts') &&
-    readFileSync(join(process.cwd(), 'tests', file), 'utf8').startsWith(
-      '// File generated from our OpenAPI spec by Stainless.',
-    ),
-);
+const testScriptPath = path.join(process.cwd(), 'scripts/test');
+const generatedTestPatternsPath = path.join(process.cwd(), 'scripts/generated-test-patterns.json');
+const generatedTopLevelTests = generatedTestPatterns
+  .filter((pattern) => pattern.endsWith('.test.ts'))
+  .map((pattern) => path.basename(pattern));
+
+function toBashPath(path: string): string {
+  if (process.platform !== 'win32') {
+    return path;
+  }
+  return path
+    .replace(/^[A-Za-z]:[\\/]/u, (prefix) => `/${prefix.charAt(0).toLowerCase()}/`)
+    .split('\\')
+    .join('/');
+}
+
+function toBashArgument(arg: string): string {
+  if (process.platform !== 'win32' || !/^[A-Za-z]:[\\/]/u.test(arg)) {
+    return arg;
+  }
+  return arg.split('\\').join('/');
+}
 
 describe('scripts/test', () => {
   let fixtureDir: string;
 
   beforeEach(() => {
-    fixtureDir = mkdtempSync(join(tmpdir(), 'openai-node-test-script-'));
+    fixtureDir = mkdtempSync(path.join(tmpdir(), 'openai-node-test-script-'));
 
-    mkdirSync(join(fixtureDir, 'scripts'), { recursive: true });
-    mkdirSync(join(fixtureDir, 'node_modules/.bin'), { recursive: true });
-    mkdirSync(join(fixtureDir, 'bin'), { recursive: true });
+    mkdirSync(path.join(fixtureDir, 'scripts'), { recursive: true });
+    mkdirSync(path.join(fixtureDir, 'node_modules/.bin'), { recursive: true });
+    mkdirSync(path.join(fixtureDir, 'bin'), { recursive: true });
 
-    copyFileSync(testScriptPath, join(fixtureDir, 'scripts/test'));
-    copyFileSync(generatedTestPatternsPath, join(fixtureDir, 'scripts/generated-test-patterns.json'));
-    chmodSync(join(fixtureDir, 'scripts/test'), 0o755);
+    copyFileSync(testScriptPath, path.join(fixtureDir, 'scripts/test'));
+    copyFileSync(generatedTestPatternsPath, path.join(fixtureDir, 'scripts/generated-test-patterns.json'));
+    chmodSync(path.join(fixtureDir, 'scripts/test'), 0o755);
 
     writeExecutable(
-      join(fixtureDir, 'bin/curl'),
+      path.join(fixtureDir, 'bin/curl'),
       `#!/usr/bin/env bash
 exit 0
 `,
     );
     writeExecutable(
-      join(fixtureDir, 'node_modules/.bin/jest'),
+      path.join(fixtureDir, 'node_modules/.bin/jest'),
       `#!/usr/bin/env bash
 printf '%s\\0' "$@" > "$JEST_ARGS_FILE"
 `,
     );
     writeExecutable(
-      join(fixtureDir, 'node_modules/.bin/vitest'),
+      path.join(fixtureDir, 'node_modules/.bin/vitest'),
       `#!/usr/bin/env bash
 printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
 `,
@@ -70,27 +82,37 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
   }
 
   function runTestScript(args: string[], suite = 'all'): { jestArgs: string[]; vitestArgs: string[] } {
-    const jestArgsFile = join(fixtureDir, 'jest-args');
-    const vitestArgsFile = join(fixtureDir, 'vitest-args');
-    const result = spawnSync(join(fixtureDir, 'scripts/test'), args, {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        JEST_ARGS_FILE: jestArgsFile,
-        OPENAI_TEST_SUITE: suite,
-        PATH: `${join(fixtureDir, 'bin')}:${process.env['PATH']}`,
-        VITEST_ARGS_FILE: vitestArgsFile,
+    const jestArgsFile = path.join(fixtureDir, 'jest-args');
+    const vitestArgsFile = path.join(fixtureDir, 'vitest-args');
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        'PATH="$1:$PATH"; shift; exec "$@"',
+        'bash',
+        toBashPath(path.join(fixtureDir, 'bin')),
+        toBashPath(path.join(fixtureDir, 'scripts/test')),
+        ...args.map(toBashArgument),
+      ],
+      {
+        encoding: 'utf-8',
+        env: {
+          ...process.env,
+          JEST_ARGS_FILE: toBashPath(jestArgsFile),
+          OPENAI_TEST_SUITE: suite,
+          VITEST_ARGS_FILE: toBashPath(vitestArgsFile),
+        },
       },
-    });
+    );
 
     if (result.status !== 0) {
       throw new Error(
-        `scripts/test exited with ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+        `scripts/test exited with ${result.status}\nerror:\n${result.error?.message}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
       );
     }
 
     const readArgs = (path: string) =>
-      existsSync(path) ? readFileSync(path, 'utf8').split('\0').slice(0, -1) : [];
+      existsSync(path) ? readFileSync(path, 'utf-8').split('\0').slice(0, -1) : [];
 
     return { jestArgs: readArgs(jestArgsFile), vitestArgs: readArgs(vitestArgsFile) };
   }
@@ -153,7 +175,7 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
     });
   });
 
-  test.each(generatedTopLevelTests)('routes Stainless-generated top-level test %s only to Jest', (file) => {
+  test.each(generatedTopLevelTests)('routes manifest-listed top-level test %s only to Jest', (file) => {
     const testPath = `tests/${file}`;
 
     expect(runTestScript([testPath])).toEqual({
@@ -163,11 +185,15 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
   });
 
   test.each([
-    { label: 'relative', testPath: './tests/index.test.ts' },
-    { label: 'absolute', testPath: join(process.cwd(), 'tests/index.test.ts') },
-  ])('routes $label generated path filters only to Jest', ({ testPath }) => {
+    { label: 'relative', testPath: './tests/index.test.ts', expectedTestPath: './tests/index.test.ts' },
+    {
+      label: 'absolute',
+      testPath: path.join(process.cwd(), 'tests/index.test.ts'),
+      expectedTestPath: toBashArgument(path.join(process.cwd(), 'tests/index.test.ts')),
+    },
+  ])('routes $label generated path filters only to Jest', ({ testPath, expectedTestPath }) => {
     expect(runTestScript([testPath])).toEqual({
-      jestArgs: ['--runInBand', testPath],
+      jestArgs: ['--runInBand', expectedTestPath],
       vitestArgs: [],
     });
   });

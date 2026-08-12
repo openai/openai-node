@@ -140,7 +140,7 @@ const completion = await client.chat.completions.parse({
 console.dir(completion, { depth: 10 });
 
 const toolCall = completion.choices[0]?.message.tool_calls?.[0];
-if (toolCall) {
+if (toolCall?.type === 'function') {
   const args = toolCall.function.parsed_arguments as z.infer<typeof Query>;
   console.log(args);
   console.log(args.table_name);
@@ -154,7 +154,8 @@ main();
 The `chat.completions.parse()` method imposes some additional restrictions on it's usage that `chat.completions.create()` does not.
 
 - If the completion completes with `finish_reason` set to `length` or `content_filter`, the `LengthFinishReasonError` / `ContentFilterFinishReasonError` errors will be raised.
-- Only strict function tools can be passed, e.g. `{type: 'function', function: {..., strict: true}}`
+- Function tools must be strict, e.g. `{type: 'function', function: {..., strict: true}}`. Custom tools are also
+  accepted, but as they have no arguments schema their calls are returned as-is, without a `parsed_arguments`.
 
 # Streaming Helpers
 
@@ -394,7 +395,7 @@ completion object for you).
 
 If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
 
-See an example of streaming helpers in action in [`examples/stream.ts`](../examples/stream.ts).
+See an example of streaming helpers in action in [`examples/chat-completions/stream.ts`](../examples/chat-completions/stream.ts).
 
 ### Automated function calls
 
@@ -487,7 +488,7 @@ adjusting `maxChatCompletions` in the request options object. Note that `max_tok
 chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
-[`examples/tool-call-helpers.ts`](../examples/tool-call-helpers.ts).
+[`examples/chat-completions/tool-call-helpers.ts`](../examples/chat-completions/tool-call-helpers.ts).
 
 Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
@@ -825,15 +826,15 @@ async function getWeather(args: z.infer<typeof GetWeatherParameters>) {
 main();
 ```
 
-See a more fully-fledged example in [`examples/tool-call-helpers-zod.ts`](../examples/tool-call-helpers-zod.ts).
+See a more fully-fledged example in [`examples/chat-completions/tool-call-helpers-zod.ts`](../examples/chat-completions/tool-call-helpers-zod.ts).
 
 #### Integrate with Next.JS
 
-See an example of a Next.JS integration here [`examples/stream-to-client-next.ts`](../examples/stream-to-client-next.ts).
+See an example of a Next.JS integration here [`examples/chat-completions/stream-to-client-next.ts`](../examples/chat-completions/stream-to-client-next.ts).
 
 #### Proxy Streaming to a Browser
 
-See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](../examples/stream-to-client-express.ts).
+See an example of using express to stream to a browser here [`examples/chat-completions/stream-to-client-express.ts`](../examples/chat-completions/stream-to-client-express.ts).
 
 # Polling Helpers
 

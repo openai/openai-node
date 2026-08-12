@@ -3,7 +3,8 @@ import OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { configureProvider } from 'openai/internal/provider';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
-import { bedrock, type BedrockProviderOptions } from 'openai/providers/bedrock/aws';
+import { bedrock } from 'openai/providers/bedrock/aws';
+import type { BedrockProviderOptions } from 'openai/providers/bedrock/aws';
 import { SignatureV4 } from '@smithy/signature-v4';
 
 import sigV4Fixture from '../fixtures/bedrock/v1/sigv4.json';
@@ -22,7 +23,9 @@ const BEDROCK_ENVIRONMENT_VARIABLES = [
 
 beforeEach(() => {
   process.env = { ...originalEnv };
-  for (const name of BEDROCK_ENVIRONMENT_VARIABLES) delete process.env[name];
+  for (const name of BEDROCK_ENVIRONMENT_VARIABLES) {
+    delete process.env[name];
+  }
 });
 
 afterEach(() => {
@@ -32,7 +35,7 @@ afterEach(() => {
 });
 
 function jsonResponse(body: unknown = {}): Response {
-  return new Response(JSON.stringify(body), {
+  return Response.json(body, {
     headers: { 'Content-Type': 'application/json' },
   });
 }
@@ -68,7 +71,7 @@ describe('bedrock provider', () => {
 
     await client.request({ method: 'get', path: '/models' });
     delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
-    const copiedClient = client.withOptions({ timeout: 1_000 });
+    const copiedClient = client.withOptions({ timeout: 1000 });
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'refreshed-token';
     await copiedClient.request({ method: 'get', path: '/models' });
 
@@ -320,7 +323,9 @@ describe('bedrock provider', () => {
     } catch (error) {
       thrown = error;
     } finally {
-      if (processDescriptor) Object.defineProperty(globalThis, 'process', processDescriptor);
+      if (processDescriptor) {
+        Object.defineProperty(globalThis, 'process', processDescriptor);
+      }
     }
 
     expect(thrown).toMatchObject({
