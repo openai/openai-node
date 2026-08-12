@@ -150,7 +150,7 @@ export function isParseableResponseFormat(format: unknown): boolean {
 
 /**
  * The canonical parser for auto-parseable response formats. This is the only place
- * that chooses between the branded `$parseRaw` callback and generic `JSON.parse()`.
+ * that chooses between an existing `$parseRaw` callback and generic `JSON.parse()`.
  *
  * Returns `null` for formats that are not auto-parseable.
  */

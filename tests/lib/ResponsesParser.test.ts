@@ -287,6 +287,13 @@ async function _responsesParsedTypes(client: OpenAI) {
   const typedSchemaStream = await client.responses.stream(typedParams).finalResponse();
   compareType<(typeof typedSchemaStream)['output_parsed'], unknown>(true);
 
+  const replayParams: ResponseStreamByIdParams = {
+    response_id: 'resp_123',
+    text: { format: { type: 'json_schema', name: 'pea_schema', schema: { type: 'object' } } },
+  };
+  const replayedSchemaStream = await client.responses.stream(replayParams).finalResponse();
+  compareType<(typeof replayedSchemaStream)['output_parsed'], unknown>(true);
+
   const textResponse = await client.responses.parse({
     model: 'gpt-5.4-mini',
     input: 'Good large pea',

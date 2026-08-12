@@ -925,6 +925,37 @@ describe('.stream()', () => {
     });
   });
 
+  it('keeps partially accumulated JSON unparsed when a later chunk refuses the request', async () => {
+    const chunks = contentChunks('{"city":', '"SF"}');
+    const refusalChoice = chunks[1]?.choices[0];
+    if (!refusalChoice) {
+      throw new Error('Expected a completion choice');
+    }
+    refusalChoice.delta.refusal = 'Request refused';
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'location', schema: { type: 'object' } },
+      },
+    });
+
+    const doneParsed: unknown[] = [];
+    const refusals: string[] = [];
+    stream.on('content.done', (event) => doneParsed.push(event.parsed));
+    stream.on('refusal.done', (event) => refusals.push(event.refusal));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(doneParsed).toEqual([null]);
+    expect(refusals).toEqual(['Request refused']);
+    expect(completion.choices[0]?.message).toMatchObject({
+      parsed: null,
+      refusal: 'Request refused',
+    });
+  });
+
   it('leaves stream events unparsed for response formats without parsed output', async () => {
     const stream = ChatCompletionStream.createChatCompletion(
       mockStreamingClient(contentChunks('{"city":', '"SF"}')),
