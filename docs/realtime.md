@@ -80,10 +80,24 @@ To start a transcription-only session, pass `intent: 'transcription'` instead of
 const rt = new OpenAIRealtimeWS({ intent: 'transcription' });
 ```
 
-Azure transcription sessions also use transcription intent and do not require a model deployment:
+Azure transcription sessions also use transcription intent. Do not pass a deployment in the connection options; configure the transcription deployment in a `session.update` event after the socket opens:
 
 ```ts
 const rt = await OpenAIRealtimeWS.azure(azureClient, { intent: 'transcription' });
+
+rt.socket.on('open', () => {
+  rt.send({
+    type: 'session.update',
+    session: {
+      type: 'transcription',
+      audio: {
+        input: {
+          transcription: { model: 'your-transcription-deployment' },
+        },
+      },
+    },
+  });
+});
 ```
 
 `model`, `callID`, and transcription `intent` are mutually exclusive. Azure transcription sessions must not include a `deploymentName`. The web `WebSocket` helper supports the same connection options.

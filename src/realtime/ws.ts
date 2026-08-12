@@ -18,7 +18,7 @@ import type { AzureRealtimeConnectionConfig, RealtimeConnectionConfig } from './
  * and register an SDK `error` listener for API or transport failures.
  */
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
-  /** Secure Realtime WebSocket URL, including the selected model or existing call ID. */
+  /** Secure Realtime WebSocket URL with its model, transcription intent, or call ID. */
   url: URL;
 
   /** Underlying `ws.WebSocket` instance for connection lifecycle and transport events. */

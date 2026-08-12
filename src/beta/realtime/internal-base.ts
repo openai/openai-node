@@ -126,7 +126,7 @@ export function isAzure(client: Pick<OpenAI, 'apiKey' | 'baseURL'>): client is A
   return client instanceof AzureOpenAI;
 }
 
-/** Starts a beta model or transcription session, or attaches to one existing non-Azure call. */
+/** Starts a beta Realtime model session or attaches to one existing non-Azure call. */
 export type RealtimeConnectionConfig =
   | {
       /**
@@ -134,29 +134,12 @@ export type RealtimeConnectionConfig =
        */
       model: string;
 
-      /** Transcription intent; cannot be supplied when starting a model-backed session. */
-      intent?: undefined;
-
       /** Existing call identifier; cannot be supplied when starting a model-backed session. */
-      callID?: undefined;
-    }
-  | {
-      /** Starts a transcription-only Realtime session without selecting a model. */
-      intent: 'transcription';
-
-      /** Model name; cannot be supplied when starting a transcription-only session. */
-      model?: undefined;
-
-      /** Existing call identifier; cannot be supplied with transcription intent. */
       callID?: undefined;
     }
   | {
       /** Model name; cannot be supplied when attaching to an existing call. */
       model?: undefined;
-
-      /** Transcription intent; cannot be supplied when attaching to an existing call. */
-      intent?: undefined;
-
       /**
        * Attach to an in-progress Realtime call over a sideband control connection.
        */
@@ -164,10 +147,10 @@ export type RealtimeConnectionConfig =
     };
 
 /**
- * Builds the URL for a beta model or transcription session, or a non-Azure sideband call.
+ * Builds the secure WebSocket URL for a beta Realtime session or non-Azure sideband call.
  *
- * @throws {Error} If connection targets conflict, intent is invalid, or an Azure sideband
- * call is requested through the beta helpers.
+ * @throws {Error} If both `model` and `callID`, or neither, are supplied, or an
+ * Azure sideband call is requested through the beta helpers.
  */
 export function buildRealtimeURL(
   client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
@@ -177,22 +160,14 @@ export function buildRealtimeURL(
     typeof connection === 'string' ? { model: connection } : connection;
   const baseURL = client.baseURL;
   const azure = isAzure(client);
-  const hasModel = config.model !== undefined;
-  const hasCallID = config.callID !== undefined;
-  const hasIntent = config.intent !== undefined;
+  const hasModel = !!config.model;
+  const hasCallID = !!config.callID;
 
   const path = '/realtime';
   const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
 
-  if (
-    Number(hasModel) + Number(hasCallID) + Number(hasIntent) !== 1 ||
-    (hasModel && !config.model) ||
-    (hasCallID && !config.callID) ||
-    (hasIntent && config.intent !== 'transcription')
-  ) {
-    throw new Error(
-      'Pass exactly one of `model`, `callID`, or transcription `intent` when opening a Realtime WebSocket.',
-    );
+  if (hasModel === hasCallID) {
+    throw new Error('Pass exactly one of `model` or `callID` when opening a Realtime WebSocket.');
   }
 
   url.protocol = 'wss';
@@ -202,15 +177,9 @@ export function buildRealtimeURL(
       throw new Error('Azure `callID` connections require the stable Realtime helpers.');
     }
     url.searchParams.set('api-version', client.apiVersion);
-    if (hasIntent) {
-      url.searchParams.set('intent', 'transcription');
-    } else {
-      url.searchParams.set('deployment', config.model!);
-    }
+    url.searchParams.set('deployment', config.model!);
   } else if (hasCallID) {
     url.searchParams.set('call_id', config.callID!);
-  } else if (hasIntent) {
-    url.searchParams.set('intent', 'transcription');
   } else {
     url.searchParams.set('model', config.model!);
   }

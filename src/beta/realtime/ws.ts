@@ -13,20 +13,20 @@ import type { RealtimeConnectionConfig } from './internal-base';
  * sending client events. Use the stable Realtime helper for Azure sideband calls.
  */
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
-  /** Secure beta Realtime WebSocket URL with its model, transcription intent, or call ID. */
+  /** Secure beta Realtime WebSocket URL, including the model or non-Azure call ID. */
   url: URL;
 
   /** Underlying `ws.WebSocket` instance for connection lifecycle and transport events. */
   socket: WS.WebSocket;
 
   /**
-   * Immediately opens a beta model or transcription session, or attaches to a non-Azure call.
+   * Immediately opens a beta Realtime model session or attaches to an existing non-Azure call.
    *
    * Clients with function-based credentials must use
    * {@link OpenAIRealtimeWS.create}; Azure deployment sessions should use
    * {@link OpenAIRealtimeWS.azure}.
    *
-   * @param props Exactly one model, transcription intent, or call ID, plus `ws` client settings.
+   * @param props Exactly one of `model` or `callID`, plus optional `ws` client settings.
    * @param client Existing client whose endpoint and API key should be reused.
    */
   constructor(
@@ -93,7 +93,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
    * Use this factory instead of the constructor when the client's `apiKey` is a function.
    *
    * @param client OpenAI client that owns the endpoint and refreshable or static credential.
-   * @param props Exactly one model, transcription intent, or call ID, plus `ws` client settings.
+   * @param props Exactly one of `model` or `callID`, plus optional `ws` client settings.
    */
   static async create(
     client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
@@ -106,68 +106,38 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   }
 
   /**
-   * Opens a beta Azure OpenAI Realtime model or transcription session.
+   * Opens a beta Azure OpenAI Realtime session for the selected model deployment.
    *
    * Static Azure API keys are sent in the `api-key` header; function-based
    * credentials are resolved first and sent as bearer credentials. Use the
    * stable Realtime helper when attaching to an existing Azure call.
    *
    * @param client Azure OpenAI client that supplies the endpoint and credential.
-   * @param props Deployment override or transcription intent, plus `ws` connection settings.
+   * @param props Optional deployment override and `ws` connection settings.
    * @throws {Error} If the Azure credential or required deployment is unavailable.
    */
   static async azure(
     client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
-    props:
-      | {
-          /** Azure model deployment; defaults to the deployment configured on the client. */
-          deploymentName?: string;
+    props: {
+      /** Azure model deployment; defaults to the deployment configured on the client. */
+      deploymentName?: string;
 
-          /** Transcription intent; cannot be combined with a model deployment. */
-          intent?: undefined;
-
-          /** Options passed directly to the underlying `ws.WebSocket` constructor. */
-          options?: WS.ClientOptions | undefined;
-        }
-      | {
-          /** Starts a transcription-only Azure Realtime session without a deployment. */
-          intent: 'transcription';
-
-          /** Deployment override; cannot be supplied with transcription intent. */
-          deploymentName?: undefined;
-
-          /** Options passed directly to the underlying `ws.WebSocket` constructor. */
-          options?: WS.ClientOptions | undefined;
-        } = {},
+      /** Options passed directly to the underlying `ws.WebSocket` constructor. */
+      options?: WS.ClientOptions | undefined;
+    } = {},
   ): Promise<OpenAIRealtimeWS> {
-    if (
-      (props.intent !== undefined && props.intent !== 'transcription') ||
-      (props.intent !== undefined && props.deploymentName !== undefined) ||
-      ('callID' in props && props.callID !== undefined)
-    ) {
-      throw new Error(
-        'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
-      );
-    }
-
     const isApiKeyProvider = await client._callApiKey();
     const apiKey = client.apiKey;
     if (!apiKey) {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
-    let connection: RealtimeConnectionConfig;
-    if (props.intent === 'transcription') {
-      connection = { intent: 'transcription' };
-    } else {
-      const deploymentName = props.deploymentName ?? client.deploymentName;
-      if (!deploymentName) {
-        throw new Error('No deployment name provided');
-      }
-      connection = { model: deploymentName };
+    const deploymentName = props.deploymentName ?? client.deploymentName;
+    if (!deploymentName) {
+      throw new Error('No deployment name provided');
     }
     return new OpenAIRealtimeWS(
       {
-        ...connection,
+        model: deploymentName,
         options: {
           ...props.options,
           headers: {

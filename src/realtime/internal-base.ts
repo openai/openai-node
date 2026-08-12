@@ -182,7 +182,7 @@ export type AzureRealtimeConnectionConfig =
       callID?: undefined;
     }
   | {
-      /** Starts a transcription-only Azure Realtime session without a deployment. */
+      /** Starts an Azure transcription session; set its deployment later in `session.update`. */
       intent: 'transcription';
 
       /** Deployment override; cannot be supplied with transcription intent. */
@@ -207,8 +207,8 @@ export type AzureRealtimeConnectionConfig =
 /**
  * Builds the secure WebSocket URL for a model or transcription session, or a sideband call.
  *
- * Azure model sessions use deployment and API-version query parameters; Azure
- * sideband calls use the versioned GA Realtime endpoint.
+ * Azure model sessions preserve their deployment and API-version query parameters;
+ * transcription sessions and sideband calls use the versioned GA Realtime endpoint.
  *
  * @throws {Error} If exactly one valid model, transcription intent, or call ID is not supplied.
  */
@@ -236,7 +236,7 @@ export function buildRealtimeURL(
   }
 
   let url: URL;
-  if (azure && hasCallID) {
+  if (azure && (hasCallID || hasIntent)) {
     url = new URL(baseURL);
     const basePath = url.pathname.replace(/\/+/g, '/').replace(/\/+$/, '');
     const versionedPath = basePath.endsWith('/v1') ? basePath : `${basePath}/v1`;
@@ -253,13 +253,11 @@ export function buildRealtimeURL(
   if (azure) {
     if (hasCallID) {
       url.searchParams.set('call_id', config.callID!);
+    } else if (hasIntent) {
+      url.searchParams.set('intent', 'transcription');
     } else {
       url.searchParams.set('api-version', client.apiVersion);
-      if (hasIntent) {
-        url.searchParams.set('intent', 'transcription');
-      } else {
-        url.searchParams.set('deployment', config.model!);
-      }
+      url.searchParams.set('deployment', config.model!);
     }
   } else if (hasCallID) {
     url.searchParams.set('call_id', config.callID!);
