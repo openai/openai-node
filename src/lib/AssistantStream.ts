@@ -101,8 +101,8 @@ export class AssistantStream
 
   //Used to accumulate deltas
   //We are accumulating many types so the value here is not strict
-  #runStepSnapshots: Record<string, Runs.RunStep> = {};
-  #messageSnapshots: Record<string, Message> = {};
+  #runStepSnapshots: Record<string, Runs.RunStep> = Object.create(null);
+  #messageSnapshots: Record<string, Message> = Object.create(null);
   #messageSnapshot: Message | undefined;
   #finalRun: Run | undefined;
   #currentContentIndex: number | undefined;

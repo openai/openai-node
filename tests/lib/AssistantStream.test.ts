@@ -281,6 +281,17 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith(finalRun.data);
   });
+
+  test.each(['__proto__', 'constructor', 'toString'])(
+    'retains legitimate message snapshots with the reserved %s ID',
+    async (id) => {
+      const message = { id, role: 'assistant', content: [] };
+      const runner = assistantStream([{ event: 'thread.message.created', data: message }, completedRun()]);
+
+      await expect(runner.finalMessages()).resolves.toEqual([message]);
+    },
+  );
+
   test('accumulates message content and exposes current and final snapshots', async () => {
     const initialMessage = { id: 'msg_123', role: 'assistant', status: 'in_progress', content: [] };
     const finalMessage = {
@@ -521,6 +532,59 @@ describe('AssistantStream run-step lifecycle', () => {
 
     await expect(runner.done()).rejects.toThrow('Received a RunStepDelta before creation of a snapshot');
   });
+
+  test('rejects inherited run-step snapshot IDs without polluting object prototypes', async () => {
+    const pollutionKey = '__assistantStreamSnapshotPollutionRegression_019ffd14__';
+
+    try {
+      const runner = assistantStream([
+        {
+          event: 'thread.run.step.delta',
+          data: { id: '__proto__', delta: { [pollutionKey]: 'attacker-controlled' } },
+        },
+        completedRun(),
+      ]);
+
+      await expect(runner.done()).rejects.toThrow('Received a RunStepDelta before creation of a snapshot');
+      expect(Object.getOwnPropertyDescriptor(Object.prototype, pollutionKey)).toBeUndefined();
+      expect(({} as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+      expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, pollutionKey);
+    }
+  });
+
+  test.each(['__proto__', 'constructor', 'toString'])(
+    'rejects a run-step delta received before the reserved %s ID has a snapshot',
+    async (id) => {
+      const runner = assistantStream([
+        { event: 'thread.run.step.delta', data: { id, delta: {} } },
+        completedRun(),
+      ]);
+
+      await expect(runner.done()).rejects.toThrow('Received a RunStepDelta before creation of a snapshot');
+    },
+  );
+
+  test.each(['__proto__', 'constructor', 'toString'])(
+    'retains legitimate run-step snapshots and deltas with the reserved %s ID',
+    async (id) => {
+      const initialStep = {
+        id,
+        status: 'in_progress',
+        step_details: { type: 'message_creation', message_creation: {} },
+      };
+      const finalStep = { ...initialStep, status: 'completed', metadata: { marker: 'received' } };
+      const runner = assistantStream([
+        { event: 'thread.run.step.created', data: initialStep },
+        { event: 'thread.run.step.delta', data: { id, delta: { metadata: { marker: 'received' } } } },
+        { event: 'thread.run.step.completed', data: finalStep },
+        completedRun(),
+      ]);
+
+      await expect(runner.finalRunSteps()).resolves.toEqual([finalStep]);
+    },
+  );
 
   test('finishes an active tool call when the run ends before its step does', async () => {
     const runner = assistantStream([
