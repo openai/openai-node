@@ -262,6 +262,12 @@ interface ChoiceEventState {
   done_tool_calls: Set<number>;
 }
 
+// The Chat Completions schema limits n to 128. Replayed streams do not retain
+// request parameters, so apply that choice limit independently and use the same
+// conservative ceiling to prevent sparse tool-call arrays from growing unbounded.
+const MAX_STREAM_CHOICES = 128;
+const MAX_STREAM_TOOL_CALLS = 128;
+
 /** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 export class ChatCompletionStream<ParsedT = null>
   extends AbstractChatCompletionRunner<ChatCompletionStreamEvents<ParsedT>, ParsedT>
@@ -616,8 +622,16 @@ export class ChatCompletionStream<ParsedT = null>
       Object.assign(snapshot, rest);
     }
 
+    const requestedChoiceCount = this.#params?.n;
+    const maxChoices =
+      typeof requestedChoiceCount === 'number' &&
+      Number.isSafeInteger(requestedChoiceCount) &&
+      requestedChoiceCount > 0
+        ? Math.min(requestedChoiceCount, MAX_STREAM_CHOICES)
+        : MAX_STREAM_CHOICES;
+
     for (const { delta, finish_reason, index, logprobs = null, ...other } of chunk.choices) {
-      if (!Number.isSafeInteger(index) || index < 0 || index >= 2 ** 32 - 1) {
+      if (!Number.isSafeInteger(index) || index < 0 || index >= maxChoices) {
         throw new OpenAIError(`Chat completion stream contains an invalid choice index: ${index}`);
       }
 
@@ -740,7 +754,7 @@ export class ChatCompletionStream<ParsedT = null>
         const toolCallSnapshots = (choice.message.tool_calls ??= []) as PartialToolCallSnapshot[];
 
         for (const { index, id, type, function: fn, custom, ...rest } of tool_calls) {
-          if (!Number.isSafeInteger(index) || index < 0 || index >= 2 ** 32 - 1) {
+          if (!Number.isSafeInteger(index) || index < 0 || index >= MAX_STREAM_TOOL_CALLS) {
             throw new OpenAIError(`Chat completion stream contains an invalid tool call index: ${index}`);
           }
 
