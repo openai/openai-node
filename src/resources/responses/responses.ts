@@ -7608,6 +7608,15 @@ export interface ResponsesClientEvent {
   stream?: boolean | null;
 
   /**
+   * The WebSocket lane for this response. Requests with the same `stream_id` are
+   * processed FIFO, and events for the response echo the same `stream_id`.
+   *
+   * `stream_id` controls routing; `previous_response_id` controls conversation
+   * lineage, so a new lane can fork from a response created on another lane.
+   */
+  stream_id?: string;
+
+  /**
    * Options for streaming responses. Only set this when you set `stream: true`.
    */
   stream_options?: ResponsesClientEvent.StreamOptions | null;
@@ -7825,59 +7834,648 @@ export namespace ResponsesClientEvent {
  * Server events emitted by the Responses WebSocket server.
  */
 export type ResponsesServerEvent =
-  | ResponseAudioDeltaEvent
-  | ResponseAudioDoneEvent
-  | ResponseAudioTranscriptDeltaEvent
-  | ResponseAudioTranscriptDoneEvent
-  | ResponseCodeInterpreterCallCodeDeltaEvent
-  | ResponseCodeInterpreterCallCodeDoneEvent
-  | ResponseCodeInterpreterCallCompletedEvent
-  | ResponseCodeInterpreterCallInProgressEvent
-  | ResponseCodeInterpreterCallInterpretingEvent
-  | ResponseCompletedEvent
-  | ResponseContentPartAddedEvent
-  | ResponseContentPartDoneEvent
-  | ResponseCreatedEvent
-  | ResponseErrorEvent
-  | ResponseFileSearchCallCompletedEvent
-  | ResponseFileSearchCallInProgressEvent
-  | ResponseFileSearchCallSearchingEvent
-  | ResponseFunctionCallArgumentsDeltaEvent
-  | ResponseFunctionCallArgumentsDoneEvent
-  | ResponseInProgressEvent
-  | ResponseFailedEvent
-  | ResponseIncompleteEvent
-  | ResponseOutputItemAddedEvent
-  | ResponseOutputItemDoneEvent
-  | ResponseReasoningSummaryPartAddedEvent
-  | ResponseReasoningSummaryPartDoneEvent
-  | ResponseReasoningSummaryTextDeltaEvent
-  | ResponseReasoningSummaryTextDoneEvent
-  | ResponseReasoningTextDeltaEvent
-  | ResponseReasoningTextDoneEvent
-  | ResponseRefusalDeltaEvent
-  | ResponseRefusalDoneEvent
-  | ResponseTextDeltaEvent
-  | ResponseTextDoneEvent
-  | ResponseWebSearchCallCompletedEvent
-  | ResponseWebSearchCallInProgressEvent
-  | ResponseWebSearchCallSearchingEvent
-  | ResponseImageGenCallCompletedEvent
-  | ResponseImageGenCallGeneratingEvent
-  | ResponseImageGenCallInProgressEvent
-  | ResponseImageGenCallPartialImageEvent
-  | ResponseMcpCallArgumentsDeltaEvent
-  | ResponseMcpCallArgumentsDoneEvent
-  | ResponseMcpCallCompletedEvent
-  | ResponseMcpCallFailedEvent
-  | ResponseMcpCallInProgressEvent
-  | ResponseMcpListToolsCompletedEvent
-  | ResponseMcpListToolsFailedEvent
-  | ResponseMcpListToolsInProgressEvent
-  | ResponseOutputTextAnnotationAddedEvent
-  | ResponseQueuedEvent
-  | ResponseCustomToolCallInputDeltaEvent
-  | ResponseCustomToolCallInputDoneEvent;
+  | ResponsesServerEvent.ResponseAudioWsDelta
+  | ResponsesServerEvent.ResponseAudioWsDone
+  | ResponsesServerEvent.ResponseAudioTranscriptWsDelta
+  | ResponsesServerEvent.ResponseAudioTranscriptWsDone
+  | ResponsesServerEvent.ResponseCodeInterpreterCallCodeWsDelta
+  | ResponsesServerEvent.ResponseCodeInterpreterCallCodeWsDone
+  | ResponsesServerEvent.ResponseCodeInterpreterCallWsCompleted
+  | ResponsesServerEvent.ResponseCodeInterpreterCallInWsProgress
+  | ResponsesServerEvent.ResponseCodeInterpreterCallWsInterpreting
+  | ResponsesServerEvent.ResponseWsCompleted
+  | ResponsesServerEvent.ResponseContentPartWsAdded
+  | ResponsesServerEvent.ResponseContentPartWsDone
+  | ResponsesServerEvent.ResponseWsCreated
+  | ResponsesServerEvent.ResponseWsError
+  | ResponsesServerEvent.ResponseFileSearchCallWsCompleted
+  | ResponsesServerEvent.ResponseFileSearchCallInWsProgress
+  | ResponsesServerEvent.ResponseFileSearchCallWsSearching
+  | ResponsesServerEvent.ResponseFunctionCallArgumentsWsDelta
+  | ResponsesServerEvent.ResponseFunctionCallArgumentsWsDone
+  | ResponsesServerEvent.ResponseInWsProgress
+  | ResponsesServerEvent.ResponseWsFailed
+  | ResponsesServerEvent.ResponseWsIncomplete
+  | ResponsesServerEvent.ResponseOutputItemWsAdded
+  | ResponsesServerEvent.ResponseOutputItemWsDone
+  | ResponsesServerEvent.ResponseReasoningSummaryPartWsAdded
+  | ResponsesServerEvent.ResponseReasoningSummaryPartWsDone
+  | ResponsesServerEvent.ResponseReasoningSummaryTextWsDelta
+  | ResponsesServerEvent.ResponseReasoningSummaryTextWsDone
+  | ResponsesServerEvent.ResponseReasoningTextWsDelta
+  | ResponsesServerEvent.ResponseReasoningTextWsDone
+  | ResponsesServerEvent.ResponseRefusalWsDelta
+  | ResponsesServerEvent.ResponseRefusalWsDone
+  | ResponsesServerEvent.ResponseTextWsDelta
+  | ResponsesServerEvent.ResponseTextWsDone
+  | ResponsesServerEvent.ResponseWebSearchCallWsCompleted
+  | ResponsesServerEvent.ResponseWebSearchCallInWsProgress
+  | ResponsesServerEvent.ResponseWebSearchCallWsSearching
+  | ResponsesServerEvent.ResponseImageGenCallWsCompleted
+  | ResponsesServerEvent.ResponseImageGenCallWsGenerating
+  | ResponsesServerEvent.ResponseImageGenCallInWsProgress
+  | ResponsesServerEvent.ResponseImageGenCallPartialWsImage
+  | ResponsesServerEvent.ResponseMcpCallArgumentsWsDelta
+  | ResponsesServerEvent.ResponseMcpCallArgumentsWsDone
+  | ResponsesServerEvent.ResponseMcpCallWsCompleted
+  | ResponsesServerEvent.ResponseMcpCallWsFailed
+  | ResponsesServerEvent.ResponseMcpCallInWsProgress
+  | ResponsesServerEvent.ResponseMcpListToolsWsCompleted
+  | ResponsesServerEvent.ResponseMcpListToolsWsFailed
+  | ResponsesServerEvent.ResponseMcpListToolsInWsProgress
+  | ResponsesServerEvent.ResponseOutputTextAnnotationWsAdded
+  | ResponsesServerEvent.ResponseWsQueued
+  | ResponsesServerEvent.ResponseCustomToolCallInputWsDelta
+  | ResponsesServerEvent.ResponseCustomToolCallInputWsDone;
+
+export namespace ResponsesServerEvent {
+  /**
+   * Emitted when there is a partial audio response.
+   */
+  export interface ResponseAudioWsDelta extends ResponseAudioDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the audio response is complete.
+   */
+  export interface ResponseAudioWsDone extends ResponseAudioDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a partial transcript of audio.
+   */
+  export interface ResponseAudioTranscriptWsDelta extends ResponseAudioTranscriptDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the full audio transcript is completed.
+   */
+  export interface ResponseAudioTranscriptWsDone extends ResponseAudioTranscriptDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a partial code snippet is streamed by the code interpreter.
+   */
+  export interface ResponseCodeInterpreterCallCodeWsDelta extends ResponseCodeInterpreterCallCodeDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the code snippet is finalized by the code interpreter.
+   */
+  export interface ResponseCodeInterpreterCallCodeWsDone extends ResponseCodeInterpreterCallCodeDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the code interpreter call is completed.
+   */
+  export interface ResponseCodeInterpreterCallWsCompleted extends ResponseCodeInterpreterCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a code interpreter call is in progress.
+   */
+  export interface ResponseCodeInterpreterCallInWsProgress extends ResponseCodeInterpreterCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the code interpreter is actively interpreting the code snippet.
+   */
+  export interface ResponseCodeInterpreterCallWsInterpreting extends ResponseCodeInterpreterCallInterpretingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the model response is complete.
+   */
+  export interface ResponseWsCompleted extends ResponseCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a new content part is added.
+   */
+  export interface ResponseContentPartWsAdded extends ResponseContentPartAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a content part is done.
+   */
+  export interface ResponseContentPartWsDone extends ResponseContentPartDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * An event that is emitted when a response is created.
+   */
+  export interface ResponseWsCreated extends ResponseCreatedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an error occurs.
+   */
+  export interface ResponseWsError extends ResponseErrorEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a file search call is completed (results found).
+   */
+  export interface ResponseFileSearchCallWsCompleted extends ResponseFileSearchCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a file search call is initiated.
+   */
+  export interface ResponseFileSearchCallInWsProgress extends ResponseFileSearchCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a file search is currently searching.
+   */
+  export interface ResponseFileSearchCallWsSearching extends ResponseFileSearchCallSearchingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a partial function-call arguments delta.
+   */
+  export interface ResponseFunctionCallArgumentsWsDelta extends ResponseFunctionCallArgumentsDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when function-call arguments are finalized.
+   */
+  export interface ResponseFunctionCallArgumentsWsDone extends ResponseFunctionCallArgumentsDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the response is in progress.
+   */
+  export interface ResponseInWsProgress extends ResponseInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * An event that is emitted when a response fails.
+   */
+  export interface ResponseWsFailed extends ResponseFailedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * An event that is emitted when a response finishes as incomplete.
+   */
+  export interface ResponseWsIncomplete extends ResponseIncompleteEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a new output item is added.
+   */
+  export interface ResponseOutputItemWsAdded extends ResponseOutputItemAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an output item is marked done.
+   */
+  export interface ResponseOutputItemWsDone extends ResponseOutputItemDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a new reasoning summary part is added.
+   */
+  export interface ResponseReasoningSummaryPartWsAdded extends ResponseReasoningSummaryPartAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a reasoning summary part is completed.
+   */
+  export interface ResponseReasoningSummaryPartWsDone extends ResponseReasoningSummaryPartDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a delta is added to a reasoning summary text.
+   */
+  export interface ResponseReasoningSummaryTextWsDelta extends ResponseReasoningSummaryTextDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a reasoning summary text is completed.
+   */
+  export interface ResponseReasoningSummaryTextWsDone extends ResponseReasoningSummaryTextDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a delta is added to a reasoning text.
+   */
+  export interface ResponseReasoningTextWsDelta extends ResponseReasoningTextDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a reasoning text is completed.
+   */
+  export interface ResponseReasoningTextWsDone extends ResponseReasoningTextDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a partial refusal text.
+   */
+  export interface ResponseRefusalWsDelta extends ResponseRefusalDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when refusal text is finalized.
+   */
+  export interface ResponseRefusalWsDone extends ResponseRefusalDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is an additional text delta.
+   */
+  export interface ResponseTextWsDelta extends ResponseTextDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when text content is finalized.
+   */
+  export interface ResponseTextWsDone extends ResponseTextDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a web search call is completed.
+   */
+  export interface ResponseWebSearchCallWsCompleted extends ResponseWebSearchCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a web search call is initiated.
+   */
+  export interface ResponseWebSearchCallInWsProgress extends ResponseWebSearchCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a web search call is executing.
+   */
+  export interface ResponseWebSearchCallWsSearching extends ResponseWebSearchCallSearchingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an image generation tool call has completed and the final image is
+   * available.
+   */
+  export interface ResponseImageGenCallWsCompleted extends ResponseImageGenCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an image generation tool call is actively generating an image
+   * (intermediate state).
+   */
+  export interface ResponseImageGenCallWsGenerating extends ResponseImageGenCallGeneratingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an image generation tool call is in progress.
+   */
+  export interface ResponseImageGenCallInWsProgress extends ResponseImageGenCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a partial image is available during image generation streaming.
+   */
+  export interface ResponseImageGenCallPartialWsImage extends ResponseImageGenCallPartialImageEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a delta (partial update) to the arguments of an MCP tool
+   * call.
+   */
+  export interface ResponseMcpCallArgumentsWsDelta extends ResponseMcpCallArgumentsDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the arguments for an MCP tool call are finalized.
+   */
+  export interface ResponseMcpCallArgumentsWsDone extends ResponseMcpCallArgumentsDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an MCP tool call has completed successfully.
+   */
+  export interface ResponseMcpCallWsCompleted extends ResponseMcpCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an MCP tool call has failed.
+   */
+  export interface ResponseMcpCallWsFailed extends ResponseMcpCallFailedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an MCP tool call is in progress.
+   */
+  export interface ResponseMcpCallInWsProgress extends ResponseMcpCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the list of available MCP tools has been successfully retrieved.
+   */
+  export interface ResponseMcpListToolsWsCompleted extends ResponseMcpListToolsCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the attempt to list available MCP tools has failed.
+   */
+  export interface ResponseMcpListToolsWsFailed extends ResponseMcpListToolsFailedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the system is in the process of retrieving the list of available
+   * MCP tools.
+   */
+  export interface ResponseMcpListToolsInWsProgress extends ResponseMcpListToolsInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an annotation is added to output text content.
+   */
+  export interface ResponseOutputTextAnnotationWsAdded extends ResponseOutputTextAnnotationAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a response is queued and waiting to be processed.
+   */
+  export interface ResponseWsQueued extends ResponseQueuedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Event representing a delta (partial update) to the input of a custom tool call.
+   */
+  export interface ResponseCustomToolCallInputWsDelta extends ResponseCustomToolCallInputDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Event indicating that input for a custom tool call is complete.
+   */
+  export interface ResponseCustomToolCallInputWsDone extends ResponseCustomToolCallInputDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+}
 
 export interface SkillReference {
   /**

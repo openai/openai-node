@@ -10185,12 +10185,14 @@ export type BetaResponsesClientEvent = BetaResponsesClientEvent.ResponseCreate |
 export namespace BetaResponsesClientEvent {
   /**
    * Client event for creating a response over a persistent WebSocket connection.
-   * This payload uses the same top-level fields as `POST /v1/responses`.
+   * This payload uses the same top-level fields as `POST /v1/responses`, plus
+   * WebSocket-only envelope metadata.
    *
    * Notes:
    *
    * - `stream` is implicit over WebSocket and should not be sent.
    * - `background` is not supported over WebSocket.
+   * - `stream_id` is WebSocket-only and is not part of `POST /v1/responses`.
    */
   export interface ResponseCreate {
     /**
@@ -10523,6 +10525,15 @@ export namespace BetaResponsesClientEvent {
     stream?: boolean | null;
 
     /**
+     * The WebSocket lane for this response. Requests with the same `stream_id` are
+     * processed FIFO, and events for the response echo the same `stream_id`.
+     *
+     * `stream_id` controls routing; `previous_response_id` controls conversation
+     * lineage, so a new lane can fork from a response created on another lane.
+     */
+    stream_id?: string;
+
+    /**
      * Options for streaming responses. Only set this when you set `stream: true`.
      */
     stream_options?: ResponseCreate.StreamOptions | null;
@@ -10815,61 +10826,650 @@ export namespace BetaResponsesClientEvent {
  * Server events emitted by the Responses WebSocket server.
  */
 export type BetaResponsesServerEvent =
-  | BetaResponseAudioDeltaEvent
-  | BetaResponseAudioDoneEvent
-  | BetaResponseAudioTranscriptDeltaEvent
-  | BetaResponseAudioTranscriptDoneEvent
-  | BetaResponseCodeInterpreterCallCodeDeltaEvent
-  | BetaResponseCodeInterpreterCallCodeDoneEvent
-  | BetaResponseCodeInterpreterCallCompletedEvent
-  | BetaResponseCodeInterpreterCallInProgressEvent
-  | BetaResponseCodeInterpreterCallInterpretingEvent
-  | BetaResponseCompletedEvent
-  | BetaResponseContentPartAddedEvent
-  | BetaResponseContentPartDoneEvent
-  | BetaResponseCreatedEvent
-  | BetaResponseErrorEvent
-  | BetaResponseFileSearchCallCompletedEvent
-  | BetaResponseFileSearchCallInProgressEvent
-  | BetaResponseFileSearchCallSearchingEvent
-  | BetaResponseFunctionCallArgumentsDeltaEvent
-  | BetaResponseFunctionCallArgumentsDoneEvent
-  | BetaResponseInProgressEvent
-  | BetaResponseFailedEvent
-  | BetaResponseIncompleteEvent
-  | BetaResponseOutputItemAddedEvent
-  | BetaResponseOutputItemDoneEvent
-  | BetaResponseReasoningSummaryPartAddedEvent
-  | BetaResponseReasoningSummaryPartDoneEvent
-  | BetaResponseReasoningSummaryTextDeltaEvent
-  | BetaResponseReasoningSummaryTextDoneEvent
-  | BetaResponseReasoningTextDeltaEvent
-  | BetaResponseReasoningTextDoneEvent
-  | BetaResponseRefusalDeltaEvent
-  | BetaResponseRefusalDoneEvent
-  | BetaResponseTextDeltaEvent
-  | BetaResponseTextDoneEvent
-  | BetaResponseWebSearchCallCompletedEvent
-  | BetaResponseWebSearchCallInProgressEvent
-  | BetaResponseWebSearchCallSearchingEvent
-  | BetaResponseImageGenCallCompletedEvent
-  | BetaResponseImageGenCallGeneratingEvent
-  | BetaResponseImageGenCallInProgressEvent
-  | BetaResponseImageGenCallPartialImageEvent
-  | BetaResponseMcpCallArgumentsDeltaEvent
-  | BetaResponseMcpCallArgumentsDoneEvent
-  | BetaResponseMcpCallCompletedEvent
-  | BetaResponseMcpCallFailedEvent
-  | BetaResponseMcpCallInProgressEvent
-  | BetaResponseMcpListToolsCompletedEvent
-  | BetaResponseMcpListToolsFailedEvent
-  | BetaResponseMcpListToolsInProgressEvent
-  | BetaResponseOutputTextAnnotationAddedEvent
-  | BetaResponseQueuedEvent
-  | BetaResponseCustomToolCallInputDeltaEvent
-  | BetaResponseCustomToolCallInputDoneEvent
+  | BetaResponsesServerEvent.BetaResponseAudioWsDelta
+  | BetaResponsesServerEvent.BetaResponseAudioWsDone
+  | BetaResponsesServerEvent.BetaResponseAudioTranscriptWsDelta
+  | BetaResponsesServerEvent.BetaResponseAudioTranscriptWsDone
+  | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallCodeWsDelta
+  | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallCodeWsDone
+  | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallWsCompleted
+  | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallInWsProgress
+  | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallWsInterpreting
+  | BetaResponsesServerEvent.BetaResponseWsCompleted
+  | BetaResponsesServerEvent.BetaResponseContentPartWsAdded
+  | BetaResponsesServerEvent.BetaResponseContentPartWsDone
+  | BetaResponsesServerEvent.BetaResponseWsCreated
+  | BetaResponsesServerEvent.BetaResponseWsError
+  | BetaResponsesServerEvent.BetaResponseFileSearchCallWsCompleted
+  | BetaResponsesServerEvent.BetaResponseFileSearchCallInWsProgress
+  | BetaResponsesServerEvent.BetaResponseFileSearchCallWsSearching
+  | BetaResponsesServerEvent.BetaResponseFunctionCallArgumentsWsDelta
+  | BetaResponsesServerEvent.BetaResponseFunctionCallArgumentsWsDone
+  | BetaResponsesServerEvent.BetaResponseInWsProgress
+  | BetaResponsesServerEvent.BetaResponseWsFailed
+  | BetaResponsesServerEvent.BetaResponseWsIncomplete
+  | BetaResponsesServerEvent.BetaResponseOutputItemWsAdded
+  | BetaResponsesServerEvent.BetaResponseOutputItemWsDone
+  | BetaResponsesServerEvent.BetaResponseReasoningSummaryPartWsAdded
+  | BetaResponsesServerEvent.BetaResponseReasoningSummaryPartWsDone
+  | BetaResponsesServerEvent.BetaResponseReasoningSummaryTextWsDelta
+  | BetaResponsesServerEvent.BetaResponseReasoningSummaryTextWsDone
+  | BetaResponsesServerEvent.BetaResponseReasoningTextWsDelta
+  | BetaResponsesServerEvent.BetaResponseReasoningTextWsDone
+  | BetaResponsesServerEvent.BetaResponseRefusalWsDelta
+  | BetaResponsesServerEvent.BetaResponseRefusalWsDone
+  | BetaResponsesServerEvent.BetaResponseTextWsDelta
+  | BetaResponsesServerEvent.BetaResponseTextWsDone
+  | BetaResponsesServerEvent.BetaResponseWebSearchCallWsCompleted
+  | BetaResponsesServerEvent.BetaResponseWebSearchCallInWsProgress
+  | BetaResponsesServerEvent.BetaResponseWebSearchCallWsSearching
+  | BetaResponsesServerEvent.BetaResponseImageGenCallWsCompleted
+  | BetaResponsesServerEvent.BetaResponseImageGenCallWsGenerating
+  | BetaResponsesServerEvent.BetaResponseImageGenCallInWsProgress
+  | BetaResponsesServerEvent.BetaResponseImageGenCallPartialWsImage
+  | BetaResponsesServerEvent.BetaResponseMcpCallArgumentsWsDelta
+  | BetaResponsesServerEvent.BetaResponseMcpCallArgumentsWsDone
+  | BetaResponsesServerEvent.BetaResponseMcpCallWsCompleted
+  | BetaResponsesServerEvent.BetaResponseMcpCallWsFailed
+  | BetaResponsesServerEvent.BetaResponseMcpCallInWsProgress
+  | BetaResponsesServerEvent.BetaResponseMcpListToolsWsCompleted
+  | BetaResponsesServerEvent.BetaResponseMcpListToolsWsFailed
+  | BetaResponsesServerEvent.BetaResponseMcpListToolsInWsProgress
+  | BetaResponsesServerEvent.BetaResponseOutputTextAnnotationWsAdded
+  | BetaResponsesServerEvent.BetaResponseWsQueued
+  | BetaResponsesServerEvent.BetaResponseCustomToolCallInputWsDelta
+  | BetaResponsesServerEvent.BetaResponseCustomToolCallInputWsDone
   | BetaResponseInjectCreatedEvent
   | BetaResponseInjectFailedEvent;
+
+export namespace BetaResponsesServerEvent {
+  /**
+   * Emitted when there is a partial audio response.
+   */
+  export interface BetaResponseAudioWsDelta extends BetaResponseAudioDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the audio response is complete.
+   */
+  export interface BetaResponseAudioWsDone extends BetaResponseAudioDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a partial transcript of audio.
+   */
+  export interface BetaResponseAudioTranscriptWsDelta extends BetaResponseAudioTranscriptDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the full audio transcript is completed.
+   */
+  export interface BetaResponseAudioTranscriptWsDone extends BetaResponseAudioTranscriptDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a partial code snippet is streamed by the code interpreter.
+   */
+  export interface BetaResponseCodeInterpreterCallCodeWsDelta extends BetaResponseCodeInterpreterCallCodeDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the code snippet is finalized by the code interpreter.
+   */
+  export interface BetaResponseCodeInterpreterCallCodeWsDone extends BetaResponseCodeInterpreterCallCodeDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the code interpreter call is completed.
+   */
+  export interface BetaResponseCodeInterpreterCallWsCompleted extends BetaResponseCodeInterpreterCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a code interpreter call is in progress.
+   */
+  export interface BetaResponseCodeInterpreterCallInWsProgress extends BetaResponseCodeInterpreterCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the code interpreter is actively interpreting the code snippet.
+   */
+  export interface BetaResponseCodeInterpreterCallWsInterpreting extends BetaResponseCodeInterpreterCallInterpretingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the model response is complete.
+   */
+  export interface BetaResponseWsCompleted extends BetaResponseCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a new content part is added.
+   */
+  export interface BetaResponseContentPartWsAdded extends BetaResponseContentPartAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a content part is done.
+   */
+  export interface BetaResponseContentPartWsDone extends BetaResponseContentPartDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * An event that is emitted when a response is created.
+   */
+  export interface BetaResponseWsCreated extends BetaResponseCreatedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an error occurs.
+   */
+  export interface BetaResponseWsError extends BetaResponseErrorEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a file search call is completed (results found).
+   */
+  export interface BetaResponseFileSearchCallWsCompleted extends BetaResponseFileSearchCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a file search call is initiated.
+   */
+  export interface BetaResponseFileSearchCallInWsProgress extends BetaResponseFileSearchCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a file search is currently searching.
+   */
+  export interface BetaResponseFileSearchCallWsSearching extends BetaResponseFileSearchCallSearchingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a partial function-call arguments delta.
+   */
+  export interface BetaResponseFunctionCallArgumentsWsDelta extends BetaResponseFunctionCallArgumentsDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when function-call arguments are finalized.
+   */
+  export interface BetaResponseFunctionCallArgumentsWsDone extends BetaResponseFunctionCallArgumentsDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the response is in progress.
+   */
+  export interface BetaResponseInWsProgress extends BetaResponseInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * An event that is emitted when a response fails.
+   */
+  export interface BetaResponseWsFailed extends BetaResponseFailedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * An event that is emitted when a response finishes as incomplete.
+   */
+  export interface BetaResponseWsIncomplete extends BetaResponseIncompleteEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a new output item is added.
+   */
+  export interface BetaResponseOutputItemWsAdded extends BetaResponseOutputItemAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an output item is marked done.
+   */
+  export interface BetaResponseOutputItemWsDone extends BetaResponseOutputItemDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a new reasoning summary part is added.
+   */
+  export interface BetaResponseReasoningSummaryPartWsAdded extends BetaResponseReasoningSummaryPartAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a reasoning summary part is completed.
+   */
+  export interface BetaResponseReasoningSummaryPartWsDone extends BetaResponseReasoningSummaryPartDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a delta is added to a reasoning summary text.
+   */
+  export interface BetaResponseReasoningSummaryTextWsDelta extends BetaResponseReasoningSummaryTextDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a reasoning summary text is completed.
+   */
+  export interface BetaResponseReasoningSummaryTextWsDone extends BetaResponseReasoningSummaryTextDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a delta is added to a reasoning text.
+   */
+  export interface BetaResponseReasoningTextWsDelta extends BetaResponseReasoningTextDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a reasoning text is completed.
+   */
+  export interface BetaResponseReasoningTextWsDone extends BetaResponseReasoningTextDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a partial refusal text.
+   */
+  export interface BetaResponseRefusalWsDelta extends BetaResponseRefusalDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when refusal text is finalized.
+   */
+  export interface BetaResponseRefusalWsDone extends BetaResponseRefusalDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is an additional text delta.
+   */
+  export interface BetaResponseTextWsDelta extends BetaResponseTextDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when text content is finalized.
+   */
+  export interface BetaResponseTextWsDone extends BetaResponseTextDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a web search call is completed.
+   */
+  export interface BetaResponseWebSearchCallWsCompleted extends BetaResponseWebSearchCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a web search call is initiated.
+   */
+  export interface BetaResponseWebSearchCallInWsProgress extends BetaResponseWebSearchCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a web search call is executing.
+   */
+  export interface BetaResponseWebSearchCallWsSearching extends BetaResponseWebSearchCallSearchingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an image generation tool call has completed and the final image is
+   * available.
+   */
+  export interface BetaResponseImageGenCallWsCompleted extends BetaResponseImageGenCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an image generation tool call is actively generating an image
+   * (intermediate state).
+   */
+  export interface BetaResponseImageGenCallWsGenerating extends BetaResponseImageGenCallGeneratingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an image generation tool call is in progress.
+   */
+  export interface BetaResponseImageGenCallInWsProgress extends BetaResponseImageGenCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a partial image is available during image generation streaming.
+   */
+  export interface BetaResponseImageGenCallPartialWsImage extends BetaResponseImageGenCallPartialImageEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when there is a delta (partial update) to the arguments of an MCP tool
+   * call.
+   */
+  export interface BetaResponseMcpCallArgumentsWsDelta extends BetaResponseMcpCallArgumentsDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the arguments for an MCP tool call are finalized.
+   */
+  export interface BetaResponseMcpCallArgumentsWsDone extends BetaResponseMcpCallArgumentsDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an MCP tool call has completed successfully.
+   */
+  export interface BetaResponseMcpCallWsCompleted extends BetaResponseMcpCallCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an MCP tool call has failed.
+   */
+  export interface BetaResponseMcpCallWsFailed extends BetaResponseMcpCallFailedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an MCP tool call is in progress.
+   */
+  export interface BetaResponseMcpCallInWsProgress extends BetaResponseMcpCallInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the list of available MCP tools has been successfully retrieved.
+   */
+  export interface BetaResponseMcpListToolsWsCompleted extends BetaResponseMcpListToolsCompletedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the attempt to list available MCP tools has failed.
+   */
+  export interface BetaResponseMcpListToolsWsFailed extends BetaResponseMcpListToolsFailedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when the system is in the process of retrieving the list of available
+   * MCP tools.
+   */
+  export interface BetaResponseMcpListToolsInWsProgress extends BetaResponseMcpListToolsInProgressEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an annotation is added to output text content.
+   */
+  export interface BetaResponseOutputTextAnnotationWsAdded extends BetaResponseOutputTextAnnotationAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when a response is queued and waiting to be processed.
+   */
+  export interface BetaResponseWsQueued extends BetaResponseQueuedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Event representing a delta (partial update) to the input of a custom tool call.
+   */
+  export interface BetaResponseCustomToolCallInputWsDelta extends BetaResponseCustomToolCallInputDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Event indicating that input for a custom tool call is complete.
+   */
+  export interface BetaResponseCustomToolCallInputWsDone extends BetaResponseCustomToolCallInputDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+}
 
 export interface BetaSkillReference {
   /**
