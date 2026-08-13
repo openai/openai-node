@@ -69,7 +69,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
           if (sse.data.startsWith('[DONE]')) {
             done = true;
-            continue;
+            break;
           }
 
           if (sse.event === null || !sse.event.startsWith('thread.')) {

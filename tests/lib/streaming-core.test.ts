@@ -26,6 +26,32 @@ describe('Stream.fromSSEResponse', () => {
     await expect(collect(stream)).resolves.toEqual([{ id: 1 }, { id: 2 }]);
   });
 
+  test('finishes at the completion sentinel without waiting for the response body to close', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"id":1}\n\ndata: [DONE]\n\n'));
+        },
+        pull() {
+          throw new Error('Attempted to read past the [DONE] completion sentinel');
+        },
+        cancel,
+      },
+      { highWaterMark: 0 },
+    );
+    const controller = new AbortController();
+    const iterator = Stream.fromSSEResponse<{ id: number }>(new Response(body), controller)[
+      Symbol.asyncIterator
+    ]();
+
+    await expect(iterator.next()).resolves.toEqual({ value: { id: 1 }, done: false });
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(body.locked).toBe(false);
+    expect(controller.signal.aborted).toBe(false);
+  });
+
   test('optionally preserves the event name alongside its parsed data', async () => {
     const response = responseForSSE('event: response.output_text.delta\ndata: {"delta":"hello"}\n\n');
     const stream = Stream.fromSSEResponse(response, new AbortController(), undefined, true);
