@@ -24,6 +24,17 @@ type _WebSocket = typeof globalThis extends {
     InstanceType<ws>
   : any;
 
+/** Removes Azure credential query values from the publicly exposed connection URL. */
+function redactAzureCredentials(url: URL): void {
+  const hasAuthorization = url.searchParams.has('Authorization');
+  if (url.searchParams.has('api-key') || !hasAuthorization) {
+    url.searchParams.set('api-key', '<REDACTED>');
+  }
+  if (hasAuthorization) {
+    url.searchParams.set('Authorization', '<REDACTED>');
+  }
+}
+
 /**
  * Connects to the Realtime API using the runtime's native `WebSocket` implementation.
  *
@@ -126,11 +137,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     });
 
     if (isAzure(client)) {
-      if (this.url.searchParams.get('Authorization') === null) {
-        this.url.searchParams.set('api-key', '<REDACTED>');
-      } else {
-        this.url.searchParams.set('Authorization', '<REDACTED>');
-      }
+      redactAzureCredentials(this.url);
     }
   }
 
