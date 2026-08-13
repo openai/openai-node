@@ -157,7 +157,11 @@ export class AzureOpenAI extends OpenAI {
         options.path = `/deployments/${model}${options.path}`;
       }
     }
-    return super.buildRequest(options, props);
+    const built = await super.buildRequest(options, props);
+    if (built.req.headers.has('api-key')) {
+      built.req.redirect = 'manual';
+    }
+    return built;
   }
 
   protected override async authHeaders(
