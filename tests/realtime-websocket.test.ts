@@ -195,6 +195,19 @@ describe.each([
     expect(errors).toHaveBeenCalledTimes(3);
   });
 
+  test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'dispatches Object.prototype event type %s without crashing',
+    (eventType) => {
+      const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
+      const events = vi.fn();
+      const event = { type: eventType };
+      onRealtimeEvent(realtime, 'event', events);
+
+      expect(() => lastBrowserSocket().dispatch('message', { data: JSON.stringify(event) })).not.toThrow();
+      expect(events).toHaveBeenCalledWith(event);
+    },
+  );
+
   test('serializes outgoing events and closes with defaults and custom options', () => {
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
     const socket = lastBrowserSocket();
@@ -391,6 +404,19 @@ describe.each([
     socket.dispatch('error', new Error('socket failed'));
     expect(errors).toHaveBeenCalledTimes(3);
   });
+
+  test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'dispatches Object.prototype event type %s without crashing',
+    (eventType) => {
+      const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
+      const events = vi.fn();
+      const event = { type: eventType };
+      onRealtimeEvent(realtime, 'event', events);
+
+      expect(() => lastNodeSocket().dispatch('message', JSON.stringify(event))).not.toThrow();
+      expect(events).toHaveBeenCalledWith(event);
+    },
+  );
 
   test('sends JSON events and closes with default and custom settings', () => {
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());

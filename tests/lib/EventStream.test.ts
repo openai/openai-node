@@ -12,6 +12,10 @@ class TestStream extends EventStream<TestEvents> {
     this._emit('foo', value, index);
   }
 
+  emitNamed(event: string, value: string, index: number) {
+    this._emit(event as 'foo', value, index);
+  }
+
   emitError(error: OpenAIError) {
     this._emit('error', error);
   }
@@ -24,6 +28,40 @@ class TestStream extends EventStream<TestEvents> {
     this._emit('end');
   }
 }
+
+describe('EventStream listeners', () => {
+  test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'safely emits unobserved Object.prototype event %s',
+    (eventName) => {
+      const stream = new TestStream();
+      const event = eventName as 'foo';
+
+      expect(() => stream.off(event, vi.fn())).not.toThrow();
+      expect(() => stream.emitNamed(event, 'ignored', 0)).not.toThrow();
+    },
+  );
+
+  test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'supports regular and one-time Object.prototype event listeners for %s',
+    (eventName) => {
+      const stream = new TestStream();
+      const event = eventName as 'foo';
+      const repeated = vi.fn();
+      const once = vi.fn();
+
+      stream.on(event, repeated);
+      stream.once(event, once);
+      stream.emitNamed(event, 'first', 1);
+      stream.emitNamed(event, 'second', 2);
+      stream.off(event, repeated);
+      stream.emitNamed(event, 'ignored', 3);
+
+      expect(repeated).toHaveBeenCalledTimes(2);
+      expect(once).toHaveBeenCalledTimes(1);
+      expect(once).toHaveBeenCalledWith('first', 1);
+    },
+  );
+});
 
 describe('EventStream.emitted', () => {
   test('resolves all arguments from a multi-argument event as a tuple', async () => {

@@ -11,6 +11,9 @@ class TestEmitter extends EventEmitter<TestEvents> {
   emitFoo(value: string) {
     this._emit('foo', value);
   }
+  emitNamed(event: string, value: string) {
+    this._emit(event as 'foo', value);
+  }
   emitError(err: Error) {
     this._emit('error', err);
   }
@@ -60,6 +63,42 @@ describe('EventEmitter.emitted', () => {
 });
 
 describe('EventEmitter listeners', () => {
+  test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'safely emits unobserved Object.prototype event %s',
+    (eventName) => {
+      const emitter = new TestEmitter();
+      const event = eventName as keyof TestEvents;
+
+      expect(emitter.hasListener(event)).toBeFalsy();
+      expect(() => emitter.off(event, vi.fn())).not.toThrow();
+      expect(() => emitter.emitNamed(event, 'ignored')).not.toThrow();
+    },
+  );
+
+  test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'supports regular and one-time Object.prototype event listeners for %s',
+    (eventName) => {
+      const emitter = new TestEmitter();
+      const event = eventName as 'foo';
+      const repeated = vi.fn();
+      const once = vi.fn();
+
+      emitter.on(event, repeated);
+      emitter.once(event, once);
+      expect(emitter.hasListener(event)).toBe(true);
+
+      emitter.emitNamed(event, 'first');
+      emitter.emitNamed(event, 'second');
+      emitter.off(event, repeated);
+      emitter.emitNamed(event, 'ignored');
+
+      expect(repeated).toHaveBeenCalledTimes(2);
+      expect(once).toHaveBeenCalledTimes(1);
+      expect(once).toHaveBeenCalledWith('first');
+      expect(emitter.hasListener(event)).toBe(false);
+    },
+  );
+
   test('invokes repeated listeners in registration order', () => {
     const emitter = new TestEmitter();
     const values: string[] = [];

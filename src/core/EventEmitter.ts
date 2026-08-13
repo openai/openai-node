@@ -16,7 +16,7 @@ export type EventParameters<Events, EventType extends keyof Events> = Record<
 export class EventEmitter<EventTypes extends Record<string, (...args: any) => any>> {
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
-  } = {};
+  } = Object.create(null);
 
   /**
    * Adds the listener function to the end of the listeners array for the event.
