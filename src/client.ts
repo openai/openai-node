@@ -1346,6 +1346,9 @@ export class OpenAI {
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
   skills: API.Skills = new API.Skills(this);
+  /**
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
+   */
   videos: API.Videos = new API.Videos(this);
 }
 

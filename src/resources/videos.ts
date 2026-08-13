@@ -9,9 +9,14 @@ import { RequestOptions } from '../internal/request-options';
 import { maybeMultipartFormRequestOptions, multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
+/**
+ * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
+ */
 export class Videos extends APIResource {
   /**
    * Create a new video generation job from a prompt and optional reference assets.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   create(body: VideoCreateParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
@@ -22,6 +27,8 @@ export class Videos extends APIResource {
 
   /**
    * Fetch the latest metadata for a generated video.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   retrieve(videoID: string, options?: RequestOptions): APIPromise<Video> {
     return this._client.get(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
@@ -29,6 +36,8 @@ export class Videos extends APIResource {
 
   /**
    * List recently generated videos for the current project.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   list(
     query: VideoListParams | null | undefined = {},
@@ -43,6 +52,8 @@ export class Videos extends APIResource {
 
   /**
    * Permanently delete a completed or failed video and its stored assets.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   delete(videoID: string, options?: RequestOptions): APIPromise<VideoDeleteResponse> {
     return this._client.delete(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
@@ -50,6 +61,8 @@ export class Videos extends APIResource {
 
   /**
    * Create a character from an uploaded video.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   createCharacter(
     body: VideoCreateCharacterParams,
@@ -65,6 +78,8 @@ export class Videos extends APIResource {
    * Download the generated video bytes or a derived preview asset.
    *
    * Streams the rendered video content for the specified video job.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   downloadContent(
     videoID: string,
@@ -83,6 +98,8 @@ export class Videos extends APIResource {
   /**
    * Create a new video generation job by editing a source video or existing
    * generated video.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   edit(body: VideoEditParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
@@ -93,6 +110,8 @@ export class Videos extends APIResource {
 
   /**
    * Create an extension of a completed video.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   extend(body: VideoExtendParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
@@ -103,6 +122,8 @@ export class Videos extends APIResource {
 
   /**
    * Fetch a character.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   getCharacter(characterID: string, options?: RequestOptions): APIPromise<VideoGetCharacterResponse> {
     return this._client.get(path`/videos/characters/${characterID}`, {
@@ -113,6 +134,8 @@ export class Videos extends APIResource {
 
   /**
    * Create a remix of a completed video using a refreshed prompt.
+   *
+   * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   remix(videoID: string, body: VideoRemixParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
