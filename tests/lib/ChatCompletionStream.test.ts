@@ -90,6 +90,209 @@ function customToolChunks(): OpenAI.Chat.ChatCompletionChunk[] {
 }
 
 describe('.stream()', () => {
+  it('rejects a choice index that would pollute the global Array prototype', async () => {
+    const pollutionKey = 'sdkPrototypePolluted';
+    const prototype = Array.prototype as unknown as Record<string, unknown>;
+    const chunks = contentChunks('unused');
+    const chunk = chunks[0];
+    if (!chunk) {
+      throw new Error('Expected a chat completion chunk');
+    }
+    chunk.choices = [
+      {
+        index: '__proto__',
+        delta: null,
+        finish_reason: null,
+        logprobs: null,
+        [pollutionKey]: 'owned',
+      } as unknown as OpenAI.Chat.ChatCompletionChunk.Choice,
+    ];
+
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [],
+    });
+
+    try {
+      const failure = await stream.done().then(
+        () => null,
+        (error: unknown) => error,
+      );
+
+      expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+      expect(failure).toBeInstanceOf(OpenAIError);
+      expect((failure as Error).message).toContain('invalid choice index: __proto__');
+      expect(stream.currentChatCompletionSnapshot?.choices).toEqual([]);
+    } finally {
+      Reflect.deleteProperty(prototype, pollutionKey);
+    }
+  });
+
+  it('rejects a tool-call index that would pollute the global Array prototype', async () => {
+    const pollutionKey = 'sdkNestedPolluted';
+    const prototype = Array.prototype as unknown as Record<string, unknown>;
+    const chunks = contentChunks('unused');
+    const chunk = chunks[0];
+    if (!chunk) {
+      throw new Error('Expected a chat completion chunk');
+    }
+    chunk.choices = [
+      {
+        index: 0,
+        delta: {
+          role: 'assistant',
+          tool_calls: [{ index: '__proto__', [pollutionKey]: 'owned' }],
+        },
+        finish_reason: null,
+        logprobs: null,
+      } as unknown as OpenAI.Chat.ChatCompletionChunk.Choice,
+    ];
+
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [],
+    });
+
+    try {
+      const failure = await stream.done().then(
+        () => null,
+        (error: unknown) => error,
+      );
+
+      expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+      expect(failure).toBeInstanceOf(OpenAIError);
+      expect((failure as Error).message).toContain('invalid tool call index: __proto__');
+      expect(stream.currentChatCompletionSnapshot?.choices[0]?.message.tool_calls).toEqual([]);
+    } finally {
+      Reflect.deleteProperty(prototype, pollutionKey);
+    }
+  });
+
+  it.each([
+    '__proto__',
+    'constructor',
+    'toString',
+    '0',
+    'not-an-index',
+    -1,
+    0.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    2 ** 32 - 1,
+    2 ** 32,
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])('rejects the invalid choice index %s before indexing the snapshot', async (index) => {
+    const chunks = contentChunks('unused');
+    const chunk = chunks[0];
+    if (!chunk) {
+      throw new Error('Expected a chat completion chunk');
+    }
+    chunk.choices = [
+      {
+        index,
+        delta: null,
+        finish_reason: null,
+        logprobs: null,
+      } as unknown as OpenAI.Chat.ChatCompletionChunk.Choice,
+    ];
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [],
+    });
+    const failure = await stream.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as Error).message).toBe(
+      `Chat completion stream contains an invalid choice index: ${index}`,
+    );
+    expect(stream.currentChatCompletionSnapshot?.choices).toEqual([]);
+  });
+
+  it.each([
+    '__proto__',
+    'constructor',
+    'toString',
+    '0',
+    'not-an-index',
+    -1,
+    0.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    2 ** 32 - 1,
+    2 ** 32,
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])('rejects the invalid tool-call index %s before indexing the snapshot', async (index) => {
+    const chunks = contentChunks('unused');
+    const chunk = chunks[0];
+    if (!chunk) {
+      throw new Error('Expected a chat completion chunk');
+    }
+    chunk.choices = [
+      {
+        index: 0,
+        delta: {
+          role: 'assistant',
+          tool_calls: [{ index }],
+        },
+        finish_reason: null,
+        logprobs: null,
+      } as unknown as OpenAI.Chat.ChatCompletionChunk.Choice,
+    ];
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [],
+    });
+    const failure = await stream.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as Error).message).toBe(
+      `Chat completion stream contains an invalid tool call index: ${index}`,
+    );
+    expect(stream.currentChatCompletionSnapshot?.choices[0]?.message.tool_calls).toEqual([]);
+  });
+
+  it('preserves valid choice indices that arrive out of order', async () => {
+    const chunks = contentChunks('second', 'first');
+    const secondChoiceChunk = chunks[0];
+    const firstChoiceChunk = chunks[1];
+    if (!secondChoiceChunk || !firstChoiceChunk) {
+      throw new Error('Expected two chat completion chunks');
+    }
+    secondChoiceChunk.choices[0] = {
+      index: 1,
+      delta: { role: 'assistant', content: 'second' },
+      finish_reason: 'stop',
+      logprobs: null,
+    };
+    firstChoiceChunk.choices[0] = {
+      index: 0,
+      delta: { role: 'assistant', content: 'first' },
+      finish_reason: 'stop',
+      logprobs: null,
+    };
+    const readable = new Stream(async function* outOfOrderChunks() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
+    }, new AbortController()).toReadableStream();
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices.map((choice) => choice.index)).toEqual([0, 1]);
+    expect(completion.choices.map((choice) => choice.message.content)).toEqual(['first', 'second']);
+  });
+
   it('emits finalization failures as errors', async () => {
     const chunk: OpenAI.Chat.ChatCompletionChunk = {
       id: 'chatcmpl-test',

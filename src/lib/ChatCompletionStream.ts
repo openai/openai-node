@@ -617,6 +617,10 @@ export class ChatCompletionStream<ParsedT = null>
     }
 
     for (const { delta, finish_reason, index, logprobs = null, ...other } of chunk.choices) {
+      if (!Number.isSafeInteger(index) || index < 0 || index >= 2 ** 32 - 1) {
+        throw new OpenAIError(`Chat completion stream contains an invalid choice index: ${index}`);
+      }
+
       let choice = snapshot.choices[index];
       if (!choice) {
         const newChoice = { finish_reason, index, message: {}, logprobs, ...other };
@@ -736,6 +740,10 @@ export class ChatCompletionStream<ParsedT = null>
         const toolCallSnapshots = (choice.message.tool_calls ??= []) as PartialToolCallSnapshot[];
 
         for (const { index, id, type, function: fn, custom, ...rest } of tool_calls) {
+          if (!Number.isSafeInteger(index) || index < 0 || index >= 2 ** 32 - 1) {
+            throw new OpenAIError(`Chat completion stream contains an invalid tool call index: ${index}`);
+          }
+
           const tool_call = (toolCallSnapshots[index] ??= {});
           Object.assign(tool_call, rest);
           if (id) {
