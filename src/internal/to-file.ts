@@ -148,7 +148,7 @@ export async function toFile(
 
   if (isResponseLike(value)) {
     const blob = await value.blob();
-    name ||= new URL(value.url).pathname.split(/[\\/]/).pop();
+    name ||= getName(value);
 
     const responseOptions =
       options?.type === undefined && blob.type ? { ...options, type: blob.type } : options;

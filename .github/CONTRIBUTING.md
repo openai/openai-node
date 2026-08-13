@@ -121,22 +121,23 @@ $ pnpm bench:json
 ```
 
 This writes `benchmark-results.json` in the repository root. The report is ignored
-by Git and is uploaded by the separate, manually triggered or scheduled benchmark
-workflow alongside a runtime, runner, revision, and fixture-hash metadata file.
-Pass a benchmark name or file filter directly to run only part of the suite, for
-example:
+by Git and uploaded as an artifact by the performance-benchmark job in normal CI.
+The separate, manually triggered or scheduled benchmark workflow also uploads a
+runtime, runner, revision, and fixture-hash metadata file. Pass a benchmark name
+or file filter directly to run only part of the suite, for example:
 
 ```sh
 $ pnpm bench streaming
 ```
 
-Benchmarks cover SSE chunk decoding and JSON parsing, incremental structured
-output parsing, schema generation and validation, and base64-versus-float
-embedding responses. Each case prepares its fixtures before timing and uses
-explicit warmup and repeated measurements. Compare medians and tail latency only
-between runs with the same Node.js version, CPU or runner class, SDK revision,
-fixture sizes, and background load. Shared CI runners are useful for collecting
-trends but are too variable for blocking performance thresholds.
+Benchmarks cover request preparation, header merging, query serialization, SSE
+chunk decoding and JSON parsing, incremental structured output parsing, schema
+generation and validation, and base64-versus-float embedding responses. Each case
+prepares its fixtures before timing and uses explicit warmup and repeated
+measurements. Compare medians and tail latency only between runs with the same
+Node.js version, CPU or runner class, SDK revision, fixture sizes, and background
+load. Shared CI runners are useful for collecting trends but are too variable for
+blocking performance thresholds.
 
 ## Linting and formatting
 

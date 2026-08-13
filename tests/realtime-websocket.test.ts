@@ -540,3 +540,247 @@ describe('stable Node realtime transcription', () => {
     expect(nodeSocketConstructor).not.toHaveBeenCalled();
   });
 });
+
+describe('stable browser realtime custom URL builder', () => {
+  test('opens the exact custom URL while preserving authentication and its existing query', () => {
+    const client = createClient();
+    const customURL = new URL('wss://sap.example.com/deployments/custom/realtime?existing=value');
+    const customBuilder = vi.fn(() => customURL);
+
+    const realtime = new StableBrowserRealtime(
+      { model: 'gpt-realtime', buildRealtimeURL: customBuilder },
+      client,
+    );
+
+    expect(lastBrowserSocket().url).toBe(customURL.toString());
+    expect(lastBrowserSocket().protocols).toEqual(['realtime', 'openai-insecure-api-key.test-key']);
+    expect(realtime.url.toString()).toBe(customURL.toString());
+    expect(realtime.url).not.toBe(customURL);
+    expect(realtime.url.searchParams.has('model')).toBe(false);
+  });
+
+  test('rejects an insecure custom URL before opening a socket', () => {
+    expect(
+      () =>
+        new StableBrowserRealtime(
+          {
+            model: 'gpt-realtime',
+            buildRealtimeURL: () => new URL('ws://sap.example.com/realtime'),
+          },
+          createClient(),
+        ),
+    ).toThrow();
+    expect(FakeBrowserSocket.instances).toHaveLength(0);
+  });
+
+  test('preserves custom URLs when the factory resolves a rotating credential', async () => {
+    const customURL = new URL('wss://sap.example.com/custom?existing=value');
+
+    const realtime = await StableBrowserRealtime.create(
+      createClient(async () => 'rotating-key'),
+      {
+        model: 'gpt-realtime',
+        buildRealtimeURL: () => customURL,
+      },
+    );
+
+    expect(lastBrowserSocket().url).toBe(customURL.toString());
+    expect(lastBrowserSocket().protocols).toEqual(['realtime', 'openai-insecure-api-key.rotating-key']);
+    expect(realtime.url.searchParams.has('model')).toBe(false);
+  });
+
+  test('authenticates and redacts an Azure API key without modifying the caller URL', async () => {
+    const client = createAzureClient({ deployment: 'configured' });
+    const customURL = new URL('wss://sap.example.com/azure/custom?existing=value');
+    const customBuilder = vi.fn(() => customURL);
+
+    const realtime = await StableBrowserRealtime.azure(client, {
+      deploymentName: 'override',
+      buildRealtimeURL: customBuilder,
+    });
+    const connectionURL = new URL(lastBrowserSocket().url);
+
+    expect(customBuilder).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({ model: 'override', buildRealtimeURL: customBuilder }),
+    );
+    expect(connectionURL.pathname).toBe('/azure/custom');
+    expect(connectionURL.searchParams.get('existing')).toBe('value');
+    expect(connectionURL.searchParams.get('api-key')).toBe('azure-key');
+    expect(connectionURL.searchParams.has('model')).toBe(false);
+    expect(connectionURL.searchParams.has('deployment')).toBe(false);
+    expect(lastBrowserSocket().protocols).toEqual(['realtime']);
+    expect(realtime.url.searchParams.get('existing')).toBe('value');
+    expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
+    expect(customURL.toString()).toBe('wss://sap.example.com/azure/custom?existing=value');
+  });
+
+  test('authenticates and redacts an Azure token without modifying the caller URL', async () => {
+    const customURL = new URL('wss://sap.example.com/azure/custom?existing=value');
+
+    const realtime = await StableBrowserRealtime.azure(
+      createAzureClient({ deployment: 'configured', tokenProvider: true }),
+      { buildRealtimeURL: () => customURL },
+    );
+    const connectionURL = new URL(lastBrowserSocket().url);
+
+    expect(connectionURL.searchParams.get('existing')).toBe('value');
+    expect(connectionURL.searchParams.get('Authorization')).toBe('Bearer azure-token');
+    expect(connectionURL.searchParams.has('model')).toBe(false);
+    expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
+    expect(customURL.toString()).toBe('wss://sap.example.com/azure/custom?existing=value');
+  });
+
+  test.each([
+    {
+      existingParameter: 'Authorization',
+      authenticationParameter: 'api-key',
+      authenticationValue: 'azure-key',
+      tokenProvider: false,
+    },
+    {
+      existingParameter: 'api-key',
+      authenticationParameter: 'Authorization',
+      authenticationValue: 'Bearer azure-token',
+      tokenProvider: true,
+    },
+  ])(
+    'redacts both Azure credential parameters when the custom URL already contains $existingParameter',
+    async ({ existingParameter, authenticationParameter, authenticationValue, tokenProvider }) => {
+      const customURL = new URL('wss://sap.example.com/azure/custom?routing=value');
+      customURL.searchParams.set(existingParameter, 'existing');
+      const callerURL = customURL.toString();
+
+      const realtime = await StableBrowserRealtime.azure(
+        createAzureClient({ deployment: 'configured', tokenProvider }),
+        { buildRealtimeURL: () => customURL },
+      );
+      const connectionURL = new URL(lastBrowserSocket().url);
+
+      expect(connectionURL.pathname).toBe('/azure/custom');
+      expect(connectionURL.searchParams.get('routing')).toBe('value');
+      expect(connectionURL.searchParams.get(existingParameter)).toBe('existing');
+      expect(connectionURL.searchParams.get(authenticationParameter)).toBe(authenticationValue);
+      expect(realtime.url.searchParams.get('routing')).toBe('value');
+      expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
+      expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
+      expect(customURL.toString()).toBe(callerURL);
+    },
+  );
+
+  test('requires an Azure deployment before invoking a custom builder', async () => {
+    const customBuilder = vi.fn(() => new URL('wss://sap.example.com/realtime'));
+
+    await expect(
+      StableBrowserRealtime.azure(createAzureClient(), { buildRealtimeURL: customBuilder }),
+    ).rejects.toThrow('No deployment name provided');
+    expect(customBuilder).not.toHaveBeenCalled();
+    expect(FakeBrowserSocket.instances).toHaveLength(0);
+  });
+});
+
+describe('stable Node realtime custom URL builder', () => {
+  test('opens the exact custom URL while preserving authentication, query, and ws options', () => {
+    const client = createClient();
+    const customURL = new URL('wss://sap.example.com/deployments/custom/realtime?existing=value');
+    const customBuilder = vi.fn(() => customURL);
+
+    const realtime = new StableNodeRealtime(
+      {
+        model: 'gpt-realtime',
+        buildRealtimeURL: customBuilder,
+        options: { handshakeTimeout: 4321, headers: { 'X-Custom': 'value' } },
+      },
+      client,
+    );
+
+    expect(lastNodeSocket().url.toString()).toBe(customURL.toString());
+    expect(lastNodeSocket().options).toMatchObject({
+      handshakeTimeout: 4321,
+      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+    });
+    expect(realtime.url).not.toBe(customURL);
+    expect(realtime.url.searchParams.has('model')).toBe(false);
+  });
+
+  test('rejects a malformed custom URL before opening a socket', () => {
+    expect(
+      () =>
+        new StableNodeRealtime(
+          { model: 'gpt-realtime', buildRealtimeURL: () => 'not a valid URL' as unknown as URL },
+          createClient(),
+        ),
+    ).toThrow();
+    expect(nodeSocketConstructor).not.toHaveBeenCalled();
+  });
+
+  test('preserves custom URLs and ws options when resolving a rotating credential', async () => {
+    const customURL = new URL('wss://sap.example.com/custom?existing=value');
+
+    const realtime = await StableNodeRealtime.create(
+      createClient(async () => 'rotating-key'),
+      {
+        model: 'gpt-realtime',
+        buildRealtimeURL: () => customURL,
+        options: { headers: { 'X-Custom': 'value' } },
+      },
+    );
+
+    expect(lastNodeSocket().url.toString()).toBe(customURL.toString());
+    expect(lastNodeSocket().options.headers).toMatchObject({
+      Authorization: 'Bearer rotating-key',
+      'X-Custom': 'value',
+    });
+    expect(realtime.url.searchParams.has('model')).toBe(false);
+  });
+
+  test('preserves custom Azure URLs, API-key authentication, and ws options', async () => {
+    const client = createAzureClient({ deployment: 'configured' });
+    const customURL = new URL('wss://sap.example.com/azure/custom?existing=value');
+    const customBuilder = vi.fn(() => customURL);
+
+    await StableNodeRealtime.azure(client, {
+      deploymentName: 'override',
+      buildRealtimeURL: customBuilder,
+      options: { handshakeTimeout: 4321, headers: { 'X-Custom': 'value' } },
+    });
+    const socket = lastNodeSocket();
+
+    expect(customBuilder).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({ model: 'override', buildRealtimeURL: customBuilder }),
+    );
+    expect(socket.url.toString()).toBe(customURL.toString());
+    expect(socket.url.searchParams.has('model')).toBe(false);
+    expect(socket.url.searchParams.has('deployment')).toBe(false);
+    expect(socket.options).toMatchObject({
+      handshakeTimeout: 4321,
+      headers: { 'api-key': 'azure-key', 'X-Custom': 'value' },
+    });
+    expect(socket.options.headers).not.toHaveProperty('Authorization');
+  });
+
+  test('preserves custom Azure URLs and authenticates token providers with a bearer header', async () => {
+    const customURL = new URL('wss://sap.example.com/azure/custom?existing=value');
+
+    await StableNodeRealtime.azure(createAzureClient({ deployment: 'configured', tokenProvider: true }), {
+      buildRealtimeURL: () => customURL,
+    });
+    const socket = lastNodeSocket();
+
+    expect(socket.url.toString()).toBe(customURL.toString());
+    expect(socket.url.searchParams.has('model')).toBe(false);
+    expect(socket.options.headers).toMatchObject({ Authorization: 'Bearer azure-token' });
+    expect(socket.options.headers).not.toHaveProperty('api-key');
+  });
+
+  test('requires an Azure deployment before invoking a custom builder', async () => {
+    const customBuilder = vi.fn(() => new URL('wss://sap.example.com/realtime'));
+
+    await expect(
+      StableNodeRealtime.azure(createAzureClient(), { buildRealtimeURL: customBuilder }),
+    ).rejects.toThrow('No deployment name provided');
+    expect(customBuilder).not.toHaveBeenCalled();
+    expect(nodeSocketConstructor).not.toHaveBeenCalled();
+  });
+});

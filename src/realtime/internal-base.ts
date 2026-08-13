@@ -130,9 +130,23 @@ export function isAzure(client: Pick<OpenAI, 'apiKey' | 'baseURL'>): client is A
   return client instanceof AzureOpenAI;
 }
 
+interface RealtimeURLBuilderOptions {
+  /**
+   * Builds the exact WebSocket URL after the connection target has been validated.
+   *
+   * Return only a trusted `wss:` URL because the client's credentials are sent to
+   * that endpoint. Model, call ID, transcription intent, and deployment query
+   * parameters are not added to the returned URL.
+   */
+  buildRealtimeURL?: (
+    client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
+    connection: RealtimeConnectionConfig,
+  ) => URL;
+}
+
 /** Starts a model or transcription session, or attaches to exactly one existing call. */
 export type RealtimeConnectionConfig =
-  | {
+  | (RealtimeURLBuilderOptions & {
       /**
        * Start a new Realtime session using the given model.
        */
@@ -143,8 +157,8 @@ export type RealtimeConnectionConfig =
 
       /** Existing call identifier; cannot be supplied when starting a model-backed session. */
       callID?: undefined;
-    }
-  | {
+    })
+  | (RealtimeURLBuilderOptions & {
       /** Starts a transcription-only Realtime session without selecting a model. */
       intent: 'transcription';
 
@@ -153,8 +167,8 @@ export type RealtimeConnectionConfig =
 
       /** Existing call identifier; cannot be supplied with transcription intent. */
       callID?: undefined;
-    }
-  | {
+    })
+  | (RealtimeURLBuilderOptions & {
       /** Model name; cannot be supplied when attaching to an existing call. */
       model?: undefined;
 
@@ -165,11 +179,11 @@ export type RealtimeConnectionConfig =
        * Attach to an in-progress Realtime call over a sideband control connection.
        */
       callID: string;
-    };
+    });
 
 /** Starts an Azure deployment or transcription session, or attaches to an existing call. */
 export type AzureRealtimeConnectionConfig =
-  | {
+  | (RealtimeURLBuilderOptions & {
       /**
        * Override the deployment configured on the Azure client.
        */
@@ -180,8 +194,8 @@ export type AzureRealtimeConnectionConfig =
 
       /** Existing call identifier; cannot be combined with `deploymentName`. */
       callID?: undefined;
-    }
-  | {
+    })
+  | (RealtimeURLBuilderOptions & {
       /** Starts an Azure transcription session; set its deployment later in `session.update`. */
       intent: 'transcription';
 
@@ -190,8 +204,8 @@ export type AzureRealtimeConnectionConfig =
 
       /** Existing call identifier; cannot be supplied with transcription intent. */
       callID?: undefined;
-    }
-  | {
+    })
+  | (RealtimeURLBuilderOptions & {
       /** Deployment override; cannot be supplied when attaching to an existing call. */
       deploymentName?: undefined;
 
@@ -202,7 +216,7 @@ export type AzureRealtimeConnectionConfig =
        * Attach to an in-progress Azure Realtime call over a sideband control connection.
        */
       callID: string;
-    };
+    });
 
 /**
  * Builds the secure WebSocket URL for a model or transcription session, or a sideband call.
@@ -211,7 +225,7 @@ export type AzureRealtimeConnectionConfig =
  * sessions select their deployment with `model`, transcription sessions use
  * `intent`, and sideband connections use `call_id`.
  *
- * @throws {Error} If exactly one valid model, transcription intent, or call ID is not supplied.
+ * @throws {Error} If the connection target is invalid or a custom URL does not use `wss:`.
  */
 export function buildRealtimeURL(
   client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
@@ -234,6 +248,14 @@ export function buildRealtimeURL(
     throw new Error(
       'Pass exactly one of `model`, `callID`, or transcription `intent` when opening a Realtime WebSocket.',
     );
+  }
+
+  if (config.buildRealtimeURL) {
+    const url = new URL(config.buildRealtimeURL(client, config));
+    if (url.protocol !== 'wss:') {
+      throw new Error('Custom Realtime WebSocket URLs must use the wss: protocol.');
+    }
+    return url;
   }
 
   let url: URL;
@@ -273,6 +295,8 @@ export function getAzureRealtimeConnection(
   const hasDeploymentName = connection.deploymentName !== undefined;
   const hasCallID = connection.callID !== undefined;
   const hasIntent = connection.intent !== undefined;
+  const customURLBuilder = connection.buildRealtimeURL;
+  const normalizedOptions = customURLBuilder ? { buildRealtimeURL: customURLBuilder } : {};
 
   if (
     Number(hasDeploymentName) + Number(hasCallID) + Number(hasIntent) > 1 ||
@@ -284,16 +308,16 @@ export function getAzureRealtimeConnection(
   }
 
   if (hasCallID) {
-    return { callID: connection.callID! };
+    return { ...normalizedOptions, callID: connection.callID! };
   }
 
   if (hasIntent) {
-    return { intent: 'transcription' };
+    return { ...normalizedOptions, intent: 'transcription' };
   }
 
   const model = connection.deploymentName ?? client.deploymentName;
   if (!model) {
     throw new Error('No deployment name provided');
   }
-  return { model };
+  return { ...normalizedOptions, model };
 }

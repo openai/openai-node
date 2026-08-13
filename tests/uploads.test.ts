@@ -63,6 +63,18 @@ describe('toFile', () => {
     expect(file.name).toEqual('audio.mp3');
   });
 
+  it('falls back to unknown_file when a Response has no URL', async () => {
+    const file = await toFile(new Response('audio contents'));
+    expect(file.name).toEqual('unknown_file');
+    await expect(file.text()).resolves.toEqual('audio contents');
+  });
+
+  it('falls back to unknown_file when a Response URL has no path segment', async () => {
+    const response = mockResponse({ url: 'https://example.com/' });
+    const file = await toFile(response);
+    expect(file.name).toEqual('unknown_file');
+  });
+
   it('infers the MIME type from a Response body', async () => {
     const response = mockResponse({
       url: 'https://example.com/my/audio.mp3',
