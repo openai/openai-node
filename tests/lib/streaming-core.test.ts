@@ -263,11 +263,18 @@ describe('_iterSSEMessages', () => {
     ]);
   });
 
-  test.each(['\n', '\r\n'])(
-    'decodes byte-fragmented %j separators before the stream ends',
-    async (newline) => {
-      const firstEvent = encoder.encode(`data: first${newline}${newline}`);
-      const secondEvent = encoder.encode(`data: second${newline}${newline}`);
+  test.each(
+    ['\n', '\r', '\r\n'].flatMap((firstEnding) =>
+      ['\n', '\r', '\r\n']
+        .filter((secondEnding) => firstEnding !== '\r' || secondEnding !== '\n')
+        .map((secondEnding) => [firstEnding, secondEnding]),
+    ),
+  )(
+    'decodes byte-fragmented %j + %j separators before the stream ends',
+    async (firstEnding, secondEnding) => {
+      const delimiter = firstEnding + secondEnding;
+      const firstEvent = encoder.encode(`data: first${delimiter}`);
+      const secondEvent = encoder.encode(`data: second${delimiter}`);
       let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
       const response = new Response(
         new ReadableStream<Uint8Array>({
@@ -285,15 +292,17 @@ describe('_iterSSEMessages', () => {
 
       await expect(first).resolves.toMatchObject({ done: false, value: { event: null, data: 'first' } });
 
+      const second = events.next();
       for (const byte of secondEvent) {
         streamController?.enqueue(Uint8Array.of(byte));
       }
-      streamController?.close();
 
-      await expect(events.next()).resolves.toMatchObject({
+      await expect(second).resolves.toMatchObject({
         done: false,
         value: { event: null, data: 'second' },
       });
+
+      streamController?.close();
       await expect(events.next()).resolves.toMatchObject({ done: true });
     },
   );
@@ -305,6 +314,72 @@ describe('_iterSSEMessages', () => {
     await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
       { event: null, data: 'first' },
       { event: null, data: 'second' },
+    ]);
+  });
+
+  test('delivers LF followed by CRLF before the stream closes', async () => {
+    let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          streamController = controller;
+        },
+      }),
+    );
+    const events = _iterSSEMessages(response, new AbortController());
+    const first = events.next();
+
+    streamController?.enqueue(encoder.encode('data: first\n\r\n'));
+    await expect(first).resolves.toMatchObject({ done: false, value: { event: null, data: 'first' } });
+
+    const second = events.next();
+    streamController?.enqueue(encoder.encode('data: second\r\n\n'));
+    await expect(second).resolves.toMatchObject({
+      done: false,
+      value: { event: null, data: 'second' },
+    });
+
+    streamController?.close();
+    await expect(events.next()).resolves.toMatchObject({ done: true });
+  });
+
+  test('does not emit a phantom event when CRLF is split after an immediate CR delimiter', async () => {
+    let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          streamController = controller;
+        },
+      }),
+    );
+    const events = _iterSSEMessages(response, new AbortController());
+    const first = events.next();
+
+    streamController?.enqueue(encoder.encode('data: first\r\r'));
+    await expect(first).resolves.toMatchObject({ done: false, value: { event: null, data: 'first' } });
+
+    const second = events.next();
+    streamController?.enqueue(encoder.encode('\ndata: second\r\r'));
+    await expect(second).resolves.toMatchObject({
+      done: false,
+      value: { event: null, data: 'second' },
+    });
+
+    streamController?.enqueue(encoder.encode('\n'));
+    streamController?.close();
+    await expect(events.next()).resolves.toMatchObject({ done: true });
+  });
+
+  test.each([
+    ['\r', '\n', '\r'],
+    ['\r\n', '\r', '\r\n'],
+    ['\n', '\r\n', '\r'],
+  ])('preserves byte-fragmented multiline data with %j, %j, and %j endings', async (first, second, third) => {
+    const bytes = encoder.encode(`data: first${first}data: second${second}${third}`);
+    const response = new Response(ReadableStreamFrom(Array.from(bytes, (byte) => Uint8Array.of(byte))));
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+      { event: null, data: 'first\nsecond' },
     ]);
   });
 
@@ -361,5 +436,25 @@ describe('_iterSSEMessages', () => {
     const response = responseForSSE('data: {"flushed":true}\n');
 
     await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toEqual([]);
+  });
+
+  test('ignores an SSE message that ends with only a single carriage return', async () => {
+    const response = responseForSSE('data: {"flushed":true}\r');
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toEqual([]);
+  });
+
+  test('ignores an SSE message that ends with only a single CRLF line ending', async () => {
+    const response = responseForSSE('data: {"flushed":true}\r\n');
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toEqual([]);
+  });
+
+  test('emits exactly one SSE message that ends with two carriage returns', async () => {
+    const response = responseForSSE('data: {"flushed":true}\r\r');
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+      { event: null, data: '{"flushed":true}' },
+    ]);
   });
 });

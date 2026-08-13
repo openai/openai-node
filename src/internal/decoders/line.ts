@@ -22,19 +22,21 @@ export class LineDecoder {
   static NEWLINE_REGEXP = /\r\n|[\n\r]/g;
 
   #buffer: Uint8Array;
-  #carriageReturnIndex: number | null;
+  #skipLeadingLF: boolean;
 
-  /** Creates a decoder with no buffered bytes or pending carriage return. */
+  /** Creates a decoder with no buffered bytes or pending newline continuation. */
   constructor() {
     this.#buffer = new Uint8Array();
-    this.#carriageReturnIndex = null;
+    this.#skipLeadingLF = false;
   }
 
   /**
    * Appends a text or UTF-8 byte chunk and returns every newly completed line.
    *
-   * Incomplete lines remain buffered for the next call. `null` and `undefined`
-   * are ignored and do not flush buffered content.
+   * Incomplete lines remain buffered for the next call. A trailing `\r`
+   * completes its line immediately, and a following `\n` is consumed as its
+   * continuation. `null` and `undefined` are ignored and do not flush buffered
+   * content.
    */
   decode(chunk: Bytes): string[] {
     if (chunk == null) {
@@ -50,36 +52,36 @@ export class LineDecoder {
       binaryChunk = chunk;
     }
 
+    if (binaryChunk.length === 0) {
+      return [];
+    }
+
+    if (this.#skipLeadingLF) {
+      this.#skipLeadingLF = false;
+      if (binaryChunk[0] === 0x0a) {
+        binaryChunk = binaryChunk.subarray(1);
+      }
+      if (binaryChunk.length === 0) {
+        return [];
+      }
+    }
+
     this.#buffer = concatBytes([this.#buffer, binaryChunk]);
 
     const lines: string[] = [];
     let patternIndex;
-    while ((patternIndex = findNewlineIndex(this.#buffer, this.#carriageReturnIndex)) != null) {
-      if (patternIndex.carriage && this.#carriageReturnIndex == null) {
-        // skip until we either get a corresponding `\n`, a new `\r` or nothing
-        this.#carriageReturnIndex = patternIndex.index;
-        continue;
-      }
-
-      // we got double \r or \rtext\n
-      if (
-        this.#carriageReturnIndex != null &&
-        (patternIndex.index !== this.#carriageReturnIndex + 1 || patternIndex.carriage)
-      ) {
-        lines.push(decodeUTF8(this.#buffer.subarray(0, this.#carriageReturnIndex - 1)));
-        this.#buffer = this.#buffer.subarray(this.#carriageReturnIndex);
-        this.#carriageReturnIndex = null;
-        continue;
-      }
-
-      const endIndex =
-        this.#carriageReturnIndex === null ? patternIndex.preceding : patternIndex.preceding - 1;
-
-      const line = decodeUTF8(this.#buffer.subarray(0, endIndex));
+    while ((patternIndex = findNewlineIndex(this.#buffer)) != null) {
+      const line = decodeUTF8(this.#buffer.subarray(0, patternIndex.preceding));
       lines.push(line);
 
       this.#buffer = this.#buffer.subarray(patternIndex.index);
-      this.#carriageReturnIndex = null;
+      if (patternIndex.carriage) {
+        if (this.#buffer[0] === 0x0a) {
+          this.#buffer = this.#buffer.subarray(1);
+        } else if (this.#buffer.length === 0) {
+          this.#skipLeadingLF = true;
+        }
+      }
     }
 
     return lines;
@@ -87,6 +89,7 @@ export class LineDecoder {
 
   /** Emits the remaining unterminated line, or returns an empty array when idle. */
   flush(): string[] {
+    this.#skipLeadingLF = false;
     if (!this.#buffer.length) {
       return [];
     }
@@ -97,21 +100,20 @@ export class LineDecoder {
 /**
  * Searches for the next CR or LF byte and returns its zero-based position,
  * the position immediately after it, and whether the byte was a carriage return.
- * Returns `null` when no newline byte exists after the requested start index.
+ * Returns `null` when the buffer contains no newline byte.
  *
  * ```ts
- * findNewlineIndex(new TextEncoder().encode('abc\ndef'), null)
+ * findNewlineIndex(new TextEncoder().encode('abc\ndef'))
  * // => { preceding: 3, index: 4, carriage: false }
  * ```
  */
 function findNewlineIndex(
   buffer: Uint8Array,
-  startIndex: number | null,
 ): { preceding: number; index: number; carriage: boolean } | null {
   const newline = 0x0a; // \n
   const carriage = 0x0d; // \r
 
-  for (let i = startIndex ?? 0; i < buffer.length; i++) {
+  for (let i = 0; i < buffer.length; i++) {
     if (buffer[i] === newline) {
       return { preceding: i, index: i + 1, carriage: false };
     }
@@ -127,33 +129,33 @@ function findNewlineIndex(
 /**
  * Finds the first blank-line separator used to delimit streamed event records.
  *
- * @returns The byte offset immediately after the first `\n\n`, `\r\r`, or
- * `\r\n\r\n` separator, or `-1` when the buffer contains no complete separator.
+ * @returns The byte offset immediately after the first pair of consecutive
+ * line endings, or `-1` when the buffer contains no complete separator.
  */
 export function findDoubleNewlineIndex(buffer: Uint8Array): number {
-  const newline = 0x0a; // \n
-  const carriage = 0x0d; // \r
-
   for (let i = 0; i < buffer.length - 1; i++) {
-    if (buffer[i] === newline && buffer[i + 1] === newline) {
-      // \n\n
-      return i + 2;
-    }
-    if (buffer[i] === carriage && buffer[i + 1] === carriage) {
-      // \r\r
-      return i + 2;
-    }
-    if (
-      buffer[i] === carriage &&
-      buffer[i + 1] === newline &&
-      i + 3 < buffer.length &&
-      buffer[i + 2] === carriage &&
-      buffer[i + 3] === newline
-    ) {
-      // \r\n\r\n
-      return i + 4;
+    const firstEndingLength = lineEndingLength(buffer, i);
+    if (firstEndingLength > 0) {
+      const secondEndingIndex = i + firstEndingLength;
+      const secondEndingLength = lineEndingLength(buffer, secondEndingIndex);
+      if (secondEndingLength > 0) {
+        return secondEndingIndex + secondEndingLength;
+      }
     }
   }
 
   return -1;
+}
+
+function lineEndingLength(buffer: Uint8Array, index: number): number {
+  const newline = 0x0a; // \n
+  const carriage = 0x0d; // \r
+
+  if (buffer[index] === newline) {
+    return 1;
+  }
+  if (buffer[index] === carriage) {
+    return buffer[index + 1] === newline ? 2 : 1;
+  }
+  return 0;
 }

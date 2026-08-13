@@ -46,6 +46,22 @@ describe('line decoder', () => {
     expect(decodeChunks(['foo\r', '\n', 'bar'], { flush: true })).toEqual(['foo', 'bar']);
   });
 
+  test('emits a trailing carriage return immediately and consumes its optional following newline', () => {
+    const decoder = new LineDecoder();
+
+    expect(decoder.decode('foo\r')).toEqual(['foo']);
+    expect(decoder.decode(null)).toEqual([]);
+    expect(decoder.decode('')).toEqual([]);
+    expect(decoder.decode('\nbar\r')).toEqual(['bar']);
+    expect(decoder.decode('\n')).toEqual([]);
+    expect(decoder.flush()).toEqual([]);
+  });
+
+  test('preserves a real empty line after a fragmented carriage-return line ending', () => {
+    expect(decodeChunks(['foo\r', '\n\n', 'bar\n'])).toEqual(['foo', '', 'bar']);
+    expect(decodeChunks(['foo\r', '\n', '\nbar\n'])).toEqual(['foo', '', 'bar']);
+  });
+
   test('single \\r', () => {
     expect(decodeChunks(['foo\r', 'bar'], { flush: true })).toEqual(['foo', 'bar']);
   });
@@ -53,8 +69,7 @@ describe('line decoder', () => {
   test('double \\r', () => {
     expect(decodeChunks(['foo\r', 'bar\r'], { flush: true })).toEqual(['foo', 'bar']);
     expect(decodeChunks(['foo\r', '\r', 'bar'], { flush: true })).toEqual(['foo', '', 'bar']);
-    // implementation detail that we don't yield the single \r line until a new \r or \n is encountered
-    expect(decodeChunks(['foo\r', '\r', 'bar'], { flush: false })).toEqual(['foo']);
+    expect(decodeChunks(['foo\r', '\r', 'bar'], { flush: false })).toEqual(['foo', '']);
   });
 
   test('double \\r then \\r\\n', () => {
@@ -115,6 +130,23 @@ describe('findDoubleNewlineIndex', () => {
     expect(findDoubleNewlineIndex(new TextEncoder().encode('\r\n\r\n'))).toBe(4);
   });
 
+  test.each([
+    ['\\n', '\n'],
+    ['\\r', '\r'],
+    ['\\r\\n', '\r\n'],
+  ])('finds every second line ending after %s', (_description, firstEnding) => {
+    for (const secondEnding of ['\n', '\r', '\r\n']) {
+      if (firstEnding === '\r' && secondEnding === '\n') {
+        continue;
+      }
+
+      const delimiter = firstEnding + secondEnding;
+      const input = `foo${delimiter}bar`;
+
+      expect(findDoubleNewlineIndex(new TextEncoder().encode(input))).toBe(3 + delimiter.length);
+    }
+  });
+
   test('returns -1 when no double newline found', () => {
     expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\nbar'))).toBe(-1);
     expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\rbar'))).toBe(-1);
@@ -122,8 +154,13 @@ describe('findDoubleNewlineIndex', () => {
     expect(findDoubleNewlineIndex(new TextEncoder().encode(''))).toBe(-1);
   });
 
+  test('recognizes standalone carriage returns at the end of a complete delimiter', () => {
+    expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\r\n\r'))).toBe(6);
+    expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\n\r'))).toBe(5);
+  });
+
   test('handles incomplete patterns', () => {
-    expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\r\n\r'))).toBe(-1);
     expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\r\n'))).toBe(-1);
+    expect(findDoubleNewlineIndex(new TextEncoder().encode('foo\r\nbar'))).toBe(-1);
   });
 });
