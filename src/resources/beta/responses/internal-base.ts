@@ -25,9 +25,9 @@ export class WebSocketError extends OpenAIError {
   /**
    * The error data that the API sent back in an error event.
    */
-  error?: ResponsesAPI.BetaResponseErrorEvent | undefined;
+  error?: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError | undefined;
 
-  constructor(message: string, event: ResponsesAPI.BetaResponseErrorEvent | null) {
+  constructor(message: string, event: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError | null) {
     super(message);
 
     this.error = event ?? undefined;
@@ -72,9 +72,12 @@ export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
   abstract close(props?: { code: number; reason: string }): void;
 
   protected _onError(event: null, message: string, cause: any): void;
-  protected _onError(event: ResponsesAPI.BetaResponseErrorEvent, message?: string | undefined): void;
   protected _onError(
-    event: ResponsesAPI.BetaResponseErrorEvent | null,
+    event: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError,
+    message?: string | undefined,
+  ): void;
+  protected _onError(
+    event: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError | null,
     message?: string | undefined,
     cause?: any,
   ): void {
