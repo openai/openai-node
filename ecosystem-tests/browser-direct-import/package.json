@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "fastest-levenshtein": "^1.0.16",
-    "puppeteer": "^23.4.0",
+    "puppeteer": "^25.5.0",
     "sirv-cli": "^3.0.0",
     "start-server-and-test": "^2.0.0",
     "ts-node": "^10.9.1",

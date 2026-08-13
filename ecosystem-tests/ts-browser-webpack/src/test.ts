@@ -1,7 +1,7 @@
-import puppeteer from 'puppeteer';
+import { launch } from 'puppeteer';
 
 (async () => {
-  const browser = await puppeteer.launch({
+  const browser = await launch({
     args: ['--no-sandbox'],
   });
   let page;
@@ -18,7 +18,9 @@ import puppeteer from 'puppeteer';
             .padEnd('warning'.length)} ${message.text()}`,
         ),
       )
-      .on('pageerror', ({ message }) => console.error(`${debugEvent('pageerror')} ${message}`))
+      .on('pageerror', (error) =>
+        console.error(`${debugEvent('pageerror')} ${error instanceof Error ? error.message : String(error)}`),
+      )
       .on('response', (response) =>
         console.error(`${debugEvent('response')} ${response.status()} ${response.url()}`),
       )
