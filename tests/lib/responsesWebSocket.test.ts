@@ -183,6 +183,19 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     ]);
   });
 
+  test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'dispatches Object.prototype event type %s without crashing',
+    (eventType) => {
+      const websocket = createWebSocket();
+      const events = vi.fn();
+      const event = { type: eventType };
+      websocket.on('event', events);
+
+      expect(() => websocket.socket.emit('message', JSON.stringify(event), false)).not.toThrow();
+      expect(events).toHaveBeenCalledWith(event);
+    },
+  );
+
   test.each([
     [ReadyState.CONNECTING, 'connecting'],
     [ReadyState.OPEN, 'open'],

@@ -17,7 +17,7 @@ export class EventStream<EventTypes extends BaseEvents> {
 
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
-  } = {};
+  } = Object.create(null);
   #abortListeners: { signal: AbortSignal; listener: () => void }[] = [];
 
   #ended = false;
