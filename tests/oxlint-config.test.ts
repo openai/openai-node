@@ -7,6 +7,14 @@ const repoRoot = process.cwd();
 const oxlint = path.join(repoRoot, 'node_modules/oxlint/bin/oxlint');
 const oxfmt = path.join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
 
+function spawnPnpmScript(script: 'format' | 'lint') {
+  const command = process.platform === 'win32' ? 'bash' : 'pnpm';
+  const args =
+    process.platform === 'win32' ? ['-c', 'pnpm --config.script-shell=bash "$@"', '_', script] : [script];
+
+  return spawnSync(command, args, { cwd: repoRoot, encoding: 'utf-8' });
+}
+
 test('inherits Ultracite native plugins and enforces their rules', () => {
   const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
     cwd: repoRoot,
@@ -325,19 +333,19 @@ test('checks and fixes generated imports through the public package commands', (
       ].join('\n'),
     );
 
-    const rejected = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf-8' });
+    const rejected = spawnPnpmScript('lint');
 
     expect(rejected.status).toBe(1);
     expect(`${rejected.stdout}${rejected.stderr}`).toContain(
       "Identifier 'Unused' is imported but never used.",
     );
 
-    const fixed = spawnSync('pnpm', ['format'], { cwd: repoRoot, encoding: 'utf-8' });
+    const fixed = spawnPnpmScript('format');
 
     expect(fixed.status).toBe(0);
     expect(readFileSync(generatedPath, 'utf-8')).not.toContain('Unused');
 
-    const accepted = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf-8' });
+    const accepted = spawnPnpmScript('lint');
 
     expect(accepted.status).toBe(0);
   } finally {
