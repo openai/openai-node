@@ -307,6 +307,29 @@ describe('streaming multipart filename and header security', () => {
     expect(stream.locked).toBe(false);
   });
 
+  test('preserves filename validation errors when an iterator cleanup accessor throws', async () => {
+    const getReturn = vi.fn(() => {
+      throw new Error('cleanup accessor failed');
+    });
+    const source = {
+      [Symbol.asyncIterator]() {
+        const iterator = {
+          next: async () => ({ done: false as const, value: 'unused' }),
+        } as AsyncIterator<string>;
+        Object.defineProperty(iterator, 'return', { get: getReturn });
+        return iterator;
+      },
+    };
+    const later = toStreamingFile(chunks('later bytes'), 'later.txt');
+    Object.defineProperty(later, 'name', { value: { toString: vi.fn() } });
+
+    const options = await multipartFormRequestOptions({ body: { source, later } }, fetch);
+    const reader = (options.body as ReadableStream).getReader();
+
+    await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    expect(getReturn).toHaveBeenCalledTimes(1);
+  });
+
   test('releases preflight readers when a later filename is invalid', async () => {
     const cancel = vi.fn();
     const stream = new ReadableStream<string>({ cancel });
