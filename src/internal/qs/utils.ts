@@ -168,8 +168,14 @@ export const encode: (
   }
 
   let out = '';
-  for (let j = 0; j < string.length; j += limit) {
-    const segment = string.length >= limit ? string.slice(j, j + limit) : string;
+  for (let j = 0; j < string.length;) {
+    let segmentEnd = Math.min((Math.floor(j / limit) + 1) * limit, string.length);
+
+    if (segmentEnd < string.length && string.codePointAt(segmentEnd - 1)! > 0xff_ff) {
+      segmentEnd += 1;
+    }
+
+    const segment = string.length >= limit ? string.slice(j, segmentEnd) : string;
     const arr = [];
 
     for (let i = 0; i < segment.length; ++i) {
@@ -217,6 +223,7 @@ export const encode: (
     }
 
     out += arr.join('');
+    j = segmentEnd;
   }
 
   return out;
