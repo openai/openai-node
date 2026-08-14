@@ -8,7 +8,12 @@ type Event = Record<string, any>;
 
 function readableEvents(events: Event[]) {
   const encoder = new TextEncoder();
-  return ReadableStreamFrom(events.map((event) => encoder.encode(`${JSON.stringify(event)}\n`)));
+  return ReadableStreamFrom(
+    events.map((event) => {
+      const line = `${JSON.stringify(event)}\n`;
+      return encoder.encode(line);
+    }),
+  );
 }
 
 function assistantStream(events: Event[]): AssistantStream {
