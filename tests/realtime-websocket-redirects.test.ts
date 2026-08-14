@@ -385,7 +385,6 @@ describe.each([
   });
 });
 
-
 describe.each([
   { name: 'stable', Responses: StableResponsesWS },
   { name: 'beta', Responses: BetaResponsesWS },
