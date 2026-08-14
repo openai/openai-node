@@ -456,6 +456,7 @@ describe('AssistantStream message index security', () => {
     expect(Object.getOwnPropertyDescriptor(content, 1)).toBeDefined();
     expect(content[1]?.text.value).toBe('second');
   });
+
   test('bounds cumulative streamed content holes across separate public events', async () => {
     const content: Record<string, any>[] = [];
     const runner = assistantStream([
@@ -490,7 +491,7 @@ describe('AssistantStream message index security', () => {
 });
 
 describe('AssistantStream run-step index security', () => {
-  test('rejects a tool-call sparse-array bomb through the public readable-stream transport', async () => {
+  test('rejects a tool-call sparse-array bomb received through the public readable-stream transport', async () => {
     const initialStep = {
       id: 'step_123',
       status: 'in_progress',
