@@ -144,7 +144,7 @@ describe.each([
     },
   );
 
-  test.each(['Authorization', 'authorization', 'Cookie', 'cookie'])(
+  test.each(['authorization', 'Cookie', 'cookie'])(
     'disables redirects for the sensitive header %s',
     (header) => {
       const realtime = new Realtime(
@@ -167,6 +167,27 @@ describe.each([
       });
     },
   );
+
+  test('preserves generated bearer precedence while disabling redirects', () => {
+    const realtime = new Realtime(
+      {
+        model: 'gpt-realtime',
+        options: {
+          followRedirects: true,
+          handshakeTimeout: 4321,
+          headers: { Authorization: 'custom-secret', 'X-Custom': 'value' },
+        },
+      },
+      createClient(),
+    );
+
+    expect(realtime.socket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options).toMatchObject({
+      followRedirects: false,
+      handshakeTimeout: 4321,
+      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+    });
+  });
 
   test('disables explicitly enabled redirects for bearer-only authentication', () => {
     const realtime = new Realtime(
