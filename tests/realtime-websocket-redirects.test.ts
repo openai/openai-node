@@ -20,15 +20,16 @@ interface FakeNodeSocket {
 }
 
 vi.mock('ws', () => ({
-  WebSocket: vi.fn().mockImplementation((url: URL, options: FakeNodeSocket['options']) => {
-    return {
-      url,
-      options,
-      on: vi.fn(),
-      send: vi.fn(),
-      close: vi.fn(),
-    } satisfies FakeNodeSocket;
-  }),
+  WebSocket: vi.fn().mockImplementation(
+    (url: URL, options: FakeNodeSocket['options']) =>
+      ({
+        url,
+        options,
+        on: vi.fn(),
+        send: vi.fn(),
+        close: vi.fn(),
+      }) satisfies FakeNodeSocket,
+  ),
 }));
 
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
@@ -247,9 +248,7 @@ describe.each([
         redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
 
         const actualWS = await vi.importActual<typeof WS>('ws');
-        nodeSocketConstructor.mockImplementationOnce((url: URL, options: WS.ClientOptions) => {
-          return new actualWS.WebSocket(url, options);
-        });
+        nodeSocketConstructor.mockImplementationOnce(\n          (url: URL, options: WS.ClientOptions) => new actualWS.WebSocket(url, options),\n        );
 
         const client = new AzureOpenAI({
           apiVersion: '2024-10-01-preview',
