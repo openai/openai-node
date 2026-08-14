@@ -56,7 +56,7 @@ const originalWebSocket = globalThis.WebSocket;
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 
 function lastBrowserSocket(): FakeBrowserSocket {
-  const socket = FakeBrowserSocket.instances[FakeBrowserSocket.instances.length - 1];
+  const [socket] = FakeBrowserSocket.instances.slice(-1);
   if (!socket) {
     throw new Error('Expected a browser WebSocket instance');
   }
@@ -64,9 +64,8 @@ function lastBrowserSocket(): FakeBrowserSocket {
 }
 
 function lastNodeSocket(): FakeNodeSocket {
-  const socket = nodeSocketConstructor.mock.results[nodeSocketConstructor.mock.results.length - 1]?.value as
-    | FakeNodeSocket
-    | undefined;
+  const [result] = nodeSocketConstructor.mock.results.slice(-1);
+  const socket = result?.value as FakeNodeSocket | undefined;
   if (!socket) {
     throw new Error('Expected a Node WebSocket instance');
   }
