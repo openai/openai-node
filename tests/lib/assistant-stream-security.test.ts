@@ -154,6 +154,23 @@ describe('AssistantStream delta index security', () => {
     expect(denseEntries[1024]?.text).toBe('next contiguous entry');
   });
 
+  test('caches dense multi-event accounting instead of rescanning the accumulated array', () => {
+    let ownKeysCalls = 0;
+    const entries = new Proxy<Record<string, unknown>[]>([], {
+      ownKeys(target) {
+        ownKeysCalls += 1;
+        return Reflect.ownKeys(target);
+      },
+    });
+
+    for (let index = 0; index < 2048; index += 1) {
+      AssistantStream.accumulateDelta({ entries }, { entries: [{ index, text: 'entry' }] });
+    }
+
+    expect(entries).toHaveLength(2048);
+    expect(ownKeysCalls).toBe(1);
+  });
+
   test.each(['missing', 'null', 'undefined'])(
     'rejects a later invalid index before creating a %s nested array',
     (initialState) => {
@@ -465,9 +482,10 @@ describe('AssistantStream message index security', () => {
     ]);
 
     await expect(runner.done()).rejects.toThrow('invalid content index');
-    expect(content).toHaveLength(1024);
-    expect(content[1023]?.['text'].value).toBe('first');
-    expect(hasOwn(content, 2047)).toBe(false);
+    const snapshotContent = runner.currentMessageSnapshot()?.content;
+    expect(snapshotContent).toHaveLength(1024);
+    expect(snapshotContent?.[1023]).toMatchObject({ text: { value: 'first' } });
+    expect(snapshotContent ? hasOwn(snapshotContent, 2047) : undefined).toBe(false);
   });
 });
 
