@@ -20,10 +20,11 @@ async function parseMultipart(options: Awaited<ReturnType<typeof multipartFormRe
 
 function withStatefulBrand<T extends object>(value: T, states: boolean[]): T {
   let checks = 0;
+  const [lastState = false] = states.slice(-1);
   return new Proxy(value, {
     has(target, key) {
       if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
-        const state = states[checks] ?? states.at(-1) ?? false;
+        const state = states[checks] ?? lastState;
         checks += 1;
         return state;
       }
