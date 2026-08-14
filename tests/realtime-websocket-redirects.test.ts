@@ -460,6 +460,8 @@ describe.each([
           createConnection: createPlainConnection as typeof connect,
         });
         const redirects = vi.fn();
+        const errors = vi.fn();
+        responses.on('error', errors);
         responses.socket.platformSocket.on('redirect', redirects);
 
         await once(responses.socket.platformSocket, 'error');
@@ -467,6 +469,9 @@ describe.each([
         expect(sourceCredentials).toEqual([value]);
         expect(disclosedCredentials).toEqual([]);
         expect(redirects).not.toHaveBeenCalled();
+        expect(errors).toHaveBeenCalledWith(
+          expect.objectContaining({ message: 'Unexpected server response: 302' }),
+        );
       } finally {
         await closeServers(source, destination);
       }
