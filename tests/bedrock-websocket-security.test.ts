@@ -56,7 +56,7 @@ const originalWebSocket = globalThis.WebSocket;
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 
 function lastBrowserSocket(): FakeBrowserSocket {
-  const socket = FakeBrowserSocket.instances.at(-1);
+  const socket = FakeBrowserSocket.instances[FakeBrowserSocket.instances.length - 1];
   if (!socket) {
     throw new Error('Expected a browser WebSocket instance');
   }
@@ -64,7 +64,9 @@ function lastBrowserSocket(): FakeBrowserSocket {
 }
 
 function lastNodeSocket(): FakeNodeSocket {
-  const socket = nodeSocketConstructor.mock.results.at(-1)?.value as FakeNodeSocket | undefined;
+  const socket = nodeSocketConstructor.mock.results[nodeSocketConstructor.mock.results.length - 1]?.value as
+    | FakeNodeSocket
+    | undefined;
   if (!socket) {
     throw new Error('Expected a Node WebSocket instance');
   }
@@ -328,10 +330,8 @@ describe.each([
   });
 
   test('disables redirects for nonempty Basic auth options', () => {
-    const websocket = new Responses(createUnauthenticatedClient(), {
-      auth: 'user:password',
-      followRedirects: true,
-    });
+    const options = { auth: 'user:password', followRedirects: true };
+    const websocket = new Responses(createUnauthenticatedClient(), options);
 
     expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
     expect(lastNodeSocket().options.followRedirects).toBe(false);
