@@ -238,6 +238,30 @@ describe('streaming multipart filename and header security', () => {
     },
   );
 
+  test('upgrades a cached named Blob when streaming behavior appears', async () => {
+    const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
+    const upload = Object.assign(new Blob(['blob bytes']), { name: 'upload.txt' });
+    let iteratorReads = 0;
+    Object.defineProperty(upload, Symbol.asyncIterator, {
+      get() {
+        iteratorReads += 1;
+        return iteratorReads === 1 ? undefined : incidentalIterator;
+      },
+    });
+
+    const options = await maybeMultipartFormRequestOptions({ body: { upload } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const file = form.get('upload') as File;
+
+    expect(file.name).toBe('upload.txt');
+    await expect(file.text()).resolves.toBe('blob bytes');
+    expect(iteratorReads).toBe(2);
+    expect(incidentalIterator).not.toHaveBeenCalled();
+  });
+
   test('snapshots named Blob filenames before reading later streaming filenames', async () => {
     const earlier = Object.assign(new Blob(['earlier bytes']), { name: 'original.txt' });
     const later = toStreamingFile(chunks('later bytes'), 'later.txt');
