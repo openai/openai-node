@@ -35,7 +35,8 @@ vi.mock('ws', () => ({
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 
 function lastNodeSocket(): FakeNodeSocket {
-  const socket = nodeSocketConstructor.mock.results.at(-1)?.value as FakeNodeSocket | undefined;
+  const [result] = nodeSocketConstructor.mock.results.slice(-1);
+  const socket = result?.value as FakeNodeSocket | undefined;
   if (!socket) {
     throw new Error('Expected a WebSocket instance');
   }
