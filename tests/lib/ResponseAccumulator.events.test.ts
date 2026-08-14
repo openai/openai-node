@@ -743,7 +743,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       applyEvent(snapshot, {
         type,
         output_index: 0,
-        [indexField]: 1,
+        [indexField]: 0,
         item: { type: 'function_call', id: 'injected', arguments: '' },
         part: {
           type: kind === 'summary' ? 'summary_text' : 'output_text',
@@ -751,7 +751,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
           annotations: [],
         },
       }),
-    ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index 1`);
+    ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index 0`);
 
     expect(inheritedSetterCalled).toBe(false);
     expect(collection).toHaveLength(1);
