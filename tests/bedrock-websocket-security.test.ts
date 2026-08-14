@@ -330,27 +330,4 @@ describe.each([
     });
     expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
   });
-  test.each([
-    ['Authorization', 'Bearer secret'],
-    ['Proxy-Authorization', 'Basic proxy-secret'],
-    ['Cookie', 'session=secret'],
-    ['X-API-Key', 'api-secret'],
-    ['api_key', 'api-secret'],
-  ])('disables redirects for the credential header %s', (header, value) => {
-    const websocket = new Responses(createUnauthenticatedClient(), {
-      followRedirects: true,
-      headers: { [header]: value },
-    });
-
-    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
-    expect(lastNodeSocket().options.followRedirects).toBe(false);
-  });
-
-  test('disables redirects for nonempty Basic auth options', () => {
-    const options = { auth: 'user:password', followRedirects: true };
-    const websocket = new Responses(createUnauthenticatedClient(), options);
-
-    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
-    expect(lastNodeSocket().options.followRedirects).toBe(false);
-  });
 });

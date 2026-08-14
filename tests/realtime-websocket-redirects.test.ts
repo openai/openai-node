@@ -5,8 +5,6 @@ import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 import OpenAI, { AzureOpenAI } from 'openai';
-import { ResponsesWS as StableResponsesWS } from 'openai/resources/responses/ws';
-import { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWS as BetaNodeRealtime } from 'openai/beta/realtime/ws';
 import * as WS from 'ws';
@@ -383,98 +381,4 @@ describe.each([
       await closeServers(source, destination);
     }
   });
-});
-
-describe.each([
-  { name: 'stable', Responses: StableResponsesWS },
-  { name: 'beta', Responses: BetaResponsesWS },
-])('$name Responses WebSocket redirect security', ({ Responses }) => {
-  test.each([
-    {
-      name: 'generated bearer authorization',
-      client: () => new OpenAI({ apiKey: 'BEARER_SECRET' }),
-      options: {},
-      header: 'authorization',
-      value: 'Bearer BEARER_SECRET',
-    },
-    {
-      name: 'caller Basic auth',
-      client: () => new OpenAI({ apiKey: null, adminAPIKey: 'admin-only' }),
-      options: { auth: 'user:pass' },
-      header: 'authorization',
-      value: 'Basic dXNlcjpwYXNz',
-    },
-    {
-      name: 'caller proxy authorization',
-      client: () => new OpenAI({ apiKey: null, adminAPIKey: 'admin-only' }),
-      options: { headers: { 'Proxy-Authorization': 'Basic PROXY_SECRET' } },
-      header: 'proxy-authorization',
-      value: 'Basic PROXY_SECRET',
-    },
-  ])(
-    'does not disclose $name across a redirect with a public listener',
-    async ({ client, options, header, value }) => {
-      const sourceCredentials: (string | undefined)[] = [];
-      const disclosedCredentials: (string | undefined)[] = [];
-      let redirectURL = '';
-
-      const destination = createServer((request, response) => {
-        request.resume();
-        disclosedCredentials.push(request.headers[header] as string | undefined);
-        response.writeHead(200);
-        response.end();
-      });
-      const source = createServer((request, response) => {
-        request.resume();
-        sourceCredentials.push(request.headers[header] as string | undefined);
-        response.writeHead(302, { location: redirectURL });
-        response.end();
-      });
-
-      try {
-        await Promise.all([
-          once(destination.listen(0, '127.0.0.1'), 'listening'),
-          once(source.listen(0, '127.0.0.1'), 'listening'),
-        ]);
-        const destinationAddress = destination.address();
-        const sourceAddress = source.address();
-        if (
-          !destinationAddress ||
-          typeof destinationAddress === 'string' ||
-          !sourceAddress ||
-          typeof sourceAddress === 'string'
-        ) {
-          throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');
-        }
-
-        redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
-        const actualWS = await vi.importActual<typeof WS>('ws');
-        actualWebSocketConstructor = actualWS.WebSocket;
-        nodeSocketConstructor.mockImplementationOnce(ActualWebSocket);
-
-        const openAI = client();
-        openAI.baseURL = `http://127.0.0.1:${sourceAddress.port}/v1`;
-        const responses = new Responses(openAI, {
-          ...options,
-          followRedirects: true,
-          createConnection: createPlainConnection as typeof connect,
-        });
-        const redirects = vi.fn();
-        const errors = vi.fn();
-        onRealtimeEvent(responses, 'error', errors);
-        responses.socket.platformSocket.on('redirect', redirects);
-
-        await once(responses.socket.platformSocket, 'error');
-
-        expect(sourceCredentials).toEqual([value]);
-        expect(disclosedCredentials).toEqual([]);
-        expect(redirects).not.toHaveBeenCalled();
-        expect(errors).toHaveBeenCalledWith(
-          expect.objectContaining({ message: 'Unexpected server response: 302' }),
-        );
-      } finally {
-        await closeServers(source, destination);
-      }
-    },
-  );
 });

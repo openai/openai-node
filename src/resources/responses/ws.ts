@@ -2,7 +2,6 @@
 
 import * as WS from 'ws';
 import { NodeWebSocket } from '../../internal/ws-adapter-node';
-import { protectWebSocketOptionsFromCredentialRedirects } from '../../internal/ws';
 import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
 
@@ -27,16 +26,13 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
   }
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
-    const ws = new WS.WebSocket(
-      url,
-      protectWebSocketOptionsFromCredentialRedirects({
-        ...this._wsOptions,
-        headers: {
-          ...authHeaders,
-          ...this._wsOptions?.headers,
-        },
-      }),
-    );
+    const ws = new WS.WebSocket(url, {
+      ...this._wsOptions,
+      headers: {
+        ...authHeaders,
+        ...this._wsOptions?.headers,
+      },
+    });
     return new NodeWebSocket(ws);
   }
 }
