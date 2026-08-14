@@ -502,4 +502,5 @@ describe('bedrock Runtime provider', () => {
     await copiedClient.request({ method: 'get', path: '/models' });
 
     expect(authorizationHeaders).toEqual(['Bearer first-token', 'Bearer refreshed-token']);
-  });});
+  });
+});
