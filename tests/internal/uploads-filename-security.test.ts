@@ -240,8 +240,13 @@ describe('streaming multipart filename and header security', () => {
       fetch,
     );
     const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+    const firstRead = reader.read().then(({ done, value }) => {
+      if (!done) {
+        emitted.push(value);
+      }
+    });
 
-    await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    await expect(firstRead).rejects.toThrow(/file.?name/iu);
     expect(emitted).toEqual([]);
     expect(incidentalIterator).not.toHaveBeenCalled();
     expect(brandChecks).toBe(2);
