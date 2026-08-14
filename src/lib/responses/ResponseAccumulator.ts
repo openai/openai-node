@@ -8,6 +8,10 @@ type ResponseAccumulatorContext = {
   outputTextLengths: WeakMap<Response['output'][number], number>;
 };
 
+function createResponseContext(): ResponseAccumulatorContext {
+  return { canonicalSnapshot: undefined, outputTextLengths: new WeakMap() };
+}
+
 /** A transport keepalive event that leaves the accumulated response unchanged. */
 type ResponseKeepAliveEvent = {
   /** Identifies a non-content keepalive event emitted by the response transport. */
@@ -26,31 +30,11 @@ type ResponseKeepAliveEvent = {
 export function accumulateResponse(
   event: ResponseStreamEvent | ResponseKeepAliveEvent,
   snapshot?: Response,
-): Response {
-  return accumulateResponseWithContext(event, snapshot, createResponseAccumulatorContext());
-}
-
-/**
- * Creates an accumulator with bookkeeping owned by a single response stream.
- *
- * @internal
- */
-export function createResponseAccumulator(): (
+): Response;
+export function accumulateResponse(
   event: ResponseStreamEvent | ResponseKeepAliveEvent,
   snapshot?: Response,
-) => Response {
-  const context = createResponseAccumulatorContext();
-  return (event, snapshot) => accumulateResponseWithContext(event, snapshot, context);
-}
-
-function createResponseAccumulatorContext(): ResponseAccumulatorContext {
-  return { canonicalSnapshot: undefined, outputTextLengths: new WeakMap() };
-}
-
-function accumulateResponseWithContext(
-  event: ResponseStreamEvent | ResponseKeepAliveEvent,
-  snapshot: Response | undefined,
-  context: ResponseAccumulatorContext,
+  context: ResponseAccumulatorContext = createResponseContext(),
 ): Response {
   if (!snapshot) {
     if (event.type !== 'response.created') {
