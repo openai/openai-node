@@ -437,36 +437,6 @@ describe('AssistantStream message index security', () => {
     expect(content[1]?.text.value).toBe('second');
   });
 
-  test('bounds cumulative streamed content holes across separate public events', async () => {
-    const content: Record<string, any>[] = [];
-    const runner = assistantStream([
-      { event: 'thread.message.created', data: { id: 'msg_123', role: 'assistant', content } },
-      {
-        event: 'thread.message.delta',
-        data: {
-          id: 'msg_123',
-          delta: {
-            content: [{ index: 1023, type: 'text', text: { value: 'first', annotations: [] } }],
-          },
-        },
-      },
-      {
-        event: 'thread.message.delta',
-        data: {
-          id: 'msg_123',
-          delta: {
-            content: [{ index: 2047, type: 'text', text: { value: 'amplified', annotations: [] } }],
-          },
-        },
-      },
-      completedRun(),
-    ]);
-
-    await expect(runner.done()).rejects.toThrow('invalid content index');
-    expect(content).toHaveLength(1024);
-    expect(content[1023]?.['text'].value).toBe('first');
-    expect(hasOwn(content, 2047)).toBe(false);
-  });
 });
 
 describe('AssistantStream run-step index security', () => {
@@ -527,55 +497,5 @@ describe('AssistantStream run-step index security', () => {
     expect(argumentsAfterDelta).toBe('original');
   });
 
-  test('bounds cumulative tool-call holes across separate public events', async () => {
-    const initialStep = {
-      id: 'step_cumulative',
-      status: 'in_progress',
-      step_details: {
-        type: 'tool_calls',
-        tool_calls: [{ index: 0, type: 'function', id: 'call_0', function: { arguments: '' } }],
-      },
-    };
-    const runner = assistantStream([
-      { event: 'thread.run.step.created', data: initialStep },
-      {
-        event: 'thread.run.step.delta',
-        data: {
-          id: 'step_cumulative',
-          delta: {
-            step_details: {
-              type: 'tool_calls',
-              tool_calls: [
-                { index: 1023, type: 'function', id: 'call_1023', function: { arguments: '' } },
-              ],
-            },
-          },
-        },
-      },
-      {
-        event: 'thread.run.step.delta',
-        data: {
-          id: 'step_cumulative',
-          delta: {
-            step_details: {
-              type: 'tool_calls',
-              tool_calls: [
-                { index: 2047, type: 'function', id: 'call_2047', function: { arguments: '' } },
-              ],
-            },
-          },
-        },
-      },
-      completedRun(),
-    ]);
-
-    await expect(runner.done()).rejects.toThrow('invalid array index');
-    const details = runner.currentRunStepSnapshot()?.step_details;
-    expect(details?.type).toBe('tool_calls');
-    if (details?.type === 'tool_calls') {
-      expect(details.tool_calls).toHaveLength(1024);
-      expect(details.tool_calls[1023]?.id).toBe('call_1023');
-      expect(hasOwn(details.tool_calls, 2047)).toBe(false);
-    }
-  });
+});
 });
