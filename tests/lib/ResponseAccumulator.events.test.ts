@@ -697,10 +697,15 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
   });
 
   test.each([
-    ['output', 'response.output_item.added', 'output_index'],
-    ['content', 'response.content_part.added', 'content_index'],
-    ['summary', 'response.reasoning_summary_part.added', 'summary_index'],
-  ])('rejects inherited numeric setters at the declared %s append position', (kind, type, indexField) => {
+    ['output', 'response.output_item.added', 'output_index', 1, 'declared append'],
+    ['content', 'response.content_part.added', 'content_index', 1, 'declared append'],
+    ['summary', 'response.reasoning_summary_part.added', 'summary_index', 1, 'declared append'],
+    ['output', 'response.output_item.added', 'output_index', 0, 'replayed existing'],
+    ['content', 'response.content_part.added', 'content_index', 0, 'replayed existing'],
+    ['summary', 'response.reasoning_summary_part.added', 'summary_index', 0, 'replayed existing'],
+  ])(
+    'rejects inherited numeric setters for a %s %s index',
+    (kind, type, indexField, declaredIndex) => {
     let snapshot: Response;
     if (kind === 'output') {
       snapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
@@ -743,7 +748,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       applyEvent(snapshot, {
         type,
         output_index: 0,
-        [indexField]: 0,
+        [indexField]: declaredIndex,
         item: { type: 'function_call', id: 'injected', arguments: '' },
         part: {
           type: kind === 'summary' ? 'summary_text' : 'output_text',
@@ -751,12 +756,13 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
           annotations: [],
         },
       }),
-    ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index 0`);
+    ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index ${declaredIndex}`);
 
-    expect(inheritedSetterCalled).toBe(false);
-    expect(collection).toHaveLength(1);
-    expect(hasOwn(collection, 1)).toBe(false);
-  });
+      expect(inheritedSetterCalled).toBe(false);
+      expect(collection).toHaveLength(1);
+      expect(hasOwn(collection, 1)).toBe(false);
+    },
+  );
 
   test('rejects inherited numeric setters before appending annotations', () => {
     const snapshot = snapshotFor({
