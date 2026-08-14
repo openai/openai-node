@@ -3,6 +3,8 @@ import { hasOwn, isObj } from './utils';
 
 const MAX_ASSISTANT_STREAM_ARRAY_GROWTH = 1024;
 
+type AssistantStreamRecord = Record<string, unknown>;
+
 interface AssistantStreamArrayState {
   length: number;
   ownEntryCount: number;
@@ -11,7 +13,7 @@ interface AssistantStreamArrayState {
 interface AssistantStreamArrayProjection {
   baselineLength: number;
   cacheable: boolean;
-  entries: Map<number, Record<string, unknown>>;
+  entries: Map<number, AssistantStreamRecord>;
   length: number;
   ownEntryCount: number;
 }
@@ -19,7 +21,7 @@ interface AssistantStreamArrayProjection {
 interface AssistantStreamDeltaProjection {
   arrays: Map<unknown[], AssistantStreamArrayProjection>;
   cacheArrays: boolean;
-  records: WeakMap<Record<string, any>, Map<string, unknown>>;
+  records: WeakMap<AssistantStreamRecord, Map<string, unknown>>;
 }
 
 const assistantStreamArrayStates = new WeakMap<unknown[], AssistantStreamArrayState>();
@@ -50,9 +52,113 @@ function isPrimitiveAssistantStreamArrayDelta(accumulator: unknown[], delta: unk
   return delta.every(isPrimitiveAssistantStreamValue) && accumulator.every(isPrimitiveAssistantStreamValue);
 }
 
+function countOwnAssistantStreamArrayEntries(accumulator: unknown[]): number {
+  let count = 0;
+  for (const key of Object.keys(accumulator)) {
+    const index = Number(key);
+    if (Number.isSafeInteger(index) && index >= 0 && index < accumulator.length && String(index) === key) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function getAssistantStreamDeltaIndex(
+  deltaEntry: AssistantStreamRecord,
+  kind: 'content' | 'array',
+  baselineLength: number,
+): number {
+  const { index } = deltaEntry;
+
+  if (kind === 'array' && (index === null || index === undefined)) {
+    console.error(deltaEntry);
+    throw new Error('Expected array delta entry to have an `index` property');
+  }
+
+  if (kind === 'array' && typeof index !== 'number') {
+    throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+  }
+
+  if (
+    !Number.isSafeInteger(index) ||
+    (index as number) < 0 ||
+    (index as number) >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH
+  ) {
+    throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
+  }
+
+  return index as number;
+}
+
+function assertValidAssistantStreamArrayDelta(
+  accumulator: unknown[],
+  delta: unknown[],
+  kind: 'content' | 'array',
+  projection: AssistantStreamDeltaProjection,
+): void {
+  let projectedArray = projection.arrays.get(accumulator);
+
+  if (!projectedArray) {
+    const cacheable =
+      projection.cacheArrays && !externallyMutableAssistantStreamValues.has(accumulator);
+    const cachedState = cacheable ? assistantStreamArrayStates.get(accumulator) : undefined;
+    projectedArray = {
+      baselineLength: accumulator.length,
+      cacheable,
+      entries: new Map(),
+      length: accumulator.length,
+      ownEntryCount:
+        cachedState?.length === accumulator.length
+          ? cachedState.ownEntryCount
+          : countOwnAssistantStreamArrayEntries(accumulator),
+    };
+    projection.arrays.set(accumulator, projectedArray);
+  }
+
+  for (const deltaEntry of delta) {
+    if (!isObj(deltaEntry)) {
+      throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+    }
+
+    const validatedIndex = getAssistantStreamDeltaIndex(
+      deltaEntry,
+      kind,
+      projectedArray.baselineLength,
+    );
+    let accumulatedEntry: unknown;
+
+    if (projectedArray.entries.has(validatedIndex)) {
+      accumulatedEntry = projectedArray.entries.get(validatedIndex);
+    } else if (hasOwn(accumulator, validatedIndex)) {
+      accumulatedEntry = accumulator[validatedIndex];
+
+      if (accumulatedEntry === null || accumulatedEntry === undefined) {
+        projectedArray.entries.set(validatedIndex, deltaEntry);
+      }
+    } else {
+      projectedArray.entries.set(validatedIndex, deltaEntry);
+      projectedArray.ownEntryCount += 1;
+    }
+
+    const projectedLength = Math.max(projectedArray.length, validatedIndex + 1);
+    if (projectedLength - projectedArray.ownEntryCount > MAX_ASSISTANT_STREAM_ARRAY_GROWTH) {
+      throw new OpenAIError(
+        `Assistant stream delta contains an invalid ${kind} index: ${validatedIndex}`,
+      );
+    }
+
+    if (isObj(accumulatedEntry)) {
+      // eslint-disable-next-line no-use-before-define -- Record and array validation recurse into each other.
+      assertValidAssistantStreamDeltaIndices(accumulatedEntry, deltaEntry, projection);
+    }
+
+    projectedArray.length = projectedLength;
+  }
+}
+
 function assertValidAssistantStreamDeltaIndices(
-  accumulator: Record<string, any>,
-  delta: Record<string, any>,
+  accumulator: AssistantStreamRecord,
+  delta: AssistantStreamRecord,
   projection: AssistantStreamDeltaProjection,
 ): void {
   let projectedValues = projection.records.get(accumulator);
@@ -92,215 +198,6 @@ function assertValidAssistantStreamDeltaIndices(
   }
 }
 
-function assertValidAssistantStreamArrayDelta(
-  accumulator: unknown[],
-  delta: unknown[],
-  kind: 'content' | 'array',
-  projection: AssistantStreamDeltaProjection,
-): void {
-  let projectedArray = projection.arrays.get(accumulator);
-
-  if (!projectedArray) {
-    const cacheable =
-      projection.cacheArrays && !externallyMutableAssistantStreamValues.has(accumulator);
-    const cachedState = cacheable ? assistantStreamArrayStates.get(accumulator) : undefined;
-    projectedArray = {
-      baselineLength: accumulator.length,
-      cacheable,
-      entries: new Map(),
-      length: accumulator.length,
-      ownEntryCount:
-        cachedState?.length === accumulator.length
-          ? cachedState.ownEntryCount
-          : countOwnAssistantStreamArrayEntries(accumulator),
-    };
-    projection.arrays.set(accumulator, projectedArray);
-  }
-
-  for (const deltaEntry of delta) {
-    if (!isObj(deltaEntry)) {
-      throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
-    }
-
-    const index = deltaEntry['index'];
-
-    if (kind === 'array' && index == null) {
-      console.error(deltaEntry);
-      throw new Error('Expected array delta entry to have an `index` property');
-    }
-
-    if (kind === 'array' && typeof index !== 'number') {
-      throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
-    }
-
-    if (
-      !Number.isSafeInteger(index) ||
-      (index as number) < 0 ||
-      (index as number) >= projectedArray.baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH
-    ) {
-      throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
-    }
-
-    const validatedIndex = index as number;
-    let accumulatedEntry: unknown;
-
-    if (projectedArray.entries.has(validatedIndex)) {
-      accumulatedEntry = projectedArray.entries.get(validatedIndex);
-    } else if (hasOwn(accumulator, validatedIndex)) {
-      accumulatedEntry = accumulator[validatedIndex];
-
-      if (accumulatedEntry === null || accumulatedEntry === undefined) {
-        projectedArray.entries.set(validatedIndex, deltaEntry);
-      }
-    } else {
-      projectedArray.entries.set(validatedIndex, deltaEntry);
-      projectedArray.ownEntryCount += 1;
-    }
-
-    const projectedLength = Math.max(projectedArray.length, validatedIndex + 1);
-    if (projectedLength - projectedArray.ownEntryCount > MAX_ASSISTANT_STREAM_ARRAY_GROWTH) {
-      throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
-    }
-
-    if (isObj(accumulatedEntry)) {
-      assertValidAssistantStreamDeltaIndices(accumulatedEntry, deltaEntry, projection);
-    }
-
-    projectedArray.length = projectedLength;
-  }
-}
-
-function countOwnAssistantStreamArrayEntries(accumulator: unknown[]): number {
-  let count = 0;
-  for (const key of Object.keys(accumulator)) {
-    const index = Number(key);
-    if (Number.isSafeInteger(index) && index >= 0 && index < accumulator.length && String(index) === key) {
-      count += 1;
-    }
-  }
-  return count;
-}
-
-function applyAssistantStreamDelta(
-  acc: Record<string, any>,
-  delta: Record<string, any>,
-  cacheArrays: boolean,
-): Record<string, any> {
-  const externallyMutable = externallyMutableAssistantStreamValues.has(acc);
-
-  for (const [key, deltaValue] of Object.entries(delta)) {
-    if (!hasOwn(acc, key)) {
-      if (externallyMutable) {
-        markAssistantStreamValueExternallyMutable(deltaValue);
-      }
-      acc[key] = deltaValue;
-      continue;
-    }
-
-    let accValue = acc[key];
-    if (accValue === null || accValue === undefined) {
-      if (externallyMutable) {
-        markAssistantStreamValueExternallyMutable(deltaValue);
-      }
-      acc[key] = deltaValue;
-      continue;
-    }
-
-    if (key === 'index' || key === 'type') {
-      acc[key] = deltaValue;
-      continue;
-    }
-
-    if (typeof accValue === 'string' && typeof deltaValue === 'string') {
-      accValue += deltaValue;
-    } else if (typeof accValue === 'number' && typeof deltaValue === 'number') {
-      accValue += deltaValue;
-    } else if (isObj(accValue) && isObj(deltaValue)) {
-      accValue = applyAssistantStreamDelta(accValue, deltaValue, cacheArrays);
-    } else if (Array.isArray(accValue) && Array.isArray(deltaValue)) {
-      if (isPrimitiveAssistantStreamArrayDelta(accValue, deltaValue)) {
-        accValue.push(...deltaValue);
-        assistantStreamArrayStates.delete(accValue);
-        continue;
-      }
-
-      for (const deltaEntry of deltaValue) {
-        if (!isObj(deltaEntry)) {
-          throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
-        }
-
-        const index = deltaEntry['index'];
-        if (index == null) {
-          console.error(deltaEntry);
-          throw new Error('Expected array delta entry to have an `index` property');
-        }
-
-        if (typeof index !== 'number') {
-          throw new TypeError(
-            `Expected array delta entry \`index\` property to be a number but got ${index}`,
-          );
-        }
-
-        if (hasOwn(accValue, index)) {
-          const accEntry = accValue[index];
-          accValue[index] =
-            accEntry == null ? deltaEntry : applyAssistantStreamDelta(accEntry, deltaEntry, cacheArrays);
-        } else {
-          defineAssistantStreamArrayEntry(accValue, index, deltaEntry);
-        }
-      }
-      continue;
-    } else {
-      throw new TypeError(
-        `Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`,
-      );
-    }
-    acc[key] = accValue;
-  }
-
-  return acc;
-}
-
-export function accumulateAssistantStreamDelta(
-  acc: Record<string, any>,
-  delta: Record<string, any>,
-  cacheArrays = false,
-): Record<string, any> {
-  assertSafeAssistantStreamDelta(delta);
-  const projection = createAssistantStreamDeltaProjection(cacheArrays);
-  assertValidAssistantStreamDeltaIndices(acc, delta, projection);
-  applyAssistantStreamDelta(acc, delta, cacheArrays);
-  commitAssistantStreamArrayProjection(projection);
-  return acc;
-}
-
-export function createAssistantStreamArrayDeltaCommit(
-  accumulator: unknown[],
-  delta: unknown[],
-  kind: 'content' | 'array',
-): () => void {
-  assertSafeAssistantStreamDelta(delta);
-  const projection = createAssistantStreamDeltaProjection(true);
-  assertValidAssistantStreamArrayDelta(accumulator, delta, kind, projection);
-  return () => commitAssistantStreamArrayProjection(projection);
-}
-
-export function defineAssistantStreamArrayEntry(
-  accumulator: unknown[],
-  index: number,
-  value: unknown,
-): void {
-  if (externallyMutableAssistantStreamValues.has(accumulator)) {
-    markAssistantStreamValueExternallyMutable(value);
-  }
-  Object.defineProperty(accumulator, index, {
-    configurable: true,
-    enumerable: true,
-    value,
-    writable: true,
-  });
-}
-
 export function markAssistantStreamValueExternallyMutable(value: unknown): void {
   if ((!isObj(value) && !Array.isArray(value)) || externallyMutableAssistantStreamValues.has(value)) {
     return;
@@ -319,6 +216,116 @@ export function markAssistantStreamValueExternallyMutable(value: unknown): void 
   }
 }
 
+export function defineAssistantStreamArrayEntry(
+  accumulator: unknown[],
+  index: number,
+  value: unknown,
+): void {
+  if (externallyMutableAssistantStreamValues.has(accumulator)) {
+    markAssistantStreamValueExternallyMutable(value);
+  }
+  Object.defineProperty(accumulator, index, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+function getRequiredAssistantStreamArrayIndex(deltaEntry: AssistantStreamRecord): number {
+  const { index } = deltaEntry;
+  if (index === null || index === undefined) {
+    console.error(deltaEntry);
+    throw new Error('Expected array delta entry to have an `index` property');
+  }
+  if (typeof index !== 'number') {
+    throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+  }
+  return index;
+}
+
+function applyAssistantStreamArrayDelta(accumulator: unknown[], delta: unknown[]): void {
+  if (isPrimitiveAssistantStreamArrayDelta(accumulator, delta)) {
+    accumulator.push(...delta);
+    assistantStreamArrayStates.delete(accumulator);
+    return;
+  }
+
+  for (const deltaEntry of delta) {
+    if (!isObj(deltaEntry)) {
+      throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+    }
+
+    const index = getRequiredAssistantStreamArrayIndex(deltaEntry);
+    if (hasOwn(accumulator, index)) {
+      const accumulatedEntry = accumulator[index];
+      if (accumulatedEntry === null || accumulatedEntry === undefined) {
+        if (externallyMutableAssistantStreamValues.has(accumulator)) {
+          markAssistantStreamValueExternallyMutable(deltaEntry);
+        }
+        accumulator[index] = deltaEntry;
+      } else {
+        // eslint-disable-next-line no-use-before-define -- Object and array accumulation recurse into each other.
+        accumulator[index] = applyAssistantStreamDelta(
+          accumulatedEntry as AssistantStreamRecord,
+          deltaEntry,
+        );
+      }
+    } else {
+      defineAssistantStreamArrayEntry(accumulator, index, deltaEntry);
+    }
+  }
+}
+
+function applyAssistantStreamDelta(
+  accumulator: AssistantStreamRecord,
+  delta: AssistantStreamRecord,
+): AssistantStreamRecord {
+  const externallyMutable = externallyMutableAssistantStreamValues.has(accumulator);
+
+  for (const [key, deltaValue] of Object.entries(delta)) {
+    if (!hasOwn(accumulator, key)) {
+      if (externallyMutable) {
+        markAssistantStreamValueExternallyMutable(deltaValue);
+      }
+      accumulator[key] = deltaValue;
+      continue;
+    }
+
+    let accumulatedValue = accumulator[key];
+    if (accumulatedValue === null || accumulatedValue === undefined) {
+      if (externallyMutable) {
+        markAssistantStreamValueExternallyMutable(deltaValue);
+      }
+      accumulator[key] = deltaValue;
+      continue;
+    }
+
+    if (key === 'index' || key === 'type') {
+      accumulator[key] = deltaValue;
+      continue;
+    }
+
+    if (typeof accumulatedValue === 'string' && typeof deltaValue === 'string') {
+      accumulatedValue += deltaValue;
+    } else if (typeof accumulatedValue === 'number' && typeof deltaValue === 'number') {
+      accumulatedValue += deltaValue;
+    } else if (isObj(accumulatedValue) && isObj(deltaValue)) {
+      accumulatedValue = applyAssistantStreamDelta(accumulatedValue, deltaValue);
+    } else if (Array.isArray(accumulatedValue) && Array.isArray(deltaValue)) {
+      applyAssistantStreamArrayDelta(accumulatedValue, deltaValue);
+      continue;
+    } else {
+      throw new TypeError(
+        `Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accumulatedValue}`,
+      );
+    }
+    accumulator[key] = accumulatedValue;
+  }
+
+  return accumulator;
+}
+
 export function assertSafeAssistantStreamDelta(value: unknown): void {
   if (!isObj(value) && !Array.isArray(value)) {
     return;
@@ -331,4 +338,30 @@ export function assertSafeAssistantStreamDelta(value: unknown): void {
 
     assertSafeAssistantStreamDelta(nestedValue);
   }
+}
+
+export function accumulateAssistantStreamDelta<Accumulator extends object>(
+  accumulator: Accumulator,
+  delta: object,
+  cacheArrays = false,
+): Accumulator {
+  assertSafeAssistantStreamDelta(delta);
+  const accumulatorRecord = accumulator as AssistantStreamRecord;
+  const deltaRecord = delta as AssistantStreamRecord;
+  const projection = createAssistantStreamDeltaProjection(cacheArrays);
+  assertValidAssistantStreamDeltaIndices(accumulatorRecord, deltaRecord, projection);
+  applyAssistantStreamDelta(accumulatorRecord, deltaRecord);
+  commitAssistantStreamArrayProjection(projection);
+  return accumulator;
+}
+
+export function createAssistantStreamArrayDeltaCommit(
+  accumulator: unknown[],
+  delta: unknown[],
+  kind: 'content' | 'array',
+): () => void {
+  assertSafeAssistantStreamDelta(delta);
+  const projection = createAssistantStreamDeltaProjection(true);
+  assertValidAssistantStreamArrayDelta(accumulator, delta, kind, projection);
+  return () => commitAssistantStreamArrayProjection(projection);
 }
