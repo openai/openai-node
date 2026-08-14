@@ -80,6 +80,10 @@ function createClient(apiKey: string | (() => Promise<string>) = 'test-key'): Op
   return new OpenAI({ apiKey, baseURL: 'https://example.com/v1/' });
 }
 
+function createUnauthenticatedClient(): OpenAI {
+  return new OpenAI({ apiKey: null, adminAPIKey: 'admin-only', baseURL: 'https://example.com/v1/' });
+}
+
 function createAzureClient(options: { tokenProvider?: boolean; deployment?: string } = {}): AzureOpenAI {
   return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
@@ -247,6 +251,39 @@ describe('Bedrock WebSocket origin containment', () => {
       }
     },
   );
+});
+
+describe.each([
+  { name: 'stable', Responses: StableResponsesWS },
+  { name: 'beta', Responses: BetaResponsesWS },
+])('$name Responses WebSocket redirect options', ({ Responses }) => {
+  test('preserves explicitly enabled redirects without sensitive headers', () => {
+    const websocket = new Responses(createUnauthenticatedClient(), {
+      followRedirects: true,
+      headers: { 'X-Custom': 'value' },
+    });
+
+    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options).toMatchObject({
+      followRedirects: true,
+      headers: { 'X-Custom': 'value' },
+    });
+    expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
+  });
+
+  test.each(['Cookie', 'X-API-KEY'])('disables redirects for caller-supplied %s credentials', (header) => {
+    const websocket = new Responses(createUnauthenticatedClient(), {
+      followRedirects: true,
+      headers: { [header]: 'secret' },
+    });
+
+    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options).toMatchObject({
+      followRedirects: false,
+      headers: { [header]: 'secret' },
+    });
+    expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
+  });
 });
 
 describe.each([
