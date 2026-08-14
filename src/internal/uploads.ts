@@ -613,7 +613,7 @@ function snapshotStreamingFileData(
         }
       },
     };
-    if (isNativeReadableStream(value)) {
+    if (isNativeReadableStream(value, true)) {
       snapshots.set(value, snapshot);
     }
     return snapshot;
