@@ -140,7 +140,10 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'stable Node Realtime',
       open: (client: BedrockOpenAI) =>
         new StableNodeRealtime(
-          { model: 'gpt-realtime', buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') },
+          {
+            model: 'gpt-realtime',
+            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+          } as ConstructorParameters<typeof BetaNodeRealtime>[0],
           client,
         ),
     },
@@ -148,7 +151,10 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'beta Node Realtime',
       open: (client: BedrockOpenAI) =>
         new BetaNodeRealtime(
-          { model: 'gpt-realtime', buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') },
+          {
+            model: 'gpt-realtime',
+            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+          } as ConstructorParameters<typeof BetaNodeRealtime>[0],
           client,
         ),
     },
@@ -156,7 +162,10 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'stable native Realtime',
       open: (client: BedrockOpenAI) =>
         new StableBrowserRealtime(
-          { model: 'gpt-realtime', buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') },
+          {
+            model: 'gpt-realtime',
+            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+          } as ConstructorParameters<typeof BetaNodeRealtime>[0],
           client,
         ),
     },
@@ -164,7 +173,10 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'beta native Realtime',
       open: (client: BedrockOpenAI) =>
         new BetaBrowserRealtime(
-          { model: 'gpt-realtime', buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') },
+          {
+            model: 'gpt-realtime',
+            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+          } as ConstructorParameters<typeof BetaBrowserRealtime>[0],
           client,
         ),
     },
@@ -183,10 +195,13 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'beta Node Realtime',
       kind: 'node',
       create: (client: BedrockOpenAI, hostile = false) =>
-        BetaNodeRealtime.create(client, {
-          model: 'gpt-realtime',
-          ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
-        }),
+        BetaNodeRealtime.create(
+          client,
+          {
+            model: 'gpt-realtime',
+            ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
+          } as Parameters<typeof BetaNodeRealtime.create>[1],
+        ),
     },
     {
       name: 'stable native Realtime',
@@ -201,10 +216,13 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'beta native Realtime',
       kind: 'native',
       create: (client: BedrockOpenAI, hostile = false) =>
-        BetaBrowserRealtime.create(client, {
-          model: 'gpt-realtime',
-          ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
-        }),
+        BetaBrowserRealtime.create(
+          client,
+          {
+            model: 'gpt-realtime',
+            ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
+          } as Parameters<typeof BetaBrowserRealtime.create>[1],
+        ),
     },
   ] as const;
 

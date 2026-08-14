@@ -14,6 +14,13 @@ import type { RealtimeConnectionConfig } from './internal-base';
  * Register an SDK `error` listener and wait for `socket`'s `open` event before
  * sending client events. Use the stable Realtime helper for Azure sideband calls.
  */
+function resolveRealtimeURL(
+  client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
+  props: RealtimeConnectionConfig & { __url?: URL | undefined },
+): URL {
+  return props.__url ?? buildRealtimeURL(client, props);
+}
+
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   /** Secure beta Realtime WebSocket URL, including the model or non-Azure call ID. */
   url: URL;
@@ -38,6 +45,9 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
       /** Indicates that a function-based credential was resolved by an async factory. @internal */
       __resolvedApiKey?: boolean;
+
+      /** Final URL validated before an asynchronous credential provider ran. @internal */
+      __url?: URL;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
@@ -52,7 +62,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         ].join('\n'),
       );
     }
-    this.url = buildRealtimeURL(client, props);
+    this.url = resolveRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, this.url);
     const headers = {
       ...props.options?.headers,
@@ -113,14 +123,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     const url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, url);
     const resolvedApiKey = await client._callApiKey();
-    return new OpenAIRealtimeWS(
-      {
-        ...props,
-        buildRealtimeURL: () => url,
-        __resolvedApiKey: resolvedApiKey,
-      },
-      client,
-    );
+    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: resolvedApiKey, __url: url }, client);
   }
 
   /**
