@@ -33,6 +33,9 @@ import type { BaseEvents } from './EventStream';
 import { EventStream } from './EventStream';
 import { hasOwn, isObj } from '../internal/utils';
 
+// Preserve out-of-order entries while bounding the sparse growth caused by any one delta.
+const MAX_ASSISTANT_STREAM_ARRAY_GROWTH = 1024;
+
 /** Lifecycle, message, run-step, tool-call, and content events emitted by an assistant stream. */
 export interface AssistantStreamEvents extends BaseEvents {
   /** Called with the finalized assistant run after all stream events have been processed. */
@@ -614,24 +617,17 @@ export class AssistantStream
         //If this delta does not have content, nothing to process
         if (data.delta.content) {
           assertSafeAssistantStreamDelta(data.delta);
+          assertValidAssistantStreamArrayDelta(snapshot.content, data.delta.content, 'content');
 
           for (const contentElement of data.delta.content) {
-            if (!Number.isInteger(contentElement.index) || contentElement.index < 0) {
-              throw new OpenAIError(
-                `Assistant stream delta contains an invalid content index: ${contentElement.index}`,
-              );
-            }
-          }
-
-          for (const contentElement of data.delta.content) {
-            if (contentElement.index in snapshot.content) {
+            if (hasOwn(snapshot.content, contentElement.index)) {
               const currentContent = snapshot.content[contentElement.index];
               snapshot.content[contentElement.index] = this.#accumulateContent(
                 contentElement,
                 currentContent,
               );
             } else {
-              snapshot.content[contentElement.index] = contentElement as MessageContent;
+              defineAssistantStreamArrayEntry(snapshot.content, contentElement.index, contentElement);
               // This is a new element
               newContent.push(contentElement);
             }
@@ -670,6 +666,7 @@ export class AssistantStream
    */
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     assertSafeAssistantStreamDelta(delta);
+    assertValidAssistantStreamDeltaIndices(acc, delta);
 
     for (const [key, deltaValue] of Object.entries(delta)) {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
@@ -701,7 +698,7 @@ export class AssistantStream
       } else if (isObj(accValue) && isObj(deltaValue)) {
         accValue = this.accumulateDelta(accValue as Record<string, any>, deltaValue as Record<string, any>);
       } else if (Array.isArray(accValue) && Array.isArray(deltaValue)) {
-        if (accValue.every((x) => typeof x === 'string' || typeof x === 'number')) {
+        if (isPrimitiveAssistantStreamArrayDelta(accValue, deltaValue)) {
           accValue.push(...deltaValue); // Use spread syntax for efficient addition
           continue;
         }
@@ -723,8 +720,12 @@ export class AssistantStream
             );
           }
 
-          const accEntry = accValue[index];
-          accValue[index] = accEntry == null ? deltaEntry : this.accumulateDelta(accEntry, deltaEntry);
+          if (hasOwn(accValue, index)) {
+            const accEntry = accValue[index];
+            accValue[index] = accEntry == null ? deltaEntry : this.accumulateDelta(accEntry, deltaEntry);
+          } else {
+            defineAssistantStreamArrayEntry(accValue, index, deltaEntry);
+          }
         }
         continue;
       } else {
@@ -800,6 +801,141 @@ export class AssistantStream
   ): Promise<Run> {
     return await this._createToolAssistantStream(runs, runId, params, options);
   }
+}
+
+interface AssistantStreamArrayProjection {
+  entries: Map<number, Record<string, unknown>>;
+  length: number;
+}
+
+interface AssistantStreamDeltaProjection {
+  arrays: WeakMap<unknown[], AssistantStreamArrayProjection>;
+  records: WeakMap<Record<string, any>, Map<string, unknown>>;
+}
+
+function createAssistantStreamDeltaProjection(): AssistantStreamDeltaProjection {
+  return { arrays: new WeakMap(), records: new WeakMap() };
+}
+
+function isPrimitiveAssistantStreamValue(value: unknown): boolean {
+  return typeof value === 'string' || typeof value === 'number';
+}
+
+function isPrimitiveAssistantStreamArrayDelta(accumulator: unknown[], delta: unknown[]): boolean {
+  return delta.every(isPrimitiveAssistantStreamValue) && accumulator.every(isPrimitiveAssistantStreamValue);
+}
+
+function assertValidAssistantStreamDeltaIndices(
+  accumulator: Record<string, any>,
+  delta: Record<string, any>,
+  projection: AssistantStreamDeltaProjection = createAssistantStreamDeltaProjection(),
+): void {
+  let projectedValues = projection.records.get(accumulator);
+
+  for (const [key, deltaValue] of Object.entries(delta)) {
+    if (key === 'index' || key === 'type') {
+      continue;
+    }
+
+    let accumulatedValue: unknown;
+
+    if (projectedValues?.has(key)) {
+      accumulatedValue = projectedValues.get(key);
+    } else if (hasOwn(accumulator, key)) {
+      accumulatedValue = accumulator[key];
+    }
+
+    if (accumulatedValue === null || accumulatedValue === undefined) {
+      if (!projectedValues) {
+        projectedValues = new Map();
+        projection.records.set(accumulator, projectedValues);
+      }
+
+      projectedValues.set(key, deltaValue);
+      continue;
+    }
+
+    if (isObj(accumulatedValue) && isObj(deltaValue)) {
+      assertValidAssistantStreamDeltaIndices(accumulatedValue, deltaValue, projection);
+    } else if (
+      Array.isArray(accumulatedValue) &&
+      Array.isArray(deltaValue) &&
+      !isPrimitiveAssistantStreamArrayDelta(accumulatedValue, deltaValue)
+    ) {
+      assertValidAssistantStreamArrayDelta(accumulatedValue, deltaValue, 'array', projection);
+    }
+  }
+}
+
+function assertValidAssistantStreamArrayDelta(
+  accumulator: unknown[],
+  delta: unknown[],
+  kind: 'content' | 'array',
+  projection: AssistantStreamDeltaProjection = createAssistantStreamDeltaProjection(),
+): void {
+  let projectedArray = projection.arrays.get(accumulator);
+
+  if (!projectedArray) {
+    projectedArray = { entries: new Map(), length: accumulator.length };
+    projection.arrays.set(accumulator, projectedArray);
+  }
+
+  for (const deltaEntry of delta) {
+    if (!isObj(deltaEntry)) {
+      throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+    }
+
+    const index = deltaEntry['index'];
+
+    if (kind === 'array' && index == null) {
+      console.error(deltaEntry);
+      throw new Error('Expected array delta entry to have an `index` property');
+    }
+
+    if (kind === 'array' && typeof index !== 'number') {
+      throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+    }
+
+    if (
+      !Number.isSafeInteger(index) ||
+      (index as number) < 0 ||
+      (index as number) >= projectedArray.length + MAX_ASSISTANT_STREAM_ARRAY_GROWTH
+    ) {
+      throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
+    }
+
+    const validatedIndex = index as number;
+    let accumulatedEntry: unknown;
+
+    if (projectedArray.entries.has(validatedIndex)) {
+      accumulatedEntry = projectedArray.entries.get(validatedIndex);
+    } else if (hasOwn(accumulator, validatedIndex)) {
+      accumulatedEntry = accumulator[validatedIndex];
+
+      if (accumulatedEntry === null || accumulatedEntry === undefined) {
+        projectedArray.entries.set(validatedIndex, deltaEntry);
+      }
+    } else {
+      projectedArray.entries.set(validatedIndex, deltaEntry);
+    }
+
+    if (isObj(accumulatedEntry)) {
+      assertValidAssistantStreamDeltaIndices(accumulatedEntry, deltaEntry, projection);
+    }
+
+    if (validatedIndex >= projectedArray.length) {
+      projectedArray.length = validatedIndex + 1;
+    }
+  }
+}
+
+function defineAssistantStreamArrayEntry(accumulator: unknown[], index: number, value: unknown): void {
+  Object.defineProperty(accumulator, index, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
 }
 
 function assertSafeAssistantStreamDelta(value: unknown): void {

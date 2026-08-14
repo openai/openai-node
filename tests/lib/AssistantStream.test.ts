@@ -26,6 +26,14 @@ function iterableEvents(events: Event[], controller = new AbortController()) {
   };
 }
 
+function unencodedAssistantStream(events: Event[]): AssistantStream {
+  return AssistantStream.createAssistantStream(
+    'thread_123',
+    { create: vi.fn().mockResolvedValue(iterableEvents(events)) } as any,
+    { assistant_id: 'assistant_123' },
+  );
+}
+
 function completedRun(id = 'run_123') {
   return { event: 'thread.run.completed', data: { id, status: 'completed' } };
 }
@@ -191,6 +199,184 @@ describe('AssistantStream delta accumulation', () => {
     });
   });
 
+  test.each([
+    4_294_967_294,
+    1_000_000,
+    1025,
+    -1,
+    1.5,
+    Number.NaN,
+    Infinity,
+    -Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])('rejects the unsafe nested array index %s before mutating the accumulator', (index) => {
+    const entries = [{ index: 0, text: 'first' }];
+    const accumulator = { status: 'original', entries };
+    let failure: unknown;
+    let lengthAfterDelta: number;
+
+    try {
+      try {
+        AssistantStream.accumulateDelta(accumulator, {
+          status: ' updated',
+          entries: [
+            { index: 0, text: ' updated' },
+            { index, text: 'ignored' },
+          ],
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      lengthAfterDelta = entries.length;
+    } finally {
+      entries.length = 1;
+      Reflect.deleteProperty(entries, String(index));
+    }
+
+    expect(lengthAfterDelta).toBe(1);
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as Error).message).toContain('invalid array index');
+    expect(accumulator).toEqual({ status: 'original', entries: [{ index: 0, text: 'first' }] });
+  });
+
+  test('preserves bounded out-of-order nested indices and fills their missing slots', () => {
+    const entries = [{ index: 0, text: 'first' }];
+
+    AssistantStream.accumulateDelta(
+      { entries },
+      {
+        entries: [
+          { index: 2, text: 'third' },
+          { index: 1, text: 'second' },
+          { index: 2, text: ' updated' },
+        ],
+      },
+    );
+
+    expect(entries).toEqual([
+      { index: 0, text: 'first' },
+      { index: 1, text: 'second' },
+      { index: 2, text: 'third updated' },
+    ]);
+  });
+
+  test('bounds nested sparse growth without limiting dense arrays', () => {
+    const sparseEntries: Record<string, unknown>[] = [];
+
+    AssistantStream.accumulateDelta(
+      { entries: sparseEntries },
+      { entries: [{ index: 1023, text: 'last allowed' }] },
+    );
+
+    expect(sparseEntries).toHaveLength(1024);
+    expect(sparseEntries[1023]?.['text']).toBe('last allowed');
+
+    const rejectedEntries: Record<string, unknown>[] = [];
+    expect(() =>
+      AssistantStream.accumulateDelta(
+        { entries: rejectedEntries },
+        { entries: [{ index: 1024, text: 'first rejected' }] },
+      ),
+    ).toThrow('invalid array index');
+    expect(rejectedEntries).toHaveLength(0);
+
+    const denseEntries = Array.from({ length: 1024 }, (_, index) => ({ index, text: 'existing' }));
+    AssistantStream.accumulateDelta(
+      { entries: denseEntries },
+      { entries: [{ index: 1024, text: 'next contiguous entry' }] },
+    );
+
+    expect(denseEntries).toHaveLength(1025);
+    expect(denseEntries[1024]?.text).toBe('next contiguous entry');
+  });
+
+  test.each(['missing', 'null', 'undefined'])(
+    'rejects a later invalid index before creating a %s nested array',
+    (initialState) => {
+      const details: Record<string, unknown> = {};
+      if (initialState !== 'missing') {
+        details['children'] = initialState === 'null' ? null : undefined;
+      }
+
+      const accumulator = { status: 'original', entries: [{ index: 0, details }] };
+      const original = structuredClone(accumulator);
+
+      expect(() =>
+        AssistantStream.accumulateDelta(accumulator, {
+          status: ' updated',
+          entries: [
+            { index: 0, details: { children: [] } },
+            { index: 0, details: { children: [{ index: 1_000_000, text: 'ignored' }] } },
+          ],
+        }),
+      ).toThrow('invalid array index');
+
+      expect(accumulator).toEqual(original);
+    },
+  );
+
+  test.each([null, undefined])(
+    'rejects a later invalid index before replacing a %s indexed array slot',
+    (initialEntry) => {
+      const accumulator = { status: 'original', entries: [initialEntry] };
+      const original = structuredClone(accumulator);
+
+      expect(() =>
+        AssistantStream.accumulateDelta(accumulator, {
+          status: ' updated',
+          entries: [
+            { index: 0, children: [] },
+            { index: 0, children: [{ index: 1_000_000, text: 'ignored' }] },
+          ],
+        }),
+      ).toThrow('invalid array index');
+
+      expect(accumulator).toEqual(original);
+    },
+  );
+
+  test('validates indexed object deltas when the accumulated array starts empty', () => {
+    const entries: Record<string, unknown>[] = [];
+
+    expect(() =>
+      AssistantStream.accumulateDelta({ entries }, { entries: [{ index: 1_000_000, text: 'ignored' }] }),
+    ).toThrow('invalid array index');
+    expect(entries).toEqual([]);
+
+    AssistantStream.accumulateDelta(
+      { entries },
+      {
+        entries: [
+          { index: 2, text: 'third' },
+          { index: 0, text: 'first' },
+          { index: 1, text: 'second' },
+        ],
+      },
+    );
+
+    expect(entries.map((entry) => entry['text'])).toEqual(['first', 'second', 'third']);
+  });
+
+  test('creates an own nested array slot without invoking inherited numeric accessors', () => {
+    const inheritedGetter = vi.fn(() => ({ index: 1, text: 'inherited' }));
+    const inheritedSetter = vi.fn();
+    const entries = [{ index: 0, text: 'first' }];
+    Object.setPrototypeOf(
+      entries,
+      Object.create(Array.prototype, {
+        1: { configurable: true, get: inheritedGetter, set: inheritedSetter },
+      }),
+    );
+
+    AssistantStream.accumulateDelta({ entries }, { entries: [{ index: 1, text: 'second' }] });
+
+    expect(inheritedGetter).not.toHaveBeenCalled();
+    expect(inheritedSetter).not.toHaveBeenCalled();
+    expect(Object.getOwnPropertyDescriptor(entries, 1)).toBeDefined();
+    expect(entries[1]).toEqual({ index: 1, text: 'second' });
+  });
+
   test('rejects malformed indexed array deltas', () => {
     expect(() => AssistantStream.accumulateDelta({ entries: [{}] }, { entries: ['invalid'] })).toThrow(
       'Expected array delta entry to be an object',
@@ -268,6 +454,204 @@ describe('AssistantStream snapshots and message lifecycle', () => {
       expect(runner.currentMessageSnapshot()).toEqual(message);
     },
   );
+
+  test.each([
+    4_294_967_294,
+    1_000_000,
+    1025,
+    -1,
+    1.5,
+    Number.NaN,
+    Infinity,
+    -Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])('rejects the unsafe streamed content index %s before mutating the message snapshot', async (index) => {
+    const content = [{ type: 'text', text: { value: 'original', annotations: [] } }];
+    const message = { id: 'msg_123', role: 'assistant', content };
+    const runner = unencodedAssistantStream([
+      { event: 'thread.message.created', data: message },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_123',
+          delta: {
+            content: [
+              { index: 0, type: 'text', text: { value: ' updated' } },
+              { index, type: 'text', text: { value: 'ignored', annotations: [] } },
+            ],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    let failure: unknown;
+    let lengthAfterDelta: number;
+
+    try {
+      try {
+        await runner.done();
+      } catch (error) {
+        failure = error;
+      }
+
+      lengthAfterDelta = content.length;
+    } finally {
+      content.length = 1;
+      Reflect.deleteProperty(content, String(index));
+    }
+
+    expect(lengthAfterDelta).toBe(1);
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as Error).message).toContain('invalid content index');
+    expect(content[0]?.text.value).toBe('original');
+  });
+
+  test('rejects a sparse-array bomb received through the public readable-stream transport', async () => {
+    const runner = assistantStream([
+      { event: 'thread.message.created', data: { id: 'msg_123', role: 'assistant', content: [] } },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_123',
+          delta: {
+            content: [{ index: 4_294_967_294, type: 'text', text: { value: 'ignored', annotations: [] } }],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    let failure: unknown;
+    let lengthAfterDelta: number | undefined;
+
+    try {
+      try {
+        await runner.done();
+      } catch (error) {
+        failure = error;
+      }
+
+      lengthAfterDelta = runner.currentMessageSnapshot()?.content.length;
+    } finally {
+      const snapshot = runner.currentMessageSnapshot();
+      if (snapshot) {
+        snapshot.content.length = 0;
+      }
+    }
+
+    expect(lengthAfterDelta).toBe(0);
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as Error).message).toContain('invalid content index');
+  });
+
+  test('preserves bounded out-of-order streamed content and fills missing slots', async () => {
+    const message = {
+      id: 'msg_123',
+      role: 'assistant',
+      content: [{ type: 'text', text: { value: 'first', annotations: [] } }],
+    };
+    const runner = unencodedAssistantStream([
+      { event: 'thread.message.created', data: message },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_123',
+          delta: {
+            content: [
+              { index: 2, type: 'text', text: { value: 'third', annotations: [] } },
+              { index: 1, type: 'text', text: { value: 'second', annotations: [] } },
+              { index: 2, type: 'text', text: { value: ' updated' } },
+            ],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+
+    await runner.done();
+
+    expect(message.content.map((entry) => entry.text.value)).toEqual(['first', 'second', 'third updated']);
+  });
+
+  test('bounds streamed content growth without limiting continued sequential creation', async () => {
+    const rejectedMessage = { id: 'msg_rejected', role: 'assistant', content: [] };
+    const rejected = unencodedAssistantStream([
+      { event: 'thread.message.created', data: rejectedMessage },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_rejected',
+          delta: {
+            content: [{ index: 1024, type: 'text', text: { value: 'first rejected', annotations: [] } }],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+
+    await expect(rejected.done()).rejects.toThrow('invalid content index');
+    expect(rejectedMessage.content).toHaveLength(0);
+
+    const content: Record<string, any>[] = [];
+    const accepted = unencodedAssistantStream([
+      { event: 'thread.message.created', data: { id: 'msg_accepted', role: 'assistant', content } },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_accepted',
+          delta: {
+            content: [{ index: 1023, type: 'text', text: { value: 'last allowed', annotations: [] } }],
+          },
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_accepted',
+          delta: {
+            content: [{ index: 1024, type: 'text', text: { value: 'next contiguous', annotations: [] } }],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+
+    await accepted.done();
+
+    expect(content).toHaveLength(1025);
+    expect(content[1023]?.['text'].value).toBe('last allowed');
+    expect(content[1024]?.['text'].value).toBe('next contiguous');
+  });
+
+  test('creates an own streamed content slot without invoking inherited numeric accessors', async () => {
+    const inheritedGetter = vi.fn(() => ({ type: 'text', text: { value: 'inherited', annotations: [] } }));
+    const inheritedSetter = vi.fn();
+    const content = [{ type: 'text', text: { value: 'first', annotations: [] } }];
+    Object.setPrototypeOf(
+      content,
+      Object.create(Array.prototype, {
+        1: { configurable: true, get: inheritedGetter, set: inheritedSetter },
+      }),
+    );
+    const message = { id: 'msg_123', role: 'assistant', content };
+    const runner = unencodedAssistantStream([
+      { event: 'thread.message.created', data: message },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_123',
+          delta: { content: [{ index: 1, type: 'text', text: { value: 'second', annotations: [] } }] },
+        },
+      },
+      completedRun(),
+    ]);
+
+    await runner.done();
+
+    expect(inheritedGetter).not.toHaveBeenCalled();
+    expect(inheritedSetter).not.toHaveBeenCalled();
+    expect(Object.getOwnPropertyDescriptor(content, 1)).toBeDefined();
+    expect(content[1]?.text.value).toBe('second');
+  });
 
   test('emits the finalized run exactly once', async () => {
     const finalRun = completedRun();
@@ -421,6 +805,63 @@ describe('AssistantStream snapshots and message lifecycle', () => {
 });
 
 describe('AssistantStream run-step lifecycle', () => {
+  test('rejects a tool-call sparse-array bomb received through the public readable-stream transport', async () => {
+    const initialStep = {
+      id: 'step_123',
+      status: 'in_progress',
+      step_details: {
+        type: 'tool_calls',
+        tool_calls: [{ index: 0, type: 'function', id: 'call_0', function: { arguments: 'original' } }],
+      },
+    };
+    const runner = assistantStream([
+      { event: 'thread.run.step.created', data: initialStep },
+      {
+        event: 'thread.run.step.delta',
+        data: {
+          id: 'step_123',
+          delta: {
+            step_details: {
+              type: 'tool_calls',
+              tool_calls: [
+                { index: 0, function: { arguments: ' updated' } },
+                { index: 4_294_967_294, type: 'function', id: 'call_ignored', function: { arguments: '{}' } },
+              ],
+            },
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    let failure: unknown;
+    let lengthAfterDelta: number | undefined;
+    let argumentsAfterDelta: string | undefined;
+
+    try {
+      try {
+        await runner.done();
+      } catch (error) {
+        failure = error;
+      }
+
+      const details = runner.currentRunStepSnapshot()?.step_details;
+      if (details?.type === 'tool_calls') {
+        lengthAfterDelta = details.tool_calls.length;
+        argumentsAfterDelta = (details.tool_calls[0] as any).function.arguments;
+      }
+    } finally {
+      const details = runner.currentRunStepSnapshot()?.step_details;
+      if (details?.type === 'tool_calls') {
+        details.tool_calls.length = 1;
+      }
+    }
+
+    expect(lengthAfterDelta).toBe(1);
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as Error).message).toContain('invalid array index');
+    expect(argumentsAfterDelta).toBe('original');
+  });
+
   test('accumulates tool calls and emits created, delta, and completion events', async () => {
     const initialStep = {
       id: 'step_123',
