@@ -35,6 +35,11 @@ export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
       continue;
     }
     const propertyPath = [...refs.currentPath, 'properties', propName];
+    if (propName === '__proto__') {
+      throw new Error(
+        `Zod field at \`${propertyPath.join('/')}\` uses unsupported property name \`__proto__\`, which Zod omits from parsed output.`,
+      );
+    }
     const parsedDef = parseDef(propDef._def, {
       ...refs,
       currentPath: propertyPath,
