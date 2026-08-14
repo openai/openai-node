@@ -386,17 +386,22 @@ const hasStreamingUploadableValue = (value: unknown, uploadableKinds: Uploadable
   if (uploadableKind === 'upload') {
     return false;
   }
+  let hasStreamingUpload = false;
+
   if (Array.isArray(value)) {
-    return value.some((entry) => hasStreamingUploadableValue(entry, uploadableKinds));
-  }
-  if (value && typeof value === 'object') {
+    for (const entry of value) {
+      if (hasStreamingUploadableValue(entry, uploadableKinds)) {
+        hasStreamingUpload = true;
+      }
+    }
+  } else if (value && typeof value === 'object') {
     for (const k in value) {
       if (hasStreamingUploadableValue((value as Record<string, unknown>)[k], uploadableKinds)) {
-        return true;
+        hasStreamingUpload = true;
       }
     }
   }
-  return false;
+  return hasStreamingUpload;
 };
 
 const hasUploadableValue = (value: unknown, uploadableKinds: UploadableKinds): boolean => {
