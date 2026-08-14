@@ -215,6 +215,67 @@ describe('streaming multipart filename and header security', () => {
     expect(brandChecks).toBe(1);
   });
 
+  test('rejects a false-first branded async-iterable before optional multipart emits bytes', async () => {
+    const emitted: Uint8Array[] = [];
+    const incidentalIterator = vi.fn(() => chunks('incidental upload bytes'));
+    const upload = toStreamingFile(chunks('authoritative upload bytes'), 'upload.png');
+    Object.defineProperties(upload, {
+      name: { value: { toString: vi.fn() } },
+      [Symbol.asyncIterator]: { value: incidentalIterator },
+    });
+
+    let brandChecks = 0;
+    const hostile = new Proxy(upload, {
+      has(target, key) {
+        if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
+          brandChecks += 1;
+          return brandChecks > 1;
+        }
+
+        return Reflect.has(target, key);
+      },
+    });
+    const options = await maybeMultipartFormRequestOptions(
+      { body: { secret: 'sensitive metadata', upload: hostile } },
+      fetch,
+    );
+    const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+
+    await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    expect(emitted).toEqual([]);
+    expect(incidentalIterator).not.toHaveBeenCalled();
+    expect(brandChecks).toBe(2);
+  });
+
+  test('upgrades a false-first branded async-iterable and streams its authoritative data', async () => {
+    const incidentalIterator = vi.fn(() => chunks('incidental upload bytes'));
+    const upload = toStreamingFile(chunks('authoritative upload bytes'), 'upload.png');
+    Object.defineProperty(upload, Symbol.asyncIterator, { value: incidentalIterator });
+
+    let brandChecks = 0;
+    const hostile = new Proxy(upload, {
+      has(target, key) {
+        if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
+          brandChecks += 1;
+          return brandChecks > 1;
+        }
+
+        return Reflect.has(target, key);
+      },
+    });
+    const options = await maybeMultipartFormRequestOptions({ body: { upload: hostile } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const file = form.get('upload') as File;
+
+    expect(file.name).toBe('upload.png');
+    await expect(file.text()).resolves.toBe('authoritative upload bytes');
+    expect(incidentalIterator).not.toHaveBeenCalled();
+    expect(brandChecks).toBe(2);
+  });
+
   test('streams a valid stateful branded async-iterable through optional multipart from its data', async () => {
     const incidentalIterator = vi.fn(() => chunks('hostile incidental upload bytes'));
     const upload = toStreamingFile(chunks('authoritative upload bytes'), 'valid.png');

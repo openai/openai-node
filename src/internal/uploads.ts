@@ -335,7 +335,13 @@ const getUploadableKind = (value: unknown, uploadableKinds: UploadableKinds): Up
   }
 
   if (uploadableKinds.has(value)) {
-    return uploadableKinds.get(value);
+    const cached = uploadableKinds.get(value);
+    if (cached === 'streaming-file' || !isStreamingFile(value)) {
+      return cached;
+    }
+
+    uploadableKinds.set(value, 'streaming-file');
+    return 'streaming-file';
   }
 
   let uploadableKind: UploadableKind;
