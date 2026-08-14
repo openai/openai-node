@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { AzureOpenAI, APIUserAbortError, toStreamingFile } from 'openai';
+import { AzureOpenAI, APIUserAbortError, OpenAIError, toStreamingFile } from 'openai';
 import type { AzureClientOptions } from 'openai';
 import type { RequestInit, RequestInfo, Response } from 'openai/internal/builtin-types';
 
@@ -259,6 +259,92 @@ describe('instantiate azure client', () => {
   });
 
   describe('Azure Active Directory (AD)', () => {
+    describe('browser credential safety', () => {
+      beforeEach(() => {
+        delete process.env['AZURE_OPENAI_API_KEY'];
+        vi.stubGlobal('window', { document: {} });
+        vi.stubGlobal('navigator', {});
+      });
+
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      test('honors explicit browser denial before obtaining credentials or sending requests', () => {
+        const azureADTokenProvider = vi.fn(async () => 'AZURE_ENTRA_BEARER_SECRET');
+        const customFetch = vi.fn();
+        const createClient = () =>
+          new AzureOpenAI({
+            baseURL: 'https://example.com',
+            apiVersion,
+            azureADTokenProvider,
+            dangerouslyAllowBrowser: false,
+            fetch: customFetch,
+          });
+
+        expect(createClient).toThrow(OpenAIError);
+        expect(createClient).toThrow(/running in a browser-like environment/);
+        expect(azureADTokenProvider).not.toHaveBeenCalled();
+        expect(customFetch).not.toHaveBeenCalled();
+      });
+
+      test.each([undefined, true])(
+        'preserves Microsoft Entra browser access when dangerouslyAllowBrowser is %s',
+        async (dangerouslyAllowBrowser) => {
+          const azureADTokenProvider = vi.fn(async () => 'AZURE_ENTRA_BEARER_SECRET');
+          const customFetch = vi.fn(
+            async (_url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
+              new globalThis.Response(JSON.stringify({ ok: true }), { headers: headers ?? [] }),
+          );
+          const client = new AzureOpenAI({
+            baseURL: 'https://example.com',
+            apiVersion,
+            azureADTokenProvider,
+            dangerouslyAllowBrowser,
+            fetch: customFetch,
+          });
+
+          expect(client).toHaveProperty('_options.dangerouslyAllowBrowser', true);
+
+          const response = await client.request({ method: 'get', path: '/foo' }).asResponse();
+
+          expect(response.headers.get('authorization')).toBe('Bearer AZURE_ENTRA_BEARER_SECRET');
+          expect(azureADTokenProvider).toHaveBeenCalledTimes(1);
+          expect(customFetch).toHaveBeenCalledTimes(1);
+        },
+      );
+
+      test('continues to reject static Azure API keys in browsers', () => {
+        const customFetch = vi.fn();
+
+        expect(
+          () =>
+            new AzureOpenAI({
+              baseURL: 'https://example.com',
+              apiVersion,
+              apiKey: 'My API Key',
+              fetch: customFetch,
+            }),
+        ).toThrow(OpenAIError);
+        expect(customFetch).not.toHaveBeenCalled();
+      });
+    });
+
+    test('preserves explicit browser denial outside browser environments', () => {
+      delete process.env['AZURE_OPENAI_API_KEY'];
+
+      const azureADTokenProvider = vi.fn(async () => 'AZURE_ENTRA_BEARER_SECRET');
+      const client = new AzureOpenAI({
+        baseURL: 'https://example.com',
+        apiVersion,
+        azureADTokenProvider,
+        dangerouslyAllowBrowser: false,
+      });
+
+      expect(client).toHaveProperty('_options.dangerouslyAllowBrowser', false);
+      expect(azureADTokenProvider).not.toHaveBeenCalled();
+    });
+
     test('with azureADTokenProvider', async () => {
       const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
         Response.json({ a: 1 }, { headers: headers ?? [] });

@@ -82,7 +82,7 @@ export class AzureOpenAI extends OpenAI {
     }
 
     if (typeof azureADTokenProvider === 'function') {
-      dangerouslyAllowBrowser = true;
+      dangerouslyAllowBrowser ??= true;
     }
 
     if (!azureADTokenProvider && !apiKey) {

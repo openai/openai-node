@@ -12,7 +12,7 @@ type Listener = (event: any) => void;
 
 type FakeNodeSocket = {
   url: URL;
-  options: { headers?: Record<string, string> };
+  options: WS.ClientOptions;
   on: Mock;
   send: Mock;
   close: Mock;

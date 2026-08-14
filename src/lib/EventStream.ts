@@ -397,6 +397,11 @@ export class EventStream<EventTypes extends BaseEvents> {
     return this._emit('error', new OpenAIError(String(error)));
   }
 
+  /** Returns whether an event currently has one or more registered listeners. */
+  protected _hasListeners<Event extends keyof EventTypes>(event: Event): boolean {
+    return Boolean(this.#listeners[event]?.length);
+  }
+
   /** Dispatches a connection, failure, cancellation, or completion lifecycle event. */
   _emit<Event extends keyof BaseEvents>(event: Event, ...args: EventParameters<BaseEvents, Event>): void;
   /** Dispatches a typed stream event to all listeners registered for that event. */
