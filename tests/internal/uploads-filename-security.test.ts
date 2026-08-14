@@ -208,6 +208,31 @@ describe('streaming multipart filename and header security', () => {
     expect(substitutedIterator).not.toHaveBeenCalled();
   });
 
+  test('captures the iterator selected from mutable source state before later filenames', async () => {
+    let current = chunks('original state bytes');
+    const source = {
+      [Symbol.asyncIterator]() {
+        return current[Symbol.asyncIterator]();
+      },
+    };
+    const later = toStreamingFile(chunks('later bytes'), 'later.png');
+    Object.defineProperty(later, 'name', {
+      get() {
+        current = chunks('substituted state bytes');
+        return 'later.png';
+      },
+    });
+
+    const options = await multipartFormRequestOptions({ body: { source, later } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    await expect((form.get('source') as File).text()).resolves.toBe('original state bytes');
+    await expect((form.get('later') as File).text()).resolves.toBe('later bytes');
+  });
+
   test('streams valid branded async-iterable files lazily using one filename snapshot per entry', async () => {
     const readChunk = vi.fn();
     const replace = vi.fn();
@@ -333,12 +358,16 @@ describe('streaming multipart filename and header security', () => {
     expect(incidentalIterator).not.toHaveBeenCalled();
   });
 
-  test('snapshots named Blob filenames before reading later streaming filenames', async () => {
+  test('snapshots named Blob filenames and bytes before reading later streaming filenames', async () => {
     const earlier = Object.assign(new Blob(['earlier bytes']), { name: 'original.txt' });
+    const substitutedStream = vi.fn(() => new Blob(['substituted bytes']).stream());
     const later = toStreamingFile(chunks('later bytes'), 'later.txt');
     Object.defineProperty(later, 'name', {
       get() {
-        Object.defineProperty(earlier, 'name', { value: 'substituted.txt' });
+        Object.defineProperties(earlier, {
+          name: { value: 'substituted.txt' },
+          stream: { value: substitutedStream },
+        });
         return 'later.txt';
       },
     });
@@ -355,5 +384,6 @@ describe('streaming multipart filename and header security', () => {
       'earlier bytes',
       'later bytes',
     ]);
+    expect(substitutedStream).not.toHaveBeenCalled();
   });
 });
