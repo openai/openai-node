@@ -466,7 +466,7 @@ function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnap
         },
       },
       dispose() {
-        if (!consumed && typeof iterator.return === 'function') {
+        if (!consumed) {
           void ignoreCleanupResult(() => iterator.return?.());
         }
       },
