@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 import { OpenAIError } from 'openai/core/error';
 import { ReadableStreamFrom } from 'openai/internal/shims';
-import { hasOwn } from 'openai/internal/utils';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
 
@@ -9,9 +8,7 @@ type Event = Record<string, any>;
 
 function readableEvents(events: Event[]) {
   const encoder = new TextEncoder();
-  return ReadableStreamFrom(
-    events.map((event) => encoder.encode(`${JSON.stringify(event)}\n`)),
-  );
+  return ReadableStreamFrom(events.map((event) => encoder.encode(`${JSON.stringify(event)}\n`)));
 }
 
 function assistantStream(events: Event[]): AssistantStream {
