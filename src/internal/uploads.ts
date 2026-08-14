@@ -431,6 +431,7 @@ type FormEntry =
       key: string;
       value: Uploadable;
       data: unknown;
+      dispose: () => Promise<void>;
       kind: 'upload';
       streamingFile: boolean;
       type: string;
@@ -440,23 +441,58 @@ type MultipartEntry =
   | Extract<FormEntry, { kind: 'field' }>
   | (Extract<FormEntry, { kind: 'upload' }> & Readonly<{ filename: string }>);
 
-function snapshotStreamingFileData(value: StreamingFileInput): StreamingFileInput {
+type MultipartDataSnapshot = Readonly<{
+  data: StreamingFileInput;
+  dispose: () => Promise<void>;
+}>;
+
+function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnapshot {
   const { getReader } = value as ReadableStream<BlobPart>;
   if (typeof getReader === 'function') {
     const reader = getReader.call(value);
-    return { getReader: () => reader } as ReadableStream<BlobPart>;
+    let consumed = false;
+    return {
+      data: {
+        getReader() {
+          consumed = true;
+          return reader;
+        },
+      } as ReadableStream<BlobPart>,
+      async dispose() {
+        if (!consumed) {
+          try {
+            await reader.cancel();
+          } finally {
+            reader.releaseLock();
+          }
+        }
+      },
+    };
   }
 
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
     const iterator = createIterator.call(value);
-    return { [Symbol.asyncIterator]: () => iterator };
+    let consumed = false;
+    return {
+      data: {
+        [Symbol.asyncIterator]() {
+          consumed = true;
+          return iterator;
+        },
+      },
+      async dispose() {
+        if (!consumed && typeof iterator.return === 'function') {
+          await iterator.return();
+        }
+      },
+    };
   }
 
   throw new TypeError('Streaming file data must be an async iterable or readable stream');
 }
 
-function snapshotBlobData(value: Blob): StreamingFileInput {
+function snapshotBlobData(value: Blob): MultipartDataSnapshot {
   const { stream } = value as Blob & { stream?: Blob['stream'] };
   if (typeof stream === 'function') {
     return snapshotStreamingFileData(stream.call(value) as ReadableStream<BlobPart>);
@@ -464,22 +500,28 @@ function snapshotBlobData(value: Blob): StreamingFileInput {
 
   const bytes = value.arrayBuffer();
   return {
-    async *[Symbol.asyncIterator]() {
-      yield await bytes;
+    data: {
+      async *[Symbol.asyncIterator]() {
+        yield await bytes;
+      },
     },
+    async dispose() {},
   };
 }
 
-function snapshotResponseData(value: Response): StreamingFileInput {
+function snapshotResponseData(value: Response): MultipartDataSnapshot {
   if (value.body) {
     return snapshotStreamingFileData(value.body);
   }
 
   const blob = value.blob();
   return {
-    async *[Symbol.asyncIterator]() {
-      yield await blob;
+    data: {
+      async *[Symbol.asyncIterator]() {
+        yield await blob;
+      },
     },
+    async dispose() {},
   };
 }
 
@@ -505,36 +547,46 @@ async function* iterateMultipartBody(
   uploadableKinds: UploadableKinds,
 ): AsyncGenerator<Uint8Array> {
   const entries: MultipartEntry[] = [];
+  const pendingDisposals = new Set<() => Promise<void>>();
 
-  for await (const entry of iterateFormEntries(body, uploadableKinds)) {
-    if (entry.kind === 'upload') {
-      entries.push({ ...entry, filename: getStreamingFileName(entry.value, options, entry.streamingFile) });
-    } else {
-      entries.push(entry);
+  try {
+    for await (const entry of iterateFormEntries(body, uploadableKinds)) {
+      if (entry.kind === 'upload') {
+        pendingDisposals.add(entry.dispose);
+        entries.push({
+          ...entry,
+          filename: getStreamingFileName(entry.value, options, entry.streamingFile),
+        });
+      } else {
+        entries.push(entry);
+      }
     }
-  }
 
-  for (const entry of entries) {
-    const { key, value } = entry;
+    for (const entry of entries) {
+      const { key, value } = entry;
 
-    if (entry.kind === 'upload') {
-      const { filename } = entry;
-      yield encodeUTF8(`--${boundary}\r\n`);
-      yield encodeUTF8(
-        `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
-          filename,
-        )}"\r\nContent-Type: ${entry.type}\r\n\r\n`,
-      );
-      yield* iterateBytes(entry.data);
-    } else {
-      yield encodeUTF8(`--${boundary}\r\n`);
-      yield encodeUTF8(
-        `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"\r\n\r\n${String(value)}`,
-      );
+      if (entry.kind === 'upload') {
+        const { filename } = entry;
+        yield encodeUTF8(`--${boundary}\r\n`);
+        yield encodeUTF8(
+          `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
+            filename,
+          )}"\r\nContent-Type: ${entry.type}\r\n\r\n`,
+        );
+        yield* iterateBytes(entry.data);
+        pendingDisposals.delete(entry.dispose);
+      } else {
+        yield encodeUTF8(`--${boundary}\r\n`);
+        yield encodeUTF8(
+          `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"\r\n\r\n${String(value)}`,
+        );
+      }
+      yield encodeUTF8('\r\n');
     }
-    yield encodeUTF8('\r\n');
+    yield encodeUTF8(`--${boundary}--\r\n`);
+  } finally {
+    await Promise.allSettled(Array.from(pendingDisposals, (dispose) => dispose()));
   }
-  yield encodeUTF8(`--${boundary}--\r\n`);
 }
 
 async function* iterateFormEntries(
@@ -573,23 +625,25 @@ async function* iterateFormValue(
   if (uploadKind) {
     const upload = value as Uploadable;
     const streamingFile = uploadKind === 'streaming-file';
-    let data: unknown = upload;
+    const type = getStreamingFileType(upload, streamingFile);
+    let snapshot: MultipartDataSnapshot;
     if (streamingFile) {
-      data = snapshotStreamingFileData((upload as StreamingFile).data);
+      snapshot = snapshotStreamingFileData((upload as StreamingFile).data);
     } else if (upload instanceof Response) {
-      data = snapshotResponseData(upload);
+      snapshot = snapshotResponseData(upload);
     } else if (upload instanceof Blob) {
-      data = snapshotBlobData(upload);
-    } else if (uploadKind === 'streaming-upload') {
-      data = snapshotStreamingFileData(upload as StreamingFileInput);
+      snapshot = snapshotBlobData(upload);
+    } else {
+      snapshot = snapshotStreamingFileData(upload as StreamingFileInput);
     }
     yield {
       key,
       value: upload,
-      data,
+      data: snapshot.data,
+      dispose: snapshot.dispose,
       kind: 'upload',
       streamingFile,
-      type: getStreamingFileType(upload, streamingFile),
+      type,
     };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
