@@ -701,17 +701,31 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     ['content', 'response.content_part.added', 'content_index'],
     ['summary', 'response.reasoning_summary_part.added', 'summary_index'],
   ])('rejects inherited numeric setters at the declared %s append position', (kind, type, indexField) => {
-    const snapshot =
-      kind === 'output'
-        ? snapshotFor({ type: 'function_call', id: 'original', arguments: '' })
-        : snapshotFor({
-            type: kind === 'summary' ? 'reasoning' : 'message',
-            content: kind === 'content' ? [{ type: 'output_text', text: 'original', annotations: [] }] : [],
-            summary: kind === 'summary' ? [{ type: 'summary_text', text: 'original' }] : [],
-          });
+    let snapshot: Response;
+    if (kind === 'output') {
+      snapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
+    } else if (kind === 'content') {
+      snapshot = snapshotFor({
+        type: 'message',
+        content: [{ type: 'output_text', text: 'original', annotations: [] }],
+        summary: [],
+      });
+    } else {
+      snapshot = snapshotFor({
+        type: 'reasoning',
+        content: [],
+        summary: [{ type: 'summary_text', text: 'original' }],
+      });
+    }
     const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
-    const collection =
-      kind === 'output' ? snapshot.output : kind === 'content' ? output.content : output.summary;
+    let collection: unknown[];
+    if (kind === 'output') {
+      collection = snapshot.output;
+    } else if (kind === 'content') {
+      collection = output.content;
+    } else {
+      collection = output.summary;
+    }
     let inheritedSetterCalled = false;
     const collectionPrototype = Object.create(Array.prototype) as object;
     Object.defineProperty(collectionPrototype, 1, {
