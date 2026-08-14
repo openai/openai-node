@@ -565,6 +565,111 @@ describe('lazy multipart stream encoding', () => {
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain('legacy blob');
   });
 
+  test('reads large legacy named Blob buffers only as each multipart part is consumed', async () => {
+    const firstBytes = new Uint8Array(2 * 1024 * 1024).fill(65);
+    const secondBytes = new Uint8Array(2 * 1024 * 1024).fill(66);
+    const first = Object.assign(new Blob([firstBytes]), { name: 'first.bin' });
+    const second = Object.assign(new Blob([secondBytes]), { name: 'second.bin' });
+    let resolveFirstRead: () => void;
+    const firstReadReady = new ReadableStream<void>({
+      start(controller) {
+        resolveFirstRead = () => controller.close();
+      },
+    }).getReader().closed;
+    const readFirst = vi.fn(async function readFirstBlob(this: Blob) {
+      await firstReadReady;
+      return Blob.prototype.arrayBuffer.call(this);
+    });
+    const readSecond = vi.fn(function readSecondBlob(this: Blob) {
+      return Blob.prototype.arrayBuffer.call(this);
+    });
+    Object.defineProperties(first, {
+      stream: { value: undefined },
+      arrayBuffer: { value: readFirst },
+    });
+    Object.defineProperties(second, {
+      stream: { value: undefined },
+      arrayBuffer: { value: readSecond },
+    });
+    const trigger = toStreamingFile(
+      (async function* chunks() {
+        yield 'trigger bytes';
+      })(),
+      'trigger.txt',
+    );
+
+    const options = await multipartFormRequestOptions({ body: { first, second, trigger } }, fetch);
+    const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+    const decode = (chunk: Awaited<ReturnType<typeof reader.read>>) => new TextDecoder().decode(chunk.value);
+
+    expect(readFirst).not.toHaveBeenCalled();
+    expect(readSecond).not.toHaveBeenCalled();
+
+    expect(decode(await reader.read())).toMatch(/^--openai-/u);
+    expect(decode(await reader.read())).toContain('filename="first.bin"');
+    expect(readFirst).not.toHaveBeenCalled();
+    expect(readSecond).not.toHaveBeenCalled();
+
+    const firstPayload = reader.read();
+    await nextEventLoopTurn();
+    expect(readFirst).toHaveBeenCalledTimes(1);
+    expect(readSecond).not.toHaveBeenCalled();
+
+    resolveFirstRead!();
+    const firstChunk = await firstPayload;
+    expect(firstChunk.value?.byteLength).toBe(firstBytes.byteLength);
+    expect(firstChunk.value?.[0]).toBe(65);
+    expect(readSecond).not.toHaveBeenCalled();
+
+    expect(decode(await reader.read())).toBe('\r\n');
+    expect(decode(await reader.read())).toMatch(/^--openai-/u);
+    expect(decode(await reader.read())).toContain('filename="second.bin"');
+    expect(readSecond).not.toHaveBeenCalled();
+
+    const secondChunk = await reader.read();
+    expect(secondChunk.value?.byteLength).toBe(secondBytes.byteLength);
+    expect(secondChunk.value?.[0]).toBe(66);
+    expect(readSecond).toHaveBeenCalledTimes(1);
+
+    await reader.cancel();
+  });
+
+  test('captures a legacy Blob reader before a later filename getter can replace it', async () => {
+    const earlier = Object.assign(new Blob(['original fallback bytes']), { name: 'original.bin' });
+    const readOriginal = vi.fn(function readOriginalBlob(this: Blob) {
+      expect(this).toBe(earlier);
+      return Blob.prototype.arrayBuffer.call(this);
+    });
+    const readSubstituted = vi.fn(async () => new TextEncoder().encode('attacker fallback bytes').buffer);
+    Object.defineProperties(earlier, {
+      stream: { value: undefined },
+      arrayBuffer: { configurable: true, value: readOriginal },
+    });
+    const later = toStreamingFile(
+      (async function* chunks() {
+        yield 'later bytes';
+      })(),
+      'later.txt',
+    );
+    Object.defineProperty(later, 'name', {
+      get() {
+        Object.defineProperty(earlier, 'arrayBuffer', { value: readSubstituted });
+        return 'later.txt';
+      },
+    });
+
+    const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    await expect((form.get('earlier') as File).text()).resolves.toBe('original fallback bytes');
+    await expect((form.get('later') as File).text()).resolves.toBe('later bytes');
+    expect(readOriginal).toHaveBeenCalledTimes(1);
+    expect(readSubstituted).not.toHaveBeenCalled();
+  });
+
   const fallbackUploadCases = [
     [
       'Blob.arrayBuffer()',
@@ -576,6 +681,7 @@ describe('lazy multipart stream encoding', () => {
         });
         return upload;
       },
+      0,
     ],
     [
       'Response.blob()',
@@ -584,12 +690,13 @@ describe('lazy multipart stream encoding', () => {
         Object.defineProperty(upload, 'blob', { value: read });
         return upload;
       },
+      1,
     ],
   ] as const;
 
   test.each(fallbackUploadCases)(
     'observes rejected %s fallback reads when a later filename fails validation',
-    async (_, createUpload) => {
+    async (_, createUpload, expectedPreflightReads) => {
       let readCount = 0;
       const read = () => {
         readCount += 1;
@@ -611,7 +718,7 @@ describe('lazy multipart stream encoding', () => {
         const reader = (options.body as ReadableStream).getReader();
 
         await expect(reader.read()).rejects.toThrow(/file.?name/iu);
-        expect(readCount).toBe(1);
+        expect(readCount).toBe(expectedPreflightReads);
         await nextEventLoopTurn();
         expect(unhandledRejection).not.toHaveBeenCalled();
       } finally {
@@ -622,7 +729,7 @@ describe('lazy multipart stream encoding', () => {
 
   test.each(fallbackUploadCases)(
     'observes rejected %s fallback reads after multipart serialization is canceled',
-    async (_, createUpload) => {
+    async (_, createUpload, expectedPreflightReads) => {
       let cancellationComplete = false;
       let rejectedAfterCancellation = false;
       let readCount = 0;
@@ -652,10 +759,10 @@ describe('lazy multipart stream encoding', () => {
         await expect(reader.read()).resolves.toMatchObject({ done: false });
         await reader.cancel();
         cancellationComplete = true;
-        expect(readCount).toBe(1);
+        expect(readCount).toBe(expectedPreflightReads);
         await nextEventLoopTurn();
         await nextEventLoopTurn();
-        expect(rejectedAfterCancellation).toBe(true);
+        expect(rejectedAfterCancellation).toBe(expectedPreflightReads !== 0);
         expect(unhandledRejection).not.toHaveBeenCalled();
       } finally {
         process.removeListener('unhandledRejection', unhandledRejection);

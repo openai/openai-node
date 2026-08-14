@@ -478,12 +478,26 @@ function snapshotStreamingFileData(
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
     const iterator = createIterator.call(value);
+    const { next } = iterator;
     let consumed = false;
     const snapshot: MultipartDataSnapshot = {
       data: {
         [Symbol.asyncIterator]() {
           consumed = true;
-          return iterator;
+          return {
+            next(...args: [] | [unknown]) {
+              return next.call(iterator, ...args);
+            },
+            return(...args: [] | [unknown]) {
+              const returnIterator = iterator.return;
+              return returnIterator
+                ? returnIterator.call(iterator, ...args)
+                : Promise.resolve({ done: true as const, value: args[0] });
+            },
+            [Symbol.asyncIterator]() {
+              return this;
+            },
+          };
         },
       },
       dispose() {
@@ -543,12 +557,11 @@ function snapshotBlobData(
     return snapshotStreamingFileData(stream.call(value) as ReadableStream<BlobPart>, snapshots);
   }
 
-  const bytes = value.arrayBuffer();
-  void ignoreCleanupResult(() => bytes);
+  const { arrayBuffer: read } = value;
   return {
     data: {
       async *[Symbol.asyncIterator]() {
-        yield await bytes;
+        yield await read.call(value);
       },
     },
   };

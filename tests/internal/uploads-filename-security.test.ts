@@ -495,6 +495,52 @@ describe('streaming multipart filename and header security', () => {
     expect(substitutedIterator).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['ordinary async iterable', false],
+    ['branded streaming file', true],
+  ] as const)(
+    'snapshots a caller-visible %s iterator next method before a later filename mutates it',
+    async (_, branded) => {
+      const originalNext = vi
+        .fn()
+        .mockResolvedValueOnce({ done: false, value: 'original earlier bytes' })
+        .mockResolvedValueOnce({ done: true, value: undefined });
+      const substitutedNext = vi
+        .fn()
+        .mockResolvedValueOnce({ done: false, value: 'attacker-substituted bytes' })
+        .mockResolvedValueOnce({ done: true, value: undefined });
+      const getReturn = vi.fn(() => {
+        throw new Error('iterator cleanup accessor must not be read during preflight');
+      });
+      const iterator: AsyncIterator<string> = { next: originalNext };
+      Object.defineProperty(iterator, 'return', { get: getReturn });
+      const createIterator = vi.fn(() => iterator);
+      const source = { [Symbol.asyncIterator]: createIterator };
+      const earlier = branded ? toStreamingFile(source, 'earlier.png') : source;
+      const later = toStreamingFile(chunks('later bytes'), 'later.png');
+      const getLaterFilename = vi.fn(() => {
+        iterator.next = substitutedNext;
+        return 'later.png';
+      });
+      Object.defineProperty(later, 'name', { get: getLaterFilename });
+
+      const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+      const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+      const form = await new Response(options.body as ReadableStream, {
+        headers: { 'content-type': contentType },
+      }).formData();
+
+      await expect((form.get('earlier') as File).text()).resolves.toBe('original earlier bytes');
+      await expect((form.get('later') as File).text()).resolves.toBe('later bytes');
+      expect(createIterator).toHaveBeenCalledTimes(1);
+      expect(getLaterFilename).toHaveBeenCalledTimes(1);
+      expect(originalNext).toHaveBeenCalledTimes(2);
+      expect(originalNext.mock.contexts).toEqual([iterator, iterator]);
+      expect(substitutedNext).not.toHaveBeenCalled();
+      expect(getReturn).not.toHaveBeenCalled();
+    },
+  );
+
   test('snapshots ordinary streaming uploads before reading later filenames', async () => {
     const originalIterator = vi.fn(() => chunks('original ordinary bytes'));
     const substitutedIterator = vi.fn(() => chunks('substituted ordinary bytes'));
@@ -632,6 +678,29 @@ describe('streaming multipart filename and header security', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(returnIterator).toHaveBeenCalledTimes(1);
     expect(stream.locked).toBe(false);
+  });
+
+  test('delegates cancellation of a consumed multipart iterator to its original receiver', async () => {
+    const next = vi.fn().mockResolvedValue({ done: false, value: 'streamed bytes' });
+    const returnIterator = vi.fn().mockResolvedValue({ done: true, value: undefined });
+    const iterator = { next, return: returnIterator };
+    const source = { [Symbol.asyncIterator]: vi.fn(() => iterator) };
+    const upload = toStreamingFile(source, 'upload.txt');
+    const options = await multipartFormRequestOptions({ body: { upload } }, fetch);
+    const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+
+    await expect(reader.read()).resolves.toMatchObject({ done: false });
+    await expect(reader.read()).resolves.toMatchObject({ done: false });
+    await expect(reader.read()).resolves.toEqual({
+      done: false,
+      value: new TextEncoder().encode('streamed bytes'),
+    });
+    await reader.cancel();
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(next.mock.contexts).toEqual([iterator]);
+    expect(returnIterator).toHaveBeenCalledTimes(1);
+    expect(returnIterator.mock.contexts).toEqual([iterator]);
   });
 
   test('preserves validation errors when upload cleanup accessors throw', async () => {
