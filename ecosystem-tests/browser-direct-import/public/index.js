@@ -107,9 +107,11 @@ const correctAnswer =
   'It was anxious to find him no one that expectation of a man who were giving his father enjoyment. But he was avoided in sight in the minister to which indeed,';
 const model = 'whisper-1';
 
-const params = new URLSearchParams(location.search);
+const apiKey = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_API_KEY__?: string }} */ (
+  globalThis
+).__OPENAI_ECOSYSTEM_TEST_API_KEY__;
 
-const client = new OpenAI({ apiKey: params.get('apiKey') ?? undefined, dangerouslyAllowBrowser: true });
+const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 
 async function typeTests() {
   // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
