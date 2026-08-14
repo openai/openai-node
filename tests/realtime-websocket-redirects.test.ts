@@ -50,7 +50,9 @@ function createClient(apiKey = 'test-key', baseURL = 'https://example.com/v1/'):
   return new OpenAI({ apiKey, baseURL });
 }
 
-function createAzureClient(options: { tokenProvider?: boolean; deployment?: string; baseURL?: string } = {}): AzureOpenAI {
+function createAzureClient(
+  options: { tokenProvider?: boolean; deployment?: string; baseURL?: string } = {},
+): AzureOpenAI {
   return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
     baseURL: options.baseURL ?? 'https://azure.example.com/openai/',
