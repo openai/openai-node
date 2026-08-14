@@ -82,7 +82,9 @@ describe('streaming multipart filename security', () => {
     );
     const reader = (options.body as ReadableStream<Uint8Array>).getReader();
     const firstRead = reader.read().then(({ done, value }) => {
-      if (!done) emitted.push(value);
+      if (!done) {
+        emitted.push(value);
+      }
     });
 
     await expect(firstRead).rejects.toThrow(/file.?name/iu);
