@@ -1,11 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const root = process.cwd();
 
-function runCli(args: string[], cwd = root) {
+function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}) {
   return spawnSync(
     process.execPath,
     [
@@ -24,6 +24,7 @@ function runCli(args: string[], cwd = root) {
         DISABLE_V8_COMPILE_CACHE: '1',
         TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
         TS_NODE_TRANSPILE_ONLY: 'true',
+        ...env,
       },
       timeout: 15_000,
     },
@@ -102,6 +103,69 @@ describe('ecosystem test CLI', () => {
       expect(result.stderr).not.toContain('▶️');
       expect(result.stderr).not.toContain('OPENAI_API_KEY');
       expect(result.stdout).not.toContain('[run]:');
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  const existingCloudflareDevVars = "OPENAI_API_KEY='existing-test-secret'\nANOTHER_VAR='keep-me'\n";
+
+  test.each([
+    {
+      name: 'preserves existing Cloudflare credentials without an API key',
+      existingVars: existingCloudflareDevVars,
+      apiKey: undefined,
+      expectedVars: existingCloudflareDevVars,
+    },
+    {
+      name: 'does not create Cloudflare credentials without an API key',
+      existingVars: undefined,
+      apiKey: undefined,
+      expectedVars: undefined,
+    },
+    {
+      name: 'preserves existing Cloudflare credentials when the API key is empty',
+      existingVars: existingCloudflareDevVars,
+      apiKey: '',
+      expectedVars: existingCloudflareDevVars,
+    },
+    {
+      name: 'updates Cloudflare credentials when an API key is available',
+      existingVars: existingCloudflareDevVars,
+      apiKey: 'test-api-key',
+      expectedVars: "OPENAI_API_KEY='test-api-key'",
+    },
+  ])('$name', ({ existingVars, apiKey, expectedVars }) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
+    const worker = path.join(fixture, 'ecosystem-tests', 'cloudflare-worker');
+    const bin = path.join(fixture, 'bin');
+    const devVars = path.join(worker, '.dev.vars');
+
+    try {
+      mkdirSync(worker, { recursive: true });
+      mkdirSync(bin);
+      writeFileSync(path.join(fixture, 'package.json'), '{}\n');
+      writeFileSync(path.join(bin, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+
+      if (existingVars !== undefined) {
+        writeFileSync(devVars, existingVars);
+      }
+
+      const result = runCli(['cloudflare-worker', '--fromNpm=openai', '--skipPack', '--noCleanup'], fixture, {
+        PATH: bin,
+        OPENAI_API_KEY: apiKey,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+
+      if (expectedVars === undefined) {
+        expect(existsSync(devVars)).toBe(false);
+      } else {
+        const actualVars = readFileSync(devVars, 'utf-8');
+        expect(actualVars).toBe(expectedVars);
+        expect(actualVars).not.toContain('undefined');
+      }
     } finally {
       rmSync(fixture, { recursive: true, force: true });
     }
