@@ -5,7 +5,6 @@ import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
 import { bedrock } from 'openai/providers/bedrock/aws';
 
-
 const originalEnv = process.env;
 const RUNTIME_MODEL = 'us.openai.gpt-5.6-sol';
 const BEDROCK_ENVIRONMENT_VARIABLES = [
@@ -76,6 +75,7 @@ function eventStreamResponse(events: unknown[]): Response {
   return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
 }
 
+describe('bedrock Runtime provider', () => {
   test.each([
     { endpoint: 'mantle' as const, hostname: 'bedrock-mantle.us-east-1.api.aws' },
     { endpoint: 'runtime' as const, hostname: 'bedrock-runtime.us-east-1.amazonaws.com' },
