@@ -11,7 +11,9 @@ async function* chunks(content = 'content') {
   yield content;
 }
 
-async function parseMultipart(options: Awaited<ReturnType<typeof multipartFormRequestOptions>>): Promise<FormData> {
+async function parseMultipart(
+  options: Awaited<ReturnType<typeof multipartFormRequestOptions>>,
+): Promise<FormData> {
   const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
   return new Response(options.body as ReadableStream, {
     headers: { 'content-type': contentType },
@@ -54,17 +56,25 @@ describe('streaming multipart filename security', () => {
     ['empty', ''],
     ['object', { toString: vi.fn() }],
     ['number', 42],
-  ] as const)('rejects a filename mutated to an %s value before the first boundary', async (_, name) => {
-    const upload = toStreamingFile(chunks('secret bytes'), 'safe.txt');
-    Object.defineProperty(upload, 'name', { value: name });
+  ] as const)(
+    'rejects a filename mutated to an %s value before the first boundary',
+    async (_, name) => {
+      const upload = toStreamingFile(chunks('secret bytes'), 'safe.txt');
+      Object.defineProperty(upload, 'name', { value: name });
 
-    const options = await multipartFormRequestOptions({ body: { secret: 'metadata', upload } }, fetch);
-    const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+      const options = await multipartFormRequestOptions(
+        { body: { secret: 'metadata', upload } },
+        fetch,
+      );
+      const reader = (options.body as ReadableStream<Uint8Array>).getReader();
 
-    await expect(reader.read()).rejects.toThrow(/file.?name/iu);
-  });
+      await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    },
+  );
 
-  test('upgrades a false-first branded async iterable before optional multipart emits bytes', async () => {
+  test(
+    'upgrades a false-first branded async iterable before optional multipart emits bytes',
+    async () => {
     const emitted: Uint8Array[] = [];
     const earlier = new File(['earlier bytes'], 'earlier.txt');
     const readEarlier = vi.spyOn(earlier, 'stream');
@@ -90,8 +100,9 @@ describe('streaming multipart filename security', () => {
     await expect(firstRead).rejects.toThrow(/file.?name/iu);
     expect(emitted).toEqual([]);
     expect(readEarlier).not.toHaveBeenCalled();
-    expect(incidentalIterator).not.toHaveBeenCalled();
-  });
+      expect(incidentalIterator).not.toHaveBeenCalled();
+    },
+  );
 
   test('uses authoritative data after upgrading a false-first branded async iterable', async () => {
     const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
