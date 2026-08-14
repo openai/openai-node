@@ -5,6 +5,7 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import type { ChatCompletionSnapshot } from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
+import { makeParseableResponseFormat } from 'openai/lib/parser';
 import type { ChatCompletionTokenLogprob } from 'openai/resources';
 import { Stream } from 'openai/streaming';
 import { z } from 'zod/v4';
@@ -1238,6 +1239,151 @@ describe('.stream()', () => {
     expect(deltaParsed).toEqual([{}, { city: 'SF' }]);
     expect(doneParsed).toEqual({ city: 'SF' });
     expect(completion.choices[0]?.message.parsed).toEqual({ city: 'SF' });
+  });
+
+  it('parses present empty assistant content when structured streaming finishes', async () => {
+    const parseRaw = vi.fn((raw: string) => ({ raw }));
+    const format = makeParseableResponseFormat(
+      { type: 'json_schema', json_schema: { name: 'empty_content', schema: {} } },
+      parseRaw,
+    );
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(contentChunks('')), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Return empty content' }],
+      response_format: format,
+    });
+    const contentEvents: unknown[] = [];
+    const deltaEvents: unknown[] = [];
+    const doneEvents: unknown[] = [];
+    stream.on('content', (...event) => contentEvents.push(event));
+    stream.on('content.delta', (event) => deltaEvents.push(event));
+    stream.on('content.done', (event) => doneEvents.push(event));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices[0]?.message).toMatchObject({ content: '', parsed: { raw: '' } });
+    expect(contentEvents).toEqual([]);
+    expect(deltaEvents).toEqual([]);
+    expect(doneEvents).toEqual([{ content: '', parsed: { raw: '' } }]);
+    expect(parseRaw).toHaveBeenCalledTimes(2);
+    expect(parseRaw).toHaveBeenNthCalledWith(1, '');
+    expect(parseRaw).toHaveBeenNthCalledWith(2, '');
+  });
+
+  it.each([undefined, null] as const)(
+    'does not emit content events when assistant content is %s',
+    async (content) => {
+      const [chunk] = contentChunks('');
+      if (!chunk?.choices[0]) {
+        throw new Error('Expected a completion choice');
+      }
+      chunk.choices[0].delta = content === undefined ? { role: 'assistant' } : { role: 'assistant', content };
+
+      const parseRaw = vi.fn((raw: string) => ({ raw }));
+      const format = makeParseableResponseFormat(
+        { type: 'json_schema', json_schema: { name: 'absent_content', schema: {} } },
+        parseRaw,
+      );
+      const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient([chunk]), {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Return no content' }],
+        response_format: format,
+      });
+      const contentEvents: unknown[] = [];
+      const deltaEvents: unknown[] = [];
+      const doneEvents: unknown[] = [];
+      stream.on('content', (...event) => contentEvents.push(event));
+      stream.on('content.delta', (event) => deltaEvents.push(event));
+      stream.on('content.done', (event) => doneEvents.push(event));
+
+      const completion = await stream.finalChatCompletion();
+
+      expect(completion.choices[0]?.message).toMatchObject({ content: null, parsed: null });
+      expect(contentEvents).toEqual([]);
+      expect(deltaEvents).toEqual([]);
+      expect(doneEvents).toEqual([]);
+      expect(parseRaw).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not parse empty content preceding structured streamed tool calls', async () => {
+    const chunks = [
+      customToolChunk({ role: 'assistant', content: '' }),
+      customToolChunk({
+        tool_calls: [
+          {
+            index: 0,
+            id: 'call_function_123',
+            type: 'function',
+            function: { name: 'get_weather', arguments: '{"city":"SF"}' },
+          },
+        ],
+      }),
+      customToolChunk({}, 'tool_calls'),
+    ];
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Check the weather' }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'location', schema: { type: 'object' } },
+      },
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'get_weather',
+            strict: true,
+            parameters: { type: 'object', properties: { city: { type: 'string' } } },
+          },
+        },
+      ],
+    });
+    const doneEvents: unknown[] = [];
+    stream.on('content.done', (event) => doneEvents.push(event));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices[0]?.message).toMatchObject({
+      content: '',
+      parsed: null,
+      tool_calls: [{ type: 'function', function: { name: 'get_weather', parsed_arguments: { city: 'SF' } } }],
+    });
+    expect(doneEvents).toEqual([]);
+  });
+
+  it('keeps empty refusal content unparsed without emitting a content completion', async () => {
+    const [chunk] = contentChunks('');
+    if (!chunk?.choices[0]) {
+      throw new Error('Expected a completion choice');
+    }
+    chunk.choices[0].delta.refusal = 'Request refused';
+
+    const parseRaw = vi.fn((raw: string) => ({ raw }));
+    const format = makeParseableResponseFormat(
+      { type: 'json_schema', json_schema: { name: 'refused_content', schema: {} } },
+      parseRaw,
+    );
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient([chunk]), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Return refused content' }],
+      response_format: format,
+    });
+    const doneEvents: unknown[] = [];
+    const refusals: string[] = [];
+    stream.on('content.done', (event) => doneEvents.push(event));
+    stream.on('refusal.done', (event) => refusals.push(event.refusal));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices[0]?.message).toMatchObject({
+      content: '',
+      parsed: null,
+      refusal: 'Request refused',
+    });
+    expect(doneEvents).toEqual([]);
+    expect(refusals).toEqual(['Request refused']);
+    expect(parseRaw).not.toHaveBeenCalled();
   });
 
   it('preserves unbranded custom parsers for structured stream completion', async () => {

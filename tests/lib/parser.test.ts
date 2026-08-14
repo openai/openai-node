@@ -1617,6 +1617,99 @@ describe('maybeParseChatCompletion', () => {
       units: 'c',
     });
   });
+
+  it('parses present empty assistant content with the response_format parser', () => {
+    const parseRaw = vi.fn((raw: string) => ({ raw }));
+    const format = makeParseableResponseFormat(
+      { type: 'json_schema', json_schema: { name: 'empty_content', schema: {} } },
+      parseRaw,
+    );
+    const rawCompletion = {
+      id: 'chatcmpl-empty',
+      object: 'chat.completion' as const,
+      created: 1_677_652_288,
+      model: 'gpt-4o-2024-08-06',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop' as const,
+          logprobs: null,
+          message: {
+            role: 'assistant' as const,
+            content: '',
+            refusal: null,
+          },
+        },
+      ],
+    };
+
+    const parsed = maybeParseChatCompletion(rawCompletion, {
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: 'hello' }],
+      response_format: format,
+    });
+
+    expect(parseRaw).toHaveBeenCalledWith('');
+    expect(parsed.choices[0]?.message.parsed).toEqual({ raw: '' });
+  });
+
+  it('does not parse empty assistant content on tool-call-only choices', () => {
+    const rawCompletion: OpenAI.Chat.ChatCompletion = {
+      id: 'chatcmpl-empty-tool-call',
+      object: 'chat.completion',
+      created: 1_677_652_288,
+      model: 'gpt-4o-2024-08-06',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'tool_calls',
+          logprobs: null,
+          message: {
+            role: 'assistant',
+            content: '',
+            refusal: null,
+            tool_calls: [
+              {
+                id: 'call_weather',
+                type: 'function',
+                function: { name: 'get_weather', arguments: '{"city":"SF"}' },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const parsed = maybeParseChatCompletion(rawCompletion, {
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: 'check the weather' }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'location', schema: { type: 'object' } },
+      },
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'get_weather',
+            strict: true,
+            parameters: { type: 'object' },
+          },
+        },
+      ],
+    });
+
+    expect(parsed.choices[0]?.message.parsed).toBeNull();
+    expect(parsed.choices[0]?.message.tool_calls?.[0]).toEqual({
+      id: 'call_weather',
+      type: 'function',
+      function: {
+        name: 'get_weather',
+        arguments: '{"city":"SF"}',
+        parsed_arguments: { city: 'SF' },
+      },
+    });
+  });
 });
 
 describe('isParseableResponseFormat', () => {
