@@ -203,12 +203,14 @@ export const maybeMultipartFormRequestOptions = async (
   fetch: OpenAI | Fetch,
   formOptions?: CreateFormOptions,
 ): Promise<RequestOptions> => {
-  if (!hasUploadableValue(opts.body)) {
+  const uploadableKinds = new WeakMap<object, UploadableKind>();
+
+  if (!hasUploadableValue(opts.body, uploadableKinds)) {
     return opts;
   }
 
-  if (hasStreamingUploadableValue(opts.body)) {
-    return createStreamingFormRequestOptions(opts, formOptions);
+  if (hasStreamingUploadableValue(opts.body, uploadableKinds)) {
+    return createStreamingFormRequestOptions(opts, uploadableKinds, formOptions);
   }
 
   return { ...opts, body: await createForm(opts.body, fetch, formOptions) };
@@ -231,8 +233,10 @@ export const multipartFormRequestOptions = async (
   fetch: OpenAI | Fetch,
   formOptions?: CreateFormOptions,
 ): Promise<RequestOptions> => {
-  if (hasStreamingUploadableValue(opts.body)) {
-    return createStreamingFormRequestOptions(opts, formOptions);
+  const uploadableKinds = new WeakMap<object, UploadableKind>();
+
+  if (hasStreamingUploadableValue(opts.body, uploadableKinds)) {
+    return createStreamingFormRequestOptions(opts, uploadableKinds, formOptions);
   }
 
   return { ...opts, body: await createForm(opts.body, fetch, formOptions) };
@@ -322,36 +326,51 @@ const isReadableStream = (value: unknown): value is ReadableStream<BlobPart> =>
 const isStreamingFile = (value: unknown): value is StreamingFile =>
   typeof value === 'object' && value !== null && brand_privateStreamingFile in value;
 
-const getUploadableKind = (value: unknown): 'upload' | 'streaming' | undefined => {
+type UploadableKind = 'upload' | 'streaming-upload' | 'streaming-file' | undefined;
+type UploadableKinds = WeakMap<object, UploadableKind>;
+
+const getUploadableKind = (value: unknown, uploadableKinds: UploadableKinds): UploadableKind => {
   if (typeof value !== 'object' || value === null) {
     return undefined;
   }
 
-  if (isStreamingFile(value)) {
-    return 'streaming';
-  }
-  if (value instanceof Response || isAsyncIterable(value) || isReadableStream(value)) {
-    return 'upload';
-  }
-  if (isNamedBlob(value)) {
-    return 'upload';
+  if (uploadableKinds.has(value)) {
+    return uploadableKinds.get(value);
   }
 
-  return undefined;
+  let uploadableKind: UploadableKind;
+
+  if (isStreamingFile(value)) {
+    uploadableKind = 'streaming-file';
+  } else if (isAsyncIterable(value) || isReadableStream(value)) {
+    uploadableKind = 'streaming-upload';
+  } else if (value instanceof Response || isNamedBlob(value)) {
+    uploadableKind = 'upload';
+  }
+
+  uploadableKinds.set(value, uploadableKind);
+
+  return uploadableKind;
 };
 
-const isUploadable = (value: unknown): value is Uploadable => getUploadableKind(value) !== undefined;
+const isUploadable = (value: unknown, uploadableKinds: UploadableKinds): value is Uploadable =>
+  getUploadableKind(value, uploadableKinds) !== undefined;
 
-const hasStreamingUploadableValue = (value: unknown): boolean => {
-  if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
+const hasStreamingUploadableValue = (value: unknown, uploadableKinds: UploadableKinds): boolean => {
+  const uploadableKind = getUploadableKind(value, uploadableKinds);
+
+  if (uploadableKind === 'streaming-file' || uploadableKind === 'streaming-upload') {
     return true;
   }
-  if (Array.isArray(value)) {
-    return value.some(hasStreamingUploadableValue);
+  if (uploadableKind === 'upload') {
+    return false;
   }
-  if (value && typeof value === 'object' && !isNamedBlob(value) && !(value instanceof Response)) {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasStreamingUploadableValue(entry, uploadableKinds));
+  }
+  if (value && typeof value === 'object') {
     for (const k in value) {
-      if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) {
+      if (hasStreamingUploadableValue((value as Record<string, unknown>)[k], uploadableKinds)) {
         return true;
       }
     }
@@ -359,16 +378,16 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
   return false;
 };
 
-const hasUploadableValue = (value: unknown): boolean => {
-  if (isUploadable(value)) {
+const hasUploadableValue = (value: unknown, uploadableKinds: UploadableKinds): boolean => {
+  if (isUploadable(value, uploadableKinds)) {
     return true;
   }
   if (Array.isArray(value)) {
-    return value.some(hasUploadableValue);
+    return value.some((entry) => hasUploadableValue(entry, uploadableKinds));
   }
   if (value && typeof value === 'object') {
     for (const k in value) {
-      if (hasUploadableValue((value as any)[k])) {
+      if (hasUploadableValue((value as any)[k], uploadableKinds)) {
         return true;
       }
     }
@@ -382,10 +401,11 @@ type FormEntry =
 
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
+  uploadableKinds: UploadableKinds,
   options: CreateFormOptions = {},
 ): RequestOptions => {
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
-  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options));
+  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options, uploadableKinds));
 
   return {
     ...opts,
@@ -398,10 +418,11 @@ async function* iterateMultipartBody(
   body: unknown,
   boundary: string,
   options: CreateFormOptions,
+  uploadableKinds: UploadableKinds,
 ): AsyncGenerator<Uint8Array> {
   const entries: (FormEntry & { filename?: string })[] = [];
 
-  for await (const entry of iterateFormEntries(body)) {
+  for await (const entry of iterateFormEntries(body, uploadableKinds)) {
     if (entry.kind === 'upload' && entry.streamingFile) {
       entries.push({ ...entry, filename: getStreamingFileName(entry.value, options, entry.streamingFile) });
     } else {
@@ -433,17 +454,24 @@ async function* iterateMultipartBody(
   yield encodeUTF8(`--${boundary}--\r\n`);
 }
 
-async function* iterateFormEntries(body: unknown): AsyncGenerator<FormEntry> {
+async function* iterateFormEntries(
+  body: unknown,
+  uploadableKinds: UploadableKinds,
+): AsyncGenerator<FormEntry> {
   if (!body || typeof body !== 'object') {
     return;
   }
 
   for (const [key, value] of Object.entries(body)) {
-    yield* iterateFormValue(key, value);
+    yield* iterateFormValue(key, value, uploadableKinds);
   }
 }
 
-async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<FormEntry> {
+async function* iterateFormValue(
+  key: string,
+  value: unknown,
+  uploadableKinds: UploadableKinds,
+): AsyncGenerator<FormEntry> {
   if (value === undefined) {
     return;
   }
@@ -458,16 +486,21 @@ async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<Fo
     return;
   }
 
-  const uploadKind = getUploadableKind(value);
+  const uploadKind = getUploadableKind(value, uploadableKinds);
   if (uploadKind) {
-    yield { key, value: value as Uploadable, kind: 'upload', streamingFile: uploadKind === 'streaming' };
+    yield {
+      key,
+      value: value as Uploadable,
+      kind: 'upload',
+      streamingFile: uploadKind === 'streaming-file',
+    };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
-      yield* iterateFormValue(key + '[]', entry);
+      yield* iterateFormValue(key + '[]', entry, uploadableKinds);
     }
   } else if (typeof value === 'object') {
     for (const [name, prop] of Object.entries(value)) {
-      yield* iterateFormValue(`${key}[${name}]`, prop);
+      yield* iterateFormValue(`${key}[${name}]`, prop, uploadableKinds);
     }
   } else {
     throw new TypeError(

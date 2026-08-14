@@ -146,7 +146,112 @@ describe('streaming multipart filename and header security', () => {
     expect(getFilename).toHaveBeenCalledTimes(1);
     expect(replace).not.toHaveBeenCalled();
     expect(toString).not.toHaveBeenCalled();
-    expect(brandChecks).toBe(2);
+    expect(brandChecks).toBe(1);
+  });
+
+  test('rejects a stateful branded async-iterable before optional multipart emits earlier fields or files', async () => {
+    const emitted: Uint8Array[] = [];
+    const earlier = new File(['sensitive earlier upload bytes'], 'earlier.png');
+    const startEarlierFile = vi.spyOn(earlier, 'stream');
+    const toString = vi.fn(() => {
+      throw new TypeError('invalid file name');
+    });
+    const incidentalIterator = vi.fn(() => chunks('hostile incidental upload bytes'));
+    const upload = toStreamingFile(chunks('authoritative upload bytes'), 'later.png');
+    Object.defineProperty(upload, 'name', { value: { toString } });
+    Object.defineProperty(upload, Symbol.asyncIterator, { value: incidentalIterator });
+
+    let brandChecks = 0;
+    const hostile = new Proxy(upload, {
+      has(target, key) {
+        if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
+          const branded = [true, true, false][brandChecks] ?? false;
+          brandChecks += 1;
+          return branded;
+        }
+
+        return Reflect.has(target, key);
+      },
+    });
+    const files = [hostile, earlier];
+    Object.defineProperty(files, Symbol.iterator, {
+      *value() {
+        yield earlier;
+        yield hostile;
+      },
+    });
+    const body = { secret: 'sensitive earlier metadata', files };
+
+    let firstRead: ReturnType<ReadableStreamDefaultReader<Uint8Array>['read']> | undefined;
+    const customFetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const stream = init?.body as ReadableStream<Uint8Array>;
+      const reader = stream.getReader();
+      firstRead = reader.read();
+      const firstChunk = await firstRead;
+
+      if (!firstChunk.done) {
+        emitted.push(firstChunk.value);
+        reader.releaseLock();
+
+        for await (const chunk of stream) {
+          emitted.push(chunk);
+        }
+      }
+
+      return Response.json({ id: 'skill-test' });
+    });
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch: customFetch });
+
+    await expect(client.skills.create(body)).rejects.toMatchObject({
+      cause: expect.objectContaining({ message: expect.stringMatching(/file.?name/iu) }),
+    });
+
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    await expect(firstRead).rejects.toThrow(/file.?name/iu);
+    expect(emitted).toEqual([]);
+    expect(startEarlierFile).not.toHaveBeenCalled();
+    expect(toString).not.toHaveBeenCalled();
+    expect(incidentalIterator).not.toHaveBeenCalled();
+    expect(brandChecks).toBe(1);
+  });
+
+  test('streams a valid stateful branded async-iterable through optional multipart from its data', async () => {
+    const incidentalIterator = vi.fn(() => chunks('hostile incidental upload bytes'));
+    const upload = toStreamingFile(chunks('authoritative upload bytes'), 'valid.png');
+    Object.defineProperty(upload, Symbol.asyncIterator, { value: incidentalIterator });
+
+    let brandChecks = 0;
+    const valid = new Proxy(upload, {
+      has(target, key) {
+        if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
+          const branded = [true, true, false][brandChecks] ?? false;
+          brandChecks += 1;
+          return branded;
+        }
+
+        return Reflect.has(target, key);
+      },
+    });
+
+    let form: FormData | undefined;
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async (_url, init) => {
+        form = await new Response(init?.body as ReadableStream, {
+          headers: { 'content-type': new Headers(init?.headers).get('content-type') ?? '' },
+        }).formData();
+
+        return Response.json({ id: 'skill-test' });
+      },
+    });
+
+    await client.skills.create({ files: [valid] });
+
+    const uploaded = form?.get('files[]') as File;
+    expect(uploaded.name).toBe('valid.png');
+    await expect(uploaded.text()).resolves.toBe('authoritative upload bytes');
+    expect(incidentalIterator).not.toHaveBeenCalled();
+    expect(brandChecks).toBe(1);
   });
 
   test('streams valid branded async-iterable files lazily using one filename snapshot per entry', async () => {
