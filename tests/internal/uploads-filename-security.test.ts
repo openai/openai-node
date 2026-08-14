@@ -104,24 +104,21 @@ describe('streaming multipart filename security', () => {
     },
   );
 
-  test(
-    'uses authoritative data after upgrading a false-first branded async iterable',
-    async () => {
-      const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
-      const upload = toStreamingFile(chunks('authoritative bytes'), 'upload.txt');
-      Object.defineProperty(upload, Symbol.asyncIterator, { value: incidentalIterator });
-      const hostile = withStatefulBrand(upload, [false, true]);
+  test('uses authoritative data after upgrading a false-first branded async iterable', async () => {
+    const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
+    const upload = toStreamingFile(chunks('authoritative bytes'), 'upload.txt');
+    Object.defineProperty(upload, Symbol.asyncIterator, { value: incidentalIterator });
+    const hostile = withStatefulBrand(upload, [false, true]);
 
-      const form = await parseMultipart(
-        await maybeMultipartFormRequestOptions({ body: { upload: hostile } }, fetch),
-      );
-      const file = form.get('upload') as File;
+    const form = await parseMultipart(
+      await maybeMultipartFormRequestOptions({ body: { upload: hostile } }, fetch),
+    );
+    const file = form.get('upload') as File;
 
-      expect(file.name).toBe('upload.txt');
-      await expect(file.text()).resolves.toBe('authoritative bytes');
-      expect(incidentalIterator).not.toHaveBeenCalled();
-    },
-  );
+    expect(file.name).toBe('upload.txt');
+    await expect(file.text()).resolves.toBe('authoritative bytes');
+    expect(incidentalIterator).not.toHaveBeenCalled();
+  });
 
   test('snapshots every earlier upload before reading a later filename getter', async () => {
     const namedBlob = Object.assign(new Blob(['blob bytes'], { type: 'text/original' }), {
