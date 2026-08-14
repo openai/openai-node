@@ -183,7 +183,7 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
 }
 
 function basename(value: string): string | undefined {
-  return value.split(/[\\/]/).pop() || undefined;
+  return value.split(/[\\/]/).pop()?.replace(/^[A-Za-z]:/, '') || undefined;
 }
 
 function normalizeFilenamePath(value: string): string {
@@ -436,6 +436,22 @@ type MultipartEntry =
   | Extract<FormEntry, { kind: 'field' }>
   | (Extract<FormEntry, { kind: 'upload' }> & Readonly<{ filename: string }>);
 
+function snapshotStreamingFileData(value: StreamingFileInput): StreamingFileInput {
+  const readable = value as ReadableStream<BlobPart>;
+  const getReader = readable.getReader;
+  if (typeof getReader === 'function') {
+    return { getReader: getReader.bind(readable) } as ReadableStream<BlobPart>;
+  }
+
+  const iterable = value as AsyncIterable<BlobPart>;
+  const createIterator = iterable[Symbol.asyncIterator];
+  if (typeof createIterator === 'function') {
+    return { [Symbol.asyncIterator]: createIterator.bind(iterable) };
+  }
+
+  throw new TypeError('Streaming file data must be an async iterable or readable stream');
+}
+
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
   uploadableKinds: UploadableKinds,
@@ -529,7 +545,7 @@ async function* iterateFormValue(
     yield {
       key,
       value: upload,
-      data: streamingFile ? (upload as StreamingFile).data : upload,
+      data: streamingFile ? snapshotStreamingFileData((upload as StreamingFile).data) : upload,
       kind: 'upload',
       streamingFile,
       type: getStreamingFileType(upload, streamingFile),
