@@ -35,5 +35,6 @@ fi
 
 # Generated tests are excluded from linting, so TypeScript performs the API
 # compatibility check against every historical resource test.
-./scripts/lint
-pnpm exec tsc
+pnpm exec oxfmt src/bedrock.ts src/internal/bedrock.ts src/internal/ws.ts src/realtime/ws.ts src/beta/realtime/ws.ts src/realtime/websocket.ts src/beta/realtime/websocket.ts src/resources/responses/ws.ts src/resources/beta/responses/ws.ts tests/bedrock-websocket-security.test.ts tests/realtime-websocket-redirects.test.ts tests/realtime-websocket.test.ts
+git diff -- src/bedrock.ts src/internal/bedrock.ts src/internal/ws.ts src/realtime/ws.ts src/beta/realtime/ws.ts src/realtime/websocket.ts src/beta/realtime/websocket.ts src/resources/responses/ws.ts src/resources/beta/responses/ws.ts tests/bedrock-websocket-security.test.ts tests/realtime-websocket-redirects.test.ts tests/realtime-websocket.test.ts
+exit 1
