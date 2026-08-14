@@ -184,6 +184,30 @@ describe('streaming multipart filename and header security', () => {
     expect(substitutedIterator).not.toHaveBeenCalled();
   });
 
+  test('snapshots ordinary streaming uploads before reading later filenames', async () => {
+    const originalIterator = vi.fn(() => chunks('original ordinary bytes'));
+    const substitutedIterator = vi.fn(() => chunks('substituted ordinary bytes'));
+    const earlier = { [Symbol.asyncIterator]: originalIterator };
+    const later = toStreamingFile(chunks('later bytes'), 'later.png');
+    Object.defineProperty(later, 'name', {
+      get() {
+        Object.defineProperty(earlier, Symbol.asyncIterator, { value: substitutedIterator });
+        return 'later.png';
+      },
+    });
+
+    const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    await expect((form.get('earlier') as File).text()).resolves.toBe('original ordinary bytes');
+    await expect((form.get('later') as File).text()).resolves.toBe('later bytes');
+    expect(originalIterator).toHaveBeenCalledTimes(1);
+    expect(substitutedIterator).not.toHaveBeenCalled();
+  });
+
   test('streams valid branded async-iterable files lazily using one filename snapshot per entry', async () => {
     const readChunk = vi.fn();
     const replace = vi.fn();
