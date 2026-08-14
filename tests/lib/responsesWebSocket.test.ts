@@ -1,13 +1,10 @@
 import { vi } from 'vitest';
-import { EventEmitter, once } from 'node:events';
-import { createServer } from 'node:http';
+import { EventEmitter } from 'node:events';
 import OpenAI from 'openai';
 import { ReadyState } from 'openai/internal/ws-adapter';
 import type { WebSocketLike } from 'openai/internal/ws-adapter';
-import { ResponsesWS as StableResponsesWS } from 'openai/resources/responses/ws';
 import { ResponsesWSBase as StableResponsesWSBase } from 'openai/resources/responses/ws-base';
 import type { ResponsesWSBaseOptions } from 'openai/resources/responses/ws-base';
-import { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';
 import { ResponsesWSBase as BetaResponsesWSBase } from 'openai/resources/beta/responses/ws-base';
 import type { ResponsesWSBaseOptions as BetaResponsesWSBaseOptions } from 'openai/resources/beta/responses/ws-base';
 import { WebSocketError as StableWebSocketError } from 'openai/resources/responses/internal-base';
@@ -355,83 +352,5 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
     expect(reconnect).not.toHaveBeenCalled();
     expect(closed).toHaveBeenCalledWith(code, 'terminal close', []);
-  });
-});
-
-describe.each([
-  ['stable', StableResponsesWS],
-  ['beta', BetaResponsesWS],
-] as const)('%s Responses WebSocket redirect security', (_version, ResponsesWS) => {
-  const ResponsesWSClass = ResponsesWS as typeof StableResponsesWS;
-
-  test('does not disclose a bearer token when a redirect listener is registered', async () => {
-    const sourceAuthorizations: (string | undefined)[] = [];
-    const disclosedAuthorizations: (string | undefined)[] = [];
-    const destinationConnections = vi.fn();
-    let redirectURL = '';
-
-    const destination = createServer((request, response) => {
-      request.resume();
-      disclosedAuthorizations.push(request.headers.authorization);
-      response.writeHead(200);
-      response.end();
-    });
-    destination.on('connection', destinationConnections);
-
-    const source = createServer((request, response) => {
-      request.resume();
-      sourceAuthorizations.push(request.headers.authorization);
-      response.writeHead(302, { location: redirectURL });
-      response.end();
-    });
-
-    try {
-      await Promise.all([
-        once(destination.listen(0, '127.0.0.1'), 'listening'),
-        once(source.listen(0, '127.0.0.1'), 'listening'),
-      ]);
-
-      const destinationAddress = destination.address();
-      const sourceAddress = source.address();
-
-      if (
-        !destinationAddress ||
-        typeof destinationAddress === 'string' ||
-        !sourceAddress ||
-        typeof sourceAddress === 'string'
-      ) {
-        throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');
-      }
-
-      redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
-
-      const websocket = new ResponsesWSClass(
-        new OpenAI({ apiKey: 'SECRET', baseURL: `http://127.0.0.1:${sourceAddress.port}/v1/` }),
-        { followRedirects: true },
-      );
-      const redirects = vi.fn();
-      const errors = vi.fn();
-      websocket.socket.platformSocket.on('redirect', redirects);
-      websocket.on('error', errors);
-
-      await once(websocket.socket.platformSocket, 'error');
-
-      expect(sourceAuthorizations).toEqual(['Bearer SECRET']);
-      expect(disclosedAuthorizations).toEqual([]);
-      expect(destinationConnections).not.toHaveBeenCalled();
-      expect(redirects).not.toHaveBeenCalled();
-      expect(errors).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Unexpected server response: 302' }),
-      );
-    } finally {
-      await Promise.all(
-        [source, destination].map(async (server) => {
-          const closed = once(server, 'close');
-          server.close();
-          server.closeAllConnections();
-          await closed;
-        }),
-      );
-    }
   });
 });

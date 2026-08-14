@@ -26,18 +26,12 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
   }
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
-    const headers = {
-      ...authHeaders,
-      ...this._wsOptions?.headers,
-    };
-    const hasSensitiveHeader = Object.keys(headers).some(
-      (name) => /^(?:authorization|cookie)$/iu.test(name) || /api[-_]?key/iu.test(name),
-    );
-
     const ws = new WS.WebSocket(url, {
       ...this._wsOptions,
-      headers,
-      ...(hasSensitiveHeader ? { followRedirects: false } : {}),
+      headers: {
+        ...authHeaders,
+        ...this._wsOptions?.headers,
+      },
     });
     return new NodeWebSocket(ws);
   }

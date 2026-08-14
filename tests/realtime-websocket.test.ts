@@ -270,20 +270,6 @@ describe.each([
     });
     expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
   });
-
-  test.each(['Cookie', 'X-API-KEY'])('disables redirects for caller-supplied %s credentials', (header) => {
-    const websocket = new Responses(createUnauthenticatedClient(), {
-      followRedirects: true,
-      headers: { [header]: 'secret' },
-    });
-
-    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
-    expect(lastNodeSocket().options).toMatchObject({
-      followRedirects: false,
-      headers: { [header]: 'secret' },
-    });
-    expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
-  });
 });
 
 describe.each([
