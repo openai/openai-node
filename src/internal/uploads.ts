@@ -327,11 +327,11 @@ const getUploadableKind = (value: unknown): 'upload' | 'streaming' | undefined =
     return undefined;
   }
 
-  if (value instanceof Response || isAsyncIterable(value) || isReadableStream(value)) {
-    return 'upload';
-  }
   if (isStreamingFile(value)) {
     return 'streaming';
+  }
+  if (value instanceof Response || isAsyncIterable(value) || isReadableStream(value)) {
+    return 'upload';
   }
   if (isNamedBlob(value)) {
     return 'upload';
