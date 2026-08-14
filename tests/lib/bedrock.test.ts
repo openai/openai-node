@@ -228,6 +228,85 @@ describe('instantiate bedrock client', () => {
   describe('request origin containment', () => {
     const configuredBaseURL = 'https://bedrock.example.com/openai/v1';
 
+    test('keeps the base URL enumerable without allowing its origin guard to be replaced', () => {
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, apiKey: 'bedrock-token' });
+      const descriptor = Object.getOwnPropertyDescriptor(client, 'baseURL');
+
+      expect(descriptor).toMatchObject({ configurable: false, enumerable: true });
+      expect(descriptor?.get).toEqual(expect.any(Function));
+      expect(descriptor?.set).toEqual(expect.any(Function));
+      expect(Object.keys(client)).toContain('baseURL');
+      expect(() =>
+        Object.defineProperty(client, 'baseURL', { value: 'https://attacker.example/openai/v1' }),
+      ).toThrow(TypeError);
+      expect(Reflect.deleteProperty(client, 'baseURL')).toBe(false);
+      expect(client.baseURL).toBe(configuredBaseURL);
+    });
+
+    test.each([
+      ['a different hostname', 'https://attacker.example/openai/v1'],
+      ['an HTTP downgrade', 'http://bedrock.example.com/openai/v1'],
+      ['a different effective port', 'https://bedrock.example.com:8443/openai/v1'],
+    ] as const)('rejects a base URL change to %s before resolving credentials', (_case, baseURL) => {
+      const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider, fetch });
+
+      expect(() => {
+        client.baseURL = baseURL;
+      }).toThrow(/request origin/i);
+
+      expect(client.baseURL).toBe(configuredBaseURL);
+      expect(bedrockTokenProvider).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('rejects malformed base URL changes without replacing the trusted endpoint', () => {
+      const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider });
+
+      expect(() => {
+        client.baseURL = 'not a valid URL';
+      }).toThrow(TypeError);
+
+      expect(client.baseURL).toBe(configuredBaseURL);
+      expect(bedrockTokenProvider).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      [
+        'a normalized HTTPS hostname, default port, and Responses suffix',
+        'https://BEDROCK.EXAMPLE.COM:443/openai/v1/responses',
+        'https://BEDROCK.EXAMPLE.COM:443/custom/v2',
+        'https://bedrock.example.com/custom/v2/models',
+      ],
+      [
+        'a normalized HTTP hostname and default port',
+        'http://CUSTOM.BEDROCK.EXAMPLE:80/openai/v1',
+        'http://CUSTOM.BEDROCK.EXAMPLE:80/custom/v2',
+        'http://custom.bedrock.example/custom/v2/models',
+      ],
+      [
+        'the same custom HTTPS port',
+        'https://LOCAL.BEDROCK.EXAMPLE:8443/openai/v1',
+        'https://LOCAL.BEDROCK.EXAMPLE:8443/custom/v2',
+        'https://local.bedrock.example:8443/custom/v2/models',
+      ],
+    ] as const)('allows a base URL change with %s', async (_case, baseURL, nextBaseURL, expectedURL) => {
+      const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
+      const client = new BedrockOpenAI({ baseURL, bedrockTokenProvider, fetch });
+
+      client.baseURL = nextBaseURL;
+      expect(client.baseURL).toBe(nextBaseURL);
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(String(fetch.mock.calls[0]![0])).toBe(expectedURL);
+    });
+
     test.each([
       ['a static bearer token', false],
       ['a rotating bearer token', true],
@@ -417,6 +496,14 @@ describe('instantiate bedrock client', () => {
       const original = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider, fetch });
       const clone = original.withOptions({ baseURL: 'https://clone.example:8443/openai/v1' });
 
+      expect(clone.baseURL).toBe('https://clone.example:8443/openai/v1');
+      expect(() => {
+        clone.baseURL = configuredBaseURL;
+      }).toThrow(/request origin/i);
+      expect(() => {
+        original.baseURL = clone.baseURL;
+      }).toThrow(/request origin/i);
+
       await expect(
         clone.request({ method: 'get', path: 'https://bedrock.example.com/exfiltrate' }),
       ).rejects.toThrow(/request origin/i);
@@ -442,11 +529,29 @@ describe('instantiate bedrock client', () => {
       const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
       const original = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider, fetch });
       const client = cloned ? original.withOptions({ timeout: 1000 }) : original;
-      client.baseURL = 'https://attacker.example/openai/v1';
 
-      await expect(client.request({ method: 'get', path: '/exfiltrate' })).rejects.toThrow(/request origin/i);
+      expect(() => {
+        client.baseURL = 'https://attacker.example/openai/v1';
+      }).toThrow(/request origin/i);
 
+      expect(client.baseURL).toBe(configuredBaseURL);
       expect(bedrockTokenProvider).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('rejects a base URL mutation attempted while a token provider is running', async () => {
+      const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider, fetch });
+      bedrockTokenProvider.mockImplementationOnce(async () => {
+        client.baseURL = 'https://attacker.example/openai/v1';
+        return 'rotating-bedrock-token';
+      });
+
+      await expect(client.request({ method: 'get', path: '/models' })).rejects.toThrow(/request origin/i);
+
+      expect(client.baseURL).toBe(configuredBaseURL);
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
       expect(fetch).not.toHaveBeenCalled();
     });
 

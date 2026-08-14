@@ -159,6 +159,20 @@ export class BedrockOpenAI extends OpenAI {
       ...opts,
     });
 
+    const trustedBaseURL = this.baseURL;
+    let currentBaseURL = trustedBaseURL;
+    Object.defineProperty(this, 'baseURL', {
+      enumerable: true,
+      configurable: false,
+      get() {
+        return currentBaseURL;
+      },
+      set(nextBaseURL: string) {
+        assertBedrockRequestOrigin(trustedBaseURL, nextBaseURL);
+        currentBaseURL = nextBaseURL;
+      },
+    });
+
     this.bedrockTokenProvider = bedrockTokenProvider;
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
   }

@@ -1,11 +1,13 @@
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
-import OpenAI, { AzureOpenAI } from 'openai';
+import OpenAI, { AzureOpenAI, BedrockOpenAI } from 'openai';
 import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtime/websocket';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaBrowserRealtime } from 'openai/beta/realtime/websocket';
 import { OpenAIRealtimeWS as BetaNodeRealtime } from 'openai/beta/realtime/ws';
+import { ResponsesWS as StableResponsesWS } from 'openai/resources/responses/ws';
+import { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';
 import * as WS from 'ws';
 
 type Listener = (event: any) => void;
@@ -106,6 +108,145 @@ afterEach(() => {
     value: originalWebSocket,
     writable: true,
   });
+});
+
+describe('Bedrock WebSocket origin containment', () => {
+  const configuredBaseURL = 'https://bedrock.example.com/openai/v1';
+  const attackerBaseURL = 'https://attacker.example/openai/v1';
+  const websocketSurfaces = [
+    {
+      name: 'stable Responses',
+      kind: 'node',
+      path: 'responses',
+      open: (client: BedrockOpenAI) => new StableResponsesWS(client),
+    },
+    {
+      name: 'beta Responses',
+      kind: 'node',
+      path: 'responses',
+      open: (client: BedrockOpenAI) => new BetaResponsesWS(client),
+    },
+    {
+      name: 'stable Node Realtime',
+      kind: 'node',
+      path: 'realtime',
+      open: (client: BedrockOpenAI) => new StableNodeRealtime({ model: 'gpt-realtime' }, client),
+    },
+    {
+      name: 'beta Node Realtime',
+      kind: 'node',
+      path: 'realtime',
+      open: (client: BedrockOpenAI) => new BetaNodeRealtime({ model: 'gpt-realtime' }, client),
+    },
+    {
+      name: 'stable native Realtime',
+      kind: 'native',
+      path: 'realtime',
+      open: (client: BedrockOpenAI) => new StableBrowserRealtime({ model: 'gpt-realtime' }, client),
+    },
+    {
+      name: 'beta native Realtime',
+      kind: 'native',
+      path: 'realtime',
+      open: (client: BedrockOpenAI) => new BetaBrowserRealtime({ model: 'gpt-realtime' }, client),
+    },
+  ] as const;
+  const realtimeFactories = [
+    {
+      name: 'stable Node Realtime',
+      kind: 'node',
+      create: (client: BedrockOpenAI) => StableNodeRealtime.create(client, { model: 'gpt-realtime' }),
+    },
+    {
+      name: 'beta Node Realtime',
+      kind: 'node',
+      create: (client: BedrockOpenAI) => BetaNodeRealtime.create(client, { model: 'gpt-realtime' }),
+    },
+    {
+      name: 'stable native Realtime',
+      kind: 'native',
+      create: (client: BedrockOpenAI) => StableBrowserRealtime.create(client, { model: 'gpt-realtime' }),
+    },
+    {
+      name: 'beta native Realtime',
+      kind: 'native',
+      create: (client: BedrockOpenAI) => BetaBrowserRealtime.create(client, { model: 'gpt-realtime' }),
+    },
+  ] as const;
+
+  test.each(websocketSurfaces)(
+    '$name rejects a cross-origin base URL before opening a socket with static credentials',
+    ({ open }) => {
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, apiKey: 'static-bedrock-secret' });
+
+      expect(() => {
+        client.baseURL = attackerBaseURL;
+        open(client);
+      }).toThrow(/request origin/iu);
+
+      expect(client.baseURL).toBe(configuredBaseURL);
+      expect(nodeSocketConstructor).not.toHaveBeenCalled();
+      expect(FakeBrowserSocket.instances).toHaveLength(0);
+    },
+  );
+
+  test.each(websocketSurfaces)(
+    '$name accepts normalized same-origin base URL changes',
+    ({ open, kind, path }) => {
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, apiKey: 'static-bedrock-secret' });
+      client.baseURL = 'https://BEDROCK.EXAMPLE.COM:443/custom/v2';
+
+      const socket = open(client);
+
+      expect(socket.url.toString()).toBe(
+        `wss://bedrock.example.com/custom/v2/${path}${path === 'realtime' ? '?model=gpt-realtime' : ''}`,
+      );
+      if (kind === 'node') {
+        expect(lastNodeSocket().options.headers).toMatchObject({
+          Authorization: 'Bearer static-bedrock-secret',
+        });
+      } else {
+        expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.static-bedrock-secret');
+      }
+    },
+  );
+
+  test.each(realtimeFactories)(
+    '$name rejects a cross-origin base URL before resolving rotating credentials',
+    async ({ create, kind }) => {
+      const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider });
+
+      await expect(
+        (async () => {
+          client.baseURL = attackerBaseURL;
+          return create(client);
+        })(),
+      ).rejects.toThrow(/request origin/iu);
+
+      expect(client.baseURL).toBe(configuredBaseURL);
+      expect(bedrockTokenProvider).not.toHaveBeenCalled();
+      expect(nodeSocketConstructor).not.toHaveBeenCalled();
+      expect(FakeBrowserSocket.instances).toHaveLength(0);
+
+      await create(client);
+
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+      if (kind === 'node') {
+        expect(lastNodeSocket().url.toString()).toBe(
+          'wss://bedrock.example.com/openai/v1/realtime?model=gpt-realtime',
+        );
+        expect(lastNodeSocket().options.headers).toMatchObject({
+          Authorization: 'Bearer rotating-bedrock-secret',
+        });
+      } else {
+        expect(lastBrowserSocket().url).toBe(
+          'wss://bedrock.example.com/openai/v1/realtime?model=gpt-realtime',
+        );
+        expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.rotating-bedrock-secret');
+      }
+    },
+  );
 });
 
 describe.each([
