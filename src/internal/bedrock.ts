@@ -5,7 +5,7 @@ import type { ProviderRequestContext } from './provider';
 import { readEnv } from './utils';
 
 /** Identifies legacy Bedrock clients without importing the client class into WebSocket modules. */
-export const brand_privateBedrockClient = Symbol('brand.privateBedrockClient');
+export const brand_privateBedrockClient = Symbol.for('openai.privateBedrockClient');
 
 /** Endpoint and region settings shared by the Bedrock provider variants. */
 export interface BedrockEndpointOptions {
