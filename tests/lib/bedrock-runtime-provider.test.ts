@@ -21,7 +21,7 @@ const BEDROCK_ENVIRONMENT_VARIABLES = [
 beforeEach(() => {
   process.env = { ...originalEnv };
   for (const name of BEDROCK_ENVIRONMENT_VARIABLES) {
-    delete process.env[name];
+    Reflect.deleteProperty(process.env, name);
   }
 });
 
@@ -148,11 +148,11 @@ describe('bedrock Runtime provider', () => {
   ])('rejects %s in explicit AWS regions before configuring any Bedrock provider', (_scenario, region) => {
     for (const endpoint of ['mantle', 'runtime'] as const) {
       expect(() => bearerBedrock({ endpoint, region, apiKey: 'bedrock-token' })).toThrow(
-        /region.*invalid|invalid.*region|valid.*region/i,
+        /region.*invalid|invalid.*region|valid.*region/iu,
       );
       expect(() =>
         bedrock({ endpoint, region, accessKeyId: 'access-key', secretAccessKey: 'secret-key' }),
-      ).toThrow(/region.*invalid|invalid.*region|valid.*region/i);
+      ).toThrow(/region.*invalid|invalid.*region|valid.*region/iu);
     }
   });
 
@@ -163,10 +163,10 @@ describe('bedrock Runtime provider', () => {
 
       for (const endpoint of ['mantle', 'runtime'] as const) {
         expect(() => bearerBedrock({ endpoint, apiKey: 'bedrock-token' })).toThrow(
-          /region.*invalid|invalid.*region|valid.*region/i,
+          /region.*invalid|invalid.*region|valid.*region/iu,
         );
         expect(() => bedrock({ endpoint, accessKeyId: 'access-key', secretAccessKey: 'secret-key' })).toThrow(
-          /region.*invalid|invalid.*region|valid.*region/i,
+          /region.*invalid|invalid.*region|valid.*region/iu,
         );
       }
     },
@@ -183,7 +183,7 @@ describe('bedrock Runtime provider', () => {
           accessKeyId: 'access-key',
           secretAccessKey: 'secret-key',
         }),
-      ).toThrow(/region.*invalid|invalid.*region|valid.*region/i);
+      ).toThrow(/region.*invalid|invalid.*region|valid.*region/iu);
     },
   );
 
@@ -363,10 +363,10 @@ describe('bedrock Runtime provider', () => {
 
     expect(credentialProvider).toHaveBeenCalledTimes(2);
     expect(requestHeaders[0]?.get('authorization')).toMatch(
-      /Credential=first-access-key\/\d{8}\/us-east-1\/bedrock\/aws4_request/,
+      /Credential=first-access-key\/\d{8}\/us-east-1\/bedrock\/aws4_request/u,
     );
     expect(requestHeaders[1]?.get('authorization')).toMatch(
-      /Credential=second-access-key\/\d{8}\/us-east-1\/bedrock\/aws4_request/,
+      /Credential=second-access-key\/\d{8}\/us-east-1\/bedrock\/aws4_request/u,
     );
     expect(requestHeaders.map((headers) => headers.get('x-amz-security-token'))).toEqual([
       'first-session-token',
