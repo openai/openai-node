@@ -399,8 +399,8 @@ const hasStreamingUploadableValue = (value: unknown, uploadableKinds: Uploadable
       }
     }
   } else if (value && typeof value === 'object') {
-    for (const k in value) {
-      if (hasStreamingUploadableValue((value as Record<string, unknown>)[k], uploadableKinds)) {
+    for (const [, entry] of Object.entries(value)) {
+      if (hasStreamingUploadableValue(entry, uploadableKinds)) {
         hasStreamingUpload = true;
       }
     }
@@ -416,8 +416,8 @@ const hasUploadableValue = (value: unknown, uploadableKinds: UploadableKinds): b
     return value.some((entry) => hasUploadableValue(entry, uploadableKinds));
   }
   if (value && typeof value === 'object') {
-    for (const k in value) {
-      if (hasUploadableValue((value as any)[k], uploadableKinds)) {
+    for (const [, entry] of Object.entries(value)) {
+      if (hasUploadableValue(entry, uploadableKinds)) {
         return true;
       }
     }
@@ -480,8 +480,15 @@ function snapshotStreamingFileData(
         }
       },
     };
-    if (typeof globalThis.ReadableStream === 'function' && value instanceof globalThis.ReadableStream) {
-      snapshots.set(value, snapshot);
+    if (typeof globalThis.ReadableStream === 'function') {
+      try {
+        const getLocked = Object.getOwnPropertyDescriptor(globalThis.ReadableStream.prototype, 'locked')?.get;
+        if (typeof getLocked?.call(value) === 'boolean') {
+          snapshots.set(value, snapshot);
+        }
+      } catch {
+        // Ordinary async iterables do not satisfy the native readable-stream brand.
+      }
     }
     return snapshot;
   }
@@ -529,6 +536,7 @@ function snapshotBlobData(
   }
 
   const bytes = value.arrayBuffer();
+  void ignoreCleanupResult(() => bytes);
   return {
     data: {
       async *[Symbol.asyncIterator]() {
@@ -547,6 +555,7 @@ function snapshotResponseData(
   }
 
   const blob = value.blob();
+  void ignoreCleanupResult(() => blob);
   return {
     data: {
       async *[Symbol.asyncIterator]() {

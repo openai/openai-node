@@ -1,6 +1,11 @@
 import fs from 'node:fs';
 
-import { multipartFormRequestOptions, createForm, toStreamingFile } from 'openai/internal/uploads';
+import {
+  createForm,
+  maybeMultipartFormRequestOptions,
+  multipartFormRequestOptions,
+  toStreamingFile,
+} from 'openai/internal/uploads';
 import { buildHeaders } from 'openai/internal/headers';
 import { toFile } from 'openai/core/uploads';
 
@@ -84,6 +89,69 @@ describe('form data validation', () => {
       fetch,
     );
     expect([...form2.entries()]).toEqual([['bar[]', 'foo']]);
+  });
+
+  test('ignores inherited enumerable getters while detecting multipart uploads', async () => {
+    let inheritedReads = 0;
+    const prototype = Object.defineProperty({}, 'unserialized', {
+      enumerable: true,
+      get() {
+        inheritedReads += 1;
+        throw new Error('inherited getter was read');
+      },
+    });
+    const plain = Object.assign(Object.create(prototype), { value: 'safe' });
+    const unchanged = { body: { nested: plain } };
+
+    await expect(maybeMultipartFormRequestOptions(unchanged, fetch)).resolves.toBe(unchanged);
+
+    async function* chunks() {
+      yield 'safe upload bytes';
+    }
+
+    const nested = Object.assign(Object.create(prototype), {
+      upload: toStreamingFile(chunks(), 'safe.txt'),
+    });
+    const options = await multipartFormRequestOptions({ body: { nested } }, fetch);
+    const encoded = await new Response(options.body as ReadableStream).text();
+
+    expect(encoded).toContain('name="nested[upload]"; filename="safe.txt"');
+    expect(encoded).toContain('safe upload bytes');
+    expect(encoded).not.toContain('unserialized');
+    expect(inheritedReads).toBe(0);
+  });
+
+  test('does not let inherited enumerable getters mutate earlier multipart uploads', async () => {
+    async function* chunks(content: string) {
+      yield content;
+    }
+
+    const earlier = toStreamingFile(chunks('original upload bytes'), 'original.txt');
+    let inheritedReads = 0;
+    const prototype = Object.defineProperty({}, 'unserialized', {
+      enumerable: true,
+      get() {
+        inheritedReads += 1;
+        Object.defineProperties(earlier, {
+          data: { value: chunks('substituted upload bytes') },
+          name: { value: 'substituted.txt' },
+        });
+        return 'poisoned';
+      },
+    });
+    const later = Object.assign(Object.create(prototype), { value: 'safe' });
+    const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const upload = form.get('earlier') as File;
+
+    expect(upload.name).toBe('original.txt');
+    await expect(upload.text()).resolves.toBe('original upload bytes');
+    expect(form.get('later[value]')).toBe('safe');
+    expect(form.has('later[unserialized]')).toBe(false);
+    expect(inheritedReads).toBe(0);
   });
 
   test('streams multipart file content lazily', async () => {

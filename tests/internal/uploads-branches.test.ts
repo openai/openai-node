@@ -1,3 +1,5 @@
+import { setImmediate as nextEventLoopTurn } from 'node:timers/promises';
+
 import { vi } from 'vitest';
 
 import { buildHeaders } from 'openai/internal/headers';
@@ -562,6 +564,128 @@ describe('lazy multipart stream encoding', () => {
 
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain('legacy blob');
   });
+
+  const fallbackUploadCases = [
+    [
+      'Blob.arrayBuffer()',
+      (read: () => Promise<never>) => {
+        const upload = Object.assign(new Blob(['fallback bytes']), { name: 'fallback.bin' });
+        Object.defineProperties(upload, {
+          stream: { value: undefined },
+          arrayBuffer: { value: read },
+        });
+        return upload;
+      },
+    ],
+    [
+      'Response.blob()',
+      (read: () => Promise<never>) => {
+        const upload = new Response(null);
+        Object.defineProperty(upload, 'blob', { value: read });
+        return upload;
+      },
+    ],
+  ] as const;
+
+  test.each(fallbackUploadCases)(
+    'observes rejected %s fallback reads when a later filename fails validation',
+    async (_, createUpload) => {
+      let readCount = 0;
+      const read = () => {
+        readCount += 1;
+        return Promise.reject(new Error('fallback read failed'));
+      };
+      const earlier = createUpload(read);
+      const later = toStreamingFile(
+        (async function* chunks() {
+          yield 'later bytes';
+        })(),
+        'later.txt',
+      );
+      Object.defineProperty(later, 'name', { value: undefined });
+      const unhandledRejection = vi.fn();
+      process.once('unhandledRejection', unhandledRejection);
+
+      try {
+        const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+        const reader = (options.body as ReadableStream).getReader();
+
+        await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+        expect(readCount).toBe(1);
+        await nextEventLoopTurn();
+        expect(unhandledRejection).not.toHaveBeenCalled();
+      } finally {
+        process.removeListener('unhandledRejection', unhandledRejection);
+      }
+    },
+  );
+
+  test.each(fallbackUploadCases)(
+    'observes rejected %s fallback reads after multipart serialization is canceled',
+    async (_, createUpload) => {
+      let cancellationComplete = false;
+      let rejectedAfterCancellation = false;
+      let readCount = 0;
+      const read = async (): Promise<never> => {
+        readCount += 1;
+        await nextEventLoopTurn();
+        rejectedAfterCancellation = cancellationComplete;
+        throw new Error('fallback read failed after cancellation');
+      };
+      const upload = createUpload(read);
+      const trigger = toStreamingFile(
+        (async function* chunks() {
+          yield 'trigger bytes';
+        })(),
+        'trigger.txt',
+      );
+      const unhandledRejection = vi.fn();
+      process.once('unhandledRejection', unhandledRejection);
+
+      try {
+        const options = await multipartFormRequestOptions(
+          { body: { earlier: 'metadata', upload, trigger } },
+          fetch,
+        );
+        const reader = (options.body as ReadableStream).getReader();
+
+        await expect(reader.read()).resolves.toMatchObject({ done: false });
+        await reader.cancel();
+        cancellationComplete = true;
+        expect(readCount).toBe(1);
+        await nextEventLoopTurn();
+        await nextEventLoopTurn();
+        expect(rejectedAfterCancellation).toBe(true);
+        expect(unhandledRejection).not.toHaveBeenCalled();
+      } finally {
+        process.removeListener('unhandledRejection', unhandledRejection);
+      }
+    },
+  );
+
+  test.each(fallbackUploadCases)(
+    'propagates rejected %s fallback reads when multipart serialization consumes them',
+    async (_, createUpload) => {
+      let readCount = 0;
+      const read = () => {
+        readCount += 1;
+        return Promise.reject(new Error('fallback read failed during consumption'));
+      };
+      const upload = createUpload(read);
+      const trigger = toStreamingFile(
+        (async function* chunks() {
+          yield 'trigger bytes';
+        })(),
+        'trigger.txt',
+      );
+      const options = await multipartFormRequestOptions({ body: { upload, trigger } }, fetch);
+
+      await expect(new Response(options.body as ReadableStream).text()).rejects.toThrow(
+        'fallback read failed during consumption',
+      );
+      expect(readCount).toBe(1);
+    },
+  );
 
   test('reports null form fields and invalid stream chunks during consumption', async () => {
     async function* validChunks() {

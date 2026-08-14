@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { runInNewContext } from 'node:vm';
 
 import { vi } from 'vitest';
 
@@ -152,6 +153,46 @@ describe('streaming multipart filename and header security', () => {
     await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual(['shared stream bytes', '']);
   });
 
+  test('reuses a genuine native readable stream from a foreign realm', async () => {
+    const stream = runInNewContext(
+      `class ForeignReadableStream extends HostReadableStream {}
+       for (const key of Reflect.ownKeys(HostReadableStream.prototype)) {
+         if (key !== 'constructor') {
+           Object.defineProperty(
+             ForeignReadableStream.prototype,
+             key,
+             Object.getOwnPropertyDescriptor(HostReadableStream.prototype, key),
+           );
+         }
+       }
+       Object.setPrototypeOf(ForeignReadableStream.prototype, Object.prototype);
+       new ForeignReadableStream({
+         start(controller) {
+           controller.enqueue('foreign realm stream bytes');
+           controller.close();
+         },
+       })`,
+      { HostReadableStream: ReadableStream },
+    ) as ReadableStream<string>;
+
+    expect(stream).not.toBeInstanceOf(ReadableStream);
+    expect(Object.getOwnPropertyDescriptor(ReadableStream.prototype, 'locked')?.get?.call(stream)).toBe(
+      false,
+    );
+
+    const options = await multipartFormRequestOptions({ body: { files: [stream, stream] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'foreign realm stream bytes',
+      '',
+    ]);
+  });
+
   test('reuses a shared readable stream that only exposes its reader protocol', async () => {
     const stream = new ReadableStream<string>({
       start(controller) {
@@ -238,6 +279,34 @@ describe('streaming multipart filename and header security', () => {
       'reusable iterable bytes',
     ]);
     expect(createIterator).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    ['do not expose a stream lock', undefined],
+    ['spoof an unlocked stream', false],
+    ['spoof a locked stream', true],
+  ] as const)('recaptures reusable reader-protocol hybrids that %s', async (_, locked) => {
+    const createIterator = vi.fn(() => chunks('reusable hybrid bytes'));
+    const getReader = vi.fn();
+    const hybrid = {
+      [Symbol.asyncIterator]: createIterator,
+      getReader,
+      ...(locked === undefined ? {} : { locked }),
+    };
+
+    const options = await multipartFormRequestOptions({ body: { files: [hybrid, hybrid] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'reusable hybrid bytes',
+      'reusable hybrid bytes',
+    ]);
+    expect(createIterator).toHaveBeenCalledTimes(2);
+    expect(getReader).not.toHaveBeenCalled();
   });
 
   test('streams all bytes for each occurrence of a reusable named blob', async () => {
