@@ -287,11 +287,16 @@ describe('streaming multipart filename and header security', () => {
     expect(brandChecks).toBe(2);
   });
 
-  test('snapshots earlier streaming data before reading later mutable filenames', async () => {
-    const earlier = toStreamingFile(chunks('original earlier bytes'), 'earlier.png');
+  test('snapshots earlier streaming metadata before reading later mutable filenames', async () => {
+    const earlier = toStreamingFile(chunks('original earlier bytes'), 'earlier.png', {
+      type: 'image/original',
+    });
     const later = toStreamingFile(chunks('later bytes'), 'later.png');
     const getLaterFilename = vi.fn(() => {
-      Object.defineProperty(earlier, 'data', { value: chunks('substituted earlier bytes') });
+      Object.defineProperties(earlier, {
+        data: { value: chunks('substituted earlier bytes') },
+        type: { value: 'image/substituted' },
+      });
       return 'later.png';
     });
     Object.defineProperty(later, 'name', { get: getLaterFilename });
@@ -307,6 +312,7 @@ describe('streaming multipart filename and header security', () => {
       'original earlier bytes',
       'later bytes',
     ]);
+    expect(files[0]?.type).toBe('image/original');
     expect(getLaterFilename).toHaveBeenCalledTimes(1);
   });
 

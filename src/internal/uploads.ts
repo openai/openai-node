@@ -405,6 +405,7 @@ type FormEntry =
       data: unknown;
       kind: 'upload';
       streamingFile: boolean;
+      type: string;
     }>;
 
 const createStreamingFormRequestOptions = (
@@ -443,12 +444,11 @@ async function* iterateMultipartBody(
 
     if (entry.kind === 'upload') {
       const filename = validatedFilename ?? getStreamingFileName(entry.value, options, entry.streamingFile);
-      const type = getStreamingFileType(entry.value, entry.streamingFile);
       yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
         `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
           filename,
-        )}"\r\nContent-Type: ${type}\r\n\r\n`,
+        )}"\r\nContent-Type: ${entry.type}\r\n\r\n`,
       );
       yield* iterateBytes(entry.data);
     } else {
@@ -504,6 +504,7 @@ async function* iterateFormValue(
       data: streamingFile ? (upload as StreamingFile).data : upload,
       kind: 'upload',
       streamingFile,
+      type: getStreamingFileType(upload, streamingFile),
     };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
