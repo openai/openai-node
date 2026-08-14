@@ -1,5 +1,49 @@
 import { APIUserAbortError, OpenAIError } from '../error';
 
+type EventQueue<Value> = {
+  readonly length: number;
+  enqueue: (value: Value) => void;
+  dequeue: () => Value | undefined;
+  clear: () => void;
+};
+
+function createEventQueue<Value>(): EventQueue<Value> {
+  let entries: (Value | undefined)[] = [];
+  let head = 0;
+
+  return {
+    get length() {
+      return entries.length - head;
+    },
+    enqueue(value) {
+      entries.push(value);
+    },
+    dequeue() {
+      if (head === entries.length) {
+        return undefined;
+      }
+
+      const value = entries[head];
+      entries[head] = undefined;
+      head += 1;
+
+      if (head === entries.length) {
+        entries = [];
+        head = 0;
+      } else if (head >= 1024 && head * 2 >= entries.length) {
+        entries = entries.slice(head);
+        head = 0;
+      }
+
+      return value;
+    },
+    clear() {
+      entries = [];
+      head = 0;
+    },
+  };
+}
+
 /** An abortable event stream with typed listeners, asynchronous iteration, and lifecycle state. */
 export class EventStream<EventTypes extends BaseEvents> {
   /** Controls the underlying request; aborting this controller cancels the stream. */
@@ -263,8 +307,8 @@ export class EventStream<EventTypes extends BaseEvents> {
       reject: (error: OpenAIError) => void;
     };
 
-    const pushQueue: T[] = [];
-    const readQueue: Reader[] = [];
+    const pushQueue = createEventQueue<T>();
+    const readQueue = createEventQueue<Reader>();
     let ended = this.ended;
     let failure: OpenAIError | undefined;
     let failureDelivered = false;
@@ -273,7 +317,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     const doneResult = (): Result => ({ value: undefined as never, done: true });
     const finishReaders = () => {
       while (readQueue.length) {
-        readQueue.shift()!.resolve(doneResult());
+        readQueue.dequeue()!.resolve(doneResult());
       }
     };
     const rejectReader = () => {
@@ -281,7 +325,7 @@ export class EventStream<EventTypes extends BaseEvents> {
         return;
       }
       failureDelivered = true;
-      readQueue.shift()!.reject(failure);
+      readQueue.dequeue()!.reject(failure);
     };
     const cleanup = () => {
       detach();
@@ -297,11 +341,11 @@ export class EventStream<EventTypes extends BaseEvents> {
       if (ended) {
         return;
       }
-      const reader = readQueue.shift();
+      const reader = readQueue.dequeue();
       if (reader) {
         reader.resolve({ value, done: false });
       } else {
-        pushQueue.push(value);
+        pushQueue.enqueue(value);
       }
     };
     const onFailure = (error: OpenAIError) => {
@@ -333,7 +377,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     return {
       next: (): Promise<Result> => {
         if (pushQueue.length) {
-          return Promise.resolve({ value: pushQueue.shift()!, done: false });
+          return Promise.resolve({ value: pushQueue.dequeue()!, done: false });
         }
 
         if (failure && !failureDelivered) {
@@ -346,12 +390,12 @@ export class EventStream<EventTypes extends BaseEvents> {
         }
 
         return new Promise<Result>((resolve, reject) => {
-          readQueue.push({ resolve, reject });
+          readQueue.enqueue({ resolve, reject });
         });
       },
       return: () => {
         ended = true;
-        pushQueue.length = 0;
+        pushQueue.clear();
         cleanup();
         finishReaders();
         if (onReturn) {
