@@ -437,14 +437,17 @@ type MultipartEntry =
   | Extract<FormEntry, { kind: 'field' }>
   | (Extract<FormEntry, { kind: 'upload' }> & Readonly<{ filename: string }>);
 
-function snapshotStreamingFileData(value: StreamingFileInput): StreamingFileInput {
+function snapshotStreamingFileData(
+  value: StreamingFileInput,
+): StreamingFileInput {
   const { getReader } = value as ReadableStream<BlobPart>;
   if (typeof getReader === 'function') {
     const snapshot = { getReader: getReader.bind(value) };
     return snapshot as ReadableStream<BlobPart>;
   }
 
-  const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
+  const { [Symbol.asyncIterator]: createIterator } =
+    value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
     return { [Symbol.asyncIterator]: createIterator.bind(value) };
   }
