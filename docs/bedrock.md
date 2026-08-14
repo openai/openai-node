@@ -24,10 +24,10 @@ Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedroc
 
 The `endpoint` option selects which regional Bedrock endpoint to use:
 
-| `endpoint`           | Default API root                                           | SigV4 signing service |
-| -------------------- | ---------------------------------------------------------- | --------------------- |
-| `'mantle'` (default) | `https://bedrock-mantle.<region>.api.aws/openai/v1`        | `bedrock-mantle`      |
-| `'runtime'`          | Regional Runtime hostname for the region's AWS partition  | `bedrock`             |
+| `endpoint`           | Default API root                                         | SigV4 signing service |
+| -------------------- | -------------------------------------------------------- | --------------------- |
+| `'mantle'` (default) | `https://bedrock-mantle.<region>.api.aws/openai/v1`      | `bedrock-mantle`      |
+| `'runtime'`          | Regional Runtime hostname for the region's AWS partition | `bedrock`             |
 
 Both endpoints use the normal SDK resources. AWS controls the available models, inference profiles, API routes, authentication methods, and streaming behavior for each endpoint; unsupported calls surface the provider's normal HTTP errors through the SDK.
 

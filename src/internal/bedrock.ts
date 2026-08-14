@@ -72,12 +72,24 @@ function normalizeBaseURL(baseURL: string): string {
 }
 
 function resolveRuntimeDnsSuffix(region: string): string {
-  if (region.startsWith('cn-')) return 'amazonaws.com.cn';
-  if (region.startsWith('eusc-')) return 'amazonaws.eu';
-  if (region.startsWith('us-iso-')) return 'c2s.ic.gov';
-  if (region.startsWith('us-isob-')) return 'sc2s.sgov.gov';
-  if (region.startsWith('eu-isoe-')) return 'cloud.adc-e.uk';
-  if (region.startsWith('us-isof-')) return 'csp.hci.ic.gov';
+  if (region.startsWith('cn-')) {
+    return 'amazonaws.com.cn';
+  }
+  if (region.startsWith('eusc-')) {
+    return 'amazonaws.eu';
+  }
+  if (region.startsWith('us-iso-')) {
+    return 'c2s.ic.gov';
+  }
+  if (region.startsWith('us-isob-')) {
+    return 'sc2s.sgov.gov';
+  }
+  if (region.startsWith('eu-isoe-')) {
+    return 'cloud.adc-e.uk';
+  }
+  if (region.startsWith('us-isof-')) {
+    return 'csp.hci.ic.gov';
+  }
   return 'amazonaws.com';
 }
 
@@ -91,16 +103,17 @@ export function parseBedrockEndpointHostname(hostname: string):
       region: string;
     }
   | undefined {
+  const canonicalHostname = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
   // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
-  const mantleRegion = /^bedrock-mantle\.([a-z0-9-]+)\.api\.aws$/i.exec(hostname)?.[1];
+  const mantleRegion = /^bedrock-mantle\.([a-z0-9-]+)\.api\.aws$/i.exec(canonicalHostname)?.[1];
   if (mantleRegion) {
     return { endpoint: 'mantle', region: mantleRegion };
   }
 
-  // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
   const runtimeMatch =
+    // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
     /^bedrock-runtime\.([a-z0-9-]+)\.(amazonaws\.com(?:\.cn)?|amazonaws\.eu|c2s\.ic\.gov|sc2s\.sgov\.gov|cloud\.adc-e\.uk|csp\.hci\.ic\.gov)$/i.exec(
-      hostname,
+      canonicalHostname,
     );
   const runtimeRegion = runtimeMatch?.[1];
   if (runtimeRegion && runtimeMatch[2]?.toLowerCase() === resolveRuntimeDnsSuffix(runtimeRegion)) {

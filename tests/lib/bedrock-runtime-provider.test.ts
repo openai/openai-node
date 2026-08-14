@@ -7,6 +7,40 @@ import { bedrock } from 'openai/providers/bedrock/aws';
 
 const originalEnv = process.env;
 const RUNTIME_MODEL = 'us.openai.gpt-5.6-sol';
+const DOTTED_CANONICAL_BEDROCK_ENDPOINTS = [
+  { endpoint: 'mantle' as const, region: 'us-east-1', hostname: 'bedrock-mantle.us-east-1.api.aws.' },
+  { endpoint: 'runtime' as const, region: 'us-east-1', hostname: 'bedrock-runtime.us-east-1.amazonaws.com.' },
+  {
+    endpoint: 'runtime' as const,
+    region: 'cn-north-1',
+    hostname: 'bedrock-runtime.cn-north-1.amazonaws.com.cn.',
+  },
+  {
+    endpoint: 'runtime' as const,
+    region: 'eusc-de-east-1',
+    hostname: 'bedrock-runtime.eusc-de-east-1.amazonaws.eu.',
+  },
+  {
+    endpoint: 'runtime' as const,
+    region: 'us-iso-east-1',
+    hostname: 'bedrock-runtime.us-iso-east-1.c2s.ic.gov.',
+  },
+  {
+    endpoint: 'runtime' as const,
+    region: 'us-isob-east-1',
+    hostname: 'bedrock-runtime.us-isob-east-1.sc2s.sgov.gov.',
+  },
+  {
+    endpoint: 'runtime' as const,
+    region: 'eu-isoe-west-1',
+    hostname: 'bedrock-runtime.eu-isoe-west-1.cloud.adc-e.uk.',
+  },
+  {
+    endpoint: 'runtime' as const,
+    region: 'us-isof-south-1',
+    hostname: 'bedrock-runtime.us-isof-south-1.csp.hci.ic.gov.',
+  },
+];
 const BEDROCK_ENVIRONMENT_VARIABLES = [
   'AWS_BEARER_TOKEN_BEDROCK',
   'AWS_BEDROCK_BASE_URL',
@@ -35,6 +69,22 @@ function jsonResponse(body: unknown = {}): Response {
   return Response.json(body, {
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function expectRejectedBedrockConfiguration(
+  options: { endpoint: 'mantle' | 'runtime'; region: string; baseURL: string },
+  expectedError: RegExp,
+): void {
+  const fetch = vi.fn(async () => jsonResponse());
+  const providers = [
+    () => bearerBedrock({ ...options, apiKey: 'bedrock-token' }),
+    () => bedrock({ ...options, accessKeyId: 'access-key', secretAccessKey: 'secret-key' }),
+  ];
+
+  for (const provider of providers) {
+    expect(() => new OpenAI({ provider: provider(), fetch })).toThrow(expectedError);
+  }
+  expect(fetch).not.toHaveBeenCalled();
 }
 
 function chatCompletionBody(content = 'Hello from Runtime') {
@@ -134,6 +184,81 @@ describe('bedrock Runtime provider', () => {
 
     expect(client.baseURL).toBe('https://bedrock-runtime.eusc-de-east-1.amazonaws.eu/openai/v1');
   });
+
+  test.each(DOTTED_CANONICAL_BEDROCK_ENDPOINTS)(
+    'preserves a valid dotted HTTPS $endpoint endpoint and credentials for $region',
+    async ({ endpoint, region, hostname }) => {
+      const baseURL = `https://${hostname}/openai/v1`;
+      const requestedURLs: string[] = [];
+      const authorizationHeaders: string[] = [];
+      const fetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+        requestedURLs.push(String(url));
+        authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
+        return jsonResponse();
+      };
+      const bearerClient = new OpenAI({
+        provider: bearerBedrock({ endpoint, region, baseURL, apiKey: 'bedrock-token' }),
+        fetch,
+      });
+      const awsClient = new OpenAI({
+        provider: bedrock({
+          endpoint,
+          region,
+          baseURL,
+          accessKeyId: 'access-key',
+          secretAccessKey: 'secret-key',
+        }),
+        fetch,
+      });
+
+      expect(bearerClient.baseURL).toBe(baseURL);
+      expect(awsClient.baseURL).toBe(baseURL);
+      await bearerClient.request({ method: 'get', path: '/models' });
+      await awsClient.request({ method: 'get', path: '/models' });
+
+      expect(requestedURLs).toEqual([`${baseURL}/models`, `${baseURL}/models`]);
+      expect(authorizationHeaders[0]).toBe('Bearer bedrock-token');
+      expect(authorizationHeaders[1]).toContain(
+        `/${region}/${endpoint === 'runtime' ? 'bedrock' : 'bedrock-mantle'}/aws4_request`,
+      );
+    },
+  );
+
+  test.each(DOTTED_CANONICAL_BEDROCK_ENDPOINTS)(
+    'rejects dotted canonical $endpoint HTTP for $region before attaching credentials',
+    ({ endpoint, region, hostname }) => {
+      expectRejectedBedrockConfiguration(
+        { endpoint, region, baseURL: `http://${hostname}/openai/v1` },
+        /HTTPS/iu,
+      );
+    },
+  );
+
+  test.each([
+    { endpoint: 'runtime' as const, hostname: 'bedrock-mantle.us-east-1.api.aws.' },
+    { endpoint: 'mantle' as const, hostname: 'bedrock-runtime.us-east-1.amazonaws.com.' },
+  ])(
+    'rejects a dotted canonical hostname that mismatches the $endpoint endpoint',
+    ({ endpoint, hostname }) => {
+      expectRejectedBedrockConfiguration(
+        { endpoint, region: 'us-east-1', baseURL: `https://${hostname}/openai/v1` },
+        /endpoint|mode/iu,
+      );
+    },
+  );
+
+  test.each([
+    { endpoint: 'mantle' as const, hostname: 'bedrock-mantle.us-west-2.api.aws.' },
+    { endpoint: 'runtime' as const, hostname: 'bedrock-runtime.us-west-2.amazonaws.com.' },
+  ])(
+    'rejects a dotted canonical $endpoint hostname with a mismatched AWS region',
+    ({ endpoint, hostname }) => {
+      expectRejectedBedrockConfiguration(
+        { endpoint, region: 'us-east-1', baseURL: `https://${hostname}/openai/v1` },
+        /endpoint region.*does not match/iu,
+      );
+    },
+  );
 
   test.each([
     ['userinfo and fragment injection', 'us-east-1.amazonaws.com@attacker.example#'],
@@ -287,5 +412,4 @@ describe('bedrock Runtime provider', () => {
       'second-session-token',
     ]);
   });
-
 });
