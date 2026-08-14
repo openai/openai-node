@@ -505,7 +505,7 @@ function snapshotBlobData(value: Blob): MultipartDataSnapshot {
         yield await bytes;
       },
     },
-    async dispose() {},
+    dispose: () => Promise.resolve(),
   };
 }
 
@@ -521,7 +521,7 @@ function snapshotResponseData(value: Response): MultipartDataSnapshot {
         yield await blob;
       },
     },
-    async dispose() {},
+    dispose: () => Promise.resolve(),
   };
 }
 
