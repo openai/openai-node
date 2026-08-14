@@ -155,7 +155,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
     };
 
     try {
-      if (typeof timeout === 'number' && timeout > 0) {
+      if (typeof timeout === 'number' && (timeout > 0 || Number.isNaN(timeout))) {
         internalSignal = AbortSignal.timeout(timeout);
       }
 

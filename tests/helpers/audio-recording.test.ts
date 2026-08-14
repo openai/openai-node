@@ -78,8 +78,8 @@ describe('recordAudio', () => {
     );
   });
 
-  test.each([1.5, Number.POSITIVE_INFINITY, 4_294_967_296])(
-    'rejects an invalid positive timeout (%s) before starting ffmpeg',
+  test.each([1.5, Number.NaN, Number.POSITIVE_INFINITY, 4_294_967_296])(
+    'rejects an invalid timeout (%s) before starting ffmpeg',
     async (timeout) => {
       mockFfmpeg();
 
