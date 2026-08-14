@@ -258,9 +258,11 @@ await client.files.create({
 });
 
 // `toFile()` creates a web File, so it must buffer stream inputs before sending them.
-// Use `toStreamingFile()` to stream an arbitrary web, Node, or cloud-storage stream directly:
+// Use `toStreamingFile()` to stream an arbitrary web, Node, or cloud-storage stream directly.
+// Most endpoints send only the basename (`input.jsonl` below); endpoints that accept logical paths,
+// such as Skills, preserve the supplied path with normalized `/` separators.
 await client.files.create({
-  file: toStreamingFile(myReadableStream, 'input.jsonl', { type: 'application/jsonl' }),
+  file: toStreamingFile(myReadableStream, 'private/data/input.jsonl', { type: 'application/jsonl' }),
   purpose: 'fine-tune',
 });
 ```
