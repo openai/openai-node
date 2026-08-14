@@ -486,10 +486,11 @@ function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnap
       } as ReadableStream<BlobPart>,
       dispose() {
         if (!consumed) {
+          void ignoreCleanupResult(() => reader.cancel());
           try {
-            void ignoreCleanupResult(() => reader.cancel());
-          } finally {
             reader.releaseLock();
+          } catch {
+            // Cleanup failures must not mask the primary multipart result.
           }
         }
       },
