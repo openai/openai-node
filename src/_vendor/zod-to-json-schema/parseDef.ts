@@ -1,5 +1,6 @@
 import type { ZodTypeDef } from 'zod/v3';
 import { ZodFirstPartyTypeKind } from 'zod/v3';
+import { hasOwn } from '../../internal/utils/values';
 import type { JsonSchema7AnyType } from './parsers/any';
 import { parseAnyDef } from './parsers/any';
 import type { JsonSchema7ArrayType } from './parsers/array';
@@ -54,6 +55,7 @@ import { parseUnknownDef } from './parsers/unknown';
 import type { Refs, Seen } from './Refs';
 import { parseReadonlyDef } from './parsers/readonly';
 import { ignoreOverride } from './Options';
+import { zodDef } from './util';
 
 type JsonSchema7RefType = { $ref: string };
 type JsonSchema7Meta = {
@@ -163,18 +165,40 @@ const get$ref = (
     // `["#","definitions","contactPerson","properties","person1","properties","name"]`
     // then we'll extract it out to `contactPerson_properties_person1_properties_name`
     case 'extract-to-root': {
-      const name = item.path
+      const baseName = item.path
         .slice(refs.basePath.length + 1)
         // The first part is either the root schema name or an extracted definition
         // name that is being materialized. Keep it stable so recursive definitions
         // do not generate a new name each time they are resolved.
         .map((part, index) => (index === 0 ? part : encodeDefinitionPathPart(part)))
         .join('_');
+      let name = baseName;
 
       // we don't need to extract the root schema in this case, as it's already
       // been added to the definitions
-      if (name !== refs.name && refs.nameStrategy === 'duplicate-ref') {
-        refs.definitions[name] = item.def;
+      const isRootSchema =
+        name === refs.name &&
+        item.path.length === refs.basePath.length + 2 &&
+        item.path[refs.basePath.length] === refs.definitionPath;
+
+      if (!isRootSchema && refs.nameStrategy === 'duplicate-ref') {
+        const hasDifferentDefinition = (definitionName: string): boolean => {
+          if (!hasOwn(refs.definitions, definitionName)) {
+            return false;
+          }
+
+          const existingDefinition = refs.definitions[definitionName];
+          return existingDefinition === undefined || zodDef(existingDefinition) !== item.def;
+        };
+        let suffix = 0;
+        while (name === refs.name || hasDifferentDefinition(name)) {
+          suffix += 1;
+          name = `${baseName}_${suffix}`;
+        }
+
+        if (!hasOwn(refs.definitions, name)) {
+          refs.definitions[name] = item.def;
+        }
       }
 
       return { $ref: [...refs.basePath, refs.definitionPath, name].join('/') };
