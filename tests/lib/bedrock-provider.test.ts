@@ -96,6 +96,21 @@ const CROSS_ORIGIN_BEDROCK_PATHS = [
   ['different effective port', 'https://bedrock.example.com:8443/openai/v1/models?credential=private'],
 ] as const;
 
+const NON_HTTP_BEDROCK_URLS = [
+  ['a file base URL and opaque data request', 'file:///trusted/openai/v1', 'data:text/plain,stolen'],
+  ['an opaque data base URL and file request', 'data:text/plain,configured', 'file:///tmp/stolen'],
+  [
+    'a blob request with the trusted embedded HTTPS origin',
+    TRUSTED_BEDROCK_BASE_URL,
+    'blob:https://bedrock.example.com/01234567-89ab-cdef-0123-456789abcdef',
+  ],
+  [
+    'a blob base URL with a matching HTTPS request origin',
+    'blob:https://bedrock.example.com/01234567-89ab-cdef-0123-456789abcdef',
+    'https://bedrock.example.com/openai/v1/models',
+  ],
+] as const;
+
 function trackedBedrockCredentials(baseURL = TRUSTED_BEDROCK_BASE_URL) {
   process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
   process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
@@ -144,6 +159,29 @@ describe('bedrock provider', () => {
         const fetch = vi.fn(async () => jsonResponse());
         const sign = vi.spyOn(SignatureV4.prototype, 'sign');
         const client = new OpenAI({ provider: create(credentials), fetch, maxRetries: 0 });
+
+        await expect(client.request({ method: 'get', path })).rejects.toThrow('Bedrock request origin');
+
+        expect(fetch).not.toHaveBeenCalled();
+        expect(credentials.tokenProvider).not.toHaveBeenCalled();
+        expect(credentials.credentialProvider).not.toHaveBeenCalled();
+        expect(sign).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each(
+      BEDROCK_AUTHENTICATION_MODES.flatMap(([mode, createProvider]) =>
+        NON_HTTP_BEDROCK_URLS.map(
+          ([attack, baseURL, path]) => [mode, attack, createProvider, baseURL, path] as const,
+        ),
+      ),
+    )(
+      'rejects %s with %s before resolving credentials or sending',
+      async (_mode, _attack, createProvider, baseURL, path) => {
+        const credentials = trackedBedrockCredentials(baseURL);
+        const fetch = vi.fn(async () => jsonResponse());
+        const sign = vi.spyOn(SignatureV4.prototype, 'sign');
+        const client = new OpenAI({ provider: createProvider(credentials), fetch, maxRetries: 0 });
 
         await expect(client.request({ method: 'get', path })).rejects.toThrow('Bedrock request origin');
 

@@ -351,6 +351,33 @@ describe('instantiate bedrock client', () => {
     });
 
     test.each([
+      ['a file base URL and opaque data request', 'file:///trusted/openai/v1', 'data:text/plain,stolen'],
+      ['an opaque data base URL and file request', 'data:text/plain,configured', 'file:///tmp/stolen'],
+      [
+        'a blob request with the trusted embedded HTTPS origin',
+        configuredBaseURL,
+        'blob:https://bedrock.example.com/01234567-89ab-cdef-0123-456789abcdef',
+      ],
+      [
+        'a blob base URL with a matching HTTPS request origin',
+        'blob:https://bedrock.example.com/01234567-89ab-cdef-0123-456789abcdef',
+        'https://bedrock.example.com/openai/v1/models',
+      ],
+    ] as const)(
+      'rejects %s before resolving rotating credentials or sending',
+      async (_case, baseURL, requestURL) => {
+        const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
+        const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
+        const client = new BedrockOpenAI({ baseURL, bedrockTokenProvider, fetch });
+
+        await expect(client.request({ method: 'get', path: requestURL })).rejects.toThrow(/request origin/i);
+
+        expect(bedrockTokenProvider).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each([
       ['the Responses resource', false, false],
       ['an admin-only security route', true, false],
       ['a cloned Responses client', false, true],

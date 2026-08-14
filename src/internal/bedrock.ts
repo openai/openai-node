@@ -114,12 +114,18 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
 /**
  * Ensures Bedrock credentials are only attached to the configured endpoint origin.
  *
- * @throws {Errors.OpenAIError} If the request targets a different origin.
+ * @throws {Errors.OpenAIError} If either URL is not HTTP(S) or the request targets a different origin.
  */
 export function assertBedrockRequestOrigin(baseURL: string, requestURL: string): void {
-  const expectedOrigin = new URL(baseURL).origin;
-  const requestOrigin = new URL(requestURL).origin;
-  if (requestOrigin !== expectedOrigin) {
+  const expectedURL = new URL(baseURL);
+  const request = new URL(requestURL);
+  const expectedOrigin = expectedURL.origin;
+  const requestOrigin = request.origin;
+  if (
+    (expectedURL.protocol !== 'http:' && expectedURL.protocol !== 'https:') ||
+    (request.protocol !== 'http:' && request.protocol !== 'https:') ||
+    requestOrigin !== expectedOrigin
+  ) {
     throw new Errors.OpenAIError(
       `Bedrock request origin \`${requestOrigin}\` does not match the configured base URL origin \`${expectedOrigin}\`.`,
     );
