@@ -804,6 +804,7 @@ export class AssistantStream
 }
 
 interface AssistantStreamArrayProjection {
+  baselineLength: number;
   entries: Map<number, Record<string, unknown>>;
   length: number;
 }
@@ -876,7 +877,11 @@ function assertValidAssistantStreamArrayDelta(
   let projectedArray = projection.arrays.get(accumulator);
 
   if (!projectedArray) {
-    projectedArray = { entries: new Map(), length: accumulator.length };
+    projectedArray = {
+      baselineLength: accumulator.length,
+      entries: new Map(),
+      length: accumulator.length,
+    };
     projection.arrays.set(accumulator, projectedArray);
   }
 
@@ -899,7 +904,7 @@ function assertValidAssistantStreamArrayDelta(
     if (
       !Number.isSafeInteger(index) ||
       (index as number) < 0 ||
-      (index as number) >= projectedArray.length + MAX_ASSISTANT_STREAM_ARRAY_GROWTH
+      (index as number) >= projectedArray.baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH
     ) {
       throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
     }
