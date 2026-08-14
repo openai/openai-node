@@ -528,10 +528,29 @@ function snapshotStreamingFileData(
       }
       throw error;
     }
+
+    let cancel: ReadableStreamDefaultReader<BlobPart>['cancel'];
+    try {
+      cancel = reader.cancel.bind(reader);
+    } catch (error) {
+      cancel = () => {
+        throw error;
+      };
+    }
+
+    let releaseLock: ReadableStreamDefaultReader<BlobPart>['releaseLock'];
+    try {
+      releaseLock = reader.releaseLock.bind(reader);
+    } catch (error) {
+      releaseLock = () => {
+        throw error;
+      };
+    }
+
     const capturedReader = {
       read: () => read.call(reader),
-      cancel: () => reader.cancel(),
-      releaseLock: () => reader.releaseLock(),
+      cancel,
+      releaseLock,
     };
     let consumed = false;
     const snapshot: MultipartDataSnapshot = {
@@ -547,9 +566,9 @@ function snapshotStreamingFileData(
       dispose() {
         if (!consumed) {
           consumed = true;
-          void ignoreCleanupResult(() => reader.cancel());
+          void ignoreCleanupResult(cancel);
           try {
-            reader.releaseLock();
+            releaseLock();
           } catch {
             // Cleanup failures must not mask the primary multipart result.
           }

@@ -726,6 +726,92 @@ describe('lazy multipart stream encoding', () => {
     expect(stream.locked).toBe(false);
   });
 
+  test.each(['completion', 'abort', 'late invalid filename'] as const)(
+    'preserves captured reader cleanup methods during %s',
+    async (outcome) => {
+      const stream = new ReadableStream<string>({
+        start(controller) {
+          controller.enqueue('original bytes');
+          controller.close();
+        },
+      });
+      const original = {
+        cancel: vi.fn(ReadableStreamDefaultReader.prototype.cancel),
+        releaseLock: vi.fn(ReadableStreamDefaultReader.prototype.releaseLock),
+      };
+      const substituted = { cancel: vi.fn(async () => {}), releaseLock: vi.fn(() => {}) };
+      let acquiredReader!: ReadableStreamDefaultReader<string>;
+
+      Object.assign(stream, {
+        [Symbol.asyncIterator]: undefined,
+        getReader() {
+          acquiredReader = ReadableStream.prototype.getReader.call(stream);
+          return Object.assign(acquiredReader, original);
+        },
+      });
+      const later = toStreamingFile(
+        (async function* chunks() {
+          yield 'later bytes';
+        })(),
+        'later.txt',
+      );
+      Object.defineProperty(later, 'name', {
+        get() {
+          Object.assign(acquiredReader, substituted);
+          return outcome === 'late invalid filename' ? undefined : 'later.txt';
+        },
+      });
+
+      const options = await multipartFormRequestOptions(
+        { body: { earlier: toStreamingFile(stream, 'earlier.txt'), later } },
+        fetch,
+      );
+      const body = options.body as ReadableStream<Uint8Array>;
+
+      if (outcome === 'completion') {
+        await expect(new Response(body).text()).resolves.toContain('original bytes');
+      } else {
+        const multipartReader = body.getReader();
+        if (outcome === 'abort') {
+          await multipartReader.read();
+          await multipartReader.cancel();
+        } else {
+          await expect(multipartReader.read()).rejects.toThrow(/file.?name/iu);
+        }
+      }
+
+      expect(original.cancel.mock.contexts).toEqual(outcome === 'completion' ? [] : [acquiredReader]);
+      expect(original.releaseLock.mock.contexts).toEqual([acquiredReader]);
+      expect(substituted.cancel).not.toHaveBeenCalled();
+      expect(substituted.releaseLock).not.toHaveBeenCalled();
+      expect(stream.locked).toBe(false);
+    },
+  );
+
+  test.each(['cancel', 'releaseLock'] as const)(
+    'preserves filename validation errors when the reader %s accessor throws',
+    async (method) => {
+      const cancel = vi.fn();
+      const releaseLock = vi.fn();
+      const reader = { read: vi.fn(), cancel, releaseLock };
+      const getCleanup = vi.fn(() => {
+        throw new Error('reader cleanup accessor failed');
+      });
+      Object.defineProperty(reader, method, { get: getCleanup });
+
+      const later = toStreamingFile((async function* chunks() {})(), 'later.txt');
+      Object.defineProperty(later, 'name', { value: undefined });
+      const options = await multipartFormRequestOptions(
+        { body: { earlier: { getReader: () => reader }, later } },
+        fetch,
+      );
+
+      await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/file.?name/iu);
+      expect(getCleanup).toHaveBeenCalledTimes(1);
+      expect(method === 'cancel' ? releaseLock : cancel).toHaveBeenCalledTimes(1);
+    },
+  );
+
   const fallbackUploadCases = [
     [
       'Blob.arrayBuffer()',
