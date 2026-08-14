@@ -414,6 +414,10 @@ type FormEntry =
       type: string;
     }>;
 
+type MultipartEntry =
+  | Extract<FormEntry, { kind: 'field' }>
+  | (Extract<FormEntry, { kind: 'upload' }> & Readonly<{ filename: string }>);
+
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
   uploadableKinds: UploadableKinds,
@@ -435,10 +439,10 @@ async function* iterateMultipartBody(
   options: CreateFormOptions,
   uploadableKinds: UploadableKinds,
 ): AsyncGenerator<Uint8Array> {
-  const entries: (FormEntry & { filename?: string })[] = [];
+  const entries: MultipartEntry[] = [];
 
   for await (const entry of iterateFormEntries(body, uploadableKinds)) {
-    if (entry.kind === 'upload' && entry.streamingFile) {
+    if (entry.kind === 'upload') {
       entries.push({ ...entry, filename: getStreamingFileName(entry.value, options, entry.streamingFile) });
     } else {
       entries.push(entry);
@@ -446,10 +450,10 @@ async function* iterateMultipartBody(
   }
 
   for (const entry of entries) {
-    const { key, value, filename: validatedFilename } = entry;
+    const { key, value } = entry;
 
     if (entry.kind === 'upload') {
-      const filename = validatedFilename ?? getStreamingFileName(entry.value, options, entry.streamingFile);
+      const { filename } = entry;
       yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
         `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
