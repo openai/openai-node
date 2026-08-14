@@ -906,5 +906,4 @@ describe('AssistantStream run-step index security', () => {
     expect(replacement).toHaveLength(2048);
     expect(replacement[2047]?.id).toBe('bounded');
   });
-
 });
