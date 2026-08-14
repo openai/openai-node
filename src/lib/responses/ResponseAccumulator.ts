@@ -1,5 +1,6 @@
 import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../resources/responses/responses';
 import { OpenAIError } from '../../error';
+import { hasOwn } from '../../internal/utils';
 import { addOutputText } from '../ResponsesParser';
 
 /** A transport keepalive event that leaves the accumulated response unchanged. */
@@ -32,6 +33,7 @@ export function accumulateResponse(
 
   switch (event.type) {
     case 'response.output_item.added': {
+      validateArrayIndex(snapshot.output, event.output_index, 'output', true);
       snapshot.output.push(structuredClone(event.item));
       if (event.item.type === 'message') {
         addOutputText(snapshot);
@@ -51,15 +53,18 @@ export function accumulateResponse(
       const type = output.type;
       const part = event.part;
       if (type === 'message' && part.type !== 'reasoning_text') {
+        validateArrayIndex(output.content, event.content_index, 'content', true);
         output.content.push(structuredClone(part));
         if (part.type === 'output_text') {
           addOutputText(snapshot);
         }
       } else if (type === 'reasoning' && part.type === 'reasoning_text') {
+        const content = output.content ?? [];
+        validateArrayIndex(content, event.content_index, 'content', true);
         if (!output.content) {
-          output.content = [];
+          output.content = content;
         }
-        output.content.push(structuredClone(part));
+        content.push(structuredClone(part));
       }
       break;
     }
@@ -113,6 +118,7 @@ export function accumulateResponse(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        validateArrayIndex(content.annotations, event.annotation_index, 'annotation', true);
         content.annotations[event.annotation_index] = structuredClone(
           event.annotation,
         ) as ResponseOutputText['annotations'][number];
@@ -186,6 +192,7 @@ export function accumulateResponse(
     case 'response.reasoning_summary_part.added': {
       const output = getOutput(snapshot, event.output_index);
       if (output.type === 'reasoning') {
+        validateArrayIndex(output.summary, event.summary_index, 'content', true);
         output.summary.push(structuredClone(event.part));
       }
       break;
@@ -400,6 +407,7 @@ function cloneResponse(response: Response): Response {
 }
 
 function getOutput(snapshot: Response, outputIndex: number): Response['output'][number] {
+  validateArrayIndex(snapshot.output, outputIndex, 'output');
   const output = snapshot.output[outputIndex];
   if (!output) {
     throw new OpenAIError(`missing output at index ${outputIndex}`);
@@ -408,11 +416,28 @@ function getOutput(snapshot: Response, outputIndex: number): Response['output'][
 }
 
 function getContent<T>(content: T[], contentIndex: number): T {
+  validateArrayIndex(content, contentIndex, 'content');
   const part = content[contentIndex];
   if (!part) {
     throw new OpenAIError(`missing content at index ${contentIndex}`);
   }
   return part;
+}
+
+function validateArrayIndex(
+  collection: readonly unknown[],
+  index: number,
+  kind: 'output' | 'content' | 'annotation',
+  allowAppend = false,
+): void {
+  if (
+    !Number.isSafeInteger(index) ||
+    index < 0 ||
+    index > collection.length ||
+    (index === collection.length ? !allowAppend || index in collection : !hasOwn(collection, index))
+  ) {
+    throw new OpenAIError(`missing ${kind} at index ${index}`);
+  }
 }
 
 function assertNever(value: never): never {

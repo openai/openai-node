@@ -1,4 +1,5 @@
 import { OpenAIError } from 'openai/core/error';
+import { hasOwn } from 'openai/internal/utils';
 import { accumulateResponse } from 'openai/lib/responses/ResponseAccumulator';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 
@@ -158,6 +159,87 @@ describe('ResponseAccumulator output and content events', () => {
     expect(snapshot.output_text).toBe('final');
     expect((snapshot.output[0] as { content: unknown[] }).content[0]).toEqual(finalPart);
     expect((snapshot.output[0] as { content: unknown[] }).content[0]).not.toBe(finalPart);
+  });
+
+  test('appends annotations sequentially and allows existing annotations to be replayed', () => {
+    const snapshot = snapshotFor({
+      type: 'message',
+      content: [{ type: 'output_text', text: '', annotations: [] }],
+    });
+    const event = {
+      type: 'response.output_text.annotation.added',
+      output_index: 0,
+      content_index: 0,
+      annotation_index: 0,
+      annotation: { type: 'url_citation', url: 'https://example.com/first' },
+    };
+
+    applyEvent(snapshot, event);
+    applyEvent(snapshot, {
+      ...event,
+      annotation: { type: 'url_citation', url: 'https://example.com/replayed' },
+    });
+    applyEvent(snapshot, {
+      ...event,
+      annotation_index: 1,
+      annotation: { type: 'url_citation', url: 'https://example.com/second' },
+    });
+
+    expect(snapshot.output[0]).toMatchObject({
+      content: [
+        {
+          annotations: [{ url: 'https://example.com/replayed' }, { url: 'https://example.com/second' }],
+        },
+      ],
+    });
+  });
+
+  test('preserves existing output, content, and summary append behavior when events are replayed', () => {
+    const outputSnapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
+    const replayedOutput = { type: 'function_call', id: 'replayed', arguments: '' };
+
+    applyEvent(outputSnapshot, {
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: replayedOutput,
+    });
+
+    expect(outputSnapshot.output).toHaveLength(2);
+    expect(outputSnapshot.output[1]).toEqual(replayedOutput);
+
+    const contentSnapshot = snapshotFor({
+      type: 'message',
+      content: [{ type: 'output_text', text: 'original', annotations: [] }],
+    });
+    const replayedContent = { type: 'output_text', text: 'replayed', annotations: [] };
+
+    applyEvent(contentSnapshot, {
+      type: 'response.content_part.added',
+      output_index: 0,
+      content_index: 0,
+      part: replayedContent,
+    });
+
+    const contentOutput = contentSnapshot.output[0] as { content: unknown[] };
+    expect(contentOutput.content).toHaveLength(2);
+    expect(contentOutput.content[1]).toEqual(replayedContent);
+
+    const summarySnapshot = snapshotFor({
+      type: 'reasoning',
+      summary: [{ type: 'summary_text', text: 'original' }],
+    });
+    const replayedSummary = { type: 'summary_text', text: 'replayed' };
+
+    applyEvent(summarySnapshot, {
+      type: 'response.reasoning_summary_part.added',
+      output_index: 0,
+      summary_index: 0,
+      part: replayedSummary,
+    });
+
+    const summaryOutput = summarySnapshot.output[0] as { summary: unknown[] };
+    expect(summaryOutput.summary).toHaveLength(2);
+    expect(summaryOutput.summary[1]).toEqual(replayedSummary);
   });
 });
 
@@ -356,6 +438,390 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
         delta: 'missing',
       }),
     ).toThrow('missing content at index 1');
+  });
+
+  test.each(['__proto__', 'constructor', 'push'])(
+    'rejects inherited output index %s without replacing the output array prototype',
+    (index) => {
+      const snapshot = makeResponse();
+      const outputPrototype = Object.getPrototypeOf(snapshot.output);
+
+      expect(() =>
+        applyEvent(snapshot, {
+          type: 'response.output_item.done',
+          output_index: index,
+          item: { type: 'message', content: [] },
+        }),
+      ).toThrow(`missing output at index ${index}`);
+
+      expect(Object.getPrototypeOf(snapshot.output)).toBe(outputPrototype);
+      expect(Object.getPrototypeOf(snapshot.output)).toBe(Array.prototype);
+      expect(snapshot.output).toHaveLength(0);
+    },
+  );
+
+  test.each([
+    -1,
+    0.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    1,
+    4_294_967_294,
+    Number.MAX_SAFE_INTEGER + 1,
+    '0',
+  ])('rejects malformed or missing existing output index %s before mutation', (index) => {
+    const snapshot = snapshotFor({ type: 'message', content: [] });
+    const [original] = snapshot.output;
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.output_item.done',
+        output_index: index,
+        item: { type: 'message', content: [{ type: 'output_text', text: 'injected' }] },
+      }),
+    ).toThrow(`missing output at index ${index}`);
+
+    expect(snapshot.output).toHaveLength(1);
+    expect(snapshot.output[0]).toBe(original);
+    expect(Object.getPrototypeOf(snapshot.output)).toBe(Array.prototype);
+  });
+
+  test.each([
+    ['message', { type: 'output_text', text: 'injected', annotations: [] }],
+    ['reasoning', { type: 'reasoning_text', text: 'injected' }],
+  ])('rejects inherited %s content indices before replacing the content array prototype', (type, part) => {
+    const snapshot = snapshotFor({ type, summary: [], content: [] });
+    const output = snapshot.output[0] as { content: unknown[] };
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.content_part.done',
+        output_index: 0,
+        content_index: '__proto__',
+        part,
+      }),
+    ).toThrow('missing content at index __proto__');
+
+    expect(Object.getPrototypeOf(output.content)).toBe(Array.prototype);
+    expect(output.content).toHaveLength(0);
+  });
+
+  test.each([-1, 0.5, Number.NaN, Number.NEGATIVE_INFINITY, 1, 4_294_967_294, '0'])(
+    'rejects malformed or missing existing content index %s before mutation',
+    (index) => {
+      const snapshot = snapshotFor({
+        type: 'message',
+        content: [{ type: 'output_text', text: 'unchanged', annotations: [] }],
+      });
+      const output = snapshot.output[0] as { content: unknown[] };
+      const [original] = output.content;
+
+      expect(() =>
+        applyEvent(snapshot, {
+          type: 'response.content_part.done',
+          output_index: 0,
+          content_index: index,
+          part: { type: 'output_text', text: 'injected', annotations: [] },
+        }),
+      ).toThrow(`missing content at index ${index}`);
+
+      expect(output.content).toHaveLength(1);
+      expect(output.content[0]).toBe(original);
+      expect(Object.getPrototypeOf(output.content)).toBe(Array.prototype);
+    },
+  );
+
+  test('rejects inherited summary indices before replacing the summary array prototype', () => {
+    const snapshot = snapshotFor({ type: 'reasoning', summary: [] });
+    const output = snapshot.output[0] as { summary: unknown[] };
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.reasoning_summary_part.done',
+        output_index: 0,
+        summary_index: '__proto__',
+        part: { type: 'summary_text', text: 'injected' },
+      }),
+    ).toThrow('missing content at index __proto__');
+
+    expect(Object.getPrototypeOf(output.summary)).toBe(Array.prototype);
+    expect(output.summary).toHaveLength(0);
+  });
+
+  test.each([-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, 1, 4_294_967_294, '0'])(
+    'rejects malformed or missing existing summary index %s before mutation',
+    (index) => {
+      const snapshot = snapshotFor({
+        type: 'reasoning',
+        summary: [{ type: 'summary_text', text: 'unchanged' }],
+      });
+      const output = snapshot.output[0] as { summary: unknown[] };
+      const [original] = output.summary;
+
+      expect(() =>
+        applyEvent(snapshot, {
+          type: 'response.reasoning_summary_part.done',
+          output_index: 0,
+          summary_index: index,
+          part: { type: 'summary_text', text: 'injected' },
+        }),
+      ).toThrow(`missing content at index ${index}`);
+
+      expect(output.summary).toHaveLength(1);
+      expect(output.summary[0]).toBe(original);
+      expect(Object.getPrototypeOf(output.summary)).toBe(Array.prototype);
+    },
+  );
+
+  test.each([
+    ['output', 'response.output_item.added', 'output_index'],
+    ['content', 'response.content_part.added', 'content_index'],
+    ['summary', 'response.reasoning_summary_part.added', 'summary_index'],
+  ])('rejects a noncontiguous %s index before appending', (kind, type, indexField) => {
+    const snapshot =
+      kind === 'output'
+        ? makeResponse()
+        : snapshotFor({
+            type: kind === 'summary' ? 'reasoning' : 'message',
+            content: [],
+            summary: [],
+          });
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type,
+        output_index: 0,
+        [indexField]: 4_294_967_294,
+        item: { type: 'message', content: [] },
+        part: {
+          type: kind === 'summary' ? 'summary_text' : 'output_text',
+          text: 'injected',
+          annotations: [],
+        },
+      }),
+    ).toThrow();
+
+    if (kind === 'output') {
+      expect(snapshot.output).toHaveLength(0);
+    } else {
+      const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
+      expect(kind === 'content' ? output.content : output.summary).toHaveLength(0);
+    }
+  });
+
+  test('does not initialize missing reasoning content for an invalid appended content index', () => {
+    const snapshot = snapshotFor({ type: 'reasoning', summary: [] });
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.content_part.added',
+        output_index: 0,
+        content_index: 1,
+        part: { type: 'reasoning_text', text: 'injected' },
+      }),
+    ).toThrow('missing content at index 1');
+
+    expect(snapshot.output[0]).not.toHaveProperty('content');
+  });
+
+  test.each([
+    ['output', 'response.output_item.added', 'output_index'],
+    ['content', 'response.content_part.added', 'content_index'],
+    ['summary', 'response.reasoning_summary_part.added', 'summary_index'],
+  ])('rejects an inherited %s index before appending', (kind, type, indexField) => {
+    const snapshot =
+      kind === 'output'
+        ? makeResponse()
+        : snapshotFor({
+            type: kind === 'summary' ? 'reasoning' : 'message',
+            content: [],
+            summary: [],
+          });
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type,
+        output_index: 0,
+        [indexField]: '__proto__',
+        item: { type: 'message', content: [] },
+        part: {
+          type: kind === 'summary' ? 'summary_text' : 'output_text',
+          text: 'injected',
+          annotations: [],
+        },
+      }),
+    ).toThrow();
+
+    if (kind === 'output') {
+      expect(snapshot.output).toHaveLength(0);
+      expect(Object.getPrototypeOf(snapshot.output)).toBe(Array.prototype);
+    } else {
+      const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
+      const collection = kind === 'content' ? output.content : output.summary;
+      expect(collection).toHaveLength(0);
+      expect(Object.getPrototypeOf(collection)).toBe(Array.prototype);
+    }
+  });
+
+  test.each([
+    '__proto__',
+    'constructor',
+    '0',
+    -1,
+    0.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    1,
+    4_294_967_294,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])('rejects invalid or noncontiguous annotation index %s without expanding the array', (index) => {
+    const snapshot = snapshotFor({
+      type: 'message',
+      content: [{ type: 'output_text', text: '', annotations: [] }],
+    });
+    const output = snapshot.output[0] as unknown as { content: [{ annotations: unknown[] }] };
+    const [{ annotations }] = output.content;
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.output_text.annotation.added',
+        output_index: 0,
+        content_index: 0,
+        annotation_index: index,
+        annotation: { type: 'url_citation', url: 'https://example.com/injected' },
+      }),
+    ).toThrow(`missing annotation at index ${index}`);
+
+    expect(annotations).toHaveLength(0);
+    expect(Object.getPrototypeOf(annotations)).toBe(Array.prototype);
+  });
+
+  test('rejects inherited numeric setters before appending annotations', () => {
+    const snapshot = snapshotFor({
+      type: 'message',
+      content: [{ type: 'output_text', text: '', annotations: [] }],
+    });
+    const output = snapshot.output[0] as unknown as { content: [{ annotations: unknown[] }] };
+    const [{ annotations }] = output.content;
+    let inheritedSetterCalled = false;
+    const annotationPrototype = Object.create(Array.prototype) as object;
+    Object.defineProperty(annotationPrototype, 0, {
+      configurable: true,
+      get() {
+        return null;
+      },
+      set() {
+        inheritedSetterCalled = true;
+      },
+    });
+    Object.setPrototypeOf(annotations, annotationPrototype);
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.output_text.annotation.added',
+        output_index: 0,
+        content_index: 0,
+        annotation_index: 0,
+        annotation: { type: 'url_citation', url: 'https://example.com/injected' },
+      }),
+    ).toThrow('missing annotation at index 0');
+
+    expect(inheritedSetterCalled).toBe(false);
+    expect(annotations).toHaveLength(0);
+    expect(hasOwn(annotations, 0)).toBe(false);
+  });
+
+  test('rejects inherited values in sparse output, content, summary, and annotation arrays', () => {
+    const inheritedOutput = { type: 'message', content: [] };
+    const outputPrototype = Object.create(Array.prototype) as Record<number, unknown>;
+    outputPrototype[0] = inheritedOutput;
+    const sparseOutput: OutputItem[] = [];
+    sparseOutput.length = 1;
+    Object.setPrototypeOf(sparseOutput, outputPrototype);
+    const outputSnapshot = makeResponse(sparseOutput);
+
+    expect(() =>
+      applyEvent(outputSnapshot, {
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: { type: 'message', content: [] },
+      }),
+    ).toThrow('missing output at index 0');
+    expect(hasOwn(sparseOutput, 0)).toBe(false);
+    expect(Object.getPrototypeOf(sparseOutput)).toBe(outputPrototype);
+
+    const contentSnapshot = snapshotFor({
+      type: 'message',
+      content: [{ type: 'output_text', text: 'unchanged', annotations: [] }],
+    });
+    const contentOutput = contentSnapshot.output[0] as unknown as {
+      content: [{ type: string; text: string; annotations: unknown[] }];
+    };
+    const [inheritedContent] = contentOutput.content;
+    const contentPrototype = Object.create(Array.prototype) as Record<number, unknown>;
+    contentPrototype[0] = inheritedContent;
+    Reflect.deleteProperty(contentOutput.content, 0);
+    Object.setPrototypeOf(contentOutput.content, contentPrototype);
+
+    expect(() =>
+      applyEvent(contentSnapshot, {
+        type: 'response.content_part.done',
+        output_index: 0,
+        content_index: 0,
+        part: { type: 'output_text', text: 'injected', annotations: [] },
+      }),
+    ).toThrow('missing content at index 0');
+    expect(hasOwn(contentOutput.content, 0)).toBe(false);
+    expect(inheritedContent.text).toBe('unchanged');
+
+    const summarySnapshot = snapshotFor({
+      type: 'reasoning',
+      summary: [{ type: 'summary_text', text: 'unchanged' }],
+    });
+    const summaryOutput = summarySnapshot.output[0] as unknown as {
+      summary: [{ type: string; text: string }];
+    };
+    const [inheritedSummary] = summaryOutput.summary;
+    const summaryPrototype = Object.create(Array.prototype) as Record<number, unknown>;
+    summaryPrototype[0] = inheritedSummary;
+    Reflect.deleteProperty(summaryOutput.summary, 0);
+    Object.setPrototypeOf(summaryOutput.summary, summaryPrototype);
+
+    expect(() =>
+      applyEvent(summarySnapshot, {
+        type: 'response.reasoning_summary_part.done',
+        output_index: 0,
+        summary_index: 0,
+        part: { type: 'summary_text', text: 'injected' },
+      }),
+    ).toThrow('missing content at index 0');
+    expect(hasOwn(summaryOutput.summary, 0)).toBe(false);
+    expect(inheritedSummary.text).toBe('unchanged');
+
+    const annotationSnapshot = snapshotFor({
+      type: 'message',
+      content: [{ type: 'output_text', text: '', annotations: [{}] }],
+    });
+    const annotationOutput = annotationSnapshot.output[0] as unknown as {
+      content: [{ annotations: unknown[] }];
+    };
+    const [{ annotations }] = annotationOutput.content;
+    const annotationPrototype = Object.create(Array.prototype) as Record<number, unknown>;
+    [annotationPrototype[0]] = annotations;
+    delete annotations[0];
+    Object.setPrototypeOf(annotations, annotationPrototype);
+
+    expect(() =>
+      applyEvent(annotationSnapshot, {
+        type: 'response.output_text.annotation.added',
+        output_index: 0,
+        content_index: 0,
+        annotation_index: 0,
+        annotation: { type: 'url_citation', url: 'https://example.com/injected' },
+      }),
+    ).toThrow('missing annotation at index 0');
+    expect(annotations).toHaveLength(1);
+    expect(hasOwn(annotations, 0)).toBe(false);
   });
 
   test.each([
