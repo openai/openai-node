@@ -233,6 +233,42 @@ describe('streaming multipart filename and header security', () => {
     await expect((form.get('later') as File).text()).resolves.toBe('later bytes');
   });
 
+  test('releases preflight readers when a later filename is invalid', async () => {
+    const cancel = vi.fn();
+    const stream = new ReadableStream<string>({ cancel });
+    const earlier = toStreamingFile(stream, 'earlier.txt');
+    const later = toStreamingFile(chunks('later bytes'), 'later.txt');
+    Object.defineProperty(later, 'name', { value: { toString: vi.fn() } });
+
+    const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+    const reader = (options.body as ReadableStream).getReader();
+
+    await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(stream.locked).toBe(false);
+  });
+
+  test('cancels unconsumed preflight readers when multipart serialization is canceled', async () => {
+    const cancel = vi.fn();
+    const laterStream = new ReadableStream<string>({ cancel });
+    const options = await multipartFormRequestOptions(
+      {
+        body: {
+          earlier: toStreamingFile(chunks('earlier bytes'), 'earlier.txt'),
+          later: toStreamingFile(laterStream, 'later.txt'),
+        },
+      },
+      fetch,
+    );
+    const reader = (options.body as ReadableStream).getReader();
+
+    await expect(reader.read()).resolves.toMatchObject({ done: false });
+    await reader.cancel();
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(laterStream.locked).toBe(false);
+  });
+
   test('streams valid branded async-iterable files lazily using one filename snapshot per entry', async () => {
     const readChunk = vi.fn();
     const replace = vi.fn();
