@@ -29,13 +29,16 @@ import type {
 } from '../resources/beta/assistants';
 import type { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from '../resources/beta/threads/runs/steps';
 import type { ThreadCreateAndRunParamsBase, Threads } from '../resources/beta/threads/threads';
-import type { BaseEvents } from './EventStream';
+import type { BaseEvents, EventParameters } from './EventStream';
 import { EventStream } from './EventStream';
-import { hasOwn, isObj } from '../internal/utils';
-
-// Preserve out-of-order entries while bounding the sparse growth caused by any one delta.
-const MAX_ASSISTANT_STREAM_ARRAY_GROWTH = 1024;
-const assistantStreamArrayStates = new WeakMap<unknown[], AssistantStreamArrayState>();
+import { hasOwn } from '../internal/utils';
+import {
+  accumulateAssistantStreamDelta,
+  assertSafeAssistantStreamDelta,
+  createAssistantStreamArrayDeltaCommit,
+  defineAssistantStreamArrayEntry,
+  markAssistantStreamValueExternallyMutable,
+} from '../internal/assistant-stream-delta';
 
 /** Lifecycle, message, run-step, tool-call, and content events emitted by an assistant stream. */
 export interface AssistantStreamEvents extends BaseEvents {
@@ -239,21 +242,25 @@ export class AssistantStream
 
   /** Returns the most recent raw event, or `undefined` before any event arrives. */
   currentEvent(): AssistantStreamEvent | undefined {
+    markAssistantStreamValueExternallyMutable(this.#currentEvent);
     return this.#currentEvent;
   }
 
   /** Returns the latest run snapshot, or `undefined` before a run event arrives. */
   currentRun(): Run | undefined {
+    markAssistantStreamValueExternallyMutable(this.#currentRunSnapshot);
     return this.#currentRunSnapshot;
   }
 
   /** Returns the message currently being accumulated, or `undefined` before message creation. */
   currentMessageSnapshot(): Message | undefined {
+    markAssistantStreamValueExternallyMutable(this.#messageSnapshot);
     return this.#messageSnapshot;
   }
 
   /** Returns the run step currently being accumulated, or `undefined` before a step begins. */
   currentRunStepSnapshot(): Runs.RunStep | undefined {
+    markAssistantStreamValueExternallyMutable(this.#currentRunStepSnapshot);
     return this.#currentRunStepSnapshot;
   }
 
@@ -407,13 +414,13 @@ export class AssistantStream
     for (const content of newContent) {
       const snapshotContent = accumulatedMessage.content[content.index];
       if (snapshotContent?.type === 'text') {
-        this._emit('textCreated', snapshotContent.text);
+        this.#emitExposed('textCreated', snapshotContent.text);
       }
     }
 
     switch (event.event) {
       case 'thread.message.created': {
-        this._emit('messageCreated', event.data);
+        this.#emitExposed('messageCreated', event.data);
         break;
       }
 
@@ -422,7 +429,7 @@ export class AssistantStream
       }
 
       case 'thread.message.delta': {
-        this._emit('messageDelta', event.data.delta, accumulatedMessage);
+        this.#emitExposed('messageDelta', event.data.delta, accumulatedMessage);
 
         if (event.data.delta.content) {
           for (const content of event.data.delta.content) {
@@ -431,7 +438,7 @@ export class AssistantStream
               const textDelta = content.text;
               const snapshot = accumulatedMessage.content[content.index];
               if (snapshot && snapshot.type === 'text') {
-                this._emit('textDelta', textDelta, snapshot.text);
+                this.#emitExposed('textDelta', textDelta, snapshot.text);
               } else {
                 throw new Error('The snapshot associated with this text delta is not text or missing');
               }
@@ -442,11 +449,11 @@ export class AssistantStream
               if (this.#currentContent) {
                 switch (this.#currentContent.type) {
                   case 'text': {
-                    this._emit('textDone', this.#currentContent.text, this.#messageSnapshot);
+                    this.#emitExposed('textDone', this.#currentContent.text, this.#messageSnapshot);
                     break;
                   }
                   case 'image_file': {
-                    this._emit('imageFileDone', this.#currentContent.image_file, this.#messageSnapshot);
+                    this.#emitExposed('imageFileDone', this.#currentContent.image_file, this.#messageSnapshot);
                     break;
                   }
                 }
@@ -470,11 +477,11 @@ export class AssistantStream
           if (currentContent) {
             switch (currentContent.type) {
               case 'image_file': {
-                this._emit('imageFileDone', currentContent.image_file, this.#messageSnapshot);
+                this.#emitExposed('imageFileDone', currentContent.image_file, this.#messageSnapshot);
                 break;
               }
               case 'text': {
-                this._emit('textDone', currentContent.text, this.#messageSnapshot);
+                this.#emitExposed('textDone', currentContent.text, this.#messageSnapshot);
                 break;
               }
             }
@@ -482,7 +489,7 @@ export class AssistantStream
         }
 
         if (this.#messageSnapshot) {
-          this._emit('messageDone', event.data);
+          this.#emitExposed('messageDone', event.data);
         }
 
         this.#messageSnapshot = undefined;
@@ -496,7 +503,7 @@ export class AssistantStream
 
     switch (event.event) {
       case 'thread.run.step.created': {
-        this._emit('runStepCreated', event.data);
+        this.#emitExposed('runStepCreated', event.data);
         break;
       }
       case 'thread.run.step.delta': {
@@ -509,26 +516,26 @@ export class AssistantStream
         ) {
           for (const toolCall of delta.step_details.tool_calls) {
             if (toolCall.index === this.#currentToolCallIndex) {
-              this._emit(
+              this.#emitExposed(
                 'toolCallDelta',
                 toolCall,
                 accumulatedRunStep.step_details.tool_calls[toolCall.index] as ToolCall,
               );
             } else {
               if (this.#currentToolCall) {
-                this._emit('toolCallDone', this.#currentToolCall);
+                this.#emitExposed('toolCallDone', this.#currentToolCall);
               }
 
               this.#currentToolCallIndex = toolCall.index;
               this.#currentToolCall = accumulatedRunStep.step_details.tool_calls[toolCall.index];
               if (this.#currentToolCall) {
-                this._emit('toolCallCreated', this.#currentToolCall);
+                this.#emitExposed('toolCallCreated', this.#currentToolCall);
               }
             }
           }
         }
 
-        this._emit('runStepDelta', event.data.delta, accumulatedRunStep);
+        this.#emitExposed('runStepDelta', event.data.delta, accumulatedRunStep);
         break;
       }
       case 'thread.run.step.completed':
@@ -538,10 +545,10 @@ export class AssistantStream
         this.#currentRunStepSnapshot = undefined;
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
-          this._emit('toolCallDone', this.#currentToolCall as ToolCall);
+          this.#emitExposed('toolCallDone', this.#currentToolCall as ToolCall);
           this.#currentToolCall = undefined;
         }
-        this._emit('runStepDone', event.data, accumulatedRunStep);
+        this.#emitExposed('runStepDone', event.data, accumulatedRunStep);
         break;
       }
       case 'thread.run.step.in_progress': {
@@ -550,9 +557,21 @@ export class AssistantStream
     }
   }
 
+  #emitExposed<Event extends keyof AssistantStreamEvents>(
+    event: Event,
+    ...args: EventParameters<AssistantStreamEvents, Event>
+  ): void {
+    if (this._hasListeners(event)) {
+      for (const value of args) {
+        markAssistantStreamValueExternallyMutable(value);
+      }
+    }
+    this._emit(event, ...args);
+  }
+
   #handleEvent(this: AssistantStream, event: AssistantStreamEvent) {
     this.#events.push(event);
-    this._emit('event', event);
+    this.#emitExposed('event', event);
   }
 
   #accumulateRunStep(event: RunStepStreamEvent): Runs.RunStep {
@@ -571,7 +590,7 @@ export class AssistantStream
         const data = event.data;
 
         if (data.delta) {
-          const accumulated = AssistantStream.accumulateDelta(snapshot, data.delta) as Runs.RunStep;
+          const accumulated = accumulateAssistantStreamDelta(snapshot, data.delta, true) as Runs.RunStep;
           this.#runStepSnapshots[event.data.id] = accumulated;
         }
 
@@ -618,8 +637,11 @@ export class AssistantStream
         //If this delta does not have content, nothing to process
         if (data.delta.content) {
           assertSafeAssistantStreamDelta(data.delta);
-          const projection = createAssistantStreamDeltaProjection();
-          assertValidAssistantStreamArrayDelta(snapshot.content, data.delta.content, 'content', projection);
+          const commitProjection = createAssistantStreamArrayDeltaCommit(
+            snapshot.content,
+            data.delta.content,
+            'content',
+          );
 
           for (const contentElement of data.delta.content) {
             if (hasOwn(snapshot.content, contentElement.index)) {
@@ -635,7 +657,7 @@ export class AssistantStream
             }
           }
 
-          commitAssistantStreamArrayProjection(projection);
+          commitProjection();
         }
 
         return [snapshot, newContent];
@@ -659,9 +681,11 @@ export class AssistantStream
     contentElement: MessageContentDelta,
     currentContent: MessageContent | undefined,
   ): TextContentBlock | ImageFileContentBlock {
-    return AssistantStream.accumulateDelta(currentContent as unknown as Record<any, any>, contentElement) as
-      | TextContentBlock
-      | ImageFileContentBlock;
+    return accumulateAssistantStreamDelta(
+      currentContent as unknown as Record<any, any>,
+      contentElement,
+      true,
+    ) as TextContentBlock | ImageFileContentBlock;
   }
 
   /**
@@ -669,80 +693,7 @@ export class AssistantStream
    * merging nested objects and indexed array entries.
    */
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
-    assertSafeAssistantStreamDelta(delta);
-    const projection = createAssistantStreamDeltaProjection();
-    assertValidAssistantStreamDeltaIndices(acc, delta, projection);
-
-    for (const [key, deltaValue] of Object.entries(delta)) {
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-        throw new OpenAIError(`Assistant stream delta contains an unsafe property: ${key}`);
-      }
-
-      if (!hasOwn(acc, key)) {
-        acc[key] = deltaValue;
-        continue;
-      }
-
-      let accValue = acc[key];
-      if (accValue === null || accValue === undefined) {
-        acc[key] = deltaValue;
-        continue;
-      }
-
-      // We don't accumulate these special properties
-      if (key === 'index' || key === 'type') {
-        acc[key] = deltaValue;
-        continue;
-      }
-
-      // Type-specific accumulation logic
-      if (typeof accValue === 'string' && typeof deltaValue === 'string') {
-        accValue += deltaValue;
-      } else if (typeof accValue === 'number' && typeof deltaValue === 'number') {
-        accValue += deltaValue;
-      } else if (isObj(accValue) && isObj(deltaValue)) {
-        accValue = this.accumulateDelta(accValue as Record<string, any>, deltaValue as Record<string, any>);
-      } else if (Array.isArray(accValue) && Array.isArray(deltaValue)) {
-        if (isPrimitiveAssistantStreamArrayDelta(accValue, deltaValue)) {
-          accValue.push(...deltaValue); // Use spread syntax for efficient addition
-          continue;
-        }
-
-        for (const deltaEntry of deltaValue) {
-          if (!isObj(deltaEntry)) {
-            throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
-          }
-
-          const index = deltaEntry['index'];
-          if (index == null) {
-            console.error(deltaEntry);
-            throw new Error('Expected array delta entry to have an `index` property');
-          }
-
-          if (typeof index !== 'number') {
-            throw new TypeError(
-              `Expected array delta entry \`index\` property to be a number but got ${index}`,
-            );
-          }
-
-          if (hasOwn(accValue, index)) {
-            const accEntry = accValue[index];
-            accValue[index] = accEntry == null ? deltaEntry : this.accumulateDelta(accEntry, deltaEntry);
-          } else {
-            defineAssistantStreamArrayEntry(accValue, index, deltaEntry);
-          }
-        }
-        continue;
-      } else {
-        throw new TypeError(
-          `Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`,
-        );
-      }
-      acc[key] = accValue;
-    }
-
-    commitAssistantStreamArrayProjection(projection);
-    return acc;
+    return accumulateAssistantStreamDelta(acc, delta);
   }
 
   #handleRun(this: AssistantStream, event: RunStreamEvent) {
@@ -766,7 +717,7 @@ export class AssistantStream
       case 'thread.run.incomplete': {
         this.#finalRun = event.data;
         if (this.#currentToolCall) {
-          this._emit('toolCallDone', this.#currentToolCall);
+          this.#emitExposed('toolCallDone', this.#currentToolCall);
           this.#currentToolCall = undefined;
         }
         break;
@@ -778,7 +729,7 @@ export class AssistantStream
   }
 
   protected _addRun(run: Run): Run {
-    this._emit('run', run);
+    this.#emitExposed('run', run);
     return run;
   }
 
@@ -806,195 +757,6 @@ export class AssistantStream
     options?: RequestOptions,
   ): Promise<Run> {
     return await this._createToolAssistantStream(runs, runId, params, options);
-  }
-}
-
-interface AssistantStreamArrayState {
-  length: number;
-  ownEntryCount: number;
-}
-
-interface AssistantStreamArrayProjection {
-  baselineLength: number;
-  entries: Map<number, Record<string, unknown>>;
-  length: number;
-  ownEntryCount: number;
-}
-
-interface AssistantStreamDeltaProjection {
-  arrays: Map<unknown[], AssistantStreamArrayProjection>;
-  records: WeakMap<Record<string, any>, Map<string, unknown>>;
-}
-
-function createAssistantStreamDeltaProjection(): AssistantStreamDeltaProjection {
-  return { arrays: new Map(), records: new WeakMap() };
-}
-
-function commitAssistantStreamArrayProjection(projection: AssistantStreamDeltaProjection): void {
-  for (const [array, projected] of projection.arrays) {
-    assistantStreamArrayStates.set(array, {
-      length: projected.length,
-      ownEntryCount: projected.ownEntryCount,
-    });
-  }
-}
-
-function isPrimitiveAssistantStreamValue(value: unknown): boolean {
-  return typeof value === 'string' || typeof value === 'number';
-}
-
-function isPrimitiveAssistantStreamArrayDelta(accumulator: unknown[], delta: unknown[]): boolean {
-  return delta.every(isPrimitiveAssistantStreamValue) && accumulator.every(isPrimitiveAssistantStreamValue);
-}
-
-function assertValidAssistantStreamDeltaIndices(
-  accumulator: Record<string, any>,
-  delta: Record<string, any>,
-  projection: AssistantStreamDeltaProjection = createAssistantStreamDeltaProjection(),
-): void {
-  let projectedValues = projection.records.get(accumulator);
-
-  for (const [key, deltaValue] of Object.entries(delta)) {
-    if (key === 'index' || key === 'type') {
-      continue;
-    }
-
-    let accumulatedValue: unknown;
-
-    if (projectedValues?.has(key)) {
-      accumulatedValue = projectedValues.get(key);
-    } else if (hasOwn(accumulator, key)) {
-      accumulatedValue = accumulator[key];
-    }
-
-    if (accumulatedValue === null || accumulatedValue === undefined) {
-      if (!projectedValues) {
-        projectedValues = new Map();
-        projection.records.set(accumulator, projectedValues);
-      }
-
-      projectedValues.set(key, deltaValue);
-      continue;
-    }
-
-    if (isObj(accumulatedValue) && isObj(deltaValue)) {
-      assertValidAssistantStreamDeltaIndices(accumulatedValue, deltaValue, projection);
-    } else if (
-      Array.isArray(accumulatedValue) &&
-      Array.isArray(deltaValue) &&
-      !isPrimitiveAssistantStreamArrayDelta(accumulatedValue, deltaValue)
-    ) {
-      assertValidAssistantStreamArrayDelta(accumulatedValue, deltaValue, 'array', projection);
-    }
-  }
-}
-
-function assertValidAssistantStreamArrayDelta(
-  accumulator: unknown[],
-  delta: unknown[],
-  kind: 'content' | 'array',
-  projection: AssistantStreamDeltaProjection = createAssistantStreamDeltaProjection(),
-): void {
-  let projectedArray = projection.arrays.get(accumulator);
-
-  if (!projectedArray) {
-    const cachedState = assistantStreamArrayStates.get(accumulator);
-    projectedArray = {
-      baselineLength: accumulator.length,
-      entries: new Map(),
-      length: accumulator.length,
-      ownEntryCount:
-        cachedState?.length === accumulator.length
-          ? cachedState.ownEntryCount
-          : countOwnAssistantStreamArrayEntries(accumulator),
-    };
-    projection.arrays.set(accumulator, projectedArray);
-  }
-
-  for (const deltaEntry of delta) {
-    if (!isObj(deltaEntry)) {
-      throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
-    }
-
-    const index = deltaEntry['index'];
-
-    if (kind === 'array' && index == null) {
-      console.error(deltaEntry);
-      throw new Error('Expected array delta entry to have an `index` property');
-    }
-
-    if (kind === 'array' && typeof index !== 'number') {
-      throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
-    }
-
-    if (
-      !Number.isSafeInteger(index) ||
-      (index as number) < 0 ||
-      (index as number) >= projectedArray.baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH
-    ) {
-      throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
-    }
-
-    const validatedIndex = index as number;
-    let accumulatedEntry: unknown;
-
-    if (projectedArray.entries.has(validatedIndex)) {
-      accumulatedEntry = projectedArray.entries.get(validatedIndex);
-    } else if (hasOwn(accumulator, validatedIndex)) {
-      accumulatedEntry = accumulator[validatedIndex];
-
-      if (accumulatedEntry === null || accumulatedEntry === undefined) {
-        projectedArray.entries.set(validatedIndex, deltaEntry);
-      }
-    } else {
-      projectedArray.entries.set(validatedIndex, deltaEntry);
-      projectedArray.ownEntryCount += 1;
-    }
-
-    const projectedLength = Math.max(projectedArray.length, validatedIndex + 1);
-    if (projectedLength - projectedArray.ownEntryCount > MAX_ASSISTANT_STREAM_ARRAY_GROWTH) {
-      throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
-    }
-
-    if (isObj(accumulatedEntry)) {
-      assertValidAssistantStreamDeltaIndices(accumulatedEntry, deltaEntry, projection);
-    }
-
-    projectedArray.length = projectedLength;
-  }
-}
-
-function countOwnAssistantStreamArrayEntries(accumulator: unknown[]): number {
-  let count = 0;
-  for (const key of Object.keys(accumulator)) {
-    const index = Number(key);
-    if (Number.isSafeInteger(index) && index >= 0 && index < accumulator.length && String(index) === key) {
-      count += 1;
-    }
-  }
-  return count;
-}
-
-function defineAssistantStreamArrayEntry(accumulator: unknown[], index: number, value: unknown): void {
-  Object.defineProperty(accumulator, index, {
-    configurable: true,
-    enumerable: true,
-    value,
-    writable: true,
-  });
-}
-
-function assertSafeAssistantStreamDelta(value: unknown): void {
-  if (!isObj(value) && !Array.isArray(value)) {
-    return;
-  }
-
-  for (const [key, nestedValue] of Object.entries(value)) {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-      throw new OpenAIError(`Assistant stream delta contains an unsafe property: ${key}`);
-    }
-
-    assertSafeAssistantStreamDelta(nestedValue);
   }
 }
 

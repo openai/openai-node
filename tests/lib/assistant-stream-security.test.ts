@@ -154,20 +154,88 @@ describe('AssistantStream delta index security', () => {
     expect(denseEntries[1024]?.text).toBe('next contiguous entry');
   });
 
-  test('caches dense multi-event accounting instead of rescanning the accumulated array', () => {
+  test('rescans externally mutable dense arrays after same-length deletions', () => {
+    const entries = Array.from({ length: 1024 }, (_, index) => ({ index, text: 'entry' }));
+
+    AssistantStream.accumulateDelta({ entries }, { entries: [{ index: 1023, text: ' updated' }] });
+    for (let index = 0; index < entries.length; index += 1) {
+      Reflect.deleteProperty(entries, index);
+    }
+
+    expect(() =>
+      AssistantStream.accumulateDelta(
+        { entries },
+        { entries: [{ index: 2047, text: 'sparse amplification attempt' }] },
+      ),
+    ).toThrow('invalid array index');
+    expect(entries).toHaveLength(1024);
+    expect(hasOwn(entries, 2047)).toBe(false);
+  });
+
+  test('rescans externally mutable sparse arrays after same-length hole fills', () => {
+    const entries: Record<string, unknown>[] = [];
+
+    AssistantStream.accumulateDelta(
+      { entries },
+      { entries: [{ index: 1023, text: 'initial sparse entry' }] },
+    );
+    for (let index = 0; index < 1023; index += 1) {
+      entries[index] = { index, text: 'externally filled' };
+    }
+
+    AssistantStream.accumulateDelta(
+      { entries },
+      { entries: [{ index: 2047, text: 'valid bounded sparse entry' }] },
+    );
+    expect(entries).toHaveLength(2048);
+    expect(entries[2047]?.['text']).toBe('valid bounded sparse entry');
+  });
+
+  test('caches dense multi-event accounting for unexposed stream-owned arrays', async () => {
     let ownKeysCalls = 0;
-    const entries = new Proxy<Record<string, unknown>[]>([], {
+    const toolCalls = new Proxy<Record<string, unknown>[]>([], {
       ownKeys(target) {
         ownKeysCalls += 1;
         return Reflect.ownKeys(target);
       },
     });
+    const events: AssistantStreamEvent[] = [
+      {
+        event: 'thread.run.step.created',
+        data: {
+          id: 'step_performance',
+          status: 'in_progress',
+          step_details: { type: 'tool_calls', tool_calls: toolCalls },
+        },
+      } as any,
+    ];
 
     for (let index = 0; index < 2048; index += 1) {
-      AssistantStream.accumulateDelta({ entries }, { entries: [{ index, text: 'entry' }] });
+      events.push({
+        event: 'thread.run.step.delta',
+        data: {
+          id: 'step_performance',
+          delta: {
+            step_details: {
+              type: 'tool_calls',
+              tool_calls: [
+                {
+                  index,
+                  type: 'function',
+                  id: `call_${index}`,
+                  function: { arguments: '' },
+                },
+              ],
+            },
+          },
+        },
+      } as any);
     }
+    events.push(completedRun() as AssistantStreamEvent);
 
-    expect(entries).toHaveLength(2048);
+    await unencodedAssistantStream(events).done();
+
+    expect(toolCalls).toHaveLength(2048);
     expect(ownKeysCalls).toBe(1);
   });
 
@@ -455,6 +523,92 @@ describe('AssistantStream message index security', () => {
     expect(inheritedSetter).not.toHaveBeenCalled();
     expect(Object.getOwnPropertyDescriptor(content, 1)).toBeDefined();
     expect(content[1]?.text.value).toBe('second');
+  });
+
+  test('invalidates cached content accounting when a listener deletes entries without shrinking', async () => {
+    const content = Array.from({ length: 1024 }, (_, index) => ({
+      type: 'text' as const,
+      text: { value: `entry_${index}`, annotations: [] },
+    }));
+    const runner = unencodedAssistantStream([
+      { event: 'thread.message.created', data: { id: 'msg_delete', role: 'assistant', content } },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_delete',
+          delta: { content: [{ index: 0, type: 'text', text: { value: ' updated' } }] },
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_delete',
+          delta: {
+            content: [{ index: 2047, type: 'text', text: { value: 'amplified', annotations: [] } }],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    runner.on('textDelta', () => {
+      const snapshotContent = runner.currentMessageSnapshot()?.content;
+      if (snapshotContent) {
+        for (let index = 0; index < snapshotContent.length; index += 1) {
+          Reflect.deleteProperty(snapshotContent, index);
+        }
+      }
+    });
+
+    await expect(runner.done()).rejects.toThrow('invalid content index');
+    expect(content).toHaveLength(1024);
+    expect(hasOwn(content, 2047)).toBe(false);
+  });
+
+  test('invalidates cached content accounting when a listener fills holes without growing length', async () => {
+    const content: Record<string, any>[] = [];
+    const runner = unencodedAssistantStream([
+      { event: 'thread.message.created', data: { id: 'msg_fill', role: 'assistant', content } },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_fill',
+          delta: {
+            content: [{ index: 1023, type: 'text', text: { value: 'sparse', annotations: [] } }],
+          },
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_fill',
+          delta: {
+            content: [{ index: 2047, type: 'text', text: { value: 'bounded', annotations: [] } }],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    let filled = false;
+    runner.on('textDelta', () => {
+      if (filled) {
+        return;
+      }
+      filled = true;
+      const snapshotContent = runner.currentMessageSnapshot()?.content;
+      if (snapshotContent) {
+        for (let index = 0; index < 1023; index += 1) {
+          snapshotContent[index] = {
+            type: 'text',
+            text: { value: `filled_${index}`, annotations: [] },
+          };
+        }
+      }
+    });
+
+    await runner.done();
+
+    expect(content).toHaveLength(2048);
+    expect(content[2047]?.['text'].value).toBe('bounded');
   });
 
   test('bounds cumulative streamed content holes across separate public events', async () => {
