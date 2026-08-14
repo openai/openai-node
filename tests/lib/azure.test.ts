@@ -294,7 +294,7 @@ describe('instantiate azure client', () => {
           const azureADTokenProvider = vi.fn(async () => 'AZURE_ENTRA_BEARER_SECRET');
           const customFetch = vi.fn(
             async (_url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
-              Response.json({ ok: true }, { headers: headers ?? [] }),
+              new globalThis.Response(JSON.stringify({ ok: true }), { headers: headers ?? [] }),
           );
           const client = new AzureOpenAI({
             baseURL: 'https://example.com',
