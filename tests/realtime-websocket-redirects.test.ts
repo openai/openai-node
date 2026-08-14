@@ -259,7 +259,8 @@ describe.each([
 
         redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
 
-        actualWebSocketConstructor = (await vi.importActual<typeof WS>('ws')).WebSocket;
+        const actualWS = await vi.importActual<typeof WS>('ws');
+        actualWebSocketConstructor = actualWS.WebSocket;
         nodeSocketConstructor.mockImplementationOnce(ActualWebSocket);
 
         const client = new AzureOpenAI({
@@ -329,7 +330,8 @@ describe.each([
 
       redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
 
-      actualWebSocketConstructor = (await vi.importActual<typeof WS>('ws')).WebSocket;
+      const actualWS = await vi.importActual<typeof WS>('ws');
+      actualWebSocketConstructor = actualWS.WebSocket;
       nodeSocketConstructor.mockImplementationOnce(ActualWebSocket);
 
       const realtime = new Realtime(
