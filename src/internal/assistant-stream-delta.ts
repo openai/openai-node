@@ -27,7 +27,9 @@ interface AssistantStreamDeltaProjection {
 const assistantStreamArrayStates = new WeakMap<unknown[], AssistantStreamArrayState>();
 const externallyMutableAssistantStreamValues = new WeakSet<object>();
 
-function createAssistantStreamDeltaProjection(cacheArrays: boolean): AssistantStreamDeltaProjection {
+function createAssistantStreamDeltaProjection(
+  cacheArrays: boolean,
+): AssistantStreamDeltaProjection {
   return { arrays: new Map(), cacheArrays, records: new WeakMap() };
 }
 
@@ -49,14 +51,22 @@ function isPrimitiveAssistantStreamValue(value: unknown): boolean {
 }
 
 function isPrimitiveAssistantStreamArrayDelta(accumulator: unknown[], delta: unknown[]): boolean {
-  return delta.every(isPrimitiveAssistantStreamValue) && accumulator.every(isPrimitiveAssistantStreamValue);
+  return (
+    delta.every(isPrimitiveAssistantStreamValue) &&
+    accumulator.every(isPrimitiveAssistantStreamValue)
+  );
 }
 
 function countOwnAssistantStreamArrayEntries(accumulator: unknown[]): number {
   let count = 0;
   for (const key of Object.keys(accumulator)) {
     const index = Number(key);
-    if (Number.isSafeInteger(index) && index >= 0 && index < accumulator.length && String(index) === key) {
+    if (
+      Number.isSafeInteger(index) &&
+      index >= 0 &&
+      index < accumulator.length &&
+      String(index) === key
+    ) {
       count += 1;
     }
   }
@@ -76,7 +86,9 @@ function getAssistantStreamDeltaIndex(
   }
 
   if (kind === 'array' && typeof index !== 'number') {
-    throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+    throw new TypeError(
+      `Expected array delta entry \`index\` property to be a number but got ${index}`,
+    );
   }
 
   if (
@@ -199,7 +211,10 @@ function assertValidAssistantStreamDeltaIndices(
 }
 
 export function markAssistantStreamValueExternallyMutable(value: unknown): void {
-  if ((!isObj(value) && !Array.isArray(value)) || externallyMutableAssistantStreamValues.has(value)) {
+  if (
+    (!isObj(value) && !Array.isArray(value)) ||
+    externallyMutableAssistantStreamValues.has(value)
+  ) {
     return;
   }
 
@@ -239,7 +254,9 @@ function getRequiredAssistantStreamArrayIndex(deltaEntry: AssistantStreamRecord)
     throw new Error('Expected array delta entry to have an `index` property');
   }
   if (typeof index !== 'number') {
-    throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+    throw new TypeError(
+      `Expected array delta entry \`index\` property to be a number but got ${index}`,
+    );
   }
   return index;
 }

@@ -685,7 +685,9 @@ export class AssistantStream
       currentContent as unknown as Record<any, any>,
       contentElement,
       true,
-    ) as TextContentBlock | ImageFileContentBlock;
+    ) as
+      | TextContentBlock
+      | ImageFileContentBlock;
   }
 
   /**
