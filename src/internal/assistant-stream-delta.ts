@@ -108,11 +108,18 @@ function getAssistantStreamDeltaIndex(
   return index as number;
 }
 
+type ValidateAssistantStreamRecord = (
+  accumulator: AssistantStreamRecord,
+  delta: AssistantStreamRecord,
+  projection: AssistantStreamDeltaProjection,
+) => void;
+
 function assertValidAssistantStreamArrayDelta(
   accumulator: unknown[],
   delta: unknown[],
   kind: 'content' | 'array',
   projection: AssistantStreamDeltaProjection,
+  validateRecord: ValidateAssistantStreamRecord,
 ): void {
   let projectedArray = projection.arrays.get(accumulator);
 
@@ -166,8 +173,7 @@ function assertValidAssistantStreamArrayDelta(
     }
 
     if (isObj(accumulatedEntry)) {
-      // eslint-disable-next-line no-use-before-define -- Record and array validation recurse into each other.
-      assertValidAssistantStreamDeltaIndices(accumulatedEntry, deltaEntry, projection);
+      validateRecord(accumulatedEntry, deltaEntry, projection);
     }
 
     projectedArray.length = projectedLength;
@@ -211,7 +217,13 @@ function assertValidAssistantStreamDeltaIndices(
       Array.isArray(deltaValue) &&
       !isPrimitiveAssistantStreamArrayDelta(accumulatedValue, deltaValue)
     ) {
-      assertValidAssistantStreamArrayDelta(accumulatedValue, deltaValue, 'array', projection);
+      assertValidAssistantStreamArrayDelta(
+        accumulatedValue,
+        deltaValue,
+        'array',
+        projection,
+        assertValidAssistantStreamDeltaIndices,
+      );
     }
   }
 }
@@ -258,7 +270,16 @@ function getRequiredAssistantStreamArrayIndex(deltaEntry: AssistantStreamRecord)
   return index;
 }
 
-function applyAssistantStreamArrayDelta(accumulator: unknown[], delta: unknown[]): void {
+type ApplyAssistantStreamRecord = (
+  accumulator: AssistantStreamRecord,
+  delta: AssistantStreamRecord,
+) => AssistantStreamRecord;
+
+function applyAssistantStreamArrayDelta(
+  accumulator: unknown[],
+  delta: unknown[],
+  applyRecord: ApplyAssistantStreamRecord,
+): void {
   if (isPrimitiveAssistantStreamArrayDelta(accumulator, delta)) {
     accumulator.push(...delta);
     assistantStreamArrayStates.delete(accumulator);
@@ -279,8 +300,7 @@ function applyAssistantStreamArrayDelta(accumulator: unknown[], delta: unknown[]
         }
         accumulator[index] = deltaEntry;
       } else {
-        // eslint-disable-next-line no-use-before-define -- Object and array accumulation recurse into each other.
-        accumulator[index] = applyAssistantStreamDelta(accumulatedEntry as AssistantStreamRecord, deltaEntry);
+        accumulator[index] = applyRecord(accumulatedEntry as AssistantStreamRecord, deltaEntry);
       }
     } else {
       defineAssistantStreamArrayEntry(accumulator, index, deltaEntry);
@@ -328,7 +348,7 @@ function applyAssistantStreamDelta(
     } else if (isObj(accumulatedValue) && isObj(deltaValue)) {
       accumulatedValue = applyAssistantStreamDelta(accumulatedValue, deltaValue);
     } else if (Array.isArray(accumulatedValue) && Array.isArray(deltaValue)) {
-      applyAssistantStreamArrayDelta(accumulatedValue, deltaValue);
+      applyAssistantStreamArrayDelta(accumulatedValue, deltaValue, applyAssistantStreamDelta);
       continue;
     } else {
       throw new TypeError(
@@ -377,6 +397,12 @@ export function createAssistantStreamArrayDeltaCommit(
 ): () => void {
   assertSafeAssistantStreamDelta(delta);
   const projection = createAssistantStreamDeltaProjection(true);
-  assertValidAssistantStreamArrayDelta(accumulator, delta, kind, projection);
+  assertValidAssistantStreamArrayDelta(
+    accumulator,
+    delta,
+    kind,
+    projection,
+    assertValidAssistantStreamDeltaIndices,
+  );
   return () => commitAssistantStreamArrayProjection(projection);
 }

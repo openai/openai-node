@@ -200,7 +200,7 @@ describe('AssistantStream delta index security', () => {
         return Reflect.ownKeys(target);
       },
     });
-    const events: AssistantStreamEvent[] = [
+    const events: Event[] = [
       {
         event: 'thread.run.step.created',
         data: {
@@ -208,7 +208,7 @@ describe('AssistantStream delta index security', () => {
           status: 'in_progress',
           step_details: { type: 'tool_calls', tool_calls: toolCalls },
         },
-      } as any,
+      },
     ];
 
     for (let index = 0; index < 2048; index += 1) {
@@ -230,9 +230,9 @@ describe('AssistantStream delta index security', () => {
             },
           },
         },
-      } as any);
+      });
     }
-    events.push(completedRun() as AssistantStreamEvent);
+    events.push(completedRun());
 
     const runner = unencodedAssistantStream(events);
     runner.on('runStepDelta', vi.fn());
