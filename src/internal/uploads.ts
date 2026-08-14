@@ -431,7 +431,7 @@ type FormEntry =
       key: string;
       value: Uploadable;
       data: unknown;
-      dispose: () => Promise<void>;
+      dispose: () => void;
       filename: string;
       kind: 'upload';
       streamingFile: boolean;
@@ -442,33 +442,18 @@ type MultipartEntry = FormEntry;
 
 type MultipartDataSnapshot = Readonly<{
   data: StreamingFileInput;
-  dispose: () => Promise<void>;
+  dispose: () => void;
 }>;
 
-function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnapshot {
-  const { getReader } = value as ReadableStream<BlobPart>;
-  if (typeof getReader === 'function') {
-    const reader = getReader.call(value);
-    let consumed = false;
-    return {
-      data: {
-        getReader() {
-          consumed = true;
-          return reader;
-        },
-      } as ReadableStream<BlobPart>,
-      async dispose() {
-        if (!consumed) {
-          try {
-            await reader.cancel();
-          } finally {
-            reader.releaseLock();
-          }
-        }
-      },
-    };
+function ignoreCleanupResult(cleanup: () => unknown): void {
+  try {
+    void Promise.resolve(cleanup()).catch(() => undefined);
+  } catch {
+    return;
   }
+}
 
+function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnapshot {
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
     const iterator = createIterator.call(value);
@@ -480,9 +465,32 @@ function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnap
           return iterator;
         },
       },
-      async dispose() {
+      dispose() {
         if (!consumed && typeof iterator.return === 'function') {
-          await iterator.return();
+          ignoreCleanupResult(() => iterator.return?.());
+        }
+      },
+    };
+  }
+
+  const { getReader } = value as ReadableStream<BlobPart>;
+  if (typeof getReader === 'function') {
+    const reader = getReader.call(value);
+    let consumed = false;
+    return {
+      data: {
+        getReader() {
+          consumed = true;
+          return reader;
+        },
+      } as ReadableStream<BlobPart>,
+      dispose() {
+        if (!consumed) {
+          try {
+            ignoreCleanupResult(() => reader.cancel());
+          } finally {
+            reader.releaseLock();
+          }
         }
       },
     };
@@ -504,7 +512,7 @@ function snapshotBlobData(value: Blob): MultipartDataSnapshot {
         yield await bytes;
       },
     },
-    dispose: () => Promise.resolve(),
+    dispose: () => undefined,
   };
 }
 
@@ -520,7 +528,7 @@ function snapshotResponseData(value: Response): MultipartDataSnapshot {
         yield await blob;
       },
     },
-    dispose: () => Promise.resolve(),
+    dispose: () => undefined,
   };
 }
 
@@ -546,7 +554,7 @@ async function* iterateMultipartBody(
   uploadableKinds: UploadableKinds,
 ): AsyncGenerator<Uint8Array> {
   const entries: MultipartEntry[] = [];
-  const pendingDisposals = new Set<() => Promise<void>>();
+  const pendingDisposals = new Set<() => void>();
 
   try {
     for await (const entry of iterateFormEntries(body, uploadableKinds, options)) {
@@ -579,7 +587,9 @@ async function* iterateMultipartBody(
     }
     yield encodeUTF8(`--${boundary}--\r\n`);
   } finally {
-    await Promise.allSettled(Array.from(pendingDisposals, (dispose) => dispose()));
+    for (const dispose of pendingDisposals) {
+      dispose();
+    }
   }
 }
 
