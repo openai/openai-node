@@ -33,6 +33,7 @@ fs.writeFileSync(file, contents);
 EOF
 fi
 
-./node_modules/.bin/oxfmt src/internal/assistant-stream-delta.ts tests/lib/assistant-stream-security.test.ts
-git diff -- src/internal/assistant-stream-delta.ts tests/lib/assistant-stream-security.test.ts
-exit 1
+# Generated tests are excluded from linting, so TypeScript performs the API
+# compatibility check against every historical resource test.
+./scripts/lint
+pnpm exec tsc
