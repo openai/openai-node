@@ -19,21 +19,27 @@ interface FakeNodeSocket {
   close: Mock;
 }
 
-vi.mock('ws', () => {
-  function WebSocket(url: URL, options: FakeNodeSocket['options']): FakeNodeSocket {
-    return {
-      url,
-      options,
-      on: vi.fn(),
-      send: vi.fn(),
-      close: vi.fn(),
-    };
-  }
-
-  return { WebSocket: vi.fn().mockImplementation(WebSocket) };
-});
+vi.mock('ws', () => ({ WebSocket: vi.fn() }));
 
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+let actualWebSocketConstructor: typeof WS.WebSocket | undefined;
+
+function CapturingWebSocket(url: URL, options: FakeNodeSocket['options']): FakeNodeSocket {
+  return {
+    url,
+    options,
+    on: vi.fn(),
+    send: vi.fn(),
+    close: vi.fn(),
+  };
+}
+
+function ActualWebSocket(url: URL, options: WS.ClientOptions): WS.WebSocket {
+  if (!actualWebSocketConstructor) {
+    throw new Error('Expected the real WebSocket constructor');
+  }
+  return new actualWebSocketConstructor(url, options);
+}
 
 function lastNodeSocket(): FakeNodeSocket {
   const [result] = nodeSocketConstructor.mock.results.slice(-1);
@@ -81,7 +87,9 @@ async function closeServers(...servers: ReturnType<typeof createServer>[]): Prom
 }
 
 beforeEach(() => {
-  nodeSocketConstructor.mockClear();
+  actualWebSocketConstructor = undefined;
+  nodeSocketConstructor.mockReset();
+  nodeSocketConstructor.mockImplementation(CapturingWebSocket);
 });
 
 afterEach(() => {
@@ -251,11 +259,8 @@ describe.each([
 
         redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
 
-        const actualWS = await vi.importActual<typeof WS>('ws');
-        function WebSocket(url: URL, options: WS.ClientOptions): WS.WebSocket {
-          return new actualWS.WebSocket(url, options);
-        }
-        nodeSocketConstructor.mockImplementationOnce(WebSocket);
+        actualWebSocketConstructor = (await vi.importActual<typeof WS>('ws')).WebSocket;
+        nodeSocketConstructor.mockImplementationOnce(ActualWebSocket);
 
         const client = new AzureOpenAI({
           apiVersion: '2024-10-01-preview',
@@ -324,11 +329,8 @@ describe.each([
 
       redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
 
-      const actualWS = await vi.importActual<typeof WS>('ws');
-      function WebSocket(url: URL, options: WS.ClientOptions): WS.WebSocket {
-        return new actualWS.WebSocket(url, options);
-      }
-      nodeSocketConstructor.mockImplementationOnce(WebSocket);
+      actualWebSocketConstructor = (await vi.importActual<typeof WS>('ws')).WebSocket;
+      nodeSocketConstructor.mockImplementationOnce(ActualWebSocket);
 
       const realtime = new Realtime(
         {
