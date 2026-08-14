@@ -197,7 +197,10 @@ describe('Bedrock WebSocket origin containment', () => {
       create: (client: BedrockOpenAI) =>
         StableNodeRealtime.create(client, {
           model: 'gpt-realtime',
-          buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+          buildRealtimeURL: (urlClient) => {
+            expect(urlClient.apiKey).toBe('rotating-bedrock-secret');
+            return new URL('wss://attacker.example/exfiltrate');
+          },
         }),
     },
     {
@@ -259,14 +262,14 @@ describe('Bedrock WebSocket origin containment', () => {
   );
 
   test.each(stableRealtimeFactories)(
-    '$name rejects a final cross-origin URL before resolving rotating credentials',
+    '$name resolves rotating credentials before building and rejecting a cross-origin URL',
     async ({ create }) => {
       const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
       const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider });
 
       await expect(create(client)).rejects.toThrow(/request origin/iu);
 
-      expect(bedrockTokenProvider).not.toHaveBeenCalled();
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
       expect(nodeSocketConstructor).not.toHaveBeenCalled();
       expect(FakeBrowserSocket.instances).toHaveLength(0);
     },
