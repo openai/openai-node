@@ -453,12 +453,20 @@ async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
   }
 }
 
-function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnapshot {
+function snapshotStreamingFileData(
+  value: StreamingFileInput,
+  snapshots: WeakMap<object, MultipartDataSnapshot>,
+): MultipartDataSnapshot {
+  const cached = snapshots.get(value);
+  if (cached) {
+    return cached;
+  }
+
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
     const iterator = createIterator.call(value);
     let consumed = false;
-    return {
+    const snapshot: MultipartDataSnapshot = {
       data: {
         [Symbol.asyncIterator]() {
           consumed = true;
@@ -467,25 +475,34 @@ function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnap
       },
       dispose() {
         if (!consumed) {
+          consumed = true;
           void ignoreCleanupResult(() => iterator.return?.());
         }
       },
     };
+    if (typeof globalThis.ReadableStream === 'function' && value instanceof globalThis.ReadableStream) {
+      snapshots.set(value, snapshot);
+    }
+    return snapshot;
   }
 
   const { getReader } = value as ReadableStream<BlobPart>;
   if (typeof getReader === 'function') {
     const reader = getReader.call(value);
     let consumed = false;
-    return {
+    const snapshot: MultipartDataSnapshot = {
       data: {
-        getReader() {
+        async *[Symbol.asyncIterator]() {
+          if (consumed) {
+            return;
+          }
           consumed = true;
-          return reader;
+          yield* ReadableStreamToAsyncIterable<BlobPart>({ getReader: () => reader });
         },
-      } as ReadableStream<BlobPart>,
+      },
       dispose() {
         if (!consumed) {
+          consumed = true;
           void ignoreCleanupResult(() => reader.cancel());
           try {
             reader.releaseLock();
@@ -495,15 +512,20 @@ function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnap
         }
       },
     };
+    snapshots.set(value, snapshot);
+    return snapshot;
   }
 
   throw new TypeError('Streaming file data must be an async iterable or readable stream');
 }
 
-function snapshotBlobData(value: Blob): MultipartDataSnapshot {
+function snapshotBlobData(
+  value: Blob,
+  snapshots: WeakMap<object, MultipartDataSnapshot>,
+): MultipartDataSnapshot {
   const { stream } = value as Blob & { stream?: Blob['stream'] };
   if (typeof stream === 'function') {
-    return snapshotStreamingFileData(stream.call(value) as ReadableStream<BlobPart>);
+    return snapshotStreamingFileData(stream.call(value) as ReadableStream<BlobPart>, snapshots);
   }
 
   const bytes = value.arrayBuffer();
@@ -516,9 +538,12 @@ function snapshotBlobData(value: Blob): MultipartDataSnapshot {
   };
 }
 
-function snapshotResponseData(value: Response): MultipartDataSnapshot {
+function snapshotResponseData(
+  value: Response,
+  snapshots: WeakMap<object, MultipartDataSnapshot>,
+): MultipartDataSnapshot {
   if (value.body) {
-    return snapshotStreamingFileData(value.body);
+    return snapshotStreamingFileData(value.body, snapshots);
   }
 
   const blob = value.blob();
@@ -554,9 +579,10 @@ async function* iterateMultipartBody(
 ): AsyncGenerator<Uint8Array> {
   const entries: MultipartEntry[] = [];
   const pendingDisposals = new Set<() => void>();
+  const snapshots = new WeakMap<object, MultipartDataSnapshot>();
 
   try {
-    for await (const entry of iterateFormEntries(body, uploadableKinds, options)) {
+    for await (const entry of iterateFormEntries(body, uploadableKinds, options, snapshots)) {
       if (entry.kind === 'upload' && entry.dispose) {
         pendingDisposals.add(entry.dispose);
       }
@@ -598,13 +624,14 @@ async function* iterateFormEntries(
   body: unknown,
   uploadableKinds: UploadableKinds,
   options: CreateFormOptions,
+  snapshots: WeakMap<object, MultipartDataSnapshot>,
 ): AsyncGenerator<FormEntry> {
   if (!body || typeof body !== 'object') {
     return;
   }
 
   for (const [key, value] of Object.entries(body)) {
-    yield* iterateFormValue(key, value, uploadableKinds, options);
+    yield* iterateFormValue(key, value, uploadableKinds, options, snapshots);
   }
 }
 
@@ -613,6 +640,7 @@ async function* iterateFormValue(
   value: unknown,
   uploadableKinds: UploadableKinds,
   options: CreateFormOptions,
+  snapshots: WeakMap<object, MultipartDataSnapshot>,
 ): AsyncGenerator<FormEntry> {
   if (value === undefined) {
     return;
@@ -636,13 +664,13 @@ async function* iterateFormValue(
     const type = getStreamingFileType(upload, streamingFile);
     let snapshot: MultipartDataSnapshot;
     if (streamingFile) {
-      snapshot = snapshotStreamingFileData((upload as StreamingFile).data);
+      snapshot = snapshotStreamingFileData((upload as StreamingFile).data, snapshots);
     } else if (upload instanceof Response) {
-      snapshot = snapshotResponseData(upload);
+      snapshot = snapshotResponseData(upload, snapshots);
     } else if (upload instanceof Blob) {
-      snapshot = snapshotBlobData(upload);
+      snapshot = snapshotBlobData(upload, snapshots);
     } else {
-      snapshot = snapshotStreamingFileData(upload as StreamingFileInput);
+      snapshot = snapshotStreamingFileData(upload as StreamingFileInput, snapshots);
     }
     yield {
       key,
@@ -656,11 +684,11 @@ async function* iterateFormValue(
     };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
-      yield* iterateFormValue(key + '[]', entry, uploadableKinds, options);
+      yield* iterateFormValue(key + '[]', entry, uploadableKinds, options, snapshots);
     }
   } else if (typeof value === 'object') {
     for (const [name, prop] of Object.entries(value)) {
-      yield* iterateFormValue(`${key}[${name}]`, prop, uploadableKinds, options);
+      yield* iterateFormValue(`${key}[${name}]`, prop, uploadableKinds, options, snapshots);
     }
   } else {
     throw new TypeError(

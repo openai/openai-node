@@ -134,6 +134,132 @@ describe('streaming multipart filename and header security', () => {
     expect(brandChecks).toBe(2);
   });
 
+  test('reuses a native readable stream shared by multiple multipart entries', async () => {
+    const stream = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue('shared stream bytes');
+        controller.close();
+      },
+    });
+
+    const options = await multipartFormRequestOptions({ body: { files: [stream, stream] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual(['shared stream bytes', '']);
+  });
+
+  test('reuses a shared readable stream that only exposes its reader protocol', async () => {
+    const stream = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue('shared reader bytes');
+        controller.close();
+      },
+    });
+    Object.defineProperty(stream, Symbol.asyncIterator, { value: undefined });
+
+    const options = await multipartFormRequestOptions({ body: { files: [stream, stream] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual(['shared reader bytes', '']);
+  });
+
+  test('reuses native readable data when a branded streaming file appears more than once', async () => {
+    const stream = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue('shared streaming file bytes');
+        controller.close();
+      },
+    });
+    const upload = toStreamingFile(stream, 'shared.txt');
+
+    const options = await multipartFormRequestOptions({ body: { files: [upload, upload] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    expect(files.map((file) => file.name)).toEqual(['shared.txt', 'shared.txt']);
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'shared streaming file bytes',
+      '',
+    ]);
+  });
+
+  test('reuses the readable body shared by separate multipart response uploads', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('shared response bytes'));
+        controller.close();
+      },
+    });
+    const first = new Response(stream);
+    const second = new Response(stream);
+
+    expect(first.body).toBe(second.body);
+
+    const options = await multipartFormRequestOptions(
+      { body: { files: [first, second], trigger: chunks('streaming trigger bytes') } },
+      fetch,
+    );
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'shared response bytes',
+      '',
+    ]);
+  });
+
+  test('captures a fresh iterator for each occurrence of a reusable async iterable', async () => {
+    const createIterator = vi.fn(() => chunks('reusable iterable bytes'));
+    const reusable = { [Symbol.asyncIterator]: createIterator };
+
+    const options = await multipartFormRequestOptions({ body: { files: [reusable, reusable] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'reusable iterable bytes',
+      'reusable iterable bytes',
+    ]);
+    expect(createIterator).toHaveBeenCalledTimes(2);
+  });
+
+  test('streams all bytes for each occurrence of a reusable named blob', async () => {
+    const blob = Object.assign(new Blob(['reusable blob bytes']), { name: 'reusable.txt' });
+
+    const options = await multipartFormRequestOptions(
+      { body: { files: [blob, blob], trigger: chunks('streaming trigger bytes') } },
+      fetch,
+    );
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    expect(files.map((file) => file.name)).toEqual(['reusable.txt', 'reusable.txt']);
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'reusable blob bytes',
+      'reusable blob bytes',
+    ]);
+  });
+
   test('snapshots earlier streaming metadata before reading later mutable filenames', async () => {
     const earlier = toStreamingFile(chunks('original earlier bytes'), 'earlier.png', {
       type: 'image/original',
@@ -281,6 +407,29 @@ describe('streaming multipart filename and header security', () => {
     expect(getReader).not.toHaveBeenCalled();
   });
 
+  test('recaptures reusable async iterators without reading incidental reader accessors', async () => {
+    const createIterator = vi.fn(() => chunks('reusable hybrid bytes'));
+    const getReader = vi.fn(() => {
+      throw new Error('incidental reader accessor was read');
+    });
+    const hybrid = { [Symbol.asyncIterator]: createIterator };
+    Object.defineProperty(hybrid, 'getReader', { get: getReader });
+
+    const options = await multipartFormRequestOptions({ body: { files: [hybrid, hybrid] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'reusable hybrid bytes',
+      'reusable hybrid bytes',
+    ]);
+    expect(createIterator).toHaveBeenCalledTimes(2);
+    expect(getReader).not.toHaveBeenCalled();
+  });
+
   test('does not await unconsumed stream cleanup before reporting an invalid filename', async () => {
     const never = new ReadableStream<void>().getReader().closed;
     const cancel = vi.fn(() => never);
@@ -345,6 +494,24 @@ describe('streaming multipart filename and header security', () => {
     Object.defineProperty(later, 'name', { value: { toString: vi.fn() } });
 
     const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+    const reader = (options.body as ReadableStream).getReader();
+
+    await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(stream.locked).toBe(false);
+  });
+
+  test('disposes a shared preflight readable once when a later filename is invalid', async () => {
+    const cancel = vi.fn();
+    const stream = new ReadableStream<string>({ cancel });
+    const shared = toStreamingFile(stream, 'shared.txt');
+    const later = toStreamingFile(chunks('later bytes'), 'later.txt');
+    Object.defineProperty(later, 'name', { value: { toString: vi.fn() } });
+
+    const options = await multipartFormRequestOptions(
+      { body: { first: stream, second: shared, later } },
+      fetch,
+    );
     const reader = (options.body as ReadableStream).getReader();
 
     await expect(reader.read()).rejects.toThrow(/file.?name/iu);
