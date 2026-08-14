@@ -100,8 +100,7 @@ function getAssistantStreamDeltaIndex(
     !Number.isSafeInteger(index) ||
     (index as number) < 0 ||
     (index as number) >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH ||
-    (!enforceSparseHoleBudget &&
-      (index as number) >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH)
+    (!enforceSparseHoleBudget && (index as number) >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH)
   ) {
     throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
   }
@@ -120,20 +119,14 @@ function assertValidAssistantStreamArrayDelta(
   if (!projectedArray) {
     const enforceSparseHoleBudget =
       projection.cacheArrays && !externallyMutableAssistantStreamValues.has(accumulator);
-    const cachedState = enforceSparseHoleBudget
-      ? assistantStreamArrayStates.get(accumulator)
-      : undefined;
+    const cachedState = enforceSparseHoleBudget ? assistantStreamArrayStates.get(accumulator) : undefined;
     projectedArray = {
       baselineLength: accumulator.length,
       cacheable: enforceSparseHoleBudget,
       enforceSparseHoleBudget,
       entries: new Map(),
       length: accumulator.length,
-      ownEntryCount: getAssistantStreamArrayOwnEntryCount(
-        accumulator,
-        enforceSparseHoleBudget,
-        cachedState,
-      ),
+      ownEntryCount: getAssistantStreamArrayOwnEntryCount(accumulator, enforceSparseHoleBudget, cachedState),
     };
     projection.arrays.set(accumulator, projectedArray);
   }
