@@ -13,8 +13,8 @@ type Listener = (...args: any[]) => void;
 export class NodeWebSocket implements WebSocketLike {
   private _ws: WS.WebSocket;
 
-  /** Maps `(event, originalListener)` -> wrapped listener for correct `off()` removal. */
-  private _listenerMap = new Map<string, Map<Listener, Listener>>();
+  /** Maps `(event, originalListener)` to every wrapped registration in listener order. */
+  private _listenerMap = new Map<string, Map<Listener, Listener[]>>();
 
   /** Wraps an existing socket created by the optional `ws` package. */
   constructor(ws: WS.WebSocket) {
@@ -44,35 +44,71 @@ export class NodeWebSocket implements WebSocketLike {
   /** Registers a listener with normalized message payloads and close reasons. */
   on(event: string, listener: Listener): void {
     const wrapped = NodeWebSocket._wrapListener(event, listener);
-    this._listenersFor(event).set(listener, wrapped);
-    this._ws.on(event, wrapped);
+    this._registerListener(event, listener, wrapped);
   }
 
   /** Removes the platform listener associated with the original callback. */
   off(event: string, listener: Listener): void {
-    const byListener = this._listenerMap.get(event);
-    if (!byListener) {
+    const wrappedListeners = this._listenerMap.get(event)?.get(listener);
+    const [wrapped] = wrappedListeners?.slice(-1) ?? [];
+    if (!wrapped) {
       return;
     }
-    const wrapped = byListener.get(listener);
-    if (wrapped) {
-      byListener.delete(listener);
-      this._ws.removeListener(event, wrapped);
-    }
+
+    this._removeListener(event, listener, wrapped);
   }
 
   /** Registers a listener that is removed before it handles its first event. */
   once(event: string, listener: Listener): void {
-    const onceListener: Listener = (...args) => {
-      this.off(event, listener);
+    let fired = false;
+    const wrapped = NodeWebSocket._wrapListener(event, (...args) => {
+      if (fired) {
+        return;
+      }
+
+      fired = true;
+      this._removeListener(event, listener, wrapped);
       listener(...args);
-    };
-    const wrapped = NodeWebSocket._wrapListener(event, onceListener);
-    this._listenersFor(event).set(listener, wrapped);
+    });
+    this._registerListener(event, listener, wrapped);
+  }
+
+  private _registerListener(event: string, listener: Listener, wrapped: Listener): void {
+    const byListener = this._listenersFor(event);
+    const wrappedListeners = byListener.get(listener);
+    if (wrappedListeners) {
+      wrappedListeners.push(wrapped);
+    } else {
+      byListener.set(listener, [wrapped]);
+    }
+
     this._ws.on(event, wrapped);
   }
 
-  private _listenersFor(event: string): Map<Listener, Listener> {
+  private _removeListener(event: string, listener: Listener, wrapped: Listener): void {
+    const byListener = this._listenerMap.get(event);
+    const wrappedListeners = byListener?.get(listener);
+    if (!byListener || !wrappedListeners) {
+      return;
+    }
+
+    const index = wrappedListeners.lastIndexOf(wrapped);
+    if (index === -1) {
+      return;
+    }
+
+    wrappedListeners.splice(index, 1);
+    if (wrappedListeners.length === 0) {
+      byListener.delete(listener);
+    }
+    if (byListener.size === 0) {
+      this._listenerMap.delete(event);
+    }
+
+    this._ws.removeListener(event, wrapped);
+  }
+
+  private _listenersFor(event: string): Map<Listener, Listener[]> {
     let map = this._listenerMap.get(event);
     if (!map) {
       map = new Map();
