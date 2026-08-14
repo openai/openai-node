@@ -22,7 +22,6 @@ async function main() {
       type: 'session.update',
       session: {
         output_modalities: ['text'],
-        model: 'gpt-4o-realtime-preview',
         type: 'realtime',
       },
     });
