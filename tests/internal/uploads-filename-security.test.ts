@@ -85,7 +85,7 @@ describe('streaming multipart filename security', () => {
         [Symbol.asyncIterator]: { value: incidentalIterator },
       });
       const hostile = withStatefulBrand(upload, [false, true]);
-  
+
       const options = await maybeMultipartFormRequestOptions(
         { body: { secret: 'metadata', earlier, upload: hostile } },
         fetch,
@@ -96,11 +96,11 @@ describe('streaming multipart filename security', () => {
           emitted.push(value);
         }
       });
-  
+
       await expect(firstRead).rejects.toThrow(/file.?name/iu);
       expect(emitted).toEqual([]);
       expect(readEarlier).not.toHaveBeenCalled();
-        expect(incidentalIterator).not.toHaveBeenCalled();
+      expect(incidentalIterator).not.toHaveBeenCalled();
     },
   );
 
