@@ -194,13 +194,13 @@ describe('ResponseAccumulator output and content events', () => {
     });
   });
 
-  test('preserves existing output, content, and summary append behavior when events are replayed', () => {
+  test('appends output, content, and summary at their declared contiguous indices', () => {
     const outputSnapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
     const replayedOutput = { type: 'function_call', id: 'replayed', arguments: '' };
 
     applyEvent(outputSnapshot, {
       type: 'response.output_item.added',
-      output_index: 0,
+      output_index: 1,
       item: replayedOutput,
     });
 
@@ -216,7 +216,7 @@ describe('ResponseAccumulator output and content events', () => {
     applyEvent(contentSnapshot, {
       type: 'response.content_part.added',
       output_index: 0,
-      content_index: 0,
+      content_index: 1,
       part: replayedContent,
     });
 
@@ -233,7 +233,7 @@ describe('ResponseAccumulator output and content events', () => {
     applyEvent(summarySnapshot, {
       type: 'response.reasoning_summary_part.added',
       output_index: 0,
-      summary_index: 0,
+      summary_index: 1,
       part: replayedSummary,
     });
 
@@ -694,6 +694,54 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
 
     expect(annotations).toHaveLength(0);
     expect(Object.getPrototypeOf(annotations)).toBe(Array.prototype);
+  });
+
+  test.each([
+    ['output', 'response.output_item.added', 'output_index'],
+    ['content', 'response.content_part.added', 'content_index'],
+    ['summary', 'response.reasoning_summary_part.added', 'summary_index'],
+  ])('rejects inherited numeric setters at the declared %s append position', (kind, type, indexField) => {
+    const snapshot =
+      kind === 'output'
+        ? snapshotFor({ type: 'function_call', id: 'original', arguments: '' })
+        : snapshotFor({
+            type: kind === 'summary' ? 'reasoning' : 'message',
+            content: kind === 'content' ? [{ type: 'output_text', text: 'original', annotations: [] }] : [],
+            summary: kind === 'summary' ? [{ type: 'summary_text', text: 'original' }] : [],
+          });
+    const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
+    const collection =
+      kind === 'output' ? snapshot.output : kind === 'content' ? output.content : output.summary;
+    let inheritedSetterCalled = false;
+    const collectionPrototype = Object.create(Array.prototype) as object;
+    Object.defineProperty(collectionPrototype, 1, {
+      configurable: true,
+      get() {
+        return null;
+      },
+      set() {
+        inheritedSetterCalled = true;
+      },
+    });
+    Object.setPrototypeOf(collection, collectionPrototype);
+
+    expect(() =>
+      applyEvent(snapshot, {
+        type,
+        output_index: 0,
+        [indexField]: 1,
+        item: { type: 'function_call', id: 'injected', arguments: '' },
+        part: {
+          type: kind === 'summary' ? 'summary_text' : 'output_text',
+          text: 'injected',
+          annotations: [],
+        },
+      }),
+    ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index 1`);
+
+    expect(inheritedSetterCalled).toBe(false);
+    expect(collection).toHaveLength(1);
+    expect(hasOwn(collection, 1)).toBe(false);
   });
 
   test('rejects inherited numeric setters before appending annotations', () => {
