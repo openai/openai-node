@@ -542,10 +542,16 @@ async function* iterateFormValue(
   if (uploadKind) {
     const upload = value as Uploadable;
     const streamingFile = uploadKind === 'streaming-file';
+    let data: unknown = upload;
+    if (streamingFile) {
+      data = snapshotStreamingFileData((upload as StreamingFile).data);
+    } else if (uploadKind === 'streaming-upload') {
+      data = snapshotStreamingFileData(upload as StreamingFileInput);
+    }
     yield {
       key,
       value: upload,
-      data: streamingFile ? snapshotStreamingFileData((upload as StreamingFile).data) : upload,
+      data,
       kind: 'upload',
       streamingFile,
       type: getStreamingFileType(upload, streamingFile),
