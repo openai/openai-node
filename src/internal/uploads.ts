@@ -442,7 +442,7 @@ type MultipartEntry = FormEntry;
 
 type MultipartDataSnapshot = Readonly<{
   data: StreamingFileInput;
-  dispose: () => void;
+  dispose?: (() => void) | undefined;
 }>;
 
 async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
