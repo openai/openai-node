@@ -156,6 +156,34 @@ describe('streaming multipart filename and header security', () => {
     expect(getLaterFilename).toHaveBeenCalledTimes(1);
   });
 
+  test('snapshots streaming byte-source behavior before reading later filenames', async () => {
+    const originalIterator = vi.fn(() => chunks('original earlier bytes'));
+    const substitutedIterator = vi.fn(() => chunks('substituted earlier bytes'));
+    const data = { [Symbol.asyncIterator]: originalIterator };
+    const earlier = toStreamingFile(data, 'earlier.png');
+    const later = toStreamingFile(chunks('later bytes'), 'later.png');
+    Object.defineProperty(later, 'name', {
+      get() {
+        Object.defineProperty(data, Symbol.asyncIterator, { value: substitutedIterator });
+        return 'later.png';
+      },
+    });
+
+    const options = await multipartFormRequestOptions({ body: { files: [earlier, later] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'original earlier bytes',
+      'later bytes',
+    ]);
+    expect(originalIterator).toHaveBeenCalledTimes(1);
+    expect(substitutedIterator).not.toHaveBeenCalled();
+  });
+
   test('streams valid branded async-iterable files lazily using one filename snapshot per entry', async () => {
     const readChunk = vi.fn();
     const replace = vi.fn();
@@ -207,6 +235,7 @@ describe('streaming multipart filename and header security', () => {
   test.each([
     ['an absolute POSIX path', '/Users/alice/private/report.txt', 'report.txt'],
     ['an absolute Windows path', 'C:\\Users\\alice\\private\\report.txt', 'report.txt'],
+    ['a drive-relative Windows path', 'C:private-report.txt', 'private-report.txt'],
     ['a nested relative path', 'private/nested/report.txt', 'report.txt'],
     ['mixed path separators', 'private\\nested/deeper\\report.txt', 'report.txt'],
     ['a plain filename', 'report.txt', 'report.txt'],
