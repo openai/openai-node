@@ -142,11 +142,7 @@ function assertValidAssistantStreamArrayDelta(
       throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
     }
 
-    const validatedIndex = getAssistantStreamDeltaIndex(
-      deltaEntry,
-      kind,
-      projectedArray.baselineLength,
-    );
+    const validatedIndex = getAssistantStreamDeltaIndex(deltaEntry, kind, projectedArray.baselineLength);
     let accumulatedEntry: unknown;
 
     if (projectedArray.entries.has(validatedIndex)) {
