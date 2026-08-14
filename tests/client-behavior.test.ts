@@ -126,6 +126,34 @@ describe('OpenAI client request behavior', () => {
     }
   });
 
+  test('prefers retry-after-ms over retry-after even when retry-after-ms is zero', async () => {
+    const parseDate = vi.spyOn(Date, 'parse');
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { error: { message: 'rate limited' } },
+          {
+            status: 429,
+            headers: {
+              'retry-after-ms': '0',
+              'retry-after': new Date(0).toUTCString(),
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(jsonResponse({ recovered: true }));
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+
+    try {
+      await expect(client.get('/items')).resolves.toEqual({ recovered: true });
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(parseDate).not.toHaveBeenCalled();
+    } finally {
+      parseDate.mockRestore();
+    }
+  });
+
   test.each([
     [new Error('network unavailable'), APIConnectionError],
     [new Error('connection timed out'), APIConnectionTimeoutError],
