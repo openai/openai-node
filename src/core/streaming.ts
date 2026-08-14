@@ -61,15 +61,12 @@ export class Stream<Item> implements AsyncIterable<Item> {
       }
       consumed = true;
       let done = false;
+      let receivedCompletionSentinel = false;
       try {
         for await (const sse of _iterSSEMessages(response, controller)) {
-          if (done) {
-            continue;
-          }
-
           if (sse.data.startsWith('[DONE]')) {
-            done = true;
-            continue;
+            receivedCompletionSentinel = true;
+            break;
           }
 
           if (sse.event === null || !sse.event.startsWith('thread.')) {
@@ -106,8 +103,8 @@ export class Stream<Item> implements AsyncIterable<Item> {
         }
         done = true;
       } catch (e) {
-        // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (isAbortError(e)) {
+        // Abort errors and cleanup failures after the completion sentinel are non-fatal.
+        if (receivedCompletionSentinel || isAbortError(e)) {
           return;
         }
         throw e;
