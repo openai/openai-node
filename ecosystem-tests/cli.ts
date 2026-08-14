@@ -248,13 +248,12 @@ let state: Args & { rootDir: string };
 type ChildOutputChunk = { dest: 'stdout' | 'stderr'; data: string | Buffer };
 
 async function main() {
-  if (!process.env['OPENAI_API_KEY']) {
-    console.error(`Error: The environment variable OPENAI_API_KEY must be set. Run the command
-  $echo 'OPENAI_API_KEY = "'"\${OPENAI_API_KEY}"'"' >> ecosystem-tests/cloudflare-worker/wrangler.toml`);
-    process.exit(0);
+  const args = (await parseArgs()) as Args;
+
+  if ((args.live || args.deploy) && !process.env['OPENAI_API_KEY']) {
+    throw new Error('The environment variable OPENAI_API_KEY must be set when using --live or --deploy.');
   }
 
-  const args = (await parseArgs()) as Args;
   console.error(`args:`, args);
 
   // Some projects, e.g. Deno can be slow to run, so offer the option to skip them. Example:
