@@ -527,7 +527,8 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
 }
 
 function escapeHeaderValue(value: string): string {
-  return value.replace(/["\\\r\n]/g, (character) => encodeURIComponent(character));
+  // oxlint-disable-next-line eslint/no-control-regex -- multipart quoted parameters must escape C0 and DEL.
+  return value.replace(/["\\\u0000-\u001F\u007F]/g, (character) => encodeURIComponent(character));
 }
 
 const addFormValue = async (

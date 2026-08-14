@@ -598,6 +598,75 @@ describe('lazy multipart stream encoding', () => {
     expect(body).not.toContain('/Users/alice/private/');
   });
 
+  test('percent-encodes every C0 control and DEL while preserving existing escapes and Unicode', async () => {
+    async function* chunks() {
+      yield 'streamed contents';
+    }
+
+    const controls = Array.from({ length: 32 }, (_, codePoint) => String.fromCodePoint(codePoint)).join('');
+    const escapedControls = Array.from(
+      { length: 32 },
+      (_, codePoint) => `%${codePoint.toString(16).toUpperCase().padStart(2, '0')}`,
+    ).join('');
+    const fieldName = `field"${controls}\u007F\\résumé`;
+    const filename = `résumé"${controls}\u007F東京🎵.txt`;
+
+    const options = await multipartFormRequestOptions(
+      { body: { [fieldName]: toStreamingFile(chunks(), filename) } },
+      fetch,
+    );
+    const body = await new Response(options.body as ReadableStream).text();
+
+    expect(body).toContain(
+      `Content-Disposition: form-data; name="field%22${escapedControls}%7F%5Crésumé"; filename="résumé%22${escapedControls}%7F東京🎵.txt"\r\n`,
+    );
+  });
+
+  test.each([
+    ['NUL', '\0', '%00'],
+    ['a non-newline C0 control', '\u0001', '%01'],
+    ['HTAB', '\t', '%09'],
+    ['the highest C0 control', '\u001F', '%1F'],
+    ['DEL', '\u007F', '%7F'],
+  ] as const)(
+    'serializes and parses branded streaming filenames and field names containing %s',
+    async (_, control, escaped) => {
+      async function* chunks() {
+        yield 'streamed contents';
+      }
+
+      const fileField = `upload${control}résumé`;
+      const metadataField = `note${control}東京`;
+      const filename = `résumé${control}東京🎵.txt`;
+      const options = await multipartFormRequestOptions(
+        {
+          body: {
+            [fileField]: toStreamingFile(chunks(), filename),
+            [metadataField]: 'safe metadata',
+          },
+        },
+        fetch,
+      );
+      const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+      const body = await new Response(options.body as ReadableStream).text();
+
+      expect(body).toContain(
+        `Content-Disposition: form-data; name="upload${escaped}résumé"; filename="résumé${escaped}東京🎵.txt"\r\n`,
+      );
+      expect(body).toContain(`name="note${escaped}東京"\r\n\r\nsafe metadata`);
+      expect(body).not.toContain(control);
+
+      const form = await new Response(body, {
+        headers: { 'content-type': contentType },
+      }).formData();
+      const uploaded = form.get(`upload${escaped}résumé`) as File;
+
+      expect(uploaded.name).toBe(`résumé${escaped}東京🎵.txt`);
+      await expect(uploaded.text()).resolves.toBe('streamed contents');
+      expect(form.get(`note${escaped}東京`)).toBe('safe metadata');
+    },
+  );
+
   test('sends only the streaming filename basename through the public transcription API', async () => {
     async function* chunks() {
       yield 'sensitive audio bytes';
@@ -670,6 +739,63 @@ describe('lazy multipart stream encoding', () => {
     expect(body).toContain('filename="stream.txt"');
     expect(body).not.toContain('my-skill/SKILL.md');
   });
+
+  test.each([
+    ['NUL', '\0', '%00'],
+    ['a non-newline C0 control', '\u0001', '%01'],
+    ['DEL', '\u007F', '%7F'],
+  ] as const)(
+    'serializes and parses %s in mixed native files, foreign named blobs, and streaming files',
+    async (_, control, escaped) => {
+      async function* chunks() {
+        yield 'streamed contents';
+      }
+
+      const filesField = `files${control}`;
+      const purposeField = `purpose${control}`;
+      const foreignBlob = Object.assign(new Blob(['foreign contents']), {
+        name: `foreign${control}東京.txt`,
+      });
+      const options = await maybeMultipartFormRequestOptions(
+        {
+          body: {
+            [filesField]: [
+              new File(['native contents'], `native${control}résumé.txt`),
+              foreignBlob,
+              toStreamingFile(chunks(), `stream${control}🎵.txt`),
+            ],
+            [purposeField]: 'assistants',
+          },
+        },
+        fetch,
+      );
+      const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+      const body = await new Response(options.body as ReadableStream).text();
+
+      expect(body).toContain(`name="files${escaped}[]"; filename="native${escaped}résumé.txt"`);
+      expect(body).toContain(`name="files${escaped}[]"; filename="foreign${escaped}東京.txt"`);
+      expect(body).toContain(`name="files${escaped}[]"; filename="stream${escaped}🎵.txt"`);
+      expect(body).toContain(`name="purpose${escaped}"\r\n\r\nassistants`);
+      expect(body).not.toContain(control);
+
+      const form = await new Response(body, {
+        headers: { 'content-type': contentType },
+      }).formData();
+      const files = form.getAll(`files${escaped}[]`) as File[];
+
+      expect(files.map((file) => file.name)).toEqual([
+        `native${escaped}résumé.txt`,
+        `foreign${escaped}東京.txt`,
+        `stream${escaped}🎵.txt`,
+      ]);
+      await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+        'native contents',
+        'foreign contents',
+        'streamed contents',
+      ]);
+      expect(form.get(`purpose${escaped}`)).toBe('assistants');
+    },
+  );
 
   test.each([
     ['conditional multipart', maybeMultipartFormRequestOptions],
