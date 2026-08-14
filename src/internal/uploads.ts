@@ -183,7 +183,8 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
 }
 
 function basename(value: string): string | undefined {
-  return value.split(/[\\/]/).pop()?.replace(/^[A-Za-z]:/, '') || undefined;
+  const name = value.split(/[\\/]/).pop()?.replace(/^[A-Za-z]:/, '');
+  return name || undefined;
 }
 
 function normalizeFilenamePath(value: string): string {
@@ -437,16 +438,15 @@ type MultipartEntry =
   | (Extract<FormEntry, { kind: 'upload' }> & Readonly<{ filename: string }>);
 
 function snapshotStreamingFileData(value: StreamingFileInput): StreamingFileInput {
-  const readable = value as ReadableStream<BlobPart>;
-  const { getReader } = readable;
+  const { getReader } = value as ReadableStream<BlobPart>;
   if (typeof getReader === 'function') {
-    return { getReader: getReader.bind(readable) } as ReadableStream<BlobPart>;
+    const snapshot = { getReader: getReader.bind(value) };
+    return snapshot as ReadableStream<BlobPart>;
   }
 
-  const iterable = value as AsyncIterable<BlobPart>;
-  const createIterator = iterable[Symbol.asyncIterator];
+  const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
-    return { [Symbol.asyncIterator]: createIterator.bind(iterable) };
+    return { [Symbol.asyncIterator]: createIterator.bind(value) };
   }
 
   throw new TypeError('Streaming file data must be an async iterable or readable stream');
