@@ -334,6 +334,8 @@ const DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES = 3;
  */
 async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGenerator<Uint8Array> {
   let data = new Uint8Array();
+  let dataStart = 0;
+  let dataEnd = 0;
   let searchStartIndex = 0;
 
   for await (const chunk of iterator) {
@@ -350,24 +352,39 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
       binaryChunk = chunk;
     }
 
-    const newData = new Uint8Array(data.length + binaryChunk.length);
-    newData.set(data);
-    newData.set(binaryChunk, data.length);
-    data = newData;
+    if (dataEnd + binaryChunk.length > data.length) {
+      const bufferedLength = dataEnd - dataStart;
 
-    let patternIndex;
-    while ((patternIndex = findDoubleNewlineIndex(data.subarray(searchStartIndex))) !== -1) {
-      patternIndex += searchStartIndex;
-      yield data.slice(0, patternIndex);
-      data = data.slice(patternIndex);
-      searchStartIndex = 0;
+      // Compact only when it reclaims substantial space without moving a large live tail repeatedly.
+      if (dataStart >= data.length / 2 && bufferedLength + binaryChunk.length <= data.length) {
+        data.copyWithin(0, dataStart, dataEnd);
+      } else {
+        const newData = new Uint8Array(Math.max(data.length * 2, bufferedLength + binaryChunk.length));
+        newData.set(data.subarray(dataStart, dataEnd));
+        data = newData;
+      }
+
+      searchStartIndex -= dataStart;
+      dataStart = 0;
+      dataEnd = bufferedLength;
     }
 
-    searchStartIndex = Math.max(0, data.length - DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES);
+    data.set(binaryChunk, dataEnd);
+    dataEnd += binaryChunk.length;
+
+    let patternIndex;
+    while ((patternIndex = findDoubleNewlineIndex(data.subarray(searchStartIndex, dataEnd))) !== -1) {
+      patternIndex += searchStartIndex;
+      yield data.slice(dataStart, patternIndex);
+      dataStart = patternIndex;
+      searchStartIndex = dataStart;
+    }
+
+    searchStartIndex = Math.max(dataStart, dataEnd - DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES);
   }
 
-  if (data.length > 0) {
-    yield data;
+  if (dataEnd > dataStart) {
+    yield data.slice(dataStart, dataEnd);
   }
 }
 

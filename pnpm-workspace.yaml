@@ -2,6 +2,8 @@ packages:
   - examples
   - '!ecosystem-tests/**'
 
+scriptShell: bash
+
 minimumReleaseAge: 11520
 minimumReleaseAgeStrict: true
 trustPolicy: no-downgrade

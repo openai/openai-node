@@ -484,6 +484,70 @@ describe('_iterSSEMessages', () => {
     }
   });
 
+  test('copies fragmented SSE data a linear number of times', async () => {
+    const payload = 'x'.repeat(4096);
+    const event = encoder.encode(`data: ${payload}\n\n`);
+    const response = new Response(ReadableStreamFrom(Array.from(event, (byte) => Uint8Array.of(byte))));
+    const copyBytes = vi.spyOn(Uint8Array.prototype, 'set');
+
+    try {
+      await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+        { event: null, data: payload },
+      ]);
+
+      const copiedBytes = copyBytes.mock.calls.reduce((total, [source]) => total + source.length, 0);
+      expect(copiedBytes).toBeLessThan(event.byteLength * 8);
+    } finally {
+      copyBytes.mockRestore();
+    }
+  });
+
+  test('compacts consumed prefixes without overwriting retained SSE frames', async () => {
+    const firstFrame = encoder.encode('data: first\r\n\r\n');
+    const response = new Response(
+      ReadableStreamFrom([
+        encoder.encode('data: first\r\n\r\ndata: second\r\n\r'),
+        encoder.encode('\n'),
+        encoder.encode('data: third\r\n\r\n'),
+      ]),
+    );
+    const compactBytes = vi.spyOn(Uint8Array.prototype, 'copyWithin');
+    const decodeLines = vi.spyOn(lineDecoders.LineDecoder.prototype, 'decode');
+
+    try {
+      await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+        { event: null, data: 'first' },
+        { event: null, data: 'second' },
+        { event: null, data: 'third' },
+      ]);
+
+      expect(compactBytes).toHaveBeenCalled();
+      expect(decodeLines.mock.calls[0]?.[0]).toEqual(firstFrame);
+    } finally {
+      decodeLines.mockRestore();
+      compactBytes.mockRestore();
+    }
+  });
+
+  test('does not compact a large live event to reclaim a small consumed prefix', async () => {
+    const payload = 'x'.repeat(4096);
+    const response = new Response(
+      ReadableStreamFrom([encoder.encode(`data: first\n\ndata: ${payload}`), encoder.encode('\n\n')]),
+    );
+    const compactBytes = vi.spyOn(Uint8Array.prototype, 'copyWithin');
+
+    try {
+      await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+        { event: null, data: 'first' },
+        { event: null, data: payload },
+      ]);
+
+      expect(compactBytes).not.toHaveBeenCalled();
+    } finally {
+      compactBytes.mockRestore();
+    }
+  });
+
   test('ignores an SSE message that ends without its required blank-line delimiter', async () => {
     const response = responseForSSE('data: {"flushed":true}\n');
 
