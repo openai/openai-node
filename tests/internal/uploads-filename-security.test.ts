@@ -233,6 +233,27 @@ describe('streaming multipart filename and header security', () => {
     await expect((form.get('later') as File).text()).resolves.toBe('later bytes');
   });
 
+  test('captures a filename before its iterator factory can mutate it', async () => {
+    let upload: ReturnType<typeof toStreamingFile>;
+    const source = {
+      [Symbol.asyncIterator]() {
+        Object.defineProperty(upload, 'name', { value: 'substituted.txt' });
+        return chunks('upload bytes')[Symbol.asyncIterator]();
+      },
+    };
+    upload = toStreamingFile(source, 'original.txt');
+
+    const options = await multipartFormRequestOptions({ body: { upload } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const file = form.get('upload') as File;
+
+    expect(file.name).toBe('original.txt');
+    await expect(file.text()).resolves.toBe('upload bytes');
+  });
+
   test('releases preflight readers when a later filename is invalid', async () => {
     const cancel = vi.fn();
     const stream = new ReadableStream<string>({ cancel });
