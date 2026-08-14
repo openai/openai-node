@@ -234,7 +234,6 @@ describe('AssistantStream delta index security', () => {
     expect(Object.getOwnPropertyDescriptor(entries, 1)).toBeDefined();
     expect(entries[1]).toEqual({ index: 1, text: 'second' });
   });
-
 });
 
 describe('AssistantStream message index security', () => {
@@ -466,7 +465,6 @@ describe('AssistantStream message index security', () => {
     expect(content[1023]?.['text'].value).toBe('first');
     expect(hasOwn(content, 2047)).toBe(false);
   });
-
 });
 
 describe('AssistantStream run-step index security', () => {
@@ -578,5 +576,4 @@ describe('AssistantStream run-step index security', () => {
       expect(hasOwn(details.tool_calls, 2047)).toBe(false);
     }
   });
-
 });
