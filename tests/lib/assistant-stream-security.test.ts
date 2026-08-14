@@ -495,5 +495,4 @@ describe('AssistantStream run-step index security', () => {
     expect((failure as Error).message).toContain('invalid array index');
     expect(argumentsAfterDelta).toBe('original');
   });
-
 });
