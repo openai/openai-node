@@ -21,6 +21,12 @@ $ PNPM_VERSION=$(node -p "require('./package.json').packageManager.replace(/^pnp
 $ npm install --global "pnpm@$PNPM_VERSION"
 ```
 
+### Windows shell requirements
+
+The repository's pnpm scripts use Bash. On Windows, install [Git for Windows](https://git-scm.com/download/win)
+and run the development commands from Git Bash, where `bash` is available on `PATH`. If you run pnpm from
+PowerShell instead, add the Git for Windows `bin` directory that contains `bash.exe` to `PATH` first.
+
 To set up the repository, run:
 
 ```sh
@@ -44,7 +50,7 @@ All files in the `examples/` directory are not modified by the generator and can
 // add an example to examples/<category>/<your-example>.ts
 
 #!/usr/bin/env -S npm run tsn -- -T
-…
+?
 ```
 
 ```sh
@@ -55,7 +61,7 @@ $ npm run tsn -- -T examples/<category>/<your-example>.ts
 
 ## Using the repository from source
 
-If you’d like to use the repository from source, you can either install from git or link to a cloned repository:
+If you?d like to use the repository from source, you can either install from git or link to a cloned repository:
 
 To install via git:
 
