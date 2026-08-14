@@ -113,7 +113,7 @@ describe('streaming multipart filename security', () => {
       const hostile = withStatefulBrand(upload, [false, true]);
 
       const form = await parseMultipart(
-      await maybeMultipartFormRequestOptions({ body: { upload: hostile } }, fetch),
+        await maybeMultipartFormRequestOptions({ body: { upload: hostile } }, fetch),
       );
       const file = form.get('upload') as File;
 
