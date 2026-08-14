@@ -706,58 +706,58 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
   ])(
     'rejects inherited numeric setters for a %s %s index',
     (kind, type, indexField, declaredIndex) => {
-    let snapshot: Response;
-    if (kind === 'output') {
-      snapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
-    } else if (kind === 'content') {
-      snapshot = snapshotFor({
-        type: 'message',
-        content: [{ type: 'output_text', text: 'original', annotations: [] }],
-        summary: [],
-      });
-    } else {
-      snapshot = snapshotFor({
-        type: 'reasoning',
-        content: [],
-        summary: [{ type: 'summary_text', text: 'original' }],
-      });
-    }
-    const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
-    let collection: unknown[];
-    if (kind === 'output') {
-      collection = snapshot.output;
-    } else if (kind === 'content') {
-      collection = output.content;
-    } else {
-      collection = output.summary;
-    }
-    let inheritedSetterCalled = false;
-    const collectionPrototype = Object.create(Array.prototype) as object;
-    Object.defineProperty(collectionPrototype, 1, {
-      configurable: true,
-      get() {
-        return null;
-      },
-      set() {
-        inheritedSetterCalled = true;
-      },
-    });
-    Object.setPrototypeOf(collection, collectionPrototype);
-
-    expect(() =>
-      applyEvent(snapshot, {
-        type,
-        output_index: 0,
-        [indexField]: declaredIndex,
-        item: { type: 'function_call', id: 'injected', arguments: '' },
-        part: {
-          type: kind === 'summary' ? 'summary_text' : 'output_text',
-          text: 'injected',
-          annotations: [],
+      let snapshot: Response;
+      if (kind === 'output') {
+        snapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
+      } else if (kind === 'content') {
+        snapshot = snapshotFor({
+          type: 'message',
+          content: [{ type: 'output_text', text: 'original', annotations: [] }],
+          summary: [],
+        });
+      } else {
+        snapshot = snapshotFor({
+          type: 'reasoning',
+          content: [],
+          summary: [{ type: 'summary_text', text: 'original' }],
+        });
+      }
+      const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
+      let collection: unknown[];
+      if (kind === 'output') {
+        collection = snapshot.output;
+      } else if (kind === 'content') {
+        collection = output.content;
+      } else {
+        collection = output.summary;
+      }
+      let inheritedSetterCalled = false;
+      const collectionPrototype = Object.create(Array.prototype) as object;
+      Object.defineProperty(collectionPrototype, 1, {
+        configurable: true,
+        get() {
+          return null;
         },
-      }),
-    ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index ${declaredIndex}`);
-
+        set() {
+          inheritedSetterCalled = true;
+        },
+      });
+      Object.setPrototypeOf(collection, collectionPrototype);
+  
+      expect(() =>
+        applyEvent(snapshot, {
+          type,
+          output_index: 0,
+          [indexField]: declaredIndex,
+          item: { type: 'function_call', id: 'injected', arguments: '' },
+          part: {
+            type: kind === 'summary' ? 'summary_text' : 'output_text',
+            text: 'injected',
+            annotations: [],
+          },
+        }),
+      ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index ${declaredIndex}`);
+  
       expect(inheritedSetterCalled).toBe(false);
       expect(collection).toHaveLength(1);
       expect(hasOwn(collection, 1)).toBe(false);
