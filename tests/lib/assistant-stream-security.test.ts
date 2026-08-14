@@ -235,7 +235,7 @@ describe('AssistantStream delta index security', () => {
     events.push(completedRun() as AssistantStreamEvent);
 
     const runner = unencodedAssistantStream(events);
-    runner.on('runStepDelta', () => undefined);
+    runner.on('runStepDelta', vi.fn());
     await runner.done();
 
     expect(toolCalls).toHaveLength(2048);
