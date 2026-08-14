@@ -300,7 +300,11 @@ export function parseChatCompletion<
             }
           : undefined),
         parsed:
-          choice.message.content !== null && choice.message.content !== undefined && !choice.message.refusal
+          choice.message.content !== null &&
+          choice.message.content !== undefined &&
+          !choice.message.refusal &&
+          (choice.message.content !== '' ||
+            (!choice.message.tool_calls?.length && !choice.message.function_call))
             ? parseResponseFormat(params, choice.message.content)
             : null,
       },

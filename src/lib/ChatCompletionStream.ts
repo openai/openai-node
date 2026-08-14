@@ -482,7 +482,14 @@ export class ChatCompletionStream<ParsedT = null>
   #emitContentDoneEvents(choiceSnapshot: ChatCompletionSnapshot.Choice) {
     const state = this.#getChoiceEventState(choiceSnapshot);
 
-    if (choiceSnapshot.message.content && !state.content_done) {
+    if (
+      choiceSnapshot.message.content != null &&
+      (choiceSnapshot.message.content !== '' ||
+        (!choiceSnapshot.message.refusal &&
+          !choiceSnapshot.message.tool_calls?.length &&
+          !choiceSnapshot.message.function_call)) &&
+      !state.content_done
+    ) {
       state.content_done = true;
 
       this._emit('content.done', {
@@ -738,7 +745,7 @@ export class ChatCompletionStream<ParsedT = null>
           choice.message.function_call = function_call;
         }
       }
-      if (content) {
+      if (content != null) {
         choice.message.content = (choice.message.content || '') + content;
 
         if (!choice.message.refusal && isParseableResponseFormat(this.#params?.response_format)) {
