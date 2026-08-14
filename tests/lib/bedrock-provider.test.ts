@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import OpenAI from 'openai';
+import OpenAI, { APIConnectionTimeoutError, NotFoundError } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { configureProvider } from 'openai/internal/provider';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
@@ -10,6 +10,7 @@ import { SignatureV4 } from '@smithy/signature-v4';
 import sigV4Fixture from '../fixtures/bedrock/v1/sigv4.json';
 
 const originalEnv = process.env;
+const RUNTIME_MODEL = 'us.openai.gpt-5.6-sol';
 const BEDROCK_ENVIRONMENT_VARIABLES = [
   'AWS_BEARER_TOKEN_BEDROCK',
   'AWS_BEDROCK_BASE_URL',
@@ -40,6 +41,44 @@ function jsonResponse(body: unknown = {}): Response {
   });
 }
 
+function chatCompletionBody(content = 'Hello from Runtime') {
+  return {
+    id: 'chatcmpl_runtime',
+    object: 'chat.completion',
+    created: 0,
+    model: RUNTIME_MODEL,
+    choices: [
+      {
+        index: 0,
+        finish_reason: 'stop',
+        logprobs: null,
+        message: { role: 'assistant', content, refusal: null },
+      },
+    ],
+    usage: { prompt_tokens: 4, completion_tokens: 3, total_tokens: 7 },
+  };
+}
+
+function responseBody(content = 'Hello from Runtime') {
+  return {
+    id: 'resp_runtime',
+    object: 'response',
+    model: RUNTIME_MODEL,
+    output: [
+      {
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'output_text', text: content, annotations: [] }],
+      },
+    ],
+  };
+}
+
+function eventStreamResponse(events: unknown[]): Response {
+  const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\ndata: [DONE]\n\n`;
+  return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
+}
+
 describe('bedrock provider', () => {
   test('owns the Mantle endpoint and bearer authentication', async () => {
     let requestedURL: RequestInfo | undefined;
@@ -58,6 +97,416 @@ describe('bedrock provider', () => {
     expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
     expect(String(requestedURL)).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1/models');
     expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
+  });
+
+  test.each([
+    { endpoint: 'mantle' as const, hostname: 'bedrock-mantle.us-east-1.api.aws' },
+    { endpoint: 'runtime' as const, hostname: 'bedrock-runtime.us-east-1.amazonaws.com' },
+  ])(
+    'derives the explicit $endpoint endpoint for dependency-free bearer authentication',
+    async ({ endpoint, hostname }) => {
+      let requestedURL: RequestInfo | undefined;
+      let requestedInit: RequestInit | undefined;
+      const client = new OpenAI({
+        provider: bearerBedrock({ endpoint, region: 'us-east-1', apiKey: 'bedrock-token' }),
+        fetch: async (url, init) => {
+          requestedURL = url;
+          requestedInit = init;
+          return jsonResponse();
+        },
+      });
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(client.baseURL).toBe(`https://${hostname}/openai/v1`);
+      expect(String(requestedURL)).toBe(`https://${hostname}/openai/v1/models`);
+      expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
+    },
+  );
+
+  test('supports Runtime bearer authentication through the AWS entrypoint', async () => {
+    let requestedURL: RequestInfo | undefined;
+    let requestedInit: RequestInit | undefined;
+    const client = new OpenAI({
+      provider: bedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
+      fetch: async (url, init) => {
+        requestedURL = url;
+        requestedInit = init;
+        return jsonResponse();
+      },
+    });
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(String(requestedURL)).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/models');
+    expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
+  });
+
+  test.each(['AWS_REGION', 'AWS_DEFAULT_REGION'] as const)(
+    'derives the Runtime endpoint region from %s',
+    (environmentVariable) => {
+      process.env[environmentVariable] = 'us-west-2';
+
+      const client = new OpenAI({
+        provider: bearerBedrock({ endpoint: 'runtime', apiKey: 'bedrock-token' }),
+      });
+
+      expect(client.baseURL).toBe('https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1');
+    },
+  );
+
+  test('supports sovereign AWS region names when deriving a Runtime endpoint', () => {
+    const client = new OpenAI({
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'eusc-de-east-1', apiKey: 'bedrock-token' }),
+    });
+
+    expect(client.baseURL).toBe('https://bedrock-runtime.eusc-de-east-1.amazonaws.com/openai/v1');
+  });
+
+  test.each([
+    ['userinfo and fragment injection', 'us-east-1.amazonaws.com@attacker.example#'],
+    ['path injection', 'us-east-1/../../attacker.example'],
+    ['query injection', 'us-east-1?target=attacker.example'],
+    ['malformed region', 'not-a-region'],
+  ])('rejects %s in explicit AWS regions before configuring any Bedrock provider', (_scenario, region) => {
+    for (const endpoint of ['mantle', 'runtime'] as const) {
+      expect(() => bearerBedrock({ endpoint, region, apiKey: 'bedrock-token' })).toThrow(
+        /region.*invalid|invalid.*region|valid.*region/i,
+      );
+      expect(() =>
+        bedrock({ endpoint, region, accessKeyId: 'access-key', secretAccessKey: 'secret-key' }),
+      ).toThrow(/region.*invalid|invalid.*region|valid.*region/i);
+    }
+  });
+
+  test.each(['AWS_REGION', 'AWS_DEFAULT_REGION'] as const)(
+    'rejects URL-delimiter injection through the %s environment variable',
+    (environmentVariable) => {
+      process.env[environmentVariable] = 'us-east-1.amazonaws.com@attacker.example#';
+
+      for (const endpoint of ['mantle', 'runtime'] as const) {
+        expect(() => bearerBedrock({ endpoint, apiKey: 'bedrock-token' })).toThrow(
+          /region.*invalid|invalid.*region|valid.*region/i,
+        );
+        expect(() => bedrock({ endpoint, accessKeyId: 'access-key', secretAccessKey: 'secret-key' })).toThrow(
+          /region.*invalid|invalid.*region|valid.*region/i,
+        );
+      }
+    },
+  );
+
+  test.each(['mantle', 'runtime'] as const)(
+    'rejects an invalid AWS signing region for an explicitly configured %s proxy',
+    (endpoint) => {
+      expect(() =>
+        bedrock({
+          endpoint,
+          region: 'us-east-1.amazonaws.com@attacker.example#',
+          baseURL: 'https://proxy.example.com/openai/v1',
+          accessKeyId: 'access-key',
+          secretAccessKey: 'secret-key',
+        }),
+      ).toThrow(/region.*invalid|invalid.*region|valid.*region/i);
+    },
+  );
+
+  test('routes Chat Completions through Runtime with SigV4 and preserves request IDs', async () => {
+    let requestedURL: RequestInfo | undefined;
+    let requestedInit: RequestInit | undefined;
+    const client = new OpenAI({
+      provider: bedrock({
+        endpoint: 'runtime',
+        region: 'us-east-1',
+        accessKeyId: 'access-key',
+        secretAccessKey: 'secret-key',
+      }),
+      fetch: async (url, init) => {
+        requestedURL = url;
+        requestedInit = init;
+        return Response.json(chatCompletionBody(), { headers: { 'x-request-id': 'req_runtime_chat' } });
+      },
+    });
+
+    const completion = await client.chat.completions.create({
+      model: RUNTIME_MODEL,
+      messages: [{ role: 'user', content: 'Say hello' }],
+    });
+
+    expect(String(requestedURL)).toBe(
+      'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions',
+    );
+    expect(JSON.parse(String(requestedInit?.body))).toMatchObject({
+      model: RUNTIME_MODEL,
+      messages: [{ role: 'user', content: 'Say hello' }],
+    });
+    expect(new Headers(requestedInit?.headers).get('authorization')).toContain('/bedrock/aws4_request');
+    expect(completion.choices[0]?.message.content).toBe('Hello from Runtime');
+    expect(completion.choices[0]?.finish_reason).toBe('stop');
+    expect(completion.usage).toEqual({ prompt_tokens: 4, completion_tokens: 3, total_tokens: 7 });
+    expect(completion._request_id).toBe('req_runtime_chat');
+  });
+
+  test('streams signed Runtime Chat Completions through standard SSE decoding', async () => {
+    let requestedURL: RequestInfo | undefined;
+    let requestedInit: RequestInit | undefined;
+    const client = new OpenAI({
+      provider: bedrock({
+        endpoint: 'runtime',
+        region: 'us-east-1',
+        accessKeyId: 'access-key',
+        secretAccessKey: 'secret-key',
+      }),
+      fetch: async (url, init) => {
+        requestedURL = url;
+        requestedInit = init;
+        return eventStreamResponse([
+          {
+            id: 'chatcmpl_runtime',
+            object: 'chat.completion.chunk',
+            created: 0,
+            model: RUNTIME_MODEL,
+            choices: [{ index: 0, delta: { role: 'assistant', content: 'Hello ' }, finish_reason: null }],
+          },
+          {
+            id: 'chatcmpl_runtime',
+            object: 'chat.completion.chunk',
+            created: 0,
+            model: RUNTIME_MODEL,
+            choices: [{ index: 0, delta: { content: 'Runtime' }, finish_reason: 'stop' }],
+          },
+        ]);
+      },
+    });
+
+    const stream = await client.chat.completions.create({
+      model: RUNTIME_MODEL,
+      messages: [{ role: 'user', content: 'Say hello' }],
+      stream: true,
+    });
+    const chunks: string[] = [];
+    const finishReasons: (string | null)[] = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk.choices[0]?.delta.content ?? '');
+      finishReasons.push(chunk.choices[0]?.finish_reason ?? null);
+    }
+
+    expect(String(requestedURL)).toBe(
+      'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions',
+    );
+    expect(JSON.parse(String(requestedInit?.body))).toMatchObject({ model: RUNTIME_MODEL, stream: true });
+    expect(new Headers(requestedInit?.headers).get('authorization')).toContain('/bedrock/aws4_request');
+    expect(chunks).toEqual(['Hello ', 'Runtime']);
+    expect(finishReasons).toEqual([null, 'stop']);
+  });
+
+  test('routes Responses through Runtime and preserves the SDK output_text helper', async () => {
+    let requestedURL: RequestInfo | undefined;
+    let requestedInit: RequestInit | undefined;
+    const client = new OpenAI({
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
+      fetch: async (url, init) => {
+        requestedURL = url;
+        requestedInit = init;
+        return jsonResponse(responseBody());
+      },
+    });
+
+    const response = await client.responses.create({ model: RUNTIME_MODEL, input: 'Say hello' });
+
+    expect(String(requestedURL)).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/responses');
+    expect(JSON.parse(String(requestedInit?.body))).toMatchObject({
+      model: RUNTIME_MODEL,
+      input: 'Say hello',
+    });
+    expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
+    expect(response.output_text).toBe('Hello from Runtime');
+  });
+
+  test('streams Runtime Responses through standard SSE event decoding', async () => {
+    let requestedInit: RequestInit | undefined;
+    const client = new OpenAI({
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
+      fetch: async (_url, init) => {
+        requestedInit = init;
+        return eventStreamResponse([
+          { type: 'response.created', sequence_number: 0, response: responseBody() },
+          { type: 'response.completed', sequence_number: 1, response: responseBody() },
+        ]);
+      },
+    });
+
+    const stream = await client.responses.create({
+      model: RUNTIME_MODEL,
+      input: 'Say hello',
+      stream: true,
+    });
+    const events: string[] = [];
+    for await (const event of stream) {
+      events.push(event.type);
+    }
+
+    expect(JSON.parse(String(requestedInit?.body))).toMatchObject({ model: RUNTIME_MODEL, stream: true });
+    expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
+    expect(events).toEqual(['response.created', 'response.completed']);
+  });
+
+  test('refreshes AWS credentials and re-signs each Runtime retry', async () => {
+    const credentialProvider = vi
+      .fn()
+      .mockResolvedValueOnce({
+        accessKeyId: 'first-access-key',
+        secretAccessKey: 'first-secret-key',
+        sessionToken: 'first-session-token',
+      })
+      .mockResolvedValueOnce({
+        accessKeyId: 'second-access-key',
+        secretAccessKey: 'second-secret-key',
+        sessionToken: 'second-session-token',
+      });
+    const requestHeaders: Headers[] = [];
+    const client = new OpenAI({
+      provider: bedrock({ endpoint: 'runtime', region: 'us-east-1', credentialProvider }),
+      maxRetries: 1,
+      fetch: async (_url, init) => {
+        requestHeaders.push(new Headers(init?.headers));
+        if (requestHeaders.length === 1) {
+          return Response.json(
+            { error: { message: 'retry this request' } },
+            {
+              status: 429,
+              headers: { 'retry-after-ms': '1' },
+            },
+          );
+        }
+        return jsonResponse(responseBody());
+      },
+    });
+
+    await client.responses.create({ model: RUNTIME_MODEL, input: 'Say hello' });
+
+    expect(credentialProvider).toHaveBeenCalledTimes(2);
+    expect(requestHeaders[0]?.get('authorization')).toMatch(
+      /Credential=first-access-key\/\d{8}\/us-east-1\/bedrock\/aws4_request/,
+    );
+    expect(requestHeaders[1]?.get('authorization')).toMatch(
+      /Credential=second-access-key\/\d{8}\/us-east-1\/bedrock\/aws4_request/,
+    );
+    expect(requestHeaders.map((headers) => headers.get('x-amz-security-token'))).toEqual([
+      'first-session-token',
+      'second-session-token',
+    ]);
+  });
+
+  test('refreshes Runtime bearer credentials before retrying a request', async () => {
+    const tokenProvider = vi.fn().mockResolvedValueOnce('first-token').mockResolvedValueOnce('second-token');
+    const authorizationHeaders: string[] = [];
+    const client = new OpenAI({
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', tokenProvider }),
+      maxRetries: 1,
+      fetch: async (_url, init) => {
+        authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
+        if (authorizationHeaders.length === 1) {
+          return Response.json(
+            { error: { message: 'retry this request' } },
+            {
+              status: 503,
+              headers: { 'retry-after-ms': '1' },
+            },
+          );
+        }
+        return jsonResponse(chatCompletionBody());
+      },
+    });
+
+    await client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
+
+    expect(tokenProvider).toHaveBeenCalledTimes(2);
+    expect(authorizationHeaders).toEqual(['Bearer first-token', 'Bearer second-token']);
+  });
+
+  test('prefers and refreshes the environment bearer credential over ambient AWS credentials for Runtime', async () => {
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'first-environment-token';
+    process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
+    process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
+    const authorizationHeaders: string[] = [];
+    const client = new OpenAI({
+      provider: bedrock({ endpoint: 'runtime', region: 'us-east-1' }),
+      fetch: async (_url, init) => {
+        authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
+        return jsonResponse(chatCompletionBody());
+      },
+    });
+
+    await client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'refreshed-environment-token';
+    await client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
+
+    expect(authorizationHeaders).toEqual([
+      'Bearer first-environment-token',
+      'Bearer refreshed-environment-token',
+    ]);
+  });
+
+  test('does not switch Runtime authentication modes when the selected environment bearer disappears', async () => {
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'temporary-environment-token';
+    process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
+    process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
+    const fetch = vi.fn(async () => jsonResponse(chatCompletionBody()));
+    const client = new OpenAI({
+      provider: bedrock({ endpoint: 'runtime', region: 'us-east-1' }),
+      fetch,
+    });
+    delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
+
+    await expect(
+      client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] }),
+    ).rejects.toMatchObject({
+      message: 'Failed to resolve a bearer credential for Bedrock.',
+      cause: expect.objectContaining({
+        message: expect.stringContaining('Could not find credentials for Bedrock'),
+      }),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('preserves Runtime HTTP error classification and request IDs', async () => {
+    const client = new OpenAI({
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
+      maxRetries: 0,
+      fetch: async () =>
+        Response.json(
+          { error: { message: 'model is unavailable in this AWS region' } },
+          {
+            status: 404,
+            headers: { 'x-request-id': 'req_runtime_missing_model' },
+          },
+        ),
+    });
+
+    const request = client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
+
+    await expect(request).rejects.toBeInstanceOf(NotFoundError);
+    await expect(request).rejects.toMatchObject({
+      status: 404,
+      requestID: 'req_runtime_missing_model',
+      message: expect.stringContaining('model is unavailable in this AWS region'),
+    });
+  });
+
+  test('maps Runtime transport timeouts to the standard SDK timeout error', async () => {
+    const fetch = vi.fn(async () => {
+      throw new Error('connection timed out');
+    });
+    const client = new OpenAI({
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
+      maxRetries: 0,
+      fetch,
+    });
+
+    await expect(
+      client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] }),
+    ).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   test('keeps the environment bearer mode across withOptions and refreshes its value', async () => {
@@ -112,6 +561,9 @@ describe('bedrock provider', () => {
 
   test('requires a region only when deriving the default endpoint', () => {
     expect(() => bearerBedrock({ apiKey: 'bedrock-token' })).toThrow('Bedrock requires an AWS region');
+    expect(() => bearerBedrock({ endpoint: 'runtime', apiKey: 'bedrock-token' })).toThrow(
+      'Bedrock requires an AWS region',
+    );
     expect(() =>
       bearerBedrock({ baseURL: 'https://bedrock.example.com/openai/v1', apiKey: 'bedrock-token' }),
     ).not.toThrow();
@@ -176,6 +628,222 @@ describe('bedrock provider', () => {
     expect(headers.get('x-amz-content-sha256')).toBe(sigV4Fixture.expected.payloadHash);
     expect(headers.get('x-amz-security-token')).toBe(sigV4Fixture.credentials.sessionToken);
     expect(headers.get('authorization')).toBe(sigV4Fixture.expected.authorization);
+  });
+
+  test.each([
+    {
+      endpoint: 'mantle' as const,
+      hostname: 'bedrock-mantle.us-east-1.api.aws',
+      service: 'bedrock-mantle',
+    },
+    {
+      endpoint: 'runtime' as const,
+      hostname: 'bedrock-runtime.us-east-1.amazonaws.com',
+      service: 'bedrock',
+    },
+  ])(
+    'signs $endpoint requests with the corresponding SigV4 credential scope',
+    async ({ endpoint, hostname, service }) => {
+      let requestedURL: RequestInfo | undefined;
+      let requestedInit: RequestInit | undefined;
+      const client = new OpenAI({
+        provider: bedrock({
+          endpoint,
+          region: 'us-east-1',
+          accessKeyId: 'access-key',
+          secretAccessKey: 'secret-key',
+        }),
+        fetch: async (url, init) => {
+          requestedURL = url;
+          requestedInit = init;
+          return jsonResponse();
+        },
+      });
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(client.baseURL).toBe(`https://${hostname}/openai/v1`);
+      expect(String(requestedURL)).toBe(`https://${hostname}/openai/v1/models`);
+      expect(new Headers(requestedInit?.headers).get('authorization')).toMatch(
+        new RegExp(`Credential=access-key/\\d{8}/us-east-1/${service}/aws4_request`),
+      );
+    },
+  );
+
+  test('supports the alternative Runtime /v1 root without changing the SigV4 service', async () => {
+    let requestedURL: RequestInfo | undefined;
+    let requestedInit: RequestInit | undefined;
+    const client = new OpenAI({
+      provider: bedrock({
+        endpoint: 'runtime',
+        region: 'us-east-1',
+        baseURL: 'https://bedrock-runtime.us-east-1.amazonaws.com/v1',
+        accessKeyId: 'access-key',
+        secretAccessKey: 'secret-key',
+      }),
+      fetch: async (url, init) => {
+        requestedURL = url;
+        requestedInit = init;
+        return jsonResponse();
+      },
+    });
+
+    await client.request({ method: 'post', path: '/responses', body: { input: 'hello' } });
+
+    expect(client.baseURL).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/v1');
+    expect(String(requestedURL)).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/v1/responses');
+    expect(new Headers(requestedInit?.headers).get('authorization')).toMatch(
+      /Credential=access-key\/\d{8}\/us-east-1\/bedrock\/aws4_request/,
+    );
+  });
+
+  test.each([
+    { endpoint: 'mantle' as const, service: 'bedrock-mantle' },
+    { endpoint: 'runtime' as const, service: 'bedrock' },
+  ])(
+    'signs a custom $endpoint endpoint with its explicitly selected SigV4 service',
+    async ({ endpoint, service }) => {
+      let requestedInit: RequestInit | undefined;
+      const client = new OpenAI({
+        provider: bedrock({
+          endpoint,
+          region: 'us-east-1',
+          baseURL: 'https://proxy.example.com/openai/v1',
+          accessKeyId: 'access-key',
+          secretAccessKey: 'secret-key',
+        }),
+        fetch: async (_url, init) => {
+          requestedInit = init;
+          return jsonResponse();
+        },
+      });
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(new Headers(requestedInit?.headers).get('authorization')).toMatch(
+        new RegExp(`Credential=access-key/\\d{8}/us-east-1/${service}/aws4_request`),
+      );
+    },
+  );
+
+  test.each([
+    {
+      authentication: 'bearer',
+      provider: () => bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
+    },
+    {
+      authentication: 'AWS SigV4',
+      provider: () =>
+        bedrock({
+          endpoint: 'runtime',
+          region: 'us-east-1',
+          accessKeyId: 'access-key',
+          secretAccessKey: 'secret-key',
+        }),
+    },
+  ])(
+    'rejects cross-origin absolute paths before sending $authentication credentials',
+    async ({ provider }) => {
+      const fetch = vi.fn(async () => jsonResponse());
+      const client = new OpenAI({ provider: provider(), fetch });
+
+      const crossOriginPaths = [
+        'https://other.example/openai/v1/models',
+        'http://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/models',
+        'https://bedrock-runtime.us-east-1.amazonaws.com:8443/openai/v1/models',
+      ];
+
+      await Promise.all(
+        crossOriginPaths.map((path) =>
+          expect(client.request({ method: 'get', path })).rejects.toThrow(
+            /origin|different host|configured endpoint/i,
+          ),
+        ),
+      );
+
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([
+    {
+      authentication: 'bearer',
+      provider: () =>
+        bearerBedrock({
+          endpoint: 'runtime',
+          region: 'us-east-1',
+          baseURL: 'https://proxy.example.com/openai/v1',
+          apiKey: 'bedrock-token',
+        }),
+      expectedAuthorization: /Bearer bedrock-token/,
+    },
+    {
+      authentication: 'AWS SigV4',
+      provider: () =>
+        bedrock({
+          endpoint: 'runtime',
+          region: 'us-east-1',
+          baseURL: 'https://proxy.example.com/openai/v1',
+          accessKeyId: 'access-key',
+          secretAccessKey: 'secret-key',
+        }),
+      expectedAuthorization: /\/bedrock\/aws4_request/,
+    },
+  ])(
+    'allows same-origin absolute paths for a configured $authentication proxy',
+    async ({ provider, expectedAuthorization }) => {
+      let requestedURL: RequestInfo | undefined;
+      let requestedInit: RequestInit | undefined;
+      const client = new OpenAI({
+        provider: provider(),
+        fetch: async (url, init) => {
+          requestedURL = url;
+          requestedInit = init;
+          return jsonResponse();
+        },
+      });
+
+      await client.request({ method: 'get', path: 'https://proxy.example.com/openai/v1/models' });
+
+      expect(String(requestedURL)).toBe('https://proxy.example.com/openai/v1/models');
+      expect(new Headers(requestedInit?.headers).get('authorization')).toMatch(expectedAuthorization);
+    },
+  );
+
+  test.each([
+    { endpoint: 'mantle' as const, baseURL: 'http://localhost:8443/openai/v1' },
+    { endpoint: 'runtime' as const, baseURL: 'http://proxy.example.com/openai/v1' },
+  ])('allows an explicitly configured HTTP custom proxy for $endpoint', async ({ endpoint, baseURL }) => {
+    const requestedURLs: string[] = [];
+    const authorizationHeaders: string[] = [];
+    const fetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+      requestedURLs.push(String(url));
+      authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
+      return jsonResponse();
+    };
+    const bearerClient = new OpenAI({
+      provider: bearerBedrock({ endpoint, region: 'us-east-1', baseURL, apiKey: 'bedrock-token' }),
+      fetch,
+    });
+    const awsClient = new OpenAI({
+      provider: bedrock({
+        endpoint,
+        region: 'us-east-1',
+        baseURL,
+        accessKeyId: 'access-key',
+        secretAccessKey: 'secret-key',
+      }),
+      fetch,
+    });
+
+    await bearerClient.request({ method: 'get', path: '/models' });
+    await awsClient.request({ method: 'get', path: '/models' });
+
+    expect(requestedURLs).toEqual([`${baseURL}/models`, `${baseURL}/models`]);
+    expect(authorizationHeaders[0]).toBe('Bearer bedrock-token');
+    expect(authorizationHeaders[1]).toContain(
+      `/${endpoint === 'runtime' ? 'bedrock' : 'bedrock-mantle'}/aws4_request`,
+    );
   });
 
   test('rejects a custom Authorization header before fetch', async () => {
@@ -337,6 +1005,7 @@ describe('bedrock provider', () => {
     const sign = vi.spyOn(SignatureV4.prototype, 'sign');
     const runtime = configureProvider(
       bedrock({
+        endpoint: 'mantle',
         region: 'us-east-1',
         baseURL: 'https://localhost:8443/openai/v1',
         accessKeyId: 'access-key',
@@ -417,27 +1086,99 @@ describe('bedrock provider', () => {
     expect(
       () =>
         new OpenAI({
-          provider: bedrock({ baseURL: 'https://bedrock.example.com/openai/v1' }),
+          provider: bedrock({ endpoint: 'mantle', baseURL: 'https://bedrock.example.com/openai/v1' }),
         }),
     ).toThrow('Bedrock requires an AWS region');
   });
 
-  test('rejects a canonical endpoint whose region does not match the signing region', async () => {
-    const fetch = vi.fn(async () => jsonResponse());
-    const client = new OpenAI({
-      provider: bedrock({
+  test.each([
+    { endpoint: 'mantle' as const, hostname: 'bedrock-mantle.us-west-2.api.aws' },
+    { endpoint: 'runtime' as const, hostname: 'bedrock-runtime.us-west-2.amazonaws.com' },
+  ])(
+    'rejects a canonical $endpoint endpoint whose region does not match the configured AWS region',
+    ({ endpoint, hostname }) => {
+      const sharedOptions = {
+        endpoint,
         region: 'us-east-1',
-        baseURL: 'https://bedrock-mantle.us-west-2.api.aws/openai/v1',
+        baseURL: `https://${hostname}/openai/v1`,
+      };
+      const expectedMessage =
+        'endpoint region `us-west-2` does not match the configured AWS region `us-east-1`';
+
+      expect(() => bearerBedrock({ ...sharedOptions, apiKey: 'bedrock-token' })).toThrow(expectedMessage);
+      expect(() =>
+        bedrock({ ...sharedOptions, accessKeyId: 'access-key', secretAccessKey: 'secret-key' }),
+      ).toThrow(expectedMessage);
+    },
+  );
+
+  test.each([
+    { endpoint: 'mantle' as const, hostname: 'bedrock-mantle.us-east-1.api.aws' },
+    { endpoint: 'runtime' as const, hostname: 'bedrock-runtime.us-east-1.amazonaws.com' },
+  ])('rejects insecure HTTP for the canonical $endpoint AWS endpoint', ({ endpoint, hostname }) => {
+    const sharedOptions = {
+      endpoint,
+      region: 'us-east-1',
+      baseURL: `http://${hostname}/openai/v1`,
+    };
+
+    expect(() => bearerBedrock({ ...sharedOptions, apiKey: 'bedrock-token' })).toThrow(/HTTPS|https/);
+    expect(() =>
+      bedrock({ ...sharedOptions, accessKeyId: 'access-key', secretAccessKey: 'secret-key' }),
+    ).toThrow(/HTTPS|https/);
+  });
+
+  test.each([
+    { endpoint: 'runtime' as const, hostname: 'bedrock-mantle.us-east-1.api.aws' },
+    { endpoint: 'mantle' as const, hostname: 'bedrock-runtime.us-east-1.amazonaws.com' },
+  ])('rejects a canonical host that does not match the explicit $endpoint mode', ({ endpoint, hostname }) => {
+    const sharedOptions = {
+      endpoint,
+      region: 'us-east-1',
+      baseURL: `https://${hostname}/openai/v1`,
+    };
+
+    expect(() => bearerBedrock({ ...sharedOptions, apiKey: 'bedrock-token' })).toThrow(/endpoint|mode/i);
+    expect(() =>
+      bedrock({ ...sharedOptions, accessKeyId: 'access-key', secretAccessKey: 'secret-key' }),
+    ).toThrow(/endpoint|mode/i);
+  });
+
+  test.each(['https://proxy.example.com/openai/v1', 'https://localhost:8443/openai/v1'])(
+    'requires an explicit endpoint mode before signing the custom endpoint %s',
+    (baseURL) => {
+      expect(() =>
+        bedrock({
+          region: 'us-east-1',
+          baseURL,
+          accessKeyId: 'access-key',
+          secretAccessKey: 'secret-key',
+        }),
+      ).toThrow(/explicit.*endpoint|endpoint.*explicit/i);
+    },
+  );
+
+  test('requires an explicit endpoint mode before signing a custom environment endpoint', () => {
+    process.env['AWS_BEDROCK_BASE_URL'] = 'https://proxy.example.com/openai/v1';
+
+    expect(() =>
+      bedrock({
+        region: 'us-east-1',
         accessKeyId: 'access-key',
         secretAccessKey: 'secret-key',
       }),
-      fetch,
-    });
+    ).toThrow(/explicit.*endpoint|endpoint.*explicit/i);
+  });
 
-    await expect(client.request({ method: 'get', path: '/models' })).rejects.toThrow(
-      'endpoint region `us-west-2` does not match the SigV4 region `us-east-1`',
-    );
-    expect(fetch).not.toHaveBeenCalled();
+  test.each(['', ' ', 'invalid', 'Runtime', null, 123])('rejects invalid endpoint mode %j', (endpoint) => {
+    const invalidEndpoint = endpoint as BedrockProviderOptions['endpoint'];
+
+    expect(() =>
+      bearerBedrock({ endpoint: invalidEndpoint, region: 'us-east-1', apiKey: 'bedrock-token' }),
+    ).toThrow(/endpoint.*mantle.*runtime/i);
+    expect(() =>
+      bedrock({ endpoint: invalidEndpoint, region: 'us-east-1', apiKey: 'bedrock-token' }),
+    ).toThrow(/endpoint.*mantle.*runtime/i);
   });
 
   test.each<[string, BedrockProviderOptions]>([

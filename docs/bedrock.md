@@ -20,22 +20,85 @@ console.log(response.output_text);
 
 Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html). A model returned by the Models API may support a different Bedrock inference API instead.
 
-The provider uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint and the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
+## Endpoints
 
-The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived endpoint:
+The `endpoint` option selects which regional Bedrock endpoint to use:
+
+| `endpoint`           | Default API root                                           | SigV4 signing service |
+| -------------------- | ---------------------------------------------------------- | --------------------- |
+| `'mantle'` (default) | `https://bedrock-mantle.<region>.api.aws/openai/v1`        | `bedrock-mantle`      |
+| `'runtime'`          | `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` | `bedrock`             |
+
+Both endpoints use the normal SDK resources. AWS controls the available models, inference profiles, API routes, authentication methods, and streaming behavior for each endpoint; unsupported calls surface the provider's normal HTTP errors through the SDK.
+
+The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived endpoint. When signing requests sent to a custom or proxy host, explicitly set `endpoint` so the SDK can select the correct SigV4 signing service:
 
 ```ts
 const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
+    endpoint: 'mantle',
     baseURL: 'https://bedrock.example.com/openai/v1',
   }),
 });
 ```
 
+Bedrock credentials are sent only to the configured API-root origin; absolute resource URLs targeting a different origin are rejected.
+
+### Amazon Bedrock Runtime
+
+Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. Example launch inference-profile identifiers include `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna`; availability depends on your AWS account and region:
+
+```ts
+import OpenAI from 'openai';
+import { bedrock } from 'openai/providers/bedrock/aws';
+
+const client = new OpenAI({
+  provider: bedrock({
+    region: 'us-west-2',
+    endpoint: 'runtime',
+  }),
+});
+
+const completion = await client.chat.completions.create({
+  model: 'us.openai.gpt-5.6-sol',
+  messages: [{ role: 'user', content: 'Say hello from Amazon Bedrock Runtime!' }],
+});
+
+console.log(completion.choices[0]?.message.content);
+```
+
+Streaming uses the same Chat Completions API:
+
+```ts
+const stream = await client.chat.completions.create({
+  model: 'us.openai.gpt-5.6-sol',
+  messages: [{ role: 'user', content: 'Say hello from Amazon Bedrock Runtime!' }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? '');
+}
+```
+
+The SDK defaults to the `/openai/v1` route described in [AWS's OpenAI model documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-openai.html). [AWS's Chat Completions documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-chat-completions-mantle.html) instead describes a `/v1` route for Bedrock Runtime. If your model or endpoint requires that route, override the API root explicitly:
+
+```ts
+const client = new OpenAI({
+  provider: bedrock({
+    region: 'us-west-2',
+    endpoint: 'runtime',
+    baseURL: 'https://bedrock-runtime.us-west-2.amazonaws.com/v1',
+  }),
+});
+```
+
+AWS controls which route and authentication method your selected model, inference profile, and endpoint accept. Consult the applicable AWS documentation if a request or credential type is rejected.
+
 ## Authentication
 
-The AWS entrypoint selects authentication in this order:
+The Bedrock provider supports bearer authentication and AWS SigV4 authentication for both Mantle and Runtime endpoints. The AWS entrypoint selects authentication in this order:
 
 1. One explicit mode passed to `bedrock(...)`: `apiKey` or `tokenProvider`, static AWS credentials, `profile`, or `credentialProvider`.
 2. The [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html) in `AWS_BEARER_TOKEN_BEDROCK`.
@@ -75,6 +138,7 @@ import { bedrock } from 'openai/providers/bedrock';
 const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
+    endpoint: 'runtime',
     apiKey: process.env['AWS_BEARER_TOKEN_BEDROCK'],
   }),
 });
@@ -104,10 +168,13 @@ import { bedrock } from 'openai/providers/bedrock/aws';
 const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
+    endpoint: 'runtime',
     profile: 'my-profile',
   }),
 });
 ```
+
+Runtime requests are signed for the `bedrock` service, while Mantle requests are signed for `bedrock-mantle`. Explicitly set `endpoint` when `baseURL` or `AWS_BEDROCK_BASE_URL` points to a custom or proxy host so the signing service is unambiguous.
 
 Pass temporary AWS credentials directly, including the session token:
 
@@ -145,7 +212,7 @@ Bedrock Mantle also supports `UNSIGNED-PAYLOAD` and AWS-chunked request signing,
 
 ## Legacy `BedrockOpenAI` class
 
-The `BedrockOpenAI` class remains available for existing bearer-authenticated applications. It accepts the `awsRegion` and `bedrockTokenProvider` option names and uses the same `/openai/v1` endpoint as the provider:
+The `BedrockOpenAI` class remains available for existing bearer-authenticated applications. It accepts the `awsRegion` and `bedrockTokenProvider` option names and defaults to the Mantle `/openai/v1` endpoint:
 
 ```ts
 import { BedrockOpenAI } from 'openai';

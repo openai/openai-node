@@ -546,7 +546,24 @@ console.log(response.output_text);
 
 Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html). A model returned by the Models API may support a different Bedrock inference API instead.
 
-This uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`, and `AWS_BEDROCK_BASE_URL` can override the endpoint.
+The default `endpoint: 'mantle'` uses `https://bedrock-mantle.<region>.api.aws/openai/v1` and the `bedrock-mantle` SigV4 signing service. Set `endpoint: 'runtime'` to use `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` and the `bedrock` signing service:
+
+```ts
+const client = new OpenAI({
+  provider: bedrock({ region: 'us-west-2', endpoint: 'runtime' }),
+});
+
+const completion = await client.chat.completions.create({
+  model: 'us.openai.gpt-5.6-sol',
+  messages: [{ role: 'user', content: 'Say hello!' }],
+});
+
+console.log(completion.choices[0]?.message.content);
+```
+
+Bedrock Runtime also supports streaming Chat Completions through `stream: true`. The provider supports bearer and SigV4 authentication on both endpoint types, subject to the AWS model, inference profile, and endpoint accepting that authentication method.
+
+The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the endpoint; when signing requests sent to a custom or proxy host, explicitly set `endpoint` to select the correct signing service. To use the alternate Runtime route described in some AWS documentation, set `baseURL: 'https://bedrock-runtime.us-west-2.amazonaws.com/v1'` alongside `endpoint: 'runtime'`. Available routes and features are controlled by AWS.
 
 The AWS entrypoint uses the standard AWS credential chain by default. It also accepts a named profile, static credentials, or a custom credential provider. Install its peer dependencies before importing it:
 
