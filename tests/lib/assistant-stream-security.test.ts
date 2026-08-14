@@ -566,9 +566,7 @@ describe('AssistantStream run-step index security', () => {
           delta: {
             step_details: {
               type: 'tool_calls',
-              tool_calls: [
-                { index: 1023, type: 'function', id: 'call_1023', function: { arguments: '' } },
-              ],
+              tool_calls: [{ index: 1023, type: 'function', id: 'call_1023', function: { arguments: '' } }],
             },
           },
         },
@@ -580,9 +578,7 @@ describe('AssistantStream run-step index security', () => {
           delta: {
             step_details: {
               type: 'tool_calls',
-              tool_calls: [
-                { index: 2047, type: 'function', id: 'call_2047', function: { arguments: '' } },
-              ],
+              tool_calls: [{ index: 2047, type: 'function', id: 'call_2047', function: { arguments: '' } }],
             },
           },
         },
