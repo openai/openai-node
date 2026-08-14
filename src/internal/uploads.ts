@@ -390,22 +390,21 @@ const hasStreamingUploadableValue = (value: unknown, uploadableKinds: Uploadable
   if (uploadableKind === 'upload') {
     return false;
   }
-  let hasStreamingUpload = false;
 
   if (Array.isArray(value)) {
     for (const entry of value) {
       if (hasStreamingUploadableValue(entry, uploadableKinds)) {
-        hasStreamingUpload = true;
+        return true;
       }
     }
   } else if (value && typeof value === 'object') {
-    for (const [, entry] of Object.entries(value)) {
-      if (hasStreamingUploadableValue(entry, uploadableKinds)) {
-        hasStreamingUpload = true;
+    for (const key of Object.keys(value)) {
+      if (hasStreamingUploadableValue((value as Record<string, unknown>)[key], uploadableKinds)) {
+        return true;
       }
     }
   }
-  return hasStreamingUpload;
+  return false;
 };
 
 const hasUploadableValue = (value: unknown, uploadableKinds: UploadableKinds): boolean => {
@@ -416,8 +415,8 @@ const hasUploadableValue = (value: unknown, uploadableKinds: UploadableKinds): b
     return value.some((entry) => hasUploadableValue(entry, uploadableKinds));
   }
   if (value && typeof value === 'object') {
-    for (const [, entry] of Object.entries(value)) {
-      if (hasUploadableValue(entry, uploadableKinds)) {
+    for (const key of Object.keys(value)) {
+      if (hasUploadableValue((value as Record<string, unknown>)[key], uploadableKinds)) {
         return true;
       }
     }
@@ -444,6 +443,20 @@ type MultipartDataSnapshot = Readonly<{
   data: StreamingFileInput;
   dispose?: (() => void) | undefined;
 }>;
+
+function isNativeReadableStream(value: StreamingFileInput): boolean {
+  if (typeof globalThis.ReadableStream !== 'function') {
+    return false;
+  }
+
+  try {
+    const getLocked = Object.getOwnPropertyDescriptor(globalThis.ReadableStream.prototype, 'locked')?.get;
+    return typeof getLocked?.call(value) === 'boolean';
+  } catch {
+    // Ordinary async iterables and reader-like objects do not satisfy the native stream brand.
+    return false;
+  }
+}
 
 async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
   try {
@@ -480,15 +493,8 @@ function snapshotStreamingFileData(
         }
       },
     };
-    if (typeof globalThis.ReadableStream === 'function') {
-      try {
-        const getLocked = Object.getOwnPropertyDescriptor(globalThis.ReadableStream.prototype, 'locked')?.get;
-        if (typeof getLocked?.call(value) === 'boolean') {
-          snapshots.set(value, snapshot);
-        }
-      } catch {
-        // Ordinary async iterables do not satisfy the native readable-stream brand.
-      }
+    if (isNativeReadableStream(value)) {
+      snapshots.set(value, snapshot);
     }
     return snapshot;
   }
@@ -519,7 +525,9 @@ function snapshotStreamingFileData(
         }
       },
     };
-    snapshots.set(value, snapshot);
+    if (isNativeReadableStream(value)) {
+      snapshots.set(value, snapshot);
+    }
     return snapshot;
   }
 
@@ -571,7 +579,9 @@ const createStreamingFormRequestOptions = (
   options: CreateFormOptions = {},
 ): RequestOptions => {
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
-  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options, uploadableKinds));
+  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options, uploadableKinds), {
+    highWaterMark: 0,
+  });
 
   return {
     ...opts,
@@ -639,8 +649,8 @@ async function* iterateFormEntries(
     return;
   }
 
-  for (const [key, value] of Object.entries(body)) {
-    yield* iterateFormValue(key, value, uploadableKinds, options, snapshots);
+  for (const key of Object.keys(body)) {
+    yield* iterateFormValue(key, (body as Record<string, unknown>)[key], uploadableKinds, options, snapshots);
   }
 }
 
@@ -665,7 +675,11 @@ async function* iterateFormValue(
     return;
   }
 
-  const uploadKind = getUploadableKind(value, uploadableKinds);
+  const wasClassified = typeof value === 'object' && uploadableKinds.has(value);
+  let uploadKind = getUploadableKind(value, uploadableKinds);
+  if (!wasClassified && uploadKind !== 'streaming-file') {
+    uploadKind = getUploadableKind(value, uploadableKinds);
+  }
   if (uploadKind) {
     const upload = value as Uploadable;
     const streamingFile = uploadKind === 'streaming-file';
@@ -696,8 +710,14 @@ async function* iterateFormValue(
       yield* iterateFormValue(key + '[]', entry, uploadableKinds, options, snapshots);
     }
   } else if (typeof value === 'object') {
-    for (const [name, prop] of Object.entries(value)) {
-      yield* iterateFormValue(`${key}[${name}]`, prop, uploadableKinds, options, snapshots);
+    for (const name of Object.keys(value)) {
+      yield* iterateFormValue(
+        `${key}[${name}]`,
+        (value as Record<string, unknown>)[name],
+        uploadableKinds,
+        options,
+        snapshots,
+      );
     }
   } else {
     throw new TypeError(

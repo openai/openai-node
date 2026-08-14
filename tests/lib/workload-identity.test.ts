@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
 import type { Response, RequestInit } from 'openai/internal/builtin-types';
+import { toStreamingFile } from 'openai/internal/uploads';
 
 const originalFetch = global.fetch;
 
@@ -283,6 +284,65 @@ describe('OpenAI with Workload Identity', () => {
     });
 
     await expect(client.models.list()).rejects.toThrow(SubjectTokenProviderError);
+  });
+
+  test('does not acquire multipart upload sources when workload identity authentication fails', async () => {
+    const authenticationFailure = new SubjectTokenProviderError('Failed to get token', 'test-provider');
+    const getToken = vi.fn().mockRejectedValue(authenticationFailure);
+    const requestFetch = vi.fn();
+    const createIterator = vi.fn(async function* asyncUploadChunks() {
+      yield new TextEncoder().encode('async upload bytes');
+    });
+    const asyncUpload = toStreamingFile({ [Symbol.asyncIterator]: createIterator }, 'async.png');
+    const getFilename = vi.fn(() => 'async.png');
+    Object.defineProperty(asyncUpload, 'name', { get: getFilename });
+
+    const pullNativeStream = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      controller.enqueue(new TextEncoder().encode('native upload bytes'));
+      controller.close();
+    });
+    const nativeStream = new ReadableStream<Uint8Array>({ pull: pullNativeStream }, { highWaterMark: 0 });
+    const readerSource = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          controller.enqueue(new TextEncoder().encode('reader upload bytes'));
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const getReader = vi.fn(() => readerSource.getReader());
+    const readerUpload = toStreamingFile(
+      { getReader } as unknown as ReadableStream<Uint8Array>,
+      'reader.png',
+    );
+
+    const client = new OpenAI({
+      workloadIdentity: {
+        identityProviderId: 'test-identity-provider-id',
+        serviceAccountId: 'test-service-account-id',
+        provider: { tokenType: 'jwt', getToken },
+      },
+      fetch: requestFetch,
+      maxRetries: 0,
+    });
+
+    await expect(
+      client.images.edit({
+        prompt: 'do not start rejected uploads',
+        image: [asyncUpload, readerUpload, toStreamingFile(nativeStream, 'native.png')],
+      }),
+    ).rejects.toBe(authenticationFailure);
+    await Promise.resolve();
+
+    expect(getToken).toHaveBeenCalledTimes(1);
+    expect(getFilename).not.toHaveBeenCalled();
+    expect(createIterator).not.toHaveBeenCalled();
+    expect(getReader).not.toHaveBeenCalled();
+    expect(pullNativeStream).not.toHaveBeenCalled();
+    expect(nativeStream.locked).toBe(false);
+    expect(readerSource.locked).toBe(false);
+    expect(requestFetch).not.toHaveBeenCalled();
   });
 
   test('propagates OAuthError on token exchange failure', async () => {

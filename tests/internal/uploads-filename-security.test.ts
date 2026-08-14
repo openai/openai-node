@@ -309,6 +309,38 @@ describe('streaming multipart filename and header security', () => {
     expect(getReader).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['do not expose a stream lock', undefined],
+    ['spoof an unlocked stream', false],
+    ['spoof a locked stream', true],
+  ] as const)('recaptures reusable reader-only uploads that %s', async (_, locked) => {
+    const getReader = vi.fn(() =>
+      new ReadableStream<string>({
+        start(controller) {
+          controller.enqueue('reusable reader bytes');
+          controller.close();
+        },
+      }).getReader(),
+    );
+    const reusable = {
+      getReader,
+      ...(locked === undefined ? {} : { locked }),
+    };
+
+    const options = await multipartFormRequestOptions({ body: { files: [reusable, reusable] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'reusable reader bytes',
+      'reusable reader bytes',
+    ]);
+    expect(getReader).toHaveBeenCalledTimes(2);
+  });
+
   test('streams all bytes for each occurrence of a reusable named blob', async () => {
     const blob = Object.assign(new Blob(['reusable blob bytes']), { name: 'reusable.txt' });
 
@@ -328,6 +360,83 @@ describe('streaming multipart filename and header security', () => {
       'reusable blob bytes',
     ]);
   });
+
+  test.each([
+    ['conditional multipart', maybeMultipartFormRequestOptions],
+    ['required multipart', multipartFormRequestOptions],
+  ] as const)(
+    'snapshots earlier uploads before reading later array getters in %s',
+    async (_, encodeRequest) => {
+      const earlier = toStreamingFile(chunks('original earlier bytes'), 'original.png', {
+        type: 'image/original',
+      });
+      const later = toStreamingFile(chunks('later bytes'), 'later.png', { type: 'image/later' });
+      const uploads = [earlier, later];
+      const getLaterUpload = vi.fn(() => {
+        Object.defineProperties(earlier, {
+          data: { value: chunks('substituted earlier bytes') },
+          name: { value: 'substituted.png' },
+          type: { value: 'image/substituted' },
+        });
+        return later;
+      });
+      Object.defineProperty(uploads, 1, { configurable: true, enumerable: true, get: getLaterUpload });
+
+      const options = await encodeRequest({ body: { files: uploads } }, fetch);
+      const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+      const form = await new Response(options.body as ReadableStream, {
+        headers: { 'content-type': contentType },
+      }).formData();
+      const files = form.getAll('files[]') as File[];
+
+      expect(files.map((file) => file.name)).toEqual(['original.png', 'later.png']);
+      expect(files.map((file) => file.type)).toEqual(['image/original', 'image/later']);
+      await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+        'original earlier bytes',
+        'later bytes',
+      ]);
+      expect(getLaterUpload).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([
+    ['conditional multipart', maybeMultipartFormRequestOptions],
+    ['required multipart', multipartFormRequestOptions],
+  ] as const)(
+    'snapshots earlier uploads before reading later object getters in %s',
+    async (_, encodeRequest) => {
+      const earlier = toStreamingFile(chunks('original earlier bytes'), 'original.png', {
+        type: 'image/original',
+      });
+      const later = toStreamingFile(chunks('later bytes'), 'later.png', { type: 'image/later' });
+      const body = { earlier };
+      const getLaterUpload = vi.fn(() => {
+        Object.defineProperties(earlier, {
+          data: { value: chunks('substituted earlier bytes') },
+          name: { value: 'substituted.png' },
+          type: { value: 'image/substituted' },
+        });
+        return later;
+      });
+      Object.defineProperty(body, 'later', { enumerable: true, get: getLaterUpload });
+
+      const options = await encodeRequest({ body }, fetch);
+      const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+      const form = await new Response(options.body as ReadableStream, {
+        headers: { 'content-type': contentType },
+      }).formData();
+      const earlierFile = form.get('earlier') as File;
+      const laterFile = form.get('later') as File;
+
+      expect(earlierFile.name).toBe('original.png');
+      expect(earlierFile.type).toBe('image/original');
+      await expect(earlierFile.text()).resolves.toBe('original earlier bytes');
+      expect(laterFile.name).toBe('later.png');
+      expect(laterFile.type).toBe('image/later');
+      await expect(laterFile.text()).resolves.toBe('later bytes');
+      expect(getLaterUpload).toHaveBeenCalledTimes(1);
+    },
+  );
 
   test('snapshots earlier streaming metadata before reading later mutable filenames', async () => {
     const earlier = toStreamingFile(chunks('original earlier bytes'), 'earlier.png', {
@@ -609,6 +718,42 @@ describe('streaming multipart filename and header security', () => {
     expect(laterStream.locked).toBe(false);
   });
 
+  test('does not snapshot multipart uploads until the body is actually read', async () => {
+    const createIterator = vi.fn(() => chunks('lazy iterator bytes'));
+    const iterable = { [Symbol.asyncIterator]: createIterator };
+    const stream = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue('lazy reader bytes');
+        controller.close();
+      },
+    });
+    Object.defineProperty(stream, Symbol.asyncIterator, { value: undefined });
+    const getReader = vi.spyOn(stream, 'getReader');
+    const upload = toStreamingFile(stream, 'lazy.txt');
+    const getFilename = vi.fn(() => 'lazy.txt');
+    Object.defineProperty(upload, 'name', { get: getFilename });
+
+    const options = await multipartFormRequestOptions({ body: { iterable, upload } }, fetch);
+    await Promise.resolve();
+
+    expect(createIterator).not.toHaveBeenCalled();
+    expect(getReader).not.toHaveBeenCalled();
+    expect(getFilename).not.toHaveBeenCalled();
+    expect(stream.locked).toBe(false);
+
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    await expect((form.get('iterable') as File).text()).resolves.toBe('lazy iterator bytes');
+    await expect((form.get('upload') as File).text()).resolves.toBe('lazy reader bytes');
+    expect(createIterator).toHaveBeenCalledTimes(1);
+    expect(getReader).toHaveBeenCalledTimes(1);
+    expect(getFilename).toHaveBeenCalledTimes(1);
+    expect(stream.locked).toBe(false);
+  });
+
   test('streams valid branded async-iterable files lazily using one filename snapshot per entry', async () => {
     const readChunk = vi.fn();
     const replace = vi.fn();
@@ -732,6 +877,63 @@ describe('streaming multipart filename and header security', () => {
     await expect(file.text()).resolves.toBe('blob bytes');
     expect(iteratorReads).toBe(2);
     expect(incidentalIterator).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['conditional multipart', maybeMultipartFormRequestOptions],
+    ['required multipart', multipartFormRequestOptions],
+  ] as const)('upgrades a later false-first named Blob in %s', async (_, encodeRequest) => {
+    const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
+    const upload = Object.assign(new Blob(['later blob bytes']), { name: 'later.txt' });
+    let iteratorReads = 0;
+    Object.defineProperty(upload, Symbol.asyncIterator, {
+      get() {
+        iteratorReads += 1;
+        return iteratorReads === 1 ? undefined : incidentalIterator;
+      },
+    });
+
+    const options = await encodeRequest({ body: { earlier: chunks('earlier bytes'), upload } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const file = form.get('upload') as File;
+
+    expect(file.name).toBe('later.txt');
+    await expect(file.text()).resolves.toBe('later blob bytes');
+    expect(iteratorReads).toBe(2);
+    expect(incidentalIterator).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['conditional multipart', maybeMultipartFormRequestOptions],
+    ['required multipart', multipartFormRequestOptions],
+  ] as const)('upgrades a later false-first async iterable in %s', async (_, encodeRequest) => {
+    const createIterator = vi.fn(() => chunks('later iterable bytes'));
+    const upload = {};
+    let iteratorReads = 0;
+    Object.defineProperty(upload, Symbol.asyncIterator, {
+      configurable: true,
+      get() {
+        iteratorReads += 1;
+        if (iteratorReads === 1) {
+          return;
+        }
+        Object.defineProperty(upload, Symbol.asyncIterator, { value: createIterator });
+        return createIterator;
+      },
+    });
+
+    const options = await encodeRequest({ body: { earlier: chunks('earlier bytes'), upload } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    await expect((form.get('upload') as File).text()).resolves.toBe('later iterable bytes');
+    expect(iteratorReads).toBe(2);
+    expect(createIterator).toHaveBeenCalledTimes(1);
   });
 
   test('snapshots named Blob filenames and bytes before reading later streaming filenames', async () => {
