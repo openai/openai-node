@@ -33,10 +33,6 @@ fs.writeFileSync(file, contents);
 EOF
 fi
 
-./node_modules/.bin/oxfmt tests/realtime-websocket-redirects.test.ts
-git diff -- tests/realtime-websocket-redirects.test.ts
-exit 1
-
 # Generated tests are excluded from linting, so TypeScript performs the API
 # compatibility check against every historical resource test.
 ./scripts/lint
