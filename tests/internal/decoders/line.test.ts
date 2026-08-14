@@ -131,6 +131,42 @@ describe('line decoder', () => {
     expect(decoder.flush()).toEqual(['a'.repeat(fragmentCount)]);
   });
 
+  test('releases oversized backing buffers after completing a line', () => {
+    const maximumRetainedBytes = 64 * 1024;
+    const oversizedLine = new Uint8Array(maximumRetainedBytes * 4).fill(0x61);
+    const newline = new Uint8Array([0x0a]);
+    const smallLine = new Uint8Array([0x62, 0x0a]);
+    const decoder = new LineDecoder();
+    const originalSet = Uint8Array.prototype.set;
+    let highWaterCapacity = 0;
+    let retainedCapacity = 0;
+
+    const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordBackingCapacity(
+      this: Uint8Array,
+      source: ArrayLike<number>,
+      offset?: number,
+    ) {
+      if (source === oversizedLine || source === newline) {
+        highWaterCapacity = Math.max(highWaterCapacity, this.buffer.byteLength);
+      } else if (source === smallLine) {
+        retainedCapacity = this.buffer.byteLength;
+      }
+      originalSet.call(this, source, offset);
+    });
+
+    try {
+      expect(decoder.decode(oversizedLine)).toEqual([]);
+      expect(decoder.decode(newline)).toEqual(['a'.repeat(oversizedLine.length)]);
+      expect(decoder.decode(smallLine)).toEqual(['b']);
+
+      expect(highWaterCapacity).toBeGreaterThan(maximumRetainedBytes);
+      expect(retainedCapacity).toBeGreaterThan(0);
+      expect(retainedCapacity).toBeLessThanOrEqual(maximumRetainedBytes);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
   test('only scans newly appended bytes while a fragmented line remains unfinished', () => {
     const fragmentCount = 2048;
     const maximumScannedBytes = fragmentCount * 4;

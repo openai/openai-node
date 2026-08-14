@@ -3,6 +3,9 @@ import { decodeUTF8, encodeUTF8 } from '../utils/bytes';
 /** Text or UTF-8 bytes accepted by the incremental line decoder. */
 export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+/** Maximum backing-buffer capacity retained after its contents are consumed. */
+const MAX_RETAINED_BUFFER_BYTES = 64 * 1024;
+
 /**
  * Incrementally decodes UTF-8 text into lines without losing partial characters
  * or newline sequences that span multiple chunks.
@@ -96,6 +99,9 @@ export class LineDecoder {
       this.#start = 0;
       this.#end = 0;
       this.#searchIndex = 0;
+      if (this.#buffer.length > MAX_RETAINED_BUFFER_BYTES) {
+        this.#buffer = new Uint8Array();
+      }
     }
 
     return lines;
