@@ -340,12 +340,21 @@ const getUploadableKind = (value: unknown, uploadableKinds: UploadableKinds): Up
 
   if (uploadableKinds.has(value)) {
     const cached = uploadableKinds.get(value);
-    if (cached === 'streaming-file' || !isStreamingFile(value)) {
+    if (cached === 'streaming-file') {
       return cached;
     }
-
-    uploadableKinds.set(value, 'streaming-file');
-    return 'streaming-file';
+    if (isStreamingFile(value)) {
+      uploadableKinds.set(value, 'streaming-file');
+      return 'streaming-file';
+    }
+    if (cached === 'streaming-upload') {
+      return cached;
+    }
+    if (isAsyncIterable(value) || isReadableStream(value)) {
+      uploadableKinds.set(value, 'streaming-upload');
+      return 'streaming-upload';
+    }
+    return cached;
   }
 
   let uploadableKind: UploadableKind;
