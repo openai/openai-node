@@ -8,9 +8,8 @@ const oxlint = path.join(repoRoot, 'node_modules/oxlint/bin/oxlint');
 const oxfmt = path.join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
 
 function spawnPnpmScript(script: 'format' | 'lint') {
-  const command = process.platform === 'win32' ? 'bash' : 'pnpm';
-  const args =
-    process.platform === 'win32' ? ['-c', 'pnpm --config.script-shell=bash "$@"', '_', script] : [script];
+  const command = process.platform === 'win32' ? (process.env['ComSpec'] ?? 'cmd.exe') : 'pnpm';
+  const args = process.platform === 'win32' ? ['/d', '/s', '/c', `pnpm ${script}`] : [script];
 
   return spawnSync(command, args, { cwd: repoRoot, encoding: 'utf-8' });
 }
