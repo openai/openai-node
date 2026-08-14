@@ -183,7 +183,10 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
 }
 
 function basename(value: string): string | undefined {
-  const name = value.split(/[\\/]/).pop()?.replace(/^[A-Za-z]:/, '');
+  const name = value
+    .split(/[\\/]/)
+    .pop()
+    ?.replace(/^[A-Za-z]:/, '');
   return name || undefined;
 }
 
