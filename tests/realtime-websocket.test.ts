@@ -1,3 +1,6 @@
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import { connect } from 'node:net';
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
@@ -12,7 +15,7 @@ type Listener = (event: any) => void;
 
 type FakeNodeSocket = {
   url: URL;
-  options: { headers?: Record<string, string> };
+  options: WS.ClientOptions;
   on: Mock;
   send: Mock;
   close: Mock;
@@ -460,6 +463,171 @@ describe.each([
     expect(socket.url.searchParams.has('api-version')).toBe(beta);
   });
 
+  test('disables explicitly enabled redirects when Azure uses a static API key', async () => {
+    await Realtime.azure(createAzureClient({ deployment: 'chat' }), {
+      options: {
+        followRedirects: true,
+        handshakeTimeout: 4321,
+        headers: { 'X-Custom': 'value' },
+      },
+    });
+
+    expect(lastNodeSocket().options).toMatchObject({
+      followRedirects: false,
+      handshakeTimeout: 4321,
+      headers: { 'api-key': 'azure-key', 'X-Custom': 'value' },
+    });
+  });
+
+  test.each(['api-key', 'API-Key', 'aPi-KeY', 'x-api-key', 'X-API-KEY', 'api_key', 'API_KEY', 'ApiKey'])(
+    'disables explicitly enabled redirects for the custom credential header %s',
+    (header) => {
+      const realtime = new Realtime(
+        {
+          model: 'gpt-realtime',
+          options: {
+            followRedirects: true,
+            handshakeTimeout: 4321,
+            headers: { [header]: 'custom-secret', 'X-Custom': 'value' },
+          },
+        },
+        createClient(),
+      );
+
+      expect(realtime.socket).toBe(lastNodeSocket());
+      expect(lastNodeSocket().options).toMatchObject({
+        followRedirects: false,
+        handshakeTimeout: 4321,
+        headers: {
+          [header]: 'custom-secret',
+          Authorization: 'Bearer test-key',
+          'X-Custom': 'value',
+        },
+      });
+    },
+  );
+
+  test('preserves explicitly enabled redirects for bearer-only authentication and unrelated headers', () => {
+    const realtime = new Realtime(
+      {
+        model: 'gpt-realtime',
+        options: {
+          followRedirects: true,
+          handshakeTimeout: 4321,
+          headers: { 'X-Custom': 'value' },
+        },
+      },
+      createClient(),
+    );
+
+    expect(realtime.socket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options).toMatchObject({
+      followRedirects: true,
+      handshakeTimeout: 4321,
+      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+    });
+  });
+
+  test('preserves default redirect behavior and unrelated connection options', () => {
+    const realtime = new Realtime(
+      {
+        model: 'gpt-realtime',
+        options: { handshakeTimeout: 4321, headers: { 'X-Custom': 'value' } },
+      },
+      createClient(),
+    );
+
+    expect(realtime.socket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options).toMatchObject({
+      handshakeTimeout: 4321,
+      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+    });
+    expect(lastNodeSocket().options.followRedirects).toBeUndefined();
+  });
+
+  test.each([302, 307, 308])(
+    'does not disclose a static Azure API key across an HTTP %i WebSocket redirect',
+    async (status) => {
+      const apiKey = 'AZURE_STATIC_SECRET';
+      const sourceAPIKeys: (string | string[] | undefined)[] = [];
+      const disclosedAPIKeys: (string | string[] | undefined)[] = [];
+      let redirectURL = '';
+
+      const destination = createServer((request, response) => {
+        request.resume();
+        disclosedAPIKeys.push(request.headers['api-key']);
+        response.writeHead(200);
+        response.end();
+      });
+
+      const source = createServer((request, response) => {
+        request.resume();
+        sourceAPIKeys.push(request.headers['api-key']);
+        response.writeHead(status, { location: redirectURL });
+        response.end();
+      });
+
+      try {
+        await Promise.all([
+          once(destination.listen(0, '127.0.0.1'), 'listening'),
+          once(source.listen(0, '127.0.0.1'), 'listening'),
+        ]);
+
+        const destinationAddress = destination.address();
+        const sourceAddress = source.address();
+
+        if (
+          !destinationAddress ||
+          typeof destinationAddress === 'string' ||
+          !sourceAddress ||
+          typeof sourceAddress === 'string'
+        ) {
+          throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');
+        }
+
+        redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
+
+        const actualWS = await vi.importActual<typeof WS>('ws');
+        nodeSocketConstructor.mockImplementationOnce(function WebSocket(url: URL, options: WS.ClientOptions) {
+          return new actualWS.WebSocket(url, options);
+        });
+
+        const client = new AzureOpenAI({
+          apiVersion: '2024-10-01-preview',
+          baseURL: `https://127.0.0.1:${sourceAddress.port}/openai/`,
+          deployment: 'chat',
+          apiKey,
+        });
+
+        const realtime = await Realtime.azure(client, {
+          options: {
+            followRedirects: true,
+            createConnection: ((options: { port?: number | string }) =>
+              connect({ host: '127.0.0.1', port: Number(options.port) })) as typeof connect,
+          },
+        });
+        const errors = vi.fn();
+        onRealtimeEvent(realtime, 'error', errors);
+
+        await once(realtime.socket, 'error');
+        expect(disclosedAPIKeys).toEqual([]);
+        expect(sourceAPIKeys).toEqual([apiKey]);
+        expect(errors).toHaveBeenCalledWith(
+          expect.objectContaining({ message: `Unexpected server response: ${status}` }),
+        );
+      } finally {
+        await Promise.all(
+          [source, destination].map(async (server) => {
+            const closed = once(server, 'close');
+            server.close();
+            server.closeAllConnections();
+            await closed;
+          }),
+        );
+      }
+    },
+  );
+
   test('authenticates Azure token-provider sessions with a bearer header', async () => {
     await Realtime.azure(createAzureClient({ deployment: 'chat', tokenProvider: true }));
     const socket = lastNodeSocket();
@@ -469,6 +637,28 @@ describe.each([
     expect(socket.url.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
     expect(socket.url.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
     expect(socket.url.searchParams.has('api-version')).toBe(beta);
+  });
+
+  test('preserves explicitly enabled redirects for Azure token-provider authentication', async () => {
+    await Realtime.azure(createAzureClient({ deployment: 'chat', tokenProvider: true }), {
+      options: { followRedirects: true, headers: { 'X-Custom': 'value' } },
+    });
+
+    expect(lastNodeSocket().options).toMatchObject({
+      followRedirects: true,
+      headers: { Authorization: 'Bearer azure-token', 'X-Custom': 'value' },
+    });
+  });
+
+  test('disables redirects when Azure token-provider authentication includes a custom API key', async () => {
+    await Realtime.azure(createAzureClient({ deployment: 'chat', tokenProvider: true }), {
+      options: { followRedirects: true, headers: { 'X-API-KEY': 'custom-secret' } },
+    });
+
+    expect(lastNodeSocket().options).toMatchObject({
+      followRedirects: false,
+      headers: { Authorization: 'Bearer azure-token', 'X-API-KEY': 'custom-secret' },
+    });
   });
 
   test('requires an Azure deployment', async () => {
