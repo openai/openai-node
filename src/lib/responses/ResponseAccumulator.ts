@@ -3,8 +3,10 @@ import { OpenAIError } from '../../error';
 import { hasOwn } from '../../internal/utils';
 import { addOutputText } from '../ResponsesParser';
 
-const canonicalOutputTextSnapshots = new WeakSet<Response>();
-const outputTextLengths = new WeakMap<Response['output'][number], number>();
+type ResponseAccumulatorContext = {
+  canonicalSnapshot: Response | undefined;
+  outputTextLengths: WeakMap<Response['output'][number], number>;
+};
 
 /** A transport keepalive event that leaves the accumulated response unchanged. */
 type ResponseKeepAliveEvent = {
@@ -25,13 +27,38 @@ export function accumulateResponse(
   event: ResponseStreamEvent | ResponseKeepAliveEvent,
   snapshot?: Response,
 ): Response {
+  return accumulateResponseWithContext(event, snapshot, createResponseAccumulatorContext());
+}
+
+/**
+ * Creates an accumulator with bookkeeping owned by a single response stream.
+ *
+ * @internal
+ */
+export function createResponseAccumulator(): (
+  event: ResponseStreamEvent | ResponseKeepAliveEvent,
+  snapshot?: Response,
+) => Response {
+  const context = createResponseAccumulatorContext();
+  return (event, snapshot) => accumulateResponseWithContext(event, snapshot, context);
+}
+
+function createResponseAccumulatorContext(): ResponseAccumulatorContext {
+  return { canonicalSnapshot: undefined, outputTextLengths: new WeakMap() };
+}
+
+function accumulateResponseWithContext(
+  event: ResponseStreamEvent | ResponseKeepAliveEvent,
+  snapshot: Response | undefined,
+  context: ResponseAccumulatorContext,
+): Response {
   if (!snapshot) {
     if (event.type !== 'response.created') {
       throw new OpenAIError(
         `When snapshot hasn't been set yet, expected 'response.created' event, got ${event.type}`,
       );
     }
-    return cloneResponse(event.response);
+    return cloneResponse(context, event.response);
   }
 
   switch (event.type) {
@@ -39,10 +66,10 @@ export function accumulateResponse(
       validateArrayAppend(snapshot.output, event.output_index, 'output');
       const output = structuredClone(event.item);
       if (output.type === 'message') {
-        ensureCanonicalOutputText(snapshot);
+        ensureCanonicalOutputText(context, snapshot);
       }
       snapshot.output.push(output);
-      const text = getOutputText(output);
+      const text = getOutputText(context, output);
       if (text) {
         snapshot.output_text += text;
       }
@@ -50,13 +77,19 @@ export function accumulateResponse(
     }
     case 'response.output_item.done': {
       const output = getOutput(snapshot, event.output_index);
-      const previousText = getOutputText(output);
+      const previousText = getOutputText(context, output);
       const replacement = structuredClone(event.item);
       if (output.type === 'message' || replacement.type === 'message') {
-        ensureCanonicalOutputText(snapshot);
+        ensureCanonicalOutputText(context, snapshot);
       }
       snapshot.output[event.output_index] = replacement;
-      updateOutputText(snapshot, event.output_index, previousText, getOutputText(replacement));
+      updateOutputText(
+        context,
+        snapshot,
+        event.output_index,
+        previousText,
+        getOutputText(context, replacement),
+      );
       break;
     }
     case 'response.content_part.added': {
@@ -67,12 +100,12 @@ export function accumulateResponse(
         validateArrayAppend(output.content, event.content_index, 'content');
         const content = structuredClone(part);
         if (content.type === 'output_text') {
-          ensureCanonicalOutputText(snapshot);
+          ensureCanonicalOutputText(context, snapshot);
         }
         output.content.push(content);
         if (content.type === 'output_text') {
-          updateCachedOutputTextLength(output, '', content.text);
-          updateOutputText(snapshot, event.output_index, '', content.text, event.content_index);
+          updateCachedOutputTextLength(context, output, '', content.text);
+          updateOutputText(context, snapshot, event.output_index, '', content.text, event.content_index);
         }
       } else if (type === 'reasoning' && part.type === 'reasoning_text') {
         const content = output.content ?? [];
@@ -92,12 +125,12 @@ export function accumulateResponse(
         const previousText = content.type === 'output_text' ? content.text : '';
         const replacement = structuredClone(part);
         if (content.type === 'output_text' || replacement.type === 'output_text') {
-          ensureCanonicalOutputText(snapshot);
+          ensureCanonicalOutputText(context, snapshot);
         }
         output.content[event.content_index] = replacement;
         const nextText = replacement.type === 'output_text' ? replacement.text : '';
-        updateCachedOutputTextLength(output, previousText, nextText);
-        updateOutputText(snapshot, event.output_index, previousText, nextText, event.content_index);
+        updateCachedOutputTextLength(context, output, previousText, nextText);
+        updateOutputText(context, snapshot, event.output_index, previousText, nextText, event.content_index);
       } else if (output.type === 'reasoning' && part.type === 'reasoning_text') {
         const content = output.content;
         if (!content) {
@@ -116,16 +149,23 @@ export function accumulateResponse(
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
         const previousText = content.text;
-        ensureCanonicalOutputText(snapshot);
+        ensureCanonicalOutputText(context, snapshot);
         content.text = previousText + event.delta;
-        updateCachedOutputTextLength(output, previousText, content.text);
+        updateCachedOutputTextLength(context, output, previousText, content.text);
         if (
           event.output_index === snapshot.output.length - 1 &&
           event.content_index === output.content.length - 1
         ) {
           snapshot.output_text += event.delta;
         } else {
-          updateOutputText(snapshot, event.output_index, previousText, content.text, event.content_index);
+          updateOutputText(
+            context,
+            snapshot,
+            event.output_index,
+            previousText,
+            content.text,
+            event.content_index,
+          );
         }
       }
       break;
@@ -138,10 +178,17 @@ export function accumulateResponse(
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
         const previousText = content.text;
-        ensureCanonicalOutputText(snapshot);
+        ensureCanonicalOutputText(context, snapshot);
         content.text = event.text;
-        updateCachedOutputTextLength(output, previousText, event.text);
-        updateOutputText(snapshot, event.output_index, previousText, event.text, event.content_index);
+        updateCachedOutputTextLength(context, output, previousText, event.text);
+        updateOutputText(
+          context,
+          snapshot,
+          event.output_index,
+          previousText,
+          event.text,
+          event.content_index,
+        );
       }
       break;
     }
@@ -408,7 +455,7 @@ export function accumulateResponse(
     case 'response.completed':
     case 'response.failed':
     case 'response.incomplete': {
-      snapshot = cloneResponse(event.response);
+      snapshot = cloneResponse(context, event.response);
       break;
     }
     case 'response.audio.delta':
@@ -432,33 +479,35 @@ export function accumulateResponse(
   return snapshot;
 }
 
-function cloneResponse(response: Response): Response {
+function cloneResponse(context: ResponseAccumulatorContext, response: Response): Response {
+  context.canonicalSnapshot = undefined;
+  context.outputTextLengths = new WeakMap();
   const snapshot = structuredClone(response);
   if (!Object.getOwnPropertyDescriptor(snapshot, 'output_text') || snapshot.output_text == null) {
     addOutputText(snapshot);
-    canonicalOutputTextSnapshots.add(snapshot);
+    context.canonicalSnapshot = snapshot;
   } else if (snapshot.output.length === 0 && snapshot.output_text === '') {
-    canonicalOutputTextSnapshots.add(snapshot);
+    context.canonicalSnapshot = snapshot;
   }
   return snapshot;
 }
 
-function ensureCanonicalOutputText(snapshot: Response): void {
-  if (canonicalOutputTextSnapshots.has(snapshot)) {
+function ensureCanonicalOutputText(context: ResponseAccumulatorContext, snapshot: Response): void {
+  if (context.canonicalSnapshot === snapshot) {
     return;
   }
 
   let text = '';
   for (const output of snapshot.output) {
-    text += getOutputText(output);
+    text += getOutputText(context, output);
   }
   if (snapshot.output_text !== text) {
     snapshot.output_text = text;
   }
-  canonicalOutputTextSnapshots.add(snapshot);
+  context.canonicalSnapshot = snapshot;
 }
 
-function getOutputText(output: Response['output'][number]): string {
+function getOutputText(context: ResponseAccumulatorContext, output: Response['output'][number]): string {
   if (output.type !== 'message') {
     return '';
   }
@@ -469,22 +518,24 @@ function getOutputText(output: Response['output'][number]): string {
       text += content.text;
     }
   }
-  outputTextLengths.set(output, text.length);
+  context.outputTextLengths.set(output, text.length);
   return text;
 }
 
 function updateCachedOutputTextLength(
+  context: ResponseAccumulatorContext,
   output: Response['output'][number],
   previousText: string,
   nextText: string,
 ): void {
-  const length = outputTextLengths.get(output);
+  const length = context.outputTextLengths.get(output);
   if (length !== undefined) {
-    outputTextLengths.set(output, length - previousText.length + nextText.length);
+    context.outputTextLengths.set(output, length - previousText.length + nextText.length);
   }
 }
 
 function updateOutputText(
+  context: ResponseAccumulatorContext,
   snapshot: Response,
   outputIndex: number,
   previousText: string,
@@ -514,7 +565,7 @@ function updateOutputText(
           precedingContentLength += precedingContent.text.length;
         }
       }
-      const outputTextLength = outputTextLengths.get(output) ?? getOutputText(output).length;
+      const outputTextLength = context.outputTextLengths.get(output) ?? getOutputText(context, output).length;
       followingContentLength = outputTextLength - precedingContentLength - nextText.length;
     } else {
       for (let index = contentIndex + 1; index < output.content.length; index += 1) {
@@ -523,7 +574,7 @@ function updateOutputText(
           followingContentLength += followingContent.text.length;
         }
       }
-      const outputTextLength = outputTextLengths.get(output) ?? getOutputText(output).length;
+      const outputTextLength = context.outputTextLengths.get(output) ?? getOutputText(context, output).length;
       precedingContentLength = outputTextLength - followingContentLength - nextText.length;
     }
   }
@@ -534,7 +585,8 @@ function updateOutputText(
     for (let index = 0; index < outputIndex; index += 1) {
       const precedingOutput = snapshot.output[index];
       if (precedingOutput?.type === 'message') {
-        offset += outputTextLengths.get(precedingOutput) ?? getOutputText(precedingOutput).length;
+        offset +=
+          context.outputTextLengths.get(precedingOutput) ?? getOutputText(context, precedingOutput).length;
       }
     }
   } else {
@@ -543,7 +595,7 @@ function updateOutputText(
       const followingOutput = snapshot.output[index];
       if (followingOutput?.type === 'message') {
         followingTextLength +=
-          outputTextLengths.get(followingOutput) ?? getOutputText(followingOutput).length;
+          context.outputTextLengths.get(followingOutput) ?? getOutputText(context, followingOutput).length;
       }
     }
     if (followingTextLength === 0) {

@@ -121,6 +121,27 @@ function measureTextWork(): { reads: number } {
   return work;
 }
 
+function measureLaterOutputVisits(): { visits: number } {
+  const work = { visits: 0 };
+  const clone = globalThis.structuredClone;
+  vi.spyOn(globalThis, 'structuredClone').mockImplementation((value, options) => {
+    const cloned = clone(value, options);
+    if (typeof cloned === 'object' && cloned !== null && 'object' in cloned && cloned.object === 'response') {
+      const snapshot = cloned as Response;
+      snapshot.output = new Proxy(snapshot.output, {
+        get(target, property, receiver) {
+          if (typeof property === 'string' && /^[1-9][0-9]*$/u.test(property)) {
+            work.visits += 1;
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+    }
+    return cloned;
+  });
+  return work;
+}
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('canonical streamed response output text', () => {
@@ -160,31 +181,55 @@ describe('canonical streamed response output text', () => {
 
   test.each(['added', 'delta'] as const)(
     'visits later tool outputs only linearly across adversarial %s updates',
-    (kind) => {
+    async (kind) => {
       const count = 384;
-      const snapshot = accumulateResponse(created());
-      accumulateResponse(outputFrame('added', 0, message(0, kind === 'delta' ? [text('')] : [])), snapshot);
+      const work = measureLaterOutputVisits();
+      const events = [created(), outputFrame('added', 0, message(0, kind === 'delta' ? [text('')] : []))];
       for (let index = 1; index <= count; index += 1) {
-        accumulateResponse(outputFrame('added', index, tool(index)), snapshot);
+        events.push(outputFrame('added', index, tool(index)));
       }
-      let laterOutputVisits = 0;
-      snapshot.output = new Proxy(snapshot.output, {
-        get(target, property, receiver) {
-          if (typeof property === 'string' && /^[1-9][0-9]*$/u.test(property)) {
-            laterOutputVisits += 1;
-          }
-          return Reflect.get(target, property, receiver);
-        },
-      });
       for (let index = 0; index < count; index += 1) {
         const event =
           kind === 'added' ? contentFrame('added', 0, index, text('x')) : textFrame('delta', 0, 0, 'x');
-        accumulateResponse(event, snapshot);
+        events.push(event);
       }
-      expect(snapshot.output_text).toBe('x'.repeat(count));
-      expect(laterOutputVisits).toBeLessThanOrEqual(count * 4);
+      const final = await stream(events);
+      expect(final.output_text).toBe('x'.repeat(count));
+      expect(work.visits).toBeLessThanOrEqual(count * 4);
     },
   );
+
+  test('keeps 4,096 ordinary streamed token deltas linear', async () => {
+    const count = 4096;
+    const work = measureTextWork();
+    const events = [created(), outputFrame('added', 0, message(0)), contentFrame('added', 0, 0, text(''))];
+    for (let index = 0; index < count; index += 1) {
+      events.push(textFrame('delta', 0, 0, 'x'));
+    }
+
+    const final = await stream(events);
+
+    expect(final.output_text).toBe('x'.repeat(count));
+    expect(work.reads).toBeLessThanOrEqual(count * 8);
+  });
+
+  test('keeps lifecycle replacements and parallel stream contexts independent', async () => {
+    const resumed = stream([
+      created([message(0, [text('old')])]),
+      textFrame('delta', 0, 0, '!'),
+      frame('response.in_progress', { response: response([message(0, [text('replacement')])], 'stale') }),
+      textFrame('delta', 0, 0, '?'),
+    ]);
+    const independent = stream([
+      created([message(0, [text('separate')])], 'poisoned'),
+      textFrame('delta', 0, 0, '!'),
+    ]);
+
+    const [replaced, separate] = await Promise.all([resumed, independent]);
+
+    expect(replaced.output_text).toBe('replacement?');
+    expect(separate.output_text).toBe('separate!');
+  });
 
   test.each([
     ['earlier output delta', [first(), second()], textFrame('delta', 0, 0, 'X'), 'AXB'],

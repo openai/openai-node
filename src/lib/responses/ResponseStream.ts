@@ -13,7 +13,7 @@ import type OpenAI from '../../index';
 import { EventStream } from '../EventStream';
 import type { BaseEvents } from '../EventStream';
 import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
-import { accumulateResponse } from './ResponseAccumulator';
+import { createResponseAccumulator } from './ResponseAccumulator';
 import type { ParseableToolsParams } from '../ResponsesParser';
 import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
@@ -93,6 +93,7 @@ export class ResponseStream<ParsedT = null>
   #params: ResponseStreamingParams | null;
   #currentResponseSnapshot: Response | undefined;
   #finalResponse: ParsedResponse<ParsedT> | undefined;
+  #accumulateResponse = createResponseAccumulator();
 
   /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ResponseStreamingParams | null) {
@@ -128,6 +129,7 @@ export class ResponseStream<ParsedT = null>
       return;
     }
     this.#currentResponseSnapshot = undefined;
+    this.#accumulateResponse = createResponseAccumulator();
   }
 
   #addEvent(this: ResponseStream<ParsedT>, event: ResponseStreamEvent, starting_after: number | null) {
@@ -149,7 +151,7 @@ export class ResponseStream<ParsedT = null>
       throw new APIError(undefined, error, event.message, undefined);
     }
 
-    const response = accumulateResponse(event, this.#currentResponseSnapshot);
+    const response = this.#accumulateResponse(event, this.#currentResponseSnapshot);
     this.#currentResponseSnapshot = response;
     maybeEmit('event', event);
 
