@@ -300,7 +300,7 @@ export function parseChatCompletion<
             }
           : undefined),
         parsed:
-          choice.message.content && !choice.message.refusal
+          choice.message.content !== null && choice.message.content !== undefined && !choice.message.refusal
             ? parseResponseFormat(params, choice.message.content)
             : null,
       },

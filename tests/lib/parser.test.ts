@@ -1617,6 +1617,41 @@ describe('maybeParseChatCompletion', () => {
       units: 'c',
     });
   });
+
+  it('parses present empty assistant content with the response_format parser', () => {
+    const parseRaw = vi.fn((raw: string) => ({ raw }));
+    const format = makeParseableResponseFormat(
+      { type: 'json_schema', json_schema: { name: 'empty_content', schema: {} } },
+      parseRaw,
+    );
+    const rawCompletion = {
+      id: 'chatcmpl-empty',
+      object: 'chat.completion' as const,
+      created: 1_677_652_288,
+      model: 'gpt-4o-2024-08-06',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop' as const,
+          logprobs: null,
+          message: {
+            role: 'assistant' as const,
+            content: '',
+            refusal: null,
+          },
+        },
+      ],
+    };
+
+    const parsed = maybeParseChatCompletion(rawCompletion, {
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: 'hello' }],
+      response_format: format,
+    });
+
+    expect(parseRaw).toHaveBeenCalledWith('');
+    expect(parsed.choices[0]?.message.parsed).toEqual({ raw: '' });
+  });
 });
 
 describe('isParseableResponseFormat', () => {
