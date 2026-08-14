@@ -100,7 +100,7 @@ function getAssistantStreamDeltaIndex(
     !Number.isSafeInteger(index) ||
     (index as number) < 0 ||
     (index as number) >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH ||
-    (!enforceSparseHoleBudget && (index as number) >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH)
+    (index as number) >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH
   ) {
     throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
   }

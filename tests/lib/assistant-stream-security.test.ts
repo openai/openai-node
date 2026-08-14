@@ -239,7 +239,7 @@ describe('AssistantStream delta index security', () => {
     await runner.done();
 
     expect(toolCalls).toHaveLength(2048);
-    expect(ownKeysCalls).toBe(1);
+    expect(ownKeysCalls).toBe(2);
   });
 
   test.each(['missing', 'null', 'undefined'])(
