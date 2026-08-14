@@ -1,10 +1,7 @@
 import * as Errors from './error';
 import { OpenAI } from './client';
 import type { ApiKeySetter, ClientOptions } from './client';
-import {
-  assertBedrockRequestOrigin,
-  brand_privateBedrockClient,
-} from './internal/bedrock';
+import { assertBedrockRequestOrigin, brand_privateBedrockClient } from './internal/bedrock';
 import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';

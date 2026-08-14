@@ -332,4 +332,3 @@ describe.each([
     expect(lastNodeSocket().options.followRedirects).toBe(false);
   });
 });
-

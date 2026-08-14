@@ -412,62 +412,65 @@ describe.each([
       header: 'proxy-authorization',
       value: 'Basic PROXY_SECRET',
     },
-  ])('does not disclose $name across a redirect with a public listener', async ({ client, options, header, value }) => {
-    const sourceCredentials: (string | undefined)[] = [];
-    const disclosedCredentials: (string | undefined)[] = [];
-    let redirectURL = '';
+  ])(
+    'does not disclose $name across a redirect with a public listener',
+    async ({ client, options, header, value }) => {
+      const sourceCredentials: (string | undefined)[] = [];
+      const disclosedCredentials: (string | undefined)[] = [];
+      let redirectURL = '';
 
-    const destination = createServer((request, response) => {
-      request.resume();
-      disclosedCredentials.push(request.headers[header] as string | undefined);
-      response.writeHead(200);
-      response.end();
-    });
-    const source = createServer((request, response) => {
-      request.resume();
-      sourceCredentials.push(request.headers[header] as string | undefined);
-      response.writeHead(302, { location: redirectURL });
-      response.end();
-    });
-
-    try {
-      await Promise.all([
-        once(destination.listen(0, '127.0.0.1'), 'listening'),
-        once(source.listen(0, '127.0.0.1'), 'listening'),
-      ]);
-      const destinationAddress = destination.address();
-      const sourceAddress = source.address();
-      if (
-        !destinationAddress ||
-        typeof destinationAddress === 'string' ||
-        !sourceAddress ||
-        typeof sourceAddress === 'string'
-      ) {
-        throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');
-      }
-
-      redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
-      const actualWS = await vi.importActual<typeof WS>('ws');
-      actualWebSocketConstructor = actualWS.WebSocket;
-      nodeSocketConstructor.mockImplementationOnce(ActualWebSocket);
-
-      const openAI = client();
-      openAI.baseURL = `http://127.0.0.1:${sourceAddress.port}/v1`;
-      const responses = new Responses(openAI, {
-        ...options,
-        followRedirects: true,
-        createConnection: createPlainConnection as typeof connect,
+      const destination = createServer((request, response) => {
+        request.resume();
+        disclosedCredentials.push(request.headers[header] as string | undefined);
+        response.writeHead(200);
+        response.end();
       });
-      const redirects = vi.fn();
-      responses.socket.platformSocket.on('redirect', redirects);
+      const source = createServer((request, response) => {
+        request.resume();
+        sourceCredentials.push(request.headers[header] as string | undefined);
+        response.writeHead(302, { location: redirectURL });
+        response.end();
+      });
 
-      await once(responses.socket.platformSocket, 'error');
+      try {
+        await Promise.all([
+          once(destination.listen(0, '127.0.0.1'), 'listening'),
+          once(source.listen(0, '127.0.0.1'), 'listening'),
+        ]);
+        const destinationAddress = destination.address();
+        const sourceAddress = source.address();
+        if (
+          !destinationAddress ||
+          typeof destinationAddress === 'string' ||
+          !sourceAddress ||
+          typeof sourceAddress === 'string'
+        ) {
+          throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');
+        }
 
-      expect(sourceCredentials).toEqual([value]);
-      expect(disclosedCredentials).toEqual([]);
-      expect(redirects).not.toHaveBeenCalled();
-    } finally {
-      await closeServers(source, destination);
-    }
-  });
+        redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
+        const actualWS = await vi.importActual<typeof WS>('ws');
+        actualWebSocketConstructor = actualWS.WebSocket;
+        nodeSocketConstructor.mockImplementationOnce(ActualWebSocket);
+
+        const openAI = client();
+        openAI.baseURL = `http://127.0.0.1:${sourceAddress.port}/v1`;
+        const responses = new Responses(openAI, {
+          ...options,
+          followRedirects: true,
+          createConnection: createPlainConnection as typeof connect,
+        });
+        const redirects = vi.fn();
+        responses.socket.platformSocket.on('redirect', redirects);
+
+        await once(responses.socket.platformSocket, 'error');
+
+        expect(sourceCredentials).toEqual([value]);
+        expect(disclosedCredentials).toEqual([]);
+        expect(redirects).not.toHaveBeenCalled();
+      } finally {
+        await closeServers(source, destination);
+      }
+    },
+  );
 });
