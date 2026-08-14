@@ -11,16 +11,16 @@ import * as WS from 'ws';
 
 type Listener = (event: any) => void;
 
-type FakeNodeSocket = {
+interface FakeNodeSocket {
   url: URL;
   options: WS.ClientOptions;
   on: Mock;
   send: Mock;
   close: Mock;
-};
+}
 
 vi.mock('ws', () => ({
-  WebSocket: vi.fn().mockImplementation(function WebSocket(url: URL, options: FakeNodeSocket['options']) {
+  WebSocket: vi.fn().mockImplementation((url: URL, options: FakeNodeSocket['options']) => {
     return {
       url,
       options,
@@ -34,8 +34,11 @@ vi.mock('ws', () => ({
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 
 function lastNodeSocket(): FakeNodeSocket {
-  return nodeSocketConstructor.mock.results[nodeSocketConstructor.mock.results.length - 1]!
-    .value as FakeNodeSocket;
+  const socket = nodeSocketConstructor.mock.results.at(-1)?.value as FakeNodeSocket | undefined;
+  if (!socket) {
+    throw new Error('Expected a WebSocket instance');
+  }
+  return socket;
 }
 
 function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
@@ -244,7 +247,7 @@ describe.each([
         redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
 
         const actualWS = await vi.importActual<typeof WS>('ws');
-        nodeSocketConstructor.mockImplementationOnce(function WebSocket(url: URL, options: WS.ClientOptions) {
+        nodeSocketConstructor.mockImplementationOnce((url: URL, options: WS.ClientOptions) => {
           return new actualWS.WebSocket(url, options);
         });
 
@@ -316,7 +319,7 @@ describe.each([
       redirectURL = `ws://127.0.0.1:${destinationAddress.port}/attacker`;
 
       const actualWS = await vi.importActual<typeof WS>('ws');
-      nodeSocketConstructor.mockImplementationOnce(function WebSocket(url: URL, options: WS.ClientOptions) {
+      nodeSocketConstructor.mockImplementationOnce((url: URL, options: WS.ClientOptions) => {
         return new actualWS.WebSocket(url, options);
       });
 
