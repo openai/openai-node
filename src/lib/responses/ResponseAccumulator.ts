@@ -3,6 +3,9 @@ import { OpenAIError } from '../../error';
 import { hasOwn } from '../../internal/utils';
 import { addOutputText } from '../ResponsesParser';
 
+const canonicalOutputTextSnapshots = new WeakSet<Response>();
+const outputTextLengths = new WeakMap<Response['output'][number], number>();
+
 /** A transport keepalive event that leaves the accumulated response unchanged. */
 type ResponseKeepAliveEvent = {
   /** Identifies a non-content keepalive event emitted by the response transport. */
@@ -34,18 +37,26 @@ export function accumulateResponse(
   switch (event.type) {
     case 'response.output_item.added': {
       validateArrayAppend(snapshot.output, event.output_index, 'output');
-      snapshot.output.push(structuredClone(event.item));
-      if (event.item.type === 'message') {
-        addOutputText(snapshot);
+      const output = structuredClone(event.item);
+      if (output.type === 'message') {
+        ensureCanonicalOutputText(snapshot);
+      }
+      snapshot.output.push(output);
+      const text = getOutputText(output);
+      if (text) {
+        snapshot.output_text += text;
       }
       break;
     }
     case 'response.output_item.done': {
-      getOutput(snapshot, event.output_index);
-      snapshot.output[event.output_index] = structuredClone(event.item);
-      if (event.item.type === 'message') {
-        addOutputText(snapshot);
+      const output = getOutput(snapshot, event.output_index);
+      const previousText = getOutputText(output);
+      const replacement = structuredClone(event.item);
+      if (output.type === 'message' || replacement.type === 'message') {
+        ensureCanonicalOutputText(snapshot);
       }
+      snapshot.output[event.output_index] = replacement;
+      updateOutputText(snapshot, event.output_index, previousText, getOutputText(replacement));
       break;
     }
     case 'response.content_part.added': {
@@ -54,9 +65,14 @@ export function accumulateResponse(
       const part = event.part;
       if (type === 'message' && part.type !== 'reasoning_text') {
         validateArrayAppend(output.content, event.content_index, 'content');
-        output.content.push(structuredClone(part));
-        if (part.type === 'output_text') {
-          addOutputText(snapshot);
+        const content = structuredClone(part);
+        if (content.type === 'output_text') {
+          ensureCanonicalOutputText(snapshot);
+        }
+        output.content.push(content);
+        if (content.type === 'output_text') {
+          updateCachedOutputTextLength(output, '', content.text);
+          updateOutputText(snapshot, event.output_index, '', content.text, event.content_index);
         }
       } else if (type === 'reasoning' && part.type === 'reasoning_text') {
         const content = output.content ?? [];
@@ -72,11 +88,16 @@ export function accumulateResponse(
       const output = getOutput(snapshot, event.output_index);
       const part = event.part;
       if (output.type === 'message' && part.type !== 'reasoning_text') {
-        getContent(output.content, event.content_index);
-        output.content[event.content_index] = structuredClone(part);
-        if (part.type === 'output_text') {
-          addOutputText(snapshot);
+        const content = getContent(output.content, event.content_index);
+        const previousText = content.type === 'output_text' ? content.text : '';
+        const replacement = structuredClone(part);
+        if (content.type === 'output_text' || replacement.type === 'output_text') {
+          ensureCanonicalOutputText(snapshot);
         }
+        output.content[event.content_index] = replacement;
+        const nextText = replacement.type === 'output_text' ? replacement.text : '';
+        updateCachedOutputTextLength(output, previousText, nextText);
+        updateOutputText(snapshot, event.output_index, previousText, nextText, event.content_index);
       } else if (output.type === 'reasoning' && part.type === 'reasoning_text') {
         const content = output.content;
         if (!content) {
@@ -94,8 +115,18 @@ export function accumulateResponse(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
-        content.text += event.delta;
-        snapshot.output_text += event.delta;
+        const previousText = content.text;
+        ensureCanonicalOutputText(snapshot);
+        content.text = previousText + event.delta;
+        updateCachedOutputTextLength(output, previousText, content.text);
+        if (
+          event.output_index === snapshot.output.length - 1 &&
+          event.content_index === output.content.length - 1
+        ) {
+          snapshot.output_text += event.delta;
+        } else {
+          updateOutputText(snapshot, event.output_index, previousText, content.text, event.content_index);
+        }
       }
       break;
     }
@@ -106,8 +137,11 @@ export function accumulateResponse(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        const previousText = content.text;
+        ensureCanonicalOutputText(snapshot);
         content.text = event.text;
-        addOutputText(snapshot);
+        updateCachedOutputTextLength(output, previousText, event.text);
+        updateOutputText(snapshot, event.output_index, previousText, event.text, event.content_index);
       }
       break;
     }
@@ -402,8 +436,139 @@ function cloneResponse(response: Response): Response {
   const snapshot = structuredClone(response);
   if (!Object.getOwnPropertyDescriptor(snapshot, 'output_text') || snapshot.output_text == null) {
     addOutputText(snapshot);
+    canonicalOutputTextSnapshots.add(snapshot);
+  } else if (snapshot.output.length === 0 && snapshot.output_text === '') {
+    canonicalOutputTextSnapshots.add(snapshot);
   }
   return snapshot;
+}
+
+function ensureCanonicalOutputText(snapshot: Response): void {
+  if (canonicalOutputTextSnapshots.has(snapshot)) {
+    return;
+  }
+
+  let text = '';
+  for (const output of snapshot.output) {
+    text += getOutputText(output);
+  }
+  if (snapshot.output_text !== text) {
+    snapshot.output_text = text;
+  }
+  canonicalOutputTextSnapshots.add(snapshot);
+}
+
+function getOutputText(output: Response['output'][number]): string {
+  if (output.type !== 'message') {
+    return '';
+  }
+
+  let text = '';
+  for (const content of output.content) {
+    if (content.type === 'output_text') {
+      text += content.text;
+    }
+  }
+  outputTextLengths.set(output, text.length);
+  return text;
+}
+
+function updateCachedOutputTextLength(
+  output: Response['output'][number],
+  previousText: string,
+  nextText: string,
+): void {
+  const length = outputTextLengths.get(output);
+  if (length !== undefined) {
+    outputTextLengths.set(output, length - previousText.length + nextText.length);
+  }
+}
+
+function updateOutputText(
+  snapshot: Response,
+  outputIndex: number,
+  previousText: string,
+  nextText: string,
+  contentIndex?: number,
+): void {
+  if (previousText === nextText) {
+    return;
+  }
+
+  const output = snapshot.output[outputIndex];
+  if (
+    outputIndex === snapshot.output.length - 1 &&
+    (contentIndex === undefined || (output?.type === 'message' && contentIndex === output.content.length - 1))
+  ) {
+    replaceOutputTextSuffix(snapshot, previousText, nextText);
+    return;
+  }
+
+  if (
+    contentIndex !== undefined &&
+    output?.type === 'message' &&
+    contentIndex >= output.content.length - contentIndex - 1
+  ) {
+    let followingTextLength = 0;
+    for (let index = contentIndex + 1; index < output.content.length; index += 1) {
+      const followingContent = output.content[index];
+      if (followingContent?.type === 'output_text') {
+        followingTextLength += followingContent.text.length;
+      }
+    }
+
+    for (let index = outputIndex + 1; index < snapshot.output.length; index += 1) {
+      const followingOutput = snapshot.output[index];
+      if (followingOutput?.type === 'message') {
+        followingTextLength +=
+          outputTextLengths.get(followingOutput) ?? getOutputText(followingOutput).length;
+      }
+    }
+
+    if (followingTextLength === 0) {
+      replaceOutputTextSuffix(snapshot, previousText, nextText);
+      return;
+    }
+
+    const offset = snapshot.output_text.length - followingTextLength - previousText.length;
+    snapshot.output_text =
+      snapshot.output_text.slice(0, offset) +
+      nextText +
+      snapshot.output_text.slice(offset + previousText.length);
+    return;
+  }
+
+  let offset = 0;
+  for (let index = 0; index < outputIndex; index += 1) {
+    const precedingOutput = snapshot.output[index];
+    if (precedingOutput?.type === 'message') {
+      offset += outputTextLengths.get(precedingOutput) ?? getOutputText(precedingOutput).length;
+    }
+  }
+
+  if (contentIndex !== undefined && output?.type === 'message') {
+    for (let index = 0; index < contentIndex; index += 1) {
+      const content = output.content[index];
+      if (content?.type === 'output_text') {
+        offset += content.text.length;
+      }
+    }
+  }
+
+  snapshot.output_text =
+    snapshot.output_text.slice(0, offset) +
+    nextText +
+    snapshot.output_text.slice(offset + previousText.length);
+}
+
+function replaceOutputTextSuffix(snapshot: Response, previousText: string, nextText: string): void {
+  if (previousText.length === 0) {
+    snapshot.output_text += nextText;
+    return;
+  }
+
+  snapshot.output_text =
+    snapshot.output_text.slice(0, snapshot.output_text.length - previousText.length) + nextText;
 }
 
 function getOutput(snapshot: Response, outputIndex: number): Response['output'][number] {
