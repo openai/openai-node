@@ -53,7 +53,7 @@ export interface StreamingFile {
  * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
  * @param name Non-empty filename sent in the multipart request.
  * @param options Optional MIME type for the streaming file.
- * @throws {TypeError} If `name` is empty.
+ * @throws {TypeError} If `name` is empty or the content type contains control characters.
  */
 export function toStreamingFile(
   data: StreamingFileInput,
@@ -64,11 +64,16 @@ export function toStreamingFile(
     throw new TypeError('toStreamingFile requires a non-empty file name');
   }
 
+  const type = options?.type;
+  if (type) {
+    validateStreamingFileType(type);
+  }
+
   return {
     [brand_privateStreamingFile]: true,
     data,
     name,
-    ...(options?.type ? { type: options.type } : {}),
+    ...(type ? { type } : {}),
   };
 }
 
@@ -384,10 +389,10 @@ async function* iterateMultipartBody(
   options: CreateFormOptions,
 ): AsyncGenerator<Uint8Array> {
   for await (const { key, value } of iterateFormEntries(body)) {
-    yield encodeUTF8(`--${boundary}\r\n`);
     if (isUploadable(value)) {
       const filename = getStreamingFileName(value, options);
       const type = getStreamingFileType(value);
+      yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
         `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
           filename,
@@ -395,6 +400,7 @@ async function* iterateMultipartBody(
       );
       yield* iterateBytes(getStreamingFileData(value));
     } else {
+      yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
         `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"\r\n\r\n${String(value)}`,
       );
@@ -455,16 +461,30 @@ function getStreamingFileName(value: Uploadable, options: CreateFormOptions): st
 }
 
 function getStreamingFileType(value: Uploadable): string {
-  if (isStreamingFile(value)) {
-    return value.type || 'application/octet-stream';
+  let type: string | undefined;
+
+  if (isStreamingFile(value) || isNamedBlob(value)) {
+    ({ type } = value);
+  } else if (value instanceof Response) {
+    type = value.headers.get('content-type') ?? undefined;
   }
-  if (isNamedBlob(value) && value.type) {
-    return value.type;
+
+  return validateStreamingFileType(type || 'application/octet-stream');
+}
+
+function validateStreamingFileType(type: string): string {
+  if (typeof type !== 'string') {
+    throw new TypeError('Streaming upload content type must be a string');
   }
-  if (value instanceof Response) {
-    return value.headers.get('content-type') || 'application/octet-stream';
+
+  for (let index = 0; index < type.length; index += 1) {
+    const character = type.codePointAt(index) ?? 0;
+    if (character <= 0x1f || character === 0x7f) {
+      throw new TypeError('Streaming upload content type must not contain control characters');
+    }
   }
-  return 'application/octet-stream';
+
+  return type;
 }
 
 function getStreamingFileData(value: Uploadable): unknown {
