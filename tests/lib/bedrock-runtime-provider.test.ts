@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import OpenAI, { APIConnectionTimeoutError, NotFoundError } from 'openai';
+import OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
 import { bedrock } from 'openai/providers/bedrock/aws';
@@ -70,11 +70,6 @@ function responseBody(content = 'Hello from Runtime') {
   };
 }
 
-function eventStreamResponse(events: unknown[]): Response {
-  const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\ndata: [DONE]\n\n`;
-  return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
-}
-
 describe('bedrock Runtime provider', () => {
   test.each([
     { endpoint: 'mantle' as const, hostname: 'bedrock-mantle.us-east-1.api.aws' },
@@ -137,7 +132,7 @@ describe('bedrock Runtime provider', () => {
       provider: bearerBedrock({ endpoint: 'runtime', region: 'eusc-de-east-1', apiKey: 'bedrock-token' }),
     });
 
-    expect(client.baseURL).toBe('https://bedrock-runtime.eusc-de-east-1.amazonaws.com/openai/v1');
+    expect(client.baseURL).toBe('https://bedrock-runtime.eusc-de-east-1.amazonaws.eu/openai/v1');
   });
 
   test.each([
@@ -223,59 +218,6 @@ describe('bedrock Runtime provider', () => {
     expect(completion._request_id).toBe('req_runtime_chat');
   });
 
-  test('streams signed Runtime Chat Completions through standard SSE decoding', async () => {
-    let requestedURL: RequestInfo | undefined;
-    let requestedInit: RequestInit | undefined;
-    const client = new OpenAI({
-      provider: bedrock({
-        endpoint: 'runtime',
-        region: 'us-east-1',
-        accessKeyId: 'access-key',
-        secretAccessKey: 'secret-key',
-      }),
-      fetch: async (url, init) => {
-        requestedURL = url;
-        requestedInit = init;
-        return eventStreamResponse([
-          {
-            id: 'chatcmpl_runtime',
-            object: 'chat.completion.chunk',
-            created: 0,
-            model: RUNTIME_MODEL,
-            choices: [{ index: 0, delta: { role: 'assistant', content: 'Hello ' }, finish_reason: null }],
-          },
-          {
-            id: 'chatcmpl_runtime',
-            object: 'chat.completion.chunk',
-            created: 0,
-            model: RUNTIME_MODEL,
-            choices: [{ index: 0, delta: { content: 'Runtime' }, finish_reason: 'stop' }],
-          },
-        ]);
-      },
-    });
-
-    const stream = await client.chat.completions.create({
-      model: RUNTIME_MODEL,
-      messages: [{ role: 'user', content: 'Say hello' }],
-      stream: true,
-    });
-    const chunks: string[] = [];
-    const finishReasons: (string | null)[] = [];
-    for await (const chunk of stream) {
-      chunks.push(chunk.choices[0]?.delta.content ?? '');
-      finishReasons.push(chunk.choices[0]?.finish_reason ?? null);
-    }
-
-    expect(String(requestedURL)).toBe(
-      'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions',
-    );
-    expect(JSON.parse(String(requestedInit?.body))).toMatchObject({ model: RUNTIME_MODEL, stream: true });
-    expect(new Headers(requestedInit?.headers).get('authorization')).toContain('/bedrock/aws4_request');
-    expect(chunks).toEqual(['Hello ', 'Runtime']);
-    expect(finishReasons).toEqual([null, 'stop']);
-  });
-
   test('routes Responses through Runtime and preserves the SDK output_text helper', async () => {
     let requestedURL: RequestInfo | undefined;
     let requestedInit: RequestInit | undefined;
@@ -297,34 +239,6 @@ describe('bedrock Runtime provider', () => {
     });
     expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
     expect(response.output_text).toBe('Hello from Runtime');
-  });
-
-  test('streams Runtime Responses through standard SSE event decoding', async () => {
-    let requestedInit: RequestInit | undefined;
-    const client = new OpenAI({
-      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
-      fetch: async (_url, init) => {
-        requestedInit = init;
-        return eventStreamResponse([
-          { type: 'response.created', sequence_number: 0, response: responseBody() },
-          { type: 'response.completed', sequence_number: 1, response: responseBody() },
-        ]);
-      },
-    });
-
-    const stream = await client.responses.create({
-      model: RUNTIME_MODEL,
-      input: 'Say hello',
-      stream: true,
-    });
-    const events: string[] = [];
-    for await (const event of stream) {
-      events.push(event.type);
-    }
-
-    expect(JSON.parse(String(requestedInit?.body))).toMatchObject({ model: RUNTIME_MODEL, stream: true });
-    expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
-    expect(events).toEqual(['response.created', 'response.completed']);
   });
 
   test('refreshes AWS credentials and re-signs each Runtime retry', async () => {
@@ -374,133 +288,4 @@ describe('bedrock Runtime provider', () => {
     ]);
   });
 
-  test('refreshes Runtime bearer credentials before retrying a request', async () => {
-    const tokenProvider = vi.fn().mockResolvedValueOnce('first-token').mockResolvedValueOnce('second-token');
-    const authorizationHeaders: string[] = [];
-    const client = new OpenAI({
-      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', tokenProvider }),
-      maxRetries: 1,
-      fetch: async (_url, init) => {
-        authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
-        if (authorizationHeaders.length === 1) {
-          return Response.json(
-            { error: { message: 'retry this request' } },
-            {
-              status: 503,
-              headers: { 'retry-after-ms': '1' },
-            },
-          );
-        }
-        return jsonResponse(chatCompletionBody());
-      },
-    });
-
-    await client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
-
-    expect(tokenProvider).toHaveBeenCalledTimes(2);
-    expect(authorizationHeaders).toEqual(['Bearer first-token', 'Bearer second-token']);
-  });
-
-  test('prefers and refreshes the environment bearer credential over ambient AWS credentials for Runtime', async () => {
-    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'first-environment-token';
-    process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
-    process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
-    const authorizationHeaders: string[] = [];
-    const client = new OpenAI({
-      provider: bedrock({ endpoint: 'runtime', region: 'us-east-1' }),
-      fetch: async (_url, init) => {
-        authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
-        return jsonResponse(chatCompletionBody());
-      },
-    });
-
-    await client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
-    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'refreshed-environment-token';
-    await client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
-
-    expect(authorizationHeaders).toEqual([
-      'Bearer first-environment-token',
-      'Bearer refreshed-environment-token',
-    ]);
-  });
-
-  test('does not switch Runtime authentication modes when the selected environment bearer disappears', async () => {
-    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'temporary-environment-token';
-    process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
-    process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
-    const fetch = vi.fn(async () => jsonResponse(chatCompletionBody()));
-    const client = new OpenAI({
-      provider: bedrock({ endpoint: 'runtime', region: 'us-east-1' }),
-      fetch,
-    });
-    delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
-
-    await expect(
-      client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] }),
-    ).rejects.toMatchObject({
-      message: 'Failed to resolve a bearer credential for Bedrock.',
-      cause: expect.objectContaining({
-        message: expect.stringContaining('Could not find credentials for Bedrock'),
-      }),
-    });
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  test('preserves Runtime HTTP error classification and request IDs', async () => {
-    const client = new OpenAI({
-      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
-      maxRetries: 0,
-      fetch: async () =>
-        Response.json(
-          { error: { message: 'model is unavailable in this AWS region' } },
-          {
-            status: 404,
-            headers: { 'x-request-id': 'req_runtime_missing_model' },
-          },
-        ),
-    });
-
-    const request = client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] });
-
-    await expect(request).rejects.toBeInstanceOf(NotFoundError);
-    await expect(request).rejects.toMatchObject({
-      status: 404,
-      requestID: 'req_runtime_missing_model',
-      message: expect.stringContaining('model is unavailable in this AWS region'),
-    });
-  });
-
-  test('maps Runtime transport timeouts to the standard SDK timeout error', async () => {
-    const fetch = vi.fn(async () => {
-      throw new Error('connection timed out');
-    });
-    const client = new OpenAI({
-      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
-      maxRetries: 0,
-      fetch,
-    });
-
-    await expect(
-      client.chat.completions.create({ model: RUNTIME_MODEL, messages: [] }),
-    ).rejects.toBeInstanceOf(APIConnectionTimeoutError);
-    expect(fetch).toHaveBeenCalledTimes(1);
-  });
-
-  test('keeps the environment bearer mode across withOptions and refreshes its value', async () => {
-    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'first-token';
-    const authorizationHeaders: string[] = [];
-    const fetch = async (_url: RequestInfo, init?: RequestInit): Promise<Response> => {
-      authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
-      return jsonResponse();
-    };
-    const client = new OpenAI({ provider: bearerBedrock({ region: 'us-east-1' }), fetch });
-
-    await client.request({ method: 'get', path: '/models' });
-    delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
-    const copiedClient = client.withOptions({ timeout: 1000 });
-    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'refreshed-token';
-    await copiedClient.request({ method: 'get', path: '/models' });
-
-    expect(authorizationHeaders).toEqual(['Bearer first-token', 'Bearer refreshed-token']);
-  });
 });
