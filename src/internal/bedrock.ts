@@ -10,8 +10,8 @@ export type BedrockEndpoint = 'mantle' | 'runtime';
 /** Endpoint and region settings shared by the Bedrock provider variants. */
 export interface BedrockEndpointOptions {
   /**
-   * Amazon Bedrock endpoint family. Defaults to `mantle` for compatibility;
-   * select `runtime` to use its regional hostname and AWS signing service.
+   * Amazon Bedrock endpoint family. Recognized AWS endpoint overrides select
+   * their own family; otherwise defaults to `mantle` for compatibility.
    */
   endpoint?: BedrockEndpoint | undefined;
 
@@ -71,26 +71,26 @@ function normalizeBaseURL(baseURL: string): string {
   return url.toString().replace(/\/$/, '');
 }
 
-function resolveRuntimeDnsSuffix(region: string): string {
+function resolveRuntimeDnsSuffixes(region: string): readonly [standard: string, dualStack: string] {
   if (region.startsWith('cn-')) {
-    return 'amazonaws.com.cn';
+    return ['amazonaws.com.cn', 'api.amazonwebservices.com.cn'];
   }
   if (region.startsWith('eusc-')) {
-    return 'amazonaws.eu';
+    return ['amazonaws.eu', 'api.amazonwebservices.eu'];
   }
   if (region.startsWith('us-iso-')) {
-    return 'c2s.ic.gov';
+    return ['c2s.ic.gov', 'api.aws.ic.gov'];
   }
   if (region.startsWith('us-isob-')) {
-    return 'sc2s.sgov.gov';
+    return ['sc2s.sgov.gov', 'api.aws.scloud'];
   }
   if (region.startsWith('eu-isoe-')) {
-    return 'cloud.adc-e.uk';
+    return ['cloud.adc-e.uk', 'api.cloud-aws.adc-e.uk'];
   }
   if (region.startsWith('us-isof-')) {
-    return 'csp.hci.ic.gov';
+    return ['csp.hci.ic.gov', 'api.aws.hci.ic.gov'];
   }
-  return 'amazonaws.com';
+  return ['amazonaws.com', 'api.aws'];
 }
 
 /** Identifies a canonical Amazon Bedrock hostname and its embedded AWS region. */
@@ -110,14 +110,13 @@ export function parseBedrockEndpointHostname(hostname: string):
     return { endpoint: 'mantle', region: mantleRegion };
   }
 
-  const runtimeMatch =
-    // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
-    /^bedrock-runtime\.([a-z0-9-]+)\.(amazonaws\.com(?:\.cn)?|amazonaws\.eu|c2s\.ic\.gov|sc2s\.sgov\.gov|cloud\.adc-e\.uk|csp\.hci\.ic\.gov)$/i.exec(
-      canonicalHostname,
-    );
-  const runtimeRegion = runtimeMatch?.[1];
-  if (runtimeRegion && runtimeMatch[2]?.toLowerCase() === resolveRuntimeDnsSuffix(runtimeRegion)) {
-    return { endpoint: 'runtime', region: runtimeRegion };
+  const [service, runtimeRegion, ...suffixParts] = canonicalHostname.toLowerCase().split('.');
+  if ((service === 'bedrock-runtime' || service === 'bedrock-runtime-fips') && runtimeRegion) {
+    const runtimeSuffix = suffixParts.join('.');
+    const [standardSuffix, dualStackSuffix] = resolveRuntimeDnsSuffixes(runtimeRegion);
+    if (runtimeSuffix === standardSuffix || runtimeSuffix === dualStackSuffix) {
+      return { endpoint: 'runtime', region: runtimeRegion };
+    }
   }
 
   return undefined;
@@ -146,6 +145,12 @@ function validateCanonicalBedrockEndpoint(
   }
 }
 
+function validateBedrockEndpointSelection(endpoint: BedrockEndpoint | undefined): void {
+  if (endpoint !== undefined && endpoint !== 'mantle' && endpoint !== 'runtime') {
+    throw new Errors.OpenAIError('The Bedrock `endpoint` must be either `mantle` or `runtime`.');
+  }
+}
+
 /**
  * Resolves the Bedrock endpoint family, region, and API root from configuration.
  *
@@ -153,7 +158,8 @@ function validateCanonicalBedrockEndpoint(
  * Endpoint precedence is `baseURL`, `AWS_BEDROCK_BASE_URL`, then the regional
  * selected endpoint; an explicit `null` base URL skips the environment override.
  * Existing `/responses` suffixes and trailing slashes are removed. Canonical
- * AWS hostnames must match the selected endpoint family.
+ * AWS hostnames infer the endpoint family when none is selected explicitly.
+ * Other configured URLs and derived endpoints default to Mantle.
  *
  * @throws {Errors.OpenAIError} If an option is invalid, a canonical hostname
  * conflicts with the endpoint family, or the default endpoint needs a region.
@@ -168,10 +174,7 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
   /** Canonical Bedrock API root with no trailing slash or `/responses` suffix. */
   baseURL: string;
 } {
-  const endpoint = options.endpoint === undefined ? 'mantle' : options.endpoint;
-  if (endpoint !== 'mantle' && endpoint !== 'runtime') {
-    throw new Errors.OpenAIError('The Bedrock `endpoint` must be either `mantle` or `runtime`.');
-  }
+  validateBedrockEndpointSelection(options.endpoint);
   if (options.region !== undefined && !normalizeOptionalString(options.region)) {
     throw new Errors.OpenAIError('The Bedrock AWS `region` must not be empty.');
   }
@@ -199,9 +202,12 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
 
   if (configuredBaseURL) {
     const baseURL = normalizeBaseURL(configuredBaseURL);
+    const endpoint =
+      options.endpoint ?? parseBedrockEndpointHostname(new URL(baseURL).hostname)?.endpoint ?? 'mantle';
     validateCanonicalBedrockEndpoint(baseURL, endpoint, region);
     return { endpoint, region, baseURL };
   }
+  const endpoint = options.endpoint ?? 'mantle';
   if (!region) {
     throw new Errors.OpenAIError(
       'Bedrock requires an AWS region. Pass `region` to `bedrock(...)`, or set `AWS_REGION` or `AWS_DEFAULT_REGION`.',
@@ -210,7 +216,7 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
 
   const hostname =
     endpoint === 'runtime'
-      ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffix(region)}`
+      ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffixes(region)[0]}`
       : `bedrock-mantle.${region}.api.aws`;
   return { endpoint, region, baseURL: `https://${hostname}/openai/v1` };
 }

@@ -29,9 +29,9 @@ The `endpoint` option selects which regional Bedrock endpoint to use:
 | `'mantle'` (default) | `https://bedrock-mantle.<region>.api.aws/openai/v1`      | `bedrock-mantle`      |
 | `'runtime'`          | Regional Runtime hostname for the region's AWS partition | `bedrock`             |
 
-Both endpoints use the normal SDK resources. AWS controls the available models, inference profiles, API routes, authentication methods, and streaming behavior for each endpoint; unsupported calls surface the provider's normal HTTP errors through the SDK.
+Both endpoint modes expose the normal SDK resources, but that does not mean AWS supports every resource on both endpoints. AWS controls the available models, inference profiles, API routes, authentication methods, and streaming behavior for each deployment; unsupported calls surface the provider's normal HTTP errors through the SDK.
 
-The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived endpoint. When signing requests sent to a custom or proxy host, explicitly set `endpoint` so the SDK can select the correct SigV4 signing service:
+The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived endpoint. If `endpoint` is omitted, recognized canonical AWS hostnames—including Runtime FIPS and dual-stack variants—automatically select their endpoint family and signing service; otherwise Mantle remains the default. Official FIPS and dual-stack endpoint overrides must use HTTPS and match the configured region. When signing requests sent to a custom or proxy host, explicitly set `endpoint` so the SDK can select the correct SigV4 signing service:
 
 ```ts
 const client = new OpenAI({
@@ -47,7 +47,9 @@ Bedrock credentials are sent only to the configured API-root origin; absolute re
 
 ### Amazon Bedrock Runtime
 
-Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. The SDK derives the AWS partition DNS suffix from the region (for example, `amazonaws.com` for `us-west-2` and `amazonaws.eu` for `eusc-de-east-1`). Example launch inference-profile identifiers include `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna`; availability depends on your AWS account and region:
+Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. The SDK derives the AWS partition DNS suffix from the region (for example, `amazonaws.com` for `us-west-2` and `amazonaws.eu` for `eusc-de-east-1`). The OpenAI inference-profile identifiers include `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna`; availability depends on your AWS account and region.
+
+For these inference profiles, the verified integration is non-streaming Chat Completions at `/openai/v1/chat/completions`, authenticated with AWS SigV4 signing service `bedrock`. Set `apiKey: null` to prevent an environment bearer token from taking precedence over your AWS credentials:
 
 ```ts
 import OpenAI from 'openai';
@@ -57,6 +59,7 @@ const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
     endpoint: 'runtime',
+    apiKey: null,
   }),
 });
 
@@ -68,7 +71,7 @@ const completion = await client.chat.completions.create({
 console.log(completion.choices[0]?.message.content);
 ```
 
-Streaming uses the same Chat Completions API:
+The SDK can send streaming requests to the same Chat Completions API. Streaming support for a particular Runtime deployment, model, and inference profile has not been live-verified and depends on AWS:
 
 ```ts
 const stream = await client.chat.completions.create({
@@ -94,17 +97,34 @@ const client = new OpenAI({
 });
 ```
 
-AWS controls which route and authentication method your selected model, inference profile, and endpoint accept. Consult the applicable AWS documentation if a request or credential type is rejected.
+AWS controls which route and authentication method your selected model, inference profile, and endpoint accept. Although the SDK can configure bearer authentication and send Runtime Responses requests, those Runtime capabilities have not been live-verified for these inference profiles. Consult the applicable AWS documentation if a request or credential type is rejected.
 
 ## Authentication
 
-The Bedrock provider supports bearer authentication and AWS SigV4 authentication for both Mantle and Runtime endpoints. The AWS entrypoint selects authentication in this order:
+The Bedrock provider can configure bearer authentication and AWS SigV4 authentication for both Mantle and Runtime endpoints. AWS determines which authentication methods a deployment accepts; Runtime bearer authentication for the OpenAI inference profiles has not been live-verified. The AWS entrypoint selects authentication in this order:
 
 1. One explicit mode passed to `bedrock(...)`: `apiKey` or `tokenProvider`, static AWS credentials, `profile`, or `credentialProvider`.
 2. The [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html) in `AWS_BEARER_TOKEN_BEDROCK`.
 3. The default AWS credential chain.
 
 Explicit bearer and AWS credential modes are mutually exclusive. Similarly, configure only one AWS credential mode at a time.
+
+An expired or stale `AWS_BEARER_TOKEN_BEDROCK` takes precedence over the implicit default AWS credential chain and can shadow otherwise valid AWS credentials. Unset `AWS_BEARER_TOKEN_BEDROCK`, or pass `apiKey: null` to disable the environment bearer fallback and force SigV4 authentication with the default AWS credential chain:
+
+```ts
+import OpenAI from 'openai';
+import { bedrock } from 'openai/providers/bedrock/aws';
+
+const client = new OpenAI({
+  provider: bedrock({
+    region: 'us-west-2',
+    endpoint: 'runtime',
+    apiKey: null,
+  }),
+});
+```
+
+You can also combine `apiKey: null` with `profile: 'my-profile'` to select a named AWS credential profile explicitly.
 
 ### Bearer authentication
 
@@ -169,6 +189,7 @@ const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
     endpoint: 'runtime',
+    apiKey: null,
     profile: 'my-profile',
   }),
 });

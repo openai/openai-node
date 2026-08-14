@@ -550,7 +550,11 @@ The default `endpoint: 'mantle'` uses `https://bedrock-mantle.<region>.api.aws/o
 
 ```ts
 const client = new OpenAI({
-  provider: bedrock({ region: 'us-west-2', endpoint: 'runtime' }),
+  provider: bedrock({
+    region: 'us-west-2',
+    endpoint: 'runtime',
+    apiKey: null, // Ignore AWS_BEARER_TOKEN_BEDROCK and use the AWS credential chain.
+  }),
 });
 
 const completion = await client.chat.completions.create({
@@ -561,11 +565,13 @@ const completion = await client.chat.completions.create({
 console.log(completion.choices[0]?.message.content);
 ```
 
-Bedrock Runtime also supports streaming Chat Completions through `stream: true`. The provider supports bearer and SigV4 authentication on both endpoint types, subject to the AWS model, inference profile, and endpoint accepting that authentication method.
+The OpenAI inference-profile identifiers include `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna`. For these models, non-streaming Chat Completions on the Runtime `/openai/v1` route have been verified with the `bedrock` SigV4 signing service. The SDK can also configure bearer authentication, streaming Chat Completions, and Runtime Responses requests, but AWS support for those features depends on the deployment, model, and inference profile and has not been verified.
 
-The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the endpoint; when signing requests sent to a custom or proxy host, explicitly set `endpoint` to select the correct signing service. To use the alternate Runtime route described in some AWS documentation, set `baseURL: 'https://bedrock-runtime.us-west-2.amazonaws.com/v1'` alongside `endpoint: 'runtime'`. Available routes and features are controlled by AWS.
+The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the endpoint. Recognized canonical AWS hostnames, including Runtime FIPS and dual-stack variants, automatically select their endpoint family and signing service when `endpoint` is omitted; they must use HTTPS and match the configured region. When signing requests sent to a custom or proxy host, explicitly set `endpoint` to select the correct signing service. To use the alternate Runtime route described in some AWS documentation, set `baseURL: 'https://bedrock-runtime.us-west-2.amazonaws.com/v1'` alongside `endpoint: 'runtime'`. Available routes and features are controlled by AWS.
 
-The AWS entrypoint uses the standard AWS credential chain by default. It also accepts a named profile, static credentials, or a custom credential provider. Install its peer dependencies before importing it:
+If `AWS_BEARER_TOKEN_BEDROCK` is set, the AWS entrypoint uses that bearer token before falling back to the default AWS credential chain. An expired or stale token can therefore shadow valid AWS credentials. Unset `AWS_BEARER_TOKEN_BEDROCK`, or pass `apiKey: null` as shown above, to force SigV4 authentication with the default credential chain. You can also combine `apiKey: null` with `profile: 'my-profile'` to select a named AWS profile explicitly.
+
+The AWS entrypoint also accepts static credentials or a custom credential provider. Install its peer dependencies before importing it:
 
 ```bash
 npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
