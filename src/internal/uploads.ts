@@ -432,14 +432,13 @@ type FormEntry =
       value: Uploadable;
       data: unknown;
       dispose: () => Promise<void>;
+      filename: string;
       kind: 'upload';
       streamingFile: boolean;
       type: string;
     }>;
 
-type MultipartEntry =
-  | Extract<FormEntry, { kind: 'field' }>
-  | (Extract<FormEntry, { kind: 'upload' }> & Readonly<{ filename: string }>);
+type MultipartEntry = FormEntry;
 
 type MultipartDataSnapshot = Readonly<{
   data: StreamingFileInput;
@@ -550,16 +549,11 @@ async function* iterateMultipartBody(
   const pendingDisposals = new Set<() => Promise<void>>();
 
   try {
-    for await (const entry of iterateFormEntries(body, uploadableKinds)) {
+    for await (const entry of iterateFormEntries(body, uploadableKinds, options)) {
       if (entry.kind === 'upload') {
         pendingDisposals.add(entry.dispose);
-        entries.push({
-          ...entry,
-          filename: getStreamingFileName(entry.value, options, entry.streamingFile),
-        });
-      } else {
-        entries.push(entry);
       }
+      entries.push(entry);
     }
 
     for (const entry of entries) {
@@ -592,13 +586,14 @@ async function* iterateMultipartBody(
 async function* iterateFormEntries(
   body: unknown,
   uploadableKinds: UploadableKinds,
+  options: CreateFormOptions,
 ): AsyncGenerator<FormEntry> {
   if (!body || typeof body !== 'object') {
     return;
   }
 
   for (const [key, value] of Object.entries(body)) {
-    yield* iterateFormValue(key, value, uploadableKinds);
+    yield* iterateFormValue(key, value, uploadableKinds, options);
   }
 }
 
@@ -606,6 +601,7 @@ async function* iterateFormValue(
   key: string,
   value: unknown,
   uploadableKinds: UploadableKinds,
+  options: CreateFormOptions,
 ): AsyncGenerator<FormEntry> {
   if (value === undefined) {
     return;
@@ -625,6 +621,7 @@ async function* iterateFormValue(
   if (uploadKind) {
     const upload = value as Uploadable;
     const streamingFile = uploadKind === 'streaming-file';
+    const filename = getStreamingFileName(upload, options, streamingFile);
     const type = getStreamingFileType(upload, streamingFile);
     let snapshot: MultipartDataSnapshot;
     if (streamingFile) {
@@ -641,17 +638,18 @@ async function* iterateFormValue(
       value: upload,
       data: snapshot.data,
       dispose: snapshot.dispose,
+      filename,
       kind: 'upload',
       streamingFile,
       type,
     };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
-      yield* iterateFormValue(key + '[]', entry, uploadableKinds);
+      yield* iterateFormValue(key + '[]', entry, uploadableKinds, options);
     }
   } else if (typeof value === 'object') {
     for (const [name, prop] of Object.entries(value)) {
-      yield* iterateFormValue(`${key}[${name}]`, prop, uploadableKinds);
+      yield* iterateFormValue(`${key}[${name}]`, prop, uploadableKinds, options);
     }
   } else {
     throw new TypeError(
