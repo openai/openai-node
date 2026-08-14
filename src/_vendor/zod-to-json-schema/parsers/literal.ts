@@ -1,5 +1,6 @@
 import type { ZodLiteralDef } from 'zod/v3';
 import type { Refs } from '../Refs';
+import { parseNullDef } from './null';
 
 export type JsonSchema7LiteralType =
   | {
@@ -7,10 +8,18 @@ export type JsonSchema7LiteralType =
       const: string | number | boolean;
     }
   | {
+      type: 'null';
+      const?: null;
+    }
+  | {
       type: 'object' | 'array';
     };
 
 export function parseLiteralDef(def: ZodLiteralDef, refs: Refs): JsonSchema7LiteralType {
+  if (def.value === null) {
+    return refs.target === 'openApi3' ? parseNullDef(refs) : { type: 'null', const: null };
+  }
+
   const parsedType = typeof def.value;
   if (
     parsedType !== 'bigint' &&
