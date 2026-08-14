@@ -438,7 +438,7 @@ type MultipartEntry =
 
 function snapshotStreamingFileData(value: StreamingFileInput): StreamingFileInput {
   const readable = value as ReadableStream<BlobPart>;
-  const getReader = readable.getReader;
+  const { getReader } = readable;
   if (typeof getReader === 'function') {
     return { getReader: getReader.bind(readable) } as ReadableStream<BlobPart>;
   }
