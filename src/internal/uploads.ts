@@ -2,7 +2,7 @@ import type { RequestOptions } from './request-options';
 import type { FilePropertyBag, Fetch } from './builtin-types';
 import type { OpenAI } from '../client';
 import { buildHeaders } from './headers';
-import { ReadableStreamFrom, ReadableStreamToAsyncIterable } from './shims';
+import { makeReadableStream, ReadableStreamFrom, ReadableStreamToAsyncIterable } from './shims';
 import type { ReadableStream } from './shim-types';
 import { encodeUTF8 } from './utils/bytes';
 
@@ -674,9 +674,28 @@ const createStreamingFormRequestOptions = (
   options: CreateFormOptions = {},
 ): RequestOptions => {
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
-  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options, uploadableKinds), {
-    highWaterMark: 0,
-  });
+  const iterator: AsyncIterator<Uint8Array> = iterateMultipartBody(
+    opts.body,
+    boundary,
+    options,
+    uploadableKinds,
+  );
+  const body = makeReadableStream(
+    {
+      async pull(controller) {
+        const { done, value } = await iterator.next();
+        if (done) {
+          controller.close();
+        } else {
+          (controller as ReadableStreamDefaultController<Uint8Array>).enqueue(value);
+        }
+      },
+      async cancel() {
+        await iterator.return?.();
+      },
+    },
+    { highWaterMark: 0 },
+  );
 
   return {
     ...opts,

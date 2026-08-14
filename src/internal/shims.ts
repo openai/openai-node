@@ -33,30 +33,24 @@ export function makeReadableStream(...args: ReadableStreamArgs): ReadableStream 
   return new ReadableStream(...args);
 }
 
-export function ReadableStreamFrom<T>(
-  iterable: Iterable<T> | AsyncIterable<T>,
-  strategy?: ReadableStreamArgs[1],
-): ReadableStream<T> {
+export function ReadableStreamFrom<T>(iterable: Iterable<T> | AsyncIterable<T>): ReadableStream<T> {
   let iter: AsyncIterator<T> | Iterator<T> =
     Symbol.asyncIterator in iterable ? iterable[Symbol.asyncIterator]() : iterable[Symbol.iterator]();
 
-  return makeReadableStream(
-    {
-      start() {},
-      async pull(controller: any) {
-        const { done, value } = await iter.next();
-        if (done) {
-          controller.close();
-        } else {
-          controller.enqueue(value);
-        }
-      },
-      async cancel() {
-        await iter.return?.();
-      },
+  return makeReadableStream({
+    start() {},
+    async pull(controller: any) {
+      const { done, value } = await iter.next();
+      if (done) {
+        controller.close();
+      } else {
+        controller.enqueue(value);
+      }
     },
-    strategy,
-  );
+    async cancel() {
+      await iter.return?.();
+    },
+  });
 }
 
 /**
