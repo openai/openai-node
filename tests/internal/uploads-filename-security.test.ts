@@ -307,10 +307,16 @@ describe('streaming multipart filename and header security', () => {
     expect(stream.locked).toBe(false);
   });
 
-  test('preserves filename validation errors when an iterator cleanup accessor throws', async () => {
+  test('preserves validation errors when upload cleanup accessors throw', async () => {
     const getReturn = vi.fn(() => {
-      throw new Error('cleanup accessor failed');
+      throw new Error('iterator cleanup accessor failed');
     });
+    const getReleaseLock = vi.fn(() => {
+      throw new Error('reader cleanup accessor failed');
+    });
+    const cleanupReader = { cancel: vi.fn() };
+    Object.defineProperty(cleanupReader, 'releaseLock', { get: getReleaseLock });
+    const stream = { getReader: () => cleanupReader } as unknown as ReadableStream<string>;
     const source = {
       [Symbol.asyncIterator]() {
         const iterator = {
@@ -323,10 +329,11 @@ describe('streaming multipart filename and header security', () => {
     const later = toStreamingFile(chunks('later bytes'), 'later.txt');
     Object.defineProperty(later, 'name', { value: { toString: vi.fn() } });
 
-    const options = await multipartFormRequestOptions({ body: { source, later } }, fetch);
-    const reader = (options.body as ReadableStream).getReader();
+    const options = await multipartFormRequestOptions({ body: { stream, source, later } }, fetch);
+    const bodyReader = (options.body as ReadableStream).getReader();
 
-    await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    await expect(bodyReader.read()).rejects.toThrow(/file.?name/iu);
+    expect(getReleaseLock).toHaveBeenCalledTimes(1);
     expect(getReturn).toHaveBeenCalledTimes(1);
   });
 
