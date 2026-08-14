@@ -83,7 +83,6 @@ function getAssistantStreamDeltaIndex(
   deltaEntry: AssistantStreamRecord,
   kind: 'content' | 'array',
   baselineLength: number,
-  enforceSparseHoleBudget: boolean,
 ): number {
   const { index } = deltaEntry;
 
@@ -147,7 +146,6 @@ function assertValidAssistantStreamArrayDelta(
       deltaEntry,
       kind,
       projectedArray.baselineLength,
-      projectedArray.enforceSparseHoleBudget,
     );
     let accumulatedEntry: unknown;
 
