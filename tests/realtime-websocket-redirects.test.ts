@@ -461,7 +461,7 @@ describe.each([
         });
         const redirects = vi.fn();
         const errors = vi.fn();
-        responses.on('error', errors);
+        onRealtimeEvent(responses, 'error', errors);
         responses.socket.platformSocket.on('redirect', redirects);
 
         await once(responses.socket.platformSocket, 'error');
