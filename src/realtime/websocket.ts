@@ -1,4 +1,5 @@
 import type { AzureOpenAI } from '../index';
+import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { OpenAI } from '../index';
 import { OpenAIError } from '../error';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../resources/realtime/realtime';
@@ -75,6 +76,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       onURL?: (url: URL) => void;
       /** Indicates the token was resolved by the factory just before connecting. @internal */
       __resolvedApiKey?: boolean;
+
+      /** Final URL validated before an asynchronous credential provider ran. @internal */
+      __url?: URL;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
@@ -101,8 +105,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       );
     }
 
-    this.url = buildRealtimeURL(client, props);
+    this.url = props.__url ?? buildRealtimeURL(client, props);
     props.onURL?.(this.url);
+    assertBedrockWebSocketOrigin(client, this.url);
 
     // @ts-ignore
     this.socket = new WebSocket(this.url.toString(), [
@@ -156,7 +161,10 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       dangerouslyAllowBrowser?: boolean;
     },
   ): Promise<OpenAIRealtimeWebSocket> {
-    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: await client._callApiKey() }, client);
+    const url = buildRealtimeURL(client, props);
+    assertBedrockWebSocketOrigin(client, url);
+    const resolvedApiKey = await client._callApiKey();
+    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: resolvedApiKey, __url: url }, client);
   }
 
   /**

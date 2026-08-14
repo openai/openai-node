@@ -4,6 +4,9 @@ import type { FinalizedRequestInit } from './types';
 import type { ProviderRequestContext } from './provider';
 import { readEnv } from './utils';
 
+/** Identifies legacy Bedrock clients without importing the client class into WebSocket modules. */
+export const brand_privateBedrockClient = /* @__PURE__ */ Symbol('brand.privateBedrockClient');
+
 /** Endpoint and region settings shared by the Bedrock provider variants. */
 export interface BedrockEndpointOptions {
   /**
@@ -130,6 +133,25 @@ export function assertBedrockRequestOrigin(baseURL: string, requestURL: string):
       `Bedrock request origin \`${requestOrigin}\` does not match the configured base URL origin \`${expectedOrigin}\`.`,
     );
   }
+}
+
+/** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
+export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): void {
+  if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
+    return;
+  }
+
+  const normalizedRequestURL = new URL(requestURL);
+  if (normalizedRequestURL.protocol === 'wss:') {
+    normalizedRequestURL.protocol = 'https:';
+  } else if (normalizedRequestURL.protocol === 'ws:') {
+    normalizedRequestURL.protocol = 'http:';
+  }
+
+  assertBedrockRequestOrigin(
+    (client as { baseURL: string }).baseURL,
+    normalizedRequestURL.toString(),
+  );
 }
 
 /**

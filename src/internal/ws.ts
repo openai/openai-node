@@ -38,6 +38,28 @@ export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
  */
 export type RawWebSocketData = string | ArrayBufferLike | ArrayBufferView | ArrayBufferView[];
 
+type CredentialedWebSocketOptions = {
+  auth?: string | null | undefined;
+  followRedirects?: boolean | undefined;
+  headers?: object | null | undefined;
+};
+
+/** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */
+export function protectWebSocketOptionsFromCredentialRedirects<Options extends CredentialedWebSocketOptions>(
+  options: Options,
+): Options {
+  const hasSensitiveHeader = Object.keys(options.headers ?? {}).some(
+    (name) =>
+      /^(?:authorization|proxy-authorization|cookie)$/iu.test(name) || /api[-_]?key/iu.test(name),
+  );
+
+  if (!options.auth && !hasSensitiveHeader) {
+    return options;
+  }
+
+  return { ...options, followRedirects: false };
+}
+
 /** A queued application message or raw WebSocket frame that was never transmitted. */
 export type UnsentMessage<T> =
   | {

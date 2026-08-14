@@ -1,7 +1,10 @@
 import * as Errors from './error';
 import { OpenAI } from './client';
 import type { ApiKeySetter, ClientOptions } from './client';
-import { assertBedrockRequestOrigin } from './internal/bedrock';
+import {
+  assertBedrockRequestOrigin,
+  brand_privateBedrockClient,
+} from './internal/bedrock';
 import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
@@ -105,6 +108,9 @@ function restoreBedrockStreamOutputText(responses: API.Responses): API.Responses
 
 /** API Client for interfacing with Amazon Bedrock's OpenAI-compatible endpoint. */
 export class BedrockOpenAI extends OpenAI {
+  /** @internal Identifies this client to credential-bearing WebSocket helpers. */
+  readonly [brand_privateBedrockClient] = true;
+
   private readonly bedrockTokenProvider: ApiKeySetter | undefined;
 
   /**
