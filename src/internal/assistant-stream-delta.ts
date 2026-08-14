@@ -228,6 +228,10 @@ function assertValidAssistantStreamDeltaIndices(
   }
 }
 
+export function isAssistantStreamValueExternallyMutable(value: unknown): boolean {
+  return (isObj(value) || Array.isArray(value)) && externallyMutableAssistantStreamValues.has(value);
+}
+
 export function markAssistantStreamValueExternallyMutable(value: unknown): void {
   if ((!isObj(value) && !Array.isArray(value)) || externallyMutableAssistantStreamValues.has(value)) {
     return;
@@ -383,7 +387,9 @@ export function accumulateAssistantStreamDelta<Accumulator extends object>(
   assertSafeAssistantStreamDelta(delta);
   const accumulatorRecord = accumulator as AssistantStreamRecord;
   const deltaRecord = delta as AssistantStreamRecord;
-  const projection = createAssistantStreamDeltaProjection(cacheArrays);
+  const projection = createAssistantStreamDeltaProjection(
+    cacheArrays && !isAssistantStreamValueExternallyMutable(accumulator),
+  );
   assertValidAssistantStreamDeltaIndices(accumulatorRecord, deltaRecord, projection);
   applyAssistantStreamDelta(accumulatorRecord, deltaRecord);
   commitAssistantStreamArrayProjection(projection);
@@ -394,9 +400,12 @@ export function createAssistantStreamArrayDeltaCommit(
   accumulator: unknown[],
   delta: unknown[],
   kind: 'content' | 'array',
+  cacheArrays = true,
 ): () => void {
   assertSafeAssistantStreamDelta(delta);
-  const projection = createAssistantStreamDeltaProjection(true);
+  const projection = createAssistantStreamDeltaProjection(
+    cacheArrays && !isAssistantStreamValueExternallyMutable(accumulator),
+  );
   assertValidAssistantStreamArrayDelta(
     accumulator,
     delta,

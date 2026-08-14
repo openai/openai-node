@@ -37,6 +37,7 @@ import {
   assertSafeAssistantStreamDelta,
   createAssistantStreamArrayDeltaCommit,
   defineAssistantStreamArrayEntry,
+  isAssistantStreamValueExternallyMutable,
   markAssistantStreamValueExternallyMutable,
 } from '../internal/assistant-stream-delta';
 
@@ -641,10 +642,12 @@ export class AssistantStream
         //If this delta does not have content, nothing to process
         if (data.delta.content) {
           assertSafeAssistantStreamDelta(data.delta);
+          const cacheArrays = !isAssistantStreamValueExternallyMutable(snapshot);
           const commitProjection = createAssistantStreamArrayDeltaCommit(
             snapshot.content,
             data.delta.content,
             'content',
+            cacheArrays,
           );
 
           for (const contentElement of data.delta.content) {
@@ -653,6 +656,7 @@ export class AssistantStream
               snapshot.content[contentElement.index] = this.#accumulateContent(
                 contentElement,
                 currentContent,
+                cacheArrays,
               );
             } else {
               defineAssistantStreamArrayEntry(snapshot.content, contentElement.index, contentElement);
@@ -684,11 +688,12 @@ export class AssistantStream
   #accumulateContent(
     contentElement: MessageContentDelta,
     currentContent: MessageContent | undefined,
+    cacheArrays: boolean,
   ): TextContentBlock | ImageFileContentBlock {
     return accumulateAssistantStreamDelta(
       currentContent as unknown as Record<any, any>,
       contentElement,
-      true,
+      cacheArrays,
     ) as TextContentBlock | ImageFileContentBlock;
   }
 

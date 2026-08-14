@@ -528,63 +528,47 @@ describe('AssistantStream message index security', () => {
     expect(content[1]?.text.value).toBe('second');
   });
 
-  test('invalidates cached content accounting when a listener deletes entries without shrinking', async () => {
-    const content = Array.from({ length: 1024 }, (_, index) => ({
-      type: 'text' as const,
-      text: { value: `entry_${index}`, annotations: [] },
-    }));
+  test('keeps replacement content arrays in constant-time absolute-bound mode after deletion', async () => {
+    let ownKeysCalls = 0;
+    const replacement = new Proxy(
+      Array.from({ length: 1024 }, (_, index) => ({
+        type: 'text' as const,
+        text: { value: `replacement_${index}`, annotations: [] },
+      })),
+      {
+        ownKeys(target) {
+          ownKeysCalls += 1;
+          return Reflect.ownKeys(target);
+        },
+      },
+    );
     const runner = unencodedAssistantStream([
-      { event: 'thread.message.created', data: { id: 'msg_delete', role: 'assistant', content } },
+      {
+        event: 'thread.message.created',
+        data: {
+          id: 'msg_replace_delete',
+          role: 'assistant',
+          content: [{ type: 'text', text: { value: 'initial', annotations: [] } }],
+        },
+      },
       {
         event: 'thread.message.delta',
         data: {
-          id: 'msg_delete',
+          id: 'msg_replace_delete',
           delta: { content: [{ index: 0, type: 'text', text: { value: ' updated' } }] },
         },
       },
       {
         event: 'thread.message.delta',
         data: {
-          id: 'msg_delete',
-          delta: {
-            content: [{ index: 65_536, type: 'text', text: { value: 'amplified', annotations: [] } }],
-          },
-        },
-      },
-      completedRun(),
-    ]);
-    runner.on('textDelta', () => {
-      const snapshotContent = runner.currentMessageSnapshot()?.content;
-      if (snapshotContent) {
-        for (let index = 0; index < snapshotContent.length; index += 1) {
-          Reflect.deleteProperty(snapshotContent, index);
-        }
-        snapshotContent.length = 65_536;
-      }
-    });
-
-    await expect(runner.done()).rejects.toThrow('invalid content index');
-    expect(content).toHaveLength(65_536);
-    expect(hasOwn(content, 65_536)).toBe(false);
-  });
-
-  test('invalidates cached content accounting when a listener fills holes without growing length', async () => {
-    const content: Record<string, any>[] = [];
-    const runner = unencodedAssistantStream([
-      { event: 'thread.message.created', data: { id: 'msg_fill', role: 'assistant', content } },
-      {
-        event: 'thread.message.delta',
-        data: {
-          id: 'msg_fill',
-          delta: {
-            content: [{ index: 1023, type: 'text', text: { value: 'sparse', annotations: [] } }],
-          },
+          id: 'msg_replace_delete',
+          delta: { content: [{ index: 1023, type: 'text', text: { value: ' cached' } }] },
         },
       },
       {
         event: 'thread.message.delta',
         data: {
-          id: 'msg_fill',
+          id: 'msg_replace_delete',
           delta: {
             content: [{ index: 2047, type: 'text', text: { value: 'bounded', annotations: [] } }],
           },
@@ -592,27 +576,98 @@ describe('AssistantStream message index security', () => {
       },
       completedRun(),
     ]);
-    let filled = false;
+    let stage = 0;
     runner.on('textDelta', () => {
-      if (filled) {
-        return;
+      const snapshot = runner.currentMessageSnapshot();
+      if (stage === 0 && snapshot) {
+        Object.defineProperty(snapshot, 'content', {
+          configurable: true,
+          enumerable: true,
+          value: replacement,
+          writable: true,
+        });
+      } else if (stage === 1) {
+        for (let index = 0; index < replacement.length; index += 1) {
+          Reflect.deleteProperty(replacement, index);
+        }
       }
-      filled = true;
-      const snapshotContent = runner.currentMessageSnapshot()?.content;
-      if (snapshotContent) {
+      stage += 1;
+    });
+
+    await runner.done();
+
+    expect(replacement).toHaveLength(2048);
+    expect(replacement[2047]?.text.value).toBe('bounded');
+    expect(ownKeysCalls).toBe(0);
+  });
+
+  test('accepts valid growth after a listener fills holes in a replacement content array', async () => {
+    const replacement = Array.from({ length: 1024 }, (_, index) => ({
+      type: 'text' as const,
+      text: { value: `replacement_${index}`, annotations: [] },
+    }));
+    for (let index = 0; index < 1023; index += 1) {
+      Reflect.deleteProperty(replacement, index);
+    }
+    const runner = unencodedAssistantStream([
+      {
+        event: 'thread.message.created',
+        data: {
+          id: 'msg_replace_fill',
+          role: 'assistant',
+          content: [{ type: 'text', text: { value: 'initial', annotations: [] } }],
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_replace_fill',
+          delta: { content: [{ index: 0, type: 'text', text: { value: ' updated' } }] },
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_replace_fill',
+          delta: { content: [{ index: 1023, type: 'text', text: { value: ' cached' } }] },
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_replace_fill',
+          delta: {
+            content: [{ index: 2047, type: 'text', text: { value: 'bounded', annotations: [] } }],
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    let stage = 0;
+    runner.on('textDelta', () => {
+      const snapshot = runner.currentMessageSnapshot();
+      if (stage === 0 && snapshot) {
+        Object.defineProperty(snapshot, 'content', {
+          configurable: true,
+          enumerable: true,
+          value: replacement,
+          writable: true,
+        });
+      } else if (stage === 1) {
         for (let index = 0; index < 1023; index += 1) {
-          snapshotContent[index] = {
+          replacement[index] = {
             type: 'text',
             text: { value: `filled_${index}`, annotations: [] },
           };
         }
       }
+      stage += 1;
     });
 
     await runner.done();
 
-    expect(content).toHaveLength(2048);
-    expect(content[2047]?.['text'].value).toBe('bounded');
+    expect(replacement).toHaveLength(2048);
+    expect(replacement[2047]?.text.value).toBe('bounded');
   });
 
   test('bounds cumulative streamed content holes across separate public events', async () => {
@@ -753,4 +808,103 @@ describe('AssistantStream run-step index security', () => {
       expect(hasOwn(details.tool_calls, 2047)).toBe(false);
     }
   });
+
+  test('accepts valid growth after a listener fills holes in replacement tool calls', async () => {
+    const replacement = Array.from({ length: 1024 }, (_, index) => ({
+      index,
+      type: 'function' as const,
+      id: `replacement_${index}`,
+      function: { arguments: '' },
+    }));
+    for (let index = 0; index < 1023; index += 1) {
+      Reflect.deleteProperty(replacement, index);
+    }
+    const runner = unencodedAssistantStream([
+      {
+        event: 'thread.run.step.created',
+        data: {
+          id: 'step_replace_fill',
+          status: 'in_progress',
+          step_details: {
+            type: 'tool_calls',
+            tool_calls: [{ index: 0, type: 'function', id: 'initial', function: { arguments: '' } }],
+          },
+        },
+      },
+      {
+        event: 'thread.run.step.delta',
+        data: {
+          id: 'step_replace_fill',
+          delta: {
+            step_details: {
+              type: 'tool_calls',
+              tool_calls: [{ index: 0, function: { arguments: ' updated' } }],
+            },
+          },
+        },
+      },
+      {
+        event: 'thread.run.step.delta',
+        data: {
+          id: 'step_replace_fill',
+          delta: {
+            step_details: {
+              type: 'tool_calls',
+              tool_calls: [{ index: 1023, function: { arguments: ' cached' } }],
+            },
+          },
+        },
+      },
+      {
+        event: 'thread.run.step.delta',
+        data: {
+          id: 'step_replace_fill',
+          delta: {
+            step_details: {
+              type: 'tool_calls',
+              tool_calls: [
+                {
+                  index: 2047,
+                  type: 'function',
+                  id: 'bounded',
+                  function: { arguments: '' },
+                },
+              ],
+            },
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    let stage = 0;
+    runner.on('runStepDelta', (_delta, snapshot) => {
+      if (snapshot.step_details.type !== 'tool_calls') {
+        return;
+      }
+      if (stage === 0) {
+        Object.defineProperty(snapshot.step_details, 'tool_calls', {
+          configurable: true,
+          enumerable: true,
+          value: replacement,
+          writable: true,
+        });
+      } else if (stage === 1) {
+        for (let index = 0; index < 1023; index += 1) {
+          replacement[index] = {
+            index,
+            type: 'function',
+            id: `filled_${index}`,
+            function: { arguments: '' },
+          };
+        }
+      }
+      stage += 1;
+    });
+
+    await runner.done();
+
+    expect(replacement).toHaveLength(2048);
+    expect(replacement[2047]?.id).toBe('bounded');
+  });
+
 });
