@@ -12,25 +12,25 @@ import * as WS from 'ws';
 
 type Listener = (event: any) => void;
 
-type FakeNodeSocket = {
+interface FakeNodeSocket {
   url: URL;
   options: WS.ClientOptions;
   on: Mock;
   send: Mock;
   close: Mock;
-};
+}
 
-vi.mock('ws', () => ({
-  WebSocket: vi.fn().mockImplementation(function WebSocket(url: URL, options: FakeNodeSocket['options']) {
-    return {
-      url,
-      options,
-      on: vi.fn(),
-      send: vi.fn(),
-      close: vi.fn(),
-    } satisfies FakeNodeSocket;
-  }),
-}));
+function CapturingWebSocket(url: URL, options: FakeNodeSocket['options']): FakeNodeSocket {
+  return {
+    url,
+    options,
+    on: vi.fn(),
+    send: vi.fn(),
+    close: vi.fn(),
+  };
+}
+
+vi.mock('ws', () => ({ WebSocket: vi.fn(CapturingWebSocket) }));
 
 class FakeBrowserSocket {
   static instances: FakeBrowserSocket[] = [];
@@ -56,12 +56,19 @@ const originalWebSocket = globalThis.WebSocket;
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 
 function lastBrowserSocket(): FakeBrowserSocket {
-  return FakeBrowserSocket.instances[FakeBrowserSocket.instances.length - 1]!;
+  const socket = FakeBrowserSocket.instances.at(-1);
+  if (!socket) {
+    throw new Error('Expected a browser WebSocket instance');
+  }
+  return socket;
 }
 
 function lastNodeSocket(): FakeNodeSocket {
-  return nodeSocketConstructor.mock.results[nodeSocketConstructor.mock.results.length - 1]!
-    .value as FakeNodeSocket;
+  const socket = nodeSocketConstructor.mock.results.at(-1)?.value as FakeNodeSocket | undefined;
+  if (!socket) {
+    throw new Error('Expected a Node WebSocket instance');
+  }
+  return socket;
 }
 
 function createUnauthenticatedClient(): OpenAI {
@@ -306,20 +313,22 @@ describe.each([
     ['X-API-Key', 'api-secret'],
     ['api_key', 'api-secret'],
   ])('disables redirects for the credential header %s', (header, value) => {
-    new Responses(createUnauthenticatedClient(), {
+    const websocket = new Responses(createUnauthenticatedClient(), {
       followRedirects: true,
       headers: { [header]: value },
     });
 
+    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
     expect(lastNodeSocket().options.followRedirects).toBe(false);
   });
 
   test('disables redirects for nonempty Basic auth options', () => {
-    new Responses(createUnauthenticatedClient(), {
+    const websocket = new Responses(createUnauthenticatedClient(), {
       auth: 'user:password',
       followRedirects: true,
     });
 
+    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
     expect(lastNodeSocket().options.followRedirects).toBe(false);
   });
 });

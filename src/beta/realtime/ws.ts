@@ -38,9 +38,6 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
       /** Indicates that a function-based credential was resolved by an async factory. @internal */
       __resolvedApiKey?: boolean;
-
-      /** Final URL validated before an asynchronous credential provider ran. @internal */
-      __url?: URL;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
@@ -55,7 +52,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         ].join('\n'),
       );
     }
-    this.url = props.__url ?? buildRealtimeURL(client, props);
+    this.url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, this.url);
     const headers = {
       ...props.options?.headers,
@@ -116,7 +113,14 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     const url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, url);
     const resolvedApiKey = await client._callApiKey();
-    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: resolvedApiKey, __url: url }, client);
+    return new OpenAIRealtimeWS(
+      {
+        ...props,
+        buildRealtimeURL: () => url,
+        __resolvedApiKey: resolvedApiKey,
+      },
+      client,
+    );
   }
 
   /**

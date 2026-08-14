@@ -108,7 +108,11 @@ function restoreBedrockStreamOutputText(responses: API.Responses): API.Responses
 
 /** API Client for interfacing with Amazon Bedrock's OpenAI-compatible endpoint. */
 export class BedrockOpenAI extends OpenAI {
-  /** @internal Identifies this client to credential-bearing WebSocket helpers. */
+  /**
+   * Identifies this client to credential-bearing WebSocket helpers.
+   *
+   * @internal
+   */
   readonly [brand_privateBedrockClient] = true;
 
   private readonly bedrockTokenProvider: ApiKeySetter | undefined;

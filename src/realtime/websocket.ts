@@ -76,9 +76,6 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       onURL?: (url: URL) => void;
       /** Indicates the token was resolved by the factory just before connecting. @internal */
       __resolvedApiKey?: boolean;
-
-      /** Final URL validated before an asynchronous credential provider ran. @internal */
-      __url?: URL;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
@@ -105,7 +102,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       );
     }
 
-    this.url = props.__url ?? buildRealtimeURL(client, props);
+    this.url = buildRealtimeURL(client, props);
     props.onURL?.(this.url);
     assertBedrockWebSocketOrigin(client, this.url);
 
@@ -164,7 +161,14 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     const url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, url);
     const resolvedApiKey = await client._callApiKey();
-    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: resolvedApiKey, __url: url }, client);
+    return new OpenAIRealtimeWebSocket(
+      {
+        ...props,
+        buildRealtimeURL: () => url,
+        __resolvedApiKey: resolvedApiKey,
+      },
+      client,
+    );
   }
 
   /**

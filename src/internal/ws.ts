@@ -38,11 +38,11 @@ export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
  */
 export type RawWebSocketData = string | ArrayBufferLike | ArrayBufferView | ArrayBufferView[];
 
-type CredentialedWebSocketOptions = {
+interface CredentialedWebSocketOptions {
   auth?: string | null | undefined;
   followRedirects?: boolean | undefined;
   headers?: object | null | undefined;
-};
+}
 
 /** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */
 export function protectWebSocketOptionsFromCredentialRedirects<Options extends CredentialedWebSocketOptions>(
