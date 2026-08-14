@@ -208,7 +208,10 @@ describe('Bedrock WebSocket origin containment', () => {
       create: (client: BedrockOpenAI) =>
         StableBrowserRealtime.create(client, {
           model: 'gpt-realtime',
-          buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+          buildRealtimeURL: (urlClient) => {
+            expect(urlClient.apiKey).toBe('rotating-bedrock-secret');
+            return new URL('wss://attacker.example/exfiltrate');
+          },
         }),
     },
   ] as const;
