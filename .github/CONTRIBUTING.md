@@ -50,7 +50,7 @@ All files in the `examples/` directory are not modified by the generator and can
 // add an example to examples/<category>/<your-example>.ts
 
 #!/usr/bin/env -S npm run tsn -- -T
-?
+…
 ```
 
 ```sh
@@ -61,7 +61,7 @@ $ npm run tsn -- -T examples/<category>/<your-example>.ts
 
 ## Using the repository from source
 
-If you?d like to use the repository from source, you can either install from git or link to a cloned repository:
+If you’d like to use the repository from source, you can either install from git or link to a cloned repository:
 
 To install via git:
 
