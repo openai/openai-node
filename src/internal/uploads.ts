@@ -53,16 +53,14 @@ export interface StreamingFile {
  * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
  * @param name Non-empty filename sent in the multipart request.
  * @param options Optional MIME type for the streaming file.
- * @throws {TypeError} If `name` is empty or the content type contains control characters.
+ * @throws {TypeError} If `name` is not a non-empty string or the content type contains control characters.
  */
 export function toStreamingFile(
   data: StreamingFileInput,
   name: string,
   options?: Pick<FilePropertyBag, 'type'>,
 ): StreamingFile {
-  if (!name) {
-    throw new TypeError('toStreamingFile requires a non-empty file name');
-  }
+  validateStreamingFileName(name);
 
   const type = options?.type;
   if (type) {
@@ -452,12 +450,18 @@ async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<Fo
   }
 }
 
-function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
-  if (isStreamingFile(value)) {
-    return options.stripFilenames === false ? normalizeFilenamePath(value.name) : value.name;
+function validateStreamingFileName(name: unknown): string {
+  if (typeof name !== 'string' || !name) {
+    throw new TypeError('toStreamingFile requires a non-empty file name');
   }
 
-  return getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
+  return name;
+}
+
+function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
+  const source = isStreamingFile(value) ? { name: validateStreamingFileName(value.name) } : value;
+
+  return getName(source, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
 }
 
 function getStreamingFileType(value: Uploadable): string {

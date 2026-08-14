@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 
+import OpenAI from 'openai';
 import { buildHeaders } from 'openai/internal/headers';
 import { toFile } from 'openai/internal/to-file';
 import {
@@ -25,6 +26,44 @@ describe('streaming upload metadata', () => {
       name: 'audio.wav',
       type: 'audio/wav',
     });
+  });
+
+  test.each([
+    ['a plain object', { replace: () => 'upload.txt' }],
+    ['a boxed string', new Object('upload.txt')],
+    ['a number', 42],
+    ['a symbol', Symbol('upload.txt')],
+    ['a boolean', true],
+    ['null', null],
+    ['undefined', undefined],
+  ] as const)('rejects %s as a streaming filename without coercing it', (_, name) => {
+    async function* chunks() {
+      yield 'content';
+    }
+
+    expect(() => toStreamingFile(chunks(), name as any)).toThrow(TypeError);
+    expect(() => toStreamingFile(chunks(), name as any)).toThrow(/file.?name/i);
+  });
+
+  test('rejects attacker-controlled filename methods without invoking them', () => {
+    async function* chunks() {
+      yield 'content';
+    }
+
+    const replace = vi.fn().mockReturnValue('attacker.txt');
+    const toString = vi.fn().mockReturnValue('attacker.txt');
+
+    expect(() => toStreamingFile(chunks(), { replace, toString } as any)).toThrow(TypeError);
+    expect(replace).not.toHaveBeenCalled();
+    expect(toString).not.toHaveBeenCalled();
+  });
+
+  test('accepts nonempty primitive Unicode filenames', () => {
+    async function* chunks() {
+      yield 'content';
+    }
+
+    expect(toStreamingFile(chunks(), 'résumé-東京🎵.wav').name).toBe('résumé-東京🎵.wav');
   });
 
   test.each([
@@ -246,6 +285,102 @@ describe('buffered multipart forms', () => {
 });
 
 describe('lazy multipart stream encoding', () => {
+  test.each([
+    ['an empty filename', ''],
+    ['a boxed string', new Object('upload.txt')],
+    ['a plain object', { replace: () => 'upload.txt', toString: () => 'upload.txt' }],
+    ['a number', 42],
+    ['a symbol', Symbol('upload.txt')],
+    ['null', null],
+    ['undefined', undefined],
+  ] as const)('rejects a filename mutated to %s before emitting its multipart boundary', async (_, name) => {
+    async function* chunks() {
+      yield 'sensitive upload bytes';
+    }
+
+    const upload = toStreamingFile(chunks(), 'safe.txt');
+    Object.defineProperty(upload, 'name', { value: name });
+
+    const options = await multipartFormRequestOptions({ body: { upload } }, fetch);
+    const reader = (options.body as ReadableStream).getReader();
+
+    await expect(reader.read()).rejects.toThrow(TypeError);
+    await expect(reader.closed).rejects.toThrow(/file.?name/i);
+  });
+
+  test.each([
+    ['default filename stripping', undefined],
+    ['explicit path preservation', { stripFilenames: false }],
+  ] as const)(
+    'rejects mutated filename methods that forge duplicate multipart fields with %s',
+    async (_, formOptions) => {
+      async function* chunks() {
+        yield 'sensitive upload bytes';
+      }
+
+      let boundary = '';
+      let normalized = false;
+      const replace = vi.fn().mockImplementation(() => {
+        if (formOptions?.stripFilenames === false && !normalized) {
+          normalized = true;
+          return { replace };
+        }
+
+        return (
+          'ok.txt"\r\n\r\nspoof\r\n' +
+          `--${boundary}\r\nContent-Disposition: form-data; name="purpose"\r\n\r\nattacker\r\n` +
+          `--${boundary}\r\nContent-Disposition: form-data; name="upload"; filename="ok.txt`
+        );
+      });
+      const upload = toStreamingFile(chunks(), 'safe.txt');
+      Object.defineProperty(upload, 'name', { value: { replace } });
+
+      const options = await multipartFormRequestOptions(
+        { body: { upload, purpose: 'assistants' } },
+        fetch,
+        formOptions,
+      );
+      const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+      boundary = contentType.split('boundary=')[1]?.split(';')[0] ?? '';
+
+      const outcome = await new Response(options.body as ReadableStream, {
+        headers: { 'content-type': contentType },
+      })
+        .formData()
+        .then(
+          (form) => ({ hasUpload: form.has('upload'), purposes: form.getAll('purpose') }),
+          (error: unknown) => error,
+        );
+
+      expect(boundary).not.toBe('');
+      expect(outcome).toBeInstanceOf(TypeError);
+      expect(outcome).toHaveProperty('message', expect.stringMatching(/file.?name/i));
+      expect(replace).not.toHaveBeenCalled();
+    },
+  );
+
+  test('reads a mutable streaming filename only once before escaping multipart headers', async () => {
+    async function* chunks() {
+      yield 'sensitive upload bytes';
+    }
+
+    const replace = vi.fn().mockReturnValue('attacker.txt');
+    const getFilename = vi.fn().mockReturnValueOnce('safe.txt').mockReturnValue({ replace });
+    const upload = toStreamingFile(chunks(), 'original.txt');
+    Object.defineProperty(upload, 'name', { get: getFilename });
+
+    const options = await multipartFormRequestOptions({ body: { upload, purpose: 'assistants' } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    expect(getFilename).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+    expect(form.getAll('purpose')).toEqual(['assistants']);
+    expect((form.get('upload') as File).name).toBe('safe.txt');
+  });
+
   test('rejects mutated content types instead of injecting duplicate form parameters', async () => {
     async function* chunks() {
       yield 'sensitive upload bytes';
@@ -406,6 +541,116 @@ describe('lazy multipart stream encoding', () => {
     );
   });
 
+  test.each([
+    ['an absolute POSIX path', '/Users/alice/private/report.txt', 'report.txt'],
+    ['an absolute Windows path', 'C:\\Users\\alice\\private\\report.txt', 'report.txt'],
+    ['a nested relative path', 'private/nested/report.txt', 'report.txt'],
+    ['mixed path separators', 'private\\nested/deeper\\report.txt', 'report.txt'],
+    ['a plain filename', 'report.txt', 'report.txt'],
+  ] as const)(
+    'strips directories from %s in serialized streaming multipart headers',
+    async (_, name, filename) => {
+      async function* chunks() {
+        yield 'content';
+      }
+
+      const options = await multipartFormRequestOptions(
+        { body: { upload: toStreamingFile(chunks(), name) } },
+        fetch,
+      );
+      const body = await new Response(options.body as ReadableStream).text();
+
+      expect(body).toContain(`Content-Disposition: form-data; name="upload"; filename="${filename}"\r\n`);
+    },
+  );
+
+  test.each([
+    ['conditional multipart', maybeMultipartFormRequestOptions],
+    ['required multipart', multipartFormRequestOptions],
+  ] as const)('strips private streaming filename paths from %s headers', async (_, encodeRequest) => {
+    async function* chunks() {
+      yield 'content';
+    }
+
+    const options = await encodeRequest(
+      { body: { upload: toStreamingFile(chunks(), 'C:\\Users\\alice\\private\\report.txt') } },
+      fetch,
+    );
+    const body = await new Response(options.body as ReadableStream).text();
+
+    expect(body).toContain('Content-Disposition: form-data; name="upload"; filename="report.txt"\r\n');
+    expect(body).not.toContain('alice');
+    expect(body).not.toContain('private');
+  });
+
+  test('preserves Unicode streaming filenames while stripping private directory names', async () => {
+    async function* chunks() {
+      yield 'content';
+    }
+
+    const options = await multipartFormRequestOptions(
+      { body: { upload: toStreamingFile(chunks(), '/Users/alice/private/résumé-東京🎵.wav') } },
+      fetch,
+    );
+    const body = await new Response(options.body as ReadableStream).text();
+
+    expect(body).toContain('Content-Disposition: form-data; name="upload"; filename="résumé-東京🎵.wav"\r\n');
+    expect(body).not.toContain('/Users/alice/private/');
+  });
+
+  test('sends only the streaming filename basename through the public transcription API', async () => {
+    async function* chunks() {
+      yield 'sensitive audio bytes';
+    }
+
+    let requestURL = '';
+    let requestBody = '';
+    let requestContentType: string | null = null;
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async (url, init) => {
+        requestURL = String(url);
+        requestContentType = new Headers(init?.headers).get('content-type');
+        requestBody = await new Response(init?.body as ReadableStream).text();
+
+        return Response.json({ text: 'transcribed' });
+      },
+    });
+
+    await client.audio.transcriptions.create({
+      file: toStreamingFile(chunks(), '/Users/alice/private/medical.wav'),
+      model: 'whisper-1',
+    });
+
+    expect(requestURL).toBe('https://api.openai.com/v1/audio/transcriptions');
+    expect(requestContentType).toMatch(/^multipart\/form-data; boundary=openai-/);
+    expect(requestBody).toContain('Content-Disposition: form-data; name="file"; filename="medical.wav"\r\n');
+    expect(requestBody).toContain('name="model"\r\n\r\nwhisper-1');
+    expect(requestBody).not.toContain('/Users/alice/private/');
+  });
+
+  test.each([
+    ['POSIX separators', 'my-skill/assets/report.txt', 'my-skill/assets/report.txt'],
+    ['Windows separators', 'my-skill\\assets\\report.txt', 'my-skill/assets/report.txt'],
+    ['mixed separators', 'my-skill/assets\\nested\\report.txt', 'my-skill/assets/nested/report.txt'],
+  ] as const)(
+    'preserves normalized streaming filename paths with %s when explicitly requested',
+    async (_, name, filename) => {
+      async function* chunks() {
+        yield 'content';
+      }
+
+      const options = await multipartFormRequestOptions(
+        { body: { upload: toStreamingFile(chunks(), name) } },
+        fetch,
+        { stripFilenames: false },
+      );
+      const body = await new Response(options.body as ReadableStream).text();
+
+      expect(body).toContain(`Content-Disposition: form-data; name="upload"; filename="${filename}"\r\n`);
+    },
+  );
+
   test('continues stripping ordinary File paths when streaming is enabled', async () => {
     async function* chunks() {
       yield 'streamed';
@@ -483,7 +728,7 @@ describe('lazy multipart stream encoding', () => {
     const options = await multipartFormRequestOptions(
       {
         body: {
-          upload: toStreamingFile(chunks() as any, 'quote"\\\r\n.wav', { type: 'audio/custom' }),
+          upload: toStreamingFile(chunks() as any, 'folder\\quote"\r\n.wav', { type: 'audio/custom' }),
           values: ['first', 2, false],
           metadata: { enabled: true, omitted: undefined },
         },
@@ -493,7 +738,7 @@ describe('lazy multipart stream encoding', () => {
 
     const body = await new Response(options.body as ReadableStream).text();
 
-    expect(body).toContain('filename="quote%22%5C%0D%0A.wav"');
+    expect(body).toContain('filename="quote%22%0D%0A.wav"');
     expect(body).toContain('Content-Type: audio/custom');
     expect(body).toContain('ABCDEFG');
     expect(body).toContain('name="values[]"\r\n\r\nfirst');
