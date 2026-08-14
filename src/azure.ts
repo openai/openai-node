@@ -1,4 +1,4 @@
-import type { RequestInit } from './internal/builtin-types';
+import type { RequestInit, RequestInfo, Response } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
@@ -157,7 +157,25 @@ export class AzureOpenAI extends OpenAI {
         options.path = `/deployments/${model}${options.path}`;
       }
     }
-    return super.buildRequest(options, props);
+    const built = await super.buildRequest(options, props);
+    if (built.req.headers.has('api-key')) {
+      built.req.redirect = 'manual';
+    }
+    return built;
+  }
+
+  protected override async fetchWithAuth(
+    url: RequestInfo,
+    init: RequestInit,
+    timeout: number,
+    controller: AbortController,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<Response> {
+    if (new Headers(init.headers).has('api-key')) {
+      init.redirect = 'manual';
+    }
+
+    return super.fetchWithAuth(url, init, timeout, controller, schemes);
   }
 
   protected override async authHeaders(
