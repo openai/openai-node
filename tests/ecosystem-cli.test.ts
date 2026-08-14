@@ -52,7 +52,7 @@ describe('ecosystem test CLI', () => {
       steps.find((step) => step.startsWith('Run ecosystem tests without live credentials\n')) ?? '';
 
     expect(workflowCondition(liveStep)).toBe(
-      "github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')",
+      "github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)",
     );
     expect(liveStep).toContain(
       'pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3',
@@ -61,12 +61,32 @@ describe('ecosystem test CLI', () => {
     expect(liveStep).toContain('secrets.OPENAI_API_KEY');
 
     expect(workflowCondition(nonLiveStep)).toBe(
-      "github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.actor == 'dependabot[bot]')",
+      "github.actor == 'dependabot[bot]' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)",
     );
     expect(nonLiveStep).toContain('pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3');
     expect(nonLiveStep).not.toContain('--live');
     expect(nonLiveStep).not.toContain('OPENAI_API_KEY');
     expect(ecosystemJob.split('OPENAI_API_KEY:')).toHaveLength(2);
+  });
+
+  test.each([
+    ['Dependabot push', 'dependabot[bot]', 'push', undefined, false],
+    ['Dependabot pull request', 'dependabot[bot]', 'pull_request', 'openai/openai-node', false],
+    ['human push', 'octocat', 'push', undefined, true],
+    ['merge group', 'octocat', 'merge_group', undefined, true],
+    ['workflow dispatch', 'octocat', 'workflow_dispatch', undefined, true],
+    ['same-repository pull request', 'octocat', 'pull_request', 'openai/openai-node', true],
+    ['fork pull request', 'octocat', 'pull_request', 'octocat/openai-node', false],
+    ['pull request with a missing head', 'octocat', 'pull_request', undefined, false],
+  ])('selects exactly one ecosystem mode for a %s', (_event, actor, eventName, headRepository, trusted) => {
+    const repository = 'openai/openai-node';
+    const keyless =
+      actor === 'dependabot[bot]' || (eventName === 'pull_request' && headRepository !== repository);
+    const live =
+      actor !== 'dependabot[bot]' && (eventName !== 'pull_request' || headRepository === repository);
+
+    expect({ keyless, live }).toEqual({ keyless: !trusted, live: trusted });
+    expect([keyless, live].filter(Boolean)).toHaveLength(1);
   });
 
   test.each(['--live', '--deploy'])('rejects keyless %s before running projects', (option) => {
