@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -30,7 +30,44 @@ function runCli(args: string[], cwd = root) {
   );
 }
 
+function workflowCondition(step: string) {
+  return step
+    .split('        if: >-\n')[1]
+    ?.split('\n        run:')[0]
+    ?.split('\n')
+    .slice(1, -1)
+    .map((line) => line.trim())
+    .join(' ');
+}
+
 describe('ecosystem test CLI', () => {
+  test('limits live ecosystem CI and credentials to trusted events', () => {
+    const workflow = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf-8');
+    const ecosystemJob = workflow.split('\n  ecosystem_tests:\n')[1] ?? '';
+    const steps = ecosystemJob.split('\n      - name: ');
+    const liveStep =
+      steps.find((step) => step.startsWith('Run ecosystem tests with live credentials\n')) ?? '';
+    const nonLiveStep =
+      steps.find((step) => step.startsWith('Run ecosystem tests without live credentials\n')) ?? '';
+
+    expect(workflowCondition(liveStep)).toBe(
+      "github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')",
+    );
+    expect(liveStep).toContain(
+      'pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3',
+    );
+    expect(liveStep).toContain('OPENAI_API_KEY:');
+    expect(liveStep).toContain('secrets.OPENAI_API_KEY');
+
+    expect(workflowCondition(nonLiveStep)).toBe(
+      "github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.actor == 'dependabot[bot]')",
+    );
+    expect(nonLiveStep).toContain('pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3');
+    expect(nonLiveStep).not.toContain('--live');
+    expect(nonLiveStep).not.toContain('OPENAI_API_KEY');
+    expect(ecosystemJob.split('OPENAI_API_KEY:')).toHaveLength(2);
+  });
+
   test.each(['--live', '--deploy'])('rejects keyless %s before running projects', (option) => {
     const result = runCli([option]);
 
