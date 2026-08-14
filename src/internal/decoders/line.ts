@@ -3,7 +3,7 @@ import { decodeUTF8, encodeUTF8 } from '../utils/bytes';
 /** Text or UTF-8 bytes accepted by the incremental line decoder. */
 export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
-/** Maximum backing-buffer capacity retained after its contents are consumed. */
+/** Maximum backing-buffer capacity retained when completed lines leave little active data. */
 const MAX_RETAINED_BUFFER_BYTES = 64 * 1024;
 
 /**
@@ -102,6 +102,18 @@ export class LineDecoder {
       if (this.#buffer.length > MAX_RETAINED_BUFFER_BYTES) {
         this.#buffer = new Uint8Array();
       }
+    } else if (
+      lines.length > 0 &&
+      this.#buffer.length > MAX_RETAINED_BUFFER_BYTES &&
+      this.#end - this.#start <= MAX_RETAINED_BUFFER_BYTES
+    ) {
+      const length = this.#end - this.#start;
+      const buffer = new Uint8Array(Math.max(length, 256));
+      buffer.set(this.#buffer.subarray(this.#start, this.#end));
+      this.#buffer = buffer;
+      this.#start = 0;
+      this.#end = length;
+      this.#searchIndex = length;
     }
 
     return lines;

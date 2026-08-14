@@ -102,8 +102,8 @@ describe('line decoder', () => {
     expect(decoded).toEqual(['известни']);
   });
 
-  test('copies a linear number of bytes for a line fragmented into single bytes', () => {
-    const fragmentCount = 16 * 1024;
+  test('copies a linear number of bytes for an oversized line fragmented into single bytes', () => {
+    const fragmentCount = 96 * 1024;
     const fragment = new Uint8Array([0x61]);
     const decoder = new LineDecoder();
     const originalSet = Uint8Array.prototype.set;
@@ -162,6 +162,149 @@ describe('line decoder', () => {
       expect(highWaterCapacity).toBeGreaterThan(maximumRetainedBytes);
       expect(retainedCapacity).toBeGreaterThan(0);
       expect(retainedCapacity).toBeLessThanOrEqual(maximumRetainedBytes);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  test('releases oversized backing buffers while retaining a small unterminated suffix', () => {
+    const maximumRetainedBytes = 64 * 1024;
+    const oversizedLine = new Uint8Array(maximumRetainedBytes * 4).fill(0x61);
+    const newlineAndPartialSuffix = new Uint8Array([0x0a, 0x62]);
+    const fragment = new Uint8Array([0x63]);
+    const newlineAndNextPartialSuffix = new Uint8Array([0x0a, 0x62]);
+    const decoder = new LineDecoder();
+    const originalSet = Uint8Array.prototype.set;
+    const retainedCapacities: number[] = [];
+    let highWaterCapacity = 0;
+
+    const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordBackingCapacity(
+      this: Uint8Array,
+      source: ArrayLike<number>,
+      offset?: number,
+    ) {
+      if (source === oversizedLine || source === newlineAndPartialSuffix) {
+        highWaterCapacity = Math.max(highWaterCapacity, this.buffer.byteLength);
+      } else if (source === fragment || source === newlineAndNextPartialSuffix) {
+        retainedCapacities.push(this.buffer.byteLength);
+      }
+      originalSet.call(this, source, offset);
+    });
+
+    try {
+      expect(decoder.decode(oversizedLine)).toEqual([]);
+      expect(decoder.decode(newlineAndPartialSuffix)).toEqual(['a'.repeat(oversizedLine.length)]);
+
+      for (let index = 0; index < 128; index += 1) {
+        expect(decoder.decode(fragment)).toEqual([]);
+        expect(decoder.decode(newlineAndNextPartialSuffix)).toEqual(['bc']);
+      }
+
+      expect(highWaterCapacity).toBeGreaterThan(maximumRetainedBytes);
+      expect(retainedCapacities).toHaveLength(256);
+      expect(Math.max(...retainedCapacities)).toBeLessThanOrEqual(maximumRetainedBytes);
+      expect(decoder.flush()).toEqual(['b']);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  test('preserves unterminated suffixes larger than the retained-buffer limit', () => {
+    const maximumRetainedBytes = 64 * 1024;
+    const oversizedLine = new Uint8Array(maximumRetainedBytes * 4).fill(0x61);
+    const oversizedSuffix = new Uint8Array(maximumRetainedBytes + 17).fill(0x62);
+    const newlineAndOversizedSuffix = new Uint8Array(oversizedSuffix.length + 1);
+    newlineAndOversizedSuffix[0] = 0x0a;
+    newlineAndOversizedSuffix.set(oversizedSuffix, 1);
+
+    const fragment = new Uint8Array([0x63]);
+    const decoder = new LineDecoder();
+    const originalSet = Uint8Array.prototype.set;
+    let retainedCapacity = 0;
+
+    const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordBackingCapacity(
+      this: Uint8Array,
+      source: ArrayLike<number>,
+      offset?: number,
+    ) {
+      if (source === fragment) {
+        retainedCapacity = this.buffer.byteLength;
+      }
+      originalSet.call(this, source, offset);
+    });
+
+    try {
+      expect(decoder.decode(oversizedLine)).toEqual([]);
+      expect(decoder.decode(newlineAndOversizedSuffix)).toEqual(['a'.repeat(oversizedLine.length)]);
+      expect(decoder.decode(fragment)).toEqual([]);
+
+      expect(retainedCapacity).toBeGreaterThan(maximumRetainedBytes);
+      expect(decoder.decode('\n')).toEqual([`${'b'.repeat(oversizedSuffix.length)}c`]);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  test('preserves split UTF-8 and CRLF while releasing an oversized backing buffer', () => {
+    const maximumRetainedBytes = 64 * 1024;
+    const oversizedLine = new Uint8Array(maximumRetainedBytes * 4).fill(0x61);
+    const newlineAndPartialUtf8Suffix = new Uint8Array([0x0a, 0x70, 0x72, 0x65, 0xf0, 0x9f]);
+    const remainingUtf8AndCarriageReturn = new Uint8Array([0x92, 0x99, 0x0d]);
+    const decoder = new LineDecoder();
+    const originalSet = Uint8Array.prototype.set;
+    let retainedCapacity = 0;
+
+    const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordBackingCapacity(
+      this: Uint8Array,
+      source: ArrayLike<number>,
+      offset?: number,
+    ) {
+      if (source === remainingUtf8AndCarriageReturn) {
+        retainedCapacity = this.buffer.byteLength;
+      }
+      originalSet.call(this, source, offset);
+    });
+
+    try {
+      expect(decoder.decode(oversizedLine)).toEqual([]);
+      expect(decoder.decode(newlineAndPartialUtf8Suffix)).toEqual(['a'.repeat(oversizedLine.length)]);
+      expect(decoder.decode(remainingUtf8AndCarriageReturn)).toEqual(['pre💙']);
+
+      expect(retainedCapacity).toBeGreaterThan(0);
+      expect(retainedCapacity).toBeLessThanOrEqual(maximumRetainedBytes);
+      expect(decoder.decode('\nnext\n')).toEqual(['next']);
+      expect(decoder.flush()).toEqual([]);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  test('reuses normal backing buffers across many small lines with live suffixes', () => {
+    const partialSuffix = new Uint8Array([0x61]);
+    const newlineAndPartialSuffix = new Uint8Array([0x0a, 0x61]);
+    const decoder = new LineDecoder();
+    const originalSet = Uint8Array.prototype.set;
+    const backingBuffers = new Set<Uint8Array>();
+
+    const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordBackingBuffer(
+      this: Uint8Array,
+      source: ArrayLike<number>,
+      offset?: number,
+    ) {
+      if (source === partialSuffix || source === newlineAndPartialSuffix) {
+        backingBuffers.add(this);
+      }
+      originalSet.call(this, source, offset);
+    });
+
+    try {
+      expect(decoder.decode(partialSuffix)).toEqual([]);
+      for (let index = 0; index < 512; index += 1) {
+        expect(decoder.decode(newlineAndPartialSuffix)).toEqual(['a']);
+      }
+
+      expect(backingBuffers.size).toBe(1);
+      expect(decoder.flush()).toEqual(['a']);
     } finally {
       setSpy.mockRestore();
     }
