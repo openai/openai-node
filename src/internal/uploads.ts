@@ -440,16 +440,44 @@ type MultipartEntry =
 function snapshotStreamingFileData(value: StreamingFileInput): StreamingFileInput {
   const { getReader } = value as ReadableStream<BlobPart>;
   if (typeof getReader === 'function') {
-    const snapshot = { getReader: getReader.bind(value) };
-    return snapshot as ReadableStream<BlobPart>;
+    const reader = getReader.call(value);
+    return { getReader: () => reader } as ReadableStream<BlobPart>;
   }
 
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
-    return { [Symbol.asyncIterator]: createIterator.bind(value) };
+    const iterator = createIterator.call(value);
+    return { [Symbol.asyncIterator]: () => iterator };
   }
 
   throw new TypeError('Streaming file data must be an async iterable or readable stream');
+}
+
+function snapshotBlobData(value: Blob): StreamingFileInput {
+  const { stream } = value as Blob & { stream?: Blob['stream'] };
+  if (typeof stream === 'function') {
+    return snapshotStreamingFileData(stream.call(value) as ReadableStream<BlobPart>);
+  }
+
+  const bytes = value.arrayBuffer();
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield await bytes;
+    },
+  };
+}
+
+function snapshotResponseData(value: Response): StreamingFileInput {
+  if (value.body) {
+    return snapshotStreamingFileData(value.body);
+  }
+
+  const blob = value.blob();
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield await blob;
+    },
+  };
 }
 
 const createStreamingFormRequestOptions = (
@@ -545,6 +573,10 @@ async function* iterateFormValue(
     let data: unknown = upload;
     if (streamingFile) {
       data = snapshotStreamingFileData((upload as StreamingFile).data);
+    } else if (upload instanceof Response) {
+      data = snapshotResponseData(upload);
+    } else if (upload instanceof Blob) {
+      data = snapshotBlobData(upload);
     } else if (uploadKind === 'streaming-upload') {
       data = snapshotStreamingFileData(upload as StreamingFileInput);
     }
