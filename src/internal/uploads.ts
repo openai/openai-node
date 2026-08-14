@@ -431,7 +431,7 @@ type FormEntry =
       key: string;
       value: Uploadable;
       data: unknown;
-      dispose: () => void;
+      dispose?: (() => void) | undefined;
       filename: string;
       kind: 'upload';
       streamingFile: boolean;
@@ -445,11 +445,11 @@ type MultipartDataSnapshot = Readonly<{
   dispose: () => void;
 }>;
 
-function ignoreCleanupResult(cleanup: () => unknown): void {
+async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
   try {
-    void Promise.resolve(cleanup()).catch(() => undefined);
+    await cleanup();
   } catch {
-    return;
+    // Cleanup failures must not mask the primary multipart result.
   }
 }
 
@@ -467,7 +467,7 @@ function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnap
       },
       dispose() {
         if (!consumed && typeof iterator.return === 'function') {
-          ignoreCleanupResult(() => iterator.return?.());
+          void ignoreCleanupResult(() => iterator.return?.());
         }
       },
     };
@@ -487,7 +487,7 @@ function snapshotStreamingFileData(value: StreamingFileInput): MultipartDataSnap
       dispose() {
         if (!consumed) {
           try {
-            ignoreCleanupResult(() => reader.cancel());
+            void ignoreCleanupResult(() => reader.cancel());
           } finally {
             reader.releaseLock();
           }
@@ -512,7 +512,6 @@ function snapshotBlobData(value: Blob): MultipartDataSnapshot {
         yield await bytes;
       },
     },
-    dispose: () => undefined,
   };
 }
 
@@ -528,7 +527,6 @@ function snapshotResponseData(value: Response): MultipartDataSnapshot {
         yield await blob;
       },
     },
-    dispose: () => undefined,
   };
 }
 
@@ -558,7 +556,7 @@ async function* iterateMultipartBody(
 
   try {
     for await (const entry of iterateFormEntries(body, uploadableKinds, options)) {
-      if (entry.kind === 'upload') {
+      if (entry.kind === 'upload' && entry.dispose) {
         pendingDisposals.add(entry.dispose);
       }
       entries.push(entry);
@@ -576,7 +574,9 @@ async function* iterateMultipartBody(
           )}"\r\nContent-Type: ${entry.type}\r\n\r\n`,
         );
         yield* iterateBytes(entry.data);
-        pendingDisposals.delete(entry.dispose);
+        if (entry.dispose) {
+          pendingDisposals.delete(entry.dispose);
+        }
       } else {
         yield encodeUTF8(`--${boundary}\r\n`);
         yield encodeUTF8(
