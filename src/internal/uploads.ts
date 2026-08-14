@@ -36,7 +36,10 @@ export interface StreamingFile {
   /** Source chunks read incrementally as the multipart request body is transmitted. */
   readonly data: StreamingFileInput;
 
-  /** Filename sent in the multipart part's `Content-Disposition` header. */
+  /**
+   * Filename supplied for the multipart part. Most endpoints send only its basename;
+   * endpoints that accept logical paths, such as Skills, preserve a normalized path.
+   */
   readonly name: string;
 
   /** Optional MIME type; defaults to `application/octet-stream` when omitted. */
@@ -51,7 +54,8 @@ export interface StreamingFile {
  * form data when the request is sent.
  *
  * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
- * @param name Non-empty filename sent in the multipart request.
+ * @param name Non-empty filename for the multipart request. Most endpoints send only its basename;
+ * endpoints that accept logical paths, such as Skills, preserve a normalized path.
  * @param options Optional MIME type for the streaming file.
  * @throws {TypeError} If `name` is not a non-empty string or the content type contains control characters.
  */
