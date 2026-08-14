@@ -444,14 +444,15 @@ type MultipartDataSnapshot = Readonly<{
   dispose?: (() => void) | undefined;
 }>;
 
-function isNativeReadableStream(value: StreamingFileInput): boolean {
+function isNativeReadableStream(value: StreamingFileInput, requireLocked = false): boolean {
   if (typeof globalThis.ReadableStream !== 'function') {
     return false;
   }
 
   try {
     const getLocked = Object.getOwnPropertyDescriptor(globalThis.ReadableStream.prototype, 'locked')?.get;
-    return typeof getLocked?.call(value) === 'boolean';
+    const locked = getLocked?.call(value);
+    return typeof locked === 'boolean' && (!requireLocked || locked);
   } catch {
     // Ordinary async iterables and reader-like objects do not satisfy the native stream brand.
     return false;
@@ -466,6 +467,42 @@ async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
   }
 }
 
+function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterator<BlobPart>['return'] {
+  try {
+    let prototype: object | null = iterator;
+    while (prototype !== null) {
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'return');
+      if (descriptor) {
+        if ('value' in descriptor) {
+          const returnIterator = descriptor.value as AsyncIterator<BlobPart>['return'];
+          return returnIterator
+            ? (...args: [] | [unknown]) => Reflect.apply(returnIterator, iterator, args)
+            : undefined;
+        }
+
+        const getReturn = descriptor.get;
+        if (!getReturn) {
+          return undefined;
+        }
+
+        return (...args: [] | [unknown]) => {
+          const returnIterator = Reflect.apply(getReturn, iterator, []) as AsyncIterator<BlobPart>['return'];
+          return returnIterator
+            ? Reflect.apply(returnIterator, iterator, args)
+            : Promise.resolve({ done: true as const, value: args[0] });
+        };
+      }
+      prototype = Object.getPrototypeOf(prototype);
+    }
+  } catch (error) {
+    return () => {
+      throw error;
+    };
+  }
+
+  return undefined;
+}
+
 function snapshotStreamingFileData(
   value: StreamingFileInput,
   snapshots: WeakMap<object, MultipartDataSnapshot>,
@@ -478,7 +515,9 @@ function snapshotStreamingFileData(
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
     const iterator = createIterator.call(value);
+    const isLockedNativeStream = isNativeReadableStream(value, true);
     const { next } = iterator;
+    const returnIterator = snapshotIteratorReturn(iterator);
     let consumed = false;
     const snapshot: MultipartDataSnapshot = {
       data: {
@@ -489,9 +528,8 @@ function snapshotStreamingFileData(
               return next.call(iterator, ...args);
             },
             return(...args: [] | [unknown]) {
-              const returnIterator = iterator.return;
               return returnIterator
-                ? returnIterator.call(iterator, ...args)
+                ? returnIterator(...args)
                 : Promise.resolve({ done: true as const, value: args[0] });
             },
             [Symbol.asyncIterator]() {
@@ -503,11 +541,11 @@ function snapshotStreamingFileData(
       dispose() {
         if (!consumed) {
           consumed = true;
-          void ignoreCleanupResult(() => iterator.return?.());
+          void ignoreCleanupResult(() => returnIterator?.());
         }
       },
     };
-    if (isNativeReadableStream(value)) {
+    if (isLockedNativeStream) {
       snapshots.set(value, snapshot);
     }
     return snapshot;

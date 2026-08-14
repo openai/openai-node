@@ -697,6 +697,129 @@ describe('lazy multipart stream encoding', () => {
     expect(readSubstituted).not.toHaveBeenCalled();
   });
 
+  test.each(['own', 'prototype'] as const)(
+    'replays a native stream with a reusable %s async iterator',
+    async (location) => {
+      const stream = new ReadableStream<string>();
+      const createIterator = vi.fn(async function* createReusableIterator() {
+        yield 'fresh reusable bytes';
+      });
+
+      if (location === 'own') {
+        Object.defineProperty(stream, Symbol.asyncIterator, { value: createIterator });
+      } else {
+        Object.setPrototypeOf(
+          stream,
+          Object.create(Object.getPrototypeOf(stream), {
+            [Symbol.asyncIterator]: { value: createIterator },
+          }),
+        );
+      }
+
+      const options = await multipartFormRequestOptions(
+        {
+          body: {
+            files: [toStreamingFile(stream, 'first.txt'), toStreamingFile(stream, 'second.txt')],
+          },
+        },
+        fetch,
+      );
+      expect(createIterator).not.toHaveBeenCalled();
+
+      const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+      const form = await new Response(options.body as ReadableStream, {
+        headers: { 'content-type': contentType },
+      }).formData();
+
+      await expect(
+        Promise.all((form.getAll('files[]') as File[]).map((file) => file.text())),
+      ).resolves.toEqual(['fresh reusable bytes', 'fresh reusable bytes']);
+      expect(createIterator.mock.contexts).toEqual([stream, stream]);
+      expect(stream.locked).toBe(false);
+    },
+  );
+
+  test.each(['active cancellation', 'late invalid filename'] as const)(
+    'preserves the original iterator cleanup method during %s',
+    async (outcome) => {
+      const next = vi.fn(async () => ({ done: false as const, value: 'original bytes' }));
+      const originalReturn = vi.fn(async () => ({ done: true as const, value: undefined }));
+      const substitutedReturn = vi.fn(async () => ({ done: true as const, value: undefined }));
+      const iterator =
+        outcome === 'active cancellation'
+          ? { next, return: originalReturn }
+          : Object.assign(Object.create({ return: originalReturn }) as { return: typeof originalReturn }, {
+              next,
+            });
+      const earlier = toStreamingFile({ [Symbol.asyncIterator]: () => iterator }, 'earlier.txt');
+      const later = toStreamingFile(
+        (async function* chunks() {
+          yield 'later bytes';
+        })(),
+        'later.txt',
+      );
+      Object.defineProperty(later, 'name', {
+        get() {
+          iterator.return = substitutedReturn;
+          return outcome === 'late invalid filename' ? undefined : 'later.txt';
+        },
+      });
+
+      const options = await multipartFormRequestOptions({ body: { earlier, later } }, fetch);
+      const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+      expect(next).not.toHaveBeenCalled();
+
+      if (outcome === 'active cancellation') {
+        const boundary = await reader.read();
+        expect(new TextDecoder().decode(boundary.value)).toMatch(/^--openai-/u);
+        const headers = await reader.read();
+        expect(new TextDecoder().decode(headers.value)).toContain('filename="earlier.txt"');
+        expect(next).not.toHaveBeenCalled();
+        const payload = await reader.read();
+        expect(new TextDecoder().decode(payload.value)).toBe('original bytes');
+        expect(next).toHaveBeenCalledTimes(1);
+        await reader.cancel();
+      } else {
+        await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+        expect(next).not.toHaveBeenCalled();
+      }
+
+      expect(originalReturn.mock.contexts).toEqual([iterator]);
+      expect(substitutedReturn).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['completion', 'late invalid filename'] as const)(
+    'defers a throwing iterator cleanup accessor during %s',
+    async (outcome) => {
+      const next = vi.fn(async () => ({ done: true as const, value: undefined }));
+      const getReturn = vi.fn(() => {
+        throw new Error('iterator cleanup accessor failed');
+      });
+      const iterator = Object.defineProperty({ next }, 'return', { get: getReturn });
+      const earlier = toStreamingFile({ [Symbol.asyncIterator]: () => iterator }, 'earlier.txt');
+      const later = toStreamingFile((async function* chunks() {})(), 'later.txt');
+      Object.defineProperty(later, 'name', { value: undefined });
+      const body = outcome === 'completion' ? { earlier } : { earlier, later };
+      const options = await multipartFormRequestOptions({ body }, fetch);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(getReturn).not.toHaveBeenCalled();
+
+      if (outcome === 'completion') {
+        await expect(new Response(options.body as ReadableStream).text()).resolves.toContain(
+          'filename="earlier.txt"',
+        );
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(getReturn).not.toHaveBeenCalled();
+      } else {
+        await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/file.?name/iu);
+        expect(next).not.toHaveBeenCalled();
+        expect(getReturn).toHaveBeenCalledTimes(1);
+      }
+    },
+  );
+
   test('cancels and unlocks a reader when capturing its read method throws', async () => {
     const originalError = new Error('reader read accessor failed');
     const cancel = vi.fn(() => Promise.reject(new Error('reader cancellation failed')));
@@ -745,7 +868,9 @@ describe('lazy multipart stream encoding', () => {
       Object.assign(stream, {
         [Symbol.asyncIterator]: undefined,
         getReader() {
-          acquiredReader = ReadableStream.prototype.getReader.call(stream);
+          acquiredReader = ReadableStream.prototype.getReader.call(
+            stream,
+          ) as ReadableStreamDefaultReader<string>;
           return Object.assign(acquiredReader, original);
         },
       });
