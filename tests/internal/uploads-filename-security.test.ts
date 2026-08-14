@@ -234,14 +234,18 @@ describe('streaming multipart filename and header security', () => {
   });
 
   test('captures a filename before its iterator factory can mutate it', async () => {
-    let upload: ReturnType<typeof toStreamingFile>;
+    const state: { upload?: ReturnType<typeof toStreamingFile> } = {};
     const source = {
       [Symbol.asyncIterator]() {
-        Object.defineProperty(upload, 'name', { value: 'substituted.txt' });
+        if (!state.upload) {
+          throw new Error('upload was not initialized');
+        }
+        Object.defineProperty(state.upload, 'name', { value: 'substituted.txt' });
         return chunks('upload bytes')[Symbol.asyncIterator]();
       },
     };
-    upload = toStreamingFile(source, 'original.txt');
+    const upload = toStreamingFile(source, 'original.txt');
+    state.upload = upload;
 
     const options = await multipartFormRequestOptions({ body: { upload } }, fetch);
     const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
@@ -252,6 +256,50 @@ describe('streaming multipart filename and header security', () => {
 
     expect(file.name).toBe('original.txt');
     await expect(file.text()).resolves.toBe('upload bytes');
+  });
+
+  test('prefers an async iterator when an upload also exposes getReader', async () => {
+    const createIterator = vi.fn(() => chunks('iterator bytes')[Symbol.asyncIterator]());
+    const getReader = vi.fn(() => new ReadableStream<string>({ start() {} }).getReader());
+    const hybrid = { [Symbol.asyncIterator]: createIterator, getReader };
+
+    const options = await multipartFormRequestOptions({ body: { hybrid } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    await expect((form.get('hybrid') as File).text()).resolves.toBe('iterator bytes');
+    expect(createIterator).toHaveBeenCalledTimes(1);
+    expect(getReader).not.toHaveBeenCalled();
+  });
+
+  test('does not await unconsumed stream cleanup before reporting an invalid filename', async () => {
+    const never = new Promise<void>(() => undefined);
+    const cancel = vi.fn(() => never);
+    const returnIterator = vi.fn(() => never);
+    const stream = new ReadableStream<string>({ cancel });
+    const source = {
+      [Symbol.asyncIterator]() {
+        return {
+          next: async () => ({ done: false as const, value: 'unused' }),
+          return: returnIterator,
+        };
+      },
+    };
+    const later = toStreamingFile(chunks('later bytes'), 'later.txt');
+    Object.defineProperty(later, 'name', { value: { toString: vi.fn() } });
+
+    const options = await multipartFormRequestOptions({ body: { stream, source, later } }, fetch);
+    const reader = (options.body as ReadableStream).getReader();
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('cleanup timed out')), 100);
+    });
+
+    await expect(Promise.race([reader.read(), timeout])).rejects.toThrow(/file.?name/iu);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(returnIterator).toHaveBeenCalledTimes(1);
+    expect(stream.locked).toBe(false);
   });
 
   test('releases preflight readers when a later filename is invalid', async () => {
