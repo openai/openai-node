@@ -467,7 +467,7 @@ export namespace ConversationItem {
     /**
      * The error from the tool call, if any.
      */
-    error?: string | null;
+    error?: ResponsesAPI.McpToolCallError | null;
 
     /**
      * The output from the tool call.

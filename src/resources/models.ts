@@ -61,6 +61,11 @@ export interface Model {
    * The organization that owns the model.
    */
   owned_by: string;
+
+  /**
+   * The date when the model will shut down, or null if not announced.
+   */
+  shutdown_date?: string | null;
 }
 
 export interface ModelDeleted {

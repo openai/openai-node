@@ -43,6 +43,7 @@ export {
   type BetaInlineSkillSource,
   type BetaLocalEnvironment,
   type BetaLocalSkill,
+  type BetaMcpToolCallError,
   type BetaNamespaceTool,
   type BetaResponse,
   type BetaResponseApplyPatchToolCall,

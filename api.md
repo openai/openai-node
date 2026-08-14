@@ -412,6 +412,7 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaInlineSkillSource</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaLocalEnvironment</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaLocalSkill</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaMcpToolCallError</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaNamespaceTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponse</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseApplyPatchToolCall</a></code>
