@@ -485,7 +485,7 @@ function snapshotStreamingFileData(
         [Symbol.asyncIterator]() {
           consumed = true;
           return {
-            next(...args: [] | [unknown]) {
+            next(...args: [] | [undefined]) {
               return next.call(iterator, ...args);
             },
             return(...args: [] | [unknown]) {
@@ -515,7 +515,13 @@ function snapshotStreamingFileData(
 
   const { getReader } = value as ReadableStream<BlobPart>;
   if (typeof getReader === 'function') {
-    const reader = getReader.call(value);
+    const reader = getReader.call(value) as ReadableStreamDefaultReader<BlobPart>;
+    const { read } = reader;
+    const capturedReader = {
+      read: () => read.call(reader),
+      cancel: () => reader.cancel(),
+      releaseLock: () => reader.releaseLock(),
+    };
     let consumed = false;
     const snapshot: MultipartDataSnapshot = {
       data: {
@@ -524,7 +530,7 @@ function snapshotStreamingFileData(
             return;
           }
           consumed = true;
-          yield* ReadableStreamToAsyncIterable<BlobPart>({ getReader: () => reader });
+          yield* ReadableStreamToAsyncIterable<BlobPart>({ getReader: () => capturedReader });
         },
       },
       dispose() {
@@ -557,11 +563,18 @@ function snapshotBlobData(
     return snapshotStreamingFileData(stream.call(value) as ReadableStream<BlobPart>, snapshots);
   }
 
+  const immutableBlob = Blob.prototype.slice.call(value);
+  const { arrayBuffer: readImmutableBlob } = Blob.prototype;
   const { arrayBuffer: read } = value;
   return {
     data: {
       async *[Symbol.asyncIterator]() {
-        yield await read.call(value);
+        if (read === readImmutableBlob) {
+          yield await read.call(value);
+        } else {
+          await read.call(value);
+          yield await readImmutableBlob.call(immutableBlob);
+        }
       },
     },
   };
