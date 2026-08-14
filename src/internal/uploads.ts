@@ -386,9 +386,19 @@ async function* iterateMultipartBody(
   boundary: string,
   options: CreateFormOptions,
 ): AsyncGenerator<Uint8Array> {
-  for await (const { key, value } of iterateFormEntries(body)) {
+  const entries: (FormEntry & { filename?: string })[] = [];
+
+  for await (const entry of iterateFormEntries(body)) {
+    if (isStreamingFile(entry.value)) {
+      entries.push({ ...entry, filename: getStreamingFileName(entry.value, options) });
+    } else {
+      entries.push(entry);
+    }
+  }
+
+  for (const { key, value, filename: validatedFilename } of entries) {
     if (isUploadable(value)) {
-      const filename = getStreamingFileName(value, options);
+      const filename = validatedFilename ?? getStreamingFileName(value, options);
       const type = getStreamingFileType(value);
       yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(

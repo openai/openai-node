@@ -58,6 +58,94 @@ describe('streaming multipart filename and header security', () => {
     await expect(reader.closed).rejects.toThrow(/file.?name/iu);
   });
 
+  test('rejects a later mutated filename before sending earlier multipart fields or files', async () => {
+    const emitted: Uint8Array[] = [];
+    const readEarlierFile = vi.fn();
+    const replace = vi.fn();
+    const toString = vi.fn();
+
+    async function* earlierChunks() {
+      readEarlierFile();
+      yield 'sensitive earlier upload bytes';
+    }
+
+    const earlier = toStreamingFile(earlierChunks(), 'earlier.png');
+    const later = toStreamingFile(chunks('later upload bytes'), 'later.png');
+    const getEarlierFilename = vi.fn(() => {
+      Object.defineProperty(later, 'name', { value: { replace, toString } });
+      return 'earlier.png';
+    });
+    Object.defineProperty(earlier, 'name', { get: getEarlierFilename });
+
+    const customFetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = init?.body as ReadableStream<Uint8Array>;
+      for await (const chunk of body) {
+        emitted.push(chunk);
+      }
+
+      return Response.json({ created: 0 });
+    });
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch: customFetch });
+
+    await expect(
+      client.images.edit({ prompt: 'sensitive earlier metadata', image: [earlier, later] }),
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({ message: expect.stringMatching(/file.?name/iu) }),
+    });
+
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    expect(emitted).toEqual([]);
+    expect(readEarlierFile).not.toHaveBeenCalled();
+    expect(getEarlierFilename).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+    expect(toString).not.toHaveBeenCalled();
+  });
+
+  test('streams valid files lazily using one filename snapshot for each multipart entry', async () => {
+    const readChunk = vi.fn();
+    const replace = vi.fn();
+
+    async function* trackedChunks(content: string) {
+      readChunk(content);
+      yield content;
+    }
+
+    const first = toStreamingFile(trackedChunks('first upload bytes'), 'original-first.png');
+    const second = toStreamingFile(trackedChunks('second upload bytes'), 'original-second.png');
+    const getFirstFilename = vi.fn().mockReturnValueOnce('first.png').mockReturnValue({ replace });
+    const getSecondFilename = vi.fn().mockReturnValueOnce('second.png').mockReturnValue({ replace });
+    Object.defineProperty(first, 'name', { get: getFirstFilename });
+    Object.defineProperty(second, 'name', { get: getSecondFilename });
+
+    let form: FormData | undefined;
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async (_url, init) => {
+        expect(readChunk).not.toHaveBeenCalled();
+
+        form = await new Response(init?.body as ReadableStream, {
+          headers: { 'content-type': new Headers(init?.headers).get('content-type') ?? '' },
+        }).formData();
+
+        return Response.json({ created: 0 });
+      },
+    });
+
+    await client.images.edit({ prompt: 'safe metadata', image: [first, second] });
+
+    const files = (form?.getAll('image[]') ?? []) as File[];
+    expect(files.map((file) => file.name)).toEqual(['first.png', 'second.png']);
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'first upload bytes',
+      'second upload bytes',
+    ]);
+    expect(form?.get('prompt')).toBe('safe metadata');
+    expect(readChunk).toHaveBeenCalledTimes(2);
+    expect(getFirstFilename).toHaveBeenCalledTimes(1);
+    expect(getSecondFilename).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   test.each([
     ['default filename stripping', undefined],
     ['explicit path preservation', { stripFilenames: false }],
