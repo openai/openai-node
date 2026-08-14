@@ -1321,7 +1321,6 @@ module.exports = defineConfig({
         'tests/buildHeaders.test.ts',
         'tests/lib/AssistantStream.test.ts',
         'tests/lib/ChatCompletionRunFunctions.test.ts',
-        'tests/lib/ChatCompletionStream-prototype-safety.test.ts',
         'tests/lib/ChatCompletionStream.test.ts',
         'tests/lib/EventStream.test.ts',
         'tests/lib/ResponseAccumulator.events.test.ts',
