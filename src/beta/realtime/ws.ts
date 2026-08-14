@@ -56,12 +56,12 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${client.apiKey}` }),
       'OpenAI-Beta': 'realtime=v1',
     };
-    const hasAPIKeyHeader = Object.keys(headers).some((name) => /api[-_]?key/iu.test(name));
+    const hasSensitiveHeader = Object.keys(headers).some(\n      (name) => /^(?:authorization|cookie)$/iu.test(name) || /api[-_]?key/iu.test(name),\n    );
 
     this.socket = new WS.WebSocket(this.url, {
       ...props.options,
       headers,
-      ...(hasAPIKeyHeader ? { followRedirects: false } : {}),
+      ...(hasSensitiveHeader ? { followRedirects: false } : {}),
     });
 
     this.socket.on('message', (wsEvent) => {
