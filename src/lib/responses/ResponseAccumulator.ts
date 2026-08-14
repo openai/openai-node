@@ -504,19 +504,41 @@ function updateOutputText(
     return;
   }
 
-  if (
-    contentIndex !== undefined &&
-    output?.type === 'message' &&
-    contentIndex >= output.content.length - contentIndex - 1
-  ) {
-    let followingTextLength = 0;
-    for (let index = contentIndex + 1; index < output.content.length; index += 1) {
-      const followingContent = output.content[index];
-      if (followingContent?.type === 'output_text') {
-        followingTextLength += followingContent.text.length;
+  let precedingContentLength = 0;
+  let followingContentLength = 0;
+  if (contentIndex !== undefined && output?.type === 'message') {
+    if (contentIndex < output.content.length - contentIndex - 1) {
+      for (let index = 0; index < contentIndex; index += 1) {
+        const precedingContent = output.content[index];
+        if (precedingContent?.type === 'output_text') {
+          precedingContentLength += precedingContent.text.length;
+        }
+      }
+      const outputTextLength = outputTextLengths.get(output) ?? getOutputText(output).length;
+      followingContentLength = outputTextLength - precedingContentLength - nextText.length;
+    } else {
+      for (let index = contentIndex + 1; index < output.content.length; index += 1) {
+        const followingContent = output.content[index];
+        if (followingContent?.type === 'output_text') {
+          followingContentLength += followingContent.text.length;
+        }
+      }
+      const outputTextLength = outputTextLengths.get(output) ?? getOutputText(output).length;
+      precedingContentLength = outputTextLength - followingContentLength - nextText.length;
+    }
+  }
+
+  let offset: number;
+  if (outputIndex <= snapshot.output.length - outputIndex - 1) {
+    offset = precedingContentLength;
+    for (let index = 0; index < outputIndex; index += 1) {
+      const precedingOutput = snapshot.output[index];
+      if (precedingOutput?.type === 'message') {
+        offset += outputTextLengths.get(precedingOutput) ?? getOutputText(precedingOutput).length;
       }
     }
-
+  } else {
+    let followingTextLength = followingContentLength;
     for (let index = outputIndex + 1; index < snapshot.output.length; index += 1) {
       const followingOutput = snapshot.output[index];
       if (followingOutput?.type === 'message') {
@@ -524,35 +546,11 @@ function updateOutputText(
           outputTextLengths.get(followingOutput) ?? getOutputText(followingOutput).length;
       }
     }
-
     if (followingTextLength === 0) {
       replaceOutputTextSuffix(snapshot, previousText, nextText);
       return;
     }
-
-    const offset = snapshot.output_text.length - followingTextLength - previousText.length;
-    snapshot.output_text =
-      snapshot.output_text.slice(0, offset) +
-      nextText +
-      snapshot.output_text.slice(offset + previousText.length);
-    return;
-  }
-
-  let offset = 0;
-  for (let index = 0; index < outputIndex; index += 1) {
-    const precedingOutput = snapshot.output[index];
-    if (precedingOutput?.type === 'message') {
-      offset += outputTextLengths.get(precedingOutput) ?? getOutputText(precedingOutput).length;
-    }
-  }
-
-  if (contentIndex !== undefined && output?.type === 'message') {
-    for (let index = 0; index < contentIndex; index += 1) {
-      const content = output.content[index];
-      if (content?.type === 'output_text') {
-        offset += content.text.length;
-      }
-    }
+    offset = snapshot.output_text.length - followingTextLength - previousText.length;
   }
 
   snapshot.output_text =
