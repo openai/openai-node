@@ -102,6 +102,7 @@ export class WorkloadIdentityAuth {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      redirect: 'manual',
     });
 
     if (!response.ok) {

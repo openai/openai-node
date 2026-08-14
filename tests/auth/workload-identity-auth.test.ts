@@ -1,10 +1,36 @@
-import { vi } from 'vitest';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import type { Server } from 'node:http';
+import { expect, vi } from 'vitest';
 
 import { WorkloadIdentityAuth } from 'openai/auth/workload-identity-auth';
-import { OAuthError, OpenAIError } from 'openai';
+import { APIError, OAuthError, OpenAIError } from 'openai';
 import type { WorkloadIdentity } from 'openai/auth/types';
 
 const originalFetch = global.fetch;
+
+async function listenLoopback(server: Server): Promise<string> {
+  const listening = once(server, 'listening');
+  server.listen(0, '127.0.0.1');
+  await listening;
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected a loopback TCP server address');
+  }
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function closeLoopback(server: Server): Promise<void> {
+  if (!server.listening) {
+    return;
+  }
+
+  const closed = once(server, 'close');
+  server.close();
+  server.closeAllConnections();
+  await closed;
+}
 
 function tokenExchangeResponse(accessToken: string, expiresIn: number): Response {
   return Response.json({
@@ -232,6 +258,54 @@ describe('WorkloadIdentityAuth', () => {
     expect(body.identity_provider_id).toBe('test-identity-provider-id');
     expect(body.service_account_id).toBe('test-service-account-id');
   });
+
+  test.each([307, 308])(
+    'does not expose workload credentials through an HTTP %i redirect',
+    async (status) => {
+      const attackerRequests: string[] = [];
+      const attacker = createServer((request, response) => {
+        let body = '';
+        request.setEncoding('utf-8');
+        request.on('data', (chunk: string) => {
+          body += chunk;
+        });
+        request.on('end', () => {
+          attackerRequests.push(body);
+          response.writeHead(200, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ access_token: 'attacker-token', expires_in: 3600 }));
+        });
+      });
+      let attackerUrl = '';
+      const tokenEndpoint = createServer((_request, response) => {
+        response.writeHead(status, { Location: `${attackerUrl}/stolen-credentials` });
+        response.end();
+      });
+
+      try {
+        attackerUrl = await listenLoopback(attacker);
+        const tokenEndpointUrl = await listenLoopback(tokenEndpoint);
+        const config: WorkloadIdentity = {
+          identityProviderId: 'sensitive-identity-provider-id',
+          serviceAccountId: 'sensitive-service-account-id',
+          provider: {
+            tokenType: 'jwt',
+            getToken: async () => 'sensitive-kubernetes-service-account-jwt',
+          },
+        };
+        const auth = new WorkloadIdentityAuth(config, async (url, init) => {
+          expect(url).toBe('https://auth.openai.com/oauth/token');
+          return await globalThis.fetch(tokenEndpointUrl, init);
+        });
+        const tokenPromise = auth.getToken();
+
+        await expect.soft(tokenPromise).rejects.toBeInstanceOf(APIError);
+        await expect.soft(tokenPromise).rejects.toHaveProperty('status', status);
+        expect(attackerRequests).toEqual([]);
+      } finally {
+        await Promise.all([closeLoopback(tokenEndpoint), closeLoopback(attacker)]);
+      }
+    },
+  );
 
   test('includes all required fields in token exchange', async () => {
     const config: WorkloadIdentity = {
