@@ -104,18 +104,17 @@ export function parseBedrockEndpointHostname(hostname: string):
     }
   | undefined {
   const canonicalHostname = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
-  // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
-  const mantleRegion = /^bedrock-mantle\.([a-z0-9-]+)\.api\.aws$/i.exec(canonicalHostname)?.[1];
-  if (mantleRegion) {
-    return { endpoint: 'mantle', region: mantleRegion };
+  const [service, region, ...suffixParts] = canonicalHostname.toLowerCase().split('.');
+  const suffix = suffixParts.join('.');
+
+  if (service === 'bedrock-mantle' && region && /^[a-z0-9-]+$/.test(region) && suffix === 'api.aws') {
+    return { endpoint: 'mantle', region };
   }
 
-  const [service, runtimeRegion, ...suffixParts] = canonicalHostname.toLowerCase().split('.');
-  if ((service === 'bedrock-runtime' || service === 'bedrock-runtime-fips') && runtimeRegion) {
-    const runtimeSuffix = suffixParts.join('.');
-    const [standardSuffix, dualStackSuffix] = resolveRuntimeDnsSuffixes(runtimeRegion);
-    if (runtimeSuffix === standardSuffix || runtimeSuffix === dualStackSuffix) {
-      return { endpoint: 'runtime', region: runtimeRegion };
+  if ((service === 'bedrock-runtime' || service === 'bedrock-runtime-fips') && region) {
+    const [standardSuffix, dualStackSuffix] = resolveRuntimeDnsSuffixes(region);
+    if (suffix === standardSuffix || suffix === dualStackSuffix) {
+      return { endpoint: 'runtime', region };
     }
   }
 
