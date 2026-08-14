@@ -696,28 +696,12 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     expect(Object.getPrototypeOf(annotations)).toBe(Array.prototype);
   });
 
-  test.each([
-    ['output', 'response.output_item.added', 'output_index', 1, 'declared append'],
-    ['content', 'response.content_part.added', 'content_index', 1, 'declared append'],
-    [
-      'summary',
-      'response.reasoning_summary_part.added',
-      'summary_index',
-      1,
-      'declared append',
-    ],
-    ['output', 'response.output_item.added', 'output_index', 0, 'replayed existing'],
-    ['content', 'response.content_part.added', 'content_index', 0, 'replayed existing'],
-    [
-      'summary',
-      'response.reasoning_summary_part.added',
-      'summary_index',
-      0,
-      'replayed existing',
-    ],
-  ])(
-    'rejects inherited numeric setters for a %s %s index',
-    (kind, type, indexField, declaredIndex) => {
+  for (const declaredIndex of [0, 1]) {
+    test.each([
+      ['output', 'response.output_item.added', 'output_index'],
+      ['content', 'response.content_part.added', 'content_index'],
+      ['summary', 'response.reasoning_summary_part.added', 'summary_index'],
+    ])(`rejects %s setter with declared index ${declaredIndex}`, (kind, type, indexField) => {
       let snapshot: Response;
       if (kind === 'output') {
         snapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
@@ -734,10 +718,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
           summary: [{ type: 'summary_text', text: 'original' }],
         });
       }
-      const output = snapshot.output[0] as {
-        content: unknown[];
-        summary: unknown[];
-      };
+      const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
       let collection: unknown[];
       if (kind === 'output') {
         collection = snapshot.output;
@@ -771,15 +752,13 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
             annotations: [],
           },
         }),
-      ).toThrow(
-        `missing ${kind === 'summary' ? 'content' : kind} at index ${declaredIndex}`,
-      );
+      ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index ${declaredIndex}`);
 
       expect(inheritedSetterCalled).toBe(false);
       expect(collection).toHaveLength(1);
       expect(hasOwn(collection, 1)).toBe(false);
-    },
-  );
+    });
+  }
 
   test('rejects inherited numeric setters before appending annotations', () => {
     const snapshot = snapshotFor({
