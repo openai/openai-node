@@ -140,21 +140,7 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'stable Node Realtime',
       open: (client: BedrockOpenAI) =>
         new StableNodeRealtime(
-          {
-            model: 'gpt-realtime',
-            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
-          } as ConstructorParameters<typeof BetaNodeRealtime>[0],
-          client,
-        ),
-    },
-    {
-      name: 'beta Node Realtime',
-      open: (client: BedrockOpenAI) =>
-        new BetaNodeRealtime(
-          {
-            model: 'gpt-realtime',
-            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
-          } as ConstructorParameters<typeof BetaNodeRealtime>[0],
+          { model: 'gpt-realtime', buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') },
           client,
         ),
     },
@@ -162,21 +148,7 @@ describe('Bedrock WebSocket origin containment', () => {
       name: 'stable native Realtime',
       open: (client: BedrockOpenAI) =>
         new StableBrowserRealtime(
-          {
-            model: 'gpt-realtime',
-            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
-          } as ConstructorParameters<typeof BetaNodeRealtime>[0],
-          client,
-        ),
-    },
-    {
-      name: 'beta native Realtime',
-      open: (client: BedrockOpenAI) =>
-        new BetaBrowserRealtime(
-          {
-            model: 'gpt-realtime',
-            buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
-          } as ConstructorParameters<typeof BetaBrowserRealtime>[0],
+          { model: 'gpt-realtime', buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') },
           client,
         ),
     },
@@ -185,44 +157,40 @@ describe('Bedrock WebSocket origin containment', () => {
     {
       name: 'stable Node Realtime',
       kind: 'node',
-      create: (client: BedrockOpenAI, hostile = false) =>
-        StableNodeRealtime.create(client, {
-          model: 'gpt-realtime',
-          ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
-        }),
+      create: (client: BedrockOpenAI) => StableNodeRealtime.create(client, { model: 'gpt-realtime' }),
     },
     {
       name: 'beta Node Realtime',
       kind: 'node',
-      create: (client: BedrockOpenAI, hostile = false) =>
-        BetaNodeRealtime.create(
-          client,
-          {
-            model: 'gpt-realtime',
-            ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
-          } as Parameters<typeof BetaNodeRealtime.create>[1],
-        ),
+      create: (client: BedrockOpenAI) => BetaNodeRealtime.create(client, { model: 'gpt-realtime' }),
     },
     {
       name: 'stable native Realtime',
       kind: 'native',
-      create: (client: BedrockOpenAI, hostile = false) =>
-        StableBrowserRealtime.create(client, {
-          model: 'gpt-realtime',
-          ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
-        }),
+      create: (client: BedrockOpenAI) => StableBrowserRealtime.create(client, { model: 'gpt-realtime' }),
     },
     {
       name: 'beta native Realtime',
       kind: 'native',
-      create: (client: BedrockOpenAI, hostile = false) =>
-        BetaBrowserRealtime.create(
-          client,
-          {
-            model: 'gpt-realtime',
-            ...(hostile ? { buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate') } : {}),
-          } as Parameters<typeof BetaBrowserRealtime.create>[1],
-        ),
+      create: (client: BedrockOpenAI) => BetaBrowserRealtime.create(client, { model: 'gpt-realtime' }),
+    },
+  ] as const;
+  const stableRealtimeFactories = [
+    {
+      name: 'stable Node Realtime',
+      create: (client: BedrockOpenAI) =>
+        StableNodeRealtime.create(client, {
+          model: 'gpt-realtime',
+          buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+        }),
+    },
+    {
+      name: 'stable native Realtime',
+      create: (client: BedrockOpenAI) =>
+        StableBrowserRealtime.create(client, {
+          model: 'gpt-realtime',
+          buildRealtimeURL: () => new URL('wss://attacker.example/exfiltrate'),
+        }),
     },
   ] as const;
 
@@ -274,13 +242,32 @@ describe('Bedrock WebSocket origin containment', () => {
     },
   );
 
-  test.each(realtimeFactories)(
+  test.each(stableRealtimeFactories)(
     '$name rejects a final cross-origin URL before resolving rotating credentials',
+    async ({ create }) => {
+      const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider });
+
+      await expect(create(client)).rejects.toThrow(/request origin/iu);
+
+      expect(bedrockTokenProvider).not.toHaveBeenCalled();
+      expect(nodeSocketConstructor).not.toHaveBeenCalled();
+      expect(FakeBrowserSocket.instances).toHaveLength(0);
+    },
+  );
+
+  test.each(realtimeFactories)(
+    '$name rejects a cross-origin base URL before resolving rotating credentials',
     async ({ create, kind }) => {
       const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
       const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider });
 
-      await expect(create(client, true)).rejects.toThrow(/request origin/iu);
+      await expect(
+        (async () => {
+          client.baseURL = attackerBaseURL;
+          return create(client);
+        })(),
+      ).rejects.toThrow(/request origin/iu);
 
       expect(client.baseURL).toBe(configuredBaseURL);
       expect(bedrockTokenProvider).not.toHaveBeenCalled();
