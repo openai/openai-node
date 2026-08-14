@@ -453,7 +453,11 @@ export class AssistantStream
                     break;
                   }
                   case 'image_file': {
-                    this.#emitExposed('imageFileDone', this.#currentContent.image_file, this.#messageSnapshot);
+                    this.#emitExposed(
+                      'imageFileDone',
+                      this.#currentContent.image_file,
+                      this.#messageSnapshot,
+                    );
                     break;
                   }
                 }
@@ -685,9 +689,7 @@ export class AssistantStream
       currentContent as unknown as Record<any, any>,
       contentElement,
       true,
-    ) as
-      | TextContentBlock
-      | ImageFileContentBlock;
+    ) as TextContentBlock | ImageFileContentBlock;
   }
 
   /**
