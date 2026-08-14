@@ -148,7 +148,10 @@ export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): 
     normalizedRequestURL.protocol = 'http:';
   }
 
-  assertBedrockRequestOrigin((client as unknown as { baseURL: string }).baseURL, normalizedRequestURL.toString());
+  assertBedrockRequestOrigin(
+    (client as unknown as { baseURL: string }).baseURL,
+    normalizedRequestURL.toString(),
+  );
 }
 
 /**
