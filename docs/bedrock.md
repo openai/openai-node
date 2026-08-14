@@ -27,7 +27,7 @@ The `endpoint` option selects which regional Bedrock endpoint to use:
 | `endpoint`           | Default API root                                           | SigV4 signing service |
 | -------------------- | ---------------------------------------------------------- | --------------------- |
 | `'mantle'` (default) | `https://bedrock-mantle.<region>.api.aws/openai/v1`        | `bedrock-mantle`      |
-| `'runtime'`          | `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` | `bedrock`             |
+| `'runtime'`          | Regional Runtime hostname for the region's AWS partition  | `bedrock`             |
 
 Both endpoints use the normal SDK resources. AWS controls the available models, inference profiles, API routes, authentication methods, and streaming behavior for each endpoint; unsupported calls surface the provider's normal HTTP errors through the SDK.
 
@@ -47,7 +47,7 @@ Bedrock credentials are sent only to the configured API-root origin; absolute re
 
 ### Amazon Bedrock Runtime
 
-Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. Example launch inference-profile identifiers include `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna`; availability depends on your AWS account and region:
+Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. The SDK derives the AWS partition DNS suffix from the region (for example, `amazonaws.com` for `us-west-2` and `amazonaws.eu` for `eusc-de-east-1`). Example launch inference-profile identifiers include `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna`; availability depends on your AWS account and region:
 
 ```ts
 import OpenAI from 'openai';
