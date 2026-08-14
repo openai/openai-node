@@ -516,7 +516,18 @@ function snapshotStreamingFileData(
   const { getReader } = value as ReadableStream<BlobPart>;
   if (typeof getReader === 'function') {
     const reader = getReader.call(value) as ReadableStreamDefaultReader<BlobPart>;
-    const { read } = reader;
+    let read: ReadableStreamDefaultReader<BlobPart>['read'];
+    try {
+      ({ read } = reader);
+    } catch (error) {
+      void ignoreCleanupResult(() => reader.cancel());
+      try {
+        reader.releaseLock();
+      } catch {
+        // Cleanup failures must not mask the primary multipart result.
+      }
+      throw error;
+    }
     const capturedReader = {
       read: () => read.call(reader),
       cancel: () => reader.cancel(),

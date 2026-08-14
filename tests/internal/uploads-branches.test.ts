@@ -697,6 +697,35 @@ describe('lazy multipart stream encoding', () => {
     expect(readSubstituted).not.toHaveBeenCalled();
   });
 
+  test('cancels and unlocks a reader when capturing its read method throws', async () => {
+    const originalError = new Error('reader read accessor failed');
+    const cancel = vi.fn(() => Promise.reject(new Error('reader cancellation failed')));
+    const stream = new ReadableStream<string>({ cancel });
+    Object.defineProperties(stream, {
+      [Symbol.asyncIterator]: { value: undefined },
+      getReader: {
+        value() {
+          const reader = ReadableStream.prototype.getReader.call(stream);
+          Object.defineProperty(reader, 'read', {
+            get() {
+              throw originalError;
+            },
+          });
+          return reader;
+        },
+      },
+    });
+
+    const options = await multipartFormRequestOptions(
+      { body: { upload: toStreamingFile(stream, 'upload.txt') } },
+      fetch,
+    );
+
+    await expect((options.body as ReadableStream).getReader().read()).rejects.toBe(originalError);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(stream.locked).toBe(false);
+  });
+
   const fallbackUploadCases = [
     [
       'Blob.arrayBuffer()',
