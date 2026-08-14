@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import OpenAI, { APIConnectionTimeoutError, NotFoundError } from 'openai';
+import OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { configureProvider } from 'openai/internal/provider';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
@@ -10,7 +10,6 @@ import { SignatureV4 } from '@smithy/signature-v4';
 import sigV4Fixture from '../fixtures/bedrock/v1/sigv4.json';
 
 const originalEnv = process.env;
-const RUNTIME_MODEL = 'us.openai.gpt-5.6-sol';
 const BEDROCK_ENVIRONMENT_VARIABLES = [
   'AWS_BEARER_TOKEN_BEDROCK',
   'AWS_BEDROCK_BASE_URL',
@@ -39,44 +38,6 @@ function jsonResponse(body: unknown = {}): Response {
   return Response.json(body, {
     headers: { 'Content-Type': 'application/json' },
   });
-}
-
-function chatCompletionBody(content = 'Hello from Runtime') {
-  return {
-    id: 'chatcmpl_runtime',
-    object: 'chat.completion',
-    created: 0,
-    model: RUNTIME_MODEL,
-    choices: [
-      {
-        index: 0,
-        finish_reason: 'stop',
-        logprobs: null,
-        message: { role: 'assistant', content, refusal: null },
-      },
-    ],
-    usage: { prompt_tokens: 4, completion_tokens: 3, total_tokens: 7 },
-  };
-}
-
-function responseBody(content = 'Hello from Runtime') {
-  return {
-    id: 'resp_runtime',
-    object: 'response',
-    model: RUNTIME_MODEL,
-    output: [
-      {
-        type: 'message',
-        role: 'assistant',
-        content: [{ type: 'output_text', text: content, annotations: [] }],
-      },
-    ],
-  };
-}
-
-function eventStreamResponse(events: unknown[]): Response {
-  const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\ndata: [DONE]\n\n`;
-  return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
 }
 
 describe('bedrock provider', () => {
