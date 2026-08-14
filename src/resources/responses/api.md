@@ -22,6 +22,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">InlineSkillSource</a></code>
 - <code><a href="./src/resources/responses/responses.ts">LocalEnvironment</a></code>
 - <code><a href="./src/resources/responses/responses.ts">LocalSkill</a></code>
+- <code><a href="./src/resources/responses/responses.ts">McpToolCallError</a></code>
 - <code><a href="./src/resources/responses/responses.ts">NamespaceTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Response</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCall</a></code>
