@@ -2,6 +2,10 @@ import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 import OpenAI, { BedrockOpenAI } from 'openai';
+import {
+  assertBedrockWebSocketOrigin,
+  brand_privateBedrockClient,
+} from 'openai/internal/bedrock';
 import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtime/websocket';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaBrowserRealtime } from 'openai/beta/realtime/websocket';
@@ -98,6 +102,17 @@ afterEach(() => {
 describe('Bedrock WebSocket origin containment', () => {
   const configuredBaseURL = 'https://bedrock.example.com/openai/v1';
   const attackerBaseURL = 'https://attacker.example/openai/v1';
+
+  test('recognizes the Bedrock client brand from another SDK module copy', () => {
+    expect(Symbol.keyFor(brand_privateBedrockClient)).toBe('openai.privateBedrockClient');
+    const foreignCopyBrand = Symbol.for('openai.privateBedrockClient');
+    const foreignClient = { baseURL: configuredBaseURL, [foreignCopyBrand]: true };
+
+    expect(() =>
+      assertBedrockWebSocketOrigin(foreignClient, new URL('wss://attacker.example/realtime')),
+    ).toThrow(/origin/iu);
+  });
+
   const websocketSurfaces = [
     {
       name: 'stable Responses',
