@@ -584,8 +584,9 @@ function snapshotResponseData(
   value: Response,
   snapshots: WeakMap<object, MultipartDataSnapshot>,
 ): MultipartDataSnapshot {
-  if (value.body) {
-    return snapshotStreamingFileData(value.body, snapshots);
+  const { body } = value;
+  if (body) {
+    return snapshotStreamingFileData(body, snapshots);
   }
 
   const blob = value.blob();

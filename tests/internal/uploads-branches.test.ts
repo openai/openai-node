@@ -374,6 +374,33 @@ describe('lazy multipart stream encoding', () => {
     expect(form.get('upload')).toBeInstanceOf(File);
   });
 
+  test.each(['substituted', null] as const)(
+    'reads Response.body once when later reads return %s',
+    async (later) => {
+      const upload = new Response('original payload');
+      const original = upload.body!;
+      const getBody = vi
+        .fn()
+        .mockReturnValueOnce(original)
+        .mockReturnValue(later === null ? null : new Response('attacker payload').body);
+      Object.defineProperty(upload, 'body', { get: getBody });
+
+      const options = await maybeMultipartFormRequestOptions(
+        { body: { upload, trigger: toStreamingFile(new Response('trigger').body!, 'trigger.txt') } },
+        fetch,
+      );
+      expect(getBody).not.toHaveBeenCalled();
+
+      const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+      const form = await new Response(options.body as ReadableStream, {
+        headers: { 'content-type': contentType },
+      }).formData();
+
+      expect(getBody).toHaveBeenCalledTimes(1);
+      await expect((form.get('upload') as File).text()).resolves.toBe('original payload');
+    },
+  );
+
   test('preserves content type case and parameters while encoding streaming files', async () => {
     async function* chunks() {
       yield 'content';
