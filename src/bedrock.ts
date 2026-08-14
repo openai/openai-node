@@ -1,6 +1,8 @@
 import * as Errors from './error';
 import { OpenAI } from './client';
 import type { ApiKeySetter, ClientOptions } from './client';
+import { assertBedrockRequestOrigin } from './internal/bedrock';
+import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import type { FinalRequestOptions, RequestOptions } from './internal/request-options';
@@ -162,12 +164,24 @@ export class BedrockOpenAI extends OpenAI {
   }
 
   protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    const configuredBaseURL = this._options.baseURL ?? this.baseURL;
+    assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
+
     const security = options.__security ?? { bearerAuth: true };
     if (security.adminAPIKeyAuth && !security.bearerAuth) {
       await this._callApiKey();
     }
 
     await super.prepareOptions(options);
+    assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
+  }
+
+  protected override async prepareRequest(
+    request: RequestInit,
+    context: { url: string; options: FinalRequestOptions },
+  ): Promise<void> {
+    assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, context.url);
+    await super.prepareRequest(request, context);
   }
 
   protected override async authHeaders(

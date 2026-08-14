@@ -5,6 +5,7 @@ import { SignatureV4 } from '@smithy/signature-v4';
 import * as Errors from '../../error';
 import type { BodyInit } from '../../internal/builtin-types';
 import {
+  assertBedrockRequestOrigin,
   assertProviderOwnsAuthorization,
   errorWithCause,
   normalizeOptionalString,
@@ -294,7 +295,10 @@ export function bedrock(options: BedrockProviderOptions = {}): Provider {
       return {
         name: 'bedrock',
         baseURL,
-        prepareRequest: auth.prepareRequest.bind(auth),
+        async prepareRequest(request, context) {
+          assertBedrockRequestOrigin(baseURL, context.url);
+          await auth.prepareRequest(request, context);
+        },
       };
     },
   });
