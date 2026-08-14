@@ -75,32 +75,32 @@ describe('streaming multipart filename security', () => {
   test(
     'upgrades a false-first branded async iterable before optional multipart emits bytes',
     async () => {
-    const emitted: Uint8Array[] = [];
-    const earlier = new File(['earlier bytes'], 'earlier.txt');
-    const readEarlier = vi.spyOn(earlier, 'stream');
-    const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
-    const upload = toStreamingFile(chunks('authoritative bytes'), 'safe.txt');
-    Object.defineProperties(upload, {
-      name: { value: { toString: vi.fn() } },
-      [Symbol.asyncIterator]: { value: incidentalIterator },
-    });
-    const hostile = withStatefulBrand(upload, [false, true]);
-
-    const options = await maybeMultipartFormRequestOptions(
-      { body: { secret: 'metadata', earlier, upload: hostile } },
-      fetch,
-    );
-    const reader = (options.body as ReadableStream<Uint8Array>).getReader();
-    const firstRead = reader.read().then(({ done, value }) => {
-      if (!done) {
-        emitted.push(value);
-      }
-    });
-
-    await expect(firstRead).rejects.toThrow(/file.?name/iu);
-    expect(emitted).toEqual([]);
-    expect(readEarlier).not.toHaveBeenCalled();
-      expect(incidentalIterator).not.toHaveBeenCalled();
+      const emitted: Uint8Array[] = [];
+      const earlier = new File(['earlier bytes'], 'earlier.txt');
+      const readEarlier = vi.spyOn(earlier, 'stream');
+      const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
+      const upload = toStreamingFile(chunks('authoritative bytes'), 'safe.txt');
+      Object.defineProperties(upload, {
+        name: { value: { toString: vi.fn() } },
+        [Symbol.asyncIterator]: { value: incidentalIterator },
+      });
+      const hostile = withStatefulBrand(upload, [false, true]);
+  
+      const options = await maybeMultipartFormRequestOptions(
+        { body: { secret: 'metadata', earlier, upload: hostile } },
+        fetch,
+      );
+      const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+      const firstRead = reader.read().then(({ done, value }) => {
+        if (!done) {
+          emitted.push(value);
+        }
+      });
+  
+      await expect(firstRead).rejects.toThrow(/file.?name/iu);
+      expect(emitted).toEqual([]);
+      expect(readEarlier).not.toHaveBeenCalled();
+        expect(incidentalIterator).not.toHaveBeenCalled();
     },
   );
 
