@@ -154,22 +154,23 @@ describe('AssistantStream delta index security', () => {
     expect(denseEntries[1024]?.text).toBe('next contiguous entry');
   });
 
-  test('rescans externally mutable dense arrays after same-length deletions', () => {
+  test('absolutely bounds externally mutable arrays after same-length deletions', () => {
     const entries = Array.from({ length: 1024 }, (_, index) => ({ index, text: 'entry' }));
 
     AssistantStream.accumulateDelta({ entries }, { entries: [{ index: 1023, text: ' updated' }] });
     for (let index = 0; index < entries.length; index += 1) {
       Reflect.deleteProperty(entries, index);
     }
+    entries.length = 65_536;
 
     expect(() =>
       AssistantStream.accumulateDelta(
         { entries },
-        { entries: [{ index: 2047, text: 'sparse amplification attempt' }] },
+        { entries: [{ index: 65_536, text: 'absolute-bound attempt' }] },
       ),
     ).toThrow('invalid array index');
-    expect(entries).toHaveLength(1024);
-    expect(hasOwn(entries, 2047)).toBe(false);
+    expect(entries).toHaveLength(65_536);
+    expect(hasOwn(entries, 65_536)).toBe(false);
   });
 
   test('rescans externally mutable sparse arrays after same-length hole fills', () => {
@@ -233,7 +234,9 @@ describe('AssistantStream delta index security', () => {
     }
     events.push(completedRun() as AssistantStreamEvent);
 
-    await unencodedAssistantStream(events).done();
+    const runner = unencodedAssistantStream(events);
+    runner.on('runStepDelta', () => undefined);
+    await runner.done();
 
     expect(toolCalls).toHaveLength(2048);
     expect(ownKeysCalls).toBe(1);
@@ -544,7 +547,7 @@ describe('AssistantStream message index security', () => {
         data: {
           id: 'msg_delete',
           delta: {
-            content: [{ index: 2047, type: 'text', text: { value: 'amplified', annotations: [] } }],
+            content: [{ index: 65_536, type: 'text', text: { value: 'amplified', annotations: [] } }],
           },
         },
       },
@@ -556,12 +559,13 @@ describe('AssistantStream message index security', () => {
         for (let index = 0; index < snapshotContent.length; index += 1) {
           Reflect.deleteProperty(snapshotContent, index);
         }
+        snapshotContent.length = 65_536;
       }
     });
 
     await expect(runner.done()).rejects.toThrow('invalid content index');
-    expect(content).toHaveLength(1024);
-    expect(hasOwn(content, 2047)).toBe(false);
+    expect(content).toHaveLength(65_536);
+    expect(hasOwn(content, 65_536)).toBe(false);
   });
 
   test('invalidates cached content accounting when a listener fills holes without growing length', async () => {

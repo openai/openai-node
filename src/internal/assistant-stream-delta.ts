@@ -2,6 +2,7 @@ import { OpenAIError } from '../error';
 import { hasOwn, isObj } from './utils';
 
 const MAX_ASSISTANT_STREAM_ARRAY_GROWTH = 1024;
+const MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH = 65_536;
 
 type AssistantStreamRecord = Record<string, unknown>;
 
@@ -13,6 +14,7 @@ interface AssistantStreamArrayState {
 interface AssistantStreamArrayProjection {
   baselineLength: number;
   cacheable: boolean;
+  enforceSparseHoleBudget: boolean;
   entries: Map<number, AssistantStreamRecord>;
   length: number;
   ownEntryCount: number;
@@ -63,10 +65,25 @@ function countOwnAssistantStreamArrayEntries(accumulator: unknown[]): number {
   return count;
 }
 
+function getAssistantStreamArrayOwnEntryCount(
+  accumulator: unknown[],
+  enforceSparseHoleBudget: boolean,
+  cachedState: AssistantStreamArrayState | undefined,
+): number {
+  if (!enforceSparseHoleBudget) {
+    return 0;
+  }
+  if (cachedState?.length === accumulator.length) {
+    return cachedState.ownEntryCount;
+  }
+  return countOwnAssistantStreamArrayEntries(accumulator);
+}
+
 function getAssistantStreamDeltaIndex(
   deltaEntry: AssistantStreamRecord,
   kind: 'content' | 'array',
   baselineLength: number,
+  enforceSparseHoleBudget: boolean,
 ): number {
   const { index } = deltaEntry;
 
@@ -82,7 +99,9 @@ function getAssistantStreamDeltaIndex(
   if (
     !Number.isSafeInteger(index) ||
     (index as number) < 0 ||
-    (index as number) >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH
+    (index as number) >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH ||
+    (!enforceSparseHoleBudget &&
+      (index as number) >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH)
   ) {
     throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
   }
@@ -99,17 +118,22 @@ function assertValidAssistantStreamArrayDelta(
   let projectedArray = projection.arrays.get(accumulator);
 
   if (!projectedArray) {
-    const cacheable = projection.cacheArrays && !externallyMutableAssistantStreamValues.has(accumulator);
-    const cachedState = cacheable ? assistantStreamArrayStates.get(accumulator) : undefined;
+    const enforceSparseHoleBudget =
+      projection.cacheArrays && !externallyMutableAssistantStreamValues.has(accumulator);
+    const cachedState = enforceSparseHoleBudget
+      ? assistantStreamArrayStates.get(accumulator)
+      : undefined;
     projectedArray = {
       baselineLength: accumulator.length,
-      cacheable,
+      cacheable: enforceSparseHoleBudget,
+      enforceSparseHoleBudget,
       entries: new Map(),
       length: accumulator.length,
-      ownEntryCount:
-        cachedState?.length === accumulator.length
-          ? cachedState.ownEntryCount
-          : countOwnAssistantStreamArrayEntries(accumulator),
+      ownEntryCount: getAssistantStreamArrayOwnEntryCount(
+        accumulator,
+        enforceSparseHoleBudget,
+        cachedState,
+      ),
     };
     projection.arrays.set(accumulator, projectedArray);
   }
@@ -119,7 +143,12 @@ function assertValidAssistantStreamArrayDelta(
       throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
     }
 
-    const validatedIndex = getAssistantStreamDeltaIndex(deltaEntry, kind, projectedArray.baselineLength);
+    const validatedIndex = getAssistantStreamDeltaIndex(
+      deltaEntry,
+      kind,
+      projectedArray.baselineLength,
+      projectedArray.enforceSparseHoleBudget,
+    );
     let accumulatedEntry: unknown;
 
     if (projectedArray.entries.has(validatedIndex)) {
@@ -136,7 +165,10 @@ function assertValidAssistantStreamArrayDelta(
     }
 
     const projectedLength = Math.max(projectedArray.length, validatedIndex + 1);
-    if (projectedLength - projectedArray.ownEntryCount > MAX_ASSISTANT_STREAM_ARRAY_GROWTH) {
+    if (
+      projectedArray.enforceSparseHoleBudget &&
+      projectedLength - projectedArray.ownEntryCount > MAX_ASSISTANT_STREAM_ARRAY_GROWTH
+    ) {
       throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${validatedIndex}`);
     }
 
@@ -270,6 +302,10 @@ function applyAssistantStreamDelta(
   const externallyMutable = externallyMutableAssistantStreamValues.has(accumulator);
 
   for (const [key, deltaValue] of Object.entries(delta)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw new OpenAIError(`Assistant stream delta contains an unsafe property: ${key}`);
+    }
+
     if (!hasOwn(accumulator, key)) {
       if (externallyMutable) {
         markAssistantStreamValueExternallyMutable(deltaValue);
