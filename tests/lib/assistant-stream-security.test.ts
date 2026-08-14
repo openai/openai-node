@@ -490,7 +490,7 @@ describe('AssistantStream message index security', () => {
 });
 
 describe('AssistantStream run-step index security', () => {
-  test('rejects a tool-call sparse-array bomb received through the public readable-stream transport', async () => {
+  test('rejects a tool-call sparse-array bomb through the public readable-stream transport', async () => {
     const initialStep = {
       id: 'step_123',
       status: 'in_progress',
