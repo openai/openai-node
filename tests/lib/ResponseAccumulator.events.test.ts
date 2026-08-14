@@ -743,7 +743,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
         },
       });
       Object.setPrototypeOf(collection, collectionPrototype);
-  
+
       expect(() =>
         applyEvent(snapshot, {
           type,
@@ -757,7 +757,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
           },
         }),
       ).toThrow(`missing ${kind === 'summary' ? 'content' : kind} at index ${declaredIndex}`);
-  
+
       expect(inheritedSetterCalled).toBe(false);
       expect(collection).toHaveLength(1);
       expect(hasOwn(collection, 1)).toBe(false);
