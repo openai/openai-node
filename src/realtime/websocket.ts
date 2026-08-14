@@ -158,9 +158,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       dangerouslyAllowBrowser?: boolean;
     },
   ): Promise<OpenAIRealtimeWebSocket> {
+    const resolvedApiKey = await client._callApiKey();
     const url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, url);
-    const resolvedApiKey = await client._callApiKey();
     return new OpenAIRealtimeWebSocket(
       {
         ...props,
