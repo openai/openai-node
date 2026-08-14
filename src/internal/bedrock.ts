@@ -71,6 +71,16 @@ function normalizeBaseURL(baseURL: string): string {
   return url.toString().replace(/\/$/, '');
 }
 
+function resolveRuntimeDnsSuffix(region: string): string {
+  if (region.startsWith('cn-')) return 'amazonaws.com.cn';
+  if (region.startsWith('eusc-')) return 'amazonaws.eu';
+  if (region.startsWith('us-iso-')) return 'c2s.ic.gov';
+  if (region.startsWith('us-isob-')) return 'sc2s.sgov.gov';
+  if (region.startsWith('eu-isoe-')) return 'cloud.adc-e.uk';
+  if (region.startsWith('us-isof-')) return 'csp.hci.ic.gov';
+  return 'amazonaws.com';
+}
+
 /** Identifies a canonical Amazon Bedrock hostname and its embedded AWS region. */
 export function parseBedrockEndpointHostname(hostname: string):
   | {
@@ -88,8 +98,12 @@ export function parseBedrockEndpointHostname(hostname: string):
   }
 
   // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
-  const runtimeRegion = /^bedrock-runtime\.([a-z0-9-]+)\.amazonaws\.com$/i.exec(hostname)?.[1];
-  if (runtimeRegion) {
+  const runtimeMatch =
+    /^bedrock-runtime\.([a-z0-9-]+)\.(amazonaws\.com(?:\.cn)?|amazonaws\.eu|c2s\.ic\.gov|sc2s\.sgov\.gov|cloud\.adc-e\.uk|csp\.hci\.ic\.gov)$/i.exec(
+      hostname,
+    );
+  const runtimeRegion = runtimeMatch?.[1];
+  if (runtimeRegion && runtimeMatch[2]?.toLowerCase() === resolveRuntimeDnsSuffix(runtimeRegion)) {
     return { endpoint: 'runtime', region: runtimeRegion };
   }
 
@@ -182,7 +196,9 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
   }
 
   const hostname =
-    endpoint === 'runtime' ? `bedrock-runtime.${region}.amazonaws.com` : `bedrock-mantle.${region}.api.aws`;
+    endpoint === 'runtime'
+      ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffix(region)}`
+      : `bedrock-mantle.${region}.api.aws`;
   return { endpoint, region, baseURL: `https://${hostname}/openai/v1` };
 }
 
