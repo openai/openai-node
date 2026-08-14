@@ -1,3 +1,5 @@
+import { setTimeout as delay } from 'node:timers/promises';
+
 import { vi } from 'vitest';
 
 import OpenAI from 'openai';
@@ -10,6 +12,11 @@ import {
 
 async function* chunks(content = 'content') {
   yield content;
+}
+
+async function failAfterDelay(milliseconds: number, message: string): Promise<never> {
+  await delay(milliseconds);
+  throw new Error(message);
 }
 
 describe('streaming multipart filename and header security', () => {
@@ -275,7 +282,7 @@ describe('streaming multipart filename and header security', () => {
   });
 
   test('does not await unconsumed stream cleanup before reporting an invalid filename', async () => {
-    const never = new Promise<void>(() => undefined);
+    const never = new ReadableStream<void>().getReader().closed;
     const cancel = vi.fn(() => never);
     const returnIterator = vi.fn(() => never);
     const stream = new ReadableStream<string>({ cancel });
@@ -292,11 +299,9 @@ describe('streaming multipart filename and header security', () => {
 
     const options = await multipartFormRequestOptions({ body: { stream, source, later } }, fetch);
     const reader = (options.body as ReadableStream).getReader();
-    const timeout = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('cleanup timed out')), 100);
-    });
-
-    await expect(Promise.race([reader.read(), timeout])).rejects.toThrow(/file.?name/iu);
+    await expect(
+      Promise.race([reader.read(), failAfterDelay(100, 'cleanup timed out')]),
+    ).rejects.toThrow(/file.?name/iu);
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(returnIterator).toHaveBeenCalledTimes(1);
     expect(stream.locked).toBe(false);
