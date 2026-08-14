@@ -9,6 +9,7 @@ import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
+import { hasOwn } from '../internal/utils/values';
 import {
   hasAutoParseableInput,
   isAutoParsableTool,
@@ -267,6 +268,19 @@ interface ChoiceEventState {
 // conservative ceiling to prevent sparse tool-call arrays from growing unbounded.
 const MAX_STREAM_CHOICES = 128;
 const MAX_STREAM_TOOL_CALLS = 128;
+
+function assignOwnProperties<T extends object>(target: T, source: object): T {
+  if (Object.prototype.propertyIsEnumerable.call(source, '__proto__') && !hasOwn(target, '__proto__')) {
+    Object.defineProperty(target, '__proto__', {
+      value: undefined,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  }
+
+  return Object.assign(target, source);
+}
 
 /** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 export class ChatCompletionStream<ParsedT = null>
@@ -626,7 +640,7 @@ export class ChatCompletionStream<ParsedT = null>
       this.#currentChatCompletionSnapshot = newSnapshot;
       snapshot = newSnapshot;
     } else if (chunk.id) {
-      Object.assign(snapshot, rest);
+      assignOwnProperties(snapshot, rest);
     }
 
     const requestedChoiceCount = this.#params?.n;
@@ -653,7 +667,7 @@ export class ChatCompletionStream<ParsedT = null>
         if (choice.logprobs) {
           const { content, refusal, ...rest } = logprobs;
           assertIsEmpty(rest);
-          Object.assign(choice.logprobs, rest);
+          assignOwnProperties(choice.logprobs, rest);
 
           if (content) {
             choice.logprobs.content ??= [];
@@ -683,7 +697,7 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
 
-      Object.assign(choice, other);
+      assignOwnProperties(choice, other);
 
       if (!delta) {
         continue;
@@ -694,7 +708,7 @@ export class ChatCompletionStream<ParsedT = null>
         audio?: Partial<ChatCompletionAudio> | null;
       };
       assertIsEmpty(rest);
-      Object.assign(choice.message, rest);
+      assignOwnProperties(choice.message, rest);
       if (
         audio?.expires_at != null &&
         audio.id == null &&
@@ -766,7 +780,7 @@ export class ChatCompletionStream<ParsedT = null>
           }
 
           const tool_call = (toolCallSnapshots[index] ??= {});
-          Object.assign(tool_call, rest);
+          assignOwnProperties(tool_call, rest);
           if (id) {
             tool_call.id = id;
           }
