@@ -807,6 +807,7 @@ interface AssistantStreamArrayProjection {
   baselineLength: number;
   entries: Map<number, Record<string, unknown>>;
   length: number;
+  ownEntryCount: number;
 }
 
 interface AssistantStreamDeltaProjection {
@@ -881,6 +882,7 @@ function assertValidAssistantStreamArrayDelta(
       baselineLength: accumulator.length,
       entries: new Map(),
       length: accumulator.length,
+      ownEntryCount: countOwnAssistantStreamArrayEntries(accumulator),
     };
     projection.arrays.set(accumulator, projectedArray);
   }
@@ -922,16 +924,31 @@ function assertValidAssistantStreamArrayDelta(
       }
     } else {
       projectedArray.entries.set(validatedIndex, deltaEntry);
+      projectedArray.ownEntryCount += 1;
+    }
+
+    const projectedLength = Math.max(projectedArray.length, validatedIndex + 1);
+    if (projectedLength - projectedArray.ownEntryCount > MAX_ASSISTANT_STREAM_ARRAY_GROWTH) {
+      throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
     }
 
     if (isObj(accumulatedEntry)) {
       assertValidAssistantStreamDeltaIndices(accumulatedEntry, deltaEntry, projection);
     }
 
-    if (validatedIndex >= projectedArray.length) {
-      projectedArray.length = validatedIndex + 1;
+    projectedArray.length = projectedLength;
+  }
+}
+
+function countOwnAssistantStreamArrayEntries(accumulator: unknown[]): number {
+  let count = 0;
+  for (const key of Object.keys(accumulator)) {
+    const index = Number(key);
+    if (Number.isSafeInteger(index) && index >= 0 && index < accumulator.length && String(index) === key) {
+      count += 1;
     }
   }
+  return count;
 }
 
 function defineAssistantStreamArrayEntry(accumulator: unknown[], index: number, value: unknown): void {
