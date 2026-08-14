@@ -81,16 +81,14 @@ export function parseBedrockEndpointHostname(hostname: string):
       region: string;
     }
   | undefined {
-  const mantleRegion = /^bedrock-mantle\.(?<region>[a-z0-9-]+)\.api\.aws$/i.exec(hostname)?.groups?.[
-    'region'
-  ];
+  // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
+  const mantleRegion = /^bedrock-mantle\.([a-z0-9-]+)\.api\.aws$/i.exec(hostname)?.[1];
   if (mantleRegion) {
     return { endpoint: 'mantle', region: mantleRegion };
   }
 
-  const runtimeRegion = /^bedrock-runtime\.(?<region>[a-z0-9-]+)\.amazonaws\.com$/i.exec(hostname)?.groups?.[
-    'region'
-  ];
+  // oxlint-disable-next-line prefer-named-capture-group -- Published SDK source must compile for ES2015.
+  const runtimeRegion = /^bedrock-runtime\.([a-z0-9-]+)\.amazonaws\.com$/i.exec(hostname)?.[1];
   if (runtimeRegion) {
     return { endpoint: 'runtime', region: runtimeRegion };
   }
