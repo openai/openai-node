@@ -240,6 +240,23 @@ describe('AssistantStream delta accumulation', () => {
     expect(accumulator).toEqual({ status: 'original', entries: [{ index: 0, text: 'first' }] });
   });
 
+  test('charges sparse growth against one fixed budget for the entire delta batch', () => {
+    const entries: Record<string, unknown>[] = [];
+    const accumulator = { status: 'original', entries };
+
+    expect(() =>
+      AssistantStream.accumulateDelta(accumulator, {
+        status: ' updated',
+        entries: [
+          { index: 1023, text: 'last individually allowed' },
+          { index: 2047, text: 'batch amplification attempt' },
+        ],
+      }),
+    ).toThrow('invalid array index');
+
+    expect(accumulator).toEqual({ status: 'original', entries: [] });
+  });
+
   test('preserves bounded out-of-order nested indices and fills their missing slots', () => {
     const entries = [{ index: 0, text: 'first' }];
 
