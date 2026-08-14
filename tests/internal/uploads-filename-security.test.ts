@@ -79,7 +79,7 @@ describe('streaming multipart filename and header security', () => {
       },
     });
     const options = await maybeMultipartFormRequestOptions(
-      { body: { secret: 'sensitive metadata', upload: hostile } },
+      { body: { earlier: chunks('earlier stream bytes'), secret: 'sensitive metadata', upload: hostile } },
       fetch,
     );
     const reader = (options.body as ReadableStream<Uint8Array>).getReader();
@@ -111,7 +111,10 @@ describe('streaming multipart filename and header security', () => {
         return Reflect.has(target, key);
       },
     });
-    const options = await maybeMultipartFormRequestOptions({ body: { upload: hostile } }, fetch);
+    const options = await maybeMultipartFormRequestOptions(
+      { body: { earlier: chunks('earlier stream bytes'), upload: hostile } },
+      fetch,
+    );
     const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
     const form = await new Response(options.body as ReadableStream, {
       headers: { 'content-type': contentType },
@@ -237,6 +240,21 @@ describe('streaming multipart filename and header security', () => {
       expect(body).toContain(`Content-Disposition: form-data; name="upload"; filename="${filename}"\r\n`);
     },
   );
+
+  test.each([
+    ['NUL', '\0', '%00'],
+    ['DEL', '\u007F', '%7F'],
+  ] as const)('escapes %s in multipart field names and filenames', async (_, control, escaped) => {
+    const field = `upload${control}field`;
+    const options = await multipartFormRequestOptions(
+      { body: { [field]: toStreamingFile(chunks('bytes'), `file${control}name.txt`) } },
+      fetch,
+    );
+    const body = await new Response(options.body as ReadableStream).text();
+
+    expect(body).toContain(`name="upload${escaped}field"; filename="file${escaped}name.txt"`);
+    expect(body).not.toContain(control);
+  });
 
   test('upgrades a cached named Blob when streaming behavior appears', async () => {
     const incidentalIterator = vi.fn(() => chunks('incidental bytes'));
