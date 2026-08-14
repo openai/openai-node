@@ -436,7 +436,6 @@ describe('AssistantStream message index security', () => {
     expect(Object.getOwnPropertyDescriptor(content, 1)).toBeDefined();
     expect(content[1]?.text.value).toBe('second');
   });
-
 });
 
 describe('AssistantStream run-step index security', () => {
@@ -497,5 +496,4 @@ describe('AssistantStream run-step index security', () => {
     expect(argumentsAfterDelta).toBe('original');
   });
 
-});
 });
