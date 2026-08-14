@@ -299,9 +299,9 @@ describe('streaming multipart filename and header security', () => {
 
     const options = await multipartFormRequestOptions({ body: { stream, source, later } }, fetch);
     const reader = (options.body as ReadableStream).getReader();
-    await expect(
-      Promise.race([reader.read(), failAfterDelay(100, 'cleanup timed out')]),
-    ).rejects.toThrow(/file.?name/iu);
+    await expect(Promise.race([reader.read(), failAfterDelay(100, 'cleanup timed out')])).rejects.toThrow(
+      /file.?name/iu,
+    );
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(returnIterator).toHaveBeenCalledTimes(1);
     expect(stream.locked).toBe(false);
