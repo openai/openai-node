@@ -35,6 +35,7 @@ import { hasOwn, isObj } from '../internal/utils';
 
 // Preserve out-of-order entries while bounding the sparse growth caused by any one delta.
 const MAX_ASSISTANT_STREAM_ARRAY_GROWTH = 1024;
+const assistantStreamArrayStates = new WeakMap<unknown[], AssistantStreamArrayState>();
 
 /** Lifecycle, message, run-step, tool-call, and content events emitted by an assistant stream. */
 export interface AssistantStreamEvents extends BaseEvents {
@@ -617,7 +618,8 @@ export class AssistantStream
         //If this delta does not have content, nothing to process
         if (data.delta.content) {
           assertSafeAssistantStreamDelta(data.delta);
-          assertValidAssistantStreamArrayDelta(snapshot.content, data.delta.content, 'content');
+          const projection = createAssistantStreamDeltaProjection();
+          assertValidAssistantStreamArrayDelta(snapshot.content, data.delta.content, 'content', projection);
 
           for (const contentElement of data.delta.content) {
             if (hasOwn(snapshot.content, contentElement.index)) {
@@ -632,6 +634,8 @@ export class AssistantStream
               newContent.push(contentElement);
             }
           }
+
+          commitAssistantStreamArrayProjection(projection);
         }
 
         return [snapshot, newContent];
@@ -666,7 +670,8 @@ export class AssistantStream
    */
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     assertSafeAssistantStreamDelta(delta);
-    assertValidAssistantStreamDeltaIndices(acc, delta);
+    const projection = createAssistantStreamDeltaProjection();
+    assertValidAssistantStreamDeltaIndices(acc, delta, projection);
 
     for (const [key, deltaValue] of Object.entries(delta)) {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
@@ -736,6 +741,7 @@ export class AssistantStream
       acc[key] = accValue;
     }
 
+    commitAssistantStreamArrayProjection(projection);
     return acc;
   }
 
@@ -803,6 +809,11 @@ export class AssistantStream
   }
 }
 
+interface AssistantStreamArrayState {
+  length: number;
+  ownEntryCount: number;
+}
+
 interface AssistantStreamArrayProjection {
   baselineLength: number;
   entries: Map<number, Record<string, unknown>>;
@@ -811,12 +822,21 @@ interface AssistantStreamArrayProjection {
 }
 
 interface AssistantStreamDeltaProjection {
-  arrays: WeakMap<unknown[], AssistantStreamArrayProjection>;
+  arrays: Map<unknown[], AssistantStreamArrayProjection>;
   records: WeakMap<Record<string, any>, Map<string, unknown>>;
 }
 
 function createAssistantStreamDeltaProjection(): AssistantStreamDeltaProjection {
-  return { arrays: new WeakMap(), records: new WeakMap() };
+  return { arrays: new Map(), records: new WeakMap() };
+}
+
+function commitAssistantStreamArrayProjection(projection: AssistantStreamDeltaProjection): void {
+  for (const [array, projected] of projection.arrays) {
+    assistantStreamArrayStates.set(array, {
+      length: projected.length,
+      ownEntryCount: projected.ownEntryCount,
+    });
+  }
 }
 
 function isPrimitiveAssistantStreamValue(value: unknown): boolean {
@@ -878,11 +898,15 @@ function assertValidAssistantStreamArrayDelta(
   let projectedArray = projection.arrays.get(accumulator);
 
   if (!projectedArray) {
+    const cachedState = assistantStreamArrayStates.get(accumulator);
     projectedArray = {
       baselineLength: accumulator.length,
       entries: new Map(),
       length: accumulator.length,
-      ownEntryCount: countOwnAssistantStreamArrayEntries(accumulator),
+      ownEntryCount:
+        cachedState?.length === accumulator.length
+          ? cachedState.ownEntryCount
+          : countOwnAssistantStreamArrayEntries(accumulator),
     };
     projection.arrays.set(accumulator, projectedArray);
   }
