@@ -421,6 +421,8 @@ export class AssistantStream
 
     switch (event.event) {
       case 'thread.message.created': {
+        this.#currentContentIndex = undefined;
+        this.#currentContent = undefined;
         this.#emitExposed('messageCreated', event.data);
         break;
       }
@@ -497,6 +499,8 @@ export class AssistantStream
           this.#emitExposed('messageDone', event.data);
         }
 
+        this.#currentContentIndex = undefined;
+        this.#currentContent = undefined;
         this.#messageSnapshot = undefined;
       }
     }
@@ -508,6 +512,8 @@ export class AssistantStream
 
     switch (event.event) {
       case 'thread.run.step.created': {
+        this.#currentToolCallIndex = undefined;
+        this.#currentToolCall = undefined;
         this.#emitExposed('runStepCreated', event.data);
         break;
       }
@@ -551,9 +557,10 @@ export class AssistantStream
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
           this.#emitExposed('toolCallDone', this.#currentToolCall as ToolCall);
-          this.#currentToolCall = undefined;
         }
         this.#emitExposed('runStepDone', event.data, accumulatedRunStep);
+        this.#currentToolCallIndex = undefined;
+        this.#currentToolCall = undefined;
         break;
       }
       case 'thread.run.step.in_progress': {
@@ -727,8 +734,9 @@ export class AssistantStream
         this.#finalRun = event.data;
         if (this.#currentToolCall) {
           this.#emitExposed('toolCallDone', this.#currentToolCall);
-          this.#currentToolCall = undefined;
         }
+        this.#currentToolCallIndex = undefined;
+        this.#currentToolCall = undefined;
         break;
       }
       case 'thread.run.cancelling': {
