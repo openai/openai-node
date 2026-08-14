@@ -33,7 +33,7 @@ export function accumulateResponse(
 
   switch (event.type) {
     case 'response.output_item.added': {
-      validateArrayIndex(snapshot.output, event.output_index, 'output', true);
+      validateArrayAppend(snapshot.output, event.output_index, 'output');
       snapshot.output.push(structuredClone(event.item));
       if (event.item.type === 'message') {
         addOutputText(snapshot);
@@ -53,14 +53,14 @@ export function accumulateResponse(
       const type = output.type;
       const part = event.part;
       if (type === 'message' && part.type !== 'reasoning_text') {
-        validateArrayIndex(output.content, event.content_index, 'content', true);
+        validateArrayAppend(output.content, event.content_index, 'content');
         output.content.push(structuredClone(part));
         if (part.type === 'output_text') {
           addOutputText(snapshot);
         }
       } else if (type === 'reasoning' && part.type === 'reasoning_text') {
         const content = output.content ?? [];
-        validateArrayIndex(content, event.content_index, 'content', true);
+        validateArrayAppend(content, event.content_index, 'content');
         if (!output.content) {
           output.content = content;
         }
@@ -192,7 +192,7 @@ export function accumulateResponse(
     case 'response.reasoning_summary_part.added': {
       const output = getOutput(snapshot, event.output_index);
       if (output.type === 'reasoning') {
-        validateArrayIndex(output.summary, event.summary_index, 'content', true);
+        validateArrayAppend(output.summary, event.summary_index, 'content');
         output.summary.push(structuredClone(event.part));
       }
       break;
@@ -422,6 +422,17 @@ function getContent<T>(content: T[], contentIndex: number): T {
     throw new OpenAIError(`missing content at index ${contentIndex}`);
   }
   return part;
+}
+
+function validateArrayAppend(
+  collection: readonly unknown[],
+  index: number,
+  kind: 'output' | 'content',
+): void {
+  if (index !== collection.length) {
+    throw new OpenAIError(`missing ${kind} at index ${index}`);
+  }
+  validateArrayIndex(collection, index, kind, true);
 }
 
 function validateArrayIndex(
