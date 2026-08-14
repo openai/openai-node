@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { OpenAIError } from 'openai/core/error';
 import { ReadableStreamFrom } from 'openai/internal/shims';
+import { hasOwn } from 'openai/internal/utils';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
 
@@ -463,7 +464,7 @@ describe('AssistantStream message index security', () => {
     await expect(runner.done()).rejects.toThrow('invalid content index');
     expect(content).toHaveLength(1024);
     expect(content[1023]?.['text'].value).toBe('first');
-    expect(Object.hasOwn(content, 2047)).toBe(false);
+    expect(hasOwn(content, 2047)).toBe(false);
   });
 
 });
@@ -574,7 +575,7 @@ describe('AssistantStream run-step index security', () => {
     if (details?.type === 'tool_calls') {
       expect(details.tool_calls).toHaveLength(1024);
       expect(details.tool_calls[1023]?.id).toBe('call_1023');
-      expect(Object.hasOwn(details.tool_calls, 2047)).toBe(false);
+      expect(hasOwn(details.tool_calls, 2047)).toBe(false);
     }
   });
 
