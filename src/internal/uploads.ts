@@ -322,14 +322,25 @@ const isReadableStream = (value: unknown): value is ReadableStream<BlobPart> =>
 const isStreamingFile = (value: unknown): value is StreamingFile =>
   typeof value === 'object' && value !== null && brand_privateStreamingFile in value;
 
-const isUploadable = (value: unknown): value is Uploadable =>
-  typeof value === 'object' &&
-  value !== null &&
-  (value instanceof Response ||
-    isAsyncIterable(value) ||
-    isReadableStream(value) ||
-    isStreamingFile(value) ||
-    isNamedBlob(value));
+const getUploadableKind = (value: unknown): 'upload' | 'streaming' | undefined => {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+
+  if (value instanceof Response || isAsyncIterable(value) || isReadableStream(value)) {
+    return 'upload';
+  }
+  if (isStreamingFile(value)) {
+    return 'streaming';
+  }
+  if (isNamedBlob(value)) {
+    return 'upload';
+  }
+
+  return undefined;
+};
+
+const isUploadable = (value: unknown): value is Uploadable => getUploadableKind(value) !== undefined;
 
 const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
@@ -365,7 +376,9 @@ const hasUploadableValue = (value: unknown): boolean => {
   return false;
 };
 
-type FormEntry = { key: string; value: unknown };
+type FormEntry =
+  | Readonly<{ key: string; value: string | number | boolean; kind: 'field'; streamingFile: false }>
+  | Readonly<{ key: string; value: Uploadable; kind: 'upload'; streamingFile: boolean }>;
 
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
@@ -389,24 +402,26 @@ async function* iterateMultipartBody(
   const entries: (FormEntry & { filename?: string })[] = [];
 
   for await (const entry of iterateFormEntries(body)) {
-    if (isStreamingFile(entry.value)) {
-      entries.push({ ...entry, filename: getStreamingFileName(entry.value, options) });
+    if (entry.kind === 'upload' && entry.streamingFile) {
+      entries.push({ ...entry, filename: getStreamingFileName(entry.value, options, entry.streamingFile) });
     } else {
       entries.push(entry);
     }
   }
 
-  for (const { key, value, filename: validatedFilename } of entries) {
-    if (isUploadable(value)) {
-      const filename = validatedFilename ?? getStreamingFileName(value, options);
-      const type = getStreamingFileType(value);
+  for (const entry of entries) {
+    const { key, value, filename: validatedFilename } = entry;
+
+    if (entry.kind === 'upload') {
+      const filename = validatedFilename ?? getStreamingFileName(entry.value, options, entry.streamingFile);
+      const type = getStreamingFileType(entry.value, entry.streamingFile);
       yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
         `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
           filename,
         )}"\r\nContent-Type: ${type}\r\n\r\n`,
       );
-      yield* iterateBytes(getStreamingFileData(value));
+      yield* iterateBytes(getStreamingFileData(entry.value, entry.streamingFile));
     } else {
       yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
@@ -438,13 +453,14 @@ async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<Fo
     );
   }
 
-  if (
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    isUploadable(value)
-  ) {
-    yield { key, value };
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    yield { key, value, kind: 'field', streamingFile: false };
+    return;
+  }
+
+  const uploadKind = getUploadableKind(value);
+  if (uploadKind) {
+    yield { key, value: value as Uploadable, kind: 'upload', streamingFile: uploadKind === 'streaming' };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
       yield* iterateFormValue(key + '[]', entry);
@@ -468,17 +484,17 @@ function validateStreamingFileName(name: unknown): string {
   return name;
 }
 
-function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
-  const source = isStreamingFile(value) ? { name: validateStreamingFileName(value.name) } : value;
+function getStreamingFileName(value: Uploadable, options: CreateFormOptions, streamingFile: boolean): string {
+  const source = streamingFile ? { name: validateStreamingFileName((value as StreamingFile).name) } : value;
 
   return getName(source, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
 }
 
-function getStreamingFileType(value: Uploadable): string {
+function getStreamingFileType(value: Uploadable, streamingFile: boolean): string {
   let type: string | undefined;
 
-  if (isStreamingFile(value) || isNamedBlob(value)) {
-    ({ type } = value);
+  if (streamingFile || isNamedBlob(value)) {
+    ({ type } = value as StreamingFile | NamedBlob);
   } else if (value instanceof Response) {
     type = value.headers.get('content-type') ?? undefined;
   }
@@ -501,9 +517,9 @@ function validateStreamingFileType(type: string): string {
   return type;
 }
 
-function getStreamingFileData(value: Uploadable): unknown {
-  if (isStreamingFile(value)) {
-    return value.data;
+function getStreamingFileData(value: Uploadable, streamingFile: boolean): unknown {
+  if (streamingFile) {
+    return (value as StreamingFile).data;
   }
   return value;
 }

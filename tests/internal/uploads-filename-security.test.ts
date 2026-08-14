@@ -101,6 +101,49 @@ describe('streaming multipart filename and header security', () => {
     expect(toString).not.toHaveBeenCalled();
   });
 
+  test('rejects a stateful streaming-file brand before emitting earlier multipart fields or files', async () => {
+    const emitted: Uint8Array[] = [];
+    const replace = vi.fn();
+    const toString = vi.fn();
+    const earlier = new File(['sensitive earlier upload bytes'], 'earlier.png');
+    const startEarlierFile = vi.spyOn(earlier, 'stream');
+    const later = toStreamingFile(chunks('later upload bytes'), 'later.png');
+    const getFilename = vi.fn(() => ({ replace, toString }));
+    Object.defineProperty(later, 'name', { get: getFilename });
+
+    let brandChecks = 0;
+    const hostile = new Proxy(later, {
+      has(target, key) {
+        if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
+          const branded = [true, true, false, true][brandChecks] ?? true;
+          brandChecks += 1;
+          return branded;
+        }
+
+        return Reflect.has(target, key);
+      },
+    });
+
+    const options = await multipartFormRequestOptions(
+      { body: { secret: 'sensitive earlier metadata', earlier, later: hostile } },
+      fetch,
+    );
+    const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+    const firstRead = reader.read().then(({ done, value }) => {
+      if (!done) {
+        emitted.push(value);
+      }
+    });
+
+    await expect(firstRead).rejects.toThrow(/file.?name/iu);
+    expect(emitted).toEqual([]);
+    expect(startEarlierFile).not.toHaveBeenCalled();
+    expect(getFilename).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+    expect(toString).not.toHaveBeenCalled();
+    expect(brandChecks).toBe(2);
+  });
+
   test('streams valid files lazily using one filename snapshot for each multipart entry', async () => {
     const readChunk = vi.fn();
     const replace = vi.fn();
