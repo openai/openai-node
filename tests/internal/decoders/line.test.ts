@@ -1,4 +1,7 @@
+import { vi } from 'vitest';
+import { Stream } from 'openai/core/streaming';
 import { findDoubleNewlineIndex, LineDecoder } from 'openai/internal/decoders/line';
+import { ReadableStreamFrom } from 'openai/internal/shims';
 
 function decodeChunks(chunks: string[], options?: { flush: boolean }): string[] {
   const flush = options?.flush ?? false;
@@ -97,6 +100,136 @@ describe('line decoder', () => {
 
     const decoded = decoder.decode(new Uint8Array([0xa]));
     expect(decoded).toEqual(['известни']);
+  });
+
+  test('copies a linear number of bytes for a line fragmented into single bytes', () => {
+    const fragmentCount = 16 * 1024;
+    const fragment = new Uint8Array([0x61]);
+    const decoder = new LineDecoder();
+    const originalSet = Uint8Array.prototype.set;
+    let copiedBytes = 0;
+
+    const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function countCopiedBytes(
+      this: Uint8Array,
+      source: ArrayLike<number>,
+      offset?: number,
+    ) {
+      copiedBytes += source.length;
+      originalSet.call(this, source, offset);
+    });
+
+    try {
+      for (let index = 0; index < fragmentCount; index += 1) {
+        decoder.decode(fragment);
+      }
+
+      expect(copiedBytes).toBeLessThanOrEqual(fragmentCount * 4);
+    } finally {
+      setSpy.mockRestore();
+    }
+
+    expect(decoder.flush()).toEqual(['a'.repeat(fragmentCount)]);
+  });
+
+  test('only scans newly appended bytes while a fragmented line remains unfinished', () => {
+    const fragmentCount = 2048;
+    const maximumScannedBytes = fragmentCount * 4;
+    const NativeUint8Array = Uint8Array;
+    const fragment = new NativeUint8Array([0x61]);
+    const trackedBuffers = new WeakMap<Uint8Array, Uint8Array>();
+    let scannedBytes = 0;
+
+    const trackBuffer = (buffer: Uint8Array): Uint8Array => {
+      const proxy = new Proxy(buffer, {
+        get(target, property) {
+          if (typeof property === 'string') {
+            const firstCharacter = property.codePointAt(0) ?? 0;
+            if (firstCharacter >= 48 && firstCharacter <= 57) {
+              scannedBytes += 1;
+              if (scannedBytes > maximumScannedBytes) {
+                throw new Error(`LineDecoder rescanned more than ${maximumScannedBytes} bytes`);
+              }
+            }
+          }
+
+          if (property === 'set') {
+            return (source: ArrayLike<number>, offset?: number) => {
+              target.set(trackedBuffers.get(source as Uint8Array) ?? source, offset);
+            };
+          }
+
+          if (property === 'subarray') {
+            return (start?: number, end?: number) => trackBuffer(target.subarray(start, end));
+          }
+
+          const value = Reflect.get(target, property, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+
+      trackedBuffers.set(proxy, buffer);
+      return proxy;
+    };
+
+    const constructorSpy = vi
+      .spyOn(globalThis, 'Uint8Array')
+      .mockImplementation(function createTrackedUint8Array(...args: unknown[]) {
+        return trackBuffer(Reflect.construct(NativeUint8Array, args) as Uint8Array);
+      } as unknown as typeof Uint8Array);
+
+    try {
+      const decoder = new LineDecoder();
+      for (let index = 0; index < fragmentCount; index += 1) {
+        decoder.decode(fragment);
+      }
+
+      expect(scannedBytes).toBeGreaterThan(0);
+      expect(scannedBytes).toBeLessThanOrEqual(maximumScannedBytes);
+    } finally {
+      constructorSpy.mockRestore();
+    }
+  });
+
+  test('preserves partial UTF-8 characters and split line endings when consumed bytes are compacted', () => {
+    const decoder = new LineDecoder();
+    const consumedLine = 'a'.repeat(4096);
+    const pendingPrefix = 'b'.repeat(2048);
+    const pendingSuffix = 'c'.repeat(4096);
+    const trailingBytes = new TextEncoder().encode(`💙${pendingSuffix}\r`);
+
+    expect(decoder.decode(`${consumedLine}\n${pendingPrefix}`)).toEqual([consumedLine]);
+    expect(decoder.decode(trailingBytes.subarray(0, 2))).toEqual([]);
+
+    const remainingBytes = new ArrayBuffer(trailingBytes.length - 2);
+    new Uint8Array(remainingBytes).set(trailingBytes.subarray(2));
+    expect(decoder.decode(remainingBytes)).toEqual([`${pendingPrefix}💙${pendingSuffix}`]);
+
+    expect(decoder.decode(null)).toEqual([]);
+    const absentChunks: string[] = [];
+    expect(decoder.decode(absentChunks[0])).toEqual([]);
+    expect(decoder.decode(new Uint8Array())).toEqual([]);
+    expect(decoder.decode('\nnext\r')).toEqual(['next']);
+    expect(decoder.decode(new Uint8Array([0x0a, 0x0a]))).toEqual(['']);
+    expect(decoder.flush()).toEqual([]);
+  });
+
+  test('decodes public newline-delimited streams fragmented into individual bytes', async () => {
+    const expected = [{ content: `${'a'.repeat(1024)}💙` }, { content: 'final unterminated line' }];
+    const encoded = new TextEncoder().encode(
+      `${JSON.stringify(expected[0])}\r\n${JSON.stringify(expected[1])}`,
+    );
+    const fragments = Array.from(encoded, (byte) => new Uint8Array([byte]));
+    const stream = Stream.fromReadableStream<{ content: string }>(
+      ReadableStreamFrom(fragments),
+      new AbortController(),
+    );
+    const actual: { content: string }[] = [];
+
+    for await (const item of stream) {
+      actual.push(item);
+    }
+
+    expect(actual).toEqual(expected);
   });
 
   test('flushing trailing newlines', () => {
