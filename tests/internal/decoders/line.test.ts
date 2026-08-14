@@ -209,7 +209,7 @@ describe('line decoder', () => {
     }
   });
 
-  test('preserves unterminated suffixes larger than the retained-buffer limit', () => {
+  test('right-sizes oversized backing buffers while retaining a persistent large suffix', () => {
     const maximumRetainedBytes = 64 * 1024;
     const oversizedLine = new Uint8Array(maximumRetainedBytes * 4).fill(0x61);
     const oversizedSuffix = new Uint8Array(maximumRetainedBytes + 17).fill(0x62);
@@ -218,17 +218,23 @@ describe('line decoder', () => {
     newlineAndOversizedSuffix.set(oversizedSuffix, 1);
 
     const fragment = new Uint8Array([0x63]);
+    const partialUtf8 = new Uint8Array([0xf0, 0x9f]);
+    const remainingUtf8AndCarriageReturn = new Uint8Array([0x92, 0x99, 0x0d]);
+    const fragmentCount = 256;
     const decoder = new LineDecoder();
     const originalSet = Uint8Array.prototype.set;
-    let retainedCapacity = 0;
+    const retainedCapacities: number[] = [];
+    let highWaterCapacity = 0;
 
     const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordBackingCapacity(
       this: Uint8Array,
       source: ArrayLike<number>,
       offset?: number,
     ) {
-      if (source === fragment) {
-        retainedCapacity = this.buffer.byteLength;
+      if (source === oversizedLine || source === newlineAndOversizedSuffix) {
+        highWaterCapacity = Math.max(highWaterCapacity, this.buffer.byteLength);
+      } else if (source === fragment || source === partialUtf8 || source === remainingUtf8AndCarriageReturn) {
+        retainedCapacities.push(this.buffer.byteLength);
       }
       originalSet.call(this, source, offset);
     });
@@ -236,11 +242,144 @@ describe('line decoder', () => {
     try {
       expect(decoder.decode(oversizedLine)).toEqual([]);
       expect(decoder.decode(newlineAndOversizedSuffix)).toEqual(['a'.repeat(oversizedLine.length)]);
-      expect(decoder.decode(fragment)).toEqual([]);
 
-      expect(retainedCapacity).toBeGreaterThan(maximumRetainedBytes);
-      expect(decoder.decode('\n')).toEqual([`${'b'.repeat(oversizedSuffix.length)}c`]);
+      for (let index = 0; index < fragmentCount; index += 1) {
+        expect(decoder.decode(fragment)).toEqual([]);
+      }
+
+      expect(decoder.decode(partialUtf8)).toEqual([]);
+      expect(decoder.decode(remainingUtf8AndCarriageReturn)).toEqual([
+        `${'b'.repeat(oversizedSuffix.length)}${'c'.repeat(fragmentCount)}💙`,
+      ]);
+
+      expect(highWaterCapacity).toBeGreaterThanOrEqual(maximumRetainedBytes * 4);
+      expect(retainedCapacities).toHaveLength(fragmentCount + 2);
+      expect(Math.min(...retainedCapacities)).toBeGreaterThan(maximumRetainedBytes);
+      expect(Math.max(...retainedCapacities)).toBeLessThanOrEqual(oversizedSuffix.length * 2);
+      expect(decoder.decode('\nnext\n')).toEqual(['next']);
+      expect(decoder.flush()).toEqual([]);
     } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  test.each([64 * 1024 - 1, 64 * 1024, 64 * 1024 + 1, 64 * 1024 + 17])(
+    'right-sizes a historical oversized allocation at the %i-byte suffix boundary',
+    (suffixLength) => {
+      const maximumRetainedBytes = 64 * 1024;
+      const oversizedLine = new Uint8Array(maximumRetainedBytes * 4).fill(0x61);
+      const suffix = new Uint8Array(suffixLength).fill(0x62);
+      const newlineAndSuffix = new Uint8Array(suffixLength + 1);
+      newlineAndSuffix[0] = 0x0a;
+      newlineAndSuffix.set(suffix, 1);
+
+      const decoder = new LineDecoder();
+      const originalSet = Uint8Array.prototype.set;
+      const resizedCapacities: number[] = [];
+      let highWaterCapacity = 0;
+
+      const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordResizeCapacity(
+        this: Uint8Array,
+        source: ArrayLike<number>,
+        offset?: number,
+      ) {
+        if (source === oversizedLine || source === newlineAndSuffix) {
+          highWaterCapacity = Math.max(highWaterCapacity, this.buffer.byteLength);
+        } else if (
+          source instanceof Uint8Array &&
+          source.length === suffixLength &&
+          offset === undefined &&
+          source.buffer.byteLength >= maximumRetainedBytes * 4 &&
+          this.buffer.byteLength < source.buffer.byteLength
+        ) {
+          resizedCapacities.push(this.buffer.byteLength);
+        }
+        originalSet.call(this, source, offset);
+      });
+
+      try {
+        expect(decoder.decode(oversizedLine)).toEqual([]);
+        expect(decoder.decode(newlineAndSuffix)).toEqual(['a'.repeat(oversizedLine.length)]);
+
+        expect(highWaterCapacity).toBeGreaterThanOrEqual(maximumRetainedBytes * 4);
+        expect(resizedCapacities).toHaveLength(1);
+        expect(resizedCapacities[0]).toBeGreaterThanOrEqual(suffixLength);
+        expect(resizedCapacities[0]).toBeLessThanOrEqual(
+          suffixLength <= maximumRetainedBytes ? maximumRetainedBytes : suffixLength * 2,
+        );
+        expect(decoder.flush()).toEqual(['b'.repeat(suffixLength)]);
+      } finally {
+        setSpy.mockRestore();
+      }
+    },
+  );
+
+  test('reuses a right-sized large buffer while completed small lines retain large suffixes', () => {
+    const maximumRetainedBytes = 64 * 1024;
+    const oversizedLine = new Uint8Array(maximumRetainedBytes * 4).fill(0x61);
+    const suffix = new Uint8Array(maximumRetainedBytes + 17).fill(0x62);
+    const newlineAndSuffix = new Uint8Array(suffix.length + 1);
+    newlineAndSuffix[0] = 0x0a;
+    newlineAndSuffix.set(suffix, 1);
+
+    const smallLinesPerCycle = 64;
+    const cycleCount = 32;
+    const cycleChunk = new Uint8Array(1 + smallLinesPerCycle * 2 + suffix.length);
+    cycleChunk[0] = 0x0a;
+    for (let index = 0; index < smallLinesPerCycle; index += 1) {
+      cycleChunk[1 + index * 2] = 0x78;
+      cycleChunk[2 + index * 2] = 0x0a;
+    }
+    cycleChunk.set(suffix, 1 + smallLinesPerCycle * 2);
+
+    const decoder = new LineDecoder();
+    expect(decoder.decode(oversizedLine)).toEqual([]);
+    expect(decoder.decode(newlineAndSuffix)).toEqual(['a'.repeat(oversizedLine.length)]);
+
+    const expectedLines = [
+      'b'.repeat(suffix.length),
+      ...Array.from({ length: smallLinesPerCycle }, () => 'x'),
+    ];
+    const originalSet = Uint8Array.prototype.set;
+    const originalCopyWithin = Uint8Array.prototype.copyWithin;
+    const backingBuffers = new Set<Uint8Array>();
+    let copiedBytes = 0;
+
+    const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function countCopiedBytes(
+      this: Uint8Array,
+      source: ArrayLike<number>,
+      offset?: number,
+    ) {
+      copiedBytes += source.length;
+      if (source === cycleChunk) {
+        backingBuffers.add(this);
+      }
+      originalSet.call(this, source, offset);
+    });
+
+    const copyWithinSpy = vi
+      .spyOn(Uint8Array.prototype, 'copyWithin')
+      .mockImplementation(function countCompactedBytes(
+        this: Uint8Array,
+        target: number,
+        start: number,
+        end?: number,
+      ) {
+        copiedBytes += Math.max(0, (end ?? this.length) - start);
+        return originalCopyWithin.call(this, target, start, end);
+      });
+
+    try {
+      for (let index = 0; index < cycleCount; index += 1) {
+        expect(decoder.decode(cycleChunk)).toEqual(expectedLines);
+      }
+
+      expect(backingBuffers.size).toBe(1);
+      expect([...backingBuffers][0]?.buffer.byteLength).toBe(suffix.length * 4);
+      expect(copiedBytes).toBeLessThanOrEqual(cycleCount * cycleChunk.length * 4);
+      expect(decoder.flush()).toEqual(['b'.repeat(suffix.length)]);
+    } finally {
+      copyWithinSpy.mockRestore();
       setSpy.mockRestore();
     }
   });

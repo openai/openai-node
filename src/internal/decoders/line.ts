@@ -102,18 +102,20 @@ export class LineDecoder {
       if (this.#buffer.length > MAX_RETAINED_BUFFER_BYTES) {
         this.#buffer = new Uint8Array();
       }
-    } else if (
-      lines.length > 0 &&
-      this.#buffer.length > MAX_RETAINED_BUFFER_BYTES &&
-      this.#end - this.#start <= MAX_RETAINED_BUFFER_BYTES
-    ) {
+    } else if (lines.length > 0 && this.#buffer.length > MAX_RETAINED_BUFFER_BYTES) {
       const length = this.#end - this.#start;
-      const buffer = new Uint8Array(Math.max(length, 256));
-      buffer.set(this.#buffer.subarray(this.#start, this.#end));
-      this.#buffer = buffer;
-      this.#start = 0;
-      this.#end = length;
-      this.#searchIndex = length;
+      if (length <= MAX_RETAINED_BUFFER_BYTES || this.#buffer.length > length * 4) {
+        const capacity =
+          length <= MAX_RETAINED_BUFFER_BYTES
+            ? Math.min(Math.max(length * 2, 256), MAX_RETAINED_BUFFER_BYTES)
+            : length * 2;
+        const buffer = new Uint8Array(capacity);
+        buffer.set(this.#buffer.subarray(this.#start, this.#end));
+        this.#buffer = buffer;
+        this.#start = 0;
+        this.#end = length;
+        this.#searchIndex = length;
+      }
     }
 
     return lines;
