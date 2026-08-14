@@ -546,7 +546,7 @@ console.log(response.output_text);
 
 Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html). A model returned by the Models API may support a different Bedrock inference API instead.
 
-The default `endpoint: 'mantle'` uses `https://bedrock-mantle.<region>.api.aws/openai/v1` and the `bedrock-mantle` SigV4 signing service. Set `endpoint: 'runtime'` to use `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` and the `bedrock` signing service:
+The default `endpoint: 'mantle'` uses `https://bedrock-mantle.<region>.api.aws/openai/v1` and the `bedrock-mantle` SigV4 signing service. Set `endpoint: 'runtime'` to use the regional Bedrock Runtime hostname (for example, `https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1`) and the `bedrock` signing service. The hostname uses the selected region's AWS partition DNS suffix:
 
 ```ts
 const client = new OpenAI({
