@@ -2,10 +2,7 @@ import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 import OpenAI, { BedrockOpenAI } from 'openai';
-import {
-  assertBedrockWebSocketOrigin,
-  brand_privateBedrockClient,
-} from 'openai/internal/bedrock';
+import { assertBedrockWebSocketOrigin, brand_privateBedrockClient } from 'openai/internal/bedrock';
 import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtime/websocket';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaBrowserRealtime } from 'openai/beta/realtime/websocket';
