@@ -254,6 +254,62 @@ describe('streaming multipart filename and header security', () => {
     expect(brandChecks).toBe(1);
   });
 
+  test('rechecks an initially inconclusive brand before choosing optional multipart encoding', async () => {
+    const upload = toStreamingFile(chunks('authoritative upload bytes'), 'upload.png');
+    let brandChecks = 0;
+    const stateful = new Proxy(upload, {
+      has(target, key) {
+        if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
+          brandChecks += 1;
+          return brandChecks > 1;
+        }
+
+        return Reflect.has(target, key);
+      },
+    });
+    const earlier = new File(['earlier upload bytes'], 'earlier.png');
+    const files = [stateful, earlier];
+    Object.defineProperty(files, Symbol.iterator, {
+      *value() {
+        yield earlier;
+        yield stateful;
+      },
+    });
+
+    const options = await maybeMultipartFormRequestOptions({ body: { files } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+
+    expect((form.getAll('files[]')[1] as File).name).toBe('upload.png');
+    await expect((form.getAll('files[]')[1] as File).text()).resolves.toBe('authoritative upload bytes');
+    expect(brandChecks).toBe(2);
+  });
+
+  test('snapshots earlier streaming data before reading later mutable filenames', async () => {
+    const earlier = toStreamingFile(chunks('original earlier bytes'), 'earlier.png');
+    const later = toStreamingFile(chunks('later bytes'), 'later.png');
+    const getLaterFilename = vi.fn(() => {
+      Object.defineProperty(earlier, 'data', { value: chunks('substituted earlier bytes') });
+      return 'later.png';
+    });
+    Object.defineProperty(later, 'name', { get: getLaterFilename });
+
+    const options = await multipartFormRequestOptions({ body: { files: [earlier, later] } }, fetch);
+    const contentType = buildHeaders([options.headers]).values.get('content-type') ?? '';
+    const form = await new Response(options.body as ReadableStream, {
+      headers: { 'content-type': contentType },
+    }).formData();
+    const files = form.getAll('files[]') as File[];
+
+    await expect(Promise.all(files.map((file) => file.text()))).resolves.toEqual([
+      'original earlier bytes',
+      'later bytes',
+    ]);
+    expect(getLaterFilename).toHaveBeenCalledTimes(1);
+  });
+
   test('streams valid branded async-iterable files lazily using one filename snapshot per entry', async () => {
     const readChunk = vi.fn();
     const replace = vi.fn();

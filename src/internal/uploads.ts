@@ -348,7 +348,9 @@ const getUploadableKind = (value: unknown, uploadableKinds: UploadableKinds): Up
     uploadableKind = 'upload';
   }
 
-  uploadableKinds.set(value, uploadableKind);
+  if (uploadableKind) {
+    uploadableKinds.set(value, uploadableKind);
+  }
 
   return uploadableKind;
 };
@@ -397,7 +399,13 @@ const hasUploadableValue = (value: unknown, uploadableKinds: UploadableKinds): b
 
 type FormEntry =
   | Readonly<{ key: string; value: string | number | boolean; kind: 'field'; streamingFile: false }>
-  | Readonly<{ key: string; value: Uploadable; kind: 'upload'; streamingFile: boolean }>;
+  | Readonly<{
+      key: string;
+      value: Uploadable;
+      data: unknown;
+      kind: 'upload';
+      streamingFile: boolean;
+    }>;
 
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
@@ -442,7 +450,7 @@ async function* iterateMultipartBody(
           filename,
         )}"\r\nContent-Type: ${type}\r\n\r\n`,
       );
-      yield* iterateBytes(getStreamingFileData(entry.value, entry.streamingFile));
+      yield* iterateBytes(entry.data);
     } else {
       yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
@@ -488,11 +496,14 @@ async function* iterateFormValue(
 
   const uploadKind = getUploadableKind(value, uploadableKinds);
   if (uploadKind) {
+    const upload = value as Uploadable;
+    const streamingFile = uploadKind === 'streaming-file';
     yield {
       key,
-      value: value as Uploadable,
+      value: upload,
+      data: streamingFile ? (upload as StreamingFile).data : upload,
       kind: 'upload',
-      streamingFile: uploadKind === 'streaming-file',
+      streamingFile,
     };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
@@ -548,13 +559,6 @@ function validateStreamingFileType(type: string): string {
   }
 
   return type;
-}
-
-function getStreamingFileData(value: Uploadable, streamingFile: boolean): unknown {
-  if (streamingFile) {
-    return (value as StreamingFile).data;
-  }
-  return value;
 }
 
 async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
