@@ -198,6 +198,37 @@ describe('strict vendor converter root schemas', () => {
     ).toThrow('Root schema must serialize to a JSON object');
   });
 
+  it('rejects callable strict roots that JSON serialization omits', () => {
+    const overriddenRoot = Object.assign(() => null, { type: 'object' as const });
+
+    expect(JSON.stringify(overriddenRoot)).toBeUndefined();
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        target: 'openApi3',
+        openaiStrictMode: true,
+        override: () => overriddenRoot,
+      }),
+    ).toThrow('Root schema must serialize to a JSON object');
+  });
+
+  it('rejects cyclic proxy-reported prototypes without hanging', () => {
+    const overriddenRoot: object = new Proxy(
+      { type: 'object' as const },
+      {
+        getPrototypeOf: () => overriddenRoot,
+      },
+    );
+
+    expect(JSON.stringify(overriddenRoot)).toBe('{"type":"object"}');
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        target: 'openApi3',
+        openaiStrictMode: true,
+        override: () => overriddenRoot as { type: 'object' },
+      }),
+    ).toThrow('Root schema cannot contain a cyclic prototype chain');
+  });
+
   it('rejects boxed BigInt roots before JSON serialization fails', () => {
     const boxedBigInt = Reflect.construct(Object, [Reflect.apply(BigInt, undefined, [1])]) as object;
     const overriddenRoot = Object.assign(boxedBigInt, {

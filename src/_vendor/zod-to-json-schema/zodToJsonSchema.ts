@@ -6,7 +6,13 @@ import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
 function validateStrictRootSerializationHook(schema: object): void {
+  const visitedPrototypes = new WeakSet<object>();
   for (let target: object | null = schema; target !== null; target = Object.getPrototypeOf(target)) {
+    if (visitedPrototypes.has(target)) {
+      throw new TypeError('Root schema cannot contain a cyclic prototype chain');
+    }
+    visitedPrototypes.add(target);
+
     const serializationHook = Object.getOwnPropertyDescriptor(target, 'toJSON');
     if (!serializationHook) {
       continue;
@@ -19,7 +25,7 @@ function validateStrictRootSerializationHook(schema: object): void {
 }
 
 function validateStrictRootShape(schema: object): void {
-  if (Array.isArray(schema)) {
+  if (typeof schema === 'function' || Array.isArray(schema)) {
     throw new TypeError('Root schema must serialize to a JSON object');
   }
 
