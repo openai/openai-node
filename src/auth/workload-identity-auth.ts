@@ -76,7 +76,7 @@ function isX509WorkloadIdentity(config: WorkloadIdentity): config is X509Workloa
   return config.type === 'x509';
 }
 
-/** Returns the opaque runtime transport identity that binds an X.509 access token. */
+/** Returns the opaque runtime transport identity used to scope X.509 refresh state. */
 export function x509TransportKey(fetchOptions: MergedRequestInit | undefined): object | undefined {
   if (!fetchOptions) {
     return undefined;
@@ -339,7 +339,7 @@ function createCredentialSource(
 export class WorkloadIdentityAuth {
   private readonly defaultState = createRefreshState();
   private readonly source: CredentialSource;
-  // Weak keys partition transport-bound tokens without extending the lifetime of caller-owned dispatchers.
+  // Weak keys partition transport-scoped state without extending caller-owned dispatcher lifetimes.
   private readonly transportStates = new WeakMap<object, RefreshState>();
 
   /**
@@ -437,13 +437,17 @@ export class WorkloadIdentityAuth {
 
     for (let retryCount = 0; ; retryCount += 1) {
       throwIfAborted(signal);
-      const retryDelayMs = state.retryNotBefore - this.source.monotonicNow();
-      if (retryDelayMs > 0) {
-        // oxlint-disable-next-line no-await-in-loop -- A shared Retry-After window gates each attempt.
-        await waitForDelay(retryDelayMs, signal, this.remainingTimeout(deadline));
-      }
       if (state.tokenGeneration !== context.generation) {
         throw REFRESH_INVALIDATED;
+      }
+      let retryDelayMs = state.retryNotBefore - this.source.monotonicNow();
+      while (retryDelayMs > 0) {
+        // oxlint-disable-next-line no-await-in-loop -- Each wake must recheck a shared backoff another attempt may extend.
+        await waitForDelay(retryDelayMs, signal, this.remainingTimeout(deadline));
+        if (state.tokenGeneration !== context.generation) {
+          throw REFRESH_INVALIDATED;
+        }
+        retryDelayMs = state.retryNotBefore - this.source.monotonicNow();
       }
       if (
         state.cachedToken &&

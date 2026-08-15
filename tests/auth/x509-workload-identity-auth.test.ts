@@ -314,6 +314,37 @@ describe('X.509 workload identity auth', () => {
     expect(customFetch).toHaveBeenCalledTimes(2);
   });
 
+  test('rechecks shared backoff when another waiter extends it', async () => {
+    vi.useFakeTimers();
+    let monotonicTime = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '1' } }))
+      .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '60' } }))
+      .mockResolvedValueOnce(tokenResponse('retried-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    const first = auth.getToken(undefined, undefined, { maxRetries: 2 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(customFetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(100);
+    const staleSleeper = auth.getToken(undefined, undefined, { maxRetries: 2 });
+    monotonicTime += 1000;
+    await vi.advanceTimersByTimeAsync(900);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+
+    monotonicTime += 100;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+
+    monotonicTime += 59_900;
+    await vi.advanceTimersByTimeAsync(59_900);
+    await expect(Promise.all([first, staleSleeper])).resolves.toEqual(['retried-token', 'retried-token']);
+    expect(customFetch).toHaveBeenCalledTimes(3);
+  });
+
   test('records Retry-After when an exchange settles after every waiter exits', async () => {
     vi.useFakeTimers();
     let monotonicTime = 1000;

@@ -390,7 +390,7 @@ export interface ClientOptions {
    * Additional `RequestInit` options to be passed to `fetch` calls.
    * Properties will be overridden by per-request `fetchOptions`.
    *
-   * X.509 workload identity binds its cached credential to this client-level
+   * X.509 workload identity scopes its cached credential to this client-level
    * transport, so per-request `fetchOptions` are rejected in that mode.
    */
   fetchOptions?: MergedRequestInit | undefined;

@@ -351,7 +351,7 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(retryFetch).toHaveBeenCalledTimes(3);
   });
 
-  test('rejects per-request fetchOptions before exchanging a transport-bound identity', async () => {
+  test('rejects per-request fetchOptions before exchanging a transport-scoped identity', async () => {
     const customFetch = vi.fn();
     const client = new OpenAI({
       apiKey: null,
