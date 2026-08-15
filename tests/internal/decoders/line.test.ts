@@ -1,4 +1,47 @@
+import { vi } from 'vitest';
 import { findDoubleNewlineIndex, LineDecoder } from 'openai/internal/decoders/line';
+
+const MAX_RETAINED_BYTES = 64 * 1024;
+
+interface BufferOperations {
+  copied: number;
+  compacted: number;
+  writes: { source: ArrayLike<number>; target: Uint8Array }[];
+}
+
+function inspectBuffers(check: (operations: BufferOperations) => void): void {
+  const operations: BufferOperations = { copied: 0, compacted: 0, writes: [] };
+  const nativeSet = Uint8Array.prototype.set;
+  const nativeCopyWithin = Uint8Array.prototype.copyWithin;
+  const setSpy = vi.spyOn(Uint8Array.prototype, 'set').mockImplementation(function recordCopy(
+    this: Uint8Array,
+    source: ArrayLike<number>,
+    offset?: number,
+  ) {
+    operations.copied += source.length;
+    operations.writes.push({ source, target: this });
+    nativeSet.call(this, source, offset);
+  });
+  const compactSpy = vi
+    .spyOn(Uint8Array.prototype, 'copyWithin')
+    .mockImplementation(function recordCompaction(
+      this: Uint8Array,
+      target: number,
+      start: number,
+      end?: number,
+    ) {
+      operations.compacted += 1;
+      operations.copied += (end ?? this.length) - start;
+      return nativeCopyWithin.call(this, target, start, end);
+    });
+
+  try {
+    check(operations);
+  } finally {
+    compactSpy.mockRestore();
+    setSpy.mockRestore();
+  }
+}
 
 function decodeChunks(chunks: string[], options?: { flush: boolean }): string[] {
   const flush = options?.flush ?? false;
@@ -97,6 +140,112 @@ describe('line decoder', () => {
 
     const decoded = decoder.decode(new Uint8Array([0xa]));
     expect(decoded).toEqual(['известни']);
+  });
+
+  test('copies and scans fragmented oversized lines in linear time', () => {
+    const count = 96 * 1024;
+    const NativeUint8Array = Uint8Array;
+    const fragment = new NativeUint8Array([0x61]);
+    let scanned = 0;
+
+    inspectBuffers((operations) => {
+      const constructorSpy = vi.spyOn(globalThis, 'Uint8Array').mockImplementation(function trackBuffer(
+        ...args: unknown[]
+      ) {
+        const buffer = Reflect.construct(NativeUint8Array, args) as Uint8Array;
+        return new Proxy(buffer, {
+          get(target, property) {
+            if (typeof property === 'string' && /^\d+$/u.test(property)) {
+              scanned += 1;
+              if (scanned > count * 4) {
+                throw new Error('LineDecoder rescanned buffered bytes');
+              }
+            }
+            const value = Reflect.get(target, property, target);
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+        });
+      } as unknown as typeof Uint8Array);
+
+      try {
+        const decoder = new LineDecoder();
+        for (let index = 0; index < count; index += 1) {
+          decoder.decode(fragment);
+        }
+        expect(scanned).toBeGreaterThan(0);
+        expect(operations.copied).toBeLessThanOrEqual(count * 4);
+        expect(decoder.flush()).toEqual(['a'.repeat(count)]);
+      } finally {
+        constructorSpy.mockRestore();
+      }
+    });
+  });
+
+  test.each([
+    [0, 256, 0],
+    [1, 256, 1],
+    [MAX_RETAINED_BYTES - 1, MAX_RETAINED_BYTES, 1],
+    [MAX_RETAINED_BYTES, MAX_RETAINED_BYTES, 1],
+    [MAX_RETAINED_BYTES + 1, (MAX_RETAINED_BYTES + 1) * 2, 1],
+    [MAX_RETAINED_BYTES * 2 - 1, (MAX_RETAINED_BYTES * 2 - 1) * 2, 1],
+    [MAX_RETAINED_BYTES * 2, MAX_RETAINED_BYTES * 8, 0],
+  ])('bounds oversized allocations with a %i-byte live suffix', (length, capacity, resizeCount) => {
+    const line = new Uint8Array(MAX_RETAINED_BYTES * 4).fill(0x61);
+    const suffix = new Uint8Array(length + 1).fill(0x62);
+    const probe = new Uint8Array([0x63]);
+    suffix[0] = 0x0a;
+    const decoder = new LineDecoder();
+
+    inspectBuffers(({ writes }) => {
+      expect(decoder.decode(line)).toEqual([]);
+      expect(decoder.decode(suffix)).toEqual(['a'.repeat(line.length)]);
+      const resized = writes.filter(
+        ({ source, target }) => source instanceof Uint8Array && source.buffer.byteLength > target.byteLength,
+      );
+      expect(resized).toHaveLength(resizeCount);
+      if (length === 0) {
+        expect(decoder.decode(probe)).toEqual([]);
+      }
+      const retained =
+        resized[0]?.target ?? writes.find(({ source }) => source === (length ? suffix : probe))?.target;
+      expect(retained?.byteLength).toBe(capacity);
+      expect(decoder.flush()).toEqual([length ? 'b'.repeat(length) : 'c']);
+    });
+  });
+
+  test.each([1, MAX_RETAINED_BYTES + 17])('reuses buffers with %i-byte live suffixes', (length) => {
+    const suffix = new Uint8Array(length).fill(0x62);
+    const cycle = new Uint8Array(length + 3);
+    cycle.set([0x0a, 0x78, 0x0a]);
+    cycle.set(suffix, 3);
+    const oversized = length > MAX_RETAINED_BYTES;
+    const prefix = oversized ? new Uint8Array(MAX_RETAINED_BYTES * 4).fill(0x61) : suffix;
+    const decoder = new LineDecoder();
+
+    inspectBuffers((operations) => {
+      expect(decoder.decode(prefix)).toEqual([]);
+      if (oversized) {
+        expect(decoder.decode(cycle.subarray(2))).toEqual(['a'.repeat(prefix.length)]);
+      }
+      const initialCopies = operations.copied;
+      for (let index = 0; index < 5; index += 1) {
+        expect(decoder.decode(cycle)).toEqual(['b'.repeat(length), 'x']);
+      }
+      const buffers = new Set(
+        operations.writes.filter(({ source }) => source === cycle).map(({ target }) => target),
+      );
+      expect(buffers.size).toBe(1);
+      expect(operations.copied - initialCopies).toBeLessThanOrEqual(cycle.length * 20);
+      if (oversized) {
+        expect(operations.compacted).toBeGreaterThan(0);
+        expect([...buffers][0]?.byteLength).toBe(length * 4);
+      }
+
+      expect(decoder.decode(new Uint8Array([0xf0, 0x9f]))).toEqual([]);
+      expect(decoder.decode(new Uint8Array([0x92, 0x99, 0x0d]))).toEqual([`${'b'.repeat(length)}💙`]);
+      expect(decoder.decode('\nnext\n')).toEqual(['next']);
+      expect(decoder.flush()).toEqual([]);
+    });
   });
 
   test('flushing trailing newlines', () => {
