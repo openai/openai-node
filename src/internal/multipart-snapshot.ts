@@ -11,30 +11,11 @@ export type MultipartDataSnapshot = Readonly<{
   dispose?: (() => void) | undefined;
 }>;
 
-function isNativeReadableStream(value: StreamingFileInput, requireLocked = false): boolean {
-  if (typeof globalThis.ReadableStream !== 'function') {
-    return false;
-  }
+const replayMultipartSnapshot = Symbol('replayMultipartSnapshot');
 
-  try {
-    const getLocked = Object.getOwnPropertyDescriptor(globalThis.ReadableStream.prototype, 'locked')?.get;
-    const locked = getLocked?.call(value);
-    return typeof locked === 'boolean' && (!requireLocked || locked);
-  } catch {
-    try {
-      // Transparent proxies cannot satisfy the intrinsic brand but retain their native prototype.
-      if (!(value instanceof globalThis.ReadableStream)) {
-        return false;
-      }
-
-      const locked = Reflect.get(value, 'locked');
-      return typeof locked === 'boolean' && (!requireLocked || locked);
-    } catch {
-      // Ordinary async iterables, reader-like objects, and hostile proxies are not native streams.
-      return false;
-    }
-  }
-}
+type ReplayableMultipartDataSnapshot = MultipartDataSnapshot & {
+  readonly [replayMultipartSnapshot]: () => MultipartDataSnapshot;
+};
 
 async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
   try {
@@ -42,6 +23,22 @@ async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
   } catch {
     // Cleanup failures must not mask the primary multipart result.
   }
+}
+
+function hasOriginalIteratorReturn(
+  iterator: AsyncIterator<BlobPart>,
+  owner: object,
+  getter: () => unknown,
+): boolean {
+  let prototype: object | null = iterator;
+  while (prototype !== null) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'return');
+    if (descriptor) {
+      return prototype === owner && !('value' in descriptor) && descriptor.get === getter;
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return false;
 }
 
 function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterator<BlobPart>['return'] {
@@ -59,10 +56,15 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
         }
 
         const getReturn = descriptor.get;
-        readReturn = () =>
-          getReturn
-            ? (Reflect.apply(getReturn, iterator, []) as AsyncIterator<BlobPart>['return'])
-            : undefined;
+        const owner = prototype;
+        readReturn = () => {
+          if (!getReturn) {
+            return;
+          }
+          return hasOriginalIteratorReturn(iterator, owner, getReturn)
+            ? (Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'])
+            : (Reflect.apply(getReturn, iterator, []) as AsyncIterator<BlobPart>['return']);
+        };
         break;
       }
       prototype = Object.getPrototypeOf(prototype);
@@ -96,128 +98,177 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
   };
 }
 
+function snapshotIterator(
+  value: StreamingFileInput,
+  createIterator: () => AsyncIterator<BlobPart>,
+): MultipartDataSnapshot {
+  const iterator = Reflect.apply(createIterator, value, []) as AsyncIterator<BlobPart>;
+  const returnIterator = snapshotIteratorReturn(iterator);
+  let next: AsyncIterator<BlobPart>['next'];
+  try {
+    ({ next } = iterator);
+  } catch (error) {
+    void ignoreCleanupResult(() => returnIterator?.());
+    throw error;
+  }
+
+  let consumed = false;
+  return {
+    data: {
+      [Symbol.asyncIterator]() {
+        consumed = true;
+        return {
+          next(...args: [] | [undefined]) {
+            return Reflect.apply(next, iterator, args);
+          },
+          return(...args: [] | [unknown]) {
+            return returnIterator
+              ? returnIterator(...args)
+              : Promise.resolve({ done: true as const, value: args[0] });
+          },
+          [Symbol.asyncIterator]() {
+            return this;
+          },
+        };
+      },
+    },
+    dispose() {
+      if (!consumed) {
+        consumed = true;
+        void ignoreCleanupResult(() => returnIterator?.());
+      }
+    },
+  };
+}
+
+function snapshotReader(
+  value: StreamingFileInput,
+  getReader: ReadableStream<BlobPart>['getReader'],
+): MultipartDataSnapshot {
+  const reader = Reflect.apply(getReader, value, []) as ReadableStreamDefaultReader<BlobPart>;
+  let read: ReadableStreamDefaultReader<BlobPart>['read'];
+  try {
+    ({ read } = reader);
+  } catch (error) {
+    void ignoreCleanupResult(() => reader.cancel());
+    try {
+      reader.releaseLock();
+    } catch {
+      // Cleanup failures must not mask the primary multipart result.
+    }
+    throw error;
+  }
+
+  let cancel: ReadableStreamDefaultReader<BlobPart>['cancel'];
+  try {
+    const cancelReader = reader.cancel;
+    cancel = (...args) => {
+      try {
+        return Promise.resolve(Reflect.apply(cancelReader, reader, args));
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    };
+  } catch (error) {
+    cancel = () => Promise.reject(error);
+  }
+
+  let releaseLock: ReadableStreamDefaultReader<BlobPart>['releaseLock'];
+  try {
+    const releaseReader = reader.releaseLock;
+    releaseLock = () => Reflect.apply(releaseReader, reader, []);
+  } catch (error) {
+    releaseLock = () => {
+      throw error;
+    };
+  }
+
+  const capturedReader = {
+    read: () => Reflect.apply(read, reader, []),
+    cancel,
+    releaseLock,
+  };
+  let consumed = false;
+  return {
+    data: {
+      async *[Symbol.asyncIterator]() {
+        if (consumed) {
+          return;
+        }
+        consumed = true;
+        yield* ReadableStreamToAsyncIterable<BlobPart>({ getReader: () => capturedReader });
+      },
+    },
+    dispose() {
+      if (!consumed) {
+        consumed = true;
+        void ignoreCleanupResult(cancel);
+        try {
+          releaseLock();
+        } catch {
+          // Cleanup failures must not mask the primary multipart result.
+        }
+      }
+    },
+  };
+}
+
+function deferredMultipartSnapshot(capture: () => MultipartDataSnapshot): MultipartDataSnapshot {
+  let snapshot: MultipartDataSnapshot | undefined;
+  let disposed = false;
+  return {
+    data: {
+      [Symbol.asyncIterator]() {
+        if (disposed) {
+          return {
+            next: () => Promise.resolve({ done: true as const, value: undefined }),
+            [Symbol.asyncIterator]() {
+              return this;
+            },
+          };
+        }
+
+        snapshot = capture();
+        const { data } = snapshot;
+        const createIterator = (data as AsyncIterable<BlobPart>)[Symbol.asyncIterator];
+        return Reflect.apply(createIterator, data, []) as AsyncIterator<BlobPart>;
+      },
+    },
+    dispose() {
+      disposed = true;
+      snapshot?.dispose?.();
+    },
+  };
+}
+
 /** Capture an upload iterator or readable-stream reader without prefetching its contents. */
 export function snapshotStreamingFileData(
   value: StreamingFileInput,
   snapshots: WeakMap<object, MultipartDataSnapshot>,
 ): MultipartDataSnapshot {
-  const cached = snapshots.get(value);
+  const cached = snapshots.get(value) as ReplayableMultipartDataSnapshot | undefined;
   if (cached) {
-    return cached;
+    return cached[replayMultipartSnapshot]();
   }
 
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
+  let capture: () => MultipartDataSnapshot;
   if (typeof createIterator === 'function') {
-    const iterator = createIterator.call(value);
-    const returnIterator = snapshotIteratorReturn(iterator);
-    const isLockedNativeStream = isNativeReadableStream(value, true);
-    let next: AsyncIterator<BlobPart>['next'];
-    try {
-      ({ next } = iterator);
-    } catch (error) {
-      void ignoreCleanupResult(() => returnIterator?.());
-      throw error;
+    capture = () => snapshotIterator(value, createIterator);
+  } else {
+    const { getReader } = value as ReadableStream<BlobPart>;
+    if (typeof getReader !== 'function') {
+      throw new TypeError('Streaming file data must be an async iterable or readable stream');
     }
-    let consumed = false;
-    const snapshot: MultipartDataSnapshot = {
-      data: {
-        [Symbol.asyncIterator]() {
-          consumed = true;
-          return {
-            next(...args: [] | [undefined]) {
-              return next.call(iterator, ...args);
-            },
-            return(...args: [] | [unknown]) {
-              return returnIterator
-                ? returnIterator(...args)
-                : Promise.resolve({ done: true as const, value: args[0] });
-            },
-            [Symbol.asyncIterator]() {
-              return this;
-            },
-          };
-        },
-      },
-      dispose() {
-        if (!consumed) {
-          consumed = true;
-          void ignoreCleanupResult(() => returnIterator?.());
-        }
-      },
-    };
-    if (isLockedNativeStream) {
-      snapshots.set(value, snapshot);
-    }
-    return snapshot;
+    capture = () => snapshotReader(value, getReader);
   }
 
-  const { getReader } = value as ReadableStream<BlobPart>;
-  if (typeof getReader === 'function') {
-    const reader = getReader.call(value) as ReadableStreamDefaultReader<BlobPart>;
-    let read: ReadableStreamDefaultReader<BlobPart>['read'];
-    try {
-      ({ read } = reader);
-    } catch (error) {
-      void ignoreCleanupResult(() => reader.cancel());
-      try {
-        reader.releaseLock();
-      } catch {
-        // Cleanup failures must not mask the primary multipart result.
-      }
-      throw error;
-    }
-
-    let cancel: ReadableStreamDefaultReader<BlobPart>['cancel'];
-    try {
-      cancel = reader.cancel.bind(reader);
-    } catch (error) {
-      cancel = () => Promise.reject(error);
-    }
-
-    let releaseLock: ReadableStreamDefaultReader<BlobPart>['releaseLock'];
-    try {
-      releaseLock = reader.releaseLock.bind(reader);
-    } catch (error) {
-      releaseLock = () => {
-        throw error;
-      };
-    }
-
-    const capturedReader = {
-      read: () => read.call(reader),
-      cancel,
-      releaseLock,
-    };
-    let consumed = false;
-    const snapshot: MultipartDataSnapshot = {
-      data: {
-        async *[Symbol.asyncIterator]() {
-          if (consumed) {
-            return;
-          }
-          consumed = true;
-          yield* ReadableStreamToAsyncIterable<BlobPart>({ getReader: () => capturedReader });
-        },
-      },
-      dispose() {
-        if (!consumed) {
-          consumed = true;
-          void ignoreCleanupResult(cancel);
-          try {
-            releaseLock();
-          } catch {
-            // Cleanup failures must not mask the primary multipart result.
-          }
-        }
-      },
-    };
-    if (isNativeReadableStream(value, true)) {
-      snapshots.set(value, snapshot);
-    }
-    return snapshot;
-  }
-
-  throw new TypeError('Streaming file data must be an async iterable or readable stream');
+  const snapshot: ReplayableMultipartDataSnapshot = {
+    ...capture(),
+    [replayMultipartSnapshot]: () => deferredMultipartSnapshot(capture),
+  };
+  snapshots.set(value, snapshot);
+  return snapshot;
 }
 
 function hasOriginalBlobRead(value: Blob, originalDescriptor: PropertyDescriptor | undefined): boolean {
@@ -240,10 +291,10 @@ export function snapshotBlobData(
 ): MultipartDataSnapshot {
   const { stream } = value as Blob & { stream?: Blob['stream'] };
   if (typeof stream === 'function') {
-    return snapshotStreamingFileData(stream.call(value) as ReadableStream<BlobPart>, snapshots);
+    return snapshotStreamingFileData(Reflect.apply(stream, value, []) as ReadableStream<BlobPart>, snapshots);
   }
 
-  const immutableBlob = Blob.prototype.slice.call(value);
+  const immutableBlob = Reflect.apply(Blob.prototype.slice, value, []) as Blob;
   const { arrayBuffer: readImmutableBlob } = Blob.prototype;
   const { arrayBuffer: read } = value;
   const originalReadDescriptor = Object.getOwnPropertyDescriptor(value, 'arrayBuffer');
@@ -252,8 +303,9 @@ export function snapshotBlobData(
     data: {
       async *[Symbol.asyncIterator]() {
         const useOriginalRead = hasOriginalBlobRead(value, originalReadDescriptor);
-        const buffer = await read.call(value);
-        yield useOriginalRead ? buffer : await readImmutableBlob.call(immutableBlob);
+        yield useOriginalRead
+          ? await Reflect.apply(read, value, [])
+          : await Reflect.apply(readImmutableBlob, immutableBlob, []);
       },
     },
   };

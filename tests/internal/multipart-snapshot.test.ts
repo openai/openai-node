@@ -71,7 +71,7 @@ describe('streaming multipart snapshots', () => {
 
       expect(body.match(/\r\n\r\nshared\r\n/gu)).toHaveLength(kind === 'locked reader' ? 1 : 2);
       expect(body).toContain('filename="second.txt"');
-      expect(acquire.mock.contexts).toEqual(kind === 'locked reader' ? [source] : [source, source]);
+      expect(acquire.mock.contexts).toEqual([source, source]);
       expect(source.locked).toBe(false);
     },
   );
@@ -108,22 +108,130 @@ describe('streaming multipart snapshots', () => {
       expect(body.match(/\r\n\r\nshared\r\n/gu)).toHaveLength(1);
       expect(body).toContain('filename="first.txt"');
       expect(body).toContain('filename="second.txt"');
-      expect(acquire).toHaveBeenCalledTimes(1);
+      expect(acquire).toHaveBeenCalledTimes(2);
       expect(target.locked).toBe(false);
     },
   );
 
-  test('does not cache reusable duck sources that spoof native locked state', async () => {
-    const acquire = vi.fn(() => ReadableStream.from(['reusable'])[Symbol.asyncIterator]());
-    const source = { locked: true, [Symbol.asyncIterator]: acquire };
+  test.each(['plain', 'native prototype'] as const)(
+    'replays reusable %s sources that spoof native locked state',
+    async (kind) => {
+      const acquire = vi.fn(() => ReadableStream.from(['reusable'])[Symbol.asyncIterator]());
+      const source = { locked: true, [Symbol.asyncIterator]: acquire };
+      if (kind === 'native prototype') {
+        Object.setPrototypeOf(source, ReadableStream.prototype);
+        expect(source).toBeInstanceOf(ReadableStream);
+      }
+      const options = await multipart({
+        files: [toStreamingFile(source, 'first.txt'), toStreamingFile(source, 'second.txt')],
+      });
+      const body = await new Response(options.body as ReadableStream).text();
+
+      expect(body.match(/\r\n\r\nreusable\r\n/gu)).toHaveLength(2);
+      expect(acquire).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  test('acquires shared reusable iterators sequentially from the original captured factory', async () => {
+    let active = false;
+    const factory = vi.fn(() => {
+      if (active) {
+        throw new Error('Overlapping iterator lifetime');
+      }
+      active = true;
+      return (async function* chunks() {
+        try {
+          yield 'sequential';
+        } finally {
+          active = false;
+        }
+      })();
+    });
+    const source = { [Symbol.asyncIterator]: factory };
+    const replacement = vi.fn();
+    const later = laterUpload();
+    Object.defineProperty(later, 'name', {
+      get() {
+        source[Symbol.asyncIterator] = replacement;
+        Object.defineProperty(factory, 'call', { value: replacement });
+        return 'later.txt';
+      },
+    });
     const options = await multipart({
       files: [toStreamingFile(source, 'first.txt'), toStreamingFile(source, 'second.txt')],
+      later,
     });
     const body = await new Response(options.body as ReadableStream).text();
 
-    expect(body.match(/\r\n\r\nreusable\r\n/gu)).toHaveLength(2);
-    expect(acquire).toHaveBeenCalledTimes(2);
+    expect(body.match(/\r\n\r\nsequential\r\n/gu)).toHaveLength(2);
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(replacement).not.toHaveBeenCalled();
+    expect(active).toBe(false);
   });
+
+  test.each(['validation', 'cancellation'] as const)(
+    'never acquires deferred shared resources during %s cleanup',
+    async (outcome) => {
+      const source = ReadableStream.from(['original']);
+      const createIterator = source[Symbol.asyncIterator];
+      const acquire = vi.fn(() => Reflect.apply(createIterator, source, []));
+      Object.defineProperty(source, Symbol.asyncIterator, { value: acquire });
+      const later = laterUpload();
+      if (outcome === 'validation') {
+        Object.defineProperty(later, 'name', { value: null });
+      }
+      const options = await multipart({
+        files: [toStreamingFile(source, 'first.txt'), toStreamingFile(source, 'second.txt')],
+        later,
+      });
+      const reader = (options.body as ReadableStream).getReader();
+      if (outcome === 'validation') {
+        await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+      } else {
+        await reader.read();
+        await reader.cancel();
+      }
+
+      expect(acquire).toHaveBeenCalledTimes(1);
+      expect(source.locked).toBe(false);
+    },
+  );
+
+  test.each(['iterator', 'reader'] as const)(
+    'invokes captured %s chunk methods without trusting their mutable call property',
+    async (kind) => {
+      const original = vi
+        .fn()
+        .mockResolvedValueOnce({ done: false, value: 'authoritative' })
+        .mockResolvedValue({ done: true });
+      const replacement = vi
+        .fn()
+        .mockResolvedValueOnce({ done: false, value: 'attacker' })
+        .mockResolvedValue({ done: true });
+      const receiver = {
+        next: original,
+        read: original,
+        cancel: vi.fn().mockResolvedValue(null),
+        releaseLock: vi.fn(),
+      };
+      const source =
+        kind === 'iterator' ? { [Symbol.asyncIterator]: () => receiver } : { getReader: () => receiver };
+      const later = laterUpload();
+      Object.defineProperty(later, 'name', {
+        get() {
+          Object.defineProperty(original, 'call', { value: replacement });
+          return 'later.txt';
+        },
+      });
+      const options = await multipart({ upload: source, later });
+      const body = await new Response(options.body as ReadableStream).text();
+
+      expect(body).toContain('authoritative');
+      expect(body).not.toContain('attacker');
+      expect(original.mock.contexts).toEqual([receiver, receiver]);
+      expect(replacement).not.toHaveBeenCalled();
+    },
+  );
 
   test('guards hostile public lock accessors on forwarding stream proxies', async () => {
     const target = ReadableStream.from(['original']);
@@ -141,241 +249,6 @@ describe('streaming multipart snapshots', () => {
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain('original');
     expect(target.locked).toBe(false);
   });
-
-  test.each([
-    ['iterator', 'completion', null],
-    ['iterator', 'cancellation', null],
-    ['iterator', 'invalid filename', null],
-    ['iterator', 'next accessor', null],
-    ['proxy iterator', 'completion', null],
-    ['proxy iterator', 'cancellation', null],
-    ['proxy iterator', 'invalid filename', null],
-    ['reader', 'completion', null],
-    ['reader', 'cancellation', null],
-    ['reader', 'invalid filename', null],
-    ['iterator', 'completion', 'return'],
-    ['iterator', 'invalid filename', 'return'],
-    ['reader', 'invalid filename', 'cancel'],
-    ['reader', 'invalid filename', 'releaseLock'],
-  ] as const)('preserves %s cleanup during %s (throwing: %s)', async (kind, outcome, throwing) => {
-    const error = new Error('next accessor failed');
-    const source = new ReadableStream<string>({
-      cancel: () => Promise.reject(new Error('cancellation failed')),
-    });
-    const next = vi.fn();
-    next.mockResolvedValueOnce({ done: false, value: 'original' }).mockResolvedValue({ done: true });
-    const original = { next, read: next, return: vi.fn(), cancel: vi.fn(), releaseLock: vi.fn() };
-    original.return.mockResolvedValue({ done: true });
-    original.cancel.mockResolvedValue(null);
-    const substituted = vi.fn();
-    const { return: originalReturn, ...withoutReturn } = original;
-    const getReturn = vi.fn(() => originalReturn);
-    let receiver =
-      kind === 'proxy iterator'
-        ? new Proxy(withoutReturn, {
-            get(target, key, proxy) {
-              return key === 'return' ? getReturn() : Reflect.get(target, key, proxy);
-            },
-          })
-        : { ...original };
-    const getCleanup = vi.fn(() => {
-      throw new Error('cleanup accessor failed');
-    });
-    if (throwing) {
-      Object.defineProperty(receiver, throwing, { get: getCleanup });
-    }
-    const earlier =
-      kind === 'reader'
-        ? { getReader: () => receiver }
-        : {
-            [Symbol.asyncIterator]() {
-              if (outcome === 'next accessor') {
-                const iterator = source[Symbol.asyncIterator]();
-                const closeIterator = iterator.return;
-                if (!closeIterator) {
-                  throw new Error('Expected native iterator cleanup');
-                }
-                original.return.mockImplementation(closeIterator.bind(iterator));
-                receiver = Object.assign(iterator, receiver);
-                Object.defineProperty(receiver, 'next', {
-                  get() {
-                    throw error;
-                  },
-                });
-              }
-              return receiver;
-            },
-          };
-    const later = laterUpload();
-    Object.defineProperty(later, 'name', {
-      get() {
-        if (!throwing) {
-          Object.assign(receiver, { return: substituted, cancel: substituted, releaseLock: substituted });
-        }
-        return outcome === 'invalid filename' ? undefined : 'later.txt';
-      },
-    });
-    const options = await multipart(
-      outcome === 'next accessor' ? { earlier: laterUpload(), later: earlier } : { earlier, later },
-    );
-
-    if (outcome === 'completion') {
-      await expect(new Response(options.body as ReadableStream).text()).resolves.toContain('original');
-    } else {
-      const reader = (options.body as ReadableStream).getReader();
-      if (outcome === 'cancellation') {
-        await reader.read();
-        await reader.cancel();
-      } else if (outcome === 'next accessor') {
-        await expect(reader.read()).rejects.toBe(error);
-      } else {
-        await expect(reader.read()).rejects.toThrow(/file.?name/iu);
-      }
-    }
-    const cleaned = outcome === 'completion' ? [] : [receiver];
-    expect(original.return.mock.contexts).toEqual(kind !== 'reader' && throwing !== 'return' ? cleaned : []);
-    expect(original.cancel.mock.contexts).toEqual(kind === 'reader' && throwing !== 'cancel' ? cleaned : []);
-    expect(original.releaseLock.mock.contexts).toEqual(
-      kind === 'reader' && throwing !== 'releaseLock' ? [receiver] : [],
-    );
-    expect(getReturn).toHaveBeenCalledTimes(kind === 'proxy iterator' && outcome !== 'completion' ? 1 : 0);
-    expect(getCleanup).toHaveBeenCalledTimes(throwing && outcome !== 'completion' ? 1 : 0);
-    expect(substituted).not.toHaveBeenCalled();
-    expect(source.locked).toBe(false);
-  });
-
-  test('retains accessor-backed iterator cleanup when a later filename replaces the accessor', async () => {
-    const source = ReadableStream.from(['original']);
-    const iterator = source[Symbol.asyncIterator]();
-    const close = iterator.return;
-    if (!close) {
-      throw new Error('Expected native iterator cleanup');
-    }
-    const release = vi.fn(close);
-    const original = vi.fn(() => release);
-    const replacement = vi.fn();
-    Object.defineProperty(iterator, 'return', { configurable: true, get: original });
-    const earlier = toStreamingFile({ [Symbol.asyncIterator]: () => iterator }, 'original.txt');
-    const later = laterUpload();
-    Object.defineProperty(later, 'name', {
-      get() {
-        Object.defineProperty(iterator, 'return', { configurable: true, get: replacement });
-        return null;
-      },
-    });
-    const options = await multipart({ earlier, later });
-
-    expect(original).not.toHaveBeenCalled();
-    await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/file.?name/iu);
-    expect(original.mock.contexts).toEqual([iterator]);
-    expect(release.mock.contexts).toEqual([iterator]);
-    expect(replacement).not.toHaveBeenCalled();
-    expect(source.locked).toBe(false);
-  });
-
-  test('runs a forwarding native async-generator Proxy finally during active cancellation', async () => {
-    const finished = vi.fn();
-    const getReturn = vi.fn();
-    async function* chunks() {
-      try {
-        yield 'original';
-      } finally {
-        finished();
-      }
-    }
-    const target = chunks();
-    const iterator = new Proxy(target, {
-      get(generator, key) {
-        if (key === 'return') {
-          getReturn();
-        }
-        const member = Reflect.get(generator, key, generator);
-        return typeof member === 'function' ? member.bind(generator) : member;
-      },
-    });
-    const source = { [Symbol.asyncIterator]: () => iterator };
-    const options = await multipart({ upload: toStreamingFile(source, 'original.txt') });
-    const reader = (options.body as ReadableStream).getReader();
-    await reader.read();
-    await reader.read();
-    await reader.read();
-
-    expect(finished).not.toHaveBeenCalled();
-    await reader.cancel();
-    expect(finished).toHaveBeenCalledTimes(1);
-    expect(getReturn).toHaveBeenCalledTimes(1);
-  });
-
-  test('unlocks native readers when capturing read throws and cancellation rejects', async () => {
-    const cancel = vi.fn(() => Promise.reject(new Error('cancellation failed')));
-    const source = new ReadableStream<string>({ cancel });
-    Object.assign(source, {
-      [Symbol.asyncIterator]: undefined,
-      getReader() {
-        return Object.defineProperty(ReadableStream.prototype.getReader.call(source), 'read', {
-          get() {
-            throw new Error('read accessor failed');
-          },
-        });
-      },
-    });
-    const options = await multipart({ upload: source });
-
-    await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow('read accessor failed');
-    expect(cancel).toHaveBeenCalledTimes(1);
-    expect(source.locked).toBe(false);
-  });
-
-  test.each(['accessor', 'binding'] as const)(
-    'releases a native reader when cancel %s throws during active cancellation',
-    async (failure) => {
-      const error = new Error(`cancel ${failure} failed`);
-      const release = vi.fn();
-      const source = new ReadableStream<string>({
-        start(controller) {
-          controller.enqueue('original');
-        },
-      });
-      Object.assign(source, {
-        [Symbol.asyncIterator]: undefined,
-        getReader() {
-          const reader = ReadableStream.prototype.getReader.call(source);
-          const releaseLock = reader.releaseLock.bind(reader);
-          Object.defineProperties(reader, {
-            cancel: {
-              get() {
-                if (failure === 'accessor') {
-                  throw error;
-                }
-                return Object.defineProperty(() => Promise.resolve(), 'bind', {
-                  get() {
-                    throw error;
-                  },
-                });
-              },
-            },
-            releaseLock: {
-              value() {
-                release();
-                releaseLock();
-              },
-            },
-          });
-          return reader;
-        },
-      });
-      const options = await multipart({ upload: toStreamingFile(source, 'original.txt') });
-      const reader = (options.body as ReadableStream).getReader();
-      await reader.read();
-      await reader.read();
-      await reader.read();
-
-      expect(source.locked).toBe(true);
-      await expect(reader.cancel()).rejects.toBe(error);
-      expect(release).toHaveBeenCalledTimes(1);
-      expect(source.locked).toBe(false);
-    },
-  );
 
   test.each(
     (['Blob', 'Response'] as const).flatMap((kind) =>

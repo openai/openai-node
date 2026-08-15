@@ -223,12 +223,10 @@ describe('streaming multipart upload security', () => {
     expect(getLater).toHaveBeenCalledTimes(1);
   });
 
-  test('snapshots legacy Blob bytes while preserving original deferred, sequential overrides', async () => {
+  test('ignores superseded legacy Blob readers while preserving unchanged deferred overrides', async () => {
     const first = Object.assign(new Blob(['original']), { name: 'first.bin', content: 'original' });
     const second = Object.assign(new Blob(['second']), { name: 'second.bin' });
-    const firstRead = vi.fn(function readFirst(this: typeof first) {
-      return Promise.resolve(new TextEncoder().encode(this.content).buffer);
-    });
+    const firstRead = vi.fn(() => Promise.reject(new Error('superseded Blob reader was invoked')));
     const secondRead = vi.fn(Blob.prototype.arrayBuffer);
     const substitutedRead = vi.fn();
     Object.assign(first, {
@@ -256,7 +254,7 @@ describe('streaming multipart upload security', () => {
     expect(firstRead).not.toHaveBeenCalled();
     expect(secondRead).not.toHaveBeenCalled();
     expect(await readChunk()).toBe('original');
-    expect(firstRead.mock.contexts).toEqual([first]);
+    expect(firstRead).not.toHaveBeenCalled();
     await readChunk();
     await readChunk();
     expect(await readChunk()).toContain('filename="second.bin"');
