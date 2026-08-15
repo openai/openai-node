@@ -516,6 +516,11 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningTextDoneEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseRefusalDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseRefusalDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallCommandAddedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallCommandDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallCommandDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallOutputContentDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallOutputContentDoneEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStatus</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStreamEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseTextConfig</a></code>

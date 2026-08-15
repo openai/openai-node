@@ -104,7 +104,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // Abort errors and cleanup failures after the completion sentinel are non-fatal.
-        if (receivedCompletionSentinel || isAbortError(e)) {
+        if (
+          receivedCompletionSentinel ||
+          isAbortError(e) ||
+          (controller.signal.aborted && e === controller.signal.reason)
+        ) {
           return;
         }
         throw e;

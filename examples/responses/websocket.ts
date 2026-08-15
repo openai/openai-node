@@ -376,7 +376,8 @@ const runResponse = async ({
         }
 
         if (event.type === 'error') {
-          throw new Error(event.error.message || 'WebSocket error event');
+          const message = 'error' in event ? event.error?.message : event.message;
+          throw new Error(message || 'WebSocket error event');
         }
 
         if (event.type === 'response.completed') {

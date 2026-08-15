@@ -316,6 +316,230 @@ describe('ResponseAccumulator tool-call deltas', () => {
   });
 });
 
+describe('ResponseAccumulator hosted shell events', () => {
+  test('accumulates interleaved commands and replaces each with its authoritative value', () => {
+    const snapshot = snapshotFor({
+      type: 'shell_call',
+      id: 'sh_123',
+      call_id: 'call_123',
+      action: { commands: [], timeout_ms: null, max_output_length: null },
+    });
+
+    applyEvent(snapshot, {
+      type: 'response.shell_call_command.added',
+      output_index: 0,
+      command_index: 0,
+      command: '',
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_command.added',
+      output_index: 0,
+      command_index: 1,
+      command: 'echo ',
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_command.delta',
+      output_index: 0,
+      command_index: 1,
+      delta: 'second',
+      obfuscation: 'padding',
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_command.delta',
+      output_index: 0,
+      command_index: 0,
+      delta: 'echo first draft',
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_command.done',
+      output_index: 0,
+      command_index: 0,
+      command: 'echo first',
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_command.done',
+      output_index: 0,
+      command_index: 1,
+      command: 'echo second',
+    });
+
+    expect(snapshot.output[0]).toMatchObject({
+      type: 'shell_call',
+      action: { commands: ['echo first', 'echo second'] },
+    });
+  });
+
+  test('accumulates out-of-order command outputs and detaches authoritative completions', () => {
+    const snapshot = accumulateResponse({
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse([
+        outputItem({
+          type: 'shell_call',
+          id: 'sh_123',
+          call_id: 'call_123',
+          action: { commands: ['first', 'second'], timeout_ms: null, max_output_length: null },
+        }),
+        outputItem({
+          type: 'shell_call_output',
+          id: 'sho_123',
+          call_id: 'call_123',
+          output: [],
+        }),
+      ]),
+    });
+
+    applyEvent(snapshot, {
+      type: 'response.shell_call_output_content.delta',
+      output_index: 1,
+      command_index: 1,
+      delta: { stdout: 'second ' },
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_output_content.delta',
+      output_index: 1,
+      command_index: 0,
+      delta: { stderr: 'first warning' },
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_output_content.delta',
+      output_index: 1,
+      command_index: 1,
+      delta: { stdout: 'output', stderr: 'second warning' },
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_output_content.delta',
+      output_index: 1,
+      command_index: 0,
+      delta: { stdout: 'first output' },
+    });
+
+    expect(snapshot.output[1]).toMatchObject({
+      type: 'shell_call_output',
+      output: [
+        {
+          stdout: 'first output',
+          stderr: 'first warning',
+          outcome: { type: 'exit', exit_code: 0 },
+        },
+        {
+          stdout: 'second output',
+          stderr: 'second warning',
+          outcome: { type: 'exit', exit_code: 0 },
+        },
+      ],
+    });
+
+    const second = {
+      stdout: 'authoritative second',
+      stderr: '',
+      outcome: { type: 'timeout' },
+    };
+    const first = {
+      stdout: 'authoritative first',
+      stderr: 'authoritative warning',
+      outcome: { type: 'exit', exit_code: 7 },
+    };
+
+    applyEvent(snapshot, {
+      type: 'response.shell_call_output_content.done',
+      output_index: 1,
+      command_index: 1,
+      output: [second],
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_output_content.done',
+      output_index: 1,
+      command_index: 0,
+      output: [first],
+    });
+
+    const [, shellOutput] = snapshot.output;
+    expect(shellOutput).toMatchObject({ type: 'shell_call_output', output: [first, second] });
+    if (shellOutput?.type === 'shell_call_output') {
+      expect(shellOutput.output[0]).not.toBe(first);
+      expect(shellOutput.output[0]?.outcome).not.toBe(first.outcome);
+      expect(shellOutput.output[1]).not.toBe(second);
+      expect(shellOutput.output[1]?.outcome).not.toBe(second.outcome);
+    }
+  });
+
+  test('rejects malformed command indices and empty authoritative output', () => {
+    const shellCall = snapshotFor({
+      type: 'shell_call',
+      id: 'sh_123',
+      call_id: 'call_123',
+      action: { commands: [], timeout_ms: null, max_output_length: null },
+    });
+
+    expect(() =>
+      applyEvent(shellCall, {
+        type: 'response.shell_call_command.delta',
+        output_index: 0,
+        command_index: 0,
+        delta: 'missing',
+      }),
+    ).toThrow('missing command at index 0');
+
+    expect(() =>
+      applyEvent(shellCall, {
+        type: 'response.shell_call_command.added',
+        output_index: 0,
+        command_index: 2,
+        command: 'missing predecessors',
+      }),
+    ).toThrow('missing command at index 2');
+
+    const shellOutput = snapshotFor({
+      type: 'shell_call_output',
+      id: 'sho_123',
+      call_id: 'call_123',
+      output: [],
+    });
+
+    expect(() =>
+      applyEvent(shellOutput, {
+        type: 'response.shell_call_output_content.delta',
+        output_index: 0,
+        command_index: 1,
+        delta: { stdout: 'missing predecessor' },
+      }),
+    ).toThrow('missing content at index 1');
+
+    expect(() =>
+      applyEvent(shellOutput, {
+        type: 'response.shell_call_output_content.done',
+        output_index: 0,
+        command_index: 0,
+        output: [],
+      }),
+    ).toThrow('missing content at index 0');
+  });
+
+  test('does not apply hosted shell events to an incompatible output item', () => {
+    const snapshot = snapshotFor({ type: 'message', content: [], status: 'in_progress' });
+
+    applyEvent(snapshot, {
+      type: 'response.shell_call_command.added',
+      output_index: 0,
+      command_index: 0,
+      command: 'ignored',
+    });
+    applyEvent(snapshot, {
+      type: 'response.shell_call_output_content.delta',
+      output_index: 0,
+      command_index: 0,
+      delta: { stdout: 'ignored' },
+    });
+
+    expect(snapshot.output[0]).toEqual({
+      type: 'message',
+      content: [],
+      status: 'in_progress',
+    });
+  });
+});
+
 describe('ResponseAccumulator reasoning events', () => {
   test('creates, accumulates, and finalizes reasoning content and summaries', () => {
     const snapshot = snapshotFor({ type: 'reasoning', id: 'reasoning_123', summary: [] });

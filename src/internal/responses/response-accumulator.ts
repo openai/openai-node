@@ -47,6 +47,17 @@ type ResponseRefusalAndArgumentsEvent = Extract<
       | 'response.mcp_call_arguments.done';
   }
 >;
+type ResponseShellEvent = Extract<
+  ResponseAccumulatorEvent,
+  {
+    type:
+      | 'response.shell_call_command.added'
+      | 'response.shell_call_command.delta'
+      | 'response.shell_call_command.done'
+      | 'response.shell_call_output_content.delta'
+      | 'response.shell_call_output_content.done';
+  }
+>;
 type ResponseReasoningEvent = Extract<
   ResponseAccumulatorEvent,
   {
@@ -126,7 +137,7 @@ type ResponseIgnoredEvent = Extract<
 function validateArrayIndex(
   collection: readonly unknown[],
   index: number,
-  kind: 'output' | 'content' | 'annotation',
+  kind: 'output' | 'content' | 'annotation' | 'command',
   allowAppend = false,
 ): void {
   if (
@@ -166,6 +177,33 @@ function getContent<T>(content: T[], contentIndex: number): T {
     throw new OpenAIError(`missing content at index ${contentIndex}`);
   }
   return part;
+}
+
+function getShellOutputContent(
+  snapshot: Response,
+  output: Extract<Response['output'][number], { type: 'shell_call_output' }>,
+  commandIndex: number,
+): (typeof output.output)[number] {
+  const shellCall = snapshot.output.find(
+    (item): item is Extract<Response['output'][number], { type: 'shell_call' }> =>
+      item.type === 'shell_call' && item.call_id === output.call_id,
+  );
+
+  if (shellCall) {
+    validateArrayIndex(shellCall.action.commands, commandIndex, 'command');
+  } else {
+    validateArrayIndex(output.output, commandIndex, 'content', true);
+  }
+
+  while (output.output.length <= commandIndex) {
+    output.output.push({
+      stdout: '',
+      stderr: '',
+      outcome: { type: 'exit', exit_code: 0 },
+    });
+  }
+
+  return getContent(output.output, commandIndex);
 }
 
 function assertNever(value: never): never {
@@ -582,6 +620,53 @@ function accumulateRefusalAndArgumentsEvent(
   }
 }
 
+function accumulateShellEvent(
+  event: ResponseAccumulatorEvent,
+  snapshot: Response,
+): event is ResponseShellEvent {
+  switch (event.type) {
+    case 'response.shell_call_command.added':
+    case 'response.shell_call_command.done': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call') {
+        const allowAppend = event.type === 'response.shell_call_command.added';
+        validateArrayIndex(output.action.commands, event.command_index, 'command', allowAppend);
+        output.action.commands[event.command_index] = event.command;
+      }
+      return true;
+    }
+    case 'response.shell_call_command.delta': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call') {
+        validateArrayIndex(output.action.commands, event.command_index, 'command');
+        output.action.commands[event.command_index] += event.delta;
+      }
+      return true;
+    }
+    case 'response.shell_call_output_content.delta': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call_output') {
+        const content = getShellOutputContent(snapshot, output, event.command_index);
+        content.stdout += event.delta.stdout ?? '';
+        content.stderr += event.delta.stderr ?? '';
+      }
+      return true;
+    }
+    case 'response.shell_call_output_content.done': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call_output') {
+        const content = getContent(event.output, 0);
+        getShellOutputContent(snapshot, output, event.command_index);
+        output.output[event.command_index] = structuredClone(content);
+      }
+      return true;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
 function accumulateReasoningEvent(
   event: ResponseAccumulatorEvent,
   snapshot: Response,
@@ -876,6 +961,9 @@ export function accumulateResponseWithContext(
     return snapshot;
   }
   if (accumulateRefusalAndArgumentsEvent(event, snapshot)) {
+    return snapshot;
+  }
+  if (accumulateShellEvent(event, snapshot)) {
     return snapshot;
   }
   if (accumulateReasoningEvent(event, snapshot)) {
