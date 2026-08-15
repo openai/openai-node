@@ -27,44 +27,15 @@ async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
 
 function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterator<BlobPart>['return'] {
   try {
-    let prototype: object | null = iterator;
-    while (prototype !== null) {
-      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'return');
-      if (descriptor) {
-        const returnIterator = Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
-        return returnIterator
-          ? (...args: [] | [unknown]) => Reflect.apply(returnIterator, iterator, args)
-          : undefined;
-      }
-      prototype = Object.getPrototypeOf(prototype);
-    }
+    const returnIterator = Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
+    return returnIterator
+      ? (...args: [] | [unknown]) => Reflect.apply(returnIterator, iterator, args)
+      : undefined;
   } catch (error) {
     return () => {
       throw error;
     };
   }
-
-  let captured:
-    | Readonly<{ returnIterator: AsyncIterator<BlobPart>['return'] }>
-    | Readonly<{ error: unknown }>
-    | undefined;
-  return (...args: [] | [unknown]) => {
-    if (!captured) {
-      try {
-        captured = { returnIterator: Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'] };
-      } catch (error) {
-        captured = { error };
-      }
-    }
-    if ('error' in captured) {
-      throw captured.error;
-    }
-
-    const { returnIterator } = captured;
-    return returnIterator
-      ? Reflect.apply(returnIterator, iterator, args)
-      : Promise.resolve({ done: true as const, value: args[0] });
-  };
 }
 
 function snapshotIterator(
@@ -223,34 +194,6 @@ function snapshotReader(
   };
 }
 
-function deferredMultipartSnapshot(capture: () => MultipartDataSnapshot): MultipartDataSnapshot {
-  let snapshot: MultipartDataSnapshot | undefined;
-  let disposed = false;
-  return {
-    data: {
-      [Symbol.asyncIterator]() {
-        if (disposed) {
-          return {
-            next: () => Promise.resolve({ done: true as const, value: undefined }),
-            [Symbol.asyncIterator]() {
-              return this;
-            },
-          };
-        }
-
-        snapshot = capture();
-        const { data } = snapshot;
-        const createIterator = (data as AsyncIterable<BlobPart>)[Symbol.asyncIterator];
-        return Reflect.apply(createIterator, data, []) as AsyncIterator<BlobPart>;
-      },
-    },
-    dispose() {
-      disposed = true;
-      snapshot?.dispose?.();
-    },
-  };
-}
-
 /** Capture an upload iterator or readable-stream reader without prefetching its contents. */
 export function snapshotStreamingFileData(
   value: StreamingFileInput,
@@ -273,9 +216,52 @@ export function snapshotStreamingFileData(
     capture = () => snapshotReader(value, getReader);
   }
 
+  const streamLocked =
+    typeof globalThis.ReadableStream === 'function'
+      ? Object.getOwnPropertyDescriptor(globalThis.ReadableStream.prototype, 'locked')?.get
+      : undefined;
+  let unlockedForwardingProxy = false;
+  if (streamLocked) {
+    try {
+      Reflect.apply(streamLocked, value, []);
+    } catch {
+      try {
+        unlockedForwardingProxy =
+          value instanceof globalThis.ReadableStream &&
+          Object.getOwnPropertyDescriptor(value, 'locked') === undefined &&
+          Reflect.get(value, 'locked') === false;
+      } catch {
+        // Hostile or non-native stream accessors cannot establish a replay contract.
+      }
+    }
+  }
+
+  const captured = capture();
+  let authenticatedNativeStream = false;
+  let lockedForwardingProxy = false;
+  if (streamLocked) {
+    try {
+      authenticatedNativeStream = Reflect.apply(streamLocked, value, []) === true;
+    } catch {
+      if (unlockedForwardingProxy) {
+        try {
+          lockedForwardingProxy = Reflect.get(value, 'locked') === true;
+        } catch {
+          // Hostile public accessors cannot establish a replay contract.
+        }
+      }
+    }
+  }
+
   const snapshot: ReplayableMultipartDataSnapshot = {
-    ...capture(),
-    [replayMultipartSnapshot]: () => deferredMultipartSnapshot(capture),
+    ...captured,
+    [replayMultipartSnapshot]: () => {
+      if (authenticatedNativeStream || lockedForwardingProxy) {
+        // Native readers are one-shot; never reacquire through a mutable source.
+        return captured;
+      }
+      throw new TypeError('Multipart streaming sources cannot be reused unless they lock a native stream');
+    },
   };
   snapshots.set(value, snapshot);
   return snapshot;

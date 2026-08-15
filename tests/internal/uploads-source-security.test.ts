@@ -266,7 +266,7 @@ describe('streaming multipart source security', () => {
         return [blob, true, incidental, getIterator];
       },
     ],
-  ] as const)('preserves shared and reusable %s semantics', async (kind, values) => {
+  ] as const)('preserves native reuse and rejects unsafe repeated %s sources', async (kind, values) => {
     const [first, secondOrReusable, incidental, getIterator] = values();
     const reusable = secondOrReusable === true;
     const second = reusable || secondOrReusable === undefined ? first : secondOrReusable;
@@ -279,6 +279,11 @@ describe('streaming multipart source security', () => {
         ? { trigger: chunks('trigger') }
         : {}),
     };
+    if (kind === 'reusable iterable' || kind === 'reusable reader') {
+      await expect(readForm(body, maybeMultipartFormRequestOptions)).rejects.toThrow(/reus|repeat/iu);
+      return;
+    }
+
     const form = await readForm(body, maybeMultipartFormRequestOptions);
     await expect(Promise.all((form.getAll('files[]') as File[]).map((file) => file.text()))).resolves.toEqual(
       ['shared', reusable ? 'shared' : ''],

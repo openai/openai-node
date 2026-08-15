@@ -102,7 +102,7 @@ describe('streaming multipart resource cleanup', () => {
     expect(original.releaseLock.mock.contexts).toEqual(
       kind === 'reader' && throwing !== 'releaseLock' ? [receiver] : [],
     );
-    expect(getReturn).toHaveBeenCalledTimes(kind === 'proxy iterator' && outcome !== 'completion' ? 1 : 0);
+    expect(getReturn).toHaveBeenCalledTimes(kind === 'proxy iterator' ? 1 : 0);
     expect(getCleanup).toHaveBeenCalledTimes(
       throwing && (outcome !== 'completion' || throwing === 'return') ? 1 : 0,
     );
@@ -197,36 +197,68 @@ describe('streaming multipart resource cleanup', () => {
     },
   );
 
-  test('cleans up accessor-backed native iterators through their forwarding Proxy receiver', async () => {
+  test.each([
+    ['accessor', 'invalid filename'],
+    ['getOwnPropertyDescriptor', 'invalid filename'],
+    ['getPrototypeOf', 'cancellation'],
+    ['descriptorless', 'invalid filename'],
+    ['descriptorless', 'cancellation'],
+  ] as const)('cleans up %s native iterator proxies during %s', async (kind, outcome) => {
     const source = ReadableStream.from(['original']);
     const target = source[Symbol.asyncIterator]();
     const close = target.return;
     if (!close) {
       throw new Error('Expected native iterator cleanup');
     }
+    const original = vi.fn(close);
+    const replacement = vi.fn(async () => ({ done: true as const, value: undefined }));
+    let cleanup: typeof close = original;
     const getReturn = vi.fn(function getReturn(this: typeof target) {
       if (this !== target) {
         throw new Error('Expected the native iterator receiver');
       }
-      return close;
+      return cleanup;
     });
-    Object.defineProperty(target, 'return', { configurable: true, get: getReturn });
+    if (kind === 'accessor') {
+      Object.defineProperty(target, 'return', { configurable: true, get: getReturn });
+    } else {
+      Reflect.deleteProperty(target, 'return');
+      Object.setPrototypeOf(target, null);
+    }
     const iterator = new Proxy(target, {
-      get(original, key) {
-        const member = Reflect.get(original, key, original);
-        return typeof member === 'function' ? member.bind(original) : member;
+      get(receiver, key) {
+        const member =
+          kind === 'accessor' || key !== 'return'
+            ? Reflect.get(receiver, key, receiver)
+            : Reflect.apply(getReturn, receiver, []);
+        return typeof member === 'function' ? member.bind(receiver) : member;
+      },
+      [kind]() {
+        throw new Error('Opaque iterator metadata');
       },
     });
     const later = laterUpload();
-    Object.defineProperty(later, 'name', { value: null });
+    Object.defineProperty(later, 'name', {
+      get() {
+        cleanup = replacement;
+        return outcome === 'invalid filename' ? null : 'later.txt';
+      },
+    });
     const options = await multipart({
       earlier: toStreamingFile({ [Symbol.asyncIterator]: () => iterator }, 'original.txt'),
       later,
     });
+    const reader = (options.body as ReadableStream).getReader();
+    if (outcome === 'invalid filename') {
+      await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+    } else {
+      await reader.read();
+      await reader.cancel();
+    }
 
-    expect(getReturn).not.toHaveBeenCalled();
-    await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/file.?name/iu);
     expect(getReturn.mock.contexts).toEqual([target]);
+    expect(original.mock.contexts).toEqual([target]);
+    expect(replacement).not.toHaveBeenCalled();
     expect(source.locked).toBe(false);
   });
 

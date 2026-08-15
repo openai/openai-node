@@ -49,7 +49,7 @@ describe('streaming multipart snapshots', () => {
   });
 
   test.each(['iterator', 'unlocked reader', 'locked reader'] as const)(
-    'replays shared native streams only when the %s does not lock them',
+    'reuses shared native streams only when the %s proves native lock ownership',
     async (kind) => {
       const source = ReadableStream.from(['shared']);
       const acquire = vi.fn(function acquire(this: ReadableStream<string>) {
@@ -67,11 +67,14 @@ describe('streaming multipart snapshots', () => {
       const options = await multipart({
         files: [toStreamingFile(source, 'first.txt'), toStreamingFile(source, 'second.txt')],
       });
-      const body = await new Response(options.body as ReadableStream).text();
-
-      expect(body.match(/\r\n\r\nshared\r\n/gu)).toHaveLength(kind === 'locked reader' ? 1 : 2);
-      expect(body).toContain('filename="second.txt"');
-      expect(acquire.mock.contexts).toEqual([source, source]);
+      if (kind === 'locked reader') {
+        const body = await new Response(options.body as ReadableStream).text();
+        expect(body.match(/\r\n\r\nshared\r\n/gu)).toHaveLength(1);
+        expect(body).toContain('filename="second.txt"');
+      } else {
+        await expect(new Response(options.body as ReadableStream).text()).rejects.toThrow(/reus|repeat/iu);
+      }
+      expect(acquire.mock.contexts).toEqual([source]);
       expect(source.locked).toBe(false);
     },
   );
@@ -108,13 +111,13 @@ describe('streaming multipart snapshots', () => {
       expect(body.match(/\r\n\r\nshared\r\n/gu)).toHaveLength(1);
       expect(body).toContain('filename="first.txt"');
       expect(body).toContain('filename="second.txt"');
-      expect(acquire).toHaveBeenCalledTimes(2);
+      expect(acquire).toHaveBeenCalledTimes(1);
       expect(target.locked).toBe(false);
     },
   );
 
   test.each(['plain', 'native prototype'] as const)(
-    'replays reusable %s sources that spoof native locked state',
+    'rejects repeated %s sources that spoof native locked state before emission',
     async (kind) => {
       const acquire = vi.fn(() => ReadableStream.from(['reusable'])[Symbol.asyncIterator]());
       const source = { locked: true, [Symbol.asyncIterator]: acquire };
@@ -125,47 +128,49 @@ describe('streaming multipart snapshots', () => {
       const options = await multipart({
         files: [toStreamingFile(source, 'first.txt'), toStreamingFile(source, 'second.txt')],
       });
-      const body = await new Response(options.body as ReadableStream).text();
-
-      expect(body.match(/\r\n\r\nreusable\r\n/gu)).toHaveLength(2);
-      expect(acquire).toHaveBeenCalledTimes(2);
+      await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/reus|repeat/iu);
+      expect(acquire).toHaveBeenCalledTimes(1);
     },
   );
 
-  test('acquires shared reusable iterators sequentially from the original captured factory', async () => {
+  test('rejects repeated mutable sources before emission or overlapping iterator lifetimes', async () => {
     let active = false;
-    const factory = vi.fn(() => {
+    const next = vi.fn();
+    const close = vi.fn(() => {
+      active = false;
+      return Promise.resolve({ done: true as const, value: undefined });
+    });
+    const factory = vi.fn(function factory(this: { currentBytes: string }) {
       if (active) {
         throw new Error('Overlapping iterator lifetime');
       }
       active = true;
-      return (async function* chunks() {
-        try {
-          yield 'sequential';
-        } finally {
-          active = false;
-        }
-      })();
+      next.mockResolvedValue({ done: false, value: this.currentBytes });
+      return { next, return: close };
     });
-    const source = { [Symbol.asyncIterator]: factory };
+    const source = { currentBytes: 'original', [Symbol.asyncIterator]: factory };
     const replacement = vi.fn();
     const later = laterUpload();
     Object.defineProperty(later, 'name', {
       get() {
+        source.currentBytes = 'attacker';
         source[Symbol.asyncIterator] = replacement;
         Object.defineProperty(factory, 'call', { value: replacement });
         return 'later.txt';
       },
     });
     const options = await multipart({
-      files: [toStreamingFile(source, 'first.txt'), toStreamingFile(source, 'second.txt')],
+      first: toStreamingFile(source, 'first.txt'),
       later,
+      second: toStreamingFile(source, 'second.txt'),
     });
-    const body = await new Response(options.body as ReadableStream).text();
 
-    expect(body.match(/\r\n\r\nsequential\r\n/gu)).toHaveLength(2);
-    expect(factory).toHaveBeenCalledTimes(2);
+    await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/reus|repeat/iu);
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledTimes(1);
     expect(replacement).not.toHaveBeenCalled();
+    expect(source.currentBytes).toBe('attacker');
     expect(active).toBe(false);
   });
 
@@ -197,7 +202,7 @@ describe('streaming multipart snapshots', () => {
     },
   );
 
-  test.each(['iterator', 'reader'] as const)(
+  test.each(['iterator', 'reader', 'hybrid'] as const)(
     'invokes captured %s chunk methods without trusting their mutable call property',
     async (kind) => {
       const original = vi
@@ -214,8 +219,11 @@ describe('streaming multipart snapshots', () => {
         cancel: vi.fn().mockResolvedValue(null),
         releaseLock: vi.fn(),
       };
+      const getReader = vi.fn(() => (kind === 'hybrid' ? { ...receiver, read: replacement } : receiver));
       const source =
-        kind === 'iterator' ? { [Symbol.asyncIterator]: () => receiver } : { getReader: () => receiver };
+        kind === 'reader'
+          ? { getReader }
+          : { [Symbol.asyncIterator]: () => receiver, ...(kind === 'hybrid' ? { getReader } : {}) };
       const later = laterUpload();
       Object.defineProperty(later, 'name', {
         get() {
@@ -230,6 +238,7 @@ describe('streaming multipart snapshots', () => {
       expect(body).not.toContain('attacker');
       expect(original.mock.contexts).toEqual([receiver, receiver]);
       expect(replacement).not.toHaveBeenCalled();
+      expect(getReader).toHaveBeenCalledTimes(kind === 'reader' ? 1 : 0);
     },
   );
 
