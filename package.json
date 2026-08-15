@@ -77,9 +77,6 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./lib/responses/_ResponseAccumulator": null,
-    "./lib/responses/_ResponseAccumulator.js": null,
-    "./lib/responses/_ResponseAccumulator.mjs": null,
     "./*.mjs": {
       "default": "./dist/*.mjs"
     },

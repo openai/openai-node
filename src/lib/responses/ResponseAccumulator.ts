@@ -1,5 +1,8 @@
 import type { Response, ResponseStreamEvent } from '../../resources/responses/responses';
-import { accumulateResponseWithContext, createResponseContext } from './_ResponseAccumulator';
+import {
+  accumulateResponseWithContext,
+  createResponseContext,
+} from '../../internal/responses/ResponseAccumulator';
 
 /** A transport keepalive event that leaves the accumulated response unchanged. */
 type ResponseKeepAliveEvent = {

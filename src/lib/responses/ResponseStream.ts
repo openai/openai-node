@@ -13,7 +13,10 @@ import type OpenAI from '../../index';
 import { EventStream } from '../EventStream';
 import type { BaseEvents } from '../EventStream';
 import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
-import { accumulateResponseWithContext, createResponseContext } from './_ResponseAccumulator';
+import {
+  accumulateResponseWithContext,
+  createResponseContext,
+} from '../../internal/responses/ResponseAccumulator';
 import type { ParseableToolsParams } from '../ResponsesParser';
 import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';

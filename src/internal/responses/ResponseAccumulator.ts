@@ -1,7 +1,7 @@
 import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../resources/responses/responses';
 import { OpenAIError } from '../../error';
-import { hasOwn } from '../../internal/utils';
-import { addOutputText } from '../ResponsesParser';
+import { hasOwn } from '../utils';
+import { addOutputText } from '../../lib/ResponsesParser';
 
 type ResponseAccumulatorContext = {
   canonicalSnapshot: Response | undefined;

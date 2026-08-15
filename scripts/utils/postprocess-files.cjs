@@ -46,9 +46,6 @@ async function postprocess() {
     }
   }
 
-  const packageJson = /** @type {{ exports: Record<string, unknown> }} */ (
-    JSON.parse(await fs.promises.readFile('dist/package.json', 'utf-8'))
-  );
   const newExports = {
     '.': {
       require: {
@@ -58,7 +55,6 @@ async function postprocess() {
       types: './index.d.mts',
       default: './index.mjs',
     },
-    ...Object.fromEntries(Object.entries(packageJson.exports).filter(([, value]) => value === null)),
   };
 
   for (const entry of await fs.promises.readdir(distDir, { withFileTypes: true })) {
@@ -93,9 +89,14 @@ async function postprocess() {
   await fs.promises.writeFile(
     'dist/package.json',
     JSON.stringify(
-      Object.assign(packageJson, {
-        exports: newExports,
-      }),
+      Object.assign(
+        /** @type {Record<String, unknown>} */ (
+          JSON.parse(await fs.promises.readFile('dist/package.json', 'utf-8'))
+        ),
+        {
+          exports: newExports,
+        },
+      ),
       null,
       2,
     ),
