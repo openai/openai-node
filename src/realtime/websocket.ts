@@ -1,4 +1,5 @@
 import type { AzureOpenAI } from '../index';
+import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { OpenAI } from '../index';
 import { OpenAIError } from '../error';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../resources/realtime/realtime';
@@ -103,6 +104,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
 
     this.url = buildRealtimeURL(client, props);
     props.onURL?.(this.url);
+    assertBedrockWebSocketOrigin(client, this.url);
 
     // @ts-ignore
     this.socket = new WebSocket(this.url.toString(), [
@@ -156,7 +158,17 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       dangerouslyAllowBrowser?: boolean;
     },
   ): Promise<OpenAIRealtimeWebSocket> {
-    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: await client._callApiKey() }, client);
+    const resolvedApiKey = await client._callApiKey();
+    const url = buildRealtimeURL(client, props);
+    assertBedrockWebSocketOrigin(client, url);
+    return new OpenAIRealtimeWebSocket(
+      {
+        ...props,
+        buildRealtimeURL: () => url,
+        __resolvedApiKey: resolvedApiKey,
+      },
+      client,
+    );
   }
 
   /**

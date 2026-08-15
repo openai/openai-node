@@ -1,7 +1,11 @@
 import * as Errors from '../error';
 import type { Provider } from '../internal/provider';
 import { createProvider } from '../internal/provider';
-import { resolveBedrockBearerAuth, resolveBedrockEndpoint } from '../internal/bedrock';
+import {
+  assertBedrockRequestOrigin,
+  resolveBedrockBearerAuth,
+  resolveBedrockEndpoint,
+} from '../internal/bedrock';
 import type { BedrockBearerOptions, BedrockEndpointOptions } from '../internal/bedrock';
 
 /** Endpoint and bearer-credential settings for the dependency-free Amazon Bedrock provider. */
@@ -36,7 +40,10 @@ export function bedrock(options: BedrockProviderOptions = {}): Provider {
       return {
         name: 'bedrock',
         baseURL,
-        prepareRequest: auth.prepareRequest.bind(auth),
+        async prepareRequest(request, context) {
+          assertBedrockRequestOrigin(baseURL, context.url);
+          await auth.prepareRequest(request, context);
+        },
       };
     },
   });

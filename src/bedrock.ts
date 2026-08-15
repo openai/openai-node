@@ -1,6 +1,8 @@
 import * as Errors from './error';
 import { OpenAI } from './client';
 import type { ApiKeySetter, ClientOptions } from './client';
+import { assertBedrockRequestOrigin, brand_privateBedrockClient } from './internal/bedrock';
+import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import type { FinalRequestOptions, RequestOptions } from './internal/request-options';
@@ -103,6 +105,13 @@ function restoreBedrockStreamOutputText(responses: API.Responses): API.Responses
 
 /** API Client for interfacing with Amazon Bedrock's OpenAI-compatible endpoint. */
 export class BedrockOpenAI extends OpenAI {
+  /**
+   * Identifies this client to credential-bearing WebSocket helpers.
+   *
+   * @internal
+   */
+  readonly [brand_privateBedrockClient] = true;
+
   private readonly bedrockTokenProvider: ApiKeySetter | undefined;
 
   /**
@@ -157,17 +166,43 @@ export class BedrockOpenAI extends OpenAI {
       ...opts,
     });
 
+    const trustedBaseURL = this.baseURL;
+    let currentBaseURL = trustedBaseURL;
+    Object.defineProperty(this, 'baseURL', {
+      enumerable: true,
+      configurable: false,
+      get() {
+        return currentBaseURL;
+      },
+      set(nextBaseURL: string) {
+        assertBedrockRequestOrigin(trustedBaseURL, nextBaseURL);
+        currentBaseURL = nextBaseURL;
+      },
+    });
+
     this.bedrockTokenProvider = bedrockTokenProvider;
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
   }
 
   protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    const configuredBaseURL = this._options.baseURL ?? this.baseURL;
+    assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
+
     const security = options.__security ?? { bearerAuth: true };
     if (security.adminAPIKeyAuth && !security.bearerAuth) {
       await this._callApiKey();
     }
 
     await super.prepareOptions(options);
+    assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
+  }
+
+  protected override async prepareRequest(
+    request: RequestInit,
+    context: { url: string; options: FinalRequestOptions },
+  ): Promise<void> {
+    assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, context.url);
+    await super.prepareRequest(request, context);
   }
 
   protected override async authHeaders(
