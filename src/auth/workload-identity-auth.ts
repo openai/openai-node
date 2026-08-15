@@ -39,9 +39,12 @@ interface RefreshContext {
 
 interface CredentialSource {
   exchange: (retryCount: number, fetchOptions: MergedRequestInit | undefined) => Promise<unknown>;
+  /** Includes host suspension so token TTLs cannot outlive real elapsed time. */
+  expirationNow: () => number;
   isExpirationSafe: (expiresAt: number) => boolean;
   maxRetries?: (options: WorkloadIdentityAuthOptions) => number;
-  now: () => number;
+  /** Clock for waiter deadlines and retry windows; monotonic for X.509 exchanges. */
+  monotonicNow: () => number;
   refreshBufferMs: (durationMs: number) => number;
   resolveFetchOptions?: (options: WorkloadIdentityAuthOptions) => MergedRequestInit | undefined;
   resolveTransportKey?: (options: WorkloadIdentityAuthOptions) => object | undefined;
@@ -302,7 +305,8 @@ function createCredentialSource(
         }),
       isExpirationSafe: (expiresAt) => Number.isFinite(expiresAt) && expiresAt <= Number.MAX_SAFE_INTEGER,
       maxRetries: (requestOptions) => validateMaxRetries(requestOptions.maxRetries ?? defaultMaxRetries),
-      now: monotonicNow,
+      expirationNow: () => Date.now(),
+      monotonicNow,
       refreshBufferMs: (durationMs) =>
         Math.min(config.refreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS, durationMs / 2),
       resolveFetchOptions,
@@ -317,8 +321,9 @@ function createCredentialSource(
 
   return {
     exchange: () => exchangeSubjectToken(config, fetch),
+    expirationNow: () => Date.now(),
     isExpirationSafe: Number.isSafeInteger,
-    now: () => Date.now(),
+    monotonicNow: () => Date.now(),
     refreshBufferMs: () => (config.refreshBufferSeconds ?? 1200) * 1000,
     resolveExpiration: (configured) => configured ?? 3600,
   };
@@ -370,7 +375,7 @@ export class WorkloadIdentityAuth {
     throwIfAborted(signal);
     const maxRetries = this.source.maxRetries?.(options) ?? 0;
     const waiterTimeoutMs = this.source.waiterTimeoutMs?.(timeoutMs);
-    const deadline = waiterTimeoutMs === undefined ? undefined : this.source.now() + waiterTimeoutMs;
+    const deadline = waiterTimeoutMs === undefined ? undefined : this.source.monotonicNow() + waiterTimeoutMs;
 
     while (true) {
       const fetchOptions = this.source.resolveFetchOptions?.(options);
@@ -413,7 +418,7 @@ export class WorkloadIdentityAuth {
 
   private refreshInBackground(context: RefreshContext): void {
     const { state } = context;
-    if (state.refreshPromise || state.retryNotBefore > this.source.now()) {
+    if (state.refreshPromise || state.retryNotBefore > this.source.monotonicNow()) {
       return;
     }
     // A proactive refresh has no waiting caller to own retry delays. Record any
@@ -432,7 +437,7 @@ export class WorkloadIdentityAuth {
 
     for (let retryCount = 0; ; retryCount += 1) {
       throwIfAborted(signal);
-      const retryDelayMs = state.retryNotBefore - this.source.now();
+      const retryDelayMs = state.retryNotBefore - this.source.monotonicNow();
       if (retryDelayMs > 0) {
         // oxlint-disable-next-line no-await-in-loop -- A shared Retry-After window gates each attempt.
         await waitForDelay(retryDelayMs, signal, this.remainingTimeout(deadline));
@@ -460,7 +465,6 @@ export class WorkloadIdentityAuth {
         if (!(error instanceof X509TokenExchangeRetryableError)) {
           throw error;
         }
-        state.retryNotBefore = Math.max(state.retryNotBefore, this.source.now() + error.retryDelayMs);
         if (state.tokenGeneration !== context.generation) {
           throw REFRESH_INVALIDATED;
         }
@@ -472,7 +476,7 @@ export class WorkloadIdentityAuth {
   }
 
   private remainingTimeout(deadline: number | undefined): number | undefined {
-    return deadline === undefined ? undefined : Math.max(0, deadline - this.source.now());
+    return deadline === undefined ? undefined : Math.max(0, deadline - this.source.monotonicNow());
   }
 
   private startRefresh(context: RefreshContext, retryCount: number): Promise<string> {
@@ -486,7 +490,21 @@ export class WorkloadIdentityAuth {
   }
 
   private async refreshToken(context: RefreshContext, retryCount: number): Promise<string> {
-    const tokenResponse = await this.source.exchange(retryCount, context.fetchOptions);
+    let tokenResponse: unknown;
+    try {
+      tokenResponse = await this.source.exchange(retryCount, context.fetchOptions);
+    } catch (error) {
+      if (
+        error instanceof X509TokenExchangeRetryableError &&
+        context.state.tokenGeneration === context.generation
+      ) {
+        context.state.retryNotBefore = Math.max(
+          context.state.retryNotBefore,
+          this.source.monotonicNow() + error.retryDelayMs,
+        );
+      }
+      throw error;
+    }
     if (
       typeof tokenResponse !== 'object' ||
       tokenResponse === null ||
@@ -504,7 +522,7 @@ export class WorkloadIdentityAuth {
       throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
     }
 
-    const now = this.source.now();
+    const now = this.source.expirationNow();
     const durationMs = expiresIn * 1000;
     const expiresAt = now + durationMs;
     if (!this.source.isExpirationSafe(expiresAt) || expiresAt <= now) {
@@ -524,11 +542,11 @@ export class WorkloadIdentityAuth {
   }
 
   private isTokenExpired(cachedToken: CachedToken): boolean {
-    return this.source.now() >= cachedToken.expiresAt;
+    return this.source.expirationNow() >= cachedToken.expiresAt;
   }
 
   private needsRefresh(cachedToken: CachedToken): boolean {
-    return this.source.now() >= cachedToken.refreshAt;
+    return this.source.expirationNow() >= cachedToken.refreshAt;
   }
 
   /** Discards a rejected cached access token so the next request performs a fresh exchange. */

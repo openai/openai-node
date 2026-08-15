@@ -187,10 +187,10 @@ describe('X.509 workload identity auth', () => {
     expect(customFetch).toHaveBeenCalledTimes(1);
   });
 
-  test('clamps refreshBufferMs to half of a short token TTL using a monotonic clock', async () => {
-    let monotonicTime = 1000;
-    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
-    vi.spyOn(Date, 'now').mockReturnValue(9_000_000_000_000);
+  test('clamps refreshBufferMs to half of a short token TTL using a suspension-aware clock', async () => {
+    let wallTime = 9_000_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
     let exchangeCount = 0;
     const customFetch = vi.fn(async () => {
       exchangeCount += 1;
@@ -199,20 +199,38 @@ describe('X.509 workload identity auth', () => {
     const auth = new WorkloadIdentityAuth({ ...config, refreshBufferMs: 60_000 }, customFetch);
 
     await expect(auth.getToken()).resolves.toBe('token-1');
-    monotonicTime += 4999;
+    wallTime += 4999;
     await expect(auth.getToken()).resolves.toBe('token-1');
     expect(customFetch).toHaveBeenCalledTimes(1);
 
-    monotonicTime += 1;
+    wallTime += 1;
     await expect(auth.getToken()).resolves.toBe('token-1');
     await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
     await vi.waitFor(async () => expect(await auth.getToken()).toBe('token-2'));
   });
 
+  test('expires a token when wall time advances across host suspension', async () => {
+    let wallTime = 9_000_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse('pre-suspension-token', 60))
+      .mockResolvedValueOnce(tokenResponse('post-suspension-token', 60));
+    const auth = new WorkloadIdentityAuth({ ...config, refreshBufferMs: 0 }, customFetch);
+
+    await expect(auth.getToken()).resolves.toBe('pre-suspension-token');
+    wallTime += 60_000;
+    await expect(auth.getToken()).resolves.toBe('post-suspension-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
   test('records background refresh backoff without scheduling a referenced retry timer', async () => {
     vi.useFakeTimers();
     let monotonicTime = 1000;
+    let wallTime = 9_000_000_000_000;
     vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
     const failedRefresh = deferredResponse();
     const successfulRefresh = deferredResponse();
     const customFetch = vi
@@ -224,6 +242,7 @@ describe('X.509 workload identity auth', () => {
 
     await expect(auth.getToken()).resolves.toBe('cached-token');
     monotonicTime += 150_000;
+    wallTime += 150_000;
     await expect(auth.getToken()).resolves.toBe('cached-token');
     expect(customFetch).toHaveBeenCalledTimes(2);
     failedRefresh.resolve(new Response(null, { status: 429, headers: { 'Retry-After': '60' } }));
@@ -292,6 +311,36 @@ describe('X.509 workload identity auth', () => {
     await vi.advanceTimersByTimeAsync(1);
 
     await expect(Promise.all([retrying, late])).resolves.toEqual(['retried-token', 'retried-token']);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('records Retry-After when an exchange settles after every waiter exits', async () => {
+    vi.useFakeTimers();
+    let monotonicTime = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const firstExchange = deferredResponse();
+    const customFetch = vi
+      .fn()
+      .mockImplementationOnce(() => firstExchange.promise)
+      .mockResolvedValueOnce(tokenResponse('retried-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    const abandoned = auth.getToken(undefined, 1000);
+    const timeoutAssertion = expect(abandoned).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    await vi.advanceTimersByTimeAsync(1000);
+    await timeoutAssertion;
+
+    firstExchange.resolve(new Response(null, { status: 429, headers: { 'Retry-After': '60' } }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const late = auth.getToken(undefined, undefined, { maxRetries: 0 });
+    monotonicTime += 59_999;
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    monotonicTime += 1;
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(late).resolves.toBe('retried-token');
     expect(customFetch).toHaveBeenCalledTimes(2);
   });
 
