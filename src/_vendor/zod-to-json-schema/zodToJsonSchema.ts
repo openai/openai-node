@@ -64,21 +64,16 @@ function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | un
 
   validateStrictRootSerializationHook(schema);
 
-  const type = descriptors['type']?.enumerable ? descriptors['type'].value : undefined;
-  const nullable = descriptors['nullable']?.enumerable && descriptors['nullable'].value === true;
+  const type = descriptors['type']?.enumerable ? Reflect.get(schema, 'type') : undefined;
+  const nullable = descriptors['nullable']?.enumerable && Reflect.get(schema, 'nullable') === true;
   if (type !== 'object' || nullable) {
     const actualType = nullable && type ? `${type},null` : type;
     throw new Error(
       `Root schema must have type: 'object' but got type: ${actualType ? `'${actualType}'` : 'undefined'}`,
     );
   }
-  const reference = descriptors['$ref'];
-  if (
-    reference?.enumerable &&
-    reference.value !== undefined &&
-    typeof reference.value !== 'function' &&
-    typeof reference.value !== 'symbol'
-  ) {
+  const reference = descriptors['$ref']?.enumerable ? Reflect.get(schema, '$ref') : undefined;
+  if (reference !== undefined && typeof reference !== 'function' && typeof reference !== 'symbol') {
     throw new Error("Root schema must be a concrete object and cannot contain '$ref'");
   }
 }

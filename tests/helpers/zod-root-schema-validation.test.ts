@@ -293,6 +293,38 @@ describe('strict vendor converter root schemas', () => {
   });
 
   it.each([
+    { keyword: 'type', stored: 'object', observed: 'string', error: expectedRootError('string') },
+    { keyword: 'nullable', stored: false, observed: true, error: expectedRootError('object,null') },
+    {
+      keyword: '$ref',
+      stored: undefined,
+      observed: '#/definitions/Root',
+      error: "Root schema must be a concrete object and cannot contain '$ref'",
+    },
+    { keyword: '$ref', stored: '#/definitions/Root', observed: undefined, error: undefined },
+  ])('observes serialized Proxy-backed $keyword values', ({ keyword, stored, observed, error }) => {
+    const target = { type: 'object' as const, [keyword]: stored };
+    const overriddenRoot = new Proxy(target, {
+      get: (subject, property, receiver) =>
+        property === keyword ? observed : Reflect.get(subject, property, receiver),
+    });
+    const serialized = JSON.stringify(overriddenRoot);
+    const convert = () =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        target: 'openApi3',
+        openaiStrictMode: true,
+        override: () => overriddenRoot,
+      });
+
+    expect(JSON.parse(serialized)[keyword]).toBe(observed);
+    if (error) {
+      expect(convert).toThrow(error);
+    } else {
+      expect(JSON.stringify(convert())).toBe(serialized);
+    }
+  });
+
+  it.each([
     { keyword: 'type', value: 'object' },
     { keyword: '$ref', value: '#/definitions/Root' },
     { keyword: 'nullable', value: true },
