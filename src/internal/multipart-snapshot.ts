@@ -8,7 +8,7 @@ export type MultipartDataSnapshot = Readonly<{
   data: StreamingFileInput;
 
   /** Releases an unused iterator or readable-stream reader after cancellation or failure. */
-  dispose?: (() => void) | undefined;
+  dispose?: (() => void | Promise<void>) | undefined;
 }>;
 
 const replayMultipartSnapshot = Symbol('replayMultipartSnapshot');
@@ -74,10 +74,11 @@ function snapshotIterator(
       },
     },
     dispose() {
-      if (!consumed) {
-        consumed = true;
-        void ignoreCleanupResult(() => returnIterator?.());
+      if (consumed) {
+        return;
       }
+      consumed = true;
+      return ignoreCleanupResult(() => returnIterator?.());
     },
   };
 }

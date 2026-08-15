@@ -1,3 +1,5 @@
+import { setImmediate as nextEventLoopTurn } from 'node:timers/promises';
+
 import { vi } from 'vitest';
 
 import { multipartFormRequestOptions, toStreamingFile } from 'openai/internal/uploads';
@@ -294,4 +296,52 @@ describe('streaming multipart resource cleanup', () => {
     expect(finished).toHaveBeenCalledTimes(1);
     expect(getReturn).toHaveBeenCalledTimes(1);
   });
+
+  test.each(['cancellation', 'invalid filename'] as const)(
+    'awaits unused iterator cleanup only for %s without delaying primary errors',
+    async (outcome) => {
+      let locked = false;
+      const cleanup = new ReadableStream<void>().getReader();
+      const iterator = {
+        next: vi.fn(),
+        return: vi.fn(async () => {
+          await cleanup.read();
+          locked = false;
+          return { done: true as const, value: undefined };
+        }),
+      };
+      const source = {
+        [Symbol.asyncIterator]() {
+          locked = true;
+          return iterator;
+        },
+      };
+      const later = laterUpload();
+      if (outcome === 'invalid filename') {
+        Object.defineProperty(later, 'name', { value: null });
+      }
+      const options = await multipart({ earlier: toStreamingFile(source, 'earlier.txt'), later });
+      const reader = (options.body as ReadableStream).getReader();
+      let cancellation: Promise<void> | undefined;
+
+      if (outcome === 'cancellation') {
+        await reader.read();
+        cancellation = reader.cancel();
+        let settled = false;
+        void cancellation.then(() => {
+          settled = true;
+        });
+        await nextEventLoopTurn();
+        expect(settled).toBe(false);
+      } else {
+        await expect(reader.read()).rejects.toThrow(/file.?name/iu);
+      }
+      expect(locked).toBe(true);
+      await cleanup.cancel();
+      await cancellation;
+      expect(locked).toBe(false);
+      expect(iterator.next).not.toHaveBeenCalled();
+      expect(iterator.return).toHaveBeenCalledTimes(1);
+    },
+  );
 });

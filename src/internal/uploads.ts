@@ -462,7 +462,7 @@ type FormEntry =
       key: string;
       value: Uploadable;
       data: unknown;
-      dispose?: (() => void) | undefined;
+      dispose?: (() => void | Promise<void>) | undefined;
       filename: string;
       kind: 'upload';
       streamingFile: boolean;
@@ -514,8 +514,9 @@ async function* iterateMultipartBody(
   uploadableKinds: UploadableKinds,
 ): AsyncGenerator<Uint8Array> {
   const entries: MultipartEntry[] = [];
-  const pendingDisposals = new Set<() => void>();
+  const pendingDisposals = new Set<() => void | Promise<void>>();
   const snapshots = new WeakMap<object, MultipartDataSnapshot>();
+  let failed = false;
 
   try {
     for await (const entry of iterateFormEntries(body, uploadableKinds, options, snapshots)) {
@@ -549,9 +550,13 @@ async function* iterateMultipartBody(
       yield encodeUTF8('\r\n');
     }
     yield encodeUTF8(`--${boundary}--\r\n`);
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
-    for (const dispose of pendingDisposals) {
-      dispose();
+    const cleanups = Array.from(pendingDisposals, (dispose) => dispose());
+    if (!failed) {
+      await Promise.all(cleanups);
     }
   }
 }
