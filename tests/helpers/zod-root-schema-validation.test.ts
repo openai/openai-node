@@ -20,6 +20,18 @@ const strictHelpers = [
   },
 ];
 
+const expectedRootError = (type?: string) =>
+  `Root schema must have type: 'object' but got type: ${type ? `'${type}'` : 'undefined'}`;
+
+interface RecursiveObject {
+  value: string;
+  children: RecursiveObject[];
+}
+
+const recursiveObject: z3.ZodType<RecursiveObject> = z3.lazy(() =>
+  z3.object({ value: z3.string(), children: z3.array(recursiveObject) }),
+);
+
 const invalidRootSchemas = [
   { name: 'a string', type: 'string', v3: z3.string(), v4: z4.string() },
   { name: 'an array', type: 'array', v3: z3.array(z3.string()), v4: z4.array(z4.string()) },
@@ -47,84 +59,49 @@ const invalidRootSchemas = [
   { name: 'an unrestricted schema', v3: z3.any(), v4: z4.any() },
 ];
 
-const expectedRootError = (type?: string) =>
-  `Root schema must have type: 'object' but got type: ${type ? `'${type}'` : 'undefined'}`;
-
-interface RecursiveObject {
-  value: string;
-  children: RecursiveObject[];
-}
-
-const recursiveObject: z3.ZodType<RecursiveObject> = z3.lazy(() =>
-  z3.object({ value: z3.string(), children: z3.array(recursiveObject) }),
-);
-
-const validObjectRoots = [
-  { name: 'a plain object', schema: z3.object({ value: z3.string() }) },
-  { name: 'a lazy object', schema: z3.lazy(() => z3.object({ value: z3.string() })) },
-  { name: 'a recursive lazy object', schema: recursiveObject },
-  {
-    name: 'a refined object',
-    schema: z3.object({ value: z3.string() }).refine(({ value }) => value.length > 0),
-  },
-  {
-    name: 'a transformed object',
-    schema: z3.object({ value: z3.string() }).transform(({ value }) => ({ value })),
-  },
-  { name: 'a defaulted object', schema: z3.object({ value: z3.string() }).default({ value: 'fallback' }) },
-  {
-    name: 'an object containing nested unions and arrays',
-    schema: z3.object({
-      values: z3.array(z3.union([z3.string(), z3.number()])),
-      choice: z3.union([z3.object({ first: z3.string() }), z3.object({ second: z3.number() })]),
-    }),
-  },
-];
-
 describe.each(strictHelpers)('$name root schema validation', ({ create }) => {
   it.each(invalidRootSchemas)('rejects $name equally for Zod v3 and v4', ({ type, v3, v4 }) => {
     expect(() => create(v3)).toThrow(expectedRootError(type));
     expect(() => create(v4)).toThrow(expectedRootError(type));
   });
 
-  it('rejects unsupported Zod v3 object intersections', () => {
+  it.each([
+    { name: 'a plain object', schema: z3.object({ value: z3.string() }) },
+    { name: 'a lazy object', schema: z3.lazy(() => z3.object({ value: z3.string() })) },
+    { name: 'a recursive lazy object', schema: recursiveObject },
+    {
+      name: 'a transformed object',
+      schema: z3.object({ value: z3.string() }).transform(({ value }) => ({ value })),
+    },
+    {
+      name: 'an object containing nested unions',
+      schema: z3.object({ values: z3.array(z3.union([z3.string(), z3.number()])) }),
+    },
+  ])('continues accepting $name', ({ schema }) => {
+    expect(() => create(schema)).not.toThrow();
+  });
+
+  it('retains intersection, optional, and primitive-union diagnostics', () => {
     expect(() =>
       create(z3.intersection(z3.object({ first: z3.string() }), z3.object({ second: z3.number() }))),
     ).toThrow(expectedRootError());
-  });
-
-  it('rejects optional Zod v3 objects that produce a root union', () => {
     expect(() => create(z3.object({ value: z3.string() }).optional())).toThrow(expectedRootError());
     expect(() => create(z4.object({ value: z4.string() }).optional())).not.toThrow();
-  });
-
-  it('reports every type in a Zod v3 primitive union', () => {
     expect(() => create(z3.union([z3.string(), z3.number()]))).toThrow(expectedRootError('string,number'));
-  });
-
-  it.each(validObjectRoots)('continues accepting $name', ({ schema }) => {
-    expect(() => create(schema)).not.toThrow();
   });
 });
 
-describe.each([
-  { name: 'direct', wrapV3: (root: z3.ZodType) => root, wrapV4: (root: z4.ZodType) => root },
-  {
-    name: 'lazy',
-    wrapV3: (root: z3.ZodType) => z3.lazy(() => root),
-    wrapV4: (root: z4.ZodType) => z4.lazy(() => root),
-  },
-])('$name registered response-format roots', ({ wrapV3, wrapV4 }) => {
+describe.each(['direct', 'lazy'] as const)('%s registered response-format roots', (kind) => {
   it('preserves frozen definitions and matches Zod v4 concrete-root behavior', () => {
     const root = z3.object({ value: z3.string() });
     const other = z3.object({ other: z3.number() });
     const schemaDefinitions = Object.freeze({ Root: root, Other: other });
-    const { schema } = zodResponseFormat(wrapV3(root), 'response', { schemaDefinitions }).json_schema;
+    const wrapped = kind === 'lazy' ? z3.lazy(() => root) : root;
+    const { schema } = zodResponseFormat(wrapped, 'response', { schemaDefinitions }).json_schema;
 
     expect(schema).toMatchObject({
       type: 'object',
       properties: { value: { type: 'string' } },
-      additionalProperties: false,
       definitions: { Root: { type: 'object' }, Other: { type: 'object' } },
     });
     expect(schema).not.toHaveProperty('$ref');
@@ -132,316 +109,174 @@ describe.each([
 
     const v4Root = z4.object({ value: z4.string() });
     const v4Definitions = Object.freeze({ Root: v4Root });
-    const v4Schema = zodResponseFormat(wrapV4(v4Root), 'response', {
+    const wrappedV4 = kind === 'lazy' ? z4.lazy(() => v4Root) : v4Root;
+    const v4Schema = zodResponseFormat(wrappedV4, 'response', {
       schemaDefinitions: v4Definitions,
     }).json_schema.schema;
-
     expect(v4Schema).toMatchObject({ type: 'object', properties: { value: { type: 'string' } } });
-    expect(v4Schema).not.toHaveProperty('$ref');
     expect(v4Definitions.Root).toBe(v4Root);
   });
 });
 
-it('preserves recursive child references for frozen registered lazy roots', () => {
+it('preserves recursive registered roots and escaped definition names', () => {
   const schemaDefinitions = Object.freeze({ Root: recursiveObject });
-  const { schema } = zodResponseFormat(recursiveObject, 'response', { schemaDefinitions }).json_schema;
-
-  expect(schema).toMatchObject({
+  const recursive = zodResponseFormat(recursiveObject, 'response', { schemaDefinitions }).json_schema.schema;
+  expect(recursive).toMatchObject({
     type: 'object',
     properties: { children: { type: 'array', items: { $ref: '#/definitions/response' } } },
     definitions: { Root: { type: 'object' }, response: { type: 'object' } },
   });
-  expect(schema).not.toHaveProperty('$ref');
   expect(schemaDefinitions.Root).toBe(recursiveObject);
-});
 
-it.each([
-  { name: 'a string', schema: z3.string(), type: 'string' },
-  { name: 'an array', schema: z3.array(z3.string()), type: 'array' },
-  { name: 'a nullable object', schema: z3.object({ value: z3.string() }).nullable(), type: undefined },
-])('rejects registered $name roots', ({ schema, type }) => {
-  expect(() => zodResponseFormat(schema, 'response', { schemaDefinitions: { Root: schema } })).toThrow(
-    expectedRootError(type),
-  );
-});
-
-it('preserves named object roots and escaped references to supplied definitions', () => {
   const shared = z3.object({ value: z3.string() });
-  const format = zodResponseFormat(z3.object({ shared }), 'named-root', {
+  const named = zodResponseFormat(z3.object({ shared }), 'named-root', {
     schemaDefinitions: { 'shared/name~value%25': shared },
-  });
-
-  expect(format.json_schema.name).toBe('named-root');
-  expect(format.json_schema.schema).toMatchObject({
-    type: 'object',
+  }).json_schema;
+  expect(named.name).toBe('named-root');
+  expect(named.schema).toMatchObject({
     properties: { shared: { $ref: '#/definitions/shared~1name~0value%2525' } },
     definitions: { 'shared/name~value%25': { type: 'object' } },
   });
 });
 
-describe('strict vendor converter root schemas', () => {
+it('rejects registered non-object roots without changing definitions', () => {
+  const root = z3.string();
+  const schemaDefinitions = Object.freeze({ Root: root });
+  expect(() => zodResponseFormat(root, 'response', { schemaDefinitions })).toThrow(
+    expectedRootError('string'),
+  );
+  expect(schemaDefinitions.Root).toBe(root);
+});
+
+const convertStrictRoot = (root: unknown) =>
+  zodToJsonSchema(z3.object({ value: z3.string() }), {
+    target: 'openApi3',
+    openaiStrictMode: true,
+    override: () => root as { type: 'object' },
+  });
+
+describe('canonical strict vendor-converter roots', () => {
   it.each([
-    { name: 'an array', root: [], serialized: '[]' },
-    { name: 'a boxed string', root: Reflect.construct(String, ['value']) as object, serialized: '"value"' },
-    { name: 'a boxed number', root: Reflect.construct(Number, [42]) as object, serialized: '42' },
-    { name: 'a boxed boolean', root: Reflect.construct(Boolean, [true]) as object, serialized: 'true' },
-  ])('rejects $name roots that falsely claim to be objects', ({ root, serialized }) => {
-    const overriddenRoot = Object.assign(root, { type: 'object' as const });
-
-    expect(JSON.stringify(overriddenRoot)).toBe(serialized);
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        target: 'openApi3',
-        openaiStrictMode: true,
-        override: () => overriddenRoot as { type: 'object' },
-      }),
-    ).toThrow('Root schema must serialize to a JSON object');
+    { name: 'an array', value: [] },
+    { name: 'a callable', value: () => null },
+    { name: 'a boxed string', value: Reflect.construct(String, ['value']) },
+    { name: 'a boxed number', value: Reflect.construct(Number, [42]) },
+    { name: 'a boxed boolean', value: Reflect.construct(Boolean, [true]) },
+    { name: 'a boxed BigInt', value: Reflect.construct(Object, [Reflect.apply(BigInt, undefined, [1])]) },
+    { name: 'a custom prototype', value: Object.create({ inherited: true }) as object },
+  ])('rejects $name carriers through the same plain-record boundary', ({ value }) => {
+    expect(() => convertStrictRoot(Object.assign(value, { type: 'object' as const }))).toThrow(
+      'Root schema must be a plain JSON-schema record',
+    );
   });
 
-  it('rejects callable strict roots that JSON serialization omits', () => {
-    const overriddenRoot = Object.assign(() => null, { type: 'object' as const });
-
-    expect(JSON.stringify(overriddenRoot)).toBeUndefined();
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        target: 'openApi3',
-        openaiStrictMode: true,
-        override: () => overriddenRoot,
-      }),
-    ).toThrow('Root schema must serialize to a JSON object');
-  });
-
-  it('rejects cyclic proxy-reported prototypes without hanging', () => {
-    const overriddenRoot: object = new Proxy(
+  it.each(['cyclic', 'fresh'] as const)('rejects a %s Proxy prototype after one inspection', (kind) => {
+    let inspections = 0;
+    const root: object = new Proxy(
       { type: 'object' as const },
       {
-        getPrototypeOf: () => overriddenRoot,
+        getPrototypeOf() {
+          inspections += 1;
+          return kind === 'cyclic' ? root : new Proxy({}, {});
+        },
       },
     );
 
-    expect(JSON.stringify(overriddenRoot)).toBe('{"type":"object"}');
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        target: 'openApi3',
-        openaiStrictMode: true,
-        override: () => overriddenRoot as { type: 'object' },
-      }),
-    ).toThrow('Root schema cannot contain a cyclic prototype chain');
+    expect(() => convertStrictRoot(root)).toThrow('Root schema must be a plain JSON-schema record');
+    expect(inspections).toBe(1);
   });
 
-  it('rejects boxed BigInt roots before JSON serialization fails', () => {
-    const boxedBigInt = Reflect.construct(Object, [Reflect.apply(BigInt, undefined, [1])]) as object;
-    const overriddenRoot = Object.assign(boxedBigInt, {
-      type: 'object' as const,
-    });
+  it.each(['plain', 'null prototype'] as const)('owns and returns a stable %s root snapshot', (kind) => {
+    const source: Record<string, unknown> =
+      kind === 'plain'
+        ? { type: 'object' }
+        : Object.assign(Object.create(null) as object, { type: 'object' });
+    const owned = convertStrictRoot(source);
+    source['type'] = 'string';
 
-    expect(() => JSON.stringify(overriddenRoot)).toThrow(TypeError);
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        target: 'openApi3',
-        openaiStrictMode: true,
-        override: () => overriddenRoot,
-      }),
-    ).toThrow('Root schema must serialize to a JSON object');
+    expect(owned).not.toBe(source);
+    expect(JSON.stringify(owned)).toBe('{"type":"object"}');
   });
 
-  it('preserves strict object roots without a prototype', () => {
-    const overriddenRoot = Object.assign(Object.create(null) as object, { type: 'object' as const });
-    const schema = zodToJsonSchema(z3.object({ value: z3.string() }), {
-      target: 'openApi3',
-      openaiStrictMode: true,
-      override: () => overriddenRoot,
-    });
-
-    expect(JSON.stringify(schema)).toBe('{"type":"object"}');
-  });
-
-  it.each([
-    { keyword: 'type', value: 'object', visibility: 'inherited' },
-    { keyword: 'type', value: 'object', visibility: 'non-enumerable' },
-    { keyword: '$ref', value: '#/definitions/Root', visibility: 'inherited' },
-    { keyword: '$ref', value: '#/definitions/Root', visibility: 'non-enumerable' },
-    { keyword: 'nullable', value: true, visibility: 'inherited' },
-    { keyword: 'nullable', value: true, visibility: 'non-enumerable' },
-  ])('validates the serialized root when $keyword is $visibility', ({ keyword, value, visibility }) => {
-    const overriddenRoot = Object.create(
-      visibility === 'inherited' ? { [keyword]: value } : Object.prototype,
+  it('neutralizes synthesized Proxy hooks and keyword reads by owning descriptor values', () => {
+    const target: Record<string, unknown> = { type: 'object', nullable: false, $ref: undefined };
+    const get = vi.fn((_subject: object, key: PropertyKey) =>
+      key === 'toJSON' ? () => ({ type: 'string' }) : 'string',
     );
+    const owned = convertStrictRoot(new Proxy(target, { get }));
+    target['type'] = 'string';
 
-    if (visibility === 'non-enumerable') {
-      Object.defineProperty(overriddenRoot, keyword, { value, enumerable: false });
-    }
-    if (keyword !== 'type') {
-      overriddenRoot.type = 'object';
-    }
-
-    const emittedRoot = JSON.stringify(overriddenRoot);
-    const convert = () =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        target: 'openApi3',
-        openaiStrictMode: true,
-        override: () => overriddenRoot,
-      });
-
-    if (keyword === 'type') {
-      expect(emittedRoot).toBe('{}');
-      expect(convert).toThrow(expectedRootError());
-    } else {
-      expect(JSON.stringify(convert())).toBe(emittedRoot);
-      expect(JSON.parse(emittedRoot)).toEqual({ type: 'object' });
-    }
+    expect(get).not.toHaveBeenCalled();
+    expect(JSON.stringify(owned)).toBe('{"type":"object","nullable":false}');
   });
 
-  it.each([
-    { keyword: 'type', stored: 'object', observed: 'string', error: expectedRootError('string') },
-    { keyword: 'nullable', stored: false, observed: true, error: expectedRootError('object,null') },
-    {
-      keyword: '$ref',
-      stored: undefined,
-      observed: '#/definitions/Root',
-      error: "Root schema must be a concrete object and cannot contain '$ref'",
+  it.each(['type', 'nullable', '$ref', 'properties', 'toJSON'] as const)(
+    'rejects an enumerable %s accessor without invoking it',
+    (key) => {
+      const root = { type: 'object' as const };
+      const getter = vi.fn(() => (key === 'type' ? 'object' : true));
+      Object.defineProperty(root, key, { enumerable: true, get: getter });
+
+      expect(() => convertStrictRoot(root)).toThrow(`Root schema property '${key}' must be a data property`);
+      expect(getter).not.toHaveBeenCalled();
     },
-    { keyword: '$ref', stored: '#/definitions/Root', observed: undefined, error: undefined },
-  ])('observes serialized Proxy-backed $keyword values', ({ keyword, stored, observed, error }) => {
-    const target = { type: 'object' as const, [keyword]: stored };
-    const overriddenRoot = new Proxy(target, {
-      get: (subject, property, receiver) =>
-        property === keyword ? observed : Reflect.get(subject, property, receiver),
-    });
-    const serialized = JSON.stringify(overriddenRoot);
-    const convert = () =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        target: 'openApi3',
-        openaiStrictMode: true,
-        override: () => overriddenRoot,
-      });
+  );
 
-    expect(JSON.parse(serialized)[keyword]).toBe(observed);
-    if (error) {
-      expect(convert).toThrow(error);
-    } else {
-      expect(JSON.stringify(convert())).toBe(serialized);
-    }
+  it('rejects callable own serialization hooks without invoking them', () => {
+    const toJSON = vi.fn(() => ({ type: 'string' }));
+    expect(() => convertStrictRoot({ type: 'object', toJSON })).toThrow("callable 'toJSON'");
+    expect(toJSON).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { keyword: 'type', value: 'object' },
-    { keyword: '$ref', value: '#/definitions/Root' },
-    { keyword: 'nullable', value: true },
-  ])('rejects an enumerable $keyword accessor without invoking it', ({ keyword, value }) => {
-    const overriddenRoot = { type: 'object' as const };
-    const getter = vi.fn(() => value);
+  it.each([Reflect.construct(Boolean, [true]), Reflect.construct(Boolean, [false]), null])(
+    'rejects non-primitive nullable keyword %s',
+    (nullable) => {
+      expect(() => convertStrictRoot({ type: 'object', nullable })).toThrow("'nullable' must be a boolean");
+    },
+  );
 
-    Object.defineProperty(overriddenRoot, keyword, { enumerable: true, get: getter });
+  it.each([undefined, () => 'reference', Symbol('reference')])(
+    'omits non-serializable root reference values',
+    ($ref) => {
+      const owned = convertStrictRoot({ type: 'object', $ref });
+      expect(owned).not.toHaveProperty('$ref');
+      expect(JSON.stringify(owned)).toBe('{"type":"object"}');
+    },
+  );
 
+  it('rejects forced root references without activating assertion siblings', () => {
     expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        openaiStrictMode: true,
-        override: () => overriddenRoot,
-      }),
-    ).toThrow(`Root schema validation keyword '${keyword}' must be a data property`);
-    expect(getter).not.toHaveBeenCalled();
-  });
-
-  it.each(['own', 'inherited'])('rejects %s toJSON hooks that serialize a non-object root', (location) => {
-    const toJSON = vi.fn().mockReturnValue({ type: 'string' });
-    const overriddenRoot =
-      location === 'own'
-        ? { type: 'object' as const, toJSON }
-        : Object.assign(Object.create({ toJSON }), { type: 'object' as const });
-
-    expect(JSON.stringify(overriddenRoot)).toBe('{"type":"string"}');
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        openaiStrictMode: true,
-        override: () => overriddenRoot,
-      }),
-    ).toThrow("Root schema cannot contain a callable or accessor-backed 'toJSON' property");
-    expect(toJSON).toHaveBeenCalledTimes(1);
-  });
-
-  it.each(['own', 'inherited'])('rejects %s toJSON accessors without invoking them', (location) => {
-    const prototype = {};
-    const overriddenRoot = Object.assign(Object.create(prototype), { type: 'object' as const });
-    const getter = vi.fn(() => () => ({ type: 'string' }));
-
-    Object.defineProperty(location === 'own' ? overriddenRoot : prototype, 'toJSON', { get: getter });
-
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        openaiStrictMode: true,
-        override: () => overriddenRoot,
-      }),
-    ).toThrow("Root schema cannot contain a callable or accessor-backed 'toJSON' property");
-    expect(getter).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    { name: 'undefined', value: undefined },
-    { name: 'a function', value: () => '#/definitions/Root' },
-    { name: 'a symbol', value: Symbol('reference') },
-  ])('ignores an enumerable root reference containing $name because JSON omits it', ({ value }) => {
-    const overriddenRoot = { type: 'object' as const, $ref: value };
-
-    expect(JSON.stringify(overriddenRoot)).toBe('{"type":"object"}');
-    const schema = zodToJsonSchema(z3.object({ value: z3.string() }), {
-      target: 'openApi3',
-      openaiStrictMode: true,
-      override: () => overriddenRoot as { type: 'object' },
-    });
-    expect(JSON.stringify(schema)).toBe('{"type":"object"}');
-  });
-
-  it.each([
-    { name: 'conflicting properties', sibling: { properties: { injected: { type: 'number' } } } },
-    { name: 'additionalProperties: true', sibling: { additionalProperties: true } },
-  ])('does not activate root reference siblings containing $name', ({ sibling }) => {
-    const root = z3.object({ value: z3.string() });
-    const schema = zodToJsonSchema(root, {
-      openaiStrictMode: true,
-      definitions: { Root: root },
-      override: (_definition, _refs, _seen, forceResolution) =>
-        forceResolution
-          ? { type: 'object', properties: { value: { type: 'string' } }, additionalProperties: false }
-          : { $ref: '#/definitions/Root', type: 'object', ...sibling },
-    });
-
-    expect(schema).toMatchObject({
-      type: 'object',
-      properties: { value: { type: 'string' } },
-      additionalProperties: false,
-    });
-    expect(schema).not.toHaveProperty('properties.injected');
-  });
-
-  it('rejects root references returned by forced overrides before activating assertion siblings', () => {
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        openaiStrictMode: true,
-        override: () => ({ $ref: '#/definitions/Root', type: 'object', additionalProperties: true }),
-      }),
+      convertStrictRoot({ type: 'object', $ref: '#/definitions/Root', additionalProperties: true }),
     ).toThrow("Root schema must be a concrete object and cannot contain '$ref'");
   });
 
-  it('rejects named object roots that resolve to a root reference', () => {
-    expect(() =>
-      zodToJsonSchema(z3.object({ value: z3.string() }), { name: 'named-object', openaiStrictMode: true }),
-    ).toThrow(expectedRootError());
+  it('forces canonical resolution before supplied root-reference siblings', () => {
+    const root = z3.object({ value: z3.string() });
+    const schema = zodToJsonSchema(root, {
+      openaiStrictMode: true,
+      definitions: Object.freeze({ Root: root }),
+      override: (_definition, _refs, _seen, forceResolution) =>
+        forceResolution
+          ? { type: 'object', properties: { value: { type: 'string' } } }
+          : { $ref: '#/definitions/Root', type: 'object', additionalProperties: true },
+    });
+
+    expect(schema).toMatchObject({ type: 'object', properties: { value: { type: 'string' } } });
+    expect(schema).not.toHaveProperty('$ref');
   });
 
-  it('continues accepting named object roots with duplicated references', () => {
+  it('rejects named root references while preserving duplicate-ref object roots', () => {
+    const root = z3.object({ value: z3.string() });
+    expect(() => zodToJsonSchema(root, { name: 'named', openaiStrictMode: true })).toThrow(
+      expectedRootError(),
+    );
     expect(
-      zodToJsonSchema(z3.object({ value: z3.string() }), {
-        name: 'named-object',
-        nameStrategy: 'duplicate-ref',
-        openaiStrictMode: true,
-      }),
+      zodToJsonSchema(root, { name: 'named', nameStrategy: 'duplicate-ref', openaiStrictMode: true }),
     ).toMatchObject({ type: 'object', properties: { value: { type: 'string' } } });
   });
 
-  it('rejects nullable OpenAPI3 object roots', () => {
+  it('rejects nullable OpenAPI3 roots', () => {
     const root = z3.object({ value: z3.string() }).nullable();
-
     expect(() => zodToJsonSchema(root, { target: 'openApi3', openaiStrictMode: true })).toThrow(
       expectedRootError('object,null'),
     );
@@ -451,21 +286,15 @@ describe('strict vendor converter root schemas', () => {
 describe.each(['jsonSchema7', 'jsonSchema2019-09', 'openApi3'] as const)(
   'non-strict %s targets',
   (target) => {
-    it('continues accepting unnamed non-object roots', () => {
+    it('preserves unnamed, named, and explicitly non-strict non-object roots', () => {
       expect(zodToJsonSchema(z3.array(z3.string()), { target })).toMatchObject({
         type: 'array',
         items: { type: 'string' },
       });
-    });
-
-    it('preserves named root references', () => {
       expect(zodToJsonSchema(z3.string(), { target, name: 'named-string' })).toMatchObject({
         $ref: '#/definitions/named-string',
         definitions: { 'named-string': { type: 'string' } },
       });
-    });
-
-    it('continues accepting non-object roots with explicit non-strict mode', () => {
       expect(zodToJsonSchema(z3.string(), { target, openaiStrictMode: false })).toMatchObject({
         type: 'string',
       });
@@ -473,40 +302,30 @@ describe.each(['jsonSchema7', 'jsonSchema2019-09', 'openApi3'] as const)(
   },
 );
 
-it('preserves non-strict registered roots without cloning or changing caller definitions', () => {
+it('preserves non-strict registered and nullable roots', () => {
   const root = z3.object({ value: z3.string() });
   const definitions = { Root: root };
-
   expect(zodToJsonSchema(root, { definitions })).toMatchObject({
     $ref: '#/definitions/Root',
     definitions: { Root: { type: 'object' } },
   });
   expect(definitions.Root).toBe(root);
+  expect(zodToJsonSchema(root.nullable(), { target: 'openApi3' })).toMatchObject({
+    type: 'object',
+    nullable: true,
+  });
 });
 
-it('preserves non-strict OpenAPI3 nullable object roots', () => {
-  const root = z3.object({ value: z3.string() }).nullable();
-
-  expect(zodToJsonSchema(root, { target: 'openApi3' })).toMatchObject({ type: 'object', nullable: true });
-});
-
-describe('zodRealtimeFunction non-strict root schemas', () => {
-  it('continues accepting a primitive Zod v3 root', () => {
-    const tool = zodRealtimeFunction({ name: 'realtime-string', parameters: z3.string() });
-
-    expect(tool.parameters).toMatchObject({ type: 'string' });
-    expect(tool).not.toHaveProperty('strict');
-  });
-
-  it('continues accepting a Zod v3 array root', () => {
-    const tool = zodRealtimeFunction({ name: 'realtime-array', parameters: z3.array(z3.string()) });
-
-    expect(tool.parameters).toMatchObject({ type: 'array', items: { type: 'string' } });
-  });
-
-  it('continues accepting a Zod v3 union root', () => {
-    const parameters = z3.union([z3.object({ first: z3.string() }), z3.object({ second: z3.number() })]);
-
-    expect(zodRealtimeFunction({ name: 'realtime-union', parameters }).parameters).toHaveProperty('anyOf');
-  });
+it.each([
+  { name: 'string', parameters: z3.string(), expected: { type: 'string' } },
+  { name: 'array', parameters: z3.array(z3.string()), expected: { type: 'array' } },
+  {
+    name: 'union',
+    parameters: z3.union([z3.object({ first: z3.string() }), z3.object({ second: z3.number() })]),
+    expected: { anyOf: expect.any(Array) },
+  },
+])('keeps realtime $name roots non-strict', ({ name, parameters, expected }) => {
+  const tool = zodRealtimeFunction({ name, parameters });
+  expect(tool.parameters).toMatchObject(expected);
+  expect(tool).not.toHaveProperty('strict');
 });

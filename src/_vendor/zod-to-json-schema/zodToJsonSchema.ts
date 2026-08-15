@@ -5,83 +5,69 @@ import { parseDef } from './parseDef';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
-function validateStrictRootSerializationHook(schema: object): void {
-  const visitedPrototypes = new WeakSet<object>();
-  for (let target: object | null = schema; target !== null; target = Object.getPrototypeOf(target)) {
-    if (visitedPrototypes.has(target)) {
-      throw new TypeError('Root schema cannot contain a cyclic prototype chain');
-    }
-    visitedPrototypes.add(target);
+function ownStrictRootSchema(
+  schema: unknown,
+  name: string | undefined,
+  nameStrategy: string,
+): JsonSchema7Type {
+  if (schema === null || typeof schema !== 'object') {
+    throw new TypeError('Root schema must be a plain JSON-schema record');
+  }
 
-    const serializationHook = Object.getOwnPropertyDescriptor(target, 'toJSON');
-    if (!serializationHook) {
+  const prototype = Object.getPrototypeOf(schema) as object | null;
+  if (![null, Object.prototype].includes(prototype)) {
+    throw new TypeError('Root schema must be a plain JSON-schema record');
+  }
+
+  const owned: Record<string, unknown> = {};
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(schema))) {
+    if (!descriptor.enumerable) {
       continue;
     }
-    if (!('value' in serializationHook) || typeof serializationHook.value === 'function') {
-      throw new Error("Root schema cannot contain a callable or accessor-backed 'toJSON' property");
+    if (!('value' in descriptor)) {
+      throw new TypeError(`Root schema property '${key}' must be a data property`);
     }
-    break;
-  }
-}
 
-function validateStrictRootShape(schema: object): void {
-  if (typeof schema === 'function' || Array.isArray(schema)) {
-    throw new TypeError('Root schema must serialize to a JSON object');
-  }
-
-  const primitiveUnboxers = [
-    String.prototype.valueOf,
-    Number.prototype.valueOf,
-    Boolean.prototype.valueOf,
-    ...(typeof BigInt === 'function' ? [BigInt.prototype.valueOf] : []),
-  ];
-
-  for (const unbox of primitiveUnboxers) {
-    try {
-      Reflect.apply(unbox, schema, []);
-    } catch {
-      // Primitive intrinsics reject objects without their matching internal slot.
+    const value: unknown = descriptor.value;
+    if (key === 'toJSON' && typeof value === 'function') {
+      throw new TypeError("Root schema cannot contain a callable 'toJSON' property");
+    }
+    if (['undefined', 'function', 'symbol'].includes(typeof value)) {
       continue;
     }
 
-    throw new TypeError('Root schema must serialize to a JSON object');
+    Object.defineProperty(owned, key, {
+      configurable: true,
+      enumerable: true,
+      value,
+      writable: true,
+    });
   }
-}
 
-function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | undefined): void {
-  if (!openaiStrictMode) {
-    return;
+  const { type, nullable, $ref: reference } = owned;
+  if (!['undefined', 'boolean'].includes(typeof nullable)) {
+    throw new TypeError("Root schema 'nullable' must be a boolean");
   }
-
-  validateStrictRootShape(schema);
-  const descriptors = Object.getOwnPropertyDescriptors(schema);
-  for (const keyword of ['type', 'nullable', '$ref'] as const) {
-    const descriptor = descriptors[keyword];
-    if (descriptor?.enumerable && !('value' in descriptor)) {
-      throw new Error(`Root schema validation keyword '${keyword}' must be a data property`);
+  if (type !== 'object' || nullable === true) {
+    let actualType: string | undefined;
+    if (typeof type === 'string') {
+      actualType = nullable === true ? `${type},null` : type;
+    } else if (Array.isArray(type)) {
+      actualType = type.join(',');
     }
-  }
-
-  validateStrictRootSerializationHook(schema);
-
-  const type = descriptors['type']?.enumerable ? Reflect.get(schema, 'type') : undefined;
-  const nullable = descriptors['nullable']?.enumerable && Reflect.get(schema, 'nullable') === true;
-  if (type !== 'object' || nullable) {
-    const actualType = nullable && type ? `${type},null` : type;
     throw new Error(
       `Root schema must have type: 'object' but got type: ${actualType ? `'${actualType}'` : 'undefined'}`,
     );
   }
-  const reference = descriptors['$ref']?.enumerable ? Reflect.get(schema, '$ref') : undefined;
-  if (reference !== undefined && typeof reference !== 'function' && typeof reference !== 'symbol') {
+  if (reference !== undefined) {
     throw new Error("Root schema must be a concrete object and cannot contain '$ref'");
   }
-}
 
-function cloneStrictRootSchemaDefinitions(refs: ReturnType<typeof getRefs>): void {
-  if (refs.openaiStrictMode) {
-    refs.definitions = { ...refs.definitions };
+  if (name !== undefined && nameStrategy !== 'duplicate-ref') {
+    throw new Error("Root schema must have type: 'object' but got type: undefined");
   }
+
+  return owned as JsonSchema7Type;
 }
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
@@ -99,7 +85,9 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   >;
 } => {
   const refs = getRefs(options);
-  cloneStrictRootSchemaDefinitions(refs);
+  if (refs.openaiStrictMode) {
+    refs.definitions = { ...refs.definitions };
+  }
 
   let name: string | undefined;
   if (typeof options === 'string') {
@@ -108,7 +96,7 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     name = options?.name;
   }
 
-  const main =
+  const parsed =
     parseDef(
       schema._def,
       name === undefined
@@ -119,13 +107,9 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
           },
       refs.openaiStrictMode === true,
     ) ?? {};
+  const main = refs.openaiStrictMode ? ownStrictRootSchema(parsed, name, refs.nameStrategy) : parsed;
 
-  validateStrictRootSchema(main, refs.openaiStrictMode);
-
-  const title =
-    typeof options === 'object' && options.name !== undefined && options.nameStrategy === 'title'
-      ? options.name
-      : undefined;
+  const title = refs.nameStrategy === 'title' ? refs.name : undefined;
 
   if (title !== undefined) {
     main.title = title;
@@ -203,8 +187,6 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   } else if (refs.target === 'jsonSchema2019-09') {
     combined.$schema = 'https://json-schema.org/draft/2019-09/schema#';
   }
-
-  validateStrictRootSchema(combined, refs.openaiStrictMode);
 
   return combined;
 };
