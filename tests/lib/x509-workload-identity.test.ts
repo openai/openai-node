@@ -374,7 +374,7 @@ describe('OpenAI with X.509 workload identity', () => {
     });
     client.requestMutation = (request) => {
       vi.setSystemTime(new Date(Date.now() + 2000));
-      (request.headers as Headers).delete('Authorization');
+      (request.headers as Headers).set('Authorization', 'Bearer workload-identity-auth');
     };
 
     const rejection = expect(client.models.list()).rejects.toMatchObject({ status: 503 });
@@ -654,10 +654,42 @@ describe('OpenAI with X.509 workload identity', () => {
           source === 'request headers' ? { headers: { Authorization: 'Bearer custom-token' } } : {},
         ),
       ).rejects.toMatchObject({ status: 401 });
-      expect(exchangeCount).toBe(1);
+      expect(exchangeCount).toBe(source === 'request headers' ? 0 : 1);
       expect(apiCount).toBe(1);
     },
   );
+
+  test.each([
+    { identity: x509Identity, identityName: 'X.509', source: 'request headers' as const },
+    { identity: x509Identity, identityName: 'X.509', source: 'request hook' as const },
+    { identity: subjectTokenIdentity, identityName: 'subject token', source: 'request headers' as const },
+    { identity: subjectTokenIdentity, identityName: 'subject token', source: 'request hook' as const },
+  ])('preserves anonymous $identityName requests created by $source', async ({ identity, source }) => {
+    let exchangeCount = 0;
+    const apiAuthorizations: (string | null)[] = [];
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchangeCount += 1;
+          return tokenResponse('workload-identity-token');
+        }
+        apiAuthorizations.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ data: [] });
+      }),
+    });
+    client.requestMutation = (request) => {
+      if (source === 'request hook') {
+        (request.headers as Headers).delete('Authorization');
+      }
+    };
+
+    await client.models.list(source === 'request headers' ? { headers: { Authorization: null } } : undefined);
+
+    expect(apiAuthorizations).toEqual([null]);
+    expect(exchangeCount).toBe(source === 'request headers' ? 0 : 1);
+  });
 
   test('collapses concurrent 401 invalidations into one shared refresh', async () => {
     const firstWaveGate = deferredResponse();

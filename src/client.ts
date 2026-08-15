@@ -1053,6 +1053,9 @@ export class OpenAI {
       req.headers.get('authorization') !== workloadIdentityAuthorization
     ) {
       workloadIdentityRequestContext.usesWorkloadIdentityToken = false;
+      if (!req.headers.has('authorization')) {
+        workloadIdentityRequestContext.workloadIdentityTokenSuppressed = true;
+      }
     }
     if (
       this._usesX509WorkloadIdentity &&
@@ -1342,7 +1345,10 @@ export class OpenAI {
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
-      if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
+      if (
+        !context?.workloadIdentityTokenSuppressed &&
+        (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`)
+      ) {
         let token: string;
         try {
           token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
@@ -1503,6 +1509,7 @@ export class OpenAI {
         fetchOptions: this._usesX509WorkloadIdentity && fetchOptions ? { ...fetchOptions } : fetchOptions,
         terminalAuthenticationError: undefined,
         transportKey: x509TransportKey(fetchOptions),
+        workloadIdentityTokenSuppressed: false,
         usesWorkloadIdentityToken: false,
       };
       // oxlint-disable-next-line no-await-in-loop -- X.509 transport rotation rebuilds auth atomically.
@@ -1557,6 +1564,8 @@ export class OpenAI {
 
     const helperMethod = options.__metadata?.['helperMethod'];
     const headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
+    const overridesAuthorization =
+      headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization');
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1571,15 +1580,18 @@ export class OpenAI {
       },
       this._provider
         ? undefined
-        : await this.authHeaders(
-            options,
-            options.__security ?? { bearerAuth: true },
-            workloadIdentityContext,
-          ),
+        : overridesAuthorization
+          ? undefined
+          : await this.authHeaders(
+              options,
+              options.__security ?? { bearerAuth: true },
+              workloadIdentityContext,
+            ),
       headerOverrides,
     ]);
 
-    if (headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization')) {
+    if (overridesAuthorization) {
+      workloadIdentityContext.workloadIdentityTokenSuppressed = true;
       workloadIdentityContext.usesWorkloadIdentityToken = false;
     }
 

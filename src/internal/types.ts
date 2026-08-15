@@ -97,5 +97,6 @@ export interface WorkloadIdentityRequestContext {
   fetchOptions: MergedRequestInit | undefined;
   terminalAuthenticationError: Error | undefined;
   transportKey: object | undefined;
+  workloadIdentityTokenSuppressed: boolean;
   usesWorkloadIdentityToken: boolean;
 }
