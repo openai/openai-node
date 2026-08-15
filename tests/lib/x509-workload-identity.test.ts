@@ -39,13 +39,18 @@ async function* nonReplayableBody() {
 }
 
 class RequestMutatingOpenAI extends OpenAI {
+  authOptionsMutation?: (options: FinalRequestOptions) => void;
+  authHeadersMutation?: (headers: NullableHeaders | undefined) => void;
   requestMutation?: (request: RequestInit) => void;
 
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
-    return super.authHeaders(opts, schemes);
+    this.authOptionsMutation?.(opts);
+    const headers = await super.authHeaders(opts, schemes);
+    this.authHeadersMutation?.(headers);
+    return headers;
   }
 
   protected override async prepareRequest(request: RequestInit): Promise<void> {
@@ -326,6 +331,43 @@ describe('OpenAI with X.509 workload identity', () => {
     originalExchange.resolve(tokenResponse('stale-token'));
 
     await expect(request).resolves.toMatchObject({ ok: true });
+    expect(requests).toHaveLength(3);
+    expect(requests.map(({ init }) => (init as { dispatcher?: unknown })?.dispatcher)).toEqual([
+      originalDispatcher,
+      replacementDispatcher,
+      replacementDispatcher,
+    ]);
+    expect(new Headers(requests[2]?.init?.headers).get('Authorization')).toBe('Bearer replacement-token');
+  });
+
+  test('restarts a failed cold exchange when the transport rotates before the API request', async () => {
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const fetchOptions = { dispatcher: originalDispatcher as { name: string } };
+    const originalExchange = deferredResponse();
+    const requests: { url: string; init: RequestInit | undefined }[] = [];
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: url.toString(), init });
+      if (!url.toString().includes('/oauth/token')) {
+        return Response.json({ data: [] });
+      }
+      return (init as { dispatcher?: unknown })?.dispatcher === originalDispatcher
+        ? await originalExchange.promise
+        : tokenResponse('replacement-token');
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+      fetchOptions: fetchOptions as never,
+    });
+
+    const request = client.models.list({ maxRetries: 0 });
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    fetchOptions.dispatcher = replacementDispatcher;
+    originalExchange.resolve(Response.json({ error: 'invalid_grant' }, { status: 400 }));
+
+    await expect(request).resolves.toMatchObject({ data: [] });
     expect(requests).toHaveLength(3);
     expect(requests.map(({ init }) => (init as { dispatcher?: unknown })?.dispatcher)).toEqual([
       originalDispatcher,
@@ -660,6 +702,60 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(exchangeCount).toBe(2);
     expect(apiCount).toBe(2);
     expect(apiAuthorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
+  });
+
+  test('preserves headers contributed by mutating options in a legacy authHeaders override', async () => {
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchangeCount += 1;
+          return tokenResponse('workload-token');
+        }
+        apiCount += 1;
+        expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer legacy-custom-token');
+        expect(new Headers(init?.headers).get('X-Legacy-Auth-Hook')).toBe('present');
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      }),
+    });
+    client.authOptionsMutation = (options) => {
+      options.headers = {
+        Authorization: 'Bearer legacy-custom-token',
+        'X-Legacy-Auth-Hook': 'present',
+      };
+    };
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+    expect(exchangeCount).toBe(1);
+    expect(apiCount).toBe(1);
+  });
+
+  test('drops workload provenance when a legacy authHeaders override replaces the credential', async () => {
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchangeCount += 1;
+          return tokenResponse('workload-token');
+        }
+        apiCount += 1;
+        expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer legacy-custom-token');
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      }),
+    });
+    client.authHeadersMutation = (headers) => {
+      headers?.values.set('Authorization', 'Bearer legacy-custom-token');
+    };
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+    expect(exchangeCount).toBe(1);
+    expect(apiCount).toBe(1);
   });
 
   test('retries a replayable 401 when response cleanup fails', async () => {

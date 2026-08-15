@@ -752,6 +752,9 @@ export class OpenAI {
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
     const context = this.#workloadIdentityBuildContexts.get(opts);
     if (this._workloadIdentityAuth) {
+      if (context) {
+        context.workloadIdentityAuthenticationAttempted = true;
+      }
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       const token = await this._workloadIdentityAuth.getToken(opts.signal, opts.timeout ?? this.timeout, {
         fetchOptions,
@@ -759,6 +762,7 @@ export class OpenAI {
         ...(context ? { transportKey: context.transportKey } : {}),
       });
       if (context) {
+        context.workloadIdentityAuthorization = `Bearer ${token}`;
         context.usesWorkloadIdentityToken = true;
       }
       return buildHeaders([
@@ -1509,27 +1513,45 @@ export class OpenAI {
 
     let workloadIdentityContext: WorkloadIdentityRequestContext;
     let reqHeaders: Headers;
-    do {
+    while (true) {
       const fetchOptions = this.fetchOptions;
       workloadIdentityContext = {
         fetchOptions: this._usesX509WorkloadIdentity && fetchOptions ? { ...fetchOptions } : fetchOptions,
         terminalAuthenticationError: undefined,
         transportKey: x509TransportKey(fetchOptions),
+        workloadIdentityAuthenticationAttempted: false,
+        workloadIdentityAuthorization: undefined,
         workloadIdentityTokenSuppressed: false,
         usesWorkloadIdentityToken: false,
       };
-      // oxlint-disable-next-line no-await-in-loop -- X.509 transport rotation rebuilds auth atomically.
-      reqHeaders = await this.buildHeaders({
-        options: inputOptions,
-        method,
-        bodyHeaders,
-        retryCount,
-        workloadIdentityContext,
-      });
-    } while (
-      this._usesX509WorkloadIdentity &&
-      workloadIdentityContext.transportKey !== x509TransportKey(this.fetchOptions)
-    );
+      try {
+        // oxlint-disable-next-line no-await-in-loop -- X.509 transport rotation rebuilds auth atomically.
+        reqHeaders = await this.buildHeaders({
+          options: inputOptions,
+          method,
+          bodyHeaders,
+          retryCount,
+          workloadIdentityContext,
+        });
+      } catch (error) {
+        if (
+          !options.signal?.aborted &&
+          this._usesX509WorkloadIdentity &&
+          workloadIdentityContext.workloadIdentityAuthenticationAttempted &&
+          workloadIdentityContext.workloadIdentityAuthorization === undefined &&
+          workloadIdentityContext.transportKey !== x509TransportKey(this.fetchOptions)
+        ) {
+          continue;
+        }
+        throw error;
+      }
+      if (
+        !this._usesX509WorkloadIdentity ||
+        workloadIdentityContext.transportKey === x509TransportKey(this.fetchOptions)
+      ) {
+        break;
+      }
+    }
 
     const req: FinalizedRequestInit = {
       method,
@@ -1569,8 +1591,8 @@ export class OpenAI {
     }
 
     const helperMethod = options.__metadata?.['helperMethod'];
-    const headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
-    const overridesAuthorization =
+    let headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
+    let overridesAuthorization =
       headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization');
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider && !overridesAuthorization) {
@@ -1581,6 +1603,11 @@ export class OpenAI {
           authOptions,
           options.__security ?? { bearerAuth: true },
         );
+        // Preserve the established protected-hook contract: subclasses may
+        // contribute request headers by mutating the options passed to authHeaders.
+        headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, authOptions.headers]);
+        overridesAuthorization =
+          headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization');
       } finally {
         this.#workloadIdentityBuildContexts.delete(authOptions);
       }
@@ -1604,6 +1631,16 @@ export class OpenAI {
     if (overridesAuthorization) {
       workloadIdentityContext.workloadIdentityTokenSuppressed = true;
       workloadIdentityContext.usesWorkloadIdentityToken = false;
+    } else if (
+      workloadIdentityContext.usesWorkloadIdentityToken &&
+      headers.values.get('authorization') !== workloadIdentityContext.workloadIdentityAuthorization
+    ) {
+      // authHeaders is a protected compatibility hook. Only credentials that
+      // survive that hook unchanged retain workload-identity provenance.
+      workloadIdentityContext.usesWorkloadIdentityToken = false;
+      if (!headers.values.get('authorization')) {
+        workloadIdentityContext.workloadIdentityTokenSuppressed = true;
+      }
     }
 
     if (!this._provider) {
