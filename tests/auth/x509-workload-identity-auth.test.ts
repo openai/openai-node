@@ -165,7 +165,11 @@ describe('X.509 workload identity auth', () => {
 
   test('a canceled waiter neither cancels nor poisons the shared refresh', async () => {
     const exchange = deferredResponse();
-    const customFetch = vi.fn(() => exchange.promise);
+    let exchangeSignal: AbortSignal | null | undefined;
+    const customFetch = vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+      exchangeSignal = init?.signal;
+      return exchange.promise;
+    });
     const auth = new WorkloadIdentityAuth(config, customFetch);
     const controller = new AbortController();
 
@@ -175,6 +179,7 @@ describe('X.509 workload identity auth', () => {
     controller.abort('caller stopped waiting');
 
     await expect(canceled).rejects.toBeInstanceOf(APIUserAbortError);
+    expect(exchangeSignal?.aborted).toBe(false);
     exchange.resolve(tokenResponse('winner-token'));
     await expect(winner).resolves.toBe('winner-token');
     await expect(auth.getToken()).resolves.toBe('winner-token');
@@ -228,9 +233,13 @@ describe('X.509 workload identity auth', () => {
 
   test('retires a stalled refresh after its final waiter exits', async () => {
     const stalledExchange = deferredResponse();
+    let stalledSignal: AbortSignal | null | undefined;
     const customFetch = vi
       .fn()
-      .mockImplementationOnce(() => stalledExchange.promise)
+      .mockImplementationOnce((_url: string | URL | Request, init?: RequestInit) => {
+        stalledSignal = init?.signal;
+        return stalledExchange.promise;
+      })
       .mockResolvedValueOnce(tokenResponse('replacement-token'));
     const auth = new WorkloadIdentityAuth(config, customFetch);
     const controller = new AbortController();
@@ -240,6 +249,7 @@ describe('X.509 workload identity auth', () => {
     controller.abort('caller stopped waiting');
     await expect(abandoned).rejects.toBeInstanceOf(APIUserAbortError);
     await vi.waitFor(() => expect(hasRefreshAttempt(auth)).toBe(false));
+    expect(stalledSignal?.aborted).toBe(true);
 
     await expect(auth.getToken()).resolves.toBe('replacement-token');
     expect(customFetch).toHaveBeenCalledTimes(2);
@@ -253,10 +263,14 @@ describe('X.509 workload identity auth', () => {
     let wallTime = 9_000_000_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
     const stalledRefresh = deferredResponse();
+    let stalledSignal: AbortSignal | null | undefined;
     const customFetch = vi
       .fn()
       .mockResolvedValueOnce(tokenResponse('cached-token', 10))
-      .mockImplementationOnce(() => stalledRefresh.promise)
+      .mockImplementationOnce((_url: string | URL | Request, init?: RequestInit) => {
+        stalledSignal = init?.signal;
+        return stalledRefresh.promise;
+      })
       .mockResolvedValueOnce(tokenResponse('replacement-token'));
     const auth = new WorkloadIdentityAuth(config, customFetch);
 
@@ -272,11 +286,37 @@ describe('X.509 workload identity auth', () => {
     controller.abort('caller stopped waiting');
     await expect(abandoned).rejects.toBeInstanceOf(APIUserAbortError);
     await vi.waitFor(() => expect(hasRefreshAttempt(auth)).toBe(false));
+    expect(stalledSignal?.aborted).toBe(true);
 
     await expect(auth.getToken()).resolves.toBe('replacement-token');
     stalledRefresh.resolve(tokenResponse('stale-token'));
     await vi.waitFor(async () => expect(await auth.getToken()).toBe('replacement-token'));
     expect(customFetch).toHaveBeenCalledTimes(3);
+  });
+
+  test('aborts an invalidated X.509 refresh and restarts its waiters', async () => {
+    const staleExchange = deferredResponse();
+    let staleSignal: AbortSignal | null | undefined;
+    const customFetch = vi
+      .fn()
+      .mockImplementationOnce((_url: string | URL | Request, init?: RequestInit) => {
+        staleSignal = init?.signal;
+        return staleExchange.promise;
+      })
+      .mockResolvedValueOnce(tokenResponse('replacement-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    const token = auth.getToken();
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    auth.invalidateToken();
+
+    await expect(token).resolves.toBe('replacement-token');
+    expect(staleSignal?.aborted).toBe(true);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+
+    staleExchange.resolve(tokenResponse('stale-token'));
+    await vi.waitFor(async () => expect(await auth.getToken()).toBe('replacement-token'));
+    expect(customFetch).toHaveBeenCalledTimes(2);
   });
 
   test('clamps refreshBufferMs to half of a short token TTL using a suspension-aware clock', async () => {

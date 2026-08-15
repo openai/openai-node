@@ -24,6 +24,7 @@ interface RefreshWaiter {
 }
 
 interface RefreshAttempt {
+  controller: AbortController;
   waiters: Set<RefreshWaiter>;
 }
 
@@ -47,7 +48,12 @@ interface RefreshContext {
 }
 
 interface CredentialSource {
-  exchange: (retryCount: number, fetchOptions: MergedRequestInit | undefined) => Promise<unknown>;
+  abortInvalidatedRefresh: boolean;
+  exchange: (
+    retryCount: number,
+    fetchOptions: MergedRequestInit | undefined,
+    signal: AbortSignal,
+  ) => Promise<unknown>;
   /** Includes host suspension so token TTLs cannot outlive real elapsed time. */
   expirationNow: () => number;
   isExpirationSafe: (expiresAt: number) => boolean;
@@ -223,6 +229,7 @@ async function waitForRefresh(
           if (refreshAttempt.waiters.size === 0 && state.refreshAttempt === refreshAttempt) {
             state.refreshAttempt = null;
             state.tokenGeneration += 1;
+            refreshAttempt.controller.abort();
           }
         }, 0);
       }
@@ -374,12 +381,14 @@ function createCredentialSource(
     const resolveFetchOptions = (requestOptions: WorkloadIdentityAuthOptions) =>
       hasOwn(requestOptions, 'fetchOptions') ? requestOptions.fetchOptions : options.fetchOptions;
     return {
-      exchange: (retryCount, effectiveFetchOptions) =>
+      abortInvalidatedRefresh: true,
+      exchange: (retryCount, effectiveFetchOptions, signal) =>
         exchangeX509Token({
           config,
           fetch,
           fetchOptions: effectiveFetchOptions,
           retryCount,
+          signal,
         }),
       isExpirationSafe: (expiresAt) => Number.isFinite(expiresAt) && expiresAt <= Number.MAX_SAFE_INTEGER,
       maxRetries: (requestOptions) => validateMaxRetries(requestOptions.maxRetries ?? defaultMaxRetries),
@@ -398,6 +407,7 @@ function createCredentialSource(
   }
 
   return {
+    abortInvalidatedRefresh: false,
     exchange: () => exchangeSubjectToken(config, fetch),
     expirationNow: () => Date.now(),
     isExpirationSafe: Number.isSafeInteger,
@@ -569,10 +579,10 @@ export class WorkloadIdentityAuth {
   }
 
   private startRefresh(context: RefreshContext, retryCount: number): RefreshAttempt {
-    const refreshAttempt: RefreshAttempt = { waiters: new Set() };
+    const refreshAttempt: RefreshAttempt = { controller: new AbortController(), waiters: new Set() };
     context.state.refreshAttempt = refreshAttempt;
     // oxlint-disable promise/prefer-await-to-callbacks -- One shared reaction fans settlement out to removable waiters.
-    void this.refreshToken(context, retryCount).then(
+    void this.refreshToken(context, retryCount, refreshAttempt.controller.signal).then(
       (token) => resolveRefresh(context.state, refreshAttempt, token),
       (error: unknown) => rejectRefresh(context.state, refreshAttempt, error),
     );
@@ -580,10 +590,14 @@ export class WorkloadIdentityAuth {
     return refreshAttempt;
   }
 
-  private async refreshToken(context: RefreshContext, retryCount: number): Promise<string> {
+  private async refreshToken(
+    context: RefreshContext,
+    retryCount: number,
+    signal: AbortSignal,
+  ): Promise<string> {
     let tokenResponse: unknown;
     try {
-      tokenResponse = await this.source.exchange(retryCount, context.fetchOptions);
+      tokenResponse = await this.source.exchange(retryCount, context.fetchOptions, signal);
     } catch (error) {
       if (
         error instanceof X509TokenExchangeRetryableError &&
@@ -648,6 +662,12 @@ export class WorkloadIdentityAuth {
     }
     state.tokenGeneration += 1;
     state.cachedToken = null;
-    state.refreshAttempt = null;
+    const { refreshAttempt } = state;
+    if (refreshAttempt && this.source.abortInvalidatedRefresh) {
+      rejectRefresh(state, refreshAttempt, REFRESH_INVALIDATED);
+      refreshAttempt.controller.abort();
+    } else {
+      state.refreshAttempt = null;
+    }
   }
 }

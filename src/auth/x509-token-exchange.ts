@@ -15,6 +15,7 @@ interface X509TokenExchangeOptions {
   fetch: Fetch;
   fetchOptions?: MergedRequestInit | undefined;
   retryCount: number;
+  signal: AbortSignal;
 }
 
 /** Internal signal that a caller may retry a sanitized exchange failure. */
@@ -100,14 +101,13 @@ async function readOAuthErrorCode(response: Response): Promise<{ error: string }
 async function exchangeAttempt(options: X509TokenExchangeOptions, body: string): Promise<unknown> {
   let response: Response;
   try {
-    const controller = new AbortController();
     response = await options.fetch.call(undefined, X509_TOKEN_EXCHANGE_URL, {
       ...(options.fetchOptions as RequestInit | undefined),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
       redirect: 'manual',
-      signal: controller.signal,
+      signal: options.signal,
     });
   } catch {
     throw retryableConnectionError(options.retryCount);
