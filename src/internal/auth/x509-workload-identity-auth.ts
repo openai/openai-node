@@ -8,8 +8,13 @@ import { exchangeX509Token, X509TokenExchangeRetryableError } from './x509-token
 
 interface CachedToken {
   token: string;
-  expiresAt: number;
-  refreshAt: number;
+  expiresAt: LifetimeDeadline;
+  refreshAt: LifetimeDeadline;
+}
+
+interface LifetimeDeadline {
+  monotonic: number;
+  wall: number;
 }
 
 interface RefreshWaiter {
@@ -19,12 +24,20 @@ interface RefreshWaiter {
 
 interface RefreshAttempt {
   controller: AbortController;
+  retryCount: number;
   waiters: Set<RefreshWaiter>;
+}
+
+interface RetrySequence {
+  lastError: X509TokenExchangeRetryableError | null;
+  nextRetryCount: number;
+  participants: Map<symbol, number>;
 }
 
 interface RefreshState {
   cachedToken: CachedToken | null;
   refreshAttempt: RefreshAttempt | null;
+  retrySequence: RetrySequence | null;
   retryNotBefore: number;
   tokenGeneration: number;
 }
@@ -49,6 +62,7 @@ function createRefreshState(): RefreshState {
   return {
     cachedToken: null,
     refreshAttempt: null,
+    retrySequence: null,
     retryNotBefore: 0,
     tokenGeneration: 0,
   };
@@ -133,6 +147,21 @@ function monotonicNow(): number {
   return now;
 }
 
+function lifetimeDeadline(durationMs: number): LifetimeDeadline {
+  const wall = Date.now() + durationMs;
+  const monotonic = monotonicNow() + durationMs;
+  if (!Number.isSafeInteger(wall) || !Number.isFinite(monotonic) || monotonic > Number.MAX_SAFE_INTEGER) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+  return { monotonic, wall };
+}
+
+function hasReached(deadline: LifetimeDeadline): boolean {
+  // Either clock may advance farther: monotonic time prevents backward wall-clock
+  // adjustments from extending a token, while wall time covers host suspension.
+  return monotonicNow() >= deadline.monotonic || Date.now() >= deadline.wall;
+}
+
 function abortError(signal: AbortSignal): APIUserAbortError {
   const error = new APIUserAbortError();
   Object.defineProperty(error, 'cause', { value: signal.reason, writable: true, configurable: true });
@@ -146,6 +175,23 @@ function throwIfAborted(signal: AbortSignal | null | undefined): void {
 }
 
 const REFRESH_INVALIDATED = Symbol('workload identity refresh invalidated');
+
+function assertRetrySequence(context: RefreshContext, retrySequence: RetrySequence): void {
+  if (context.state.tokenGeneration !== context.generation || context.state.retrySequence !== retrySequence) {
+    throw REFRESH_INVALIDATED;
+  }
+}
+
+function leaveRetrySequence(state: RefreshState, retrySequence: RetrySequence, participant: symbol): void {
+  retrySequence.participants.delete(participant);
+  if (
+    retrySequence.participants.size === 0 &&
+    state.retrySequence === retrySequence &&
+    !state.refreshAttempt
+  ) {
+    state.retrySequence = null;
+  }
+}
 
 function takeRefreshWaiters(state: RefreshState, refreshAttempt: RefreshAttempt): RefreshWaiter[] {
   if (state.refreshAttempt === refreshAttempt) {
@@ -191,6 +237,7 @@ async function waitForRefresh(
         setTimeout(() => {
           if (refreshAttempt.waiters.size === 0 && state.refreshAttempt === refreshAttempt) {
             state.refreshAttempt = null;
+            state.retrySequence = null;
             state.tokenGeneration += 1;
             refreshAttempt.controller.abort();
           }
@@ -411,54 +458,92 @@ export class X509WorkloadIdentityAuth {
   ): Promise<string> {
     const { state } = context;
     const cachedAtStart = state.cachedToken;
+    const retrySequence = state.retrySequence ?? {
+      lastError: null,
+      nextRetryCount: 0,
+      participants: new Map(),
+    };
+    const participant = Symbol('X.509 refresh participant');
+    state.retrySequence = retrySequence;
+    retrySequence.participants.set(participant, maxRetries);
 
-    for (let retryCount = 0; ; retryCount += 1) {
-      throwIfAborted(signal);
-      X509WorkloadIdentityAuth.throwIfDeadlineExceeded(deadline);
-      if (state.tokenGeneration !== context.generation) {
-        throw REFRESH_INVALIDATED;
-      }
-      let retryDelayMs = state.retryNotBefore - monotonicNow();
-      while (retryDelayMs > 0) {
-        // oxlint-disable-next-line no-await-in-loop -- Each wake must recheck a shared backoff another attempt may extend.
-        await waitForDelay(retryDelayMs, signal, X509WorkloadIdentityAuth.remainingTimeout(deadline));
-        if (state.tokenGeneration !== context.generation) {
-          throw REFRESH_INVALIDATED;
-        }
+    try {
+      while (true) {
+        throwIfAborted(signal);
         X509WorkloadIdentityAuth.throwIfDeadlineExceeded(deadline);
-        retryDelayMs = state.retryNotBefore - monotonicNow();
-      }
-      if (
-        state.cachedToken &&
-        state.cachedToken !== cachedAtStart &&
-        !X509WorkloadIdentityAuth.isTokenExpired(state.cachedToken)
-      ) {
-        return state.cachedToken.token;
-      }
+        assertRetrySequence(context, retrySequence);
+        if (state.retryNotBefore > monotonicNow()) {
+          // oxlint-disable-next-line no-await-in-loop -- Each attempt must honor the latest shared backoff.
+          await X509WorkloadIdentityAuth.waitForRetryWindow(context, retrySequence, signal, deadline);
+        }
+        if (
+          state.cachedToken &&
+          state.cachedToken !== cachedAtStart &&
+          !X509WorkloadIdentityAuth.isTokenExpired(state.cachedToken)
+        ) {
+          return state.cachedToken.token;
+        }
 
-      try {
-        X509WorkloadIdentityAuth.throwIfDeadlineExceeded(deadline);
-        const refreshAttempt = state.refreshAttempt ?? this.startRefresh(context, retryCount);
-        // oxlint-disable-next-line no-await-in-loop -- Token refresh attempts are intentionally sequential.
-        const token = await waitForRefresh(
-          state,
-          refreshAttempt,
-          signal,
-          X509WorkloadIdentityAuth.remainingTimeout(deadline),
-        );
-        return token;
-      } catch (error) {
-        if (!(error instanceof X509TokenExchangeRetryableError)) {
-          throw error;
-        }
-        if (state.tokenGeneration !== context.generation) {
-          throw REFRESH_INVALIDATED;
-        }
-        if (retryCount >= maxRetries) {
-          throw error.error;
+        const refreshAttempt =
+          state.refreshAttempt ?? this.startRetrySequenceAttempt(context, retrySequence, deadline);
+
+        try {
+          // oxlint-disable-next-line no-await-in-loop -- Token refresh attempts are intentionally sequential.
+          const token = await waitForRefresh(
+            state,
+            refreshAttempt,
+            signal,
+            X509WorkloadIdentityAuth.remainingTimeout(deadline),
+          );
+          return token;
+        } catch (error) {
+          if (!(error instanceof X509TokenExchangeRetryableError)) {
+            throw error;
+          }
+          assertRetrySequence(context, retrySequence);
+          if (refreshAttempt.retryCount >= maxRetries) {
+            throw error.error;
+          }
         }
       }
+    } finally {
+      leaveRetrySequence(state, retrySequence, participant);
     }
+  }
+
+  private static async waitForRetryWindow(
+    context: RefreshContext,
+    retrySequence: RetrySequence,
+    signal?: AbortSignal | null,
+    deadline?: number,
+  ): Promise<void> {
+    let retryDelayMs = context.state.retryNotBefore - monotonicNow();
+    while (retryDelayMs > 0) {
+      // oxlint-disable-next-line no-await-in-loop -- Each wake must recheck a shared backoff another attempt may extend.
+      await waitForDelay(retryDelayMs, signal, X509WorkloadIdentityAuth.remainingTimeout(deadline));
+      assertRetrySequence(context, retrySequence);
+      X509WorkloadIdentityAuth.throwIfDeadlineExceeded(deadline);
+      retryDelayMs = context.state.retryNotBefore - monotonicNow();
+    }
+  }
+
+  private startRetrySequenceAttempt(
+    context: RefreshContext,
+    retrySequence: RetrySequence,
+    deadline: number | undefined,
+  ): RefreshAttempt {
+    let sharedRetryBudget = -1;
+    for (const retryBudget of retrySequence.participants.values()) {
+      sharedRetryBudget = Math.max(sharedRetryBudget, retryBudget);
+    }
+    if (retrySequence.nextRetryCount > sharedRetryBudget) {
+      if (!retrySequence.lastError) {
+        throw new OpenAIError('X.509 workload identity retry sequence is missing its failure.');
+      }
+      throw retrySequence.lastError.error;
+    }
+    X509WorkloadIdentityAuth.throwIfDeadlineExceeded(deadline);
+    return this.startRefresh(context, retrySequence.nextRetryCount);
   }
 
   private static remainingTimeout(deadline: number | undefined): number | undefined {
@@ -472,7 +557,11 @@ export class X509WorkloadIdentityAuth {
   }
 
   private startRefresh(context: RefreshContext, retryCount: number): RefreshAttempt {
-    const refreshAttempt: RefreshAttempt = { controller: new AbortController(), waiters: new Set() };
+    const refreshAttempt: RefreshAttempt = {
+      controller: new AbortController(),
+      retryCount,
+      waiters: new Set(),
+    };
     context.state.refreshAttempt = refreshAttempt;
     // oxlint-disable promise/prefer-await-to-then promise/prefer-await-to-callbacks -- One shared reaction fans settlement out to removable waiters.
     void this.refreshToken(context, retryCount, refreshAttempt.controller.signal).then(
@@ -506,6 +595,11 @@ export class X509WorkloadIdentityAuth {
           context.state.retryNotBefore,
           monotonicNow() + error.retryDelayMs,
         );
+        const { retrySequence } = context.state;
+        if (retrySequence) {
+          retrySequence.lastError = error;
+          retrySequence.nextRetryCount = Math.max(retrySequence.nextRetryCount, retryCount + 1);
+        }
       }
       throw error;
     }
@@ -525,20 +619,25 @@ export class X509WorkloadIdentityAuth {
       throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
     }
 
-    const now = Date.now();
     const durationMs = expiresIn * 1000;
-    const expiresAt = now + durationMs;
-    if (!Number.isFinite(expiresAt) || expiresAt > Number.MAX_SAFE_INTEGER || expiresAt <= now) {
+    if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
     }
+    const expiresAt = lifetimeDeadline(durationMs);
+    const refreshBufferMs = Math.min(
+      this.config.refreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS,
+      durationMs / 2,
+    );
 
     if (context.state.tokenGeneration === context.generation) {
       context.state.retryNotBefore = 0;
       context.state.cachedToken = {
         token: accessToken,
         expiresAt,
-        refreshAt:
-          expiresAt - Math.min(this.config.refreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS, durationMs / 2),
+        refreshAt: {
+          monotonic: expiresAt.monotonic - refreshBufferMs,
+          wall: expiresAt.wall - refreshBufferMs,
+        },
       };
     }
 
@@ -546,11 +645,11 @@ export class X509WorkloadIdentityAuth {
   }
 
   private static isTokenExpired(cachedToken: CachedToken): boolean {
-    return Date.now() >= cachedToken.expiresAt;
+    return hasReached(cachedToken.expiresAt);
   }
 
   private static needsRefresh(cachedToken: CachedToken): boolean {
-    return Date.now() >= cachedToken.refreshAt;
+    return hasReached(cachedToken.refreshAt);
   }
 
   /** Discards a rejected cached access token so the next request performs a fresh exchange. */
@@ -562,6 +661,8 @@ export class X509WorkloadIdentityAuth {
     }
     state.tokenGeneration += 1;
     state.cachedToken = null;
+    state.retryNotBefore = 0;
+    state.retrySequence = null;
     const { refreshAttempt } = state;
     if (refreshAttempt) {
       rejectRefresh(state, refreshAttempt, REFRESH_INVALIDATED);
