@@ -1107,6 +1107,9 @@ export class OpenAI {
       if (options.signal?.aborted || req.signal?.aborted) {
         throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal!);
       }
+      if (workloadIdentityRequestContext?.terminalAuthenticationError === response) {
+        throw response;
+      }
       // detect native connection timeout errors
       // deno throws "TypeError: error sending request for url (https://example/): client error (Connect): tcp connect error: Operation timed out (os error 60): Operation timed out (os error 60)"
       // undici throws "TypeError: fetch failed" with cause "ConnectTimeoutError: Connect Timeout Error (attempted address: example:443, timeout: 1ms)"
@@ -1336,11 +1339,20 @@ export class OpenAI {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
-        const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
-          fetchOptions,
-          maxRetries,
-          ...(context ? { transportKey: context.transportKey } : {}),
-        });
+        let token: string;
+        try {
+          token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
+            fetchOptions,
+            maxRetries,
+            ...(context ? { transportKey: context.transportKey } : {}),
+          });
+        } catch (error) {
+          const authenticationError = castToError(error);
+          if (this._usesX509WorkloadIdentity && context) {
+            context.terminalAuthenticationError = authenticationError;
+          }
+          throw authenticationError;
+        }
         headers.set('Authorization', `Bearer ${token}`);
         if (context) {
           context.usesWorkloadIdentityToken = true;
@@ -1485,6 +1497,7 @@ export class OpenAI {
       const fetchOptions = this.fetchOptions;
       workloadIdentityContext = {
         fetchOptions: this._usesX509WorkloadIdentity && fetchOptions ? { ...fetchOptions } : fetchOptions,
+        terminalAuthenticationError: undefined,
         transportKey: x509TransportKey(fetchOptions),
         usesWorkloadIdentityToken: false,
       };

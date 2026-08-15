@@ -92,9 +92,10 @@ export type MergedRequestInit = RequestInits &
   /** We don't include these in the types as they'll be overridden for every request. */
   Partial<Record<'body' | 'headers' | 'method' | 'signal', never>>;
 
-/** Effective client transport captured while resolving a transport-bound workload identity. */
+/** Effective client transport captured while resolving a transport-scoped workload identity. */
 export interface WorkloadIdentityRequestContext {
   fetchOptions: MergedRequestInit | undefined;
+  terminalAuthenticationError: Error | undefined;
   transportKey: object | undefined;
   usesWorkloadIdentityToken: boolean;
 }

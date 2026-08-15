@@ -351,6 +351,40 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(retryFetch).toHaveBeenCalledTimes(3);
   });
 
+  test('does not renew an exhausted exchange budget through API request retries', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        return exchangeCount === 1
+          ? Response.json({ access_token: 'short-lived-token', expires_in: 1 })
+          : new Response(null, { status: 503, headers: { 'Retry-After': '0' } });
+      }
+      apiCount += 1;
+      return Response.json({ data: [] });
+    });
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+      maxRetries: 2,
+    });
+    client.requestMutation = (request) => {
+      vi.setSystemTime(new Date(Date.now() + 2000));
+      (request.headers as Headers).delete('Authorization');
+    };
+
+    const rejection = expect(client.models.list()).rejects.toMatchObject({ status: 503 });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await rejection;
+
+    expect(exchangeCount).toBe(4);
+    expect(apiCount).toBe(0);
+  });
+
   test('rejects per-request fetchOptions before exchanging a transport-scoped identity', async () => {
     const customFetch = vi.fn();
     const client = new OpenAI({
