@@ -45,7 +45,7 @@ interface CloseEvent {
  */
 export class BrowserWebSocket implements WebSocketLike {
   private _ws: WebSocket;
-  private _listenerMap = new Map<string, Map<Listener, DOMEventHandler>>();
+  private _listenerMap = new Map<string, Map<Listener, DOMEventHandler[]>>();
 
   /** Wraps an existing browser socket and configures binary frames as array buffers. */
   constructor(ws: WebSocket) {
@@ -76,35 +76,62 @@ export class BrowserWebSocket implements WebSocketLike {
   /** Registers a listener and converts browser event objects to SDK event arguments. */
   on(event: string, listener: Listener): void {
     const wrapped = BrowserWebSocket._wrapListener(event, listener);
-    this._listenersFor(event).set(listener, wrapped);
-    this._ws.addEventListener(event, wrapped);
+    this._addListener(event, listener, wrapped);
   }
 
   /** Removes the browser event wrapper associated with the original listener. */
   off(event: string, listener: Listener): void {
-    const byListener = this._listenerMap.get(event);
-    if (!byListener) {
-      return;
-    }
-    const wrapped = byListener.get(listener);
+    const wrappedListeners = this._listenerMap.get(event)?.get(listener);
+    const [wrapped] = wrappedListeners?.slice(-1) ?? [];
     if (wrapped) {
-      byListener.delete(listener);
-      this._ws.removeEventListener(event, wrapped);
+      this._removeListener(event, listener, wrapped);
     }
   }
 
   /** Registers a listener that is removed before it handles its first event. */
   once(event: string, listener: Listener): void {
-    const onceListener: Listener = (...args) => {
-      this.off(event, listener);
+    let fired = false;
+    const wrapped = BrowserWebSocket._wrapListener(event, (...args) => {
+      if (fired) {
+        return;
+      }
+      fired = true;
+      this._removeListener(event, listener, wrapped);
       listener(...args);
-    };
-    const wrapped = BrowserWebSocket._wrapListener(event, onceListener);
-    this._listenersFor(event).set(listener, wrapped);
-    this._ws.addEventListener(event, wrapped);
+    });
+    this._addListener(event, listener, wrapped);
   }
 
-  private _listenersFor(event: string): Map<Listener, DOMEventHandler> {
+  private _addListener(event: string, listener: Listener, wrapped: DOMEventHandler): void {
+    this._ws.addEventListener(event, wrapped);
+    const byListener = this._listenersFor(event);
+    const wrappedListeners = byListener.get(listener);
+    if (!wrappedListeners) {
+      byListener.set(listener, [wrapped]);
+    } else if (!wrappedListeners.includes(wrapped)) {
+      wrappedListeners.push(wrapped);
+    }
+  }
+
+  private _removeListener(event: string, listener: Listener, wrapped: DOMEventHandler): void {
+    const byListener = this._listenerMap.get(event);
+    const wrappedListeners = byListener?.get(listener);
+    const index = wrappedListeners?.lastIndexOf(wrapped) ?? -1;
+    if (!byListener || !wrappedListeners || index === -1) {
+      return;
+    }
+
+    this._ws.removeEventListener(event, wrapped);
+    wrappedListeners.splice(index, 1);
+    if (wrappedListeners.length === 0) {
+      byListener.delete(listener);
+    }
+    if (byListener.size === 0) {
+      this._listenerMap.delete(event);
+    }
+  }
+
+  private _listenersFor(event: string): Map<Listener, DOMEventHandler[]> {
     let map = this._listenerMap.get(event);
     if (!map) {
       map = new Map();
