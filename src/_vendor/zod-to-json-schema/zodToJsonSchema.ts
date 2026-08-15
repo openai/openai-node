@@ -5,6 +5,19 @@ import { parseDef } from './parseDef';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
+function validateStrictRootSerializationHook(schema: object): void {
+  for (let target: object | null = schema; target !== null; target = Object.getPrototypeOf(target)) {
+    const serializationHook = Object.getOwnPropertyDescriptor(target, 'toJSON');
+    if (!serializationHook) {
+      continue;
+    }
+    if (!('value' in serializationHook) || typeof serializationHook.value === 'function') {
+      throw new Error("Root schema cannot contain a callable or accessor-backed 'toJSON' property");
+    }
+    break;
+  }
+}
+
 function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | undefined): void {
   if (!openaiStrictMode) {
     return;
@@ -18,6 +31,8 @@ function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | un
     }
   }
 
+  validateStrictRootSerializationHook(schema);
+
   const type = descriptors['type']?.enumerable ? descriptors['type'].value : undefined;
   const nullable = descriptors['nullable']?.enumerable && descriptors['nullable'].value === true;
   if (type !== 'object' || nullable) {
@@ -26,7 +41,13 @@ function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | un
       `Root schema must have type: 'object' but got type: ${actualType ? `'${actualType}'` : 'undefined'}`,
     );
   }
-  if (descriptors['$ref']?.enumerable) {
+  const reference = descriptors['$ref'];
+  if (
+    reference?.enumerable &&
+    reference.value !== undefined &&
+    typeof reference.value !== 'function' &&
+    typeof reference.value !== 'symbol'
+  ) {
     throw new Error("Root schema must be a concrete object and cannot contain '$ref'");
   }
 }

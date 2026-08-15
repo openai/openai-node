@@ -235,6 +235,55 @@ describe('strict vendor converter root schemas', () => {
     expect(getter).not.toHaveBeenCalled();
   });
 
+  it.each(['own', 'inherited'])('rejects %s toJSON hooks that serialize a non-object root', (location) => {
+    const toJSON = vi.fn().mockReturnValue({ type: 'string' });
+    const overriddenRoot =
+      location === 'own'
+        ? { type: 'object' as const, toJSON }
+        : Object.assign(Object.create({ toJSON }), { type: 'object' as const });
+
+    expect(JSON.stringify(overriddenRoot)).toBe('{"type":"string"}');
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        openaiStrictMode: true,
+        override: () => overriddenRoot,
+      }),
+    ).toThrow("Root schema cannot contain a callable or accessor-backed 'toJSON' property");
+    expect(toJSON).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['own', 'inherited'])('rejects %s toJSON accessors without invoking them', (location) => {
+    const prototype = {};
+    const overriddenRoot = Object.assign(Object.create(prototype), { type: 'object' as const });
+    const getter = vi.fn(() => () => ({ type: 'string' }));
+
+    Object.defineProperty(location === 'own' ? overriddenRoot : prototype, 'toJSON', { get: getter });
+
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        openaiStrictMode: true,
+        override: () => overriddenRoot,
+      }),
+    ).toThrow("Root schema cannot contain a callable or accessor-backed 'toJSON' property");
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'undefined', value: undefined },
+    { name: 'a function', value: () => '#/definitions/Root' },
+    { name: 'a symbol', value: Symbol('reference') },
+  ])('ignores an enumerable root reference containing $name because JSON omits it', ({ value }) => {
+    const overriddenRoot = { type: 'object' as const, $ref: value };
+
+    expect(JSON.stringify(overriddenRoot)).toBe('{"type":"object"}');
+    const schema = zodToJsonSchema(z3.object({ value: z3.string() }), {
+      target: 'openApi3',
+      openaiStrictMode: true,
+      override: () => overriddenRoot as { type: 'object' },
+    });
+    expect(JSON.stringify(schema)).toBe('{"type":"object"}');
+  });
+
   it.each([
     { name: 'conflicting properties', sibling: { properties: { injected: { type: 'number' } } } },
     { name: 'additionalProperties: true', sibling: { additionalProperties: true } },
