@@ -2,7 +2,7 @@ import type { Response, ResponseStreamEvent } from '../../resources/responses/re
 import {
   accumulateResponseWithContext,
   createResponseContext,
-} from '../../internal/responses/ResponseAccumulator';
+} from '../../internal/responses/response-accumulator';
 
 /** A transport keepalive event that leaves the accumulated response unchanged. */
 type ResponseKeepAliveEvent = {

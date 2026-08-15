@@ -1,4 +1,5 @@
 import { expect, vi } from 'vitest';
+import { OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { accumulateResponse } from 'openai/lib/responses/ResponseAccumulator';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
@@ -8,6 +9,8 @@ import type {
   ResponseOutputText,
   ResponseStreamEvent,
 } from 'openai/resources/responses/responses';
+import * as responseAccumulator from '../../src/internal/responses/response-accumulator';
+import * as responseParser from '../../src/lib/ResponsesParser';
 
 type Output = Response['output'][number];
 type Content = ResponseOutputMessage['content'][number];
@@ -211,6 +214,36 @@ describe('canonical streamed response output text', () => {
 
     expect(final.output_text).toBe('x'.repeat(count));
     expect(work.reads).toBeLessThanOrEqual(count * 8);
+  });
+
+  test('releases the request-owned accumulator context when the stream ends', async () => {
+    const createContext = vi.spyOn(responseAccumulator, 'createResponseContext');
+
+    const final = await stream([created([first()]), textFrame('delta', 0, 0, '!')]);
+
+    expect(final.output_text).toBe('A!');
+    expect(createContext).toHaveBeenCalledTimes(3);
+    const [, requestContext, releasedContext] = createContext.mock.results.map(({ value }) => value);
+    expect(requestContext?.canonicalSnapshot?.output_text).toBe('A!');
+    expect(releasedContext?.canonicalSnapshot).toBeUndefined();
+    expect(releasedContext?.outputTextLengths).not.toBe(requestContext?.outputTextLengths);
+  });
+
+  test('releases the request-owned accumulator context before response parsing fails', async () => {
+    const createContext = vi.spyOn(responseAccumulator, 'createResponseContext');
+    const parsingFailure = new OpenAIError('response parsing failed');
+    const parseResponse = vi.spyOn(responseParser, 'maybeParseResponse').mockImplementation(() => {
+      expect(createContext).toHaveBeenCalledTimes(3);
+      throw parsingFailure;
+    });
+
+    await expect(stream([created([first()]), textFrame('delta', 0, 0, '!')])).rejects.toBe(parsingFailure);
+
+    expect(parseResponse).toHaveBeenCalledOnce();
+    const [, requestContext, releasedContext] = createContext.mock.results.map(({ value }) => value);
+    expect(requestContext?.canonicalSnapshot?.output_text).toBe('A!');
+    expect(releasedContext?.canonicalSnapshot).toBeUndefined();
+    expect(releasedContext?.outputTextLengths).not.toBe(requestContext?.outputTextLengths);
   });
 
   test('keeps lifecycle replacements and parallel stream contexts independent', async () => {

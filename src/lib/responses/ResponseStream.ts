@@ -16,7 +16,7 @@ import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } 
 import {
   accumulateResponseWithContext,
   createResponseContext,
-} from '../../internal/responses/ResponseAccumulator';
+} from '../../internal/responses/response-accumulator';
 import type { ParseableToolsParams } from '../ResponsesParser';
 import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
@@ -213,6 +213,7 @@ export class ResponseStream<ParsedT = null>
       throw new OpenAIError(`request ended without sending any events`);
     }
     this.#currentResponseSnapshot = undefined;
+    this.#accumulatorContext = createResponseContext();
     const parsedResponse = finalizeResponse<ParsedT>(snapshot, this.#params);
     this.#finalResponse = parsedResponse;
 
