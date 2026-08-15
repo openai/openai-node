@@ -5,6 +5,12 @@ import { hasOwn } from '../utils';
 interface ResponseAccumulatorContext {
   canonicalSnapshot: Response | undefined;
   outputTextLengths: WeakMap<Response['output'][number], number>;
+  outputTextOffset: ResponseOutputTextOffset | undefined;
+}
+
+interface ResponseOutputTextOffset {
+  outputIndex: number;
+  offset: number;
 }
 
 interface ResponseKeepAliveEvent {
@@ -195,6 +201,7 @@ function ensureCanonicalOutputText(context: ResponseAccumulatorContext, snapshot
     return;
   }
 
+  context.outputTextOffset = undefined;
   let text = '';
   for (const output of snapshot.output) {
     text += getOutputText(context, output);
@@ -208,6 +215,7 @@ function ensureCanonicalOutputText(context: ResponseAccumulatorContext, snapshot
 function cloneResponse(context: ResponseAccumulatorContext, response: Response): Response {
   context.canonicalSnapshot = undefined;
   context.outputTextLengths = new WeakMap();
+  context.outputTextOffset = undefined;
   const snapshot = structuredClone(response);
   if (
     !Object.getOwnPropertyDescriptor(snapshot, 'output_text') ||
@@ -288,7 +296,12 @@ function getOutputTextOffset(
   outputIndex: number,
   lengths: ResponseContentTextLengths,
   previousText: string,
-): number | undefined {
+): number {
+  const cachedOffset = context.outputTextOffset;
+  if (cachedOffset?.outputIndex === outputIndex) {
+    return cachedOffset.offset + lengths.precedingContentLength;
+  }
+
   if (outputIndex <= snapshot.output.length - outputIndex - 1) {
     let offset = lengths.precedingContentLength;
     for (let index = 0; index < outputIndex; index += 1) {
@@ -298,6 +311,7 @@ function getOutputTextOffset(
           context.outputTextLengths.get(precedingOutput) ?? getOutputText(context, precedingOutput).length;
       }
     }
+    context.outputTextOffset = { outputIndex, offset: offset - lengths.precedingContentLength };
     return offset;
   }
 
@@ -309,10 +323,9 @@ function getOutputTextOffset(
         context.outputTextLengths.get(followingOutput) ?? getOutputText(context, followingOutput).length;
     }
   }
-  if (followingTextLength === 0) {
-    return undefined;
-  }
-  return snapshot.output_text.length - followingTextLength - previousText.length;
+  const offset = snapshot.output_text.length - followingTextLength - previousText.length;
+  context.outputTextOffset = { outputIndex, offset: offset - lengths.precedingContentLength };
+  return offset;
 }
 
 function updateOutputText(
@@ -338,7 +351,7 @@ function updateOutputText(
 
   const lengths = getContentTextLengths(context, output, contentIndex, nextText);
   const offset = getOutputTextOffset(context, snapshot, outputIndex, lengths, previousText);
-  if (offset === undefined) {
+  if (offset + previousText.length === snapshot.output_text.length) {
     replaceOutputTextSuffix(snapshot, previousText, nextText);
     return;
   }
@@ -876,7 +889,7 @@ function isIgnoredResponseEvent(event: ResponseAccumulatorEvent): event is Respo
 }
 
 export function createResponseContext(): ResponseAccumulatorContext {
-  return { canonicalSnapshot: undefined, outputTextLengths: new WeakMap() };
+  return { canonicalSnapshot: undefined, outputTextLengths: new WeakMap(), outputTextOffset: undefined };
 }
 
 export function accumulateResponseWithContext(

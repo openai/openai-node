@@ -202,6 +202,103 @@ describe('canonical streamed response output text', () => {
     },
   );
 
+  test.each(['added', 'delta'] as const)(
+    'visits surrounding tool outputs only linearly across middle-message %s updates',
+    async (kind) => {
+      const count = 256;
+      const middleIndex = count / 2;
+      const work = measureLaterOutputVisits();
+      const events = [created()];
+
+      for (let index = 0; index < middleIndex; index += 1) {
+        events.push(outputFrame('added', index, tool(index)));
+      }
+      events.push(
+        outputFrame('added', middleIndex, message(middleIndex, kind === 'delta' ? [text('')] : [])),
+      );
+      for (let index = middleIndex + 1; index <= count; index += 1) {
+        events.push(outputFrame('added', index, tool(index)));
+      }
+      for (let index = 0; index < count; index += 1) {
+        const event =
+          kind === 'added'
+            ? contentFrame('added', middleIndex, index, text('x'))
+            : textFrame('delta', middleIndex, 0, 'x');
+        events.push(event);
+      }
+
+      const final = await stream(events);
+
+      expect(final.output_text).toBe('x'.repeat(count));
+      expect(work.visits).toBeLessThanOrEqual(count * 8);
+    },
+  );
+
+  test.each([
+    ['an earlier message becomes a tool', message(0, [text('A')]), outputFrame('done', 0, tool(0)), 'M12Z'],
+    [
+      'an earlier tool becomes a message',
+      tool(0),
+      outputFrame('done', 0, message(0, [text('longer')])),
+      'longerM12Z',
+    ],
+    [
+      'an earlier message is replaced with longer text',
+      message(0, [text('A')]),
+      outputFrame('done', 0, message(0, [text('longer')])),
+      'longerM12Z',
+    ],
+    [
+      'an earlier message receives a text delta',
+      message(0, [text('A')]),
+      textFrame('delta', 0, 0, '++'),
+      'A++M12Z',
+    ],
+    [
+      'an earlier message receives authoritative text',
+      message(0, [text('A')]),
+      textFrame('done', 0, 0, 'longer'),
+      'longerM12Z',
+    ],
+  ] as [string, Output, ResponseStreamEvent, string][])(
+    'updates a cached middle-message offset when %s',
+    async (_label, earlierOutput, earlierUpdate, expected) => {
+      const events = [
+        created(),
+        outputFrame('added', 0, earlierOutput),
+        outputFrame('added', 1, message(1, [text('M')])),
+        outputFrame('added', 2, message(2, [text('Z')])),
+        textFrame('delta', 1, 0, '1'),
+        earlierUpdate,
+        textFrame('delta', 1, 0, '2'),
+      ];
+
+      const final = await stream(events);
+
+      expect(final.output_text).toBe(expected);
+    },
+  );
+
+  test('keeps a suffix-seeded middle-message cursor relative to its entire output', async () => {
+    const middleIndex = 4;
+    const events = [created()];
+
+    for (let index = 0; index < middleIndex; index += 1) {
+      events.push(outputFrame('added', index, tool(index)));
+    }
+    events.push(
+      outputFrame('added', middleIndex, message(middleIndex, [text('A'), text('B')])),
+      outputFrame('added', middleIndex + 1, tool(middleIndex + 1)),
+      outputFrame('added', middleIndex + 2, tool(middleIndex + 2)),
+      textFrame('delta', middleIndex, 1, 'x'),
+      textFrame('delta', middleIndex, 1, 'y'),
+    );
+
+    const final = await stream(events);
+
+    expect(final.output_text).toBe('ABxy');
+  });
+
   test('keeps 4,096 ordinary streamed token deltas linear', async () => {
     const count = 4096;
     const work = measureTextWork();
