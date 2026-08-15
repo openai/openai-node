@@ -61,18 +61,32 @@ const defaultOptions: Omit<Options, 'definitions' | 'basePath'> = {
 
 export const getDefaultOptions = <Target extends Targets>(
   options: Partial<Options<Target>> | string | undefined,
-) =>
+): Options<Target> => {
   // We need to add `definitions` here as we may mutate it
-  (typeof options === 'string'
-    ? {
-        ...defaultOptions,
-        basePath: ['#'],
-        definitions: {},
-        name: options,
-      }
-    : {
-        ...defaultOptions,
-        basePath: ['#'],
-        definitions: {},
-        ...options,
-      }) as Options<Target>;
+  const resolvedOptions = (
+    typeof options === 'string'
+      ? {
+          ...defaultOptions,
+          basePath: ['#'],
+          definitions: {},
+          name: options,
+        }
+      : {
+          ...defaultOptions,
+          basePath: ['#'],
+          definitions: {},
+          ...options,
+        }
+  ) as Options<Target>;
+
+  if (
+    typeof options !== 'string' &&
+    options?.definitions &&
+    resolvedOptions.$refStrategy === 'extract-to-root' &&
+    resolvedOptions.nameStrategy === 'duplicate-ref'
+  ) {
+    resolvedOptions.definitions = { ...options.definitions };
+  }
+
+  return resolvedOptions;
+};
