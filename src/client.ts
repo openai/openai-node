@@ -305,32 +305,48 @@ const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
 const WORKLOAD_IDENTITY_REQUEST_CONTEXT = Symbol('workloadIdentityRequestContext');
+const workloadIdentityRequestContexts = new WeakMap<object, WorkloadIdentityRequestContext>();
 
-type WorkloadIdentityContextCarrier = {
-  [WORKLOAD_IDENTITY_REQUEST_CONTEXT]?: WorkloadIdentityRequestContext;
-};
+interface WorkloadIdentityContextCarrier {
+  [WORKLOAD_IDENTITY_REQUEST_CONTEXT]?: object;
+}
 
 function attachWorkloadIdentityContext<T extends object>(
   target: T,
   context: WorkloadIdentityRequestContext,
 ): T & WorkloadIdentityContextCarrier {
   const carrier = target as T & WorkloadIdentityContextCarrier;
+  const contextKey = Object.freeze({});
+  workloadIdentityRequestContexts.set(contextKey, context);
   // Keep this enumerable so ordinary object spread in protected-hook overrides
-  // preserves request provenance, then remove it before invoking the transport.
-  carrier[WORKLOAD_IDENTITY_REQUEST_CONTEXT] = context;
+  // preserves request provenance without exposing the private request context.
+  carrier[WORKLOAD_IDENTITY_REQUEST_CONTEXT] = contextKey;
   return carrier;
 }
 
 function workloadIdentityContext(target: object): WorkloadIdentityRequestContext | undefined {
-  return (target as WorkloadIdentityContextCarrier)[WORKLOAD_IDENTITY_REQUEST_CONTEXT];
+  const contextKey = (target as WorkloadIdentityContextCarrier)[WORKLOAD_IDENTITY_REQUEST_CONTEXT];
+  return contextKey ? workloadIdentityRequestContexts.get(contextKey) : undefined;
 }
 
 function removeWorkloadIdentityContext(target: object): void {
-  delete (target as WorkloadIdentityContextCarrier)[WORKLOAD_IDENTITY_REQUEST_CONTEXT];
+  Reflect.deleteProperty(target, WORKLOAD_IDENTITY_REQUEST_CONTEXT);
 }
 
 function hasAuthorizationOverride(headers: NullableHeaders): boolean {
   return headers.values.has('authorization') || headers.nulls.has('authorization');
+}
+
+function hasNonWorkloadIdentityAuthorization(
+  headers: NullableHeaders | undefined,
+  context: WorkloadIdentityRequestContext,
+): boolean {
+  return (
+    headers !== undefined &&
+    hasAuthorizationOverride(headers) &&
+    (!context.usesWorkloadIdentityToken ||
+      headers.values.get('authorization') !== context.workloadIdentityAuthorization)
+  );
 }
 
 function defaultBaseURL(usesX509WorkloadIdentity: boolean): string {
@@ -1623,11 +1639,16 @@ export class OpenAI {
       const authOptions = attachWorkloadIdentityContext({ ...options }, workloadIdentityContext);
       workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
       authenticationHeaders = await this.authHeaders(authOptions, options.__security ?? { bearerAuth: true });
+      const authenticationOverridesWorkloadIdentity = hasNonWorkloadIdentityAuthorization(
+        authenticationHeaders,
+        workloadIdentityContext,
+      );
       // Preserve the established protected-hook contract: subclasses may
       // contribute request headers by mutating the options passed to authHeaders.
       headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, authOptions.headers]);
       overridesAuthorization = hasAuthorizationOverride(headerOverrides);
-      workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
+      workloadIdentityContext.workloadIdentityTokenSuppressed =
+        overridesAuthorization || authenticationOverridesWorkloadIdentity;
     }
     const headers = buildHeaders([
       idempotencyHeaders,

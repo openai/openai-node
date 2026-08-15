@@ -1,7 +1,9 @@
+import { inspect } from 'node:util';
 import { expect, vi } from 'vitest';
 
 import OpenAI from 'openai';
 import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import { buildHeaders } from 'openai/internal/headers';
 import type { NullableHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 
@@ -18,6 +20,8 @@ function tokenResponse(token: string): Response {
 class AuthHeadersCompatibilityOpenAI extends OpenAI {
   authOptionsMutation?: (options: FinalRequestOptions) => void;
   authHeadersMutation?: (headers: NullableHeaders | undefined) => void;
+  authHeadersReplacement?: NullableHeaders;
+  hookInputInspection?: (input: object) => void;
   cloneAuthOptions = false;
   cloneFetchInit = false;
   omitAuthHeaders = false;
@@ -26,6 +30,10 @@ class AuthHeadersCompatibilityOpenAI extends OpenAI {
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
+    this.hookInputInspection?.(opts);
+    if (this.authHeadersReplacement) {
+      return this.authHeadersReplacement;
+    }
     if (this.omitAuthHeaders) {
       return undefined;
     }
@@ -50,6 +58,10 @@ class AuthHeadersCompatibilityOpenAI extends OpenAI {
       controller,
       schemes,
     );
+  }
+
+  protected override async prepareRequest(request: RequestInit): Promise<void> {
+    this.hookInputInspection?.(request);
   }
 }
 
@@ -149,6 +161,78 @@ describe('workload identity authHeaders subclass compatibility', () => {
     await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
     expect(exchangeCount).toBe(1);
     expect(apiCount).toBe(1);
+  });
+
+  test.each([
+    { name: 'empty', value: '' },
+    { name: 'null', value: null },
+  ])('honors an explicit $name Authorization from an authHeaders override', async ({ value }) => {
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const client = new AuthHeadersCompatibilityOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchangeCount += 1;
+          return tokenResponse('unexpected-workload-token');
+        }
+        apiCount += 1;
+        expect(new Headers(init?.headers).get('Authorization')).toBe(value);
+        return Response.json({ data: [] });
+      }),
+    });
+    client.authHeadersReplacement = buildHeaders([{ Authorization: value }]);
+
+    await client.models.list();
+
+    expect(exchangeCount).toBe(0);
+    expect(apiCount).toBe(1);
+  });
+
+  test('keeps X.509 transport secrets behind opaque protected-hook carriers', async () => {
+    const hookSnapshots: string[] = [];
+    const originalDispatcher = {
+      cert: 'private-certificate-material',
+      key: 'private-key-material',
+    };
+    const attackerDispatcher = { name: 'attacker-dispatcher' };
+    const requestDispatchers: unknown[] = [];
+    const client = new AuthHeadersCompatibilityOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetchOptions: { dispatcher: originalDispatcher as never },
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        requestDispatchers.push((init as { dispatcher?: unknown } | undefined)?.dispatcher);
+        return url.toString().includes('/oauth/token')
+          ? tokenResponse('workload-token')
+          : Response.json({ data: [] });
+      }),
+    });
+    client.hookInputInspection = (input) => {
+      hookSnapshots.push(inspect(input, { depth: 8, showHidden: true }));
+      const contextSymbol = Object.getOwnPropertySymbols(input).find(
+        (symbol) => symbol.description === 'workloadIdentityRequestContext',
+      );
+      expect(contextSymbol).toBeDefined();
+      if (contextSymbol) {
+        const contextKey = (input as Record<symbol, unknown>)[contextSymbol];
+        expect(typeof contextKey).toBe('object');
+        expect(contextKey).not.toBeNull();
+        expect(Object.isFrozen(contextKey)).toBe(true);
+        expect(Reflect.set(contextKey as object, 'fetchOptions', { dispatcher: attackerDispatcher })).toBe(
+          false,
+        );
+        expect(Reflect.set(contextKey as object, 'workloadIdentityTokenSuppressed', true)).toBe(false);
+      }
+    };
+
+    await client.models.list();
+
+    expect(hookSnapshots).toHaveLength(2);
+    expect(hookSnapshots.join('\n')).not.toContain('private-certificate-material');
+    expect(hookSnapshots.join('\n')).not.toContain('private-key-material');
+    expect(requestDispatchers).toEqual([originalDispatcher, originalDispatcher]);
   });
 
   test.each(['request', 'default'] as const)(
