@@ -72,14 +72,15 @@ function snapshotIterator(
   createIterator: () => AsyncIterator<BlobPart>,
 ): MultipartDataSnapshot {
   const iterator = Reflect.apply(createIterator, value, []) as AsyncIterator<BlobPart>;
-  const returnIterator = snapshotIteratorReturn(iterator);
   let next: AsyncIterator<BlobPart>['next'];
   try {
     ({ next } = iterator);
   } catch (error) {
+    const returnIterator = snapshotIteratorReturn(iterator);
     void ignoreCleanupResult(() => returnIterator?.());
     throw error;
   }
+  const returnIterator = snapshotIteratorReturn(iterator);
 
   let consumed = false;
   return {

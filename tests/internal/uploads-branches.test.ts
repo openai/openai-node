@@ -190,7 +190,7 @@ describe('buffered multipart forms', () => {
       'authoritative',
     );
     expect(incidental).not.toHaveBeenCalled();
-    expect([brandChecks, iteratorChecks]).toEqual([detections, detections]);
+    expect([brandChecks, iteratorChecks]).toEqual([detections, 0]);
   });
 
   test('preserves explicit nested file paths only when requested', async () => {

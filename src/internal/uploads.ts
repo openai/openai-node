@@ -390,12 +390,12 @@ const getUploadableKind = (value: unknown, uploadableKinds: UploadableKinds): Up
 
   if (isStreamingFile(value)) {
     uploadableKind = 'streaming-file';
-  } else if (isAsyncIterable(value) || isReadableStream(value)) {
-    uploadableKind = 'streaming-upload';
   } else if (value instanceof Response) {
     uploadableKind = 'response';
   } else if (isNamedBlob(value)) {
     uploadableKind = 'named-blob';
+  } else if (isAsyncIterable(value) || isReadableStream(value)) {
+    uploadableKind = 'streaming-upload';
   }
 
   if (uploadableKind) {

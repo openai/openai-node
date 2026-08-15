@@ -59,11 +59,19 @@ describe('streaming multipart source security', () => {
       ).map(([mode, encode]) => [kind, mode, encode] as const),
     ),
   )('preserves cached %s bytes in mixed %s streaming multipart requests', async (kind, mode, encode) => {
+    const type = kind === 'Blob' ? 'text/blob' : 'text/response';
     const source =
       kind === 'Blob'
-        ? Object.assign(new Blob(['authoritative Blob bytes']), { name: 'original.txt' })
-        : Object.assign(new Response('authoritative Response bytes'), { name: 'original.txt' });
-    const attacker = vi.fn(() => chunks('attacker bytes'));
+        ? Object.assign(new Blob(['authoritative Blob bytes'], { type }), { name: 'original.txt' })
+        : Object.assign(new Response('authoritative Response bytes', { headers: { 'content-type': type } }), {
+            name: 'original.txt',
+          });
+    const protocol = mode === 'optional' ? Symbol.asyncIterator : 'getReader';
+    const attacker = vi.fn(() =>
+      protocol === Symbol.asyncIterator ? chunks('attacker bytes') : readable('attacker bytes').getReader(),
+    );
+    const getAttacker = vi.fn(() => attacker);
+    Object.defineProperty(source, protocol, { get: getAttacker });
     let brandChecks = 0;
     let prototypeChecks = 0;
     const upload = new Proxy(source, {
@@ -88,8 +96,10 @@ describe('streaming multipart source security', () => {
       encode,
     );
 
+    expect(form.get('upload')).toMatchObject({ name: 'original.txt', type });
     await expect((form.get('upload') as File).text()).resolves.toBe(`authoritative ${kind} bytes`);
     await expect((form.get('sibling') as File).text()).resolves.toBe('sibling bytes');
+    expect(getAttacker).not.toHaveBeenCalled();
     expect(attacker).not.toHaveBeenCalled();
     expect(brandChecks).toBe(1);
     expect(prototypeChecks).toBe(kind === 'Blob' ? 2 : 1);
@@ -236,7 +246,7 @@ describe('streaming multipart source security', () => {
       ['shared', reusable ? 'shared' : ''],
     );
     if (kind === 'reusable named Blob') {
-      expect(getIterator).toHaveBeenCalledTimes(1);
+      expect(getIterator).not.toHaveBeenCalled();
       expect(incidental).not.toHaveBeenCalled();
     }
   });

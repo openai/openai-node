@@ -152,6 +152,51 @@ describe('streaming multipart resource cleanup', () => {
     },
   );
 
+  test.each(['native', 'forwarding Proxy'] as const)(
+    'captures %s iterator bytes before its return accessor can replace next',
+    async (kind) => {
+      const source = ReadableStream.from(['original']);
+      const target = source[Symbol.asyncIterator]();
+      const { next, return: close } = target;
+      if (!close) {
+        throw new Error('Expected native iterator cleanup');
+      }
+      const original = vi.fn(next);
+      const replacement = vi.fn().mockResolvedValue({ done: false, value: 'attacker' });
+      const release = vi.fn(close);
+      Object.defineProperty(target, 'next', { configurable: true, value: original });
+      const getReturn = vi.fn(() => {
+        Object.defineProperty(target, 'next', { configurable: true, value: replacement });
+        return release;
+      });
+      Object.defineProperty(target, 'return', { configurable: true, get: getReturn });
+      const iterator =
+        kind === 'native'
+          ? target
+          : new Proxy(target, {
+              get(value, key) {
+                const member = Reflect.get(value, key, value);
+                return typeof member === 'function' ? member.bind(value) : member;
+              },
+            });
+      const options = await multipart({
+        upload: toStreamingFile({ [Symbol.asyncIterator]: () => iterator }, 'original.txt'),
+      });
+      const reader = (options.body as ReadableStream<Uint8Array>).getReader();
+      await reader.read();
+      await reader.read();
+      const chunk = await reader.read();
+      await reader.cancel();
+
+      expect(new TextDecoder().decode(chunk.value)).toBe('original');
+      expect(original.mock.contexts).toEqual([target]);
+      expect(getReturn.mock.contexts).toEqual([target]);
+      expect(release.mock.contexts).toEqual([target]);
+      expect(replacement).not.toHaveBeenCalled();
+      expect(source.locked).toBe(false);
+    },
+  );
+
   test('cleans up accessor-backed native iterators through their forwarding Proxy receiver', async () => {
     const source = ReadableStream.from(['original']);
     const target = source[Symbol.asyncIterator]();
