@@ -1,6 +1,6 @@
 import { expect, vi } from 'vitest';
 
-import { APIConnectionError, APIUserAbortError, OAuthError } from 'openai';
+import { APIConnectionError, APIConnectionTimeoutError, APIUserAbortError, OAuthError } from 'openai';
 import type { X509WorkloadIdentity } from 'openai/auth';
 import { WorkloadIdentityAuth } from 'openai/auth/workload-identity-auth';
 
@@ -135,6 +135,26 @@ describe('X.509 workload identity auth', () => {
 
     await expect(canceled).rejects.toBeInstanceOf(APIUserAbortError);
     exchange.resolve(tokenResponse('winner-token'));
+    await expect(winner).resolves.toBe('winner-token');
+    await expect(auth.getToken()).resolves.toBe('winner-token');
+    expect(customFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('a timed-out waiter neither cancels nor poisons the shared refresh', async () => {
+    vi.useFakeTimers();
+    const exchange = deferredResponse();
+    const customFetch = vi.fn(() => exchange.promise);
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    const timedOut = auth.getToken(undefined, 1000);
+    const winner = auth.getToken(undefined, 5000);
+    const timeoutAssertion = expect(timedOut).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    expect(customFetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await timeoutAssertion;
+    exchange.resolve(tokenResponse('winner-token'));
+
     await expect(winner).resolves.toBe('winner-token');
     await expect(auth.getToken()).resolves.toBe('winner-token');
     expect(customFetch).toHaveBeenCalledTimes(1);

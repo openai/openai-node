@@ -1,12 +1,18 @@
 import { expect, vi } from 'vitest';
 
-import OpenAI, { APIUserAbortError } from 'openai';
+import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
 import type { RequestInit } from 'openai/internal/builtin-types';
 
 const x509Identity = {
   type: 'x509' as const,
   identityProviderId: 'idp_test',
   serviceAccountId: 'svc_acct_test',
+};
+
+const subjectTokenIdentity = {
+  identityProviderId: 'idp_subject',
+  serviceAccountId: 'svc_subject',
+  provider: { tokenType: 'jwt' as const, getToken: async () => 'subject-token' },
 };
 
 function tokenResponse(token: string): Response {
@@ -36,6 +42,7 @@ describe('OpenAI with X.509 workload identity', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     delete process.env['OPENAI_API_KEY'];
@@ -72,6 +79,32 @@ describe('OpenAI with X.509 workload identity', () => {
     });
 
     expect(client.baseURL).toBe('https://gateway.example.com/v1');
+    expect(client.withOptions({ workloadIdentity: subjectTokenIdentity }).baseURL).toBe(
+      'https://gateway.example.com/v1',
+    );
+  });
+
+  test('recomputes a default base URL when withOptions changes workload identity modes', () => {
+    const customFetch = vi.fn();
+    const subjectTokenClient = new OpenAI({
+      apiKey: null,
+      workloadIdentity: subjectTokenIdentity,
+      fetch: customFetch,
+    });
+    const x509Client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+    });
+
+    const derivedSubjectTokenClient = subjectTokenClient.withOptions({ timeout: 5000 });
+
+    expect(derivedSubjectTokenClient.withOptions({ workloadIdentity: x509Identity }).baseURL).toBe(
+      'https://mtls.api.openai.com/v1',
+    );
+    expect(x509Client.withOptions({ workloadIdentity: subjectTokenIdentity }).baseURL).toBe(
+      'https://api.openai.com/v1',
+    );
   });
 
   test('does not change API-key routing, redirects, or authentication', async () => {
@@ -112,12 +145,26 @@ describe('OpenAI with X.509 workload identity', () => {
       fetchOptions: { dispatcher: dispatcher as never, redirect: 'follow' },
     });
 
-    await client.models.list({ fetchOptions: { redirect: 'follow' } });
+    await client.models.list();
 
     expect(requests).toHaveLength(2);
     expect(requests[0]?.init).toMatchObject({ dispatcher, redirect: 'manual' });
     expect(requests[1]?.init).toMatchObject({ dispatcher, redirect: 'manual' });
     expect(closeDispatcher).not.toHaveBeenCalled();
+  });
+
+  test('rejects per-request fetchOptions before exchanging a transport-bound identity', async () => {
+    const customFetch = vi.fn();
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+    });
+
+    await expect(
+      client.models.list({ fetchOptions: { dispatcher: { name: 'request-dispatcher' } as never } }),
+    ).rejects.toThrow('requires transport options on the client');
+    expect(customFetch).not.toHaveBeenCalled();
   });
 
   test('shares the X.509 token cache with a transport-equivalent withOptions client', async () => {
@@ -296,6 +343,33 @@ describe('OpenAI with X.509 workload identity', () => {
 
     await expect(canceled).rejects.toBeInstanceOf(APIUserAbortError);
     exchange.resolve(tokenResponse('shared-token'));
+    await expect(winner).resolves.toMatchObject({ data: [] });
+    expect(apiCount).toBe(1);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('a request timeout bounds its exchange wait without canceling another request', async () => {
+    vi.useFakeTimers();
+    const exchange = deferredResponse();
+    let apiCount = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request) => {
+      if (url.toString().includes('/oauth/token')) {
+        return await exchange.promise;
+      }
+      apiCount += 1;
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
+
+    const timedOut = client.models.list({ timeout: 1000 });
+    const winner = client.models.list({ timeout: 5000 });
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    const timeoutAssertion = expect(timedOut).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await timeoutAssertion;
+    exchange.resolve(tokenResponse('shared-token'));
+
     await expect(winner).resolves.toMatchObject({ data: [] });
     expect(apiCount).toBe(1);
     expect(customFetch).toHaveBeenCalledTimes(2);

@@ -1,4 +1,10 @@
-import { APIError, APIUserAbortError, OAuthError, OpenAIError } from '../core/error';
+import {
+  APIConnectionTimeoutError,
+  APIError,
+  APIUserAbortError,
+  OAuthError,
+  OpenAIError,
+} from '../core/error';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import type { MergedRequestInit } from '../internal/types';
@@ -23,6 +29,7 @@ interface CredentialSource {
   now: () => number;
   refreshBufferMs: (durationMs: number) => number;
   resolveExpiration: (configured: unknown) => unknown;
+  waiterTimeoutMs?: (timeoutMs: number | undefined) => number | undefined;
 }
 
 const SUBJECT_TOKEN_TYPES: Record<SubjectTokenWorkloadIdentity['provider']['tokenType'], string> = {
@@ -82,26 +89,43 @@ function throwIfAborted(signal: AbortSignal | null | undefined): void {
 async function waitForRefresh(
   refreshPromise: Promise<string>,
   signal: AbortSignal | null | undefined,
+  timeoutMs: number | undefined,
 ): Promise<string> {
-  if (!signal) {
+  if (!signal && timeoutMs === undefined) {
     return await refreshPromise;
   }
   throwIfAborted(signal);
 
   // oxlint-disable-next-line promise/avoid-new -- AbortSignal only exposes callback-based cancellation.
   return await new Promise<string>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = (abortListener: () => void) => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      signal?.removeEventListener('abort', abortListener);
+    };
     const onAbort = () => {
-      signal.removeEventListener('abort', onAbort);
+      if (!signal) {
+        return;
+      }
+      cleanup(onAbort);
       reject(abortError(signal));
     };
-    signal.addEventListener('abort', onAbort, { once: true });
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (timeoutMs !== undefined) {
+      timer = setTimeout(() => {
+        cleanup(onAbort);
+        reject(new APIConnectionTimeoutError());
+      }, timeoutMs);
+    }
     void refreshPromise.then(
       (token) => {
-        signal.removeEventListener('abort', onAbort);
+        cleanup(onAbort);
         resolve(token);
       },
       (error: unknown) => {
-        signal.removeEventListener('abort', onAbort);
+        cleanup(onAbort);
         reject(error);
       },
     );
@@ -169,6 +193,7 @@ function createCredentialSource(
       refreshBufferMs: (durationMs) =>
         Math.min(config.refreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS, durationMs / 2),
       resolveExpiration: (configured) => configured,
+      waiterTimeoutMs: (timeoutMs) => timeoutMs,
     };
   }
 
@@ -212,15 +237,21 @@ export class WorkloadIdentityAuth {
    * refresh runs. Concurrent callers share the same in-flight token exchange.
    * Canceling one waiter does not cancel or invalidate that shared exchange.
    *
+   * @param signal Optional caller cancellation signal for this waiter.
+   * @param timeoutMs Optional X.509 waiter timeout; it does not abort a shared exchange.
    * @throws {OAuthError} When the token endpoint rejects the workload identity.
    * @throws {APIError} When another unsuccessful HTTP response prevents token exchange.
    * @throws {OpenAIError} When a successful exchange has an invalid access token or expiration.
    */
-  async getToken(signal?: AbortSignal | null): Promise<string> {
+  async getToken(signal?: AbortSignal | null, timeoutMs?: number): Promise<string> {
     throwIfAborted(signal);
 
     if (!this.cachedToken || this.isTokenExpired(this.cachedToken)) {
-      return await waitForRefresh(this.refreshPromise ?? this.startRefresh(), signal);
+      return await waitForRefresh(
+        this.refreshPromise ?? this.startRefresh(),
+        signal,
+        this.source.waiterTimeoutMs?.(timeoutMs),
+      );
     }
 
     if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {

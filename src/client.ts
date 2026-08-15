@@ -3,7 +3,7 @@
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
-import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
+import { hasOwn, validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
@@ -370,6 +370,9 @@ export interface ClientOptions {
   /**
    * Additional `RequestInit` options to be passed to `fetch` calls.
    * Properties will be overridden by per-request `fetchOptions`.
+   *
+   * X.509 workload identity binds its cached credential to this client-level
+   * transport, so per-request `fetchOptions` are rejected in that mode.
    */
   fetchOptions?: MergedRequestInit | undefined;
 
@@ -463,6 +466,7 @@ export class OpenAI {
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth;
+  private _baseURLWasConfigured: boolean;
   private readonly _usesX509WorkloadIdentity: boolean;
 
   /**
@@ -581,6 +585,7 @@ export class OpenAI {
 
     this._options = options;
     this._provider = providerRuntime;
+    this._baseURLWasConfigured = Boolean(baseURL);
     this._usesX509WorkloadIdentity = usesX509WorkloadIdentity;
 
     if (workloadIdentity) {
@@ -620,7 +625,16 @@ export class OpenAI {
       project: this.project,
       webhookSecret: this.webhookSecret,
     };
-    if (residencyBaseURL !== undefined) {
+    const nextWorkloadIdentity = hasOwn(options, 'workloadIdentity')
+      ? options.workloadIdentity
+      : this._options.workloadIdentity;
+    const changesX509Mode = (nextWorkloadIdentity?.type === 'x509') !== this._usesX509WorkloadIdentity;
+    const recomputesDefaultBaseURL =
+      changesX509Mode &&
+      !this._baseURLWasConfigured &&
+      !this.#explicitDataResidency &&
+      !hasOwn(options, 'baseURL');
+    if (residencyBaseURL !== undefined || recomputesDefaultBaseURL) {
       delete inheritedOptions.baseURL;
     }
     if (provider) {
@@ -646,6 +660,9 @@ export class OpenAI {
         !provider,
     };
     const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    if (!hasOwn(options, 'baseURL') && !recomputesDefaultBaseURL) {
+      client._baseURLWasConfigured = this._baseURLWasConfigured;
+    }
     if (
       this._workloadIdentityAuth &&
       this._usesX509WorkloadIdentity &&
@@ -714,7 +731,12 @@ export class OpenAI {
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
     if (this._workloadIdentityAuth) {
       return buildHeaders([
-        { Authorization: `Bearer ${await this._workloadIdentityAuth.getToken(opts.signal)}` },
+        {
+          Authorization: `Bearer ${await this._workloadIdentityAuth.getToken(
+            opts.signal,
+            opts.timeout ?? this.timeout,
+          )}`,
+        },
       ]);
     }
     if (this.apiKey == null) {
@@ -1236,7 +1258,7 @@ export class OpenAI {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
-        const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal);
+        const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout);
         headers.set('Authorization', `Bearer ${token}`);
       }
     }
@@ -1353,6 +1375,11 @@ export class OpenAI {
     { retryCount = 0 }: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
     const options = { ...inputOptions };
+    if (this._usesX509WorkloadIdentity && options.fetchOptions !== undefined) {
+      throw new Errors.OpenAIError(
+        'X.509 workload identity requires transport options on the client; per-request `fetchOptions` are not supported.',
+      );
+    }
     const { method, path, query, defaultBaseURL } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
