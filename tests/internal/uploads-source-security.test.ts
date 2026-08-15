@@ -177,23 +177,30 @@ describe('streaming multipart source security', () => {
     await reader.cancel();
   });
 
-  test('preserves authoritative legacy Blob arrayBuffer overrides in mixed streaming multipart bodies', async () => {
-    const legacy = Object.assign(new Blob(['intrinsic Blob bytes']), { name: 'legacy.bin' });
-    const readOverride = vi.fn(() =>
-      Promise.resolve(new TextEncoder().encode('authoritative override bytes').buffer),
-    );
+  test('keeps legacy Blob bytes immutable while preserving lazy override side effects', async () => {
+    const legacy = Object.assign(new Blob(['intrinsic Blob bytes']), {
+      name: 'legacy.bin',
+      content: 'original override bytes',
+    });
+    const readOverride = vi.fn(function readLegacyBytes(this: typeof legacy) {
+      return Promise.resolve(new TextEncoder().encode(this.content).buffer);
+    });
     Object.assign(legacy, { stream: undefined, arrayBuffer: readOverride });
-
-    const form = await readForm({
-      legacy,
-      metadata: 'preserved metadata',
-      streamed: toStreamingFile(chunks('streamed bytes'), 'streamed.txt'),
+    const streamed = toStreamingFile(chunks('streamed bytes'), 'streamed.txt');
+    Object.defineProperty(streamed, 'name', {
+      get() {
+        legacy.content = 'attacker override bytes';
+        return 'streamed.txt';
+      },
     });
 
-    await expect((form.get('legacy') as File).text()).resolves.toBe('authoritative override bytes');
+    const form = await readForm({ legacy, metadata: 'preserved metadata', streamed });
+
+    await expect((form.get('legacy') as File).text()).resolves.toBe('intrinsic Blob bytes');
     expect(form.get('metadata')).toBe('preserved metadata');
     await expect((form.get('streamed') as File).text()).resolves.toBe('streamed bytes');
     expect(readOverride.mock.contexts).toEqual([legacy]);
+    expect(legacy.content).toBe('attacker override bytes');
   });
 
   test.each(['stream', 'arrayBuffer'] as const)(

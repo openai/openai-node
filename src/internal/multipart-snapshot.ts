@@ -228,6 +228,7 @@ export function snapshotStreamingFileData(
       try {
         unlockedForwardingProxy =
           value instanceof globalThis.ReadableStream &&
+          Object.getPrototypeOf(value) === globalThis.ReadableStream.prototype &&
           Object.getOwnPropertyDescriptor(value, 'locked') === undefined &&
           Reflect.get(value, 'locked') === false;
       } catch {
@@ -298,10 +299,10 @@ export function snapshotBlobData(
   return {
     data: {
       async *[Symbol.asyncIterator]() {
-        const useOriginalRead = hasOriginalBlobRead(value, originalReadDescriptor);
-        yield useOriginalRead
-          ? await Reflect.apply(read, value, [])
-          : await Reflect.apply(readImmutableBlob, immutableBlob, []);
+        if (hasOriginalBlobRead(value, originalReadDescriptor) && read !== readImmutableBlob) {
+          await Reflect.apply(read, value, []);
+        }
+        yield await Reflect.apply(readImmutableBlob, immutableBlob, []);
       },
     },
   };

@@ -116,13 +116,24 @@ describe('streaming multipart snapshots', () => {
     },
   );
 
-  test.each(['plain', 'native prototype'] as const)(
+  test.each(['plain', 'native prototype', 'inherited lock'] as const)(
     'rejects repeated %s sources that spoof native locked state before emission',
     async (kind) => {
-      const acquire = vi.fn(() => ReadableStream.from(['reusable'])[Symbol.asyncIterator]());
+      let locked = false;
+      const acquire = vi.fn(() => {
+        locked = true;
+        return ReadableStream.from(['reusable'])[Symbol.asyncIterator]();
+      });
       const source = { locked: true, [Symbol.asyncIterator]: acquire };
-      if (kind === 'native prototype') {
-        Object.setPrototypeOf(source, ReadableStream.prototype);
+      if (kind !== 'plain') {
+        const prototype =
+          kind === 'inherited lock'
+            ? Object.create(ReadableStream.prototype, { locked: { get: () => locked } })
+            : ReadableStream.prototype;
+        if (kind === 'inherited lock') {
+          Reflect.deleteProperty(source, 'locked');
+        }
+        Object.setPrototypeOf(source, prototype);
         expect(source).toBeInstanceOf(ReadableStream);
       }
       const options = await multipart({
