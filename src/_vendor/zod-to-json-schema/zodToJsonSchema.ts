@@ -10,15 +10,23 @@ function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | un
     return;
   }
 
-  const type = 'type' in schema ? schema.type : undefined;
-  const nullable = 'nullable' in schema && schema.nullable === true;
+  const descriptors = Object.getOwnPropertyDescriptors(schema);
+  for (const keyword of ['type', 'nullable', '$ref'] as const) {
+    const descriptor = descriptors[keyword];
+    if (descriptor?.enumerable && !('value' in descriptor)) {
+      throw new Error(`Root schema validation keyword '${keyword}' must be a data property`);
+    }
+  }
+
+  const type = descriptors['type']?.enumerable ? descriptors['type'].value : undefined;
+  const nullable = descriptors['nullable']?.enumerable && descriptors['nullable'].value === true;
   if (type !== 'object' || nullable) {
     const actualType = nullable && type ? `${type},null` : type;
     throw new Error(
       `Root schema must have type: 'object' but got type: ${actualType ? `'${actualType}'` : 'undefined'}`,
     );
   }
-  if ('$ref' in schema) {
+  if (descriptors['$ref']?.enumerable) {
     throw new Error("Root schema must be a concrete object and cannot contain '$ref'");
   }
 }

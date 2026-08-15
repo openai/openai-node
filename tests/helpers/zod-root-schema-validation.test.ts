@@ -1,4 +1,5 @@
 import { zodToJsonSchema } from 'openai/_vendor/zod-to-json-schema';
+import { vi } from 'vitest';
 import {
   zodFunction,
   zodRealtimeFunction,
@@ -179,6 +180,61 @@ it('preserves named object roots and escaped references to supplied definitions'
 });
 
 describe('strict vendor converter root schemas', () => {
+  it.each([
+    { keyword: 'type', value: 'object', visibility: 'inherited' },
+    { keyword: 'type', value: 'object', visibility: 'non-enumerable' },
+    { keyword: '$ref', value: '#/definitions/Root', visibility: 'inherited' },
+    { keyword: '$ref', value: '#/definitions/Root', visibility: 'non-enumerable' },
+    { keyword: 'nullable', value: true, visibility: 'inherited' },
+    { keyword: 'nullable', value: true, visibility: 'non-enumerable' },
+  ])('validates the serialized root when $keyword is $visibility', ({ keyword, value, visibility }) => {
+    const overriddenRoot = Object.create(
+      visibility === 'inherited' ? { [keyword]: value } : Object.prototype,
+    );
+
+    if (visibility === 'non-enumerable') {
+      Object.defineProperty(overriddenRoot, keyword, { value, enumerable: false });
+    }
+    if (keyword !== 'type') {
+      overriddenRoot.type = 'object';
+    }
+
+    const emittedRoot = JSON.stringify(overriddenRoot);
+    const convert = () =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        target: 'openApi3',
+        openaiStrictMode: true,
+        override: () => overriddenRoot,
+      });
+
+    if (keyword === 'type') {
+      expect(emittedRoot).toBe('{}');
+      expect(convert).toThrow(expectedRootError());
+    } else {
+      expect(JSON.stringify(convert())).toBe(emittedRoot);
+      expect(JSON.parse(emittedRoot)).toEqual({ type: 'object' });
+    }
+  });
+
+  it.each([
+    { keyword: 'type', value: 'object' },
+    { keyword: '$ref', value: '#/definitions/Root' },
+    { keyword: 'nullable', value: true },
+  ])('rejects an enumerable $keyword accessor without invoking it', ({ keyword, value }) => {
+    const overriddenRoot = { type: 'object' as const };
+    const getter = vi.fn(() => value);
+
+    Object.defineProperty(overriddenRoot, keyword, { enumerable: true, get: getter });
+
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        openaiStrictMode: true,
+        override: () => overriddenRoot,
+      }),
+    ).toThrow(`Root schema validation keyword '${keyword}' must be a data property`);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
   it.each([
     { name: 'conflicting properties', sibling: { properties: { injected: { type: 'number' } } } },
     { name: 'additionalProperties: true', sibling: { additionalProperties: true } },
