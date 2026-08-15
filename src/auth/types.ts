@@ -7,11 +7,8 @@ export interface SubjectTokenProvider {
   getToken: () => Promise<string>;
 }
 
-/** Configures federation from an external subject token into an OpenAI service account. */
-export interface SubjectTokenWorkloadIdentity {
-  /** Reserved for the X.509 workload-identity variant. */
-  type?: never;
-
+/** Configures federation from an external workload identity into an OpenAI service account. */
+export interface WorkloadIdentity {
   /** Optional OAuth client identifier included in the token-exchange request. */
   clientId?: string;
 
@@ -27,6 +24,9 @@ export interface SubjectTokenWorkloadIdentity {
   /** Seconds before expiration when access-token refresh begins; defaults to 1,200 seconds. */
   refreshBufferSeconds?: number;
 }
+
+/** Explicit name for the subject-token workload-identity variant. */
+export type SubjectTokenWorkloadIdentity = WorkloadIdentity;
 
 /** Configures X.509 federation using the client certificate supplied by the HTTP transport. */
 export interface X509WorkloadIdentity {
@@ -52,8 +52,8 @@ export interface X509WorkloadIdentity {
   refreshBufferSeconds?: never;
 }
 
-/** Configures federation from an external workload identity into an OpenAI service account. */
-export type WorkloadIdentity = SubjectTokenWorkloadIdentity | X509WorkloadIdentity;
+/** Accepted workload-identity variants for an OpenAI client. */
+export type WorkloadIdentityConfig = SubjectTokenWorkloadIdentity | X509WorkloadIdentity;
 
 /** OAuth token-exchange response returned by the OpenAI workload-identity endpoint. */
 export interface TokenExchangeResponse {

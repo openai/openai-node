@@ -1,9 +1,15 @@
-import type { WorkloadIdentity } from '../../auth/types';
+import type { WorkloadIdentityConfig, X509WorkloadIdentity } from '../../auth/types';
 import type { Fetch } from '../builtin-types';
 import * as Shims from '../shims';
 import { SubjectTokenWorkloadIdentityAuth } from './subject-token-workload-identity-auth';
 import { X509WorkloadIdentityAuth } from './x509-workload-identity-auth';
 import type { X509WorkloadIdentityAuthOptions } from './x509-workload-identity-auth';
+
+export function isX509WorkloadIdentity(
+  config: WorkloadIdentityConfig | null | undefined,
+): config is X509WorkloadIdentity {
+  return config !== null && config !== undefined && 'type' in config && config.type === 'x509';
+}
 
 /** Internal mode owner used by clients that need request-scoped X.509 lifecycle controls. */
 export class WorkloadIdentityAuthState {
@@ -11,12 +17,11 @@ export class WorkloadIdentityAuthState {
     | { type: 'subject-token'; auth: SubjectTokenWorkloadIdentityAuth }
     | { type: 'x509'; auth: X509WorkloadIdentityAuth };
 
-  constructor(config: WorkloadIdentity, fetch?: Fetch, options: X509WorkloadIdentityAuthOptions = {}) {
+  constructor(config: WorkloadIdentityConfig, fetch?: Fetch, options: X509WorkloadIdentityAuthOptions = {}) {
     const effectiveFetch = fetch ?? Shims.getDefaultFetch();
-    this.implementation =
-      config.type === 'x509'
-        ? { type: 'x509', auth: new X509WorkloadIdentityAuth(config, effectiveFetch, options) }
-        : { type: 'subject-token', auth: new SubjectTokenWorkloadIdentityAuth(config, effectiveFetch) };
+    this.implementation = isX509WorkloadIdentity(config)
+      ? { type: 'x509', auth: new X509WorkloadIdentityAuth(config, effectiveFetch, options) }
+      : { type: 'subject-token', auth: new SubjectTokenWorkloadIdentityAuth(config, effectiveFetch) };
   }
 
   async getToken(

@@ -1,6 +1,6 @@
 import type { Fetch } from '../internal/builtin-types';
 import { WorkloadIdentityAuthState } from '../internal/auth/workload-identity-auth-state';
-import type { WorkloadIdentity } from './types';
+import type { WorkloadIdentityConfig } from './types';
 
 /**
  * Exchanges external workload identities for cached OpenAI access tokens.
@@ -11,7 +11,7 @@ import type { WorkloadIdentity } from './types';
 export class WorkloadIdentityAuth {
   #state: WorkloadIdentityAuthState;
 
-  constructor(config: WorkloadIdentity, fetch?: Fetch) {
+  constructor(config: WorkloadIdentityConfig, fetch?: Fetch) {
     this.#state = new WorkloadIdentityAuthState(config, fetch);
   }
 

@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
 import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
+import type { ClientOptions } from 'openai';
+import type { WorkloadIdentity } from 'openai/auth';
 import type { Response, RequestInit } from 'openai/internal/builtin-types';
 
 const originalFetch = global.fetch;
@@ -19,6 +21,11 @@ const createTestClientOptions = () => ({
   project: 'test-project-id',
 });
 
+interface ApplicationWorkloadIdentity extends WorkloadIdentity {
+  readonly type: 'application-owned-discriminator';
+  readonly applicationMetadata: string;
+}
+
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,6 +43,34 @@ describe('OpenAI with Workload Identity', () => {
     const client = new OpenAI(createTestClientOptions());
 
     expect(client).toBeDefined();
+  });
+
+  test('preserves extensible WorkloadIdentity interface compatibility', async () => {
+    const workloadIdentity: ApplicationWorkloadIdentity = {
+      type: 'application-owned-discriminator',
+      applicationMetadata: 'legacy-metadata',
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+    const options: ClientOptions = { workloadIdentity };
+    let exchangeCount = 0;
+
+    global.fetch = vi.fn(async (url: string) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        return Response.json({ access_token: 'exchanged-access-token', expires_in: 3600 });
+      }
+      return Response.json({ data: [] });
+    }) as typeof fetch;
+
+    const client = new OpenAI(options);
+    await client.models.list();
+
+    expect(exchangeCount).toBe(1);
   });
 
   test('apiKey and workloadIdentity are mutually exclusive at runtime', () => {

@@ -13,7 +13,10 @@ import {
   protectX509RequestOptions,
   x509TransportKey,
 } from './internal/auth/x509-workload-identity-auth';
-import { WorkloadIdentityAuthState } from './internal/auth/workload-identity-auth-state';
+import {
+  isX509WorkloadIdentity,
+  WorkloadIdentityAuthState,
+} from './internal/auth/workload-identity-auth-state';
 import { uuid4 } from './internal/utils/uuid';
 import { hasOwn, validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
@@ -29,7 +32,7 @@ import { resolveDataResidency, type DataResidency } from './internal/data-reside
 export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
-import type { WorkloadIdentity } from './auth/types';
+import type { WorkloadIdentityConfig } from './auth/types';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
@@ -478,7 +481,7 @@ export interface ClientOptions {
    * Workload identity configuration for OAuth2 token exchange authentication.
    * Mutually exclusive with `apiKey`.
    */
-  workloadIdentity?: WorkloadIdentity | undefined;
+  workloadIdentity?: WorkloadIdentityConfig | undefined;
 
   /**
    * Configure this client to use a third-party API provider.
@@ -562,7 +565,7 @@ export class OpenAI {
       workloadIdentity,
       ...opts
     } = clientOptions as InternalClientOptions;
-    const usesX509WorkloadIdentity = workloadIdentity?.type === 'x509';
+    const usesX509WorkloadIdentity = isX509WorkloadIdentity(workloadIdentity);
     const providerRuntime = provider ? configureProvider(provider) : undefined;
     const options: ClientOptions = {
       apiKey,
@@ -671,7 +674,7 @@ export class OpenAI {
     const nextWorkloadIdentity = hasOwn(options, 'workloadIdentity')
       ? options.workloadIdentity
       : this._options.workloadIdentity;
-    const changesX509Mode = (nextWorkloadIdentity?.type === 'x509') !== this._usesX509WorkloadIdentity;
+    const changesX509Mode = isX509WorkloadIdentity(nextWorkloadIdentity) !== this._usesX509WorkloadIdentity;
     const recomputesDefaultBaseURL =
       changesX509Mode &&
       !this._baseURLWasConfigured &&

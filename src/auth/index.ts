@@ -1,5 +1,6 @@
 export type {
   WorkloadIdentity,
+  WorkloadIdentityConfig,
   SubjectTokenProvider,
   SubjectTokenWorkloadIdentity,
   TokenExchangeResponse,
