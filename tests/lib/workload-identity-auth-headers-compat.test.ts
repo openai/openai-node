@@ -123,4 +123,38 @@ describe('workload identity authHeaders subclass compatibility', () => {
     expect(exchangeCount).toBe(1);
     expect(apiCount).toBe(1);
   });
+
+  test.each(['request', 'default'] as const)(
+    'preserves companion authHeaders from a subclass with a $source Authorization override',
+    async (source) => {
+      let exchangeCount = 0;
+      let apiCount = 0;
+      const client = new AuthHeadersCompatibilityOpenAI({
+        apiKey: null,
+        workloadIdentity: x509Identity,
+        ...(source === 'default' ? { defaultHeaders: { Authorization: 'Bearer caller-token' } } : {}),
+        fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+          if (url.toString().includes('/oauth/token')) {
+            exchangeCount += 1;
+            return tokenResponse('workload-token');
+          }
+          apiCount += 1;
+          const headers = new Headers(init?.headers);
+          expect(headers.get('Authorization')).toBe('Bearer caller-token');
+          expect(headers.get('X-Companion-Signature')).toBe('signed');
+          return Response.json({ data: [] });
+        }),
+      });
+      client.authHeadersMutation = (headers) => {
+        headers?.values.set('X-Companion-Signature', 'signed');
+      };
+
+      await client.models.list(
+        source === 'request' ? { headers: { Authorization: 'Bearer caller-token' } } : undefined,
+      );
+
+      expect(exchangeCount).toBe(0);
+      expect(apiCount).toBe(1);
+    },
+  );
 });

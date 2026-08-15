@@ -752,6 +752,9 @@ export class OpenAI {
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
     const context = this.#workloadIdentityBuildContexts.get(opts);
     if (this._workloadIdentityAuth) {
+      if (context?.workloadIdentityTokenSuppressed) {
+        return undefined;
+      }
       if (context) {
         context.workloadIdentityAuthenticationAttempted = true;
       }
@@ -1595,8 +1598,9 @@ export class OpenAI {
     let overridesAuthorization =
       headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization');
     let authenticationHeaders: NullableHeaders | undefined;
-    if (!this._provider && !overridesAuthorization) {
+    if (!this._provider) {
       const authOptions = { ...options };
+      workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
       this.#workloadIdentityBuildContexts.set(authOptions, workloadIdentityContext);
       try {
         authenticationHeaders = await this.authHeaders(
@@ -1608,6 +1612,7 @@ export class OpenAI {
         headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, authOptions.headers]);
         overridesAuthorization =
           headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization');
+        workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
       } finally {
         this.#workloadIdentityBuildContexts.delete(authOptions);
       }
