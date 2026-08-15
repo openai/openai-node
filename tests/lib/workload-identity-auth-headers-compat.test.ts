@@ -18,6 +18,8 @@ function tokenResponse(token: string): Response {
 class AuthHeadersCompatibilityOpenAI extends OpenAI {
   authOptionsMutation?: (options: FinalRequestOptions) => void;
   authHeadersMutation?: (headers: NullableHeaders | undefined) => void;
+  cloneAuthOptions = false;
+  cloneFetchInit = false;
   omitAuthHeaders = false;
 
   protected override async authHeaders(
@@ -27,8 +29,9 @@ class AuthHeadersCompatibilityOpenAI extends OpenAI {
     if (this.omitAuthHeaders) {
       return undefined;
     }
-    this.authOptionsMutation?.(opts);
-    const headers = await super.authHeaders(opts, schemes);
+    const authOptions = this.cloneAuthOptions ? { ...opts } : opts;
+    this.authOptionsMutation?.(authOptions);
+    const headers = await super.authHeaders(authOptions, schemes);
     this.authHeadersMutation?.(headers);
     return headers;
   }
@@ -40,7 +43,13 @@ class AuthHeadersCompatibilityOpenAI extends OpenAI {
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<Response> {
-    return await super.fetchWithAuth(url, init, timeout, controller, schemes);
+    return await super.fetchWithAuth(
+      url,
+      this.cloneFetchInit ? { ...init } : init,
+      timeout,
+      controller,
+      schemes,
+    );
   }
 }
 
@@ -56,33 +65,37 @@ describe('workload identity authHeaders subclass compatibility', () => {
     delete process.env['OPENAI_BASE_URL'];
   });
 
-  test('preserves workload-token provenance through a legacy authHeaders override', async () => {
-    let exchangeCount = 0;
-    let apiCount = 0;
-    const apiAuthorizations: (string | null)[] = [];
-    const client = new AuthHeadersCompatibilityOpenAI({
-      apiKey: null,
-      workloadIdentity: x509Identity,
-      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-        if (url.toString().includes('/oauth/token')) {
-          exchangeCount += 1;
-          return tokenResponse(`token-${exchangeCount}`);
-        }
-        apiCount += 1;
-        apiAuthorizations.push(new Headers(init?.headers).get('Authorization'));
-        return apiCount === 1
-          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
-          : Response.json({ data: [] });
-      }),
-      maxRetries: 0,
-    });
+  test.each([false, true])(
+    'preserves workload-token provenance through a legacy authHeaders override (clone: %s)',
+    async (cloneAuthOptions) => {
+      let exchangeCount = 0;
+      let apiCount = 0;
+      const apiAuthorizations: (string | null)[] = [];
+      const client = new AuthHeadersCompatibilityOpenAI({
+        apiKey: null,
+        workloadIdentity: x509Identity,
+        fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+          if (url.toString().includes('/oauth/token')) {
+            exchangeCount += 1;
+            return tokenResponse(`token-${exchangeCount}`);
+          }
+          apiCount += 1;
+          apiAuthorizations.push(new Headers(init?.headers).get('Authorization'));
+          return apiCount === 1
+            ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+            : Response.json({ data: [] });
+        }),
+        maxRetries: 0,
+      });
+      client.cloneAuthOptions = cloneAuthOptions;
 
-    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+      await expect(client.models.list()).resolves.toMatchObject({ data: [] });
 
-    expect(exchangeCount).toBe(2);
-    expect(apiCount).toBe(2);
-    expect(apiAuthorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
-  });
+      expect(exchangeCount).toBe(2);
+      expect(apiCount).toBe(2);
+      expect(apiAuthorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
+    },
+  );
 
   test('preserves headers contributed by mutating options in a legacy authHeaders override', async () => {
     let exchangeCount = 0;
@@ -204,23 +217,58 @@ describe('workload identity authHeaders subclass compatibility', () => {
     expect(exchangeCount).toBe(1);
   });
 
-  test('preserves a request retry budget through a five-argument fetchWithAuth override', async () => {
+  test.each([false, true])(
+    'preserves a request retry budget through a five-argument fetchWithAuth override (clone: %s)',
+    async (cloneFetchInit) => {
+      let exchangeCount = 0;
+      const client = new AuthHeadersCompatibilityOpenAI({
+        apiKey: null,
+        workloadIdentity: x509Identity,
+        maxRetries: 2,
+        fetch: vi.fn(async (url: string | URL | Request) => {
+          if (url.toString().includes('/oauth/token')) {
+            exchangeCount += 1;
+            return new Response(null, { status: 503, headers: { 'Retry-After': '0' } });
+          }
+          throw new Error('The API request must not run after a failed token exchange.');
+        }),
+      });
+      client.omitAuthHeaders = true;
+      client.cloneFetchInit = cloneFetchInit;
+
+      await expect(client.models.list({ maxRetries: 0 })).rejects.toMatchObject({ status: 503 });
+      expect(exchangeCount).toBe(1);
+    },
+  );
+
+  test('preserves workload-token provenance through a cloned fetchWithAuth init', async () => {
     let exchangeCount = 0;
+    let apiCount = 0;
+    const apiAuthorizations: (string | null)[] = [];
     const client = new AuthHeadersCompatibilityOpenAI({
       apiKey: null,
       workloadIdentity: x509Identity,
-      maxRetries: 2,
-      fetch: vi.fn(async (url: string | URL | Request) => {
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        expect(Object.getOwnPropertySymbols(init ?? {})).toEqual([]);
         if (url.toString().includes('/oauth/token')) {
           exchangeCount += 1;
-          return new Response(null, { status: 503, headers: { 'Retry-After': '0' } });
+          return tokenResponse(`token-${exchangeCount}`);
         }
-        throw new Error('The API request must not run after a failed token exchange.');
+        apiCount += 1;
+        apiAuthorizations.push(new Headers(init?.headers).get('Authorization'));
+        return apiCount === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
       }),
+      maxRetries: 0,
     });
+    client.cloneFetchInit = true;
     client.omitAuthHeaders = true;
 
-    await expect(client.models.list({ maxRetries: 0 })).rejects.toMatchObject({ status: 503 });
-    expect(exchangeCount).toBe(1);
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+
+    expect(exchangeCount).toBe(2);
+    expect(apiCount).toBe(2);
+    expect(apiAuthorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
   });
 });

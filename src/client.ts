@@ -301,6 +301,30 @@ const OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
+const WORKLOAD_IDENTITY_REQUEST_CONTEXT = Symbol('workloadIdentityRequestContext');
+
+type WorkloadIdentityContextCarrier = {
+  [WORKLOAD_IDENTITY_REQUEST_CONTEXT]?: WorkloadIdentityRequestContext;
+};
+
+function attachWorkloadIdentityContext<T extends object>(
+  target: T,
+  context: WorkloadIdentityRequestContext,
+): T & WorkloadIdentityContextCarrier {
+  const carrier = target as T & WorkloadIdentityContextCarrier;
+  // Keep this enumerable so ordinary object spread in protected-hook overrides
+  // preserves request provenance, then remove it before invoking the transport.
+  carrier[WORKLOAD_IDENTITY_REQUEST_CONTEXT] = context;
+  return carrier;
+}
+
+function workloadIdentityContext(target: object): WorkloadIdentityRequestContext | undefined {
+  return (target as WorkloadIdentityContextCarrier)[WORKLOAD_IDENTITY_REQUEST_CONTEXT];
+}
+
+function removeWorkloadIdentityContext(target: object): void {
+  delete (target as WorkloadIdentityContextCarrier)[WORKLOAD_IDENTITY_REQUEST_CONTEXT];
+}
 
 function hasAuthorizationOverride(headers: NullableHeaders): boolean {
   return headers.values.has('authorization') || headers.nulls.has('authorization');
@@ -484,10 +508,6 @@ export class OpenAI {
   #encoder: Opts.RequestEncoder;
   // Preserve an explicit global selection without storing a second routing URL.
   #explicitDataResidency = false;
-  // Preserve request-scoped auth provenance across the established two-argument
-  // protected auth hooks without exposing new parameters to subclasses.
-  #workloadIdentityBuildContexts = new WeakMap<FinalRequestOptions, WorkloadIdentityRequestContext>();
-  #workloadIdentityRequestContexts = new WeakMap<RequestInit, WorkloadIdentityRequestContext>();
   #responseAttempts = new WeakMap<AbortController, { timeout: number; retriesRemaining: number }>();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
@@ -744,7 +764,7 @@ export class OpenAI {
       adminAPIKeyAuth: true,
     },
   ): Promise<NullableHeaders | undefined> {
-    const context = this.#workloadIdentityBuildContexts.get(opts);
+    const context = workloadIdentityContext(opts);
     const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts) : null;
     const adminHeaders = schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null;
     if (context && adminHeaders?.values.has('authorization')) {
@@ -754,7 +774,7 @@ export class OpenAI {
   }
 
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    const context = this.#workloadIdentityBuildContexts.get(opts);
+    const context = workloadIdentityContext(opts);
     if (this._workloadIdentityAuth) {
       if (context) {
         context.workloadIdentityTokenSuppressed =
@@ -1046,7 +1066,7 @@ export class OpenAI {
     const { req, url, timeout } = await this.buildRequest(options, {
       retryCount: maxRetries - retriesRemaining,
     });
-    const workloadIdentityRequestContext = this.#workloadIdentityRequestContexts.get(req);
+    const workloadIdentityRequestContext = workloadIdentityContext(req);
     const workloadIdentityAuthorization = workloadIdentityRequestContext?.usesWorkloadIdentityToken
       ? req.headers.get('authorization')
       : undefined;
@@ -1349,7 +1369,7 @@ export class OpenAI {
       adminAPIKeyAuth: true,
     },
   ): Promise<Response> {
-    const context = this.#workloadIdentityRequestContexts.get(init);
+    const context = workloadIdentityContext(init);
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       const headers = init.headers as Headers;
@@ -1379,6 +1399,7 @@ export class OpenAI {
       }
     }
 
+    removeWorkloadIdentityContext(init);
     const response = await this.fetchWithTimeout(url, init, timeout, controller);
 
     return response;
@@ -1567,9 +1588,7 @@ export class OpenAI {
       ...((options.fetchOptions as any) ?? {}),
       ...(this._usesX509WorkloadIdentity ? { redirect: 'manual' } : {}),
     };
-    if (this._workloadIdentityAuth) {
-      this.#workloadIdentityRequestContexts.set(req, workloadIdentityContext);
-    }
+    if (this._workloadIdentityAuth) attachWorkloadIdentityContext(req, workloadIdentityContext);
 
     return { req, url, timeout: options.timeout };
   }
@@ -1598,22 +1617,14 @@ export class OpenAI {
     let overridesAuthorization = hasAuthorizationOverride(headerOverrides);
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider) {
-      const authOptions = { ...options };
+      const authOptions = attachWorkloadIdentityContext({ ...options }, workloadIdentityContext);
       workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
-      this.#workloadIdentityBuildContexts.set(authOptions, workloadIdentityContext);
-      try {
-        authenticationHeaders = await this.authHeaders(
-          authOptions,
-          options.__security ?? { bearerAuth: true },
-        );
-        // Preserve the established protected-hook contract: subclasses may
-        // contribute request headers by mutating the options passed to authHeaders.
-        headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, authOptions.headers]);
-        overridesAuthorization = hasAuthorizationOverride(headerOverrides);
-        workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
-      } finally {
-        this.#workloadIdentityBuildContexts.delete(authOptions);
-      }
+      authenticationHeaders = await this.authHeaders(authOptions, options.__security ?? { bearerAuth: true });
+      // Preserve the established protected-hook contract: subclasses may
+      // contribute request headers by mutating the options passed to authHeaders.
+      headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, authOptions.headers]);
+      overridesAuthorization = hasAuthorizationOverride(headerOverrides);
+      workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
     }
     const headers = buildHeaders([
       idempotencyHeaders,
