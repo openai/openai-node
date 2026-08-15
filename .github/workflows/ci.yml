@@ -277,7 +277,27 @@ jobs:
       - name: Bootstrap
         run: ./scripts/bootstrap
 
-      - name: Run ecosystem tests
+      - name: Run ecosystem tests without live credentials
+        if: >-
+          ${{
+            github.actor == 'dependabot[bot]' ||
+            (github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name != github.repository)
+          }}
+        run: |
+          pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3
+        env:
+          DISABLE_V8_COMPILE_CACHE: '1'
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+      - name: Run ecosystem tests with live credentials
+        if: >-
+          ${{
+            github.actor != 'dependabot[bot]' &&
+            (github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.full_name == github.repository)
+          }}
         run: |
           pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
         env:
