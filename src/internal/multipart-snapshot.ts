@@ -45,6 +45,7 @@ async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
 }
 
 function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterator<BlobPart>['return'] {
+  let readReturn = () => Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
   try {
     let prototype: object | null = iterator;
     while (prototype !== null) {
@@ -57,6 +58,11 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
             : undefined;
         }
 
+        const getReturn = descriptor.get;
+        readReturn = () =>
+          getReturn
+            ? (Reflect.apply(getReturn, iterator, []) as AsyncIterator<BlobPart>['return'])
+            : undefined;
         break;
       }
       prototype = Object.getPrototypeOf(prototype);
@@ -74,7 +80,7 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
   return (...args: [] | [unknown]) => {
     if (!captured) {
       try {
-        captured = { returnIterator: Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'] };
+        captured = { returnIterator: readReturn() };
       } catch (error) {
         captured = { error };
       }

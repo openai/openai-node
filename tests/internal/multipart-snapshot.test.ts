@@ -244,6 +244,35 @@ describe('streaming multipart snapshots', () => {
     expect(source.locked).toBe(false);
   });
 
+  test('retains accessor-backed iterator cleanup when a later filename replaces the accessor', async () => {
+    const source = ReadableStream.from(['original']);
+    const iterator = source[Symbol.asyncIterator]();
+    const close = iterator.return;
+    if (!close) {
+      throw new Error('Expected native iterator cleanup');
+    }
+    const release = vi.fn(close);
+    const original = vi.fn(() => release);
+    const replacement = vi.fn();
+    Object.defineProperty(iterator, 'return', { configurable: true, get: original });
+    const earlier = toStreamingFile({ [Symbol.asyncIterator]: () => iterator }, 'original.txt');
+    const later = laterUpload();
+    Object.defineProperty(later, 'name', {
+      get() {
+        Object.defineProperty(iterator, 'return', { configurable: true, get: replacement });
+        return null;
+      },
+    });
+    const options = await multipart({ earlier, later });
+
+    expect(original).not.toHaveBeenCalled();
+    await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/file.?name/iu);
+    expect(original.mock.contexts).toEqual([iterator]);
+    expect(release.mock.contexts).toEqual([iterator]);
+    expect(replacement).not.toHaveBeenCalled();
+    expect(source.locked).toBe(false);
+  });
+
   test('runs a forwarding native async-generator Proxy finally during active cancellation', async () => {
     const finished = vi.fn();
     const getReturn = vi.fn();
