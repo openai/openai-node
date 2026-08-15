@@ -9,7 +9,7 @@ import type { AutoParseableResponseTool } from '../lib/ResponsesParser';
 import { makeParseableResponseTool } from '../lib/ResponsesParser';
 import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 import type { RealtimeFunctionTool } from '../resources/realtime/realtime';
-import { toStrictJsonSchema } from '../lib/transform';
+import { forEachJSONSchemaChild, toStrictJsonSchema } from '../lib/transform';
 import type { JSONSchema } from '../lib/jsonschema';
 import { hasOwn } from '../internal/utils/values';
 
@@ -85,27 +85,27 @@ function escapeSchemaDefinitionRefs<T extends object>(
     ]),
   );
 
+  if (refReplacements.size === 0) {
+    return schema;
+  }
+
+  const visited = new Set<object>();
   const visit = (value: unknown): void => {
-    if (!value || typeof value !== 'object') {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || visited.has(value)) {
       return;
     }
 
-    if (Array.isArray(value)) {
-      for (const child of value) {
-        visit(child);
-      }
-      return;
-    }
-
+    visited.add(value);
     const record = value as Record<string, unknown>;
     const ref = record['$ref'];
     if (typeof ref === 'string') {
-      record['$ref'] = refReplacements.get(ref) ?? ref;
+      const replacement = refReplacements.get(ref);
+      if (replacement !== undefined && replacement !== ref) {
+        record['$ref'] = replacement;
+      }
     }
 
-    for (const child of Object.values(record)) {
-      visit(child);
-    }
+    forEachJSONSchemaChild(record, [], visit);
   };
 
   visit(schema);
