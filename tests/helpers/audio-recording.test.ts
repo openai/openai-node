@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { MockedFunction } from 'vitest';
 import { spawn } from 'node:child_process';
-import { EventEmitter } from 'node:events';
+import { EventEmitter, getEventListeners } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
 
@@ -27,7 +27,12 @@ function mockFfplay(exitCode = 0) {
       callback();
     },
   });
-  const ffplay = Object.assign(new EventEmitter(), { stdin, kill: vi.fn() });
+  const ffplay = Object.assign(new EventEmitter(), {
+    stdin,
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
+    kill: vi.fn(),
+  });
   stdin.on('finish', () => ffplay.emit('close', exitCode));
   spawnMock.mockReturnValue(ffplay as any);
   return { chunks, ffplay };
@@ -55,7 +60,7 @@ describe('recordAudio', () => {
     expect(spawnMock).toHaveBeenCalledWith(
       'ffmpeg',
       expect.arrayContaining(['-i', ':0', '-ar', '24000', '-ac', '1', '-f', 'wav', 'pipe:1']),
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['ignore', 'pipe', 'ignore'] },
     );
   });
 
@@ -73,6 +78,16 @@ describe('recordAudio', () => {
     );
   });
 
+  test.each([1.5, Number.NaN, Number.POSITIVE_INFINITY, 4_294_967_296])(
+    'rejects an invalid timeout (%s) before starting ffmpeg',
+    async (timeout) => {
+      mockFfmpeg();
+
+      await expect(recordAudio({ timeout })).rejects.toBeInstanceOf(RangeError);
+      expect(spawnMock).not.toHaveBeenCalled();
+    },
+  );
+
   test('terminates ffmpeg when its external abort signal is triggered', async () => {
     const ffmpeg = mockFfmpeg();
     const controller = new AbortController();
@@ -83,6 +98,67 @@ describe('recordAudio', () => {
 
     ffmpeg.emit('close', 0);
     await recording;
+  });
+
+  test.each([
+    ['a successful exit', 0, undefined],
+    ['an unsuccessful exit', 2, undefined],
+    ['a process error', undefined, new Error('microphone unavailable')],
+  ] as const)(
+    'removes external and timeout abort listeners after %s',
+    async (_description, exitCode, failure) => {
+      const ffmpeg = mockFfmpeg();
+      const controller = new AbortController();
+      const timeoutController = new AbortController();
+      vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+      const recording = recordAudio({ signal: controller.signal, timeout: 50 });
+
+      expect(getEventListeners(controller.signal, 'abort')).toHaveLength(1);
+      expect(getEventListeners(timeoutController.signal, 'abort')).toHaveLength(1);
+      expect(ffmpeg.stdout.listenerCount('data')).toBe(1);
+
+      if (failure) {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        ffmpeg.emit('error', failure);
+        await expect(recording).rejects.toBe(failure);
+      } else {
+        ffmpeg.emit('close', exitCode);
+        const expectation =
+          exitCode === 0
+            ? expect(recording).resolves.toBeInstanceOf(File)
+            : expect(recording).rejects.toThrow(`ffmpeg process exited with code ${exitCode}`);
+        await expectation;
+      }
+
+      expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+      expect(getEventListeners(timeoutController.signal, 'abort')).toHaveLength(0);
+      expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
+    },
+  );
+
+  test('does not stop ffmpeg when an external signal aborts after recording completes', async () => {
+    const ffmpeg = mockFfmpeg();
+    const controller = new AbortController();
+    const recording = recordAudio({ signal: controller.signal });
+
+    ffmpeg.emit('close', 0);
+    await recording;
+    controller.abort();
+
+    expect(ffmpeg.kill).not.toHaveBeenCalled();
+  });
+
+  test('does not stop ffmpeg when a timeout signal aborts after recording completes', async () => {
+    const ffmpeg = mockFfmpeg();
+    const timeoutController = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    const recording = recordAudio({ timeout: 50 });
+
+    ffmpeg.emit('close', 0);
+    await recording;
+    timeoutController.abort();
+
+    expect(ffmpeg.kill).not.toHaveBeenCalled();
   });
 
   test('retains captured audio when an intentional abort exits with a nonzero code', async () => {
@@ -182,6 +258,18 @@ describe('recordAudio', () => {
     await expect(recordAudio()).rejects.toThrow('ffmpeg was not found');
   });
 
+  test('terminates ffmpeg when recording setup fails after it starts', async () => {
+    const ffmpeg = mockFfmpeg();
+    const failure = new Error('microphone output could not be observed');
+    vi.spyOn(ffmpeg.stdout, 'on').mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    await expect(recordAudio()).rejects.toBe(failure);
+    expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
+  });
+
   test('rejects an unexpected unsuccessful ffmpeg exit', async () => {
     const ffmpeg = mockFfmpeg();
     const recording = recordAudio();
@@ -207,6 +295,28 @@ describe('playAudio input and process errors', () => {
     await playAudio(Readable.from(['node audio']));
 
     expect(Buffer.concat(chunks).toString()).toBe('node audio');
+  });
+
+  test('drains ffplay output without changing its spawn arguments', async () => {
+    const { ffplay } = mockFfplay();
+
+    await playAudio(Readable.from(['audio']));
+
+    expect(spawnMock).toHaveBeenCalledWith('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
+    expect(ffplay.stdout.readableFlowing).toBe(true);
+    expect(ffplay.stderr.readableFlowing).toBe(true);
+  });
+
+  test('rejects source pipeline failures and stops ffplay', async () => {
+    const { ffplay } = mockFfplay();
+    const source = new PassThrough();
+    const failure = new Error('audio source failed');
+    const playback = playAudio(source);
+
+    source.destroy(failure);
+
+    await expect(playback).rejects.toBe(failure);
+    expect(ffplay.kill).toHaveBeenCalledTimes(1);
   });
 
   test('rejects unsuccessful ffplay exit codes', async () => {
