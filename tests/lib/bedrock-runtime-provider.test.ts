@@ -1,6 +1,7 @@
+import { once } from 'node:events';
 import { vi } from 'vitest';
 
-import OpenAI from 'openai';
+import OpenAI, { NotFoundError } from 'openai';
 import type { Provider } from 'openai/internal/provider';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
 import { bedrock } from 'openai/providers/bedrock/aws';
@@ -58,7 +59,7 @@ function providerCases(options: EndpointOptions) {
   ] as const;
 }
 
-function createClient(provider: Provider, body: unknown = {}) {
+function createClient(provider: Provider, body: unknown = {}, responseInit?: ResponseInit) {
   const requests: { url: string; headers: Headers; body: string }[] = [];
   const client = new OpenAI({
     provider,
@@ -68,7 +69,7 @@ function createClient(provider: Provider, body: unknown = {}) {
         headers: new Headers(init?.headers),
         body: String(init?.body ?? ''),
       });
-      return Response.json(body);
+      return Response.json(body, responseInit);
     },
   });
   return { client, requests };
@@ -223,6 +224,7 @@ describe('bedrock Runtime provider', () => {
         secretAccessKey: 'secret-key',
       }),
       completionBody,
+      { headers: { 'x-request-id': 'req_runtime_chat' } },
     );
 
     const completion = await client.chat.completions.create({
@@ -235,6 +237,7 @@ describe('bedrock Runtime provider', () => {
     );
     expect(JSON.parse(requests[0]?.body ?? '{}')).toMatchObject({ model: RUNTIME_MODEL });
     expect(requests[0]?.headers.get('authorization')).toContain('/bedrock/aws4_request');
+    expect(completion._request_id).toBe('req_runtime_chat');
     expect(completion.choices[0]?.finish_reason).toBe('stop');
     expect(completion.usage?.total_tokens).toBe(7);
   });
@@ -251,36 +254,78 @@ describe('bedrock Runtime provider', () => {
     expect(requests[0]?.headers.get('authorization')).toBe('Bearer bedrock-token');
   });
 
-  test('refreshes AWS credentials and re-signs Runtime retries', async () => {
-    let attempt = 0;
-    const credentialProvider = vi.fn(async () => {
-      attempt += 1;
-      return {
-        accessKeyId: `access-${attempt}`,
-        secretAccessKey: 'secret',
-        sessionToken: `session-${attempt}`,
-      };
-    });
-    const headers: Headers[] = [];
+  test('preserves Runtime request IDs on typed HTTP errors', async () => {
     const client = new OpenAI({
-      provider: bedrock({ endpoint: 'runtime', region: 'us-east-1', credentialProvider }),
-      maxRetries: 1,
-      fetch: async (_url, init) => {
-        headers.push(new Headers(init?.headers));
-        return headers.length === 1
-          ? Response.json(
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
+      maxRetries: 0,
+      fetch: async () =>
+        Response.json(
+          { error: { message: 'Runtime model is unavailable' } },
+          { status: 404, headers: { 'x-request-id': 'req_runtime_error' } },
+        ),
+    });
+
+    const runtimeError = await client.chat.completions
+      .create({ model: RUNTIME_MODEL, messages: [{ role: 'user', content: 'Say hello' }] })
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+
+    expect(runtimeError).toBeInstanceOf(NotFoundError);
+    expect(runtimeError).toMatchObject({
+      status: 404,
+      requestID: 'req_runtime_error',
+      message: expect.stringContaining('Runtime model is unavailable'),
+    });
+  });
+
+  test.each(['429', 'timeout'] as const)(
+    'refreshes AWS credentials and re-signs Runtime %s retries',
+    async (retryKind) => {
+      let attempt = 0;
+      const credentialProvider = vi.fn(async () => {
+        attempt += 1;
+        return {
+          accessKeyId: `access-${attempt}`,
+          secretAccessKey: 'secret',
+          sessionToken: `session-${attempt}`,
+        };
+      });
+      const headers: Headers[] = [];
+      const client = new OpenAI({
+        provider: bedrock({ endpoint: 'runtime', region: 'us-east-1', credentialProvider }),
+        maxRetries: 1,
+        timeout: retryKind === 'timeout' ? 10 : 600_000,
+        fetch: async (_url, init) => {
+          headers.push(new Headers(init?.headers));
+          if (headers.length > 1) {
+            return Response.json({});
+          }
+          if (retryKind === '429') {
+            return Response.json(
               { error: { message: 'retry' } },
               { status: 429, headers: { 'retry-after-ms': '1' } },
-            )
-          : Response.json({});
-      },
-    });
+            );
+          }
+          const signal = init?.signal;
+          if (!signal) {
+            throw new Error('missing request signal');
+          }
+          await once(signal, 'abort');
+          throw new Error('timed out');
+        },
+      });
 
-    await client.request({ method: 'get', path: '/models' });
+      await client.request({ method: 'get', path: '/models' });
 
-    expect(credentialProvider).toHaveBeenCalledTimes(2);
-    expect(headers.map((request) => request.get('x-amz-security-token'))).toEqual(['session-1', 'session-2']);
-    expect(headers[0]?.get('authorization')).toMatch(/Credential=access-1\/\d{8}\/us-east-1\/bedrock\//u);
-    expect(headers[1]?.get('authorization')).toMatch(/Credential=access-2\/\d{8}\/us-east-1\/bedrock\//u);
-  });
+      expect(credentialProvider).toHaveBeenCalledTimes(2);
+      expect(headers.map((request) => request.get('x-amz-security-token'))).toEqual([
+        'session-1',
+        'session-2',
+      ]);
+      expect(headers[0]?.get('authorization')).toMatch(/Credential=access-1\/\d{8}\/us-east-1\/bedrock\//u);
+      expect(headers[1]?.get('authorization')).toMatch(/Credential=access-2\/\d{8}\/us-east-1\/bedrock\//u);
+    },
+  );
 });

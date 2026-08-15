@@ -11,10 +11,15 @@ import { bedrock as awsBedrock } from 'openai/providers/bedrock/aws';
  * BEDROCK_LIVE_TEST=1 BEDROCK_LIVE_ENDPOINT=runtime BEDROCK_LIVE_AUTH=default-chain \
  * AWS_REGION=us-west-2 pnpm test:live:bedrock
  *
+ * To exercise several credential paths in one explicitly enabled run, set
+ * BEDROCK_LIVE_AUTHS to a comma-separated list such as bearer,default-chain.
+ * Every selected mode still requires its corresponding valid credential
+ * configuration.
+ *
  * Mantle requires BEDROCK_MODEL to support the Responses API. Runtime defaults
- * to us.openai.gpt-5.6-sol and tests Chat Completions. Set BEDROCK_MODEL to
- * another inference profile, or BEDROCK_LIVE_MODELS to a comma-separated list
- * such as us.openai.gpt-5.6-sol,us.openai.gpt-5.6-terra,us.openai.gpt-5.6-luna.
+ * to the three US CRIS inference profiles and tests Chat Completions. Set
+ * BEDROCK_MODEL to one profile, or BEDROCK_LIVE_MODELS to a comma-separated
+ * override such as global.openai.gpt-5.6-sol.
  *
  * Set BEDROCK_LIVE_STREAM=1 to include streaming inference requests. Runtime
  * Responses compatibility is opt-in with BEDROCK_LIVE_RESPONSES=1. Override the
@@ -22,13 +27,18 @@ import { bedrock as awsBedrock } from 'openai/providers/bedrock/aws';
  */
 const LIVE_TEST_FLAG = 'BEDROCK_LIVE_TEST';
 const AUTH_MODE_ENV = 'BEDROCK_LIVE_AUTH';
+const AUTH_MODE_LIST_ENV = 'BEDROCK_LIVE_AUTHS';
 const ENDPOINT_MODE_ENV = 'BEDROCK_LIVE_ENDPOINT';
 const MODEL_ENV = 'BEDROCK_MODEL';
 const MODEL_LIST_ENV = 'BEDROCK_LIVE_MODELS';
 const RESPONSES_ENV = 'BEDROCK_LIVE_RESPONSES';
 const STREAM_ENV = 'BEDROCK_LIVE_STREAM';
 const LIVE_TEST_TIMEOUT = 180_000;
-const DEFAULT_RUNTIME_MODEL = 'us.openai.gpt-5.6-sol';
+const DEFAULT_RUNTIME_MODELS = [
+  'us.openai.gpt-5.6-sol',
+  'us.openai.gpt-5.6-terra',
+  'us.openai.gpt-5.6-luna',
+] as const;
 
 const endpointModes = ['mantle', 'runtime'] as const;
 type EndpointMode = (typeof endpointModes)[number];
@@ -51,12 +61,30 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-function readAuthMode(): AuthMode {
-  const value = requiredEnv(AUTH_MODE_ENV);
-  if ((authModes as readonly string[]).includes(value)) {
-    return value as AuthMode;
+function readAuthModes(): AuthMode[] {
+  const configuredModes = process.env[AUTH_MODE_LIST_ENV];
+  const configuredEnv = configuredModes === undefined ? AUTH_MODE_ENV : AUTH_MODE_LIST_ENV;
+  const values =
+    configuredModes === undefined
+      ? [requiredEnv(AUTH_MODE_ENV)]
+      : requiredEnv(AUTH_MODE_LIST_ENV)
+          .split(',')
+          .map((mode) => mode.trim())
+          .filter(Boolean);
+
+  if (values.length === 0) {
+    throw new Error(`${configuredEnv} must include at least one authentication mode.`);
   }
-  throw new Error(`${AUTH_MODE_ENV} must be one of: ${authModes.join(', ')}.`);
+
+  const invalidModes = values.filter((value) => !(authModes as readonly string[]).includes(value));
+  if (invalidModes.length > 0) {
+    throw new Error(
+      `${configuredEnv} contains unsupported mode(s): ${invalidModes.join(', ')}. ` +
+        `Use: ${authModes.join(', ')}.`,
+    );
+  }
+
+  return [...new Set(values)] as AuthMode[];
 }
 
 function readEndpointMode(): EndpointMode {
@@ -81,7 +109,8 @@ function readModels(endpoint: EndpointMode): string[] {
   }
 
   if (endpoint === 'runtime') {
-    return [process.env[MODEL_ENV]?.trim() || DEFAULT_RUNTIME_MODEL];
+    const model = process.env[MODEL_ENV]?.trim();
+    return model ? [model] : [...DEFAULT_RUNTIME_MODELS];
   }
   return [requiredEnv(MODEL_ENV)];
 }
@@ -139,14 +168,14 @@ if (!region) {
 
 const endpointMode = readEndpointMode();
 const models = readModels(endpointMode);
-const authMode = readAuthMode();
+const selectedAuthModes = readAuthModes();
 const baseURL = process.env['AWS_BEDROCK_BASE_URL']?.trim();
 const runResponsesTest = endpointMode === 'mantle' || process.env[RESPONSES_ENV] === '1';
 const runStreamingTest = process.env[STREAM_ENV] === '1';
 
 jest.setTimeout(LIVE_TEST_TIMEOUT);
 
-describe(`Amazon Bedrock ${endpointMode} live (${authMode})`, () => {
+describe.each(selectedAuthModes)(`Amazon Bedrock ${endpointMode} live (%s)`, (authMode) => {
   let client: OpenAI;
 
   beforeAll(async () => {
@@ -234,15 +263,25 @@ describe(`Amazon Bedrock ${endpointMode} live (${authMode})`, () => {
         stream: true,
       });
       let eventCount = 0;
-      let completed = false;
+      let outputText = '';
+      let completedResponseID: string | undefined;
+      let finalEventType: string | undefined;
 
       for await (const event of stream) {
         eventCount += 1;
-        completed ||= event.type === 'response.completed';
+        finalEventType = event.type;
+        if (event.type === 'response.output_text.delta') {
+          outputText += event.delta;
+        }
+        if (event.type === 'response.completed') {
+          completedResponseID = event.response.id;
+        }
       }
 
       expect(eventCount).toBeGreaterThan(0);
-      expect(completed).toBe(true);
+      expect(outputText.trim().length).toBeGreaterThan(0);
+      expect(completedResponseID).toEqual(expect.any(String));
+      expect(finalEventType).toBe('response.completed');
     },
   );
 });

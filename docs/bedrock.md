@@ -47,9 +47,9 @@ Bedrock credentials are sent only to the configured API-root origin; absolute re
 
 ### Amazon Bedrock Runtime
 
-Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. The SDK derives the AWS partition DNS suffix from the region (for example, `amazonaws.com` for `us-west-2` and `amazonaws.eu` for `eusc-de-east-1`). The OpenAI inference-profile identifiers include `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna`; availability depends on your AWS account and region.
+Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. The SDK derives the AWS partition DNS suffix from the region (for example, `amazonaws.com` for `us-west-2` and `amazonaws.eu` for `eusc-de-east-1`). The OpenAI Runtime identifiers `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna` are cross-Region inference (CRIS) profile IDs: `us.` selects US CRIS, while an ID such as `global.openai.gpt-5.6-sol` selects Global CRIS. For these deployments, Runtime requires an inference-profile ID and AWS rejects a bare model ID such as `openai.gpt-5.6-sol`; availability depends on your AWS account and region.
 
-For these inference profiles, the verified integration is non-streaming Chat Completions at `/openai/v1/chat/completions`, authenticated with AWS SigV4 signing service `bedrock`. Set `apiKey: null` to prevent an environment bearer token from taking precedence over your AWS credentials:
+For the three US profiles, the new provider's verified integration is non-streaming Chat Completions at `/openai/v1/chat/completions`, authenticated with AWS SigV4 signing service `bedrock`. Set `apiKey: null` to prevent an environment bearer token from taking precedence over your AWS credentials:
 
 ```ts
 import OpenAI from 'openai';
@@ -97,11 +97,11 @@ const client = new OpenAI({
 });
 ```
 
-AWS controls which route and authentication method your selected model, inference profile, and endpoint accept. Although the SDK can configure bearer authentication and send Runtime Responses requests, those Runtime capabilities have not been live-verified for these inference profiles. Consult the applicable AWS documentation if a request or credential type is rejected.
+A separate live validation exercised non-streaming Runtime Responses for `us.openai.gpt-5.6-sol` and `global.openai.gpt-5.6-sol` through the legacy bearer-authenticated `BedrockOpenAI` client. It did not exercise the new `bedrock(...)` provider, SigV4, or Runtime streaming. AWS controls which route and authentication method your selected model, inference profile, and endpoint accept; treat bearer authentication, Runtime Responses, and streaming as deployment-dependent unless you have validated that exact path.
 
 ## Authentication
 
-The Bedrock provider can configure bearer authentication and AWS SigV4 authentication for both Mantle and Runtime endpoints. AWS determines which authentication methods a deployment accepts; Runtime bearer authentication for the OpenAI inference profiles has not been live-verified. The AWS entrypoint selects authentication in this order:
+The Bedrock provider can configure bearer authentication and AWS SigV4 authentication for both Mantle and Runtime endpoints. AWS determines which authentication methods a deployment accepts. A legacy bearer-authenticated Runtime Responses path has been live-verified for US and Global CRIS, but that does not establish bearer acceptance for every deployment or live coverage for the new provider. The AWS entrypoint selects authentication in this order:
 
 1. One explicit mode passed to `bedrock(...)`: `apiKey` or `tokenProvider`, static AWS credentials, `profile`, or `credentialProvider`.
 2. The [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html) in `AWS_BEARER_TOKEN_BEDROCK`.
@@ -243,5 +243,7 @@ const client = new BedrockOpenAI({
   apiKey: process.env['AWS_BEARER_TOKEN_BEDROCK'],
 });
 ```
+
+The live-verified legacy Runtime Responses path explicitly set a Runtime `baseURL` and used a US or Global CRIS inference-profile ID; it covered non-streaming bearer requests only.
 
 New applications using AWS credentials should prefer `new OpenAI({ provider: bedrock(...) })` with the `openai/providers/bedrock/aws` entrypoint.
