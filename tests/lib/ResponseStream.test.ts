@@ -154,6 +154,147 @@ describe('.stream()', () => {
     });
   });
 
+  it('replays hosted shell events, dispatches typed listeners, and preserves each command output', async () => {
+    const events: ResponseStreamEvent[] = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: {
+          id: 'sh_123',
+          type: 'shell_call',
+          call_id: 'call_123',
+          environment: null,
+          status: 'in_progress',
+          action: { commands: [], timeout_ms: null, max_output_length: null },
+        },
+      },
+      {
+        type: 'response.shell_call_command.added',
+        sequence_number: 2,
+        output_index: 0,
+        command_index: 0,
+        command: '',
+      },
+      {
+        type: 'response.shell_call_command.added',
+        sequence_number: 3,
+        output_index: 0,
+        command_index: 1,
+        command: '',
+      },
+      {
+        type: 'response.shell_call_command.delta',
+        sequence_number: 4,
+        output_index: 0,
+        command_index: 1,
+        delta: 'echo second',
+        obfuscation: 'padding',
+      },
+      {
+        type: 'response.shell_call_command.delta',
+        sequence_number: 5,
+        output_index: 0,
+        command_index: 0,
+        delta: 'echo first draft',
+      },
+      {
+        type: 'response.shell_call_command.done',
+        sequence_number: 6,
+        output_index: 0,
+        command_index: 0,
+        command: 'echo first',
+      },
+      {
+        type: 'response.shell_call_command.done',
+        sequence_number: 7,
+        output_index: 0,
+        command_index: 1,
+        command: 'echo second',
+      },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 8,
+        output_index: 1,
+        item: {
+          id: 'sho_123',
+          type: 'shell_call_output',
+          call_id: 'call_123',
+          status: 'in_progress',
+          max_output_length: null,
+          output: [],
+        },
+      },
+      {
+        type: 'response.shell_call_output_content.delta',
+        sequence_number: 9,
+        item_id: 'sho_123',
+        output_index: 1,
+        command_index: 1,
+        delta: { stdout: 'second output' },
+      },
+      {
+        type: 'response.shell_call_output_content.delta',
+        sequence_number: 10,
+        item_id: 'sho_123',
+        output_index: 1,
+        command_index: 0,
+        delta: { stdout: 'first output', stderr: 'first warning' },
+      },
+      {
+        type: 'response.shell_call_output_content.done',
+        sequence_number: 11,
+        item_id: 'sho_123',
+        output_index: 1,
+        command_index: 1,
+        output: [{ stdout: 'second final', stderr: '', outcome: { type: 'timeout' } }],
+      },
+      {
+        type: 'response.shell_call_output_content.done',
+        sequence_number: 12,
+        item_id: 'sho_123',
+        output_index: 1,
+        command_index: 0,
+        output: [{ stdout: 'first final', stderr: 'final warning', outcome: { type: 'exit', exit_code: 7 } }],
+      },
+    ];
+    const emittedTypes: ResponseStreamEvent['type'][] = [];
+    const obfuscation: (string | undefined)[] = [];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events))
+      .on('response.shell_call_command.added', (event) => emittedTypes.push(event.type))
+      .on('response.shell_call_command.delta', (event) => {
+        emittedTypes.push(event.type);
+        obfuscation.push(event.obfuscation);
+      })
+      .on('response.shell_call_command.done', (event) => emittedTypes.push(event.type))
+      .on('response.shell_call_output_content.delta', (event) => emittedTypes.push(event.type))
+      .on('response.shell_call_output_content.done', (event) => emittedTypes.push(event.type));
+
+    const final = await stream.finalResponse();
+
+    expect(emittedTypes).toEqual(
+      events
+        .filter((event) => event.type !== 'response.created' && event.type !== 'response.output_item.added')
+        .map((event) => event.type),
+    );
+    expect(obfuscation).toEqual(['padding', undefined]);
+    expect(final.output).toMatchObject([
+      { type: 'shell_call', action: { commands: ['echo first', 'echo second'] } },
+      {
+        type: 'shell_call_output',
+        output: [
+          { stdout: 'first final', stderr: 'final warning', outcome: { type: 'exit', exit_code: 7 } },
+          { stdout: 'second final', stderr: '', outcome: { type: 'timeout' } },
+        ],
+      },
+    ]);
+  });
+
   it('converts an error event into an APIError', async () => {
     const events: ResponseStreamEvent[] = [
       {

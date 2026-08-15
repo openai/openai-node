@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { expectTypeOf, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import OpenAI from 'openai';
 import { ReadyState } from 'openai/internal/ws-adapter';
@@ -9,6 +9,8 @@ import { ResponsesWSBase as BetaResponsesWSBase } from 'openai/resources/beta/re
 import type { ResponsesWSBaseOptions as BetaResponsesWSBaseOptions } from 'openai/resources/beta/responses/ws-base';
 import { WebSocketError as StableWebSocketError } from 'openai/resources/responses/internal-base';
 import { WebSocketError as BetaWebSocketError } from 'openai/resources/beta/responses/internal-base';
+import type { ResponsesServerEvent as StableResponsesServerEvent } from 'openai/resources/responses/responses';
+import type { BetaResponsesServerEvent } from 'openai/resources/beta/responses/responses';
 
 class FakeResponseSocket extends EventEmitter implements WebSocketLike {
   readyState: number = ReadyState.CONNECTING;
@@ -28,6 +30,51 @@ const variants = [
   ['stable', StableResponsesWSBase, StableWebSocketError],
   ['beta', BetaResponsesWSBase, BetaWebSocketError],
 ] as const;
+
+const websocketAPIErrorCases = [
+  [
+    'nested protocol',
+    {
+      type: 'error',
+      error: {
+        code: 'invalid_request',
+        message: 'nested request failed',
+        param: null,
+        type: 'invalid_request_error',
+      },
+      status: 400,
+      stream_id: 'stream_nested',
+    } satisfies StableResponsesServerEvent.ResponseWsError & BetaResponsesServerEvent.BetaResponseWsError,
+    'nested request failed',
+  ],
+  [
+    'flat streaming',
+    {
+      type: 'error',
+      code: 'invalid_request',
+      message: 'flat stream failed',
+      param: null,
+      sequence_number: 7,
+      stream_id: 'stream_flat',
+    } satisfies StableResponsesServerEvent.ResponseWsStreamingError &
+      BetaResponsesServerEvent.BetaResponseWsStreamingError,
+    'flat stream failed',
+  ],
+] as const;
+
+test('public WebSocket error types preserve flat and nested server events', () => {
+  type StableErrorEvent = Extract<StableResponsesServerEvent, { type: 'error' }>;
+  type BetaErrorEvent = Extract<BetaResponsesServerEvent, { type: 'error' }>;
+
+  expectTypeOf<StableErrorEvent>().toEqualTypeOf<
+    StableResponsesServerEvent.ResponseWsError | StableResponsesServerEvent.ResponseWsStreamingError
+  >();
+  expectTypeOf<BetaErrorEvent>().toEqualTypeOf<
+    BetaResponsesServerEvent.BetaResponseWsError | BetaResponsesServerEvent.BetaResponseWsStreamingError
+  >();
+  expectTypeOf<StableWebSocketError['error']>().toEqualTypeOf<StableErrorEvent | undefined>();
+  expectTypeOf<BetaWebSocketError['error']>().toEqualTypeOf<BetaErrorEvent | undefined>();
+});
 
 describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketError) => {
   const BaseClass = Base as typeof StableResponsesWSBase;
@@ -177,10 +224,25 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     expect(typed).toHaveBeenCalledWith(event);
     expect(raw).toHaveBeenNthCalledWith(1, 'not json');
     expect(raw).toHaveBeenNthCalledWith(2, Uint8Array.from([1, 2]));
-    expect(errors.mock.calls.map(([error]) => error.message)).toEqual([
-      JSON.stringify(apiError),
-      'socket failed',
-    ]);
+    expect(errors.mock.calls.map(([error]) => error.message)).toEqual(['request failed', 'socket failed']);
+  });
+
+  test.each(websocketAPIErrorCases)('dispatches %s API errors', (_shape, apiError, expectedMessage) => {
+    const websocket = createWebSocket();
+    const events = vi.fn();
+    const errors = vi.fn();
+    websocket.on('event', events);
+    websocket.on('error', errors);
+
+    websocket.socket.emit('message', JSON.stringify(apiError), false);
+
+    expect(events).toHaveBeenCalledWith(apiError);
+    expect(errors).toHaveBeenCalledTimes(1);
+    const [error] = errors.mock.calls[0]!;
+    expect(error).toBeInstanceOf(WebSocketError);
+    expect(error.message).toBe(expectedMessage);
+    expect(error.error).toEqual(apiError);
+    expect(error.error.stream_id).toBe(apiError.stream_id);
   });
 
   test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(

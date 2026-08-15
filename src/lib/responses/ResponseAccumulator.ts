@@ -161,6 +161,48 @@ export function accumulateResponse(
       }
       break;
     }
+    case 'response.shell_call_command.added': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call') {
+        validateArrayIndex(output.action.commands, event.command_index, 'command', true);
+        output.action.commands[event.command_index] = event.command;
+      }
+      break;
+    }
+    case 'response.shell_call_command.delta': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call') {
+        validateArrayIndex(output.action.commands, event.command_index, 'command');
+        output.action.commands[event.command_index] += event.delta;
+      }
+      break;
+    }
+    case 'response.shell_call_command.done': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call') {
+        validateArrayIndex(output.action.commands, event.command_index, 'command');
+        output.action.commands[event.command_index] = event.command;
+      }
+      break;
+    }
+    case 'response.shell_call_output_content.delta': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call_output') {
+        const content = getShellOutputContent(snapshot, output, event.command_index);
+        content.stdout += event.delta.stdout ?? '';
+        content.stderr += event.delta.stderr ?? '';
+      }
+      break;
+    }
+    case 'response.shell_call_output_content.done': {
+      const output = getOutput(snapshot, event.output_index);
+      if (output.type === 'shell_call_output') {
+        const content = getContent(event.output, 0);
+        getShellOutputContent(snapshot, output, event.command_index);
+        output.output[event.command_index] = structuredClone(content);
+      }
+      break;
+    }
     case 'response.reasoning_text.delta': {
       const output = getOutput(snapshot, event.output_index);
       if (output.type === 'reasoning') {
@@ -424,6 +466,33 @@ function getContent<T>(content: T[], contentIndex: number): T {
   return part;
 }
 
+function getShellOutputContent(
+  snapshot: Response,
+  output: Extract<Response['output'][number], { type: 'shell_call_output' }>,
+  commandIndex: number,
+): (typeof output.output)[number] {
+  const shellCall = snapshot.output.find(
+    (item): item is Extract<Response['output'][number], { type: 'shell_call' }> =>
+      item.type === 'shell_call' && item.call_id === output.call_id,
+  );
+
+  if (shellCall) {
+    validateArrayIndex(shellCall.action.commands, commandIndex, 'command');
+  } else {
+    validateArrayIndex(output.output, commandIndex, 'content', true);
+  }
+
+  while (output.output.length <= commandIndex) {
+    output.output.push({
+      stdout: '',
+      stderr: '',
+      outcome: { type: 'exit', exit_code: 0 },
+    });
+  }
+
+  return getContent(output.output, commandIndex);
+}
+
 function validateArrayAppend(
   collection: readonly unknown[],
   index: number,
@@ -438,7 +507,7 @@ function validateArrayAppend(
 function validateArrayIndex(
   collection: readonly unknown[],
   index: number,
-  kind: 'output' | 'content' | 'annotation',
+  kind: 'output' | 'content' | 'annotation' | 'command',
   allowAppend = false,
 ): void {
   if (
