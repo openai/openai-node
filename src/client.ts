@@ -1189,7 +1189,11 @@ export class OpenAI {
         !options.__metadata?.['hasStreamingBody'] &&
         !options.__metadata?.['workloadIdentityTokenRefreshed']
       ) {
-        await Shims.CancelReadableStream(response.body);
+        try {
+          await Shims.CancelReadableStream(response.body);
+        } catch {
+          // Response cleanup is best-effort and must not prevent authentication recovery.
+        }
         const authorization = req.headers.get('authorization');
         this._workloadIdentityAuth.invalidateToken(
           authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined,

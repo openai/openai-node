@@ -595,6 +595,35 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(authorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
   });
 
+  test('retries a replayable 401 when response cleanup fails', async () => {
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        return tokenResponse(`token-${exchangeCount}`);
+      }
+      apiCount += 1;
+      if (apiCount === 1) {
+        const response = new Response(null, { status: 401 });
+        Object.defineProperty(response, 'body', {
+          value: {
+            [Symbol.asyncIterator]: () => ({
+              return: () => Promise.reject(new Error('response cleanup failed')),
+            }),
+          },
+        });
+        return response;
+      }
+      return Response.json({ ok: true });
+    });
+    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
+
+    await expect(client.post('/replayable', { body: 'same-body' })).resolves.toMatchObject({ ok: true });
+    expect(exchangeCount).toBe(2);
+    expect(apiCount).toBe(2);
+  });
+
   test.each(['request headers', 'request hook'] as const)(
     'does not replay a 401 for a custom bearer set by %s',
     async (source) => {

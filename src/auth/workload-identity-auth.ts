@@ -200,6 +200,7 @@ function rejectRefresh(state: RefreshState, refreshAttempt: RefreshAttempt, erro
 }
 
 async function waitForRefresh(
+  state: RefreshState,
   refreshAttempt: RefreshAttempt,
   signal: AbortSignal | null | undefined,
   timeoutMs: number | undefined,
@@ -215,7 +216,16 @@ async function waitForRefresh(
     // oxlint-disable-next-line prefer-const -- Cleanup must close over the subscriber before it is initialized.
     let waiter: RefreshWaiter;
     const cleanup = () => {
-      refreshAttempt.waiters.delete(waiter);
+      const removed = refreshAttempt.waiters.delete(waiter);
+      if (removed && refreshAttempt.waiters.size === 0 && state.refreshAttempt === refreshAttempt) {
+        // Let requests already queued in this turn join before an orphaned attempt is retired.
+        setTimeout(() => {
+          if (refreshAttempt.waiters.size === 0 && state.refreshAttempt === refreshAttempt) {
+            state.refreshAttempt = null;
+            state.tokenGeneration += 1;
+          }
+        }, 0);
+      }
       if (timer !== undefined) {
         clearTimeout(timer);
       }
@@ -426,7 +436,8 @@ export class WorkloadIdentityAuth {
    *
    * Cached tokens nearing expiration are returned immediately while a background
    * refresh runs. Concurrent callers share the same in-flight token exchange.
-   * Canceling one waiter does not cancel or invalidate that shared exchange.
+   * Canceling one waiter does not affect other waiters; an attempt with no
+   * remaining waiters is retired so future callers can start a new exchange.
    *
    * @param signal Optional caller cancellation signal for this waiter.
    * @param timeoutMs Optional X.509 waiter timeout; it does not abort a shared exchange.
@@ -489,9 +500,9 @@ export class WorkloadIdentityAuth {
     if (state.refreshAttempt || state.retryNotBefore > this.source.monotonicNow()) {
       return;
     }
-    // A proactive refresh has no waiting caller to own retry delays. Record any
-    // server backoff in shared state and let a later request start the next attempt.
-    void this.refreshWithRetries(context, 0).catch(() => null);
+    // A proactive refresh has no waiting caller to own retry delays. Its shared
+    // attempt records server backoff, and a later request may join or retire it.
+    this.startRefresh(context, 0);
   }
 
   private async refreshWithRetries(
@@ -531,7 +542,7 @@ export class WorkloadIdentityAuth {
         this.throwIfDeadlineExceeded(deadline);
         const refreshAttempt = state.refreshAttempt ?? this.startRefresh(context, retryCount);
         // oxlint-disable-next-line no-await-in-loop -- Token refresh attempts are intentionally sequential.
-        const token = await waitForRefresh(refreshAttempt, signal, this.remainingTimeout(deadline));
+        const token = await waitForRefresh(state, refreshAttempt, signal, this.remainingTimeout(deadline));
         return token;
       } catch (error) {
         if (!(error instanceof X509TokenExchangeRetryableError)) {
