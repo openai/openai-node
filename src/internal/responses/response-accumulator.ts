@@ -1,13 +1,15 @@
 import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../resources/responses/responses';
+import type { ResponseAccumulatorContext } from './canonical-output-text';
 import { OpenAIError } from '../../error';
 import { hasOwn } from '../utils';
-import { OutputTextIndex } from './output-text-index';
-
-interface ResponseAccumulatorContext {
-  canonicalSnapshot: Response | undefined;
-  outputTextLengths: WeakMap<Response['output'][number], number>;
-  outputTextIndex: OutputTextIndex;
-}
+import {
+  cloneResponse,
+  createCanonicalResponseContext,
+  ensureCanonicalOutputText,
+  getOutputText,
+  updateCachedOutputTextLength,
+  updateOutputText,
+} from './canonical-output-text';
 
 interface ResponseKeepAliveEvent {
   type: 'keepalive';
@@ -208,148 +210,6 @@ function getShellOutputContent(
 
 function assertNever(value: never): never {
   throw new OpenAIError(`Unhandled response stream event: ${JSON.stringify(value)}`);
-}
-
-function getOutputText(context: ResponseAccumulatorContext, output: Response['output'][number]): string {
-  if (output.type !== 'message') {
-    return '';
-  }
-
-  let text = '';
-  for (const content of output.content) {
-    if (content.type === 'output_text') {
-      text += content.text;
-    }
-  }
-  context.outputTextLengths.set(output, text.length);
-  return text;
-}
-
-function ensureCanonicalOutputText(context: ResponseAccumulatorContext, snapshot: Response): void {
-  if (context.canonicalSnapshot === snapshot) {
-    return;
-  }
-
-  const outputTextIndex = new OutputTextIndex();
-  let text = '';
-  for (const output of snapshot.output) {
-    const outputText = getOutputText(context, output);
-    text += outputText;
-    outputTextIndex.append(outputText.length);
-  }
-  if (snapshot.output_text !== text) {
-    snapshot.output_text = text;
-  }
-  context.outputTextIndex = outputTextIndex;
-  context.canonicalSnapshot = snapshot;
-}
-
-function cloneResponse(context: ResponseAccumulatorContext, response: Response): Response {
-  context.canonicalSnapshot = undefined;
-  context.outputTextLengths = new WeakMap();
-  context.outputTextIndex = new OutputTextIndex();
-  const snapshot = structuredClone(response);
-  if (
-    !Object.getOwnPropertyDescriptor(snapshot, 'output_text') ||
-    snapshot.output_text === null ||
-    snapshot.output_text === undefined
-  ) {
-    ensureCanonicalOutputText(context, snapshot);
-  } else if (snapshot.output.length === 0 && snapshot.output_text === '') {
-    context.canonicalSnapshot = snapshot;
-  }
-  return snapshot;
-}
-
-function updateCachedOutputTextLength(
-  context: ResponseAccumulatorContext,
-  output: Response['output'][number],
-  outputIndex: number,
-  previousText: string,
-  nextText: string,
-): void {
-  const length = context.outputTextLengths.get(output);
-  if (length !== undefined) {
-    const nextLength = length - previousText.length + nextText.length;
-    context.outputTextLengths.set(output, nextLength);
-    context.outputTextIndex.update(outputIndex, nextLength);
-  }
-}
-
-function replaceOutputTextSuffix(snapshot: Response, previousText: string, nextText: string): void {
-  if (previousText.length === 0) {
-    snapshot.output_text += nextText;
-    return;
-  }
-
-  snapshot.output_text =
-    snapshot.output_text.slice(0, snapshot.output_text.length - previousText.length) + nextText;
-}
-
-function getPrecedingContentTextLength(
-  context: ResponseAccumulatorContext,
-  output: Response['output'][number] | undefined,
-  contentIndex: number | undefined,
-  nextText: string,
-): number {
-  if (contentIndex === undefined || output?.type !== 'message') {
-    return 0;
-  }
-
-  if (contentIndex < output.content.length - contentIndex - 1) {
-    let precedingContentLength = 0;
-    for (let index = 0; index < contentIndex; index += 1) {
-      const precedingContent = output.content[index];
-      if (precedingContent?.type === 'output_text') {
-        precedingContentLength += precedingContent.text.length;
-      }
-    }
-    return precedingContentLength;
-  }
-
-  let followingContentLength = 0;
-  for (let index = contentIndex + 1; index < output.content.length; index += 1) {
-    const followingContent = output.content[index];
-    if (followingContent?.type === 'output_text') {
-      followingContentLength += followingContent.text.length;
-    }
-  }
-  const outputTextLength = context.outputTextLengths.get(output) ?? getOutputText(context, output).length;
-  return outputTextLength - followingContentLength - nextText.length;
-}
-
-function updateOutputText(
-  context: ResponseAccumulatorContext,
-  snapshot: Response,
-  outputIndex: number,
-  previousText: string,
-  nextText: string,
-  contentIndex?: number,
-): void {
-  if (previousText === nextText) {
-    return;
-  }
-
-  const output = snapshot.output[outputIndex];
-  if (
-    outputIndex === snapshot.output.length - 1 &&
-    (contentIndex === undefined || (output?.type === 'message' && contentIndex === output.content.length - 1))
-  ) {
-    replaceOutputTextSuffix(snapshot, previousText, nextText);
-    return;
-  }
-
-  const precedingContentLength = getPrecedingContentTextLength(context, output, contentIndex, nextText);
-  const offset = context.outputTextIndex.prefixSum(outputIndex) + precedingContentLength;
-  if (offset + previousText.length === snapshot.output_text.length) {
-    replaceOutputTextSuffix(snapshot, previousText, nextText);
-    return;
-  }
-
-  snapshot.output_text =
-    snapshot.output_text.slice(0, offset) +
-    nextText +
-    snapshot.output_text.slice(offset + previousText.length);
 }
 
 function accumulateOutputItemEvent(
@@ -927,11 +787,7 @@ function isIgnoredResponseEvent(event: ResponseAccumulatorEvent): event is Respo
 }
 
 export function createResponseContext(): ResponseAccumulatorContext {
-  return {
-    canonicalSnapshot: undefined,
-    outputTextLengths: new WeakMap(),
-    outputTextIndex: new OutputTextIndex(),
-  };
+  return createCanonicalResponseContext();
 }
 
 export function accumulateResponseWithContext(

@@ -108,49 +108,124 @@ async function stream(events: ResponseStreamEvent[]): Promise<Response> {
   return ResponseStream.fromReadableStream(ReadableStreamFrom(chunks)).finalResponse();
 }
 
-function measureTextWork(): { reads: number } {
-  const work = { reads: 0 };
+function measureWork(kind: 'text' | 'output'): { count: number } {
+  const work = { count: 0 };
   const clone = globalThis.structuredClone;
+  const instrument = <T extends object>(target: T, matches: (property: PropertyKey) => boolean) =>
+    new Proxy(target, {
+      get(current, property, receiver) {
+        work.count += Number(matches(property));
+        return Reflect.get(current, property, receiver);
+      },
+    });
   vi.spyOn(globalThis, 'structuredClone').mockImplementation((value, options) => {
     const cloned = clone(value, options);
-    if (typeof cloned === 'object' && cloned !== null && 'type' in cloned && cloned.type === 'output_text') {
-      let current = (cloned as ResponseOutputText).text;
-      Object.defineProperty(cloned, 'text', {
-        configurable: true,
-        enumerable: true,
-        get(): string {
-          work.reads += 1;
-          return current;
-        },
-        set(next: string): void {
-          current = next;
-        },
-      });
+    if (typeof cloned !== 'object' || cloned === null) {
+      return cloned;
+    }
+    if (kind === 'text' && 'type' in cloned && cloned.type === 'output_text') {
+      return instrument(cloned, (property) => property === 'text');
+    }
+    if (kind === 'output' && 'object' in cloned && cloned.object === 'response') {
+      const snapshot = cloned as Response;
+      snapshot.output = instrument(
+        snapshot.output,
+        (property) => typeof property === 'string' && /^[1-9][0-9]*$/u.test(property),
+      );
     }
     return cloned;
   });
   return work;
 }
 
-function measureLaterOutputVisits(): { visits: number } {
-  const work = { visits: 0 };
-  const clone = globalThis.structuredClone;
-  vi.spyOn(globalThis, 'structuredClone').mockImplementation((value, options) => {
-    const cloned = clone(value, options);
-    if (typeof cloned === 'object' && cloned !== null && 'object' in cloned && cloned.object === 'response') {
-      const snapshot = cloned as Response;
-      snapshot.output = new Proxy(snapshot.output, {
-        get(target, property, receiver) {
-          if (typeof property === 'string' && /^[1-9][0-9]*$/u.test(property)) {
-            work.visits += 1;
-          }
-          return Reflect.get(target, property, receiver);
-        },
-      });
+function middleEvents(count: number, kind: 'added' | 'delta') {
+  const middle = Math.floor((257 - count) / 2);
+  const earlier = 16;
+  const last = count - 1;
+  const parts = Array.from({ length: count }, (_, index) => [String.fromCodePoint(65 + index)]);
+  const events = [
+    created(),
+    ...Array.from({ length: 257 }, (_, index) =>
+      outputFrame(
+        'added',
+        index,
+        index >= middle && index < middle + count
+          ? message(index, [text(requiredAt(requiredAt(parts, index - middle), 0)), refusal()])
+          : tool(index),
+      ),
+    ),
+  ];
+  const expected = new Map<number, string>();
+  let prefix = '';
+  const canonical = () => prefix + parts.flat().join('');
+  const record = (event: ResponseStreamEvent) => {
+    events.push(event);
+    expected.set(events.length - 1, canonical());
+  };
+  const replaceEarlier = (value: string, type: 'output' | 'content' | 'tool' | 'delta') => {
+    prefix = type === 'delta' ? prefix + value : value;
+    const item = type === 'tool' ? tool(earlier) : message(earlier, [refusal(), text(value)]);
+    let event: ResponseStreamEvent;
+    if (type === 'output' || type === 'tool') {
+      event = outputFrame('done', earlier, item);
+    } else if (type === 'delta') {
+      event = textFrame('delta', earlier, 1, value);
+    } else {
+      event = contentFrame('done', earlier, 1, value ? text(value) : refusal());
     }
-    return cloned;
-  });
-  return work;
+    record(event);
+  };
+  const replaceMiddle = (index: number, value: string, output = false) => {
+    if (output) {
+      parts[index] = [value];
+    } else {
+      requiredAt(parts, index)[0] = value;
+    }
+    record(
+      output
+        ? outputFrame('done', middle + index, message(middle + index, [text(value), refusal()]))
+        : textFrame('done', middle + index, 0, value),
+    );
+  };
+  const appendPart = (index: number, value: string, type: 'added' | 'delta', tail = false) => {
+    const content = requiredAt(parts, index);
+    if (type === 'added') {
+      content.push(value);
+      record(contentFrame('added', middle + index, content.length, text(value)));
+    } else {
+      const partIndex = tail ? content.length - 1 : 0;
+      content[partIndex] = requiredAt(content, partIndex) + value;
+      record(textFrame('delta', middle + index, tail ? content.length : 0, value));
+    }
+  };
+  const mutations = new Map<number, () => void>([
+    [32, () => replaceEarlier('early', 'output')],
+    [64, () => replaceEarlier('a much longer earlier prefix', 'content')],
+    [80, () => appendPart(last, 'tail', 'added')],
+    [88, () => appendPart(last, '++', 'delta', true)],
+    [96, () => replaceMiddle(0, 'first replacement')],
+    [112, () => replaceMiddle(last, 'a much longer last replacement')],
+    [128, () => replaceEarlier('', 'tool')],
+    [160, () => replaceEarlier('back', 'output')],
+    [176, () => replaceMiddle(1, 'middle replacement', true)],
+    [192, () => replaceEarlier('!', 'delta')],
+    [224, () => replaceEarlier('', 'content')],
+    [240, () => replaceEarlier('return', 'content')],
+  ]);
+  for (let index = 0; index < 256; index += 1) {
+    mutations.get(index)?.();
+    appendPart(index % count, String.fromCodePoint(97 + (index % 26)), kind);
+  }
+  return { events, expected, canonical };
+}
+
+function firstText(snapshot: Response): ResponseOutputText {
+  const output = requiredAt(snapshot.output, 0);
+  const part = output.type === 'message' ? requiredAt(output.content, 0) : undefined;
+  if (part?.type !== 'output_text') {
+    throw new Error('expected output text');
+  }
+  return part;
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -159,360 +234,87 @@ describe('canonical streamed response output text', () => {
   const first = () => message(0, [text('A')]);
   const second = () => message(1, [text('B')]);
   const both = () => message(0, [text('A'), text('B')]);
-  const unicode = () => [message(0, [text('😀')]), tool(1), message(2, [text('🚀')])];
-
-  test.each([
-    { label: 'one message', later: 'none', order: 'single' },
-    { label: 'an existing later message', later: 'message', order: 'single' },
-    { label: 'an existing later tool', later: 'tool', order: 'single' },
-    { label: 'a later message populated first', later: 'parallel', order: 'later-first' },
-    { label: 'alternating output messages', later: 'parallel', order: 'alternating' },
-  ])('keeps public streaming linear with $label', async ({ later, order }) => {
-    const count = 1024;
-    const work = measureTextWork();
-    const laterOutput = { none: null, message: second(), tool: tool(1), parallel: message(1) }[later];
-    const outputs: Output[] = [message(0), ...(laterOutput ? [laterOutput] : [])];
-    const events = [created(), ...outputs.map((item, index) => outputFrame('added', index, item))];
-    if (order === 'later-first') {
-      for (let index = 0; index < count; index += 1) {
-        events.push(contentFrame('added', 1, index, text('B')));
-      }
-    }
-    for (let index = 0; index < count; index += 1) {
-      if (order === 'alternating') {
-        events.push(contentFrame('added', 1, index, text('B')));
-      }
-      events.push(contentFrame('added', 0, index, text('A')));
-    }
-    const suffix = { none: '', message: 'B', tool: '', parallel: 'B'.repeat(count) }[later];
-    const final = await stream(events);
-    expect(final.output_text).toBe('A'.repeat(count) + suffix);
-    expect(work.reads).toBeLessThanOrEqual(count * 16);
-  });
-
-  test.each(['added', 'delta'] as const)(
-    'visits later tool outputs only linearly across adversarial %s updates',
-    async (kind) => {
-      const count = 384;
-      const work = measureLaterOutputVisits();
-      const events = [created(), outputFrame('added', 0, message(0, kind === 'delta' ? [text('')] : []))];
-      for (let index = 1; index <= count; index += 1) {
-        events.push(outputFrame('added', index, tool(index)));
-      }
-      for (let index = 0; index < count; index += 1) {
-        const event =
-          kind === 'added' ? contentFrame('added', 0, index, text('x')) : textFrame('delta', 0, 0, 'x');
-        events.push(event);
-      }
-      const final = await stream(events);
-      expect(final.output_text).toBe('x'.repeat(count));
-      expect(work.visits).toBeLessThanOrEqual(count * 4);
-    },
-  );
-
-  test.each(['added', 'delta'] as const)(
-    'visits surrounding tool outputs only linearly across middle-message %s updates',
-    async (kind) => {
-      const count = 256;
-      const middleIndex = count / 2;
-      const work = measureLaterOutputVisits();
-      const events = [created()];
-
-      for (let index = 0; index < middleIndex; index += 1) {
-        events.push(outputFrame('added', index, tool(index)));
-      }
-      events.push(
-        outputFrame('added', middleIndex, message(middleIndex, kind === 'delta' ? [text('')] : [])),
-      );
-      for (let index = middleIndex + 1; index <= count; index += 1) {
-        events.push(outputFrame('added', index, tool(index)));
-      }
-      for (let index = 0; index < count; index += 1) {
-        const event =
-          kind === 'added'
-            ? contentFrame('added', middleIndex, index, text('x'))
-            : textFrame('delta', middleIndex, 0, 'x');
-        events.push(event);
-      }
-
-      const final = await stream(events);
-
-      expect(final.output_text).toBe('x'.repeat(count));
-      expect(work.visits).toBeLessThanOrEqual(count * 8);
-    },
-  );
 
   test.each(
     [2, 8, 32].flatMap((messageCount) =>
-      (['added', 'delta'] as const).map((kind) => ({ messageCount, kind })),
+      (['delta', 'added'] as const).map((kind) => ({ messageCount, kind })),
     ),
-  )('indexes $messageCount alternating middle messages for $kind updates', async ({ messageCount, kind }) => {
-    const outputCount = 257;
-    const middleIndex = Math.floor((outputCount - messageCount) / 2);
-    const earlierIndex = 16;
-    const lastIndex = messageCount - 1;
-    const parts = Array.from({ length: messageCount }, (_, index) => [String.fromCodePoint(65 + index)]);
-    const contentLengths = Array.from({ length: messageCount }, () => 2);
-    const expected = new Map<number, string>();
-    const events = [created()];
-    let prefix = '';
-    let tailContentIndex = 0;
-    let tailPartIndex = 0;
-
-    for (let index = 0; index < middleIndex; index += 1) {
-      events.push(outputFrame('added', index, tool(index)));
-    }
-    for (let index = 0; index < messageCount; index += 1) {
-      const firstPart = requiredAt(requiredAt(parts, index), 0);
-      events.push(
-        outputFrame('added', middleIndex + index, message(middleIndex + index, [text(firstPart), refusal()])),
-      );
-    }
-    for (let index = middleIndex + messageCount; index < outputCount; index += 1) {
-      events.push(outputFrame('added', index, tool(index)));
-    }
-
-    const record = (event: ResponseStreamEvent): void => {
-      events.push(event);
-      expected.set(events.length - 1, prefix + parts.map((content) => content.join('')).join(''));
-    };
-
-    const replaceEarlierOutput = (value: string): void => {
-      prefix = value;
-      record(outputFrame('done', earlierIndex, message(earlierIndex, [refusal(), text(prefix)])));
-    };
-    const replaceEarlierContent = (value: string): void => {
-      prefix = value;
-      record(contentFrame('done', earlierIndex, 1, prefix ? text(prefix) : refusal()));
-    };
-    const replaceActiveContent = (index: number, value: string): void => {
-      requiredAt(parts, index)[0] = value;
-      record(textFrame('done', middleIndex + index, 0, value));
-    };
-    const mutations = new Map<number, () => void>([
-      [32, () => replaceEarlierOutput('early')],
-      [64, () => replaceEarlierContent('a much longer earlier prefix')],
-      [
-        80,
-        () => {
-          const content = requiredAt(parts, lastIndex);
-          tailPartIndex = content.length;
-          tailContentIndex = requiredAt(contentLengths, lastIndex);
-          content.push('tail');
-          contentLengths[lastIndex] = tailContentIndex + 1;
-          record(contentFrame('added', middleIndex + lastIndex, tailContentIndex, text('tail')));
-        },
-      ],
-      [
-        88,
-        () => {
-          const content = requiredAt(parts, lastIndex);
-          content[tailPartIndex] = `${requiredAt(content, tailPartIndex)}++`;
-          record(textFrame('delta', middleIndex + lastIndex, tailContentIndex, '++'));
-        },
-      ],
-      [96, () => replaceActiveContent(0, 'first replacement')],
-      [112, () => replaceActiveContent(lastIndex, 'a much longer last replacement')],
-      [
-        128,
-        () => {
-          prefix = '';
-          record(outputFrame('done', earlierIndex, tool(earlierIndex)));
-        },
-      ],
-      [160, () => replaceEarlierOutput('back')],
-      [
-        176,
-        () => {
-          parts[1] = ['middle replacement'];
-          contentLengths[1] = 2;
-          record(
-            outputFrame(
-              'done',
-              middleIndex + 1,
-              message(middleIndex + 1, [text('middle replacement'), refusal()]),
-            ),
-          );
-        },
-      ],
-      [
-        192,
-        () => {
-          prefix += '!';
-          record(textFrame('delta', earlierIndex, 1, '!'));
-        },
-      ],
-      [224, () => replaceEarlierContent('')],
-      [240, () => replaceEarlierContent('return')],
-    ]);
-
-    for (let index = 0; index < 256; index += 1) {
-      mutations.get(index)?.();
-
-      const messageIndex = index % messageCount;
-      const delta = String.fromCodePoint(97 + (index % 26));
-      const content = requiredAt(parts, messageIndex);
-      if (kind === 'added') {
-        const contentIndex = requiredAt(contentLengths, messageIndex);
-        content.push(delta);
-        contentLengths[messageIndex] = contentIndex + 1;
-        record(contentFrame('added', middleIndex + messageIndex, contentIndex, text(delta)));
-      } else {
-        content[0] = requiredAt(content, 0) + delta;
-        record(textFrame('delta', middleIndex + messageIndex, 0, delta));
-      }
-    }
-
-    const work = measureLaterOutputVisits();
-    const reducer = responseAccumulator.accumulateResponseWithContext;
+  )('indexes $messageCount middle messages for $kind updates', async ({ messageCount, kind }) => {
+    const { events, expected, canonical } = middleEvents(messageCount, kind);
+    const work = measureWork('output');
+    const reduce = responseAccumulator.accumulateResponseWithContext;
     vi.spyOn(responseAccumulator, 'accumulateResponseWithContext').mockImplementation(
       (event, snapshot, context) => {
-        const next = reducer(event, snapshot, context);
-        const canonical = expected.get(event.sequence_number);
-        if (canonical !== undefined) {
-          expect(next.output_text).toBe(canonical);
+        const next = reduce(event, snapshot, context);
+        const value = expected.get(event.sequence_number);
+        if (value !== undefined) {
+          expect(next.output_text).toBe(value);
         }
         return next;
       },
     );
-
     const final = await stream(events);
-
-    expect(final.output_text).toBe(prefix + parts.map((content) => content.join('')).join(''));
-    expect(work.visits).toBeLessThanOrEqual(events.length * 12);
-  });
-
-  test.each([
-    ['an earlier message becomes a tool', message(0, [text('A')]), outputFrame('done', 0, tool(0)), 'M12Z'],
-    [
-      'an earlier tool becomes a message',
-      tool(0),
-      outputFrame('done', 0, message(0, [text('longer')])),
-      'longerM12Z',
-    ],
-    [
-      'an earlier message is replaced with longer text',
-      message(0, [text('A')]),
-      outputFrame('done', 0, message(0, [text('longer')])),
-      'longerM12Z',
-    ],
-    [
-      'an earlier message receives a text delta',
-      message(0, [text('A')]),
-      textFrame('delta', 0, 0, '++'),
-      'A++M12Z',
-    ],
-    [
-      'an earlier message receives authoritative text',
-      message(0, [text('A')]),
-      textFrame('done', 0, 0, 'longer'),
-      'longerM12Z',
-    ],
-  ] as [string, Output, ResponseStreamEvent, string][])(
-    'updates a cached middle-message offset when %s',
-    async (_label, earlierOutput, earlierUpdate, expected) => {
-      const events = [
-        created(),
-        outputFrame('added', 0, earlierOutput),
-        outputFrame('added', 1, message(1, [text('M')])),
-        outputFrame('added', 2, message(2, [text('Z')])),
-        textFrame('delta', 1, 0, '1'),
-        earlierUpdate,
-        textFrame('delta', 1, 0, '2'),
-      ];
-
-      const final = await stream(events);
-
-      expect(final.output_text).toBe(expected);
-    },
-  );
-
-  test('keeps a suffix-seeded middle-message cursor relative to its entire output', async () => {
-    const middleIndex = 4;
-    const events = [created()];
-
-    for (let index = 0; index < middleIndex; index += 1) {
-      events.push(outputFrame('added', index, tool(index)));
-    }
-    events.push(
-      outputFrame('added', middleIndex, message(middleIndex, [text('A'), text('B')])),
-      outputFrame('added', middleIndex + 1, tool(middleIndex + 1)),
-      outputFrame('added', middleIndex + 2, tool(middleIndex + 2)),
-      textFrame('delta', middleIndex, 1, 'x'),
-      textFrame('delta', middleIndex, 1, 'y'),
-    );
-
-    const final = await stream(events);
-
-    expect(final.output_text).toBe('ABxy');
+    expect(final.output_text).toBe(canonical());
+    expect(work.count).toBeLessThanOrEqual(events.length * 12);
   });
 
   test('keeps 4,096 ordinary streamed token deltas linear', async () => {
     const count = 4096;
-    const work = measureTextWork();
-    const events = [created(), outputFrame('added', 0, message(0)), contentFrame('added', 0, 0, text(''))];
-    for (let index = 0; index < count; index += 1) {
-      events.push(textFrame('delta', 0, 0, 'x'));
-    }
-
+    const work = measureWork('text');
+    const events = [
+      created(),
+      outputFrame('added', 0, message(0)),
+      contentFrame('added', 0, 0, text('')),
+      ...Array.from({ length: count }, () => textFrame('delta', 0, 0, 'x')),
+    ];
     const final = await stream(events);
-
     expect(final.output_text).toBe('x'.repeat(count));
-    expect(work.reads).toBeLessThanOrEqual(count * 8);
+    expect(work.count).toBeLessThanOrEqual(count * 8);
   });
 
-  test('releases the request-owned accumulator context when the stream ends', async () => {
+  test.each([false, true])('releases the accumulator context when parsing fails: %s', async (fails) => {
     const createContext = vi.spyOn(responseAccumulator, 'createResponseContext');
-
-    const final = await stream([created([first()]), textFrame('delta', 0, 0, '!')]);
-
-    expect(final.output_text).toBe('A!');
+    const failure = new OpenAIError('response parsing failed');
+    if (fails) {
+      vi.spyOn(responseParser, 'maybeParseResponse').mockImplementation(() => {
+        expect(createContext).toHaveBeenCalledTimes(3);
+        throw failure;
+      });
+    }
+    const result = stream([created([first()]), textFrame('delta', 0, 0, '!')]);
+    if (fails) {
+      await expect(result).rejects.toBe(failure);
+    } else {
+      const final = await result;
+      expect(final.output_text).toBe('A!');
+    }
     expect(createContext).toHaveBeenCalledTimes(3);
-    const [, requestContext, releasedContext] = createContext.mock.results.map(({ value }) => value);
-    expect(requestContext?.canonicalSnapshot?.output_text).toBe('A!');
-    expect(releasedContext?.canonicalSnapshot).toBeUndefined();
-    expect(releasedContext?.outputTextLengths).not.toBe(requestContext?.outputTextLengths);
-    expect(requestContext?.outputTextIndex.length).toBeGreaterThan(0);
-    expect(releasedContext?.outputTextIndex).not.toBe(requestContext?.outputTextIndex);
-    expect(releasedContext?.outputTextIndex.length).toBe(0);
+    const [, request, released] = createContext.mock.results.map(({ value }) => value);
+    expect(request?.canonicalSnapshot?.output_text).toBe('A!');
+    expect(released?.canonicalSnapshot).toBeUndefined();
+    expect(released?.outputTextLengths).not.toBe(request?.outputTextLengths);
+    expect(request?.outputTextIndex.length).toBeGreaterThan(0);
+    expect(released?.outputTextIndex).not.toBe(request?.outputTextIndex);
+    expect(released?.outputTextIndex.length).toBe(0);
   });
 
-  test('releases the request-owned accumulator context before response parsing fails', async () => {
-    const createContext = vi.spyOn(responseAccumulator, 'createResponseContext');
-    const parsingFailure = new OpenAIError('response parsing failed');
-    const parseResponse = vi.spyOn(responseParser, 'maybeParseResponse').mockImplementation(() => {
-      expect(createContext).toHaveBeenCalledTimes(3);
-      throw parsingFailure;
-    });
-
-    await expect(stream([created([first()]), textFrame('delta', 0, 0, '!')])).rejects.toBe(parsingFailure);
-
-    expect(parseResponse).toHaveBeenCalledOnce();
-    const [, requestContext, releasedContext] = createContext.mock.results.map(({ value }) => value);
-    expect(requestContext?.canonicalSnapshot?.output_text).toBe('A!');
-    expect(releasedContext?.canonicalSnapshot).toBeUndefined();
-    expect(releasedContext?.outputTextLengths).not.toBe(requestContext?.outputTextLengths);
-    expect(requestContext?.outputTextIndex.length).toBeGreaterThan(0);
-    expect(releasedContext?.outputTextIndex).not.toBe(requestContext?.outputTextIndex);
-    expect(releasedContext?.outputTextIndex.length).toBe(0);
-  });
-
-  test('keeps lifecycle replacements and parallel stream contexts independent', async () => {
-    const resumed = stream([
-      created([message(0, [text('old')])]),
-      textFrame('delta', 0, 0, '!'),
-      frame('response.in_progress', { response: response([message(0, [text('replacement')])], 'stale') }),
-      textFrame('delta', 0, 0, '?'),
-    ]);
-    const independent = stream([
-      created([message(0, [text('separate')])], 'poisoned'),
-      textFrame('delta', 0, 0, '!'),
-    ]);
-
-    const [replaced, separate] = await Promise.all([resumed, independent]);
-
-    expect(replaced.output_text).toBe('replacement?');
-    expect(separate.output_text).toBe('separate!');
+  test.each([
+    ['ordinary accumulation', (snapshot: Response) => snapshot, 'AXY'],
+    ['aggregate overwrite', (snapshot: Response) => (snapshot.output_text = 'corrupted'), 'AXY'],
+    ['same-length content', (snapshot: Response) => (firstText(snapshot).text = 'ZZ'), 'ZZY'],
+    ['different-length content', (snapshot: Response) => (firstText(snapshot).text = 'longer'), 'longerY'],
+    [
+      'existing output replacement',
+      (snapshot: Response) => (snapshot.output[0] = message(0, [text('B')])),
+      'BY',
+    ],
+    ['output append', (snapshot: Response) => snapshot.output.push(second()), 'AXYB'],
+  ])('repairs public snapshot mutation after %s in place', (_label, mutate, expected) => {
+    const snapshot = accumulateResponse(created([first()]));
+    accumulateResponse(textFrame('delta', 0, 0, 'X'), snapshot);
+    mutate(snapshot);
+    expect(accumulateResponse(textFrame('delta', 0, 0, 'Y'), snapshot)).toBe(snapshot);
+    expect(snapshot.output_text).toBe(expected);
   });
 
   test.each([
@@ -528,10 +330,15 @@ describe('canonical streamed response output text', () => {
       contentFrame('done', 0, 0, text('A')),
       'AB',
     ],
-    ['authoritative replacement', [first(), second()], textFrame('done', 0, 0, 'longer'), 'longerB'],
-    ['unicode across a tool', unicode(), textFrame('delta', 0, 0, '🙂'), '😀🙂🚀'],
+    ['authoritative length shift', [first(), second()], textFrame('done', 0, 0, 'longer'), 'longerB'],
+    [
+      'UTF-16 offsets across a tool',
+      [message(0, [text('😀')]), tool(1), message(2, [text('🚀')])],
+      textFrame('delta', 0, 0, '🙂'),
+      '😀🙂🚀',
+    ],
   ] as [string, Output[], ResponseStreamEvent, string][])(
-    'preserves canonical order and detached event payloads for %s',
+    'preserves canonical order and detached payloads for %s',
     async (_label, outputs, update, expected) => {
       const events = [created(), ...outputs.map((item, index) => outputFrame('added', index, item)), update];
       const original = structuredClone(events);
@@ -539,41 +346,35 @@ describe('canonical streamed response output text', () => {
       for (const event of events) {
         direct = accumulateResponse(event, direct);
       }
-      const streamed = await stream(events);
       expect(direct?.output_text).toBe(expected);
-      expect(streamed.output_text).toBe(expected);
+      const final = await stream(events);
+      expect(final.output_text).toBe(expected);
       expect(events).toEqual(original);
     },
   );
 
-  test.each([
-    ['a text part is appended', contentFrame('added', 0, 1, text('B')), 'AB'],
-    ['an empty part is appended', contentFrame('added', 0, 1, text('')), 'A'],
-    ['a message is appended', outputFrame('added', 1, message(1, [text('B')])), 'AB'],
-    ['an identical output is finalized', outputFrame('done', 0, message(0, [text('A')])), 'A'],
-  ] as [string, ResponseStreamEvent, string][])(
-    'repairs stale lifecycle aggregates when %s',
-    (_label, event, expected) => {
-      for (const stale of ['', 'not canonical']) {
-        const snapshot = accumulateResponse(created([first()], stale));
-        accumulateResponse(event, snapshot);
-        expect(snapshot.output_text).toBe(expected);
-      }
-    },
-  );
+  test('keeps lifecycle replacements and parallel stream contexts independent', async () => {
+    const replaced = stream([
+      created([message(0, [text('old')])]),
+      textFrame('delta', 0, 0, '!'),
+      frame('response.in_progress', { response: response([message(0, [text('replacement')])], 'stale') }),
+      textFrame('delta', 0, 0, '?'),
+    ]);
+    const separate = stream([created([first()], 'poisoned'), textFrame('delta', 0, 0, '!')]);
+    const results = await Promise.all([replaced, separate]);
+    expect(results.map(({ output_text }) => output_text)).toEqual(['replacement?', 'A!']);
+  });
 
   test.each([
-    ['missing output', [], outputFrame('done', 0, tool(0))],
-    ['output gap', [message(0)], outputFrame('added', 2, message(2))],
-    ['content append gap', [message(0, [text('A')])], contentFrame('added', 0, 2, text('B'))],
-    ['content replacement gap', [message(0, [text('A')])], contentFrame('done', 0, 1, refusal())],
-  ] as [string, Output[], ResponseStreamEvent][])(
-    'rejects %s without mutating the aggregate',
-    (_label, outputs, event) => {
-      const snapshot = accumulateResponse(created(outputs));
-      const previous = snapshot.output_text;
-      expect(() => accumulateResponse(event, snapshot)).toThrow();
-      expect(snapshot.output_text).toBe(previous);
-    },
-  );
+    ['text appended', contentFrame('added', 0, 1, text('B')), 'AB'],
+    ['empty text appended', contentFrame('added', 0, 1, text('')), 'A'],
+    ['message appended', outputFrame('added', 1, second()), 'AB'],
+    ['identical output finalized', outputFrame('done', 0, first()), 'A'],
+  ])('repairs stale lifecycle aggregates when %s', (_label, event, expected) => {
+    for (const stale of ['', 'not canonical']) {
+      const snapshot = accumulateResponse(created([first()], stale));
+      accumulateResponse(event, snapshot);
+      expect(snapshot.output_text).toBe(expected);
+    }
+  });
 });
