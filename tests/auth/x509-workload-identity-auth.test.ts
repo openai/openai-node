@@ -412,6 +412,41 @@ describe('X.509 workload identity auth', () => {
     await expect(auth.getToken()).resolves.toBe('refreshed-token');
   });
 
+  test('retires a stalled proactive refresh that never gains a foreground waiter', async () => {
+    vi.useFakeTimers();
+    let monotonicTime = 1000;
+    let wallTime = 9_000_000_000_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
+    const stalledRefresh = deferredResponse();
+    let stalledSignal: AbortSignal | null | undefined;
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse('cached-token', 300))
+      .mockImplementationOnce((_url: string | URL | Request, init?: RequestInit) => {
+        stalledSignal = init?.signal;
+        return stalledRefresh.promise;
+      });
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    monotonicTime += 150_000;
+    wallTime += 150_000;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(599_999);
+    expect(stalledSignal?.aborted).toBe(false);
+    expect(hasRefreshAttempt(auth)).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(stalledSignal?.aborted).toBe(true);
+    expect(hasRefreshAttempt(auth)).toBe(false);
+
+    stalledRefresh.resolve(tokenResponse('stale-token'));
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+  });
+
   test.each([408, 409, 429, 500, 503])('retries transient HTTP %i responses', async (status) => {
     const customFetch = vi
       .fn()
@@ -478,6 +513,30 @@ describe('X.509 workload identity auth', () => {
 
     await expect(Promise.all([retrying, late])).resolves.toEqual(['retried-token', 'retried-token']);
     expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('gives a late backoff waiter its own retry after the first attempt it observes', async () => {
+    vi.useFakeTimers();
+    const firstExchange = deferredResponse();
+    const customFetch = vi
+      .fn()
+      .mockImplementationOnce(() => firstExchange.promise)
+      .mockResolvedValueOnce(new Response(null, { status: 503, headers: { 'Retry-After': '0' } }))
+      .mockResolvedValueOnce(tokenResponse('late-retried-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    const first = auth.getToken(undefined, undefined, { maxRetries: 1 });
+    const firstRejection = expect(first).rejects.toMatchObject({ status: 503 });
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    firstExchange.resolve(new Response(null, { status: 503, headers: { 'Retry-After': '1' } }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const late = auth.getToken(undefined, undefined, { maxRetries: 1 });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    await firstRejection;
+    await expect(late).resolves.toBe('late-retried-token');
+    expect(customFetch).toHaveBeenCalledTimes(3);
   });
 
   test('rechecks shared backoff when another waiter extends it', async () => {
@@ -610,7 +669,7 @@ describe('X.509 workload identity auth', () => {
     expect(customFetch).toHaveBeenCalledTimes(2);
   });
 
-  test('does not let a late waiter reset the shared retry sequence', async () => {
+  test('offsets an active-attempt late waiter budget without resetting the retry sequence', async () => {
     const firstExchange = deferredResponse();
     const finalExchange = deferredResponse();
     const customFetch = vi
@@ -621,6 +680,7 @@ describe('X.509 workload identity auth', () => {
     const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 1 });
 
     const first = auth.getToken();
+    const firstRejection = expect(first).rejects.toMatchObject({ status: 503 });
     await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
     firstExchange.resolve(new Response(null, { status: 503, headers: { 'Retry-After': '0' } }));
     await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
@@ -628,13 +688,8 @@ describe('X.509 workload identity auth', () => {
     const late = auth.getToken();
     finalExchange.resolve(new Response(null, { status: 503, headers: { 'Retry-After': '0' } }));
 
-    await expect(Promise.allSettled([first, late])).resolves.toMatchObject([
-      { status: 'rejected', reason: { status: 503 } },
-      { status: 'rejected', reason: { status: 503 } },
-    ]);
-    expect(customFetch).toHaveBeenCalledTimes(2);
-
-    await expect(auth.getToken()).resolves.toBe('next-sequence-token');
+    await firstRejection;
+    await expect(late).resolves.toBe('next-sequence-token');
     expect(customFetch).toHaveBeenCalledTimes(3);
   });
 

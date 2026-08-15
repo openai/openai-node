@@ -24,6 +24,7 @@ interface RefreshWaiter {
 
 interface RefreshAttempt {
   controller: AbortController;
+  orphanTimer: ReturnType<typeof setTimeout> | undefined;
   retryCount: number;
   waiters: Set<RefreshWaiter>;
 }
@@ -31,7 +32,7 @@ interface RefreshAttempt {
 interface RetrySequence {
   lastError: X509TokenExchangeRetryableError | null;
   nextRetryCount: number;
-  participants: Map<symbol, number>;
+  participantAttemptCeilings: Map<symbol, number>;
 }
 
 interface RefreshState {
@@ -55,6 +56,7 @@ interface RefreshContext {
 }
 
 const DEFAULT_REFRESH_BUFFER_MS = 1_200_000;
+const DEFAULT_PROACTIVE_REFRESH_TIMEOUT_MS = 600_000;
 const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
 const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
 
@@ -183,9 +185,9 @@ function assertRetrySequence(context: RefreshContext, retrySequence: RetrySequen
 }
 
 function leaveRetrySequence(state: RefreshState, retrySequence: RetrySequence, participant: symbol): void {
-  retrySequence.participants.delete(participant);
+  retrySequence.participantAttemptCeilings.delete(participant);
   if (
-    retrySequence.participants.size === 0 &&
+    retrySequence.participantAttemptCeilings.size === 0 &&
     state.retrySequence === retrySequence &&
     !state.refreshAttempt
   ) {
@@ -197,9 +199,33 @@ function takeRefreshWaiters(state: RefreshState, refreshAttempt: RefreshAttempt)
   if (state.refreshAttempt === refreshAttempt) {
     state.refreshAttempt = null;
   }
+  if (refreshAttempt.orphanTimer !== undefined) {
+    clearTimeout(refreshAttempt.orphanTimer);
+    refreshAttempt.orphanTimer = undefined;
+  }
   const waiters = [...refreshAttempt.waiters];
   refreshAttempt.waiters.clear();
   return waiters;
+}
+
+function scheduleOrphanRetirement(
+  state: RefreshState,
+  refreshAttempt: RefreshAttempt,
+  delayMs: number,
+): void {
+  if (refreshAttempt.orphanTimer !== undefined) {
+    clearTimeout(refreshAttempt.orphanTimer);
+  }
+  refreshAttempt.orphanTimer = setTimeout(() => {
+    refreshAttempt.orphanTimer = undefined;
+    if (refreshAttempt.waiters.size === 0 && state.refreshAttempt === refreshAttempt) {
+      state.refreshAttempt = null;
+      state.retrySequence = null;
+      state.tokenGeneration += 1;
+      refreshAttempt.controller.abort();
+    }
+  }, delayMs);
+  (refreshAttempt.orphanTimer as unknown as { unref?: () => void }).unref?.();
 }
 
 function resolveRefresh(state: RefreshState, refreshAttempt: RefreshAttempt, token: string): void {
@@ -234,14 +260,7 @@ async function waitForRefresh(
       const removed = refreshAttempt.waiters.delete(waiter);
       if (removed && refreshAttempt.waiters.size === 0 && state.refreshAttempt === refreshAttempt) {
         // Let requests already queued in this turn join before an orphaned attempt is retired.
-        setTimeout(() => {
-          if (refreshAttempt.waiters.size === 0 && state.refreshAttempt === refreshAttempt) {
-            state.refreshAttempt = null;
-            state.retrySequence = null;
-            state.tokenGeneration += 1;
-            refreshAttempt.controller.abort();
-          }
-        }, 0);
+        scheduleOrphanRetirement(state, refreshAttempt, 0);
       }
       if (timer !== undefined) {
         clearTimeout(timer);
@@ -405,7 +424,7 @@ export class X509WorkloadIdentityAuth {
           return await this.refreshWithRetries(context, maxRetries, signal, deadline);
         }
         if (X509WorkloadIdentityAuth.needsRefresh(state.cachedToken)) {
-          this.refreshInBackground(context);
+          this.refreshInBackground(context, timeoutMs);
         }
         return state.cachedToken.token;
       } catch (error) {
@@ -440,14 +459,15 @@ export class X509WorkloadIdentityAuth {
     return hasOwn(options, 'transportKey') ? options.transportKey : x509TransportKey(fetchOptions);
   }
 
-  private refreshInBackground(context: RefreshContext): void {
+  private refreshInBackground(context: RefreshContext, timeoutMs: number | undefined): void {
     const { state } = context;
     if (state.refreshAttempt || state.retryNotBefore > monotonicNow()) {
       return;
     }
-    // A proactive refresh has no waiting caller to own retry delays. Its shared
-    // attempt records server backoff, and a later request may join or retire it.
-    this.startRefresh(context, 0);
+    // A proactive refresh has no waiting caller, so bound its transport lifetime
+    // independently. A foreground waiter that joins takes ownership instead.
+    const refreshAttempt = this.startRefresh(context, 0);
+    scheduleOrphanRetirement(state, refreshAttempt, timeoutMs ?? DEFAULT_PROACTIVE_REFRESH_TIMEOUT_MS);
   }
 
   private async refreshWithRetries(
@@ -461,11 +481,13 @@ export class X509WorkloadIdentityAuth {
     const retrySequence = state.retrySequence ?? {
       lastError: null,
       nextRetryCount: 0,
-      participants: new Map(),
+      participantAttemptCeilings: new Map(),
     };
     const participant = Symbol('X.509 refresh participant');
     state.retrySequence = retrySequence;
-    retrySequence.participants.set(participant, maxRetries);
+    const firstAttempt = state.refreshAttempt?.retryCount ?? retrySequence.nextRetryCount;
+    const participantAttemptCeiling = Math.min(Number.MAX_SAFE_INTEGER, firstAttempt + maxRetries);
+    retrySequence.participantAttemptCeilings.set(participant, participantAttemptCeiling);
 
     try {
       while (true) {
@@ -501,7 +523,7 @@ export class X509WorkloadIdentityAuth {
             throw error;
           }
           assertRetrySequence(context, retrySequence);
-          if (refreshAttempt.retryCount >= maxRetries) {
+          if (refreshAttempt.retryCount >= participantAttemptCeiling) {
             throw error.error;
           }
         }
@@ -533,8 +555,8 @@ export class X509WorkloadIdentityAuth {
     deadline: number | undefined,
   ): RefreshAttempt {
     let sharedRetryBudget = -1;
-    for (const retryBudget of retrySequence.participants.values()) {
-      sharedRetryBudget = Math.max(sharedRetryBudget, retryBudget);
+    for (const attemptCeiling of retrySequence.participantAttemptCeilings.values()) {
+      sharedRetryBudget = Math.max(sharedRetryBudget, attemptCeiling);
     }
     if (retrySequence.nextRetryCount > sharedRetryBudget) {
       if (!retrySequence.lastError) {
@@ -559,6 +581,7 @@ export class X509WorkloadIdentityAuth {
   private startRefresh(context: RefreshContext, retryCount: number): RefreshAttempt {
     const refreshAttempt: RefreshAttempt = {
       controller: new AbortController(),
+      orphanTimer: undefined,
       retryCount,
       waiters: new Set(),
     };
