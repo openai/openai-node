@@ -140,6 +140,22 @@ describe('OpenAI with X.509 workload identity', () => {
     );
   });
 
+  test('treats the X.509 API host as an SDK default for request-level route selection', () => {
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: vi.fn(),
+    });
+
+    expect(client.buildURL('/models', null, 'https://route-default.example/v1')).toBe(
+      'https://route-default.example/v1/models',
+    );
+    client.baseURL = 'https://gateway.example.com/v1';
+    expect(client.buildURL('/models', null, 'https://route-default.example/v1')).toBe(
+      'https://gateway.example.com/v1/models',
+    );
+  });
+
   test('does not change API-key routing, redirects, or authentication', async () => {
     const requests: { url: string; init: RequestInit | undefined }[] = [];
     const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -368,6 +384,45 @@ describe('OpenAI with X.509 workload identity', () => {
     };
 
     await expect(client.models.list()).rejects.toThrow('request hooks must not change the transport');
+    expect(requests).toEqual(['https://mtls.auth.openai.com/oauth/token']);
+  });
+
+  test('rejects nested request-hook transport changes before sending the API request', async () => {
+    const tls = { cert: 'certificate-a', key: 'private-key-a' };
+    const requests: string[] = [];
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetchOptions: { tls } as never,
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        requests.push(url.toString());
+        return tokenResponse('access-token');
+      }),
+    });
+    client.requestMutation = (request) => {
+      (request as { tls: { cert: string } }).tls.cert = 'certificate-b';
+    };
+
+    await expect(client.models.list()).rejects.toThrow();
+    expect(tls.cert).toBe('certificate-a');
+    expect(requests).toEqual(['https://mtls.auth.openai.com/oauth/token']);
+  });
+
+  test('rejects request-hook redirect changes before sending the API request', async () => {
+    const requests: string[] = [];
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        requests.push(url.toString());
+        return tokenResponse('access-token');
+      }),
+    });
+    client.requestMutation = (request) => {
+      request.redirect = 'follow';
+    };
+
+    await expect(client.models.list()).rejects.toThrow('must not change the transport or redirect behavior');
     expect(requests).toEqual(['https://mtls.auth.openai.com/oauth/token']);
   });
 

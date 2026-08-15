@@ -24,7 +24,12 @@ export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import type { WorkloadIdentity } from './auth/types';
-import { hasSameX509Transport, WorkloadIdentityAuth, x509TransportKey } from './auth/workload-identity-auth';
+import {
+  hasSameX509Transport,
+  protectX509RequestOptions,
+  WorkloadIdentityAuth,
+  x509TransportKey,
+} from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
@@ -694,7 +699,7 @@ export class OpenAI {
     return (
       this.#explicitDataResidency ||
       this._provider !== undefined ||
-      this.baseURL !== OPENAI_API_BASE_URL
+      this.baseURL !== defaultBaseURL(this._usesX509WorkloadIdentity)
     );
   }
 
@@ -1033,8 +1038,16 @@ export class OpenAI {
       : undefined;
     const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
-    await this.prepareRequest(req, { url, options });
-    await this._provider?.prepareRequest?.(req, { url, options });
+    const restoreX509RequestOptions = this._usesX509WorkloadIdentity
+      ? protectX509RequestOptions(req)
+      : undefined;
+    let requestHookChangedX509Options = false;
+    try {
+      await this.prepareRequest(req, { url, options });
+      await this._provider?.prepareRequest?.(req, { url, options });
+    } finally {
+      requestHookChangedX509Options = restoreX509RequestOptions?.() ?? false;
+    }
     if (
       workloadIdentityRequestContext?.usesWorkloadIdentityToken &&
       req.headers.get('authorization') !== workloadIdentityAuthorization
@@ -1044,10 +1057,11 @@ export class OpenAI {
     if (
       this._usesX509WorkloadIdentity &&
       workloadIdentityRequestContext &&
-      !hasSameX509Transport(workloadIdentityRequestContext.fetchOptions, req)
+      (requestHookChangedX509Options ||
+        !hasSameX509Transport(workloadIdentityRequestContext.fetchOptions, req))
     ) {
       throw new Errors.OpenAIError(
-        'X.509 workload identity requires transport options on the client; request hooks must not change the transport.',
+        'X.509 workload identity request hooks must not change the transport or redirect behavior.',
       );
     }
 

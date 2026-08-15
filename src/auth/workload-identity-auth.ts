@@ -58,6 +58,7 @@ const SUBJECT_TOKEN_EXCHANGE_URL = 'https://auth.openai.com/oauth/token';
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const DEFAULT_REFRESH_BUFFER_MS = 1_200_000;
 const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
+const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
 
 function createRefreshState(): RefreshState {
   return {
@@ -92,6 +93,30 @@ export function hasSameX509Transport(expected: MergedRequestInit | undefined, ac
     (key) =>
       (expected as Record<string, unknown> | undefined)?.[key] === (actual as Record<string, unknown>)[key],
   );
+}
+
+/** Hides X.509 transport and redirect policy from request hooks, then restores them unchanged. */
+export function protectX509RequestOptions(request: RequestInit): () => boolean {
+  const requestOptions = request as Record<string, unknown>;
+  const protectedOptions: { key: (typeof X509_HOOK_PROTECTED_OPTION_KEYS)[number]; value: unknown }[] = [];
+
+  for (const key of X509_HOOK_PROTECTED_OPTION_KEYS) {
+    if (hasOwn(requestOptions, key)) {
+      protectedOptions.push({ key, value: requestOptions[key] });
+      Reflect.deleteProperty(requestOptions, key);
+    }
+  }
+
+  return () => {
+    const changed = X509_HOOK_PROTECTED_OPTION_KEYS.some((key) => hasOwn(requestOptions, key));
+    for (const key of X509_HOOK_PROTECTED_OPTION_KEYS) {
+      Reflect.deleteProperty(requestOptions, key);
+    }
+    for (const option of protectedOptions) {
+      requestOptions[option.key] = option.value;
+    }
+    return changed;
+  };
 }
 
 function validateX509Config(config: X509WorkloadIdentity): void {
