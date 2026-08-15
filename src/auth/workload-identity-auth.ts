@@ -386,8 +386,8 @@ export class WorkloadIdentityAuth {
           // oxlint-disable-next-line no-await-in-loop -- Invalidation restarts within the original deadline.
           return await this.refreshWithRetries(context, maxRetries, signal, deadline);
         }
-        if (this.needsRefresh(state.cachedToken) && !state.refreshPromise) {
-          void this.refreshWithRetries(context, maxRetries).catch(() => null);
+        if (this.needsRefresh(state.cachedToken)) {
+          this.refreshInBackground(context);
         }
         return state.cachedToken.token;
       } catch (error) {
@@ -409,6 +409,16 @@ export class WorkloadIdentityAuth {
       this.transportStates.set(transportKey, state);
     }
     return state;
+  }
+
+  private refreshInBackground(context: RefreshContext): void {
+    const { state } = context;
+    if (state.refreshPromise || state.retryNotBefore > this.source.now()) {
+      return;
+    }
+    // A proactive refresh has no waiting caller to own retry delays. Record any
+    // server backoff in shared state and let a later request start the next attempt.
+    void this.refreshWithRetries(context, 0).catch(() => null);
   }
 
   private async refreshWithRetries(

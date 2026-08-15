@@ -209,6 +209,40 @@ describe('X.509 workload identity auth', () => {
     await vi.waitFor(async () => expect(await auth.getToken()).toBe('token-2'));
   });
 
+  test('records background refresh backoff without scheduling a referenced retry timer', async () => {
+    vi.useFakeTimers();
+    let monotonicTime = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const failedRefresh = deferredResponse();
+    const successfulRefresh = deferredResponse();
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse('cached-token', 300))
+      .mockImplementationOnce(() => failedRefresh.promise)
+      .mockImplementationOnce(() => successfulRefresh.promise);
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 2 });
+
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    monotonicTime += 150_000;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+    failedRefresh.resolve(new Response(null, { status: 429, headers: { 'Retry-After': '60' } }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+
+    monotonicTime += 59_999;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+
+    monotonicTime += 1;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    expect(customFetch).toHaveBeenCalledTimes(3);
+    successfulRefresh.resolve(tokenResponse('refreshed-token', 300));
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(auth.getToken()).resolves.toBe('refreshed-token');
+  });
+
   test.each([408, 409, 429, 500, 503])('retries transient HTTP %i responses', async (status) => {
     const customFetch = vi
       .fn()
