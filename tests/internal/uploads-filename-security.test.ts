@@ -76,6 +76,32 @@ describe('streaming multipart upload security', () => {
     expect(checks).toBe(2);
   });
 
+  test.each([
+    ['optional', maybeMultipartFormRequestOptions],
+    ['required', multipartFormRequestOptions],
+  ] as const)(
+    'materializes cached named Blobs without rechecking their names in %s multipart requests',
+    async (_, encode) => {
+      const source = Object.assign(new Blob(['authoritative Blob bytes'], { type: 'text/plain' }), {
+        name: 'original.txt',
+      });
+      const hasName = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
+      const upload = new Proxy(source, {
+        has(target, property) {
+          return property === 'name' ? hasName() : Reflect.has(target, property);
+        },
+      });
+
+      const options = await encode({ body: { upload } }, fetch);
+      expect(options.body).toBeInstanceOf(FormData);
+      const file = (options.body as FormData).get('upload');
+      expect(file).toBeInstanceOf(File);
+      expect(file).toMatchObject({ name: 'original.txt', type: 'text/plain' });
+      await expect((file as File).text()).resolves.toBe('authoritative Blob bytes');
+      expect(hasName).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test.each(['iterator', 'branded iterator', 'reader'] as const)(
     'captures the original %s method and receiver before later filenames',
     async (kind) => {
@@ -165,6 +191,25 @@ describe('streaming multipart upload security', () => {
     expect(substitutedRead).not.toHaveBeenCalled();
     expect(first.slice).not.toHaveBeenCalled();
     await reader.cancel();
+  });
+
+  test('preserves authoritative legacy Blob arrayBuffer overrides in mixed streaming multipart bodies', async () => {
+    const legacy = Object.assign(new Blob(['intrinsic Blob bytes']), { name: 'legacy.bin' });
+    const readOverride = vi.fn(() =>
+      Promise.resolve(new TextEncoder().encode('authoritative override bytes').buffer),
+    );
+    Object.assign(legacy, { stream: undefined, arrayBuffer: readOverride });
+
+    const form = await readForm({
+      legacy,
+      metadata: 'preserved metadata',
+      streamed: toStreamingFile(chunks('streamed bytes'), 'streamed.txt'),
+    });
+
+    await expect((form.get('legacy') as File).text()).resolves.toBe('authoritative override bytes');
+    expect(form.get('metadata')).toBe('preserved metadata');
+    await expect((form.get('streamed') as File).text()).resolves.toBe('streamed bytes');
+    expect(readOverride.mock.contexts).toEqual([legacy]);
   });
 
   test.each([
