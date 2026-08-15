@@ -595,8 +595,8 @@ async function* iterateFormValue(
   if (uploadKind) {
     const upload = value as Uploadable;
     const streamingFile = uploadKind === 'streaming-file';
-    const filename = getStreamingFileName(upload, options, streamingFile);
-    const type = getStreamingFileType(upload, streamingFile);
+    const filename = getStreamingFileName(upload, options, uploadKind);
+    const type = getStreamingFileType(upload, uploadKind);
     let snapshot: MultipartDataSnapshot;
     if (streamingFile) {
       snapshot = snapshotStreamingFileData((upload as StreamingFile).data, snapshots);
@@ -646,16 +646,26 @@ function validateStreamingFileName(name: unknown): string {
   return name;
 }
 
-function getStreamingFileName(value: Uploadable, options: CreateFormOptions, streamingFile: boolean): string {
-  const source = streamingFile ? { name: validateStreamingFileName((value as StreamingFile).name) } : value;
+function getStreamingFileName(
+  value: Uploadable,
+  options: CreateFormOptions,
+  uploadKind: Exclude<UploadableKind, undefined>,
+): string {
+  const source =
+    uploadKind === 'streaming-file'
+      ? { name: validateStreamingFileName((value as StreamingFile).name) }
+      : value;
 
-  return getName(source, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
+  return (
+    getNameInternal(source, { stripFilename: options.stripFilenames }, uploadKind === 'named-blob') ??
+    'unknown_file'
+  );
 }
 
-function getStreamingFileType(value: Uploadable, streamingFile: boolean): string {
+function getStreamingFileType(value: Uploadable, uploadKind: Exclude<UploadableKind, undefined>): string {
   let type: string | undefined;
 
-  if (streamingFile || isNamedBlob(value)) {
+  if (uploadKind === 'streaming-file' || uploadKind === 'named-blob' || isNamedBlob(value)) {
     ({ type } = value as StreamingFile | NamedBlob);
   } else if (value instanceof Response) {
     type = value.headers.get('content-type') ?? undefined;

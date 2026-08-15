@@ -102,6 +102,35 @@ describe('streaming multipart upload security', () => {
     },
   );
 
+  test.each([
+    ['optional', maybeMultipartFormRequestOptions],
+    ['required', multipartFormRequestOptions],
+  ] as const)(
+    'preserves cached named Blob metadata in mixed %s streaming multipart requests',
+    async (_, encode) => {
+      const source = Object.assign(new Blob(['authoritative Blob bytes'], { type: 'text/plain' }), {
+        name: 'original.txt',
+      });
+      const hasName = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
+      const upload = new Proxy(source, {
+        has(target, property) {
+          return property === 'name' ? hasName() : Reflect.has(target, property);
+        },
+      });
+
+      const form = await readForm(
+        { upload, sibling: toStreamingFile(chunks('sibling bytes'), 'sibling.txt') },
+        encode,
+      );
+      const file = form.get('upload');
+      expect(file).toBeInstanceOf(File);
+      expect(file).toMatchObject({ name: 'original.txt', type: 'text/plain' });
+      await expect((file as File).text()).resolves.toBe('authoritative Blob bytes');
+      await expect((form.get('sibling') as File).text()).resolves.toBe('sibling bytes');
+      expect(hasName).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test.each(['iterator', 'branded iterator', 'reader'] as const)(
     'captures the original %s method and receiver before later filenames',
     async (kind) => {
