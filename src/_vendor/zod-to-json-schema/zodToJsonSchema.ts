@@ -10,29 +10,16 @@ function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | un
     return;
   }
 
-  const typeProperty = Object.getOwnPropertyDescriptor(schema, 'type');
-  const nullableProperty = Object.getOwnPropertyDescriptor(schema, 'nullable');
-  if ((typeProperty && !('value' in typeProperty)) || (nullableProperty && !('value' in nullableProperty))) {
-    throw new Error('Accessor-backed root schema properties are not supported');
-  }
-
-  const type = typeProperty?.value;
-  const nullable = nullableProperty?.value === true;
+  const type = 'type' in schema ? schema.type : undefined;
+  const nullable = 'nullable' in schema && schema.nullable === true;
   if (type !== 'object' || nullable) {
     const actualType = nullable && type ? `${type},null` : type;
     throw new Error(
       `Root schema must have type: 'object' but got type: ${actualType ? `'${actualType}'` : 'undefined'}`,
     );
   }
-  if (Object.getOwnPropertyDescriptor(schema, '$ref')) {
+  if ('$ref' in schema) {
     throw new Error("Root schema must be a concrete object and cannot contain '$ref'");
-  }
-}
-
-function validateRootSchemaDataProperties(schema: object): void {
-  const descriptors = Reflect.ownKeys(schema).map((key) => Object.getOwnPropertyDescriptor(schema, key));
-  if (descriptors.some((descriptor) => descriptor?.enumerable && !('value' in descriptor))) {
-    throw new Error('Accessor-backed root schema properties are not supported');
   }
 }
 
@@ -40,83 +27,6 @@ function cloneStrictRootSchemaDefinitions(refs: ReturnType<typeof getRefs>): voi
   if (refs.openaiStrictMode) {
     refs.definitions = { ...refs.definitions };
   }
-}
-
-function resolveStrictRootSchemaReference(
-  schema: JsonSchema7Type,
-  definitions: Record<string, JsonSchema7Type>,
-  definitionPrefix: string,
-): JsonSchema7Type {
-  const maxReferences = Object.keys(definitions).length;
-  const visitedReferences = new Set<string>();
-  let resolved = schema;
-
-  while (true) {
-    const reference = Object.getOwnPropertyDescriptor(resolved, '$ref');
-    if (!reference) {
-      break;
-    }
-    if (!('value' in reference)) {
-      throw new Error('Accessor-backed local root schema references are not supported');
-    }
-
-    const { value } = reference;
-    if (
-      typeof value !== 'string' ||
-      !definitionPrefix.startsWith('#/') ||
-      !value.startsWith(definitionPrefix)
-    ) {
-      break;
-    }
-    if (visitedReferences.has(value)) {
-      throw new Error(`Cyclic local root schema reference: ${value}`);
-    }
-
-    const definition = Object.getOwnPropertyDescriptor(definitions, value.slice(definitionPrefix.length));
-    if (
-      !definition ||
-      !('value' in definition) ||
-      !definition.value ||
-      typeof definition.value !== 'object'
-    ) {
-      break;
-    }
-    if (visitedReferences.size >= maxReferences) {
-      throw new Error(`Cyclic local root schema reference: ${value}`);
-    }
-    visitedReferences.add(value);
-    resolved = definition.value;
-  }
-
-  return resolved;
-}
-
-function materializeStrictRootSchema(
-  schema: JsonSchema7Type,
-  definitions: Record<string, JsonSchema7Type> | undefined,
-  openaiStrictMode: boolean | undefined,
-  definitionPath: string[],
-): JsonSchema7Type {
-  if (!openaiStrictMode || !definitions) {
-    return schema;
-  }
-
-  const rootReference = Object.getOwnPropertyDescriptor(schema, '$ref');
-  if (rootReference && !('value' in rootReference)) {
-    throw new Error('Accessor-backed local root schema references are not supported');
-  }
-  if (typeof rootReference?.value !== 'string') {
-    return schema;
-  }
-
-  const resolved = resolveStrictRootSchemaReference(schema, definitions, `${definitionPath.join('/')}/`);
-  validateStrictRootSchema(resolved, openaiStrictMode);
-  validateRootSchemaDataProperties(schema);
-  validateRootSchemaDataProperties(resolved);
-
-  const rootMetadata = { ...schema } as Record<string, unknown>;
-  delete rootMetadata['$ref'];
-  return { ...resolved, ...rootMetadata };
 }
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
@@ -143,7 +53,7 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     name = options?.name;
   }
 
-  let main =
+  const main =
     parseDef(
       schema._def,
       name === undefined
@@ -152,8 +62,10 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
             ...refs,
             currentPath: [...refs.basePath, refs.definitionPath, name],
           },
-      false,
+      refs.openaiStrictMode === true,
     ) ?? {};
+
+  validateStrictRootSchema(main, refs.openaiStrictMode);
 
   const title =
     typeof options === 'object' && options.name !== undefined && options.nameStrategy === 'title'
@@ -198,12 +110,6 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
 
     return definitions;
   })();
-
-  main = materializeStrictRootSchema(main, definitions, refs.openaiStrictMode, [
-    ...refs.basePath,
-    refs.definitionPath,
-  ]);
-  validateStrictRootSchema(main, refs.openaiStrictMode);
 
   let combined: ReturnType<typeof zodToJsonSchema<Target>>;
   if (name === undefined) {
