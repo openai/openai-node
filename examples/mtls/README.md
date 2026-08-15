@@ -1,6 +1,8 @@
-# API-key + HTTP mTLS examples
+# HTTP mTLS examples
 
 These examples keep mTLS configuration at the HTTP transport layer. The SDK receives the configured transport through its existing `fetch` and `fetchOptions` options. Before running them, follow the [OpenAI Mutual TLS Beta Program](https://help.openai.com/en/articles/10876024-openai-mutual-tls-beta-program) instructions to enroll, upload, and activate the appropriate certificate for your organization or project.
+
+The original Node.js, Deno, and Bun examples combine an API key with HTTP mTLS. They do not perform X.509 workload identity token exchange. The separate Node.js toggle example demonstrates first-class X.509 workload identity federation.
 
 All three examples expect:
 
@@ -49,3 +51,22 @@ The Bun example passes `tls: { cert, key }` to Bun's native `fetch`.
 ## Advanced transports
 
 Because the SDK does not own the mTLS transport, applications can use runtime-native features such as proxies, custom trust stores, encrypted keys, hardware-backed keys, or certificate rotation where their chosen HTTP client supports them. Keep the certificate-bearing transport scoped to the OpenAI mTLS endpoint, and close or replace it when rotating credentials.
+
+## X.509 workload identity federation (Node.js)
+
+[`x509-wif-node.mjs`](./x509-wif-node.mjs) uses an application-owned `OPENAI_AUTH_MODE=api_key|x509` rollout toggle. In `x509` mode, set:
+
+```sh
+export OPENAI_AUTH_MODE='x509'
+export OPENAI_IDENTITY_PROVIDER_ID='idp_...'
+export OPENAI_SERVICE_ACCOUNT_ID='svc_acct_...'
+export OPENAI_MTLS_CERTIFICATE_CHAIN='/path/to/client-chain.pem'
+export OPENAI_MTLS_PRIVATE_KEY='/path/to/client-key.pem'
+# Optional:
+export OPENAI_MTLS_PRIVATE_KEY_PASSWORD='...'
+export OPENAI_BASE_URL='https://mtls.api.openai.com/v1'
+```
+
+Run it with `node x509-wif-node.mjs`. Omit `OPENAI_BASE_URL` to use the X.509-only default `https://mtls.api.openai.com/v1`. In `api_key` mode, only `OPENAI_API_KEY` is required and the ordinary API endpoint is used.
+
+The SDK sends the certificate-authenticated token exchange through the same configured `fetch` and `fetchOptions.dispatcher` as API requests. It never reads certificate files itself, never accepts a configurable exchange URL, and refuses redirects in X.509 mode. The application remains responsible for closing the dispatcher and rebuilding it for certificate rotation.

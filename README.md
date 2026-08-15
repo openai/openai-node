@@ -113,7 +113,7 @@ For secure, automated environments like cloud-managed Kubernetes, Azure, and GCP
 
 The `workloadIdentity` parameter is mutually exclusive with `apiKey`.
 
-The required fields are `identityProviderId`, `serviceAccountId`, and `provider`.
+For JWT/ID-token federation, the required fields are `identityProviderId`, `serviceAccountId`, and `provider`.
 
 ### Kubernetes (service account tokens)
 
@@ -184,7 +184,40 @@ const client = new OpenAI({
 });
 ```
 
-You can also customize the token refresh buffer (default is 1200 seconds (20 minutes) before expiration):
+### X.509 workload identity federation
+
+Server runtimes can use a client certificate as the workload identity. Configure certificates, private keys, passphrases, proxies, trust, pooling, and rotation on the runtime-native HTTP transport; the SDK does not accept or retain that material.
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { Agent, fetch as undiciFetch } from 'undici';
+import OpenAI from 'openai';
+
+const dispatcher = new Agent({
+  connect: {
+    cert: await readFile('/path/to/client-chain.pem'),
+    key: await readFile('/path/to/client-key.pem'),
+  },
+});
+
+const client = new OpenAI({
+  apiKey: null,
+  workloadIdentity: {
+    type: 'x509',
+    identityProviderId: 'idp_...',
+    serviceAccountId: 'svc_acct_...',
+    refreshBufferMs: 120_000,
+  },
+  fetch: undiciFetch,
+  fetchOptions: { dispatcher },
+});
+```
+
+X.509 mode exchanges lazily through the pinned mTLS authentication endpoint and defaults API requests to `https://mtls.api.openai.com/v1` when `baseURL` and `OPENAI_BASE_URL` are unset. Both legs use the configured `fetch` and `fetchOptions`, and redirects are refused. Browser and certificate-opaque edge runtimes are unsupported even with `dangerouslyAllowBrowser`. HTTP APIs are supported; Realtime/WebSockets are not yet supported with X.509 workload identity.
+
+See the [X.509 workload identity guide](https://developers.openai.com/api/docs/guides/workload-identity-federation/x509) and the runnable [`OPENAI_AUTH_MODE` Node.js toggle example](./examples/mtls/x509-wif-node.mjs). Close or replace application-owned transports when rotating certificates.
+
+For JWT/ID-token federation, you can customize the token refresh buffer (default is 1200 seconds (20 minutes) before expiration):
 
 ```ts
 import OpenAI from 'openai';
@@ -771,7 +804,7 @@ const client = new OpenAI({
 
 ### Mutual TLS
 
-The API mTLS beta combines your API key with a client certificate. For enrollment, certificate requirements, activation, and supported endpoints, see the [OpenAI Mutual TLS Beta Program](https://help.openai.com/en/articles/10876024-openai-mutual-tls-beta-program). Configure mTLS on your runtime's HTTP transport, then pass that transport to the SDK with `fetch` and `fetchOptions`. Set `baseURL` to the mTLS endpoint explicitly:
+The API mTLS beta can combine your API key with a client certificate. For enrollment, certificate requirements, activation, and supported endpoints, see the [OpenAI Mutual TLS Beta Program](https://help.openai.com/en/articles/10876024-openai-mutual-tls-beta-program). Configure mTLS on your runtime's HTTP transport, then pass that transport to the SDK with `fetch` and `fetchOptions`. Set `baseURL` to the mTLS endpoint explicitly:
 
 ```ts
 import { readFile } from 'node:fs/promises';
@@ -799,7 +832,7 @@ const client = new OpenAI({
 
 Use `https://mtls-eu.api.openai.com/v1` for EU Data Residency. The example uses manual redirects so the certificate-bearing transport does not automatically follow a redirect to another host. Close transports your application creates when they are no longer needed.
 
-See the runnable [Node.js, Deno, and Bun mTLS examples](./examples/mtls/README.md) for certificate-chain setup, optional Node.js encrypted-key support, and runtime-specific transport cleanup.
+See the runnable [API-key + mTLS and X.509 workload identity examples](./examples/mtls/README.md) for certificate-chain setup, optional Node.js encrypted-key support, the `OPENAI_AUTH_MODE` rollout toggle, and runtime-specific transport cleanup.
 
 ## Frequently Asked Questions
 

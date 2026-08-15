@@ -242,6 +242,7 @@ import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
+import { parseRetryAfterMillis } from './internal/utils/retries';
 import {
   type LogLevel,
   type Logger,
@@ -267,6 +268,18 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
     scope.Bun === undefined &&
     scope.EdgeRuntime === undefined &&
     scope.WebSocketPair === undefined
+  );
+}
+
+function isCertificateCapableServerRuntime(): boolean {
+  if (isRunningInBrowserOrBrowserWorker()) return false;
+
+  const scope = globalThis as any;
+  if (scope.EdgeRuntime !== undefined || scope.WebSocketPair !== undefined) return false;
+  return (
+    scope.process?.versions?.node !== undefined ||
+    scope.Deno?.version?.deno !== undefined ||
+    scope.Bun?.version !== undefined
   );
 }
 
@@ -450,6 +463,7 @@ export class OpenAI {
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth;
+  private readonly _usesX509WorkloadIdentity: boolean;
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -497,6 +511,7 @@ export class OpenAI {
       workloadIdentity,
       ...opts
     } = clientOptions as InternalClientOptions;
+    const usesX509WorkloadIdentity = workloadIdentity?.type === 'x509';
     const providerRuntime = provider ? configureProvider(provider) : undefined;
     const options: ClientOptions = {
       apiKey,
@@ -507,7 +522,11 @@ export class OpenAI {
       workloadIdentity,
       provider,
       ...opts,
-      baseURL: providerRuntime?.baseURL ?? residencyBaseURL ?? (baseURL || `https://api.openai.com/v1`),
+      baseURL:
+        providerRuntime?.baseURL ??
+        residencyBaseURL ??
+        (baseURL ||
+          (usesX509WorkloadIdentity ? 'https://mtls.api.openai.com/v1' : 'https://api.openai.com/v1')),
     };
 
     if (apiKey && workloadIdentity) {
@@ -517,6 +536,12 @@ export class OpenAI {
     if (!providerRuntime && !apiKey && !adminAPIKey && !workloadIdentity) {
       throw new Errors.OpenAIError(
         'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.',
+      );
+    }
+
+    if (usesX509WorkloadIdentity && !isCertificateCapableServerRuntime()) {
+      throw new Errors.OpenAIError(
+        'X.509 workload identity is only supported in server runtimes with a client-certificate-capable HTTP transport. `dangerouslyAllowBrowser` does not enable it.',
       );
     }
 
@@ -556,9 +581,13 @@ export class OpenAI {
 
     this._options = options;
     this._provider = providerRuntime;
+    this._usesX509WorkloadIdentity = usesX509WorkloadIdentity;
 
     if (workloadIdentity) {
-      this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
+      this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch, {
+        fetchOptions: this.fetchOptions,
+        maxRetries: this.maxRetries,
+      });
     }
 
     this.apiKey = typeof apiKey === 'string' ? apiKey : null;
@@ -616,7 +645,19 @@ export class OpenAI {
         !hasOwn(options, 'baseURL') &&
         !provider,
     };
-    return new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    if (
+      this._workloadIdentityAuth &&
+      this._usesX509WorkloadIdentity &&
+      client._usesX509WorkloadIdentity &&
+      client._options.workloadIdentity === this._options.workloadIdentity &&
+      client.fetch === this.fetch &&
+      client.fetchOptions === this.fetchOptions &&
+      client.maxRetries === this.maxRetries
+    ) {
+      client._workloadIdentityAuth = this._workloadIdentityAuth;
+    }
+    return client;
   }
 
   /**
@@ -672,7 +713,9 @@ export class OpenAI {
 
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
     if (this._workloadIdentityAuth) {
-      return buildHeaders([{ Authorization: `Bearer ${await this._workloadIdentityAuth.getToken()}` }]);
+      return buildHeaders([
+        { Authorization: `Bearer ${await this._workloadIdentityAuth.getToken(opts.signal)}` },
+      ]);
     }
     if (this.apiKey == null) {
       return undefined;
@@ -1058,7 +1101,10 @@ export class OpenAI {
         !options.__metadata?.['workloadIdentityTokenRefreshed']
       ) {
         await Shims.CancelReadableStream(response.body);
-        this._workloadIdentityAuth.invalidateToken();
+        const authorization = req.headers.get('authorization');
+        this._workloadIdentityAuth.invalidateToken(
+          authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined,
+        );
 
         return this.makeRequest(
           {
@@ -1190,7 +1236,7 @@ export class OpenAI {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
-        const token = await this._workloadIdentityAuth.getToken();
+        const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal);
         headers.set('Authorization', `Bearer ${token}`);
       }
     }
@@ -1269,27 +1315,7 @@ export class OpenAI {
     requestLogID: string,
     responseHeaders?: Headers | undefined,
   ): Promise<APIResponseProps> {
-    let timeoutMillis: number | undefined;
-
-    // Note the `retry-after-ms` header may not be standard, but is a good idea and we'd like proactive support for it.
-    const retryAfterMillisHeader = responseHeaders?.get('retry-after-ms');
-    if (retryAfterMillisHeader) {
-      const timeoutMs = parseFloat(retryAfterMillisHeader);
-      if (!Number.isNaN(timeoutMs)) {
-        timeoutMillis = timeoutMs;
-      }
-    }
-
-    // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-    const retryAfterHeader = responseHeaders?.get('retry-after');
-    if (retryAfterHeader && timeoutMillis === undefined) {
-      const timeoutSeconds = parseFloat(retryAfterHeader);
-      if (!Number.isNaN(timeoutSeconds)) {
-        timeoutMillis = timeoutSeconds * 1000;
-      } else {
-        timeoutMillis = Date.parse(retryAfterHeader) - Date.now();
-      }
-    }
+    let timeoutMillis = responseHeaders ? parseRetryAfterMillis(responseHeaders) : undefined;
 
     // If the API asks us to wait a certain amount of time, just do what it
     // says, but otherwise calculate a default
@@ -1352,6 +1378,7 @@ export class OpenAI {
       ...(body && { body }),
       ...((this.fetchOptions as any) ?? {}),
       ...((options.fetchOptions as any) ?? {}),
+      ...(this._usesX509WorkloadIdentity ? { redirect: 'manual' } : {}),
     };
 
     return { req, url, timeout: options.timeout };
