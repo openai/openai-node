@@ -24,10 +24,10 @@ Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedroc
 
 The `endpoint` option selects which regional Bedrock endpoint to use:
 
-| `endpoint`           | Default API root                                         | SigV4 signing service |
-| -------------------- | -------------------------------------------------------- | --------------------- |
-| `'mantle'` (default) | `https://bedrock-mantle.<region>.api.aws/openai/v1`      | `bedrock-mantle`      |
-| `'runtime'`          | Regional Runtime hostname for the region's AWS partition | `bedrock`             |
+| `endpoint`           | Default API root                                           | SigV4 signing service |
+| -------------------- | ---------------------------------------------------------- | --------------------- |
+| `'mantle'` (default) | `https://bedrock-mantle.<region>.api.aws/openai/v1`        | `bedrock-mantle`      |
+| `'runtime'`          | `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` | `bedrock`             |
 
 Both endpoint modes expose the normal SDK resources, but that does not mean AWS supports every resource on both endpoints. AWS controls the available models, inference profiles, API routes, authentication methods, and streaming behavior for each deployment; unsupported calls surface the provider's normal HTTP errors through the SDK.
 
@@ -47,7 +47,9 @@ Bedrock credentials are sent only to the configured API-root origin; absolute re
 
 ### Amazon Bedrock Runtime
 
-Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. The SDK derives the AWS partition DNS suffix from the region (for example, `amazonaws.com` for `us-west-2` and `amazonaws.eu` for `eusc-de-east-1`). The OpenAI Runtime identifiers `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna` are cross-Region inference (CRIS) profile IDs: `us.` selects US CRIS, while an ID such as `global.openai.gpt-5.6-sol` selects Global CRIS. For these deployments, Runtime requires an inference-profile ID and AWS rejects a bare model ID such as `openai.gpt-5.6-sol`; availability depends on your AWS account and region.
+Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. For example, the default API root in `us-west-2` is `https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1`. The SDK derives the AWS partition DNS suffix from the region, using `amazonaws.com` for `us-west-2`, `amazonaws.eu` for `eusc-de-east-1`, and the corresponding suffix for other AWS partitions.
+
+The OpenAI Runtime identifiers `us.openai.gpt-5.6-sol`, `us.openai.gpt-5.6-terra`, and `us.openai.gpt-5.6-luna` are cross-Region inference (CRIS) profile IDs: `us.` selects US CRIS, while an ID such as `global.openai.gpt-5.6-sol` selects Global CRIS. For these deployments, Runtime requires an inference-profile ID and AWS rejects a bare model ID such as `openai.gpt-5.6-sol`; availability depends on your AWS account and region.
 
 For the three US profiles, the new provider's verified integration is non-streaming Chat Completions at `/openai/v1/chat/completions`, authenticated with AWS SigV4 signing service `bedrock`. Set `apiKey: null` to prevent an environment bearer token from taking precedence over your AWS credentials:
 
@@ -84,6 +86,16 @@ for await (const chunk of stream) {
   process.stdout.write(chunk.choices[0]?.delta?.content ?? '');
 }
 ```
+
+For a runnable example, see [`examples/bedrock/runtime-chat.ts`](../examples/bedrock/runtime-chat.ts). It defaults to SigV4 authentication, ignores any stale `AWS_BEARER_TOKEN_BEDROCK`, and uses `us.openai.gpt-5.6-sol`:
+
+```sh
+AWS_REGION=us-east-1 pnpm tsn examples/bedrock/runtime-chat.ts
+AWS_REGION=us-east-1 BEDROCK_MODEL=us.openai.gpt-5.6-terra BEDROCK_STREAM=1 pnpm tsn examples/bedrock/runtime-chat.ts
+AWS_REGION=us-east-1 BEDROCK_AUTH=bearer BEDROCK_MODEL=us.openai.gpt-5.6-luna pnpm tsn examples/bedrock/runtime-chat.ts
+```
+
+The bearer example requires `AWS_BEARER_TOKEN_BEDROCK` to be configured. Streaming remains opt-in and depends on support for the selected AWS deployment and model.
 
 The SDK defaults to the `/openai/v1` route described in [AWS's OpenAI model documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-openai.html). [AWS's Chat Completions documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-chat-completions-mantle.html) instead describes a `/v1` route for Bedrock Runtime. If your model or endpoint requires that route, override the API root explicitly:
 

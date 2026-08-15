@@ -12,7 +12,9 @@ import { bedrock as awsBedrock } from 'openai/providers/bedrock/aws';
  * AWS_REGION=us-west-2 pnpm test:live:bedrock
  *
  * To exercise several credential paths in one explicitly enabled run, set
- * BEDROCK_LIVE_AUTHS to a comma-separated list such as bearer,default-chain.
+ * BEDROCK_LIVE_AUTHS to a comma-separated list such as
+ * bearer,token-provider,default-chain. The token-provider mode resolves
+ * AWS_BEARER_TOKEN_BEDROCK again before each request attempt.
  * Every selected mode still requires its corresponding valid credential
  * configuration.
  *
@@ -46,6 +48,7 @@ type EndpointMode = (typeof endpointModes)[number];
 const authModes = [
   'bearer',
   'environment-bearer',
+  'token-provider',
   'default-chain',
   'profile',
   'static',
@@ -127,6 +130,13 @@ async function providerForAuth(
       requiredEnv('AWS_BEARER_TOKEN_BEDROCK');
       return bearerBedrock(endpoint);
     }
+    case 'token-provider': {
+      requiredEnv('AWS_BEARER_TOKEN_BEDROCK');
+      return bearerBedrock({
+        ...endpoint,
+        tokenProvider: async () => requiredEnv('AWS_BEARER_TOKEN_BEDROCK'),
+      });
+    }
     case 'default-chain': {
       return awsBedrock({ ...endpoint, apiKey: null });
     }
@@ -199,6 +209,7 @@ describe.each(selectedAuthModes)(`Amazon Bedrock ${endpointMode} live (%s)`, (au
       });
 
       expect(completion.id).toEqual(expect.any(String));
+      expect(completion._request_id).toEqual(expect.any(String));
       expect(completion.choices[0]?.message.content?.trim().length).toBeGreaterThan(0);
       expect(completion.choices[0]?.finish_reason).toEqual(expect.any(String));
       expect(completion.usage).toMatchObject({
@@ -249,6 +260,9 @@ describe.each(selectedAuthModes)(`Amazon Bedrock ${endpointMode} live (%s)`, (au
       });
 
       expect(response.id).toEqual(expect.any(String));
+      if (endpointMode === 'runtime') {
+        expect(response._request_id).toEqual(expect.any(String));
+      }
       expect(response.output_text.trim().length).toBeGreaterThan(0);
     },
   );

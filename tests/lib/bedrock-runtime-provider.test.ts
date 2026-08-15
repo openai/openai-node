@@ -208,50 +208,75 @@ describe('bedrock Runtime provider', () => {
     },
   );
 
-  test('routes Runtime Chat Completions and signs the request for the bedrock service', async () => {
-    const completionBody = {
-      id: 'chatcmpl_runtime',
-      object: 'chat.completion',
-      model: RUNTIME_MODEL,
-      choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'Hello' } }],
-      usage: { prompt_tokens: 4, completion_tokens: 3, total_tokens: 7 },
-    };
-    const { client, requests } = createClient(
-      bedrock({
-        endpoint: 'runtime',
-        region: 'us-east-1',
-        accessKeyId: 'access-key',
-        secretAccessKey: 'secret-key',
-      }),
-      completionBody,
-      { headers: { 'x-request-id': 'req_runtime_chat' } },
-    );
+  test.each(providerCases({ endpoint: 'runtime', region: 'us-east-1' }))(
+    'routes Runtime Chat Completions with $authentication authentication',
+    async ({ authentication, create }) => {
+      const completionBody = {
+        id: 'chatcmpl_runtime',
+        object: 'chat.completion',
+        model: RUNTIME_MODEL,
+        choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'Hello' } }],
+        usage: { prompt_tokens: 4, completion_tokens: 3, total_tokens: 7 },
+      };
+      const { client, requests } = createClient(create(), completionBody, {
+        headers: { 'x-request-id': 'req_runtime_chat' },
+      });
 
-    const completion = await client.chat.completions.create({
-      model: RUNTIME_MODEL,
-      messages: [{ role: 'user', content: 'Say hello' }],
+      const completion = await client.chat.completions.create({
+        model: RUNTIME_MODEL,
+        messages: [{ role: 'user', content: 'Say hello' }],
+      });
+
+      expect(requests[0]?.url).toBe(
+        'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions',
+      );
+      expect(JSON.parse(requests[0]?.body ?? '{}')).toMatchObject({ model: RUNTIME_MODEL });
+      expect(requests[0]?.headers.get('authorization')).toContain(
+        authentication === 'bearer' ? 'Bearer bedrock-token' : '/bedrock/aws4_request',
+      );
+      expect(completion._request_id).toBe('req_runtime_chat');
+      expect(completion.choices[0]?.finish_reason).toBe('stop');
+      expect(completion.usage?.total_tokens).toBe(7);
+    },
+  );
+
+  test.each(providerCases({ endpoint: 'runtime', region: 'us-east-1' }))(
+    'routes Runtime Responses with $authentication authentication',
+    async ({ authentication, create }) => {
+      const { client, requests } = createClient(create(), {
+        id: 'resp_runtime',
+        object: 'response',
+        model: RUNTIME_MODEL,
+        output: [],
+      });
+
+      await client.responses.create({ model: RUNTIME_MODEL, input: 'Say hello' });
+
+      expect(requests[0]?.url).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/responses');
+      expect(requests[0]?.headers.get('authorization')).toContain(
+        authentication === 'bearer' ? 'Bearer bedrock-token' : '/bedrock/aws4_request',
+      );
+    },
+  );
+
+  test('refreshes Runtime bearer credentials before retrying', async () => {
+    const tokenProvider = vi.fn(async () => `runtime-token-${tokenProvider.mock.calls.length}`);
+    const authorizationHeaders: (string | null)[] = [];
+    const client = new OpenAI({
+      provider: bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', tokenProvider }),
+      maxRetries: 1,
+      fetch: async (_url, init) => {
+        authorizationHeaders.push(new Headers(init?.headers).get('authorization'));
+        return authorizationHeaders.length === 1
+          ? Response.json({}, { status: 429, headers: { 'retry-after-ms': '1' } })
+          : Response.json({});
+      },
     });
 
-    expect(requests[0]?.url).toBe(
-      'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions',
-    );
-    expect(JSON.parse(requests[0]?.body ?? '{}')).toMatchObject({ model: RUNTIME_MODEL });
-    expect(requests[0]?.headers.get('authorization')).toContain('/bedrock/aws4_request');
-    expect(completion._request_id).toBe('req_runtime_chat');
-    expect(completion.choices[0]?.finish_reason).toBe('stop');
-    expect(completion.usage?.total_tokens).toBe(7);
-  });
+    await client.request({ method: 'get', path: '/models' });
 
-  test('routes Runtime Responses through the dependency-free bearer provider', async () => {
-    const { client, requests } = createClient(
-      bearerBedrock({ endpoint: 'runtime', region: 'us-east-1', apiKey: 'bedrock-token' }),
-      { id: 'resp_runtime', object: 'response', model: RUNTIME_MODEL, output: [] },
-    );
-
-    await client.responses.create({ model: RUNTIME_MODEL, input: 'Say hello' });
-
-    expect(requests[0]?.url).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/responses');
-    expect(requests[0]?.headers.get('authorization')).toBe('Bearer bedrock-token');
+    expect(tokenProvider).toHaveBeenCalledTimes(2);
+    expect(authorizationHeaders).toEqual(['Bearer runtime-token-1', 'Bearer runtime-token-2']);
   });
 
   test('preserves Runtime request IDs on typed HTTP errors', async () => {
