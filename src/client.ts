@@ -1048,12 +1048,13 @@ export class OpenAI {
     } finally {
       requestHookChangedX509Options = restoreX509RequestOptions?.() ?? false;
     }
+    req.headers = new Headers(req.headers);
     if (
       workloadIdentityRequestContext?.usesWorkloadIdentityToken &&
       req.headers.get('authorization') !== workloadIdentityAuthorization
     ) {
       workloadIdentityRequestContext.usesWorkloadIdentityToken = false;
-      if (!req.headers.has('authorization')) {
+      if (!req.headers.get('authorization')) {
         workloadIdentityRequestContext.workloadIdentityTokenSuppressed = true;
       }
     }
@@ -1188,15 +1189,8 @@ export class OpenAI {
         response.status === 401 &&
         this._workloadIdentityAuth &&
         security.bearerAuth &&
-        workloadIdentityRequestContext?.usesWorkloadIdentityToken &&
-        !options.__metadata?.['hasStreamingBody'] &&
-        !options.__metadata?.['workloadIdentityTokenRefreshed']
+        workloadIdentityRequestContext?.usesWorkloadIdentityToken
       ) {
-        try {
-          await Shims.CancelReadableStream(response.body);
-        } catch {
-          // Response cleanup is best-effort and must not prevent authentication recovery.
-        }
         const authorization = req.headers.get('authorization');
         this._workloadIdentityAuth.invalidateToken(
           authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined,
@@ -1210,17 +1204,27 @@ export class OpenAI {
           },
         );
 
-        return this.makeRequest(
-          {
-            ...options,
-            __metadata: {
-              ...options.__metadata,
-              workloadIdentityTokenRefreshed: true,
+        if (
+          !options.__metadata?.['hasStreamingBody'] &&
+          !options.__metadata?.['workloadIdentityTokenRefreshed']
+        ) {
+          try {
+            await Shims.CancelReadableStream(response.body);
+          } catch {
+            // Response cleanup is best-effort and must not prevent authentication recovery.
+          }
+          return this.makeRequest(
+            {
+              ...options,
+              __metadata: {
+                ...options.__metadata,
+                workloadIdentityTokenRefreshed: true,
+              },
             },
-          },
-          retriesRemaining,
-          retryOfRequestLogID ?? requestLogID,
-        );
+            retriesRemaining,
+            retryOfRequestLogID ?? requestLogID,
+          );
+        }
       }
 
       const shouldRetry = await this.shouldRetry(response);

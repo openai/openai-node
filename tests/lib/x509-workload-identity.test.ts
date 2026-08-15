@@ -661,9 +661,19 @@ describe('OpenAI with X.509 workload identity', () => {
 
   test.each([
     { identity: x509Identity, identityName: 'X.509', source: 'request headers' as const },
-    { identity: x509Identity, identityName: 'X.509', source: 'request hook' as const },
+    { identity: x509Identity, identityName: 'X.509', source: 'request hook deletion' as const },
+    { identity: x509Identity, identityName: 'X.509', source: 'request hook empty value' as const },
     { identity: subjectTokenIdentity, identityName: 'subject token', source: 'request headers' as const },
-    { identity: subjectTokenIdentity, identityName: 'subject token', source: 'request hook' as const },
+    {
+      identity: subjectTokenIdentity,
+      identityName: 'subject token',
+      source: 'request hook deletion' as const,
+    },
+    {
+      identity: subjectTokenIdentity,
+      identityName: 'subject token',
+      source: 'request hook empty value' as const,
+    },
   ])('preserves anonymous $identityName requests created by $source', async ({ identity, source }) => {
     let exchangeCount = 0;
     const apiAuthorizations: (string | null)[] = [];
@@ -680,16 +690,57 @@ describe('OpenAI with X.509 workload identity', () => {
       }),
     });
     client.requestMutation = (request) => {
-      if (source === 'request hook') {
+      if (source === 'request hook deletion') {
         (request.headers as Headers).delete('Authorization');
+      } else if (source === 'request hook empty value') {
+        (request.headers as Headers).set('Authorization', '  ');
       }
     };
 
     await client.models.list(source === 'request headers' ? { headers: { Authorization: null } } : undefined);
 
-    expect(apiAuthorizations).toEqual([null]);
+    expect(apiAuthorizations).toEqual([source === 'request hook empty value' ? '' : null]);
     expect(exchangeCount).toBe(source === 'request headers' ? 0 : 1);
   });
+
+  test.each([
+    {
+      headers: { Authorization: 'Bearer hook-token', 'X-Hook': 'object' },
+      name: 'object',
+      expectedAuthorization: 'Bearer hook-token',
+    },
+    {
+      headers: [['X-Hook', 'tuples']],
+      name: 'tuple array',
+      expectedAuthorization: null,
+    },
+  ] as const)(
+    'normalizes a $name HeadersInit installed by a request hook',
+    async ({ headers, expectedAuthorization }) => {
+      let exchangeCount = 0;
+      const apiAuthorizations: (string | null)[] = [];
+      const client = new RequestMutatingOpenAI({
+        apiKey: null,
+        workloadIdentity: x509Identity,
+        fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+          if (url.toString().includes('/oauth/token')) {
+            exchangeCount += 1;
+            return tokenResponse('workload-identity-token');
+          }
+          apiAuthorizations.push(new Headers(init?.headers).get('Authorization'));
+          return Response.json({ data: [] });
+        }),
+      });
+      client.requestMutation = (request) => {
+        request.headers = headers as Exclude<RequestInit['headers'], undefined>;
+      };
+
+      await client.models.list();
+
+      expect(apiAuthorizations).toEqual([expectedAuthorization]);
+      expect(exchangeCount).toBe(1);
+    },
+  );
 
   test('collapses concurrent 401 invalidations into one shared refresh', async () => {
     const firstWaveGate = deferredResponse();
@@ -785,16 +836,20 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(apiCount).toBe(4);
   });
 
-  test('does not replay a non-replayable body after a 401', async () => {
+  test('invalidates without replaying a non-replayable body after a 401', async () => {
     let exchangeCount = 0;
     let apiCount = 0;
-    const customFetch = vi.fn(async (url: string | URL | Request) => {
+    const apiAuthorizations: (string | null)[] = [];
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       if (url.toString().includes('/oauth/token')) {
         exchangeCount += 1;
         return tokenResponse(`token-${exchangeCount}`);
       }
       apiCount += 1;
-      return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      apiAuthorizations.push(new Headers(init?.headers).get('Authorization'));
+      return apiCount === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
     });
     const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
 
@@ -803,6 +858,11 @@ describe('OpenAI with X.509 workload identity', () => {
     });
     expect(exchangeCount).toBe(1);
     expect(apiCount).toBe(1);
+
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+    expect(exchangeCount).toBe(2);
+    expect(apiCount).toBe(2);
+    expect(apiAuthorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
   });
 
   test('a canceled API request does not cancel the exchange shared by another request', async () => {
