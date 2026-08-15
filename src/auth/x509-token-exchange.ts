@@ -61,7 +61,7 @@ async function exchangeAttempt(
   let response: Response;
   try {
     const controller = new AbortController();
-    response = await options.fetch(X509_TOKEN_EXCHANGE_URL, {
+    response = await options.fetch.call(undefined, X509_TOKEN_EXCHANGE_URL, {
       ...(options.fetchOptions as RequestInit | undefined),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

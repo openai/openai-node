@@ -24,7 +24,7 @@ interface WorkloadIdentityAuthOptions {
 }
 
 interface CredentialSource {
-  exchange: () => Promise<unknown>;
+  exchange: (options: WorkloadIdentityAuthOptions) => Promise<unknown>;
   isExpirationSafe: (expiresAt: number) => boolean;
   now: () => number;
   refreshBufferMs: (durationMs: number) => number;
@@ -184,10 +184,17 @@ function createCredentialSource(
 ): CredentialSource {
   if (isX509WorkloadIdentity(config)) {
     validateX509Config(config);
-    const maxRetries = validateMaxRetries(options.maxRetries ?? 2);
+    const defaultMaxRetries = validateMaxRetries(options.maxRetries ?? 2);
     return {
-      exchange: async () =>
-        await exchangeX509Token({ config, fetch, fetchOptions: options.fetchOptions, maxRetries }),
+      exchange: async (requestOptions) =>
+        await exchangeX509Token({
+          config,
+          fetch,
+          fetchOptions: hasOwn(requestOptions, 'fetchOptions')
+            ? requestOptions.fetchOptions
+            : options.fetchOptions,
+          maxRetries: validateMaxRetries(requestOptions.maxRetries ?? defaultMaxRetries),
+        }),
       isExpirationSafe: (expiresAt) => Number.isFinite(expiresAt) && expiresAt <= Number.MAX_SAFE_INTEGER,
       now: monotonicNow,
       refreshBufferMs: (durationMs) =>
@@ -239,30 +246,35 @@ export class WorkloadIdentityAuth {
    *
    * @param signal Optional caller cancellation signal for this waiter.
    * @param timeoutMs Optional X.509 waiter timeout; it does not abort a shared exchange.
+   * @param options Optional effective transport and retry settings for an X.509 exchange.
    * @throws {OAuthError} When the token endpoint rejects the workload identity.
    * @throws {APIError} When another unsuccessful HTTP response prevents token exchange.
    * @throws {OpenAIError} When a successful exchange has an invalid access token or expiration.
    */
-  async getToken(signal?: AbortSignal | null, timeoutMs?: number): Promise<string> {
+  async getToken(
+    signal?: AbortSignal | null,
+    timeoutMs?: number,
+    options: WorkloadIdentityAuthOptions = {},
+  ): Promise<string> {
     throwIfAborted(signal);
 
     if (!this.cachedToken || this.isTokenExpired(this.cachedToken)) {
       return await waitForRefresh(
-        this.refreshPromise ?? this.startRefresh(),
+        this.refreshPromise ?? this.startRefresh(options),
         signal,
         this.source.waiterTimeoutMs?.(timeoutMs),
       );
     }
 
     if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
-      void this.startRefresh().catch(() => null);
+      void this.startRefresh(options).catch(() => null);
     }
 
     return this.cachedToken.token;
   }
 
-  private startRefresh(): Promise<string> {
-    const refreshPromise = this.refreshToken(this.tokenGeneration);
+  private startRefresh(options: WorkloadIdentityAuthOptions): Promise<string> {
+    const refreshPromise = this.refreshToken(this.tokenGeneration, options);
     this.refreshPromise = refreshPromise;
     void refreshPromise.then(
       () => this.clearRefresh(refreshPromise),
@@ -277,8 +289,8 @@ export class WorkloadIdentityAuth {
     }
   }
 
-  private async refreshToken(generation: number): Promise<string> {
-    const tokenResponse = await this.source.exchange();
+  private async refreshToken(generation: number, options: WorkloadIdentityAuthOptions): Promise<string> {
+    const tokenResponse = await this.source.exchange(options);
     if (
       typeof tokenResponse !== 'object' ||
       tokenResponse === null ||

@@ -284,8 +284,14 @@ function isCertificateCapableServerRuntime(): boolean {
 }
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
+const OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
+const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
+
+function defaultBaseURL(usesX509WorkloadIdentity: boolean): string {
+  return usesX509WorkloadIdentity ? X509_API_BASE_URL : OPENAI_API_BASE_URL;
+}
 
 export type ApiKeySetter = () => Promise<string>;
 
@@ -529,8 +535,7 @@ export class OpenAI {
       baseURL:
         providerRuntime?.baseURL ??
         residencyBaseURL ??
-        (baseURL ||
-          (usesX509WorkloadIdentity ? 'https://mtls.api.openai.com/v1' : 'https://api.openai.com/v1')),
+        (baseURL || defaultBaseURL(usesX509WorkloadIdentity)),
     };
 
     if (apiKey && workloadIdentity) {
@@ -589,10 +594,7 @@ export class OpenAI {
     this._usesX509WorkloadIdentity = usesX509WorkloadIdentity;
 
     if (workloadIdentity) {
-      this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch, {
-        fetchOptions: this.fetchOptions,
-        maxRetries: this.maxRetries,
-      });
+      this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
     }
 
     this.apiKey = typeof apiKey === 'string' ? apiKey : null;
@@ -633,6 +635,7 @@ export class OpenAI {
       changesX509Mode &&
       !this._baseURLWasConfigured &&
       !this.#explicitDataResidency &&
+      this.baseURL === defaultBaseURL(this._usesX509WorkloadIdentity) &&
       !hasOwn(options, 'baseURL');
     if (residencyBaseURL !== undefined || recomputesDefaultBaseURL) {
       delete inheritedOptions.baseURL;
@@ -684,7 +687,7 @@ export class OpenAI {
     return (
       this.#explicitDataResidency ||
       this._provider !== undefined ||
-      this.baseURL !== 'https://api.openai.com/v1'
+      this.baseURL !== OPENAI_API_BASE_URL
     );
   }
 
@@ -735,6 +738,10 @@ export class OpenAI {
           Authorization: `Bearer ${await this._workloadIdentityAuth.getToken(
             opts.signal,
             opts.timeout ?? this.timeout,
+            {
+              fetchOptions: this.fetchOptions,
+              maxRetries: opts.maxRetries ?? this.maxRetries,
+            },
           )}`,
         },
       ]);
@@ -1036,7 +1043,9 @@ export class OpenAI {
       this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
         ? createRequestController(req.signal)
         : new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
+    const response = await this.fetchWithAuth(url, req, timeout, controller, security, maxRetries).catch(
+      castToError,
+    );
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1253,12 +1262,16 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
+    maxRetries: number = this.maxRetries,
   ): Promise<Response> {
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
-        const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout);
+        const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
+          fetchOptions: this.fetchOptions,
+          maxRetries,
+        });
         headers.set('Authorization', `Bearer ${token}`);
       }
     }

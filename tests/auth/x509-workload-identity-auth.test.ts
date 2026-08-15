@@ -79,6 +79,18 @@ describe('X.509 workload identity auth', () => {
     expect(body).not.toHaveProperty('client_id');
   });
 
+  test('invokes a custom fetch with an undefined receiver', async () => {
+    const receivers: unknown[] = [];
+    const customFetch = vi.fn(function customFetch(this: unknown) {
+      receivers.push(this);
+      return Promise.resolve(tokenResponse('access-token'));
+    });
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    await expect(auth.getToken()).resolves.toBe('access-token');
+    expect(receivers).toEqual([undefined]);
+  });
+
   test.each(['provider', 'clientId', 'refreshBufferSeconds'] as const)(
     'rejects the subject-token-only `%s` field at construction time',
     (field) => {
@@ -219,6 +231,18 @@ describe('X.509 workload identity auth', () => {
 
     await expect(auth.getToken()).rejects.toMatchObject({ status: 503 });
     expect(customFetch).toHaveBeenCalledTimes(3);
+  });
+
+  test('uses the effective per-call maxRetries when starting an exchange', async () => {
+    const customFetch = vi.fn(
+      async () => new Response(null, { status: 503, headers: { 'Retry-After': '0' } }),
+    );
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 2 });
+
+    await expect(auth.getToken(undefined, undefined, { maxRetries: 0 })).rejects.toMatchObject({
+      status: 503,
+    });
+    expect(customFetch).toHaveBeenCalledTimes(1);
   });
 
   test('retries a connection error and reports a bounded terminal failure', async () => {

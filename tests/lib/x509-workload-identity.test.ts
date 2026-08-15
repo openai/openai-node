@@ -107,6 +107,30 @@ describe('OpenAI with X.509 workload identity', () => {
     );
   });
 
+  test('preserves a runtime baseURL change when withOptions changes workload identity modes', () => {
+    const customFetch = vi.fn();
+    const subjectTokenClient = new OpenAI({
+      apiKey: null,
+      workloadIdentity: subjectTokenIdentity,
+      fetch: customFetch,
+    });
+    const x509Client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+    });
+
+    subjectTokenClient.baseURL = 'https://subject-gateway.example.com/v1';
+    x509Client.baseURL = 'https://x509-gateway.example.com/v1';
+
+    expect(subjectTokenClient.withOptions({ workloadIdentity: x509Identity }).baseURL).toBe(
+      'https://subject-gateway.example.com/v1',
+    );
+    expect(x509Client.withOptions({ workloadIdentity: subjectTokenIdentity }).baseURL).toBe(
+      'https://x509-gateway.example.com/v1',
+    );
+  });
+
   test('does not change API-key routing, redirects, or authentication', async () => {
     const requests: { url: string; init: RequestInit | undefined }[] = [];
     const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -151,6 +175,61 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(requests[0]?.init).toMatchObject({ dispatcher, redirect: 'manual' });
     expect(requests[1]?.init).toMatchObject({ dispatcher, redirect: 'manual' });
     expect(closeDispatcher).not.toHaveBeenCalled();
+  });
+
+  test('uses the current client fetchOptions for both legs after transport replacement', async () => {
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const requests: RequestInit[] = [];
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push(init ?? {});
+      return url.toString().includes('/oauth/token')
+        ? tokenResponse('access-token')
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+      fetchOptions: { dispatcher: originalDispatcher as never },
+    });
+
+    client.fetchOptions = { dispatcher: replacementDispatcher as never };
+    await client.models.list();
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toMatchObject({ dispatcher: replacementDispatcher });
+    expect(requests[1]).toMatchObject({ dispatcher: replacementDispatcher });
+  });
+
+  test('honors per-request maxRetries for a cold token exchange', async () => {
+    const noRetryFetch = vi.fn(
+      async () => new Response(null, { status: 503, headers: { 'Retry-After': '0' } }),
+    );
+    const noRetryClient = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: noRetryFetch,
+      maxRetries: 2,
+    });
+
+    await expect(noRetryClient.models.list({ maxRetries: 0 })).rejects.toMatchObject({ status: 503 });
+    expect(noRetryFetch).toHaveBeenCalledTimes(1);
+
+    const retryFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503, headers: { 'Retry-After': '0' } }))
+      .mockResolvedValueOnce(tokenResponse('access-token'))
+      .mockResolvedValueOnce(Response.json({ data: [] }));
+    const retryClient = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: retryFetch,
+      maxRetries: 0,
+    });
+
+    await expect(retryClient.models.list({ maxRetries: 1 })).resolves.toMatchObject({ data: [] });
+    expect(retryFetch).toHaveBeenCalledTimes(3);
   });
 
   test('rejects per-request fetchOptions before exchanging a transport-bound identity', async () => {

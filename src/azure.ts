@@ -182,12 +182,13 @@ export class AzureOpenAI extends OpenAI {
     timeout: number,
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    maxRetries?: number,
   ): Promise<Response> {
     if (new Headers(init.headers).has('api-key')) {
       init.redirect = 'manual';
     }
 
-    return super.fetchWithAuth(url, init, timeout, controller, schemes);
+    return super.fetchWithAuth(url, init, timeout, controller, schemes, maxRetries);
   }
 
   protected override async authHeaders(
