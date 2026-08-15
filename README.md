@@ -267,6 +267,14 @@ await client.files.create({
 });
 ```
 
+Streaming upload sources are one-shot within a multipart request. Before sending any bytes, the SDK
+validates all parts and acquires each source's iterator or reader; file contents are still streamed lazily.
+Do not reuse the same custom async-iterable or readable source for multiple fields, or provide distinct
+sources whose factories contend for an exclusive shared resource. These requests fail before transmission
+so later metadata cannot replace captured bytes or cleanup methods. To upload the same content more than
+once, materialize it once into an immutable `Blob` or `File` (which can be reused), call `toFile()`, or
+provide independently backed streaming sources.
+
 ## Webhook Verification
 
 Verifying webhook signatures is _optional but encouraged_.

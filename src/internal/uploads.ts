@@ -55,6 +55,11 @@ export interface StreamingFile {
  * must consume all of its contents up front. The stream is instead encoded lazily as multipart
  * form data when the request is sent.
  *
+ * Multipart requests validate all parts and acquire every iterator or reader before sending their
+ * first byte. Each streaming source is single-use within a request, and distinct sources must not
+ * contend for an exclusive resource. Reuse an immutable `Blob`/`File` or independently backed
+ * streams when uploading the same content more than once.
+ *
  * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
  * @param name Non-empty filename for the multipart request. Most endpoints send only its basename;
  * endpoints that accept logical paths, such as Skills, preserve a normalized path.
