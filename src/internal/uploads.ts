@@ -369,7 +369,7 @@ const getUploadableKind = (value: unknown, uploadableKinds: UploadableKinds): Up
 
   if (uploadableKinds.has(value)) {
     const cached = uploadableKinds.get(value);
-    if (cached === 'streaming-file') {
+    if (cached === 'streaming-file' || cached === 'named-blob' || cached === 'response') {
       return cached;
     }
     if (isStreamingFile(value)) {
@@ -600,6 +600,10 @@ async function* iterateFormValue(
     let snapshot: MultipartDataSnapshot;
     if (streamingFile) {
       snapshot = snapshotStreamingFileData((upload as StreamingFile).data, snapshots);
+    } else if (uploadKind === 'response') {
+      snapshot = snapshotResponseData(upload as Response, snapshots);
+    } else if (uploadKind === 'named-blob') {
+      snapshot = snapshotBlobData(upload as Blob, snapshots);
     } else if (upload instanceof Response) {
       snapshot = snapshotResponseData(upload, snapshots);
     } else if (upload instanceof Blob) {
@@ -665,7 +669,9 @@ function getStreamingFileName(
 function getStreamingFileType(value: Uploadable, uploadKind: Exclude<UploadableKind, undefined>): string {
   let type: string | undefined;
 
-  if (uploadKind === 'streaming-file' || uploadKind === 'named-blob' || isNamedBlob(value)) {
+  if (uploadKind === 'response') {
+    type = (value as Response).headers.get('content-type') ?? undefined;
+  } else if (uploadKind === 'streaming-file' || uploadKind === 'named-blob' || isNamedBlob(value)) {
     ({ type } = value as StreamingFile | NamedBlob);
   } else if (value instanceof Response) {
     type = value.headers.get('content-type') ?? undefined;

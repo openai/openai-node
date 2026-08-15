@@ -21,8 +21,18 @@ function isNativeReadableStream(value: StreamingFileInput, requireLocked = false
     const locked = getLocked?.call(value);
     return typeof locked === 'boolean' && (!requireLocked || locked);
   } catch {
-    // Ordinary async iterables and reader-like objects do not satisfy the native stream brand.
-    return false;
+    try {
+      // Transparent proxies cannot satisfy the intrinsic brand but retain their native prototype.
+      if (!(value instanceof globalThis.ReadableStream)) {
+        return false;
+      }
+
+      const locked = Reflect.get(value, 'locked');
+      return typeof locked === 'boolean' && (!requireLocked || locked);
+    } catch {
+      // Ordinary async iterables, reader-like objects, and hostile proxies are not native streams.
+      return false;
+    }
   }
 }
 
@@ -41,23 +51,13 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
       const descriptor = Object.getOwnPropertyDescriptor(prototype, 'return');
       if (descriptor) {
         if ('value' in descriptor) {
-          const returnIterator = descriptor.value as AsyncIterator<BlobPart>['return'];
+          const returnIterator = Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
           return returnIterator
             ? (...args: [] | [unknown]) => Reflect.apply(returnIterator, iterator, args)
             : undefined;
         }
 
-        const getReturn = descriptor.get;
-        if (!getReturn) {
-          return undefined;
-        }
-
-        return (...args: [] | [unknown]) => {
-          const returnIterator = Reflect.apply(getReturn, iterator, []) as AsyncIterator<BlobPart>['return'];
-          return returnIterator
-            ? Reflect.apply(returnIterator, iterator, args)
-            : Promise.resolve({ done: true as const, value: args[0] });
-        };
+        break;
       }
       prototype = Object.getPrototypeOf(prototype);
     }
@@ -67,8 +67,23 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
     };
   }
 
+  let captured:
+    | Readonly<{ returnIterator: AsyncIterator<BlobPart>['return'] }>
+    | Readonly<{ error: unknown }>
+    | undefined;
   return (...args: [] | [unknown]) => {
-    const returnIterator = Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
+    if (!captured) {
+      try {
+        captured = { returnIterator: Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'] };
+      } catch (error) {
+        captured = { error };
+      }
+    }
+    if ('error' in captured) {
+      throw captured.error;
+    }
+
+    const { returnIterator } = captured;
     return returnIterator
       ? Reflect.apply(returnIterator, iterator, args)
       : Promise.resolve({ done: true as const, value: args[0] });
@@ -150,9 +165,7 @@ export function snapshotStreamingFileData(
     try {
       cancel = reader.cancel.bind(reader);
     } catch (error) {
-      cancel = () => {
-        throw error;
-      };
+      cancel = () => Promise.reject(error);
     }
 
     let releaseLock: ReadableStreamDefaultReader<BlobPart>['releaseLock'];

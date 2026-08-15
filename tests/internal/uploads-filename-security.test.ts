@@ -102,6 +102,52 @@ describe('streaming multipart upload security', () => {
     },
   );
 
+  test.each(
+    (['Blob', 'Response'] as const).flatMap((kind) =>
+      (
+        [
+          ['optional', maybeMultipartFormRequestOptions],
+          ['required', multipartFormRequestOptions],
+        ] as const
+      ).map(([mode, encode]) => [kind, mode, encode] as const),
+    ),
+  )('preserves cached %s bytes in mixed %s streaming multipart requests', async (kind, mode, encode) => {
+    const source =
+      kind === 'Blob'
+        ? Object.assign(new Blob(['authoritative Blob bytes']), { name: 'original.txt' })
+        : Object.assign(new Response('authoritative Response bytes'), { name: 'original.txt' });
+    const attacker = vi.fn(() => chunks('attacker bytes'));
+    let brandChecks = 0;
+    let prototypeChecks = 0;
+    const upload = new Proxy(source, {
+      has(target, property) {
+        if (typeof property === 'symbol' && property.description === 'brand.privateStreamingFile') {
+          brandChecks += 1;
+          return brandChecks > (mode === 'optional' ? 2 : 1);
+        }
+        return Reflect.has(target, property);
+      },
+      get(target, property) {
+        return property === 'data' ? attacker() : Reflect.get(target, property, target);
+      },
+      getPrototypeOf(target) {
+        prototypeChecks += 1;
+        return kind === 'Blob' && prototypeChecks > 2 ? Response.prototype : Reflect.getPrototypeOf(target);
+      },
+    });
+
+    const form = await readForm(
+      { upload, sibling: toStreamingFile(chunks('sibling bytes'), 'sibling.txt') },
+      encode,
+    );
+
+    await expect((form.get('upload') as File).text()).resolves.toBe(`authoritative ${kind} bytes`);
+    await expect((form.get('sibling') as File).text()).resolves.toBe('sibling bytes');
+    expect(attacker).not.toHaveBeenCalled();
+    expect(brandChecks).toBe(1);
+    expect(prototypeChecks).toBe(kind === 'Blob' ? 2 : 1);
+  });
+
   test.each([
     ['optional', maybeMultipartFormRequestOptions],
     ['required', multipartFormRequestOptions],
@@ -282,14 +328,16 @@ describe('streaming multipart upload security', () => {
     }
     const body = {
       files: [first, second],
-      ...(kind === 'shared Response body' ? { trigger: chunks('trigger') } : {}),
+      ...(kind === 'shared Response body' || kind === 'reusable named Blob'
+        ? { trigger: chunks('trigger') }
+        : {}),
     };
     const form = await readForm(body, maybeMultipartFormRequestOptions);
     await expect(Promise.all((form.getAll('files[]') as File[]).map((file) => file.text()))).resolves.toEqual(
       ['shared', reusable ? 'shared' : ''],
     );
     if (kind === 'reusable named Blob') {
-      expect(getIterator).toHaveBeenCalledTimes(2);
+      expect(getIterator).toHaveBeenCalledTimes(1);
       expect(incidental).not.toHaveBeenCalled();
     }
   });
