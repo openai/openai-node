@@ -4,6 +4,7 @@ import generatedTestPatterns from './scripts/generated-test-patterns.json';
 const config: JestConfigWithTsJest = {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/scripts/jest-setup.ts'],
   testMatch: generatedTestPatterns.map(
     (pattern) => `<rootDir>/${pattern}${pattern.endsWith('.test.ts') ? '' : '/**/*.test.ts'}`,
   ),

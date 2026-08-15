@@ -118,6 +118,7 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
   }
 
   test('keeps Jest limited to the canonical generated suites without a Vitest compatibility layer', () => {
+    expect(jestConfig.setupFiles).toEqual(['<rootDir>/scripts/jest-setup.ts']);
     expect(jestConfig.testMatch).toEqual(
       generatedTestPatterns.map(
         (pattern) => `<rootDir>/${pattern}${pattern.endsWith('.test.ts') ? '' : '/**/*.test.ts'}`,
