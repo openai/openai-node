@@ -26,6 +26,13 @@ function deferredResponse(): {
   return { promise, resolve: resolveResponse };
 }
 
+function refreshWaiterCount(auth: WorkloadIdentityAuth): number {
+  const internal = auth as unknown as {
+    defaultState: { refreshAttempt: { waiters: Set<unknown> } | null };
+  };
+  return internal.defaultState.refreshAttempt?.waiters.size ?? 0;
+}
+
 describe('X.509 workload identity auth', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -187,6 +194,31 @@ describe('X.509 workload identity auth', () => {
     expect(customFetch).toHaveBeenCalledTimes(1);
   });
 
+  test('removes canceled and timed-out subscribers from a stalled shared refresh', async () => {
+    vi.useFakeTimers();
+    const exchange = deferredResponse();
+    const customFetch = vi.fn(() => exchange.promise);
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+    const controllers = Array.from({ length: 25 }, () => new AbortController());
+    const canceled = controllers.map((controller) => auth.getToken(controller.signal));
+    const timedOut = Array.from({ length: 25 }, () => auth.getToken(undefined, 1000));
+    const abandoned = Promise.allSettled([...canceled, ...timedOut]);
+    const winner = auth.getToken(undefined, 5000);
+
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    expect(refreshWaiterCount(auth)).toBe(51);
+    for (const controller of controllers) {
+      controller.abort('caller stopped waiting');
+    }
+    await vi.advanceTimersByTimeAsync(1000);
+    await abandoned;
+
+    expect(refreshWaiterCount(auth)).toBe(1);
+    exchange.resolve(tokenResponse('winner-token'));
+    await expect(winner).resolves.toBe('winner-token');
+    expect(refreshWaiterCount(auth)).toBe(0);
+  });
+
   test('clamps refreshBufferMs to half of a short token TTL using a suspension-aware clock', async () => {
     let wallTime = 9_000_000_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
@@ -289,6 +321,22 @@ describe('X.509 workload identity auth', () => {
 
     await expect(token).resolves.toBe('retried-token');
     expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not start a refresh attempt when Retry-After reaches the waiter deadline', async () => {
+    vi.useFakeTimers();
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '1' } }))
+      .mockResolvedValueOnce(tokenResponse('too-late-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 1 });
+
+    const token = auth.getToken(undefined, 1000);
+    const rejection = expect(token).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    await rejection;
+    expect(customFetch).toHaveBeenCalledTimes(1);
   });
 
   test('makes late callers share an active Retry-After window and the next attempt', async () => {
@@ -460,6 +508,59 @@ describe('X.509 workload identity auth', () => {
     await expect(result).rejects.toBeInstanceOf(APIConnectionError);
     await expect(result).rejects.not.toHaveProperty('cause');
     await expect(result).rejects.not.toThrow('private-key-material');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('retries a connection failure while reading a successful exchange body', async () => {
+    const failedBody = new ReadableStream({
+      start(controller) {
+        controller.error(new Error('body stream contains private transport details'));
+      },
+    });
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(failedBody, { status: 200 }))
+      .mockResolvedValueOnce(tokenResponse('retried-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 1 });
+
+    await expect(auth.getToken()).resolves.toBe('retried-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('redacts a terminal connection failure while reading a successful exchange body', async () => {
+    const failedBody = new ReadableStream({
+      start(controller) {
+        controller.error(new Error('body stream contains private transport details'));
+      },
+    });
+    const auth = new WorkloadIdentityAuth(
+      config,
+      vi.fn(async () => new Response(failedBody, { status: 200 })),
+      { maxRetries: 0 },
+    );
+
+    const caughtError = await auth.getToken().catch((error: unknown) => error);
+    expect(caughtError).toBeInstanceOf(APIConnectionError);
+    expect(`${String(caughtError)} ${JSON.stringify(caughtError)}`).not.toContain(
+      'private transport details',
+    );
+  });
+
+  test('preserves a retryable status error when response cleanup fails', async () => {
+    const failedCleanupBody = new ReadableStream({
+      cancel() {
+        return Promise.reject(new Error('cleanup contains private transport details'));
+      },
+    });
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(failedCleanupBody, { status: 503, headers: { 'Retry-After': '0' } }),
+      )
+      .mockResolvedValueOnce(tokenResponse('retried-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 1 });
+
+    await expect(auth.getToken()).resolves.toBe('retried-token');
     expect(customFetch).toHaveBeenCalledTimes(2);
   });
 

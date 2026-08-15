@@ -52,6 +52,38 @@ function isRetryable(status: number): boolean {
   return status === 408 || status === 409 || status === 429 || status >= 500;
 }
 
+function retryableConnectionError(retryCount: number): X509TokenExchangeRetryableError {
+  return new X509TokenExchangeRetryableError(
+    new APIConnectionError({
+      message: 'X.509 workload identity token exchange failed due to a connection error.',
+    }),
+    defaultRetryDelayMillis(retryCount),
+  );
+}
+
+async function cancelResponseBody(response: Response): Promise<void> {
+  try {
+    await Shims.CancelReadableStream(response.body);
+  } catch {
+    // Cleanup is best-effort and must not replace the sanitized status error.
+  }
+}
+
+async function readSuccessBody(response: Response, retryCount: number): Promise<unknown> {
+  let responseText: string;
+  try {
+    responseText = await response.text();
+  } catch {
+    throw retryableConnectionError(retryCount);
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    throw new OpenAIError('X.509 workload identity token exchange returned invalid JSON.');
+  }
+}
+
 async function readOAuthErrorCode(response: Response): Promise<{ error: string } | undefined> {
   const parsed: unknown = await response.json().catch((): undefined => undefined);
   if (
@@ -78,20 +110,11 @@ async function exchangeAttempt(options: X509TokenExchangeOptions, body: string):
       signal: controller.signal,
     });
   } catch {
-    throw new X509TokenExchangeRetryableError(
-      new APIConnectionError({
-        message: 'X.509 workload identity token exchange failed due to a connection error.',
-      }),
-      defaultRetryDelayMillis(options.retryCount),
-    );
+    throw retryableConnectionError(options.retryCount);
   }
 
   if (response.ok) {
-    try {
-      return await response.json();
-    } catch {
-      throw new OpenAIError('X.509 workload identity token exchange returned invalid JSON.');
-    }
+    return await readSuccessBody(response, options.retryCount);
   }
 
   if (isRetryable(response.status)) {
@@ -102,7 +125,7 @@ async function exchangeAttempt(options: X509TokenExchangeOptions, body: string):
       response.headers,
     );
     const retryDelayMs = retryDelayMillis(response.headers, options.retryCount);
-    await Shims.CancelReadableStream(response.body);
+    await cancelResponseBody(response);
     throw new X509TokenExchangeRetryableError(error, retryDelayMs);
   }
 
@@ -110,7 +133,7 @@ async function exchangeAttempt(options: X509TokenExchangeOptions, body: string):
     throw new OAuthError(response.status, await readOAuthErrorCode(response), response.headers);
   }
 
-  await Shims.CancelReadableStream(response.body);
+  await cancelResponseBody(response);
   throw APIError.generate(
     response.status,
     undefined,

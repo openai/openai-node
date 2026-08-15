@@ -18,9 +18,18 @@ interface CachedToken {
   refreshAt: number;
 }
 
+interface RefreshWaiter {
+  reject: (error: unknown) => void;
+  resolve: (token: string) => void;
+}
+
+interface RefreshAttempt {
+  waiters: Set<RefreshWaiter>;
+}
+
 interface RefreshState {
   cachedToken: CachedToken | null;
-  refreshPromise: Promise<string> | null;
+  refreshAttempt: RefreshAttempt | null;
   retryNotBefore: number;
   tokenGeneration: number;
 }
@@ -66,7 +75,7 @@ const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] a
 function createRefreshState(): RefreshState {
   return {
     cachedToken: null,
-    refreshPromise: null,
+    refreshAttempt: null,
     retryNotBefore: 0,
     tokenGeneration: 0,
   };
@@ -169,55 +178,83 @@ function throwIfAborted(signal: AbortSignal | null | undefined): void {
 
 const REFRESH_INVALIDATED = Symbol('workload identity refresh invalidated');
 
-function clearRefresh(state: RefreshState, refreshPromise: Promise<string>): void {
-  if (state.refreshPromise === refreshPromise) {
-    state.refreshPromise = null;
+function takeRefreshWaiters(state: RefreshState, refreshAttempt: RefreshAttempt): RefreshWaiter[] {
+  if (state.refreshAttempt === refreshAttempt) {
+    state.refreshAttempt = null;
+  }
+  const waiters = [...refreshAttempt.waiters];
+  refreshAttempt.waiters.clear();
+  return waiters;
+}
+
+function resolveRefresh(state: RefreshState, refreshAttempt: RefreshAttempt, token: string): void {
+  for (const waiter of takeRefreshWaiters(state, refreshAttempt)) {
+    waiter.resolve(token);
   }
 }
 
-async function waitForPromise<T>(
-  promise: Promise<T>,
+function rejectRefresh(state: RefreshState, refreshAttempt: RefreshAttempt, error: unknown): void {
+  for (const waiter of takeRefreshWaiters(state, refreshAttempt)) {
+    waiter.reject(error);
+  }
+}
+
+async function waitForRefresh(
+  refreshAttempt: RefreshAttempt,
   signal: AbortSignal | null | undefined,
   timeoutMs: number | undefined,
-): Promise<T> {
-  if (!signal && timeoutMs === undefined) {
-    return await promise;
-  }
+): Promise<string> {
   throwIfAborted(signal);
 
   // oxlint-disable-next-line promise/avoid-new -- AbortSignal only exposes callback-based cancellation.
-  return await new Promise<T>((resolve, reject) => {
+  return await new Promise<string>((resolve, reject) => {
+    let finished = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const cleanup = (abortListener: () => void) => {
+    // oxlint-disable-next-line prefer-const -- Cleanup must close over the handler before it is initialized.
+    let onAbort: () => void;
+    // oxlint-disable-next-line prefer-const -- Cleanup must close over the subscriber before it is initialized.
+    let waiter: RefreshWaiter;
+    const cleanup = () => {
+      refreshAttempt.waiters.delete(waiter);
       if (timer !== undefined) {
         clearTimeout(timer);
       }
-      signal?.removeEventListener('abort', abortListener);
+      signal?.removeEventListener('abort', onAbort);
     };
-    const onAbort = () => {
-      if (!signal) {
-        return;
+    const finish = (): boolean => {
+      if (finished) {
+        return false;
       }
-      cleanup(onAbort);
-      reject(abortError(signal));
+      finished = true;
+      cleanup();
+      return true;
     };
+    onAbort = () => {
+      if (signal && finish()) {
+        reject(abortError(signal));
+      }
+    };
+    waiter = {
+      reject: (error) => {
+        if (finish()) {
+          reject(error);
+        }
+      },
+      resolve: (token) => {
+        if (finish()) {
+          resolve(token);
+        }
+      },
+    };
+    refreshAttempt.waiters.add(waiter);
     signal?.addEventListener('abort', onAbort, { once: true });
     if (timeoutMs !== undefined) {
       timer = setTimeout(() => {
-        cleanup(onAbort);
-        reject(new APIConnectionTimeoutError());
+        if (finish()) {
+          reject(new APIConnectionTimeoutError());
+        }
       }, timeoutMs);
     }
-    void promise.then(
-      (value) => {
-        cleanup(onAbort);
-        resolve(value);
-      },
-      (error: unknown) => {
-        cleanup(onAbort);
-        reject(error);
-      },
-    );
   });
 }
 
@@ -227,17 +264,48 @@ async function waitForDelay(
   timeoutMs: number | undefined,
 ): Promise<void> {
   throwIfAborted(signal);
-  let cancel: (() => void) | undefined;
-  // oxlint-disable-next-line promise/avoid-new -- Timers only expose callback-based completion.
-  const delay = new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, delayMs);
-    cancel = () => clearTimeout(timer);
-  });
-  try {
-    await waitForPromise(delay, signal, timeoutMs);
-  } finally {
-    cancel?.();
+  if (timeoutMs !== undefined && timeoutMs <= 0) {
+    throw new APIConnectionTimeoutError();
   }
+  // oxlint-disable-next-line promise/avoid-new -- Timers only expose callback-based completion.
+  return await new Promise<void>((resolve, reject) => {
+    let finished = false;
+    // oxlint-disable-next-line prefer-const -- Cleanup must close over the timer before it is initialized.
+    let timer: ReturnType<typeof setTimeout>;
+    // oxlint-disable-next-line prefer-const -- Cleanup must close over the handler before it is initialized.
+    let onAbort: () => void;
+    const timeoutWins = timeoutMs !== undefined && timeoutMs <= delayMs;
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const finish = (): boolean => {
+      if (finished) {
+        return false;
+      }
+      finished = true;
+      cleanup();
+      return true;
+    };
+    onAbort = () => {
+      if (signal && finish()) {
+        reject(abortError(signal));
+      }
+    };
+    timer = setTimeout(
+      () => {
+        if (finish()) {
+          if (timeoutWins) {
+            reject(new APIConnectionTimeoutError());
+          } else {
+            resolve();
+          }
+        }
+      },
+      timeoutWins ? timeoutMs : delayMs,
+    );
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 async function exchangeSubjectToken(config: SubjectTokenWorkloadIdentity, fetch: Fetch): Promise<unknown> {
@@ -418,7 +486,7 @@ export class WorkloadIdentityAuth {
 
   private refreshInBackground(context: RefreshContext): void {
     const { state } = context;
-    if (state.refreshPromise || state.retryNotBefore > this.source.monotonicNow()) {
+    if (state.refreshAttempt || state.retryNotBefore > this.source.monotonicNow()) {
       return;
     }
     // A proactive refresh has no waiting caller to own retry delays. Record any
@@ -437,6 +505,7 @@ export class WorkloadIdentityAuth {
 
     for (let retryCount = 0; ; retryCount += 1) {
       throwIfAborted(signal);
+      this.throwIfDeadlineExceeded(deadline);
       if (state.tokenGeneration !== context.generation) {
         throw REFRESH_INVALIDATED;
       }
@@ -447,6 +516,7 @@ export class WorkloadIdentityAuth {
         if (state.tokenGeneration !== context.generation) {
           throw REFRESH_INVALIDATED;
         }
+        this.throwIfDeadlineExceeded(deadline);
         retryDelayMs = state.retryNotBefore - this.source.monotonicNow();
       }
       if (
@@ -458,12 +528,10 @@ export class WorkloadIdentityAuth {
       }
 
       try {
+        this.throwIfDeadlineExceeded(deadline);
+        const refreshAttempt = state.refreshAttempt ?? this.startRefresh(context, retryCount);
         // oxlint-disable-next-line no-await-in-loop -- Token refresh attempts are intentionally sequential.
-        const token = await waitForPromise(
-          state.refreshPromise ?? this.startRefresh(context, retryCount),
-          signal,
-          this.remainingTimeout(deadline),
-        );
+        const token = await waitForRefresh(refreshAttempt, signal, this.remainingTimeout(deadline));
         return token;
       } catch (error) {
         if (!(error instanceof X509TokenExchangeRetryableError)) {
@@ -483,14 +551,22 @@ export class WorkloadIdentityAuth {
     return deadline === undefined ? undefined : Math.max(0, deadline - this.source.monotonicNow());
   }
 
-  private startRefresh(context: RefreshContext, retryCount: number): Promise<string> {
-    const refreshPromise = this.refreshToken(context, retryCount);
-    context.state.refreshPromise = refreshPromise;
-    void refreshPromise.then(
-      () => clearRefresh(context.state, refreshPromise),
-      () => clearRefresh(context.state, refreshPromise),
+  private throwIfDeadlineExceeded(deadline: number | undefined): void {
+    if (deadline !== undefined && this.source.monotonicNow() >= deadline) {
+      throw new APIConnectionTimeoutError();
+    }
+  }
+
+  private startRefresh(context: RefreshContext, retryCount: number): RefreshAttempt {
+    const refreshAttempt: RefreshAttempt = { waiters: new Set() };
+    context.state.refreshAttempt = refreshAttempt;
+    // oxlint-disable promise/prefer-await-to-callbacks -- One shared reaction fans settlement out to removable waiters.
+    void this.refreshToken(context, retryCount).then(
+      (token) => resolveRefresh(context.state, refreshAttempt, token),
+      (error: unknown) => rejectRefresh(context.state, refreshAttempt, error),
     );
-    return refreshPromise;
+    // oxlint-enable promise/prefer-await-to-callbacks
+    return refreshAttempt;
   }
 
   private async refreshToken(context: RefreshContext, retryCount: number): Promise<string> {
@@ -561,6 +637,6 @@ export class WorkloadIdentityAuth {
     }
     state.tokenGeneration += 1;
     state.cachedToken = null;
-    state.refreshPromise = null;
+    state.refreshAttempt = null;
   }
 }
