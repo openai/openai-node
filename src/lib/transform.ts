@@ -90,6 +90,24 @@ const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
 /** Visits a nested schema together with its root-relative path and containing schema keyword. */
 type JSONSchemaChildVisitor = (schema: unknown, path: string[], keyword: string) => void;
 
+/** Assigns schema keywords without invoking the inherited `__proto__` setter. */
+function assignSchema<T extends object>(target: T, ...sources: object[]): T {
+  for (const source of sources) {
+    if (Object.prototype.propertyIsEnumerable.call(source, '__proto__') && !hasOwn(target, '__proto__')) {
+      Object.defineProperty(target, '__proto__', {
+        value: undefined,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
+
+    Object.assign(target, source);
+  }
+
+  return target;
+}
+
 /**
  * Visits only values carried by JSON Schema keywords that contain schemas.
  * Literal payloads such as enum, const, and default deliberately do not
@@ -318,7 +336,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
   for (const keyword of Object.keys(schema)) {
     delete schemaRecord[keyword];
   }
-  Object.assign(schema, inlined, inheritedAnnotations, rootMetadata);
+  assignSchema(schema, inlined, inheritedAnnotations, rootMetadata);
   if (rootDefinitions !== undefined) {
     schema.$defs = rootDefinitions;
   }
@@ -368,7 +386,7 @@ function normalizeRootAllOf(schema: JSONSchema): void {
     for (const keyword of Object.keys(schema)) {
       delete schemaRecord[keyword];
     }
-    Object.assign(schema, normalized, rootMetadata);
+    assignSchema(schema, normalized, rootMetadata);
   }
 }
 
@@ -415,7 +433,12 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
     const renames = definitionRenames.get(keyword);
     const mergedDefinitions: Record<string, JSONSchemaDefinition> = { ...rootDefinitions };
     for (const [name, definition] of Object.entries(branchDefinitions)) {
-      mergedDefinitions[renames?.get(name) ?? name] = definition as JSONSchemaDefinition;
+      Object.defineProperty(mergedDefinitions, renames?.get(name) ?? name, {
+        value: definition,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
     normalized[keyword] = mergedDefinitions;
     delete rootMetadata[keyword];
@@ -426,7 +449,7 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
   for (const keyword of Object.keys(schema)) {
     delete schemaRecord[keyword];
   }
-  Object.assign(schema, normalized, rootMetadata);
+  assignSchema(schema, normalized, rootMetadata);
   return true;
 }
 
@@ -684,7 +707,7 @@ function ensureStrictJsonSchema(
   // the same strict handling as type: 'object'. Explicitly open object schemas
   // cannot be represented in Structured Outputs strict mode.
   if (hasObjectShape(jsonSchema)) {
-    if (!('additionalProperties' in jsonSchema)) {
+    if (!hasOwn(jsonSchema, 'additionalProperties')) {
       jsonSchema.additionalProperties = false;
     } else if (jsonSchema.additionalProperties !== false) {
       throw new Error(
@@ -767,7 +790,7 @@ function ensureStrictJsonSchema(
       const resolved = ensureStrictJsonSchema(branch, [...path, 'allOf', '0'], root);
       const annotations = { ...jsonSchema };
       delete annotations.allOf;
-      Object.assign(jsonSchema, resolved, annotations);
+      assignSchema(jsonSchema, resolved, annotations);
       delete jsonSchema.allOf;
     }
   }
@@ -1689,7 +1712,7 @@ export function normalizeObjectAllOfForExclusivity(
       for (const keyword of Object.keys(normalized)) {
         delete (normalized as Record<string, unknown>)[keyword];
       }
-      Object.assign(normalized, flattened, siblings);
+      assignSchema(normalized, flattened, siblings);
     }
 
     return normalized;
@@ -1956,7 +1979,7 @@ function mergeObjectAllOf(
       for (const keyword of Object.keys(jsonSchema)) {
         delete (jsonSchema as any)[keyword];
       }
-      Object.assign(jsonSchema, merged);
+      assignSchema(jsonSchema, merged);
       return true;
     }
     fail();
@@ -1988,7 +2011,7 @@ function mergeObjectAllOf(
   for (const keyword of Object.keys(jsonSchema)) {
     delete (jsonSchema as any)[keyword];
   }
-  Object.assign(jsonSchema, merged);
+  assignSchema(jsonSchema, merged);
   return true;
 }
 
