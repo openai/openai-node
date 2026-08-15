@@ -297,25 +297,44 @@ describe('streaming multipart resource cleanup', () => {
     expect(getReturn).toHaveBeenCalledTimes(1);
   });
 
-  test.each(['cancellation', 'invalid filename'] as const)(
-    'awaits unused iterator cleanup only for %s without delaying primary errors',
-    async (outcome) => {
+  test.each([
+    ['iterator', 'cancellation'],
+    ['iterator', 'invalid filename'],
+    ['reader', 'cancellation'],
+    ['reader', 'invalid filename'],
+  ] as const)(
+    'awaits unused %s cleanup only for %s without delaying primary errors',
+    async (kind, outcome) => {
       let locked = false;
       const cleanup = new ReadableStream<void>().getReader();
+      const release = vi.fn(async () => {
+        await cleanup.read();
+        locked = false;
+      });
       const iterator = {
         next: vi.fn(),
         return: vi.fn(async () => {
-          await cleanup.read();
-          locked = false;
+          await release();
           return { done: true as const, value: undefined };
         }),
       };
-      const source = {
-        [Symbol.asyncIterator]() {
-          locked = true;
-          return iterator;
-        },
-      };
+      const source =
+        kind === 'reader'
+          ? Object.assign(
+              new ReadableStream<string>({
+                start() {
+                  locked = true;
+                },
+                cancel: release,
+              }),
+              { [Symbol.asyncIterator]: undefined },
+            )
+          : {
+              [Symbol.asyncIterator]() {
+                locked = true;
+                return iterator;
+              },
+            };
       const later = laterUpload();
       if (outcome === 'invalid filename') {
         Object.defineProperty(later, 'name', { value: null });
@@ -337,11 +356,15 @@ describe('streaming multipart resource cleanup', () => {
         await expect(reader.read()).rejects.toThrow(/file.?name/iu);
       }
       expect(locked).toBe(true);
+      if (source instanceof ReadableStream) {
+        expect(source.locked).toBe(false);
+      }
       await cleanup.cancel();
       await cancellation;
       expect(locked).toBe(false);
       expect(iterator.next).not.toHaveBeenCalled();
-      expect(iterator.return).toHaveBeenCalledTimes(1);
+      expect(iterator.return).toHaveBeenCalledTimes(kind === 'iterator' ? 1 : 0);
+      expect(release).toHaveBeenCalledTimes(1);
     },
   );
 });

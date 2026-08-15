@@ -182,15 +182,17 @@ function snapshotReader(
       },
     },
     dispose() {
-      if (!consumed) {
-        consumed = true;
-        void ignoreCleanupResult(cancel);
-        try {
-          releaseLock();
-        } catch {
-          // Cleanup failures must not mask the primary multipart result.
-        }
+      if (consumed) {
+        return;
       }
+      consumed = true;
+      const cancellation = ignoreCleanupResult(cancel);
+      try {
+        releaseLock();
+      } catch {
+        // Cleanup failures must not mask the primary multipart result.
+      }
+      return cancellation;
     },
   };
 }
