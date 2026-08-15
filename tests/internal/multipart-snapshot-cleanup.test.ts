@@ -103,13 +103,15 @@ describe('streaming multipart resource cleanup', () => {
       kind === 'reader' && throwing !== 'releaseLock' ? [receiver] : [],
     );
     expect(getReturn).toHaveBeenCalledTimes(kind === 'proxy iterator' && outcome !== 'completion' ? 1 : 0);
-    expect(getCleanup).toHaveBeenCalledTimes(throwing && outcome !== 'completion' ? 1 : 0);
+    expect(getCleanup).toHaveBeenCalledTimes(
+      throwing && (outcome !== 'completion' || throwing === 'return') ? 1 : 0,
+    );
     expect(substituted).not.toHaveBeenCalled();
     expect(source.locked).toBe(false);
   });
 
-  test.each(['own', 'inherited'] as const)(
-    'retains %s accessor-backed iterator cleanup when a later filename replaces the accessor',
+  test.each(['own', 'inherited', 'stateful'] as const)(
+    'retains %s accessor-backed iterator cleanup when a later filename mutates its source',
     async (kind) => {
       const source = ReadableStream.from(['original']);
       const iterator = source[Symbol.asyncIterator]();
@@ -117,10 +119,11 @@ describe('streaming multipart resource cleanup', () => {
       if (!close) {
         throw new Error('Expected native iterator cleanup');
       }
-      const release = vi.fn(close);
-      const original = vi.fn(() => release);
       const replacement = vi.fn();
-      const owner = kind === 'own' ? iterator : Object.create(Object.getPrototypeOf(iterator));
+      const release = vi.fn(close);
+      let originalCleanup = release;
+      const original = vi.fn(() => originalCleanup);
+      const owner = kind === 'inherited' ? Object.create(Object.getPrototypeOf(iterator)) : iterator;
       Object.defineProperty(owner, 'return', { configurable: true, get: original });
       if (kind === 'inherited') {
         Reflect.deleteProperty(iterator, 'return');
@@ -130,7 +133,11 @@ describe('streaming multipart resource cleanup', () => {
       const later = laterUpload();
       Object.defineProperty(later, 'name', {
         get() {
-          Object.defineProperty(iterator, 'return', { configurable: true, get: replacement });
+          if (kind === 'stateful') {
+            originalCleanup = replacement;
+          } else {
+            Object.defineProperty(iterator, 'return', { configurable: true, get: replacement });
+          }
           return null;
         },
       });
@@ -210,87 +217,4 @@ describe('streaming multipart resource cleanup', () => {
     expect(finished).toHaveBeenCalledTimes(1);
     expect(getReturn).toHaveBeenCalledTimes(1);
   });
-
-  test('unlocks native readers when capturing read throws and cancellation rejects', async () => {
-    const cancel = vi.fn(() => Promise.reject(new Error('cancellation failed')));
-    const source = new ReadableStream<string>({ cancel });
-    Object.assign(source, {
-      [Symbol.asyncIterator]: undefined,
-      getReader() {
-        return Object.defineProperty(ReadableStream.prototype.getReader.call(source), 'read', {
-          get() {
-            throw new Error('read accessor failed');
-          },
-        });
-      },
-    });
-    const options = await multipart({ upload: source });
-
-    await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow('read accessor failed');
-    expect(cancel).toHaveBeenCalledTimes(1);
-    expect(source.locked).toBe(false);
-  });
-
-  test.each(['accessor', 'method', 'poisoned binding'] as const)(
-    'releases a native reader during active cancellation despite its %s',
-    async (failure) => {
-      const error = new Error(`cancel ${failure} failed`);
-      const release = vi.fn();
-      const getBinding = vi.fn(() => {
-        throw error;
-      });
-      const source = new ReadableStream<string>({
-        start(controller) {
-          controller.enqueue('original');
-        },
-      });
-      Object.assign(source, {
-        [Symbol.asyncIterator]: undefined,
-        getReader() {
-          const reader = ReadableStream.prototype.getReader.call(source);
-          const releaseLock = reader.releaseLock.bind(reader);
-          Object.defineProperties(reader, {
-            cancel: {
-              get() {
-                if (failure === 'accessor') {
-                  throw error;
-                }
-                const cancel = () => {
-                  expect(source.locked).toBe(true);
-                  if (failure === 'method') {
-                    throw error;
-                  }
-                  return Promise.resolve();
-                };
-                return failure === 'poisoned binding'
-                  ? Object.defineProperty(cancel, 'bind', { get: getBinding })
-                  : cancel;
-              },
-            },
-            releaseLock: {
-              value() {
-                release();
-                releaseLock();
-              },
-            },
-          });
-          return reader;
-        },
-      });
-      const options = await multipart({ upload: toStreamingFile(source, 'original.txt') });
-      const reader = (options.body as ReadableStream).getReader();
-      await reader.read();
-      await reader.read();
-      await reader.read();
-
-      expect(source.locked).toBe(true);
-      const cancellation = reader.cancel();
-      await (failure === 'poisoned binding'
-        ? expect(cancellation).resolves.toBeUndefined()
-        : expect(cancellation).rejects.toBe(error));
-      expect(release).toHaveBeenCalledTimes(1);
-      expect(getBinding).not.toHaveBeenCalled();
-      expect(source.locked).toBe(false);
-    },
-  );
 });

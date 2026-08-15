@@ -25,47 +25,16 @@ async function ignoreCleanupResult(cleanup: () => unknown): Promise<void> {
   }
 }
 
-function hasOriginalIteratorReturn(
-  iterator: AsyncIterator<BlobPart>,
-  owner: object,
-  getter: () => unknown,
-): boolean {
-  let prototype: object | null = iterator;
-  while (prototype !== null) {
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'return');
-    if (descriptor) {
-      return prototype === owner && !('value' in descriptor) && descriptor.get === getter;
-    }
-    prototype = Object.getPrototypeOf(prototype);
-  }
-  return false;
-}
-
 function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterator<BlobPart>['return'] {
-  let readReturn = () => Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
   try {
     let prototype: object | null = iterator;
     while (prototype !== null) {
       const descriptor = Object.getOwnPropertyDescriptor(prototype, 'return');
       if (descriptor) {
-        if ('value' in descriptor) {
-          const returnIterator = Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
-          return returnIterator
-            ? (...args: [] | [unknown]) => Reflect.apply(returnIterator, iterator, args)
-            : undefined;
-        }
-
-        const getReturn = descriptor.get;
-        const owner = prototype;
-        readReturn = () => {
-          if (!getReturn) {
-            return;
-          }
-          return hasOriginalIteratorReturn(iterator, owner, getReturn)
-            ? (Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'])
-            : (Reflect.apply(getReturn, iterator, []) as AsyncIterator<BlobPart>['return']);
-        };
-        break;
+        const returnIterator = Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
+        return returnIterator
+          ? (...args: [] | [unknown]) => Reflect.apply(returnIterator, iterator, args)
+          : undefined;
       }
       prototype = Object.getPrototypeOf(prototype);
     }
@@ -82,7 +51,7 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
   return (...args: [] | [unknown]) => {
     if (!captured) {
       try {
-        captured = { returnIterator: readReturn() };
+        captured = { returnIterator: Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'] };
       } catch (error) {
         captured = { error };
       }
@@ -159,29 +128,69 @@ function snapshotReader(
     throw error;
   }
 
-  let cancel: ReadableStreamDefaultReader<BlobPart>['cancel'];
+  let cancelReader: ReadableStreamDefaultReader<BlobPart>['cancel'];
   try {
-    const cancelReader = reader.cancel;
-    cancel = (...args) => {
-      try {
-        return Promise.resolve(Reflect.apply(cancelReader, reader, args));
-      } catch (error) {
-        return Promise.reject(error);
-      }
-    };
+    cancelReader = reader.cancel;
   } catch (error) {
-    cancel = () => Promise.reject(error);
-  }
-
-  let releaseLock: ReadableStreamDefaultReader<BlobPart>['releaseLock'];
-  try {
-    const releaseReader = reader.releaseLock;
-    releaseLock = () => Reflect.apply(releaseReader, reader, []);
-  } catch (error) {
-    releaseLock = () => {
+    cancelReader = () => {
       throw error;
     };
   }
+
+  let releaseReader: ReadableStreamDefaultReader<BlobPart>['releaseLock'];
+  try {
+    releaseReader = reader.releaseLock;
+  } catch (error) {
+    releaseReader = () => {
+      throw error;
+    };
+  }
+
+  interface PendingCancellation {
+    releaseError?: Readonly<{ error: unknown }>;
+  }
+  let pendingCancellation: PendingCancellation | undefined;
+  const settleCancellation = async (
+    cancellation: Promise<void>,
+    current: PendingCancellation,
+  ): Promise<void> => {
+    try {
+      await cancellation;
+    } finally {
+      if (pendingCancellation === current) {
+        pendingCancellation = undefined;
+      }
+    }
+    if (current.releaseError) {
+      throw current.releaseError.error;
+    }
+  };
+  const cancel: ReadableStreamDefaultReader<BlobPart>['cancel'] = (...args) => {
+    let cancellation: Promise<void>;
+    try {
+      cancellation = Promise.resolve(Reflect.apply(cancelReader, reader, args));
+    } catch (error) {
+      cancellation = Promise.reject(error);
+    }
+
+    const current: PendingCancellation = {};
+    pendingCancellation = current;
+    const settledCancellation = settleCancellation(cancellation, current);
+    // Keep rejections observed even if a stream adapter exits before awaiting cleanup.
+    void ignoreCleanupResult(() => settledCancellation);
+    return settledCancellation;
+  };
+  const releaseLock: ReadableStreamDefaultReader<BlobPart>['releaseLock'] = () => {
+    try {
+      Reflect.apply(releaseReader, reader, []);
+    } catch (error) {
+      if (!pendingCancellation) {
+        throw error;
+      }
+      // The generated adapter releases synchronously before awaiting cancellation.
+      pendingCancellation.releaseError = { error };
+    }
+  };
 
   const capturedReader = {
     read: () => Reflect.apply(read, reader, []),
