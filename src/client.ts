@@ -24,7 +24,7 @@ export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import type { WorkloadIdentity } from './auth/types';
-import { WorkloadIdentityAuth, x509TransportKey } from './auth/workload-identity-auth';
+import { hasSameX509Transport, WorkloadIdentityAuth, x509TransportKey } from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
@@ -733,10 +733,12 @@ export class OpenAI {
     },
     context?: WorkloadIdentityRequestContext,
   ): Promise<NullableHeaders | undefined> {
-    return buildHeaders([
-      schemes.bearerAuth ? await this.bearerAuth(opts, context) : null,
-      schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
-    ]);
+    const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, context) : null;
+    const adminHeaders = schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null;
+    if (context && adminHeaders?.values.has('authorization')) {
+      context.usesWorkloadIdentityToken = false;
+    }
+    return buildHeaders([bearerHeaders, adminHeaders]);
   }
 
   protected async bearerAuth(
@@ -745,17 +747,17 @@ export class OpenAI {
   ): Promise<NullableHeaders | undefined> {
     if (this._workloadIdentityAuth) {
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
+      const token = await this._workloadIdentityAuth.getToken(opts.signal, opts.timeout ?? this.timeout, {
+        fetchOptions,
+        maxRetries: opts.maxRetries ?? this.maxRetries,
+        ...(context ? { transportKey: context.transportKey } : {}),
+      });
+      if (context) {
+        context.usesWorkloadIdentityToken = true;
+      }
       return buildHeaders([
         {
-          Authorization: `Bearer ${await this._workloadIdentityAuth.getToken(
-            opts.signal,
-            opts.timeout ?? this.timeout,
-            {
-              fetchOptions,
-              maxRetries: opts.maxRetries ?? this.maxRetries,
-              ...(context ? { transportKey: context.transportKey } : {}),
-            },
-          )}`,
+          Authorization: `Bearer ${token}`,
         },
       ]);
     }
@@ -1026,10 +1028,28 @@ export class OpenAI {
       retryCount: maxRetries - retriesRemaining,
     });
     const workloadIdentityRequestContext = this.#workloadIdentityRequestContexts.get(req);
+    const workloadIdentityAuthorization = workloadIdentityRequestContext?.usesWorkloadIdentityToken
+      ? req.headers.get('authorization')
+      : undefined;
     const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
     await this.prepareRequest(req, { url, options });
     await this._provider?.prepareRequest?.(req, { url, options });
+    if (
+      workloadIdentityRequestContext?.usesWorkloadIdentityToken &&
+      req.headers.get('authorization') !== workloadIdentityAuthorization
+    ) {
+      workloadIdentityRequestContext.usesWorkloadIdentityToken = false;
+    }
+    if (
+      this._usesX509WorkloadIdentity &&
+      workloadIdentityRequestContext &&
+      !hasSameX509Transport(workloadIdentityRequestContext.fetchOptions, req)
+    ) {
+      throw new Errors.OpenAIError(
+        'X.509 workload identity requires transport options on the client; request hooks must not change the transport.',
+      );
+    }
 
     /** Not an API request ID, just for correlating local log entries. */
     const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
@@ -1148,6 +1168,7 @@ export class OpenAI {
         response.status === 401 &&
         this._workloadIdentityAuth &&
         security.bearerAuth &&
+        workloadIdentityRequestContext?.usesWorkloadIdentityToken &&
         !options.__metadata?.['hasStreamingBody'] &&
         !options.__metadata?.['workloadIdentityTokenRefreshed']
       ) {
@@ -1307,6 +1328,9 @@ export class OpenAI {
           ...(context ? { transportKey: context.transportKey } : {}),
         });
         headers.set('Authorization', `Bearer ${token}`);
+        if (context) {
+          context.usesWorkloadIdentityToken = true;
+        }
       }
     }
 
@@ -1448,6 +1472,7 @@ export class OpenAI {
       workloadIdentityContext = {
         fetchOptions: this._usesX509WorkloadIdentity && fetchOptions ? { ...fetchOptions } : fetchOptions,
         transportKey: x509TransportKey(fetchOptions),
+        usesWorkloadIdentityToken: false,
       };
       // oxlint-disable-next-line no-await-in-loop -- X.509 transport rotation rebuilds auth atomically.
       reqHeaders = await this.buildHeaders({
@@ -1473,7 +1498,7 @@ export class OpenAI {
       ...((options.fetchOptions as any) ?? {}),
       ...(this._usesX509WorkloadIdentity ? { redirect: 'manual' } : {}),
     };
-    if (this._usesX509WorkloadIdentity) {
+    if (this._workloadIdentityAuth) {
       this.#workloadIdentityRequestContexts.set(req, workloadIdentityContext);
     }
 
@@ -1500,6 +1525,7 @@ export class OpenAI {
     }
 
     const helperMethod = options.__metadata?.['helperMethod'];
+    const headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1519,10 +1545,12 @@ export class OpenAI {
             options.__security ?? { bearerAuth: true },
             workloadIdentityContext,
           ),
-      this._options.defaultHeaders,
-      bodyHeaders,
-      options.headers,
+      headerOverrides,
     ]);
+
+    if (headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization')) {
+      workloadIdentityContext.usesWorkloadIdentityToken = false;
+    }
 
     if (!this._provider) {
       this.validateHeaders(headers, options.__security ?? { bearerAuth: true });

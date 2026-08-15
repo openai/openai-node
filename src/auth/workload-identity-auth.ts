@@ -5,7 +5,7 @@ import {
   OAuthError,
   OpenAIError,
 } from '../core/error';
-import type { Fetch } from '../internal/builtin-types';
+import type { Fetch, RequestInit } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import type { MergedRequestInit } from '../internal/types';
 import { hasOwn } from '../internal/utils/values';
@@ -84,6 +84,14 @@ export function x509TransportKey(fetchOptions: MergedRequestInit | undefined): o
     }
   }
   return fetchOptions;
+}
+
+/** Checks that request hooks preserved every runtime transport option used by X.509 mode. */
+export function hasSameX509Transport(expected: MergedRequestInit | undefined, actual: RequestInit): boolean {
+  return TRANSPORT_OPTION_KEYS.every(
+    (key) =>
+      (expected as Record<string, unknown> | undefined)?.[key] === (actual as Record<string, unknown>)[key],
+  );
 }
 
 function validateX509Config(config: X509WorkloadIdentity): void {

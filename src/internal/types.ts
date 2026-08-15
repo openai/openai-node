@@ -96,4 +96,5 @@ export type MergedRequestInit = RequestInits &
 export interface WorkloadIdentityRequestContext {
   fetchOptions: MergedRequestInit | undefined;
   transportKey: object | undefined;
+  usesWorkloadIdentityToken: boolean;
 }

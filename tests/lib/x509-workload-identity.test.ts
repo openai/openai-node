@@ -36,6 +36,14 @@ async function* nonReplayableBody() {
   yield new TextEncoder().encode('not replayable');
 }
 
+class RequestMutatingOpenAI extends OpenAI {
+  requestMutation?: (request: RequestInit) => void;
+
+  protected override async prepareRequest(request: RequestInit): Promise<void> {
+    this.requestMutation?.(request);
+  }
+}
+
 describe('OpenAI with X.509 workload identity', () => {
   beforeEach(() => {
     delete process.env['OPENAI_API_KEY'];
@@ -341,6 +349,28 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(customFetch).not.toHaveBeenCalled();
   });
 
+  test('rejects request-hook transport changes before sending the API request', async () => {
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const requests: string[] = [];
+
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetchOptions: { dispatcher: originalDispatcher as never },
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        requests.push(url.toString());
+        return tokenResponse('access-token');
+      }),
+    });
+    client.requestMutation = (request) => {
+      (request as { dispatcher?: unknown }).dispatcher = replacementDispatcher;
+    };
+
+    await expect(client.models.list()).rejects.toThrow('request hooks must not change the transport');
+    expect(requests).toEqual(['https://mtls.auth.openai.com/oauth/token']);
+  });
+
   test('shares X.509 state by transport while isolating withOptions clients that diverge', async () => {
     const originalDispatcher = { name: 'original-dispatcher' };
     const replacementDispatcher = { name: 'replacement-dispatcher' };
@@ -475,6 +505,41 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(bodies).toEqual(['same-body', 'same-body']);
     expect(authorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
   });
+
+  test.each(['request headers', 'request hook'] as const)(
+    'does not replay a 401 for a custom bearer set by %s',
+    async (source) => {
+      let exchangeCount = 0;
+      let apiCount = 0;
+
+      const client = new RequestMutatingOpenAI({
+        apiKey: null,
+        workloadIdentity: x509Identity,
+        fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+          if (url.toString().includes('/oauth/token')) {
+            exchangeCount += 1;
+            return tokenResponse(`token-${exchangeCount}`);
+          }
+          apiCount += 1;
+          expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer custom-token');
+          return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+        }),
+      });
+      client.requestMutation = (request) => {
+        if (source === 'request hook') {
+          (request.headers as Headers).set('Authorization', 'Bearer custom-token');
+        }
+      };
+
+      await expect(
+        client.models.list(
+          source === 'request headers' ? { headers: { Authorization: 'Bearer custom-token' } } : {},
+        ),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(exchangeCount).toBe(1);
+      expect(apiCount).toBe(1);
+    },
+  );
 
   test('collapses concurrent 401 invalidations into one shared refresh', async () => {
     const firstWaveGate = deferredResponse();
