@@ -331,12 +331,19 @@ export function snapshotResponseData(
     return snapshotStreamingFileData(body, snapshots);
   }
 
+  const { slice, stream, arrayBuffer } = Blob.prototype;
   const blob = value.blob();
   void ignoreCleanupResult(() => blob);
   return {
     data: {
       async *[Symbol.asyncIterator]() {
-        yield await blob;
+        const immutableBlob = Reflect.apply(slice, await blob, []) as Blob;
+        if (typeof stream === 'function') {
+          const immutableBody = Reflect.apply(stream, immutableBlob, []) as ReadableStream<BlobPart>;
+          yield* ReadableStreamToAsyncIterable<BlobPart>(immutableBody);
+        } else {
+          yield await Reflect.apply(arrayBuffer, immutableBlob, []);
+        }
       },
     },
   };

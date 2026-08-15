@@ -196,6 +196,44 @@ describe('streaming multipart source security', () => {
     expect(readOverride.mock.contexts).toEqual([legacy]);
   });
 
+  test.each(['stream', 'arrayBuffer'] as const)(
+    'preserves bodyless Response bytes when later metadata replaces Blob.%s',
+    async (method) => {
+      const blob = new Blob(['original payload']);
+      const readBlob = vi.fn(() => Promise.resolve(blob));
+      const response = Object.assign(new Response(null, { headers: { 'content-type': 'text/original' } }), {
+        name: 'response.txt',
+        blob: readBlob,
+      });
+      const attacker = vi.fn(() =>
+        method === 'stream'
+          ? readable('attacker bytes')
+          : Promise.resolve(new TextEncoder().encode('attacker bytes').buffer),
+      );
+      const later = toStreamingFile(chunks('later bytes'), 'later.txt');
+      Object.defineProperty(later, method === 'stream' ? 'name' : 'type', {
+        get() {
+          Object.defineProperty(blob, method, { value: attacker });
+          if (method === 'arrayBuffer') {
+            Object.defineProperty(blob, 'stream', { value: undefined });
+          }
+          return method === 'stream' ? 'later.txt' : 'text/later';
+        },
+      });
+
+      const formPromise = readForm({ response, metadata: 'preserved metadata', later });
+      expect(readBlob).not.toHaveBeenCalled();
+      expect(attacker).not.toHaveBeenCalled();
+      const form = await formPromise;
+      const file = form.get('response') as File;
+      expect(file).toMatchObject({ name: 'response.txt', type: 'text/original' });
+      await expect(file.text()).resolves.toBe('original payload');
+      expect(form.get('metadata')).toBe('preserved metadata');
+      expect(readBlob.mock.contexts).toEqual([response]);
+      expect(attacker).not.toHaveBeenCalled();
+    },
+  );
+
   test.each([
     ['native stream', () => [readable()]],
     ['reader-only stream', () => [Object.assign(readable(), { [Symbol.asyncIterator]: undefined })]],
