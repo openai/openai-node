@@ -219,4 +219,32 @@ describe('streaming multipart filename security', () => {
       expect(attacker).not.toHaveBeenCalled();
     },
   );
+
+  test.each([false, true])(
+    'keeps custom Blob stream bytes authoritative (repeated: %s)',
+    async (repeated) => {
+      const source = ReadableStream.from(['override bytes']);
+      const stream = vi.fn(() => source);
+      const getStream = vi.fn(() => stream);
+      const upload = Object.assign(new Blob(['intrinsic bytes']), { name: 'custom.txt' });
+      Object.defineProperty(upload, 'stream', { get: getStream });
+      const body: Record<string, unknown> = { first: upload };
+      if (repeated) {
+        body['second'] = upload;
+      }
+      body['marker'] = toStreamingFile(chunks('marker'), 'marker.txt');
+      const options = await multipartFormRequestOptions({ body }, fetch);
+
+      if (repeated) {
+        await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/replay|reuse/iu);
+        expect(source.locked).toBe(false);
+      } else {
+        const encoded = await new Response(options.body as ReadableStream).text();
+        expect(encoded).toContain('override bytes');
+        expect(encoded).not.toContain('intrinsic bytes');
+      }
+      expect(getStream).toHaveBeenCalledTimes(1);
+      expect(stream).toHaveBeenCalledTimes(1);
+    },
+  );
 });

@@ -288,8 +288,9 @@ function hasOriginalBlobRead(value: Blob, originalDescriptor: PropertyDescriptor
 export function snapshotBlobData(
   value: Blob,
   snapshots: WeakMap<object, MultipartDataSnapshot>,
+  captured?: Readonly<{ stream: Blob['stream'] | undefined }>,
 ): MultipartDataSnapshot {
-  const { stream } = value as Blob & { stream?: Blob['stream'] };
+  const { stream } = captured ?? (value as Blob & { stream?: Blob['stream'] });
   if (typeof stream === 'function') {
     return snapshotStreamingFileData(Reflect.apply(stream, value, []) as ReadableStream<BlobPart>, snapshots);
   }

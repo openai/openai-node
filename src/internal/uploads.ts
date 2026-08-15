@@ -476,6 +476,7 @@ type CapturedUpload = Readonly<{
   snapshot: MultipartDataSnapshot;
   source: StreamingFileInput | undefined;
   immutableBlob: Blob | undefined;
+  unreplayableBlob: boolean;
 }>;
 
 function snapshotCapturedUpload(
@@ -484,6 +485,9 @@ function snapshotCapturedUpload(
 ): MultipartDataSnapshot {
   if (captured.source) {
     return snapshotStreamingFileData(captured.source, snapshots);
+  }
+  if (captured.unreplayableBlob) {
+    throw new TypeError('Multipart Blob custom streams cannot be safely replayed');
   }
   if (captured.immutableBlob) {
     return snapshotBlobData(captured.immutableBlob, snapshots);
@@ -502,15 +506,21 @@ function captureMultipartUpload(
   const type = getStreamingFileType(upload, uploadKind);
   const source = streamingFile ? (upload as StreamingFile).data : undefined;
   let immutableBlob: Blob | undefined;
+  let unreplayableBlob = false;
   let snapshot: MultipartDataSnapshot;
   if (streamingFile) {
     snapshot = snapshotStreamingFileData(source as StreamingFileInput, snapshots);
   } else if (uploadKind === 'response') {
     snapshot = snapshotResponseData(upload as Response, snapshots);
   } else if (uploadKind === 'named-blob') {
-    snapshot = snapshotBlobData(upload as Blob, snapshots);
+    const { stream } = upload as Blob & { stream?: Blob['stream'] };
+    snapshot = snapshotBlobData(upload as Blob, snapshots, { stream });
     if (snapshot.dispose) {
-      immutableBlob = Reflect.apply(Blob.prototype.slice, upload, []) as Blob;
+      if (stream === Blob.prototype.stream) {
+        immutableBlob = Reflect.apply(Blob.prototype.slice, upload, []) as Blob;
+      } else {
+        unreplayableBlob = true;
+      }
     }
   } else if (upload instanceof Response) {
     snapshot = snapshotResponseData(upload, snapshots);
@@ -532,6 +542,7 @@ function captureMultipartUpload(
     snapshot,
     source,
     immutableBlob,
+    unreplayableBlob,
   };
 }
 
