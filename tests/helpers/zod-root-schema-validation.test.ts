@@ -198,6 +198,22 @@ describe('strict vendor converter root schemas', () => {
     ).toThrow('Root schema must serialize to a JSON object');
   });
 
+  it('rejects boxed BigInt roots before JSON serialization fails', () => {
+    const boxedBigInt = Reflect.construct(Object, [Reflect.apply(BigInt, undefined, [1])]) as object;
+    const overriddenRoot = Object.assign(boxedBigInt, {
+      type: 'object' as const,
+    });
+
+    expect(() => JSON.stringify(overriddenRoot)).toThrow(TypeError);
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        target: 'openApi3',
+        openaiStrictMode: true,
+        override: () => overriddenRoot,
+      }),
+    ).toThrow('Root schema must serialize to a JSON object');
+  });
+
   it('preserves strict object roots without a prototype', () => {
     const overriddenRoot = Object.assign(Object.create(null) as object, { type: 'object' as const });
     const schema = zodToJsonSchema(z3.object({ value: z3.string() }), {

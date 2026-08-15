@@ -23,7 +23,14 @@ function validateStrictRootShape(schema: object): void {
     throw new TypeError('Root schema must serialize to a JSON object');
   }
 
-  for (const unbox of [String.prototype.valueOf, Number.prototype.valueOf, Boolean.prototype.valueOf]) {
+  const primitiveUnboxers = [
+    String.prototype.valueOf,
+    Number.prototype.valueOf,
+    Boolean.prototype.valueOf,
+    ...(typeof BigInt === 'function' ? [BigInt.prototype.valueOf] : []),
+  ];
+
+  for (const unbox of primitiveUnboxers) {
     try {
       Reflect.apply(unbox, schema, []);
     } catch {
