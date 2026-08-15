@@ -4,6 +4,7 @@ import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
+import { path } from './internal/utils/path';
 import { OpenAI } from './client';
 import type { ClientOptions } from './client';
 
@@ -154,7 +155,7 @@ export class AzureOpenAI extends OpenAI {
       }
       const model = this.deploymentName || options.body['model'] || options.__metadata?.['model'];
       if (model !== undefined && !this.baseURL.includes('/deployments')) {
-        options.path = `/deployments/${model}${options.path}`;
+        options.path = path`/deployments/${model}` + options.path;
       }
     }
     const built = await super.buildRequest(options, props);
