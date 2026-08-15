@@ -5,6 +5,17 @@ import { parseDef } from './parseDef';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
+function validateStrictRootSchema(schema: JsonSchema7Type, openaiStrictMode: boolean | undefined): void {
+  if (!openaiStrictMode) {
+    return;
+  }
+
+  const type = 'type' in schema ? schema.type : undefined;
+  if (type !== 'object') {
+    throw new Error(`Root schema must have type: 'object' but got type: ${type ? `'${type}'` : 'undefined'}`);
+  }
+}
+
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   schema: ZodSchema<any>,
   options?: Partial<Options<Target>> | string,
@@ -39,6 +50,8 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
           },
       false,
     ) ?? {};
+
+  validateStrictRootSchema(main, refs.openaiStrictMode);
 
   const title =
     typeof options === 'object' && options.name !== undefined && options.nameStrategy === 'title'
