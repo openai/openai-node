@@ -4436,6 +4436,26 @@ export interface BetaResponseImageGenCallPartialImageEvent {
    * The agent that owns this multi-agent streaming event.
    */
   agent?: BetaResponseImageGenCallPartialImageEvent.Agent | null;
+
+  /**
+   * The background setting that was used.
+   */
+  background?: string;
+
+  /**
+   * The output format that was used.
+   */
+  output_format?: string;
+
+  /**
+   * The image quality that was used.
+   */
+  quality?: string;
+
+  /**
+   * The image size that was used.
+   */
+  size?: string;
 }
 
 export namespace BetaResponseImageGenCallPartialImageEvent {
@@ -9705,6 +9725,324 @@ export namespace BetaResponseRefusalDoneEvent {
 }
 
 /**
+ * A streaming event that indicated a shell command was added to a tool call.
+ */
+export interface BetaResponseShellCallCommandAddedEvent {
+  /**
+   * The shell command that was added.
+   */
+  command: string;
+
+  /**
+   * The index of the shell command that was added.
+   */
+  command_index: number;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.added`.
+   */
+  type: 'response.shell_call_command.added';
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  agent?: BetaResponseShellCallCommandAddedEvent.Agent;
+}
+
+export namespace BetaResponseShellCallCommandAddedEvent {
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+}
+
+/**
+ * A streaming event that indicated a shell command was incrementally updated.
+ */
+export interface BetaResponseShellCallCommandDeltaEvent {
+  /**
+   * The index of the shell command that was updated.
+   */
+  command_index: number;
+
+  /**
+   * The shell command delta that was appended.
+   */
+  delta: string;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.delta`.
+   */
+  type: 'response.shell_call_command.delta';
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  agent?: BetaResponseShellCallCommandDeltaEvent.Agent;
+
+  /**
+   * An obfuscation string that was added to pad the event payload.
+   */
+  obfuscation?: string;
+}
+
+export namespace BetaResponseShellCallCommandDeltaEvent {
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+}
+
+/**
+ * A streaming event that indicated a shell command was completed.
+ */
+export interface BetaResponseShellCallCommandDoneEvent {
+  /**
+   * The final shell command that was emitted.
+   */
+  command: string;
+
+  /**
+   * The index of the shell command that was completed.
+   */
+  command_index: number;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.done`.
+   */
+  type: 'response.shell_call_command.done';
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  agent?: BetaResponseShellCallCommandDoneEvent.Agent;
+}
+
+export namespace BetaResponseShellCallCommandDoneEvent {
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+}
+
+/**
+ * A streaming event that indicated shell call output was incrementally added.
+ */
+export interface BetaResponseShellCallOutputContentDeltaEvent {
+  /**
+   * The index of the shell command that produced output.
+   */
+  command_index: number;
+
+  /**
+   * The stdout/stderr delta that was emitted.
+   */
+  delta: BetaResponseShellCallOutputContentDeltaEvent.Delta;
+
+  /**
+   * The ID of the output item that was updated.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_output_content.delta`.
+   */
+  type: 'response.shell_call_output_content.delta';
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  agent?: BetaResponseShellCallOutputContentDeltaEvent.Agent;
+}
+
+export namespace BetaResponseShellCallOutputContentDeltaEvent {
+  /**
+   * The stdout/stderr delta that was emitted.
+   */
+  export interface Delta {
+    /**
+     * The stderr delta that was emitted.
+     */
+    stderr?: string;
+
+    /**
+     * The stdout delta that was emitted.
+     */
+    stdout?: string;
+  }
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+}
+
+/**
+ * A streaming event that indicated shell call output was completed.
+ */
+export interface BetaResponseShellCallOutputContentDoneEvent {
+  /**
+   * The index of the shell command that produced output.
+   */
+  command_index: number;
+
+  /**
+   * The ID of the output item that was updated.
+   */
+  item_id: string;
+
+  /**
+   * The output contents emitted for the shell command.
+   */
+  output: Array<BetaResponseShellCallOutputContentDoneEvent.Output>;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_output_content.done`.
+   */
+  type: 'response.shell_call_output_content.done';
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  agent?: BetaResponseShellCallOutputContentDoneEvent.Agent;
+}
+
+export namespace BetaResponseShellCallOutputContentDoneEvent {
+  /**
+   * The content of a shell tool call output that was emitted.
+   */
+  export interface Output {
+    /**
+     * Represents either an exit outcome (with an exit code) or a timeout outcome for a
+     * shell call output chunk.
+     */
+    outcome: Output.Timeout | Output.Exit;
+
+    /**
+     * The standard error output that was captured.
+     */
+    stderr: string;
+
+    /**
+     * The standard output that was captured.
+     */
+    stdout: string;
+
+    /**
+     * The identifier of the actor that created the item.
+     */
+    created_by?: string;
+  }
+
+  export namespace Output {
+    /**
+     * Indicates that the shell call exceeded its configured time limit.
+     */
+    export interface Timeout {
+      /**
+       * The outcome type. Always `timeout`.
+       */
+      type: 'timeout';
+    }
+
+    /**
+     * Indicates that the shell commands finished and returned an exit code.
+     */
+    export interface Exit {
+      /**
+       * Exit code from the shell process.
+       */
+      exit_code: number;
+
+      /**
+       * The outcome type. Always `exit`.
+       */
+      type: 'exit';
+    }
+  }
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+}
+
+/**
  * The status of the response generation. One of `completed`, `failed`,
  * `in_progress`, `cancelled`, `queued`, or `incomplete`.
  */
@@ -9739,6 +10077,11 @@ export type BetaResponseStreamEvent =
   | BetaResponseFileSearchCallSearchingEvent
   | BetaResponseFunctionCallArgumentsDeltaEvent
   | BetaResponseFunctionCallArgumentsDoneEvent
+  | BetaResponseShellCallCommandAddedEvent
+  | BetaResponseShellCallCommandDeltaEvent
+  | BetaResponseShellCallCommandDoneEvent
+  | BetaResponseShellCallOutputContentDeltaEvent
+  | BetaResponseShellCallOutputContentDoneEvent
   | BetaResponseInProgressEvent
   | BetaResponseFailedEvent
   | BetaResponseIncompleteEvent
@@ -11010,6 +11353,11 @@ export type BetaResponsesServerEvent =
   | BetaResponsesServerEvent.BetaResponseFileSearchCallWsSearching
   | BetaResponsesServerEvent.BetaResponseFunctionCallArgumentsWsDelta
   | BetaResponsesServerEvent.BetaResponseFunctionCallArgumentsWsDone
+  | BetaResponsesServerEvent.BetaResponseShellCallCommandWsAdded
+  | BetaResponsesServerEvent.BetaResponseShellCallCommandWsDelta
+  | BetaResponsesServerEvent.BetaResponseShellCallCommandWsDone
+  | BetaResponsesServerEvent.BetaResponseShellCallOutputContentWsDelta
+  | BetaResponsesServerEvent.BetaResponseShellCallOutputContentWsDone
   | BetaResponsesServerEvent.BetaResponseInWsProgress
   | BetaResponsesServerEvent.BetaResponseWsFailed
   | BetaResponsesServerEvent.BetaResponseWsIncomplete
@@ -11044,6 +11392,7 @@ export type BetaResponsesServerEvent =
   | BetaResponsesServerEvent.BetaResponseWsQueued
   | BetaResponsesServerEvent.BetaResponseCustomToolCallInputWsDelta
   | BetaResponsesServerEvent.BetaResponseCustomToolCallInputWsDone
+  | BetaResponsesServerEvent.BetaResponseWsStreamingError
   | BetaResponsesServerEvent.BetaResponseWsError
   | BetaResponseInjectCreatedEvent
   | BetaResponseInjectFailedEvent;
@@ -11240,6 +11589,61 @@ export namespace BetaResponsesServerEvent {
    * Emitted when function-call arguments are finalized.
    */
   export interface BetaResponseFunctionCallArgumentsWsDone extends BetaResponseFunctionCallArgumentsDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was added to a tool call.
+   */
+  export interface BetaResponseShellCallCommandWsAdded extends BetaResponseShellCallCommandAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was incrementally updated.
+   */
+  export interface BetaResponseShellCallCommandWsDelta extends BetaResponseShellCallCommandDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was completed.
+   */
+  export interface BetaResponseShellCallCommandWsDone extends BetaResponseShellCallCommandDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated shell call output was incrementally added.
+   */
+  export interface BetaResponseShellCallOutputContentWsDelta extends BetaResponseShellCallOutputContentDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated shell call output was completed.
+   */
+  export interface BetaResponseShellCallOutputContentWsDone extends BetaResponseShellCallOutputContentDoneEvent {
     /**
      * The WebSocket lane that emitted this event. This field is present when the
      * originating `response.create` event supplied a `stream_id`.
@@ -11618,6 +12022,17 @@ export namespace BetaResponsesServerEvent {
    * Event indicating that input for a custom tool call is complete.
    */
   export interface BetaResponseCustomToolCallInputWsDone extends BetaResponseCustomToolCallInputDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an error occurs while streaming a response over the WebSocket.
+   */
+  export interface BetaResponseWsStreamingError extends BetaResponseErrorEvent {
     /**
      * The WebSocket lane that emitted this event. This field is present when the
      * originating `response.create` event supplied a `stream_id`.
@@ -13505,6 +13920,11 @@ export declare namespace Responses {
     type BetaResponseReasoningTextDoneEvent as BetaResponseReasoningTextDoneEvent,
     type BetaResponseRefusalDeltaEvent as BetaResponseRefusalDeltaEvent,
     type BetaResponseRefusalDoneEvent as BetaResponseRefusalDoneEvent,
+    type BetaResponseShellCallCommandAddedEvent as BetaResponseShellCallCommandAddedEvent,
+    type BetaResponseShellCallCommandDeltaEvent as BetaResponseShellCallCommandDeltaEvent,
+    type BetaResponseShellCallCommandDoneEvent as BetaResponseShellCallCommandDoneEvent,
+    type BetaResponseShellCallOutputContentDeltaEvent as BetaResponseShellCallOutputContentDeltaEvent,
+    type BetaResponseShellCallOutputContentDoneEvent as BetaResponseShellCallOutputContentDoneEvent,
     type BetaResponseStatus as BetaResponseStatus,
     type BetaResponseStreamEvent as BetaResponseStreamEvent,
     type BetaResponseTextConfig as BetaResponseTextConfig,

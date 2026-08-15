@@ -3758,6 +3758,26 @@ export interface ResponseImageGenCallPartialImageEvent {
    * The type of the event. Always 'response.image_generation_call.partial_image'.
    */
   type: 'response.image_generation_call.partial_image';
+
+  /**
+   * The background setting that was used.
+   */
+  background?: string;
+
+  /**
+   * The output format that was used.
+   */
+  output_format?: string;
+
+  /**
+   * The image quality that was used.
+   */
+  quality?: string;
+
+  /**
+   * The image size that was used.
+   */
+  size?: string;
 }
 
 /**
@@ -7047,6 +7067,243 @@ export interface ResponseRefusalDoneEvent {
 }
 
 /**
+ * A streaming event that indicated a shell command was added to a tool call.
+ */
+export interface ResponseShellCallCommandAddedEvent {
+  /**
+   * The shell command that was added.
+   */
+  command: string;
+
+  /**
+   * The index of the shell command that was added.
+   */
+  command_index: number;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.added`.
+   */
+  type: 'response.shell_call_command.added';
+}
+
+/**
+ * A streaming event that indicated a shell command was incrementally updated.
+ */
+export interface ResponseShellCallCommandDeltaEvent {
+  /**
+   * The index of the shell command that was updated.
+   */
+  command_index: number;
+
+  /**
+   * The shell command delta that was appended.
+   */
+  delta: string;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.delta`.
+   */
+  type: 'response.shell_call_command.delta';
+
+  /**
+   * An obfuscation string that was added to pad the event payload.
+   */
+  obfuscation?: string;
+}
+
+/**
+ * A streaming event that indicated a shell command was completed.
+ */
+export interface ResponseShellCallCommandDoneEvent {
+  /**
+   * The final shell command that was emitted.
+   */
+  command: string;
+
+  /**
+   * The index of the shell command that was completed.
+   */
+  command_index: number;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.done`.
+   */
+  type: 'response.shell_call_command.done';
+}
+
+/**
+ * A streaming event that indicated shell call output was incrementally added.
+ */
+export interface ResponseShellCallOutputContentDeltaEvent {
+  /**
+   * The index of the shell command that produced output.
+   */
+  command_index: number;
+
+  /**
+   * The stdout/stderr delta that was emitted.
+   */
+  delta: ResponseShellCallOutputContentDeltaEvent.Delta;
+
+  /**
+   * The ID of the output item that was updated.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_output_content.delta`.
+   */
+  type: 'response.shell_call_output_content.delta';
+}
+
+export namespace ResponseShellCallOutputContentDeltaEvent {
+  /**
+   * The stdout/stderr delta that was emitted.
+   */
+  export interface Delta {
+    /**
+     * The stderr delta that was emitted.
+     */
+    stderr?: string;
+
+    /**
+     * The stdout delta that was emitted.
+     */
+    stdout?: string;
+  }
+}
+
+/**
+ * A streaming event that indicated shell call output was completed.
+ */
+export interface ResponseShellCallOutputContentDoneEvent {
+  /**
+   * The index of the shell command that produced output.
+   */
+  command_index: number;
+
+  /**
+   * The ID of the output item that was updated.
+   */
+  item_id: string;
+
+  /**
+   * The output contents emitted for the shell command.
+   */
+  output: Array<ResponseShellCallOutputContentDoneEvent.Output>;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_output_content.done`.
+   */
+  type: 'response.shell_call_output_content.done';
+}
+
+export namespace ResponseShellCallOutputContentDoneEvent {
+  /**
+   * The content of a shell tool call output that was emitted.
+   */
+  export interface Output {
+    /**
+     * Represents either an exit outcome (with an exit code) or a timeout outcome for a
+     * shell call output chunk.
+     */
+    outcome: Output.Timeout | Output.Exit;
+
+    /**
+     * The standard error output that was captured.
+     */
+    stderr: string;
+
+    /**
+     * The standard output that was captured.
+     */
+    stdout: string;
+
+    /**
+     * The identifier of the actor that created the item.
+     */
+    created_by?: string;
+  }
+
+  export namespace Output {
+    /**
+     * Indicates that the shell call exceeded its configured time limit.
+     */
+    export interface Timeout {
+      /**
+       * The outcome type. Always `timeout`.
+       */
+      type: 'timeout';
+    }
+
+    /**
+     * Indicates that the shell commands finished and returned an exit code.
+     */
+    export interface Exit {
+      /**
+       * Exit code from the shell process.
+       */
+      exit_code: number;
+
+      /**
+       * The outcome type. Always `exit`.
+       */
+      type: 'exit';
+    }
+  }
+}
+
+/**
  * The status of the response generation. One of `completed`, `failed`,
  * `in_progress`, `cancelled`, `queued`, or `incomplete`.
  */
@@ -7075,6 +7332,11 @@ export type ResponseStreamEvent =
   | ResponseFileSearchCallSearchingEvent
   | ResponseFunctionCallArgumentsDeltaEvent
   | ResponseFunctionCallArgumentsDoneEvent
+  | ResponseShellCallCommandAddedEvent
+  | ResponseShellCallCommandDeltaEvent
+  | ResponseShellCallCommandDoneEvent
+  | ResponseShellCallOutputContentDeltaEvent
+  | ResponseShellCallOutputContentDoneEvent
   | ResponseInProgressEvent
   | ResponseFailedEvent
   | ResponseIncompleteEvent
@@ -8014,6 +8276,11 @@ export type ResponsesServerEvent =
   | ResponsesServerEvent.ResponseFileSearchCallWsSearching
   | ResponsesServerEvent.ResponseFunctionCallArgumentsWsDelta
   | ResponsesServerEvent.ResponseFunctionCallArgumentsWsDone
+  | ResponsesServerEvent.ResponseShellCallCommandWsAdded
+  | ResponsesServerEvent.ResponseShellCallCommandWsDelta
+  | ResponsesServerEvent.ResponseShellCallCommandWsDone
+  | ResponsesServerEvent.ResponseShellCallOutputContentWsDelta
+  | ResponsesServerEvent.ResponseShellCallOutputContentWsDone
   | ResponsesServerEvent.ResponseInWsProgress
   | ResponsesServerEvent.ResponseWsFailed
   | ResponsesServerEvent.ResponseWsIncomplete
@@ -8048,6 +8315,7 @@ export type ResponsesServerEvent =
   | ResponsesServerEvent.ResponseWsQueued
   | ResponsesServerEvent.ResponseCustomToolCallInputWsDelta
   | ResponsesServerEvent.ResponseCustomToolCallInputWsDone
+  | ResponsesServerEvent.ResponseWsStreamingError
   | ResponsesServerEvent.ResponseWsError;
 
 export namespace ResponsesServerEvent {
@@ -8242,6 +8510,61 @@ export namespace ResponsesServerEvent {
    * Emitted when function-call arguments are finalized.
    */
   export interface ResponseFunctionCallArgumentsWsDone extends ResponseFunctionCallArgumentsDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was added to a tool call.
+   */
+  export interface ResponseShellCallCommandWsAdded extends ResponseShellCallCommandAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was incrementally updated.
+   */
+  export interface ResponseShellCallCommandWsDelta extends ResponseShellCallCommandDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was completed.
+   */
+  export interface ResponseShellCallCommandWsDone extends ResponseShellCallCommandDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated shell call output was incrementally added.
+   */
+  export interface ResponseShellCallOutputContentWsDelta extends ResponseShellCallOutputContentDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated shell call output was completed.
+   */
+  export interface ResponseShellCallOutputContentWsDone extends ResponseShellCallOutputContentDoneEvent {
     /**
      * The WebSocket lane that emitted this event. This field is present when the
      * originating `response.create` event supplied a `stream_id`.
@@ -8620,6 +8943,17 @@ export namespace ResponsesServerEvent {
    * Event indicating that input for a custom tool call is complete.
    */
   export interface ResponseCustomToolCallInputWsDone extends ResponseCustomToolCallInputDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an error occurs while streaming a response over the WebSocket.
+   */
+  export interface ResponseWsStreamingError extends ResponseErrorEvent {
     /**
      * The WebSocket lane that emitted this event. This field is present when the
      * originating `response.create` event supplied a `stream_id`.
@@ -10263,6 +10597,11 @@ export declare namespace Responses {
     type ResponseReasoningTextDoneEvent as ResponseReasoningTextDoneEvent,
     type ResponseRefusalDeltaEvent as ResponseRefusalDeltaEvent,
     type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
+    type ResponseShellCallCommandAddedEvent as ResponseShellCallCommandAddedEvent,
+    type ResponseShellCallCommandDeltaEvent as ResponseShellCallCommandDeltaEvent,
+    type ResponseShellCallCommandDoneEvent as ResponseShellCallCommandDoneEvent,
+    type ResponseShellCallOutputContentDeltaEvent as ResponseShellCallOutputContentDeltaEvent,
+    type ResponseShellCallOutputContentDoneEvent as ResponseShellCallOutputContentDoneEvent,
     type ResponseStatus as ResponseStatus,
     type ResponseStreamEvent as ResponseStreamEvent,
     type ResponseTextConfig as ResponseTextConfig,

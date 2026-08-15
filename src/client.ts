@@ -7,7 +7,7 @@ import { validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/uti
 import { sleep } from './internal/utils/sleep';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
-import type { APIResponseProps } from './internal/parse';
+import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/detect-platform';
 import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
@@ -249,6 +249,25 @@ import {
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
+function isRunningInBrowserOrBrowserWorker(): boolean {
+  if (isRunningInBrowser()) return true;
+
+  const scope = globalThis as any;
+  return (
+    typeof scope.WorkerGlobalScope === 'function' &&
+    scope instanceof scope.WorkerGlobalScope &&
+    typeof scope.WorkerNavigator === 'function' &&
+    scope.navigator instanceof scope.WorkerNavigator &&
+    typeof scope.navigator?.userAgent === 'string' &&
+    scope.navigator.userAgent !== 'Cloudflare-Workers' &&
+    scope.process?.versions?.node === undefined &&
+    scope.Deno === undefined &&
+    scope.Bun === undefined &&
+    scope.EdgeRuntime === undefined &&
+    scope.WebSocketPair === undefined
+  );
+}
+
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 
 export type ApiKeySetter = () => Promise<string>;
@@ -301,6 +320,23 @@ export interface ClientOptions {
    *
    * Note that request timeouts are retried by default, so in a worst-case scenario you may wait
    * much longer than this timeout before the promise succeeds or fails.
+   *
+   * Node.js fetch enforces independent response-header and body-inactivity timeouts, typically
+   * defaulting to five minutes, even when this timeout is longer. To increase them, install
+   * `undici` and configure an Agent with the matching fetch implementation:
+   *
+   * ```ts
+   * import { Agent, fetch } from 'undici';
+   *
+   * const timeout = 20 * 60 * 1000;
+   * const client = new OpenAI({
+   *   timeout,
+   *   fetch,
+   *   fetchOptions: {
+   *     dispatcher: new Agent({ headersTimeout: timeout, bodyTimeout: timeout }),
+   *   },
+   * });
+   * ```
    *
    * @unit milliseconds
    */
@@ -395,6 +431,7 @@ export class OpenAI {
 
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
+  #responseAttempts = new WeakMap<AbortController, { timeout: number; retriesRemaining: number }>();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
@@ -466,7 +503,7 @@ export class OpenAI {
       );
     }
 
-    if (!options.dangerouslyAllowBrowser && isRunningInBrowser()) {
+    if (!options.dangerouslyAllowBrowser && isRunningInBrowserOrBrowserWorker()) {
       throw new Errors.OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\nIf you understand the risks and have appropriate mitigations in place,\nyou can set the `dangerouslyAllowBrowser` option to `true`, e.g.,\n\nnew OpenAI({ apiKey, dangerouslyAllowBrowser: true });\n\nhttps://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety\n",
       );
@@ -637,7 +674,9 @@ export class OpenAI {
     message: string | undefined,
     headers: Headers,
   ): Errors.APIError {
-    return Errors.APIError.generate(status, error, message, headers);
+    const normalizedError =
+      error && typeof error === 'object' && (error as { error?: unknown }).error == null ? { error } : error;
+    return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
   async _callApiKey(): Promise<boolean> {
@@ -749,7 +788,109 @@ export class OpenAI {
     options: PromiseOrValue<FinalRequestOptions>,
     remainingRetries: number | null = null,
   ): APIPromise<Rsp> {
-    return new APIPromise(this, this.makeRequest(options, remainingRetries, undefined));
+    return this.responsePromise<Rsp>(this.makeRequest(options, remainingRetries, undefined));
+  }
+
+  private responsePromise<Rsp>(
+    request: Promise<APIResponseProps>,
+    parse: (client: OpenAI, props: APIResponseProps) => Promise<any> = (client, props) =>
+      this.parseResponseWithTimeout<Rsp>(client, props),
+  ): APIPromise<Rsp> {
+    const promise = new APIPromise<Rsp>(this, request, parse);
+
+    // A body timeout can retry after the original raw response has arrived. Wait for
+    // parsing before selecting the response so withResponse() reports the retry.
+    promise.withResponse = async () => {
+      const data = await promise;
+      const { response } = await request;
+      return { data, response, request_id: response.headers.get('x-request-id') };
+    };
+    promise._thenUnwrap = <Next>(transform: (data: Rsp, props: APIResponseProps) => Next) =>
+      this.responsePromise<Next>(request, async (client, props) =>
+        addRequestID(transform(await parse(client, props), props), props.response),
+      );
+
+    return promise;
+  }
+
+  private async parseResponseWithTimeout<Rsp>(client: OpenAI, props: APIResponseProps): Promise<any> {
+    if (
+      props.options.stream ||
+      props.options.__binaryResponse ||
+      props.response.status === 204 ||
+      props.response.headers.get('content-length') === '0'
+    ) {
+      return defaultParseResponse<Rsp>(client, props);
+    }
+
+    while (true) {
+      const attempt = this.#responseAttempts.get(props.controller);
+      const timeout = attempt?.timeout ?? props.options.timeout ?? this.timeout;
+      const remaining = Math.max(0, props.startTime + timeout - Date.now());
+      const callerSignal = props.options.signal;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let abortListener: (() => void) | undefined;
+      let timedOut = false;
+
+      try {
+        // Tool runners preserve a completed buffered turn before cancellation stops the next request.
+        if (callerSignal?.aborted && props.options.__metadata?.['helperMethod'] !== 'runTools') {
+          throw new Errors.APIUserAbortError();
+        }
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            props.controller.abort();
+            reject(new Errors.APIConnectionTimeoutError());
+          }, remaining);
+
+          if (callerSignal) {
+            abortListener = () => reject(new Errors.APIUserAbortError());
+            callerSignal.addEventListener('abort', abortListener, { once: true });
+          }
+        });
+
+        return await Promise.race([defaultParseResponse<Rsp>(client, props), timeoutPromise]);
+      } catch (error) {
+        if (callerSignal?.aborted) {
+          throw new Errors.APIUserAbortError();
+        }
+        if (!timedOut) {
+          throw error;
+        }
+
+        const retriesRemaining = attempt?.retriesRemaining ?? 0;
+        if (
+          !retriesRemaining ||
+          props.options.__metadata?.['hasStreamingBody'] ||
+          ((globalThis as any).ReadableStream &&
+            props.options.body instanceof (globalThis as any).ReadableStream) ||
+          (typeof props.options.body === 'object' &&
+            props.options.body !== null &&
+            (Symbol.asyncIterator in props.options.body ||
+              (Symbol.iterator in props.options.body &&
+                'next' in props.options.body &&
+                typeof props.options.body.next === 'function')))
+        ) {
+          throw new Errors.APIConnectionTimeoutError();
+        }
+
+        if (timer !== undefined) clearTimeout(timer);
+        if (abortListener) callerSignal?.removeEventListener('abort', abortListener);
+        abortListener = undefined;
+
+        const next = await this.retryRequest(
+          props.options,
+          retriesRemaining,
+          props.retryOfRequestLogID ?? props.requestLogID,
+        );
+        Object.assign(props, next);
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+        if (abortListener) callerSignal?.removeEventListener('abort', abortListener);
+      }
+    }
   }
 
   private async makeRequest(
@@ -789,19 +930,23 @@ export class OpenAI {
       }),
     );
 
-    if (options.signal?.aborted) {
-      throw new Errors.APIUserAbortError();
+    if (options.signal?.aborted || req.signal?.aborted) {
+      throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal!);
     }
 
     const security = options.__security ?? { bearerAuth: true };
-    const controller = new AbortController();
+    // Request hooks may replace the caller signal before it reaches fetch.
+    const controller =
+      this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
+        ? createRequestController(req.signal)
+        : new AbortController();
     const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
-      if (options.signal?.aborted) {
-        throw new Errors.APIUserAbortError();
+      if (options.signal?.aborted || req.signal?.aborted) {
+        throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal!);
       }
       // detect native connection timeout errors
       // deno throws "TypeError: error sending request for url (https://example/): client error (Connect): tcp connect error: Operation timed out (os error 60): Operation timed out (os error 60)"
@@ -844,7 +989,20 @@ export class OpenAI {
         throw response;
       }
       if (isTimeout) {
-        throw new Errors.APIConnectionTimeoutError();
+        const transportCause = 'cause' in response ? response.cause : undefined;
+        const isHeadersTimeout =
+          typeof transportCause === 'object' &&
+          transportCause !== null &&
+          'code' in transportCause &&
+          transportCause.code === 'UND_ERR_HEADERS_TIMEOUT';
+        const timeoutError = isHeadersTimeout
+          ? new Errors.APIConnectionTimeoutError({
+              message:
+                'Request timed out. Node.js fetch timed out waiting for response headers; ' +
+                'configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.',
+            })
+          : new Errors.APIConnectionTimeoutError();
+        throw Object.assign(timeoutError, { cause: response });
       }
       throw new Errors.APIConnectionError({
         message: getConnectionErrorMessage(response),
@@ -949,6 +1107,7 @@ export class OpenAI {
       }),
     );
 
+    this.#responseAttempts.set(controller, { timeout, retriesRemaining });
     return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
   }
 
@@ -973,7 +1132,17 @@ export class OpenAI {
     options: PromiseOrValue<FinalRequestOptions>,
   ): Pagination.PagePromise<PageClass, Item> {
     const request = this.makeRequest(options, null, undefined);
-    return new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
+    const page = new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
+    const guarded = this.responsePromise<PageClass>(request, async (client, props) => {
+      const body = await this.parseResponseWithTimeout(client, props);
+      return new Page(client, props.response, body, props.options);
+    });
+    page.then = guarded.then.bind(guarded);
+    page.catch = guarded.catch.bind(guarded);
+    page.finally = guarded.finally.bind(guarded);
+    page.withResponse = guarded.withResponse.bind(guarded);
+    page._thenUnwrap = guarded._thenUnwrap.bind(guarded);
+    return page;
   }
 
   protected async fetchWithAuth(
@@ -1008,7 +1177,8 @@ export class OpenAI {
   ): Promise<Response> {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
-    if (signal) signal.addEventListener('abort', abort, { once: true });
+    const composed = !!signal && composedCallerSignals.get(controller) === signal;
+    if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
 
     const timeout = setTimeout(abort, ms);
 
@@ -1031,6 +1201,9 @@ export class OpenAI {
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       return await this.fetch.call(undefined, url, fetchOptions);
+    } catch (err) {
+      if (signal && !composed) signal.removeEventListener('abort', abort);
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -1089,7 +1262,12 @@ export class OpenAI {
 
     // If the API asks us to wait a certain amount of time, just do what it
     // says, but otherwise calculate a default
-    if (timeoutMillis === undefined) {
+    if (
+      timeoutMillis === undefined ||
+      !Number.isFinite(timeoutMillis) ||
+      timeoutMillis < 0 ||
+      timeoutMillis > 60 * 1000
+    ) {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
@@ -1170,7 +1348,7 @@ export class OpenAI {
       idempotencyHeaders,
       {
         Accept: 'application/json',
-        'User-Agent': this.getUserAgent(),
+        ...(!isRunningInBrowserOrBrowserWorker() ? { 'User-Agent': this.getUserAgent() } : undefined),
         'X-Stainless-Retry-Count': String(retryCount),
         ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
@@ -1197,6 +1375,12 @@ export class OpenAI {
     // note: we can't just inline this method inside `fetchWithTimeout()` because then the closure
     //       would capture all request options, and cause a memory leak.
     return () => controller.abort();
+  }
+
+  private _makeUserAbortError(signal: NonNullable<RequestInit['signal']>): Errors.APIUserAbortError {
+    const error = new Errors.APIUserAbortError();
+    Object.defineProperty(error, 'cause', { value: signal.reason, writable: true, configurable: true });
+    return error;
   }
 
   private buildBody({ options }: { options: FinalRequestOptions }): {
@@ -1376,6 +1560,30 @@ OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
+
+const composedCallerSignals = new WeakMap<AbortController, AbortSignal>();
+
+function createRequestController(callerSignal: AbortSignal | null | undefined): AbortController {
+  const controller = new AbortController();
+  if (!callerSignal) return controller;
+
+  const nativeAbortSignal = (globalThis as any).AbortSignal;
+  if (typeof nativeAbortSignal?.any !== 'function' || !(callerSignal instanceof nativeAbortSignal)) {
+    return controller;
+  }
+
+  try {
+    // Native composition keeps cancellation active after response headers without
+    // retaining an abort listener on the caller's signal or changing its reason.
+    const composed = nativeAbortSignal.any([controller.signal, callerSignal]) as AbortSignal;
+    Object.defineProperty(controller, 'signal', { value: composed, configurable: true });
+    composedCallerSignals.set(controller, callerSignal);
+  } catch {
+    // Older or incompatible runtimes retain the existing listener-based fallback.
+  }
+
+  return controller;
+}
 
 function getConnectionErrorMessage(error: Error): string | undefined {
   if (isUndiciDispatcherVersionMismatchError(error)) {
