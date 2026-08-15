@@ -1,6 +1,7 @@
 import { expect, vi } from 'vitest';
 
 import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
+import { CursorPage } from 'openai/core/pagination';
 import type { RequestInit } from 'openai/internal/builtin-types';
 
 const x509Identity = {
@@ -177,7 +178,7 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(closeDispatcher).not.toHaveBeenCalled();
   });
 
-  test('uses the current client fetchOptions for both legs after transport replacement', async () => {
+  test('invalidates a warm token and uses replacement client fetchOptions for both legs', async () => {
     const originalDispatcher = { name: 'original-dispatcher' };
     const replacementDispatcher = { name: 'replacement-dispatcher' };
     const requests: RequestInit[] = [];
@@ -194,12 +195,15 @@ describe('OpenAI with X.509 workload identity', () => {
       fetchOptions: { dispatcher: originalDispatcher as never },
     });
 
-    client.fetchOptions = { dispatcher: replacementDispatcher as never };
     await client.models.list();
+    client.fetchOptions = { dispatcher: replacementDispatcher as never };
+    await client.post('/non-replayable', { body: nonReplayableBody() });
 
-    expect(requests).toHaveLength(2);
-    expect(requests[0]).toMatchObject({ dispatcher: replacementDispatcher });
-    expect(requests[1]).toMatchObject({ dispatcher: replacementDispatcher });
+    expect(requests).toHaveLength(4);
+    expect(requests[0]).toMatchObject({ dispatcher: originalDispatcher });
+    expect(requests[1]).toMatchObject({ dispatcher: originalDispatcher });
+    expect(requests[2]).toMatchObject({ dispatcher: replacementDispatcher });
+    expect(requests[3]).toMatchObject({ dispatcher: replacementDispatcher });
   });
 
   test('honors per-request maxRetries for a cold token exchange', async () => {
@@ -379,6 +383,35 @@ describe('OpenAI with X.509 workload identity', () => {
 
     await expect(Promise.all([client.models.list(), client.models.list()])).resolves.toHaveLength(2);
     expect(exchangeCount).toBe(2);
+    expect(apiCount).toBe(4);
+  });
+
+  test('allows one independent 401 refresh for each pagination request', async () => {
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        return tokenResponse(`token-${exchangeCount}`);
+      }
+
+      apiCount += 1;
+      if (apiCount === 1 || apiCount === 3) {
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      }
+      return Response.json({
+        data: [{ id: apiCount === 2 ? 'first' : 'second' }],
+        has_more: apiCount === 2,
+      });
+    });
+    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
+
+    const firstPage = await client.getAPIList('/items', CursorPage<{ id: string }>);
+    const secondPage = await firstPage.getNextPage();
+
+    expect(firstPage.data).toEqual([{ id: 'first' }]);
+    expect(secondPage.data).toEqual([{ id: 'second' }]);
+    expect(exchangeCount).toBe(3);
     expect(apiCount).toBe(4);
   });
 

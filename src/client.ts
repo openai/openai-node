@@ -1243,6 +1243,9 @@ export class OpenAI {
     const page = new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
     const guarded = this.responsePromise<PageClass>(request, async (client, props) => {
       const body = await this.parseResponseWithTimeout(client, props);
+      if (props.options.__metadata) {
+        delete props.options.__metadata['workloadIdentityTokenRefreshed'];
+      }
       return new Page(client, props.response, body, props.options);
     });
     page.then = guarded.then.bind(guarded);
