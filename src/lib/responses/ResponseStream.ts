@@ -13,7 +13,10 @@ import type OpenAI from '../../index';
 import { EventStream } from '../EventStream';
 import type { BaseEvents } from '../EventStream';
 import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } from './EventTypes';
-import { accumulateResponse } from './ResponseAccumulator';
+import {
+  accumulateResponseWithContext,
+  createResponseContext,
+} from '../../internal/responses/response-accumulator';
 import type { ParseableToolsParams } from '../ResponsesParser';
 import { maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
@@ -93,6 +96,7 @@ export class ResponseStream<ParsedT = null>
   #params: ResponseStreamingParams | null;
   #currentResponseSnapshot: Response | undefined;
   #finalResponse: ParsedResponse<ParsedT> | undefined;
+  #accumulatorContext = createResponseContext();
 
   /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ResponseStreamingParams | null) {
@@ -128,6 +132,7 @@ export class ResponseStream<ParsedT = null>
       return;
     }
     this.#currentResponseSnapshot = undefined;
+    this.#accumulatorContext = createResponseContext();
   }
 
   #addEvent(this: ResponseStream<ParsedT>, event: ResponseStreamEvent, starting_after: number | null) {
@@ -149,7 +154,11 @@ export class ResponseStream<ParsedT = null>
       throw new APIError(undefined, error, event.message, undefined);
     }
 
-    const response = accumulateResponse(event, this.#currentResponseSnapshot);
+    const response = accumulateResponseWithContext(
+      event,
+      this.#currentResponseSnapshot,
+      this.#accumulatorContext,
+    );
     this.#currentResponseSnapshot = response;
     maybeEmit('event', event);
 
@@ -204,6 +213,7 @@ export class ResponseStream<ParsedT = null>
       throw new OpenAIError(`request ended without sending any events`);
     }
     this.#currentResponseSnapshot = undefined;
+    this.#accumulatorContext = createResponseContext();
     const parsedResponse = finalizeResponse<ParsedT>(snapshot, this.#params);
     this.#finalResponse = parsedResponse;
 
