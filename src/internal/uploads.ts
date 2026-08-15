@@ -221,7 +221,7 @@ export const maybeMultipartFormRequestOptions = async (
     return createStreamingFormRequestOptions(opts, uploadableKinds, formOptions);
   }
 
-  return { ...opts, body: await createForm(opts.body, fetch, formOptions) };
+  return { ...opts, body: await createFormInternal(opts.body, fetch, formOptions, uploadableKinds) };
 };
 
 /** Request options whose body must be encoded as multipart form data. */
@@ -247,7 +247,7 @@ export const multipartFormRequestOptions = async (
     return createStreamingFormRequestOptions(opts, uploadableKinds, formOptions);
   }
 
-  return { ...opts, body: await createForm(opts.body, fetch, formOptions) };
+  return { ...opts, body: await createFormInternal(opts.body, fetch, formOptions, uploadableKinds) };
 };
 
 const supportsFormDataMap = /* @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>();
@@ -308,6 +308,13 @@ export const createForm = async <T = Record<string, unknown>>(
   body: T | undefined,
   fetch: OpenAI | Fetch,
   options: CreateFormOptions = {},
+): Promise<FormData> => await createFormInternal(body, fetch, options);
+
+const createFormInternal = async <T = Record<string, unknown>>(
+  body: T | undefined,
+  fetch: OpenAI | Fetch,
+  options: CreateFormOptions = {},
+  uploadableKinds?: UploadableKinds,
 ): Promise<FormData> => {
   if (!(await supportsFormData(fetch))) {
     throw new TypeError(
@@ -316,7 +323,9 @@ export const createForm = async <T = Record<string, unknown>>(
   }
   const form = new FormData();
   await Promise.all(
-    Object.entries(body || {}).map(([key, value]) => addFormValue(form, key, value, options)),
+    Object.entries(body || {}).map(([key, value]) =>
+      addFormValue(form, key, value, options, uploadableKinds),
+    ),
   );
   return form;
 };
@@ -500,7 +509,12 @@ function snapshotIteratorReturn(iterator: AsyncIterator<BlobPart>): AsyncIterato
     };
   }
 
-  return undefined;
+  return (...args: [] | [unknown]) => {
+    const returnIterator = Reflect.get(iterator, 'return') as AsyncIterator<BlobPart>['return'];
+    return returnIterator
+      ? Reflect.apply(returnIterator, iterator, args)
+      : Promise.resolve({ done: true as const, value: args[0] });
+  };
 }
 
 function snapshotStreamingFileData(
@@ -928,6 +942,7 @@ const addFormValue = async (
   key: string,
   value: unknown,
   options: CreateFormOptions,
+  uploadableKinds?: UploadableKinds,
 ): Promise<void> => {
   if (value === undefined) {
     return;
@@ -946,7 +961,10 @@ const addFormValue = async (
       key,
       makeFile([await value.blob()], getName(value, { stripFilename: options.stripFilenames })),
     );
-  } else if (isAsyncIterable(value)) {
+  } else if (
+    !(uploadableKinds?.get(value as object) === 'upload' && value instanceof Blob) &&
+    isAsyncIterable(value)
+  ) {
     form.append(
       key,
       makeFile(
@@ -957,10 +975,12 @@ const addFormValue = async (
   } else if (isNamedBlob(value)) {
     form.append(key, value, getName(value, { stripFilename: options.stripFilenames }));
   } else if (Array.isArray(value)) {
-    await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry, options)));
+    await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry, options, uploadableKinds)));
   } else if (typeof value === 'object') {
     await Promise.all(
-      Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop, options)),
+      Object.entries(value).map(([name, prop]) =>
+        addFormValue(form, `${key}[${name}]`, prop, options, uploadableKinds),
+      ),
     );
   } else {
     throw new TypeError(

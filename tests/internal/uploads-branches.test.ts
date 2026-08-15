@@ -156,6 +156,45 @@ describe('buffered multipart forms', () => {
     expect(form.get('nested[upload]')).toBeInstanceOf(File);
   });
 
+  test.each([
+    ['optional', maybeMultipartFormRequestOptions, 2],
+    ['required', multipartFormRequestOptions, 1],
+  ] as const)('preserves finalized %s named Blob classifications', async (_, encode, detections) => {
+    const blob = Object.assign(new Blob(['authoritative']), { name: 'safe.txt' });
+    const incidental = vi.fn(async function* attacker() {
+      yield new TextEncoder().encode('attacker');
+    });
+    let brandChecks = 0;
+    let iteratorChecks = 0;
+    const upload = new Proxy(blob, {
+      has(target, key) {
+        if (typeof key === 'symbol' && key.description === 'brand.privateStreamingFile') {
+          brandChecks += 1;
+          return brandChecks > detections;
+        }
+        if (key === Symbol.asyncIterator) {
+          return iteratorChecks > detections;
+        }
+        return Reflect.has(target, key);
+      },
+      get(target, key) {
+        if (key === Symbol.asyncIterator) {
+          iteratorChecks += 1;
+          return iteratorChecks > detections ? incidental : undefined;
+        }
+        return Reflect.get(target, key, target);
+      },
+    });
+    const options = await encode({ body: { nested: [{ upload }] } }, fetch);
+
+    expect(options.body).toBeInstanceOf(FormData);
+    await expect(((options.body as FormData).get('nested[][upload]') as File).text()).resolves.toBe(
+      'authoritative',
+    );
+    expect(incidental).not.toHaveBeenCalled();
+    expect([brandChecks, iteratorChecks]).toEqual([detections, detections]);
+  });
+
   test('preserves explicit nested file paths only when requested', async () => {
     const upload = new File(['manifest'], 'my-skill/SKILL.md');
     const defaultOptions = await maybeMultipartFormRequestOptions({ body: { nested: { upload } } }, fetch);
@@ -636,6 +675,9 @@ describe('lazy multipart stream encoding', () => {
     ['iterator', 'completion', null],
     ['iterator', 'cancellation', null],
     ['iterator', 'invalid filename', null],
+    ['proxy iterator', 'completion', null],
+    ['proxy iterator', 'cancellation', null],
+    ['proxy iterator', 'invalid filename', null],
     ['reader', 'completion', null],
     ['reader', 'cancellation', null],
     ['reader', 'invalid filename', null],
@@ -650,7 +692,16 @@ describe('lazy multipart stream encoding', () => {
     original.return.mockResolvedValue({ done: true });
     original.cancel.mockResolvedValue(null);
     const substituted = vi.fn();
-    const receiver = { ...original };
+    const { return: originalReturn, ...withoutReturn } = original;
+    const getReturn = vi.fn(() => originalReturn);
+    const receiver =
+      kind === 'proxy iterator'
+        ? new Proxy(withoutReturn, {
+            get(target, key, proxy) {
+              return key === 'return' ? getReturn() : Reflect.get(target, key, proxy);
+            },
+          })
+        : { ...original };
     const getCleanup = vi.fn(() => {
       throw new Error('cleanup accessor failed');
     });
@@ -682,13 +733,12 @@ describe('lazy multipart stream encoding', () => {
       }
     }
     const cleaned = outcome === 'completion' ? [] : [receiver];
-    expect(original.return.mock.contexts).toEqual(
-      kind === 'iterator' && throwing !== 'return' ? cleaned : [],
-    );
+    expect(original.return.mock.contexts).toEqual(kind !== 'reader' && throwing !== 'return' ? cleaned : []);
     expect(original.cancel.mock.contexts).toEqual(kind === 'reader' && throwing !== 'cancel' ? cleaned : []);
     expect(original.releaseLock.mock.contexts).toEqual(
       kind === 'reader' && throwing !== 'releaseLock' ? [receiver] : [],
     );
+    expect(getReturn).toHaveBeenCalledTimes(kind === 'proxy iterator' && outcome !== 'completion' ? 1 : 0);
     expect(getCleanup).toHaveBeenCalledTimes(throwing && outcome !== 'completion' ? 1 : 0);
     expect(substituted).not.toHaveBeenCalled();
   });
