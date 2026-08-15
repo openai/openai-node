@@ -223,44 +223,29 @@ export function snapshotStreamingFileData(
     typeof globalThis.ReadableStream === 'function'
       ? Object.getOwnPropertyDescriptor(globalThis.ReadableStream.prototype, 'locked')?.get
       : undefined;
-  let unlockedForwardingProxy = false;
+  let intrinsicallyUnlocked = false;
   if (streamLocked) {
     try {
-      Reflect.apply(streamLocked, value, []);
+      intrinsicallyUnlocked = Reflect.apply(streamLocked, value, []) === false;
     } catch {
-      try {
-        unlockedForwardingProxy =
-          value instanceof globalThis.ReadableStream &&
-          Object.getPrototypeOf(value) === globalThis.ReadableStream.prototype &&
-          Object.getOwnPropertyDescriptor(value, 'locked') === undefined &&
-          Reflect.get(value, 'locked') === false;
-      } catch {
-        // Hostile or non-native stream accessors cannot establish a replay contract.
-      }
+      // Only an intrinsic native stream lock transition can establish replay rights.
     }
   }
 
   const captured = capture();
   let authenticatedNativeStream = false;
-  let lockedForwardingProxy = false;
-  if (streamLocked) {
+  if (streamLocked && intrinsicallyUnlocked) {
     try {
       authenticatedNativeStream = Reflect.apply(streamLocked, value, []) === true;
     } catch {
-      if (unlockedForwardingProxy) {
-        try {
-          lockedForwardingProxy = Reflect.get(value, 'locked') === true;
-        } catch {
-          // Hostile public accessors cannot establish a replay contract.
-        }
-      }
+      // Opaque or non-native sources cannot establish authenticated lock ownership.
     }
   }
 
   const snapshot: ReplayableMultipartDataSnapshot = {
     ...captured,
     [replayMultipartSnapshot]: () => {
-      if (authenticatedNativeStream || lockedForwardingProxy) {
+      if (authenticatedNativeStream) {
         // Native readers are one-shot; never reacquire through a mutable source.
         return captured;
       }

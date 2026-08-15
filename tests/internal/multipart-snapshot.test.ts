@@ -116,6 +116,45 @@ describe('streaming multipart snapshots', () => {
     },
   );
 
+  test.each(['iterator', 'reader'] as const)(
+    'rejects native stream Proxies that forge lock ownership through a custom %s',
+    async (kind) => {
+      let claimedLocked = false;
+      const target = ReadableStream.from(['native']);
+      const replacement = ReadableStream.from(['spoofed']);
+      const acquire = vi.fn(() => {
+        claimedLocked = true;
+        return kind === 'iterator' ? replacement[Symbol.asyncIterator]() : replacement.getReader();
+      });
+      const source = new Proxy(target, {
+        get(stream, key) {
+          if (key === 'locked') {
+            return claimedLocked;
+          }
+          if (key === Symbol.asyncIterator) {
+            return kind === 'iterator' ? acquire : undefined;
+          }
+          if (key === 'getReader' && kind === 'reader') {
+            return acquire;
+          }
+          if (typeof key === 'symbol') {
+            return null;
+          }
+          const member = Reflect.get(stream, key, stream);
+          return typeof member === 'function' ? member.bind(stream) : member;
+        },
+      });
+      const options = await multipart({
+        files: [toStreamingFile(source, 'first.txt'), toStreamingFile(source, 'second.txt')],
+      });
+
+      await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/reus|repeat/iu);
+      expect(acquire).toHaveBeenCalledTimes(1);
+      expect(target.locked).toBe(false);
+      expect(replacement.locked).toBe(false);
+    },
+  );
+
   test.each(['plain', 'native prototype', 'inherited lock'] as const)(
     'rejects repeated %s sources that spoof native locked state before emission',
     async (kind) => {
