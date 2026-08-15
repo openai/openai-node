@@ -3,6 +3,7 @@ import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
+import type { WorkloadIdentityRequestContext } from './internal/types';
 import { isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
@@ -183,7 +184,7 @@ export class AzureOpenAI extends OpenAI {
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
     maxRetries?: number,
-    context?: { fetchOptions: ClientOptions['fetchOptions'] },
+    context?: WorkloadIdentityRequestContext,
   ): Promise<Response> {
     if (new Headers(init.headers).has('api-key')) {
       init.redirect = 'manual';
@@ -195,7 +196,7 @@ export class AzureOpenAI extends OpenAI {
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-    context?: { fetchOptions: ClientOptions['fetchOptions'] },
+    context?: WorkloadIdentityRequestContext,
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {

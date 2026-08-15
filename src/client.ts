@@ -1,7 +1,13 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
-import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
+import type {
+  HTTPMethod,
+  PromiseOrValue,
+  MergedRequestInit,
+  FinalizedRequestInit,
+  WorkloadIdentityRequestContext,
+} from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
 import { hasOwn, validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
@@ -18,7 +24,7 @@ export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import type { WorkloadIdentity } from './auth/types';
-import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
+import { WorkloadIdentityAuth, x509TransportKey } from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
@@ -290,10 +296,6 @@ const OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
-
-interface WorkloadIdentityRequestContext {
-  fetchOptions: MergedRequestInit | undefined;
-}
 
 function defaultBaseURL(usesX509WorkloadIdentity: boolean): string {
   return usesX509WorkloadIdentity ? X509_API_BASE_URL : OPENAI_API_BASE_URL;
@@ -751,6 +753,7 @@ export class OpenAI {
             {
               fetchOptions,
               maxRetries: opts.maxRetries ?? this.maxRetries,
+              ...(context ? { transportKey: context.transportKey } : {}),
             },
           )}`,
         },
@@ -1156,6 +1159,9 @@ export class OpenAI {
             fetchOptions: workloadIdentityRequestContext
               ? workloadIdentityRequestContext.fetchOptions
               : this.fetchOptions,
+            ...(workloadIdentityRequestContext
+              ? { transportKey: workloadIdentityRequestContext.transportKey }
+              : {}),
           },
         );
 
@@ -1298,6 +1304,7 @@ export class OpenAI {
         const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
           fetchOptions,
           maxRetries,
+          ...(context ? { transportKey: context.transportKey } : {}),
         });
         headers.set('Authorization', `Bearer ${token}`);
       }
@@ -1434,19 +1441,26 @@ export class OpenAI {
       };
     }
 
-    let workloadIdentityFetchOptions = this.fetchOptions;
+    let workloadIdentityContext: WorkloadIdentityRequestContext;
     let reqHeaders: Headers;
     do {
-      workloadIdentityFetchOptions = this.fetchOptions;
+      const fetchOptions = this.fetchOptions;
+      workloadIdentityContext = {
+        fetchOptions: this._usesX509WorkloadIdentity && fetchOptions ? { ...fetchOptions } : fetchOptions,
+        transportKey: x509TransportKey(fetchOptions),
+      };
       // oxlint-disable-next-line no-await-in-loop -- X.509 transport rotation rebuilds auth atomically.
       reqHeaders = await this.buildHeaders({
         options: inputOptions,
         method,
         bodyHeaders,
         retryCount,
-        fetchOptions: workloadIdentityFetchOptions,
+        workloadIdentityContext,
       });
-    } while (this._usesX509WorkloadIdentity && workloadIdentityFetchOptions !== this.fetchOptions);
+    } while (
+      this._usesX509WorkloadIdentity &&
+      workloadIdentityContext.transportKey !== x509TransportKey(this.fetchOptions)
+    );
 
     const req: FinalizedRequestInit = {
       method,
@@ -1455,12 +1469,12 @@ export class OpenAI {
       ...((globalThis as any).ReadableStream &&
         body instanceof (globalThis as any).ReadableStream && { duplex: 'half' }),
       ...(body && { body }),
-      ...((workloadIdentityFetchOptions as any) ?? {}),
+      ...((workloadIdentityContext.fetchOptions as any) ?? {}),
       ...((options.fetchOptions as any) ?? {}),
       ...(this._usesX509WorkloadIdentity ? { redirect: 'manual' } : {}),
     };
     if (this._usesX509WorkloadIdentity) {
-      this.#workloadIdentityRequestContexts.set(req, { fetchOptions: workloadIdentityFetchOptions });
+      this.#workloadIdentityRequestContexts.set(req, workloadIdentityContext);
     }
 
     return { req, url, timeout: options.timeout };
@@ -1471,13 +1485,13 @@ export class OpenAI {
     method,
     bodyHeaders,
     retryCount,
-    fetchOptions,
+    workloadIdentityContext,
   }: {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
     retryCount: number;
-    fetchOptions: MergedRequestInit | undefined;
+    workloadIdentityContext: WorkloadIdentityRequestContext;
   }): Promise<Headers> {
     let idempotencyHeaders: HeadersLike = {};
     if (this.idempotencyHeader && method !== 'get') {
@@ -1500,7 +1514,11 @@ export class OpenAI {
       },
       this._provider
         ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }, { fetchOptions }),
+        : await this.authHeaders(
+            options,
+            options.__security ?? { bearerAuth: true },
+            workloadIdentityContext,
+          ),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,

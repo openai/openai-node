@@ -8,7 +8,6 @@ import {
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import type { MergedRequestInit } from '../internal/types';
-import { sleep } from '../internal/utils/sleep';
 import { hasOwn } from '../internal/utils/values';
 import type { SubjectTokenWorkloadIdentity, WorkloadIdentity, X509WorkloadIdentity } from './types';
 import { exchangeX509Token, X509TokenExchangeRetryableError } from './x509-token-exchange';
@@ -29,6 +28,7 @@ interface RefreshState {
 interface WorkloadIdentityAuthOptions {
   fetchOptions?: MergedRequestInit | undefined;
   maxRetries?: number | undefined;
+  transportKey?: object | undefined;
 }
 
 interface RefreshContext {
@@ -44,6 +44,7 @@ interface CredentialSource {
   now: () => number;
   refreshBufferMs: (durationMs: number) => number;
   resolveFetchOptions?: (options: WorkloadIdentityAuthOptions) => MergedRequestInit | undefined;
+  resolveTransportKey?: (options: WorkloadIdentityAuthOptions) => object | undefined;
   resolveExpiration: (configured: unknown) => unknown;
   waiterTimeoutMs?: (timeoutMs: number | undefined) => number | undefined;
 }
@@ -56,6 +57,7 @@ const SUBJECT_TOKEN_TYPES: Record<SubjectTokenWorkloadIdentity['provider']['toke
 const SUBJECT_TOKEN_EXCHANGE_URL = 'https://auth.openai.com/oauth/token';
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const DEFAULT_REFRESH_BUFFER_MS = 1_200_000;
+const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
 
 function createRefreshState(): RefreshState {
   return {
@@ -70,8 +72,26 @@ function isX509WorkloadIdentity(config: WorkloadIdentity): config is X509Workloa
   return config.type === 'x509';
 }
 
+/** Returns the opaque runtime transport identity that binds an X.509 access token. */
+export function x509TransportKey(fetchOptions: MergedRequestInit | undefined): object | undefined {
+  if (!fetchOptions) {
+    return undefined;
+  }
+  for (const key of TRANSPORT_OPTION_KEYS) {
+    const value = (fetchOptions as Record<string, unknown>)[key];
+    if ((typeof value === 'object' && value !== null) || typeof value === 'function') {
+      return value as object;
+    }
+  }
+  return fetchOptions;
+}
+
 function validateX509Config(config: X509WorkloadIdentity): void {
-  if (hasOwn(config, 'provider') || hasOwn(config, 'clientId') || hasOwn(config, 'refreshBufferSeconds')) {
+  if (
+    config.provider !== undefined ||
+    config.clientId !== undefined ||
+    config.refreshBufferSeconds !== undefined
+  ) {
     throw new OpenAIError(
       'X.509 workload identity does not accept `provider`, `clientId`, or `refreshBufferSeconds`.',
     );
@@ -165,6 +185,25 @@ async function waitForPromise<T>(
   });
 }
 
+async function waitForDelay(
+  delayMs: number,
+  signal: AbortSignal | null | undefined,
+  timeoutMs: number | undefined,
+): Promise<void> {
+  throwIfAborted(signal);
+  let cancel: (() => void) | undefined;
+  // oxlint-disable-next-line promise/avoid-new -- Timers only expose callback-based completion.
+  const delay = new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, delayMs);
+    cancel = () => clearTimeout(timer);
+  });
+  try {
+    await waitForPromise(delay, signal, timeoutMs);
+  } finally {
+    cancel?.();
+  }
+}
+
 async function exchangeSubjectToken(config: SubjectTokenWorkloadIdentity, fetch: Fetch): Promise<unknown> {
   const subjectToken = await config.provider.getToken();
   const body: Record<string, string> = {
@@ -218,6 +257,8 @@ function createCredentialSource(
   if (isX509WorkloadIdentity(config)) {
     validateX509Config(config);
     const defaultMaxRetries = validateMaxRetries(options.maxRetries ?? 2);
+    const resolveFetchOptions = (requestOptions: WorkloadIdentityAuthOptions) =>
+      hasOwn(requestOptions, 'fetchOptions') ? requestOptions.fetchOptions : options.fetchOptions;
     return {
       exchange: (retryCount, effectiveFetchOptions) =>
         exchangeX509Token({
@@ -231,8 +272,11 @@ function createCredentialSource(
       now: monotonicNow,
       refreshBufferMs: (durationMs) =>
         Math.min(config.refreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS, durationMs / 2),
-      resolveFetchOptions: (requestOptions) =>
-        hasOwn(requestOptions, 'fetchOptions') ? requestOptions.fetchOptions : options.fetchOptions,
+      resolveFetchOptions,
+      resolveTransportKey: (requestOptions) =>
+        hasOwn(requestOptions, 'transportKey')
+          ? requestOptions.transportKey
+          : x509TransportKey(resolveFetchOptions(requestOptions)),
       resolveExpiration: (configured) => configured,
       waiterTimeoutMs: (timeoutMs) => timeoutMs,
     };
@@ -258,7 +302,7 @@ export class WorkloadIdentityAuth {
   private readonly defaultState = createRefreshState();
   private readonly source: CredentialSource;
   // Weak keys partition transport-bound tokens without extending the lifetime of caller-owned dispatchers.
-  private readonly transportStates = new WeakMap<MergedRequestInit, RefreshState>();
+  private readonly transportStates = new WeakMap<object, RefreshState>();
 
   /**
    * Creates a workload-identity token cache and OAuth token-exchange client.
@@ -297,7 +341,7 @@ export class WorkloadIdentityAuth {
 
     while (true) {
       const fetchOptions = this.source.resolveFetchOptions?.(options);
-      const state = this.getRefreshState(fetchOptions);
+      const state = this.getRefreshState(this.source.resolveTransportKey?.(options));
       const context: RefreshContext = {
         fetchOptions,
         generation: state.tokenGeneration,
@@ -322,14 +366,14 @@ export class WorkloadIdentityAuth {
     }
   }
 
-  private getRefreshState(fetchOptions: MergedRequestInit | undefined): RefreshState {
-    if (fetchOptions === undefined) {
+  private getRefreshState(transportKey: object | undefined): RefreshState {
+    if (transportKey === undefined) {
       return this.defaultState;
     }
-    let state = this.transportStates.get(fetchOptions);
+    let state = this.transportStates.get(transportKey);
     if (!state) {
       state = createRefreshState();
-      this.transportStates.set(fetchOptions, state);
+      this.transportStates.set(transportKey, state);
     }
     return state;
   }
@@ -348,7 +392,7 @@ export class WorkloadIdentityAuth {
       const retryDelayMs = state.retryNotBefore - this.source.now();
       if (retryDelayMs > 0) {
         // oxlint-disable-next-line no-await-in-loop -- A shared Retry-After window gates each attempt.
-        await waitForPromise(sleep(retryDelayMs), signal, this.remainingTimeout(deadline));
+        await waitForDelay(retryDelayMs, signal, this.remainingTimeout(deadline));
       }
       if (state.tokenGeneration !== context.generation) {
         throw REFRESH_INVALIDATED;
@@ -446,7 +490,7 @@ export class WorkloadIdentityAuth {
 
   /** Discards a rejected cached access token so the next request performs a fresh exchange. */
   invalidateToken(rejectedToken?: string, options: WorkloadIdentityAuthOptions = {}): void {
-    const state = this.getRefreshState(this.source.resolveFetchOptions?.(options));
+    const state = this.getRefreshState(this.source.resolveTransportKey?.(options));
     if (rejectedToken !== undefined && state.cachedToken?.token !== rejectedToken) {
       return;
     }

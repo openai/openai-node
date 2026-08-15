@@ -107,6 +107,21 @@ describe('X.509 workload identity auth', () => {
     },
   );
 
+  test('allows subject-token-only fields when they are explicitly undefined', () => {
+    expect(
+      () =>
+        new WorkloadIdentityAuth(
+          {
+            ...config,
+            provider: undefined,
+            clientId: undefined,
+            refreshBufferSeconds: undefined,
+          } as unknown as X509WorkloadIdentity,
+          vi.fn(),
+        ),
+    ).not.toThrow();
+  });
+
   test.each([undefined, null, 0, -1, '3600', Number.NaN, Number.POSITIVE_INFINITY])(
     'requires a positive numeric expires_in value: %s',
     async (expiresIn) => {
@@ -244,6 +259,43 @@ describe('X.509 workload identity auth', () => {
 
     await expect(Promise.all([retrying, late])).resolves.toEqual(['retried-token', 'retried-token']);
     expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('clears the Retry-After timer when its waiter is canceled', async () => {
+    vi.useFakeTimers();
+    const customFetch = vi.fn(
+      async () => new Response(null, { status: 429, headers: { 'Retry-After': '60' } }),
+    );
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 1 });
+    const controller = new AbortController();
+
+    const token = auth.getToken(controller.signal);
+    const rejection = expect(token).rejects.toBeInstanceOf(APIUserAbortError);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    controller.abort('stop waiting');
+
+    await rejection;
+    expect(vi.getTimerCount()).toBe(0);
+    expect(customFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('clears the Retry-After timer when its waiter times out', async () => {
+    vi.useFakeTimers();
+    const customFetch = vi.fn(
+      async () => new Response(null, { status: 429, headers: { 'Retry-After': '60' } }),
+    );
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 1 });
+
+    const token = auth.getToken(undefined, 1000);
+    const rejection = expect(token).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    await rejection;
+    expect(vi.getTimerCount()).toBe(0);
+    expect(customFetch).toHaveBeenCalledTimes(1);
   });
 
   test('bounds transient retries to maxRetries plus the initial attempt', async () => {

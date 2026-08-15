@@ -206,9 +206,39 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(requests[3]).toMatchObject({ dispatcher: replacementDispatcher });
   });
 
+  test('invalidates a warm token when the client dispatcher is replaced in place', async () => {
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const fetchOptions = { dispatcher: originalDispatcher as { name: string } };
+    const requests: RequestInit[] = [];
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push(init ?? {});
+      return url.toString().includes('/oauth/token')
+        ? tokenResponse('access-token')
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+      fetchOptions: fetchOptions as never,
+    });
+
+    await client.models.list();
+    fetchOptions.dispatcher = replacementDispatcher;
+    await client.post('/non-replayable', { body: nonReplayableBody() });
+
+    expect(requests).toHaveLength(4);
+    expect(requests[0]).toMatchObject({ dispatcher: originalDispatcher });
+    expect(requests[1]).toMatchObject({ dispatcher: originalDispatcher });
+    expect(requests[2]).toMatchObject({ dispatcher: replacementDispatcher });
+    expect(requests[3]).toMatchObject({ dispatcher: replacementDispatcher });
+  });
+
   test('restarts a cold exchange after transport rotation before sending a non-replayable body', async () => {
     const originalDispatcher = { name: 'original-dispatcher' };
     const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const fetchOptions = { dispatcher: originalDispatcher as { name: string } };
     const originalExchange = deferredResponse();
     const requests: { url: string; init: RequestInit | undefined }[] = [];
     const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -224,12 +254,12 @@ describe('OpenAI with X.509 workload identity', () => {
       apiKey: null,
       workloadIdentity: x509Identity,
       fetch: customFetch,
-      fetchOptions: { dispatcher: originalDispatcher as never },
+      fetchOptions: fetchOptions as never,
     });
 
     const request = client.post('/non-replayable', { body: nonReplayableBody() });
     await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
-    client.fetchOptions = { dispatcher: replacementDispatcher as never };
+    fetchOptions.dispatcher = replacementDispatcher;
     originalExchange.resolve(tokenResponse('stale-token'));
 
     await expect(request).resolves.toMatchObject({ ok: true });

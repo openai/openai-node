@@ -91,3 +91,9 @@ export type MergedRequestInit = RequestInits &
   RuntimeFetchOptions &
   /** We don't include these in the types as they'll be overridden for every request. */
   Partial<Record<'body' | 'headers' | 'method' | 'signal', never>>;
+
+/** Effective client transport captured while resolving a transport-bound workload identity. */
+export interface WorkloadIdentityRequestContext {
+  fetchOptions: MergedRequestInit | undefined;
+  transportKey: object | undefined;
+}
