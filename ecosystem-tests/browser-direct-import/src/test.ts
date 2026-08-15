@@ -32,8 +32,23 @@ import { launch } from 'puppeteer';
 
     if (!apiKey) {throw new Error('missing process.env.OPENAI_API_KEY');}
 
-    // Navigate the page to a URL
-    await page.goto(`http://localhost:8081/index.html?apiKey=${apiKey}`);
+    const origin = 'http://localhost:8081';
+    await page.evaluateOnNewDocument(
+      (key, expectedOrigin) => {
+        if (location.origin !== expectedOrigin) {
+          return;
+        }
+        Object.defineProperty(globalThis, '__OPENAI_ECOSYSTEM_TEST_API_KEY__', {
+          value: key,
+          configurable: false,
+          enumerable: false,
+          writable: false,
+        });
+      },
+      apiKey,
+      origin,
+    );
+    await page.goto(`${origin}/index.html`);
 
     await page.waitForSelector('#running', { timeout: 15_000 });
 
