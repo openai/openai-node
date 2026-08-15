@@ -15,6 +15,14 @@ import * as responseParser from '../../src/lib/ResponsesParser';
 type Output = Response['output'][number];
 type Content = ResponseOutputMessage['content'][number];
 
+function requiredAt<T>(values: readonly T[], index: number): T {
+  const value = values[index];
+  if (value === undefined) {
+    throw new Error(`missing test value at index ${index}`);
+  }
+  return value;
+}
+
 const text = (value: string): ResponseOutputText => ({ type: 'output_text', text: value, annotations: [] });
 const refusal = (): Content => ({ type: 'refusal', refusal: 'refused' });
 const message = (index: number, content: Content[] = []): ResponseOutputMessage => ({
@@ -234,6 +242,146 @@ describe('canonical streamed response output text', () => {
     },
   );
 
+  test.each(
+    [2, 8, 32].flatMap((messageCount) =>
+      (['added', 'delta'] as const).map((kind) => ({ messageCount, kind })),
+    ),
+  )('indexes $messageCount alternating middle messages for $kind updates', async ({ messageCount, kind }) => {
+    const outputCount = 257;
+    const middleIndex = Math.floor((outputCount - messageCount) / 2);
+    const earlierIndex = 16;
+    const lastIndex = messageCount - 1;
+    const parts = Array.from({ length: messageCount }, (_, index) => [String.fromCodePoint(65 + index)]);
+    const contentLengths = Array.from({ length: messageCount }, () => 2);
+    const expected = new Map<number, string>();
+    const events = [created()];
+    let prefix = '';
+    let tailContentIndex = 0;
+    let tailPartIndex = 0;
+
+    for (let index = 0; index < middleIndex; index += 1) {
+      events.push(outputFrame('added', index, tool(index)));
+    }
+    for (let index = 0; index < messageCount; index += 1) {
+      const firstPart = requiredAt(requiredAt(parts, index), 0);
+      events.push(
+        outputFrame('added', middleIndex + index, message(middleIndex + index, [text(firstPart), refusal()])),
+      );
+    }
+    for (let index = middleIndex + messageCount; index < outputCount; index += 1) {
+      events.push(outputFrame('added', index, tool(index)));
+    }
+
+    const record = (event: ResponseStreamEvent): void => {
+      events.push(event);
+      expected.set(events.length - 1, prefix + parts.map((content) => content.join('')).join(''));
+    };
+
+    const replaceEarlierOutput = (value: string): void => {
+      prefix = value;
+      record(outputFrame('done', earlierIndex, message(earlierIndex, [refusal(), text(prefix)])));
+    };
+    const replaceEarlierContent = (value: string): void => {
+      prefix = value;
+      record(contentFrame('done', earlierIndex, 1, prefix ? text(prefix) : refusal()));
+    };
+    const replaceActiveContent = (index: number, value: string): void => {
+      requiredAt(parts, index)[0] = value;
+      record(textFrame('done', middleIndex + index, 0, value));
+    };
+    const mutations = new Map<number, () => void>([
+      [32, () => replaceEarlierOutput('early')],
+      [64, () => replaceEarlierContent('a much longer earlier prefix')],
+      [
+        80,
+        () => {
+          const content = requiredAt(parts, lastIndex);
+          tailPartIndex = content.length;
+          tailContentIndex = requiredAt(contentLengths, lastIndex);
+          content.push('tail');
+          contentLengths[lastIndex] = tailContentIndex + 1;
+          record(contentFrame('added', middleIndex + lastIndex, tailContentIndex, text('tail')));
+        },
+      ],
+      [
+        88,
+        () => {
+          const content = requiredAt(parts, lastIndex);
+          content[tailPartIndex] = `${requiredAt(content, tailPartIndex)}++`;
+          record(textFrame('delta', middleIndex + lastIndex, tailContentIndex, '++'));
+        },
+      ],
+      [96, () => replaceActiveContent(0, 'first replacement')],
+      [112, () => replaceActiveContent(lastIndex, 'a much longer last replacement')],
+      [
+        128,
+        () => {
+          prefix = '';
+          record(outputFrame('done', earlierIndex, tool(earlierIndex)));
+        },
+      ],
+      [160, () => replaceEarlierOutput('back')],
+      [
+        176,
+        () => {
+          parts[1] = ['middle replacement'];
+          contentLengths[1] = 2;
+          record(
+            outputFrame(
+              'done',
+              middleIndex + 1,
+              message(middleIndex + 1, [text('middle replacement'), refusal()]),
+            ),
+          );
+        },
+      ],
+      [
+        192,
+        () => {
+          prefix += '!';
+          record(textFrame('delta', earlierIndex, 1, '!'));
+        },
+      ],
+      [224, () => replaceEarlierContent('')],
+      [240, () => replaceEarlierContent('return')],
+    ]);
+
+    for (let index = 0; index < 256; index += 1) {
+      mutations.get(index)?.();
+
+      const messageIndex = index % messageCount;
+      const delta = String.fromCodePoint(97 + (index % 26));
+      const content = requiredAt(parts, messageIndex);
+      if (kind === 'added') {
+        const contentIndex = requiredAt(contentLengths, messageIndex);
+        content.push(delta);
+        contentLengths[messageIndex] = contentIndex + 1;
+        record(contentFrame('added', middleIndex + messageIndex, contentIndex, text(delta)));
+      } else {
+        content[0] = requiredAt(content, 0) + delta;
+        record(textFrame('delta', middleIndex + messageIndex, 0, delta));
+      }
+    }
+
+    const work = measureLaterOutputVisits();
+    const reducer = responseAccumulator.accumulateResponseWithContext;
+    vi.spyOn(responseAccumulator, 'accumulateResponseWithContext').mockImplementation(
+      (event, snapshot, context) => {
+        const next = reducer(event, snapshot, context);
+        const canonical = expected.get(event.sequence_number);
+        if (canonical !== undefined) {
+          expect(next.output_text).toBe(canonical);
+        }
+        return next;
+      },
+    );
+
+    const final = await stream(events);
+
+    expect(final.output_text).toBe(prefix + parts.map((content) => content.join('')).join(''));
+    expect(work.visits).toBeLessThanOrEqual(events.length * 12);
+  });
+
   test.each([
     ['an earlier message becomes a tool', message(0, [text('A')]), outputFrame('done', 0, tool(0)), 'M12Z'],
     [
@@ -324,6 +472,9 @@ describe('canonical streamed response output text', () => {
     expect(requestContext?.canonicalSnapshot?.output_text).toBe('A!');
     expect(releasedContext?.canonicalSnapshot).toBeUndefined();
     expect(releasedContext?.outputTextLengths).not.toBe(requestContext?.outputTextLengths);
+    expect(requestContext?.outputTextIndex.length).toBeGreaterThan(0);
+    expect(releasedContext?.outputTextIndex).not.toBe(requestContext?.outputTextIndex);
+    expect(releasedContext?.outputTextIndex.length).toBe(0);
   });
 
   test('releases the request-owned accumulator context before response parsing fails', async () => {
@@ -341,6 +492,9 @@ describe('canonical streamed response output text', () => {
     expect(requestContext?.canonicalSnapshot?.output_text).toBe('A!');
     expect(releasedContext?.canonicalSnapshot).toBeUndefined();
     expect(releasedContext?.outputTextLengths).not.toBe(requestContext?.outputTextLengths);
+    expect(requestContext?.outputTextIndex.length).toBeGreaterThan(0);
+    expect(releasedContext?.outputTextIndex).not.toBe(requestContext?.outputTextIndex);
+    expect(releasedContext?.outputTextIndex.length).toBe(0);
   });
 
   test('keeps lifecycle replacements and parallel stream contexts independent', async () => {
