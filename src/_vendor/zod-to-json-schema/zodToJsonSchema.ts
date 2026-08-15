@@ -18,11 +18,29 @@ function validateStrictRootSerializationHook(schema: object): void {
   }
 }
 
+function validateStrictRootShape(schema: object): void {
+  if (Array.isArray(schema)) {
+    throw new TypeError('Root schema must serialize to a JSON object');
+  }
+
+  for (const unbox of [String.prototype.valueOf, Number.prototype.valueOf, Boolean.prototype.valueOf]) {
+    try {
+      Reflect.apply(unbox, schema, []);
+    } catch {
+      // Primitive intrinsics reject objects without their matching internal slot.
+      continue;
+    }
+
+    throw new TypeError('Root schema must serialize to a JSON object');
+  }
+}
+
 function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | undefined): void {
   if (!openaiStrictMode) {
     return;
   }
 
+  validateStrictRootShape(schema);
   const descriptors = Object.getOwnPropertyDescriptors(schema);
   for (const keyword of ['type', 'nullable', '$ref'] as const) {
     const descriptor = descriptors[keyword];

@@ -181,6 +181,35 @@ it('preserves named object roots and escaped references to supplied definitions'
 
 describe('strict vendor converter root schemas', () => {
   it.each([
+    { name: 'an array', root: [], serialized: '[]' },
+    { name: 'a boxed string', root: Reflect.construct(String, ['value']) as object, serialized: '"value"' },
+    { name: 'a boxed number', root: Reflect.construct(Number, [42]) as object, serialized: '42' },
+    { name: 'a boxed boolean', root: Reflect.construct(Boolean, [true]) as object, serialized: 'true' },
+  ])('rejects $name roots that falsely claim to be objects', ({ root, serialized }) => {
+    const overriddenRoot = Object.assign(root, { type: 'object' as const });
+
+    expect(JSON.stringify(overriddenRoot)).toBe(serialized);
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        target: 'openApi3',
+        openaiStrictMode: true,
+        override: () => overriddenRoot as { type: 'object' },
+      }),
+    ).toThrow('Root schema must serialize to a JSON object');
+  });
+
+  it('preserves strict object roots without a prototype', () => {
+    const overriddenRoot = Object.assign(Object.create(null) as object, { type: 'object' as const });
+    const schema = zodToJsonSchema(z3.object({ value: z3.string() }), {
+      target: 'openApi3',
+      openaiStrictMode: true,
+      override: () => overriddenRoot,
+    });
+
+    expect(JSON.stringify(schema)).toBe('{"type":"object"}');
+  });
+
+  it.each([
     { keyword: 'type', value: 'object', visibility: 'inherited' },
     { keyword: 'type', value: 'object', visibility: 'non-enumerable' },
     { keyword: '$ref', value: '#/definitions/Root', visibility: 'inherited' },
