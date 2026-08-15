@@ -19,18 +19,26 @@ interface CachedToken {
   refreshAt: number;
 }
 
+interface RefreshState {
+  cachedToken: CachedToken | null;
+  refreshPromise: Promise<string> | null;
+  retryNotBefore: number;
+  tokenGeneration: number;
+}
+
 interface WorkloadIdentityAuthOptions {
   fetchOptions?: MergedRequestInit | undefined;
   maxRetries?: number | undefined;
 }
 
 interface RefreshContext {
+  fetchOptions: MergedRequestInit | undefined;
   generation: number;
-  options: WorkloadIdentityAuthOptions;
+  state: RefreshState;
 }
 
 interface CredentialSource {
-  exchange: (options: WorkloadIdentityAuthOptions, retryCount: number) => Promise<unknown>;
+  exchange: (retryCount: number, fetchOptions: MergedRequestInit | undefined) => Promise<unknown>;
   isExpirationSafe: (expiresAt: number) => boolean;
   maxRetries?: (options: WorkloadIdentityAuthOptions) => number;
   now: () => number;
@@ -48,6 +56,15 @@ const SUBJECT_TOKEN_TYPES: Record<SubjectTokenWorkloadIdentity['provider']['toke
 const SUBJECT_TOKEN_EXCHANGE_URL = 'https://auth.openai.com/oauth/token';
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const DEFAULT_REFRESH_BUFFER_MS = 1_200_000;
+
+function createRefreshState(): RefreshState {
+  return {
+    cachedToken: null,
+    refreshPromise: null,
+    retryNotBefore: 0,
+    tokenGeneration: 0,
+  };
+}
 
 function isX509WorkloadIdentity(config: WorkloadIdentity): config is X509WorkloadIdentity {
   return config.type === 'x509';
@@ -91,6 +108,14 @@ function abortError(signal: AbortSignal): APIUserAbortError {
 function throwIfAborted(signal: AbortSignal | null | undefined): void {
   if (signal?.aborted) {
     throw abortError(signal);
+  }
+}
+
+const REFRESH_INVALIDATED = Symbol('workload identity refresh invalidated');
+
+function clearRefresh(state: RefreshState, refreshPromise: Promise<string>): void {
+  if (state.refreshPromise === refreshPromise) {
+    state.refreshPromise = null;
   }
 }
 
@@ -193,14 +218,12 @@ function createCredentialSource(
   if (isX509WorkloadIdentity(config)) {
     validateX509Config(config);
     const defaultMaxRetries = validateMaxRetries(options.maxRetries ?? 2);
-    const fetchOptions = (requestOptions: WorkloadIdentityAuthOptions) =>
-      hasOwn(requestOptions, 'fetchOptions') ? requestOptions.fetchOptions : options.fetchOptions;
     return {
-      exchange: async (requestOptions, retryCount) =>
-        await exchangeX509Token({
+      exchange: (retryCount, effectiveFetchOptions) =>
+        exchangeX509Token({
           config,
           fetch,
-          fetchOptions: fetchOptions(requestOptions),
+          fetchOptions: effectiveFetchOptions,
           retryCount,
         }),
       isExpirationSafe: (expiresAt) => Number.isFinite(expiresAt) && expiresAt <= Number.MAX_SAFE_INTEGER,
@@ -208,14 +231,15 @@ function createCredentialSource(
       now: monotonicNow,
       refreshBufferMs: (durationMs) =>
         Math.min(config.refreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS, durationMs / 2),
-      resolveFetchOptions: fetchOptions,
+      resolveFetchOptions: (requestOptions) =>
+        hasOwn(requestOptions, 'fetchOptions') ? requestOptions.fetchOptions : options.fetchOptions,
       resolveExpiration: (configured) => configured,
       waiterTimeoutMs: (timeoutMs) => timeoutMs,
     };
   }
 
   return {
-    exchange: async () => await exchangeSubjectToken(config, fetch),
+    exchange: () => exchangeSubjectToken(config, fetch),
     isExpirationSafe: Number.isSafeInteger,
     now: () => Date.now(),
     refreshBufferMs: () => (config.refreshBufferSeconds ?? 1200) * 1000,
@@ -231,12 +255,10 @@ function createCredentialSource(
  * for a successful exchange before they are returned.
  */
 export class WorkloadIdentityAuth {
-  private cachedToken: CachedToken | null = null;
-  private refreshPromise: Promise<string> | null = null;
-  private currentFetchOptions: MergedRequestInit | undefined;
-  private hasCurrentFetchOptions = false;
-  private tokenGeneration = 0;
+  private readonly defaultState = createRefreshState();
   private readonly source: CredentialSource;
+  // Weak keys partition transport-bound tokens without extending the lifetime of caller-owned dispatchers.
+  private readonly transportStates = new WeakMap<MergedRequestInit, RefreshState>();
 
   /**
    * Creates a workload-identity token cache and OAuth token-exchange client.
@@ -269,28 +291,47 @@ export class WorkloadIdentityAuth {
     options: WorkloadIdentityAuthOptions = {},
   ): Promise<string> {
     throwIfAborted(signal);
-    if (this.source.resolveFetchOptions) {
-      const fetchOptions = this.source.resolveFetchOptions(options);
-      if (this.hasCurrentFetchOptions && this.currentFetchOptions !== fetchOptions) {
-        this.invalidateToken();
-      }
-      this.currentFetchOptions = fetchOptions;
-      this.hasCurrentFetchOptions = true;
-    }
-    const context: RefreshContext = { generation: this.tokenGeneration, options };
     const maxRetries = this.source.maxRetries?.(options) ?? 0;
     const waiterTimeoutMs = this.source.waiterTimeoutMs?.(timeoutMs);
     const deadline = waiterTimeoutMs === undefined ? undefined : this.source.now() + waiterTimeoutMs;
 
-    if (!this.cachedToken || this.isTokenExpired(this.cachedToken)) {
-      return await this.refreshWithRetries(context, maxRetries, signal, deadline);
-    }
+    while (true) {
+      const fetchOptions = this.source.resolveFetchOptions?.(options);
+      const state = this.getRefreshState(fetchOptions);
+      const context: RefreshContext = {
+        fetchOptions,
+        generation: state.tokenGeneration,
+        state,
+      };
 
-    if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
-      void this.refreshWithRetries(context, maxRetries).catch(() => null);
+      try {
+        if (!state.cachedToken || this.isTokenExpired(state.cachedToken)) {
+          // oxlint-disable-next-line no-await-in-loop -- Invalidation restarts within the original deadline.
+          return await this.refreshWithRetries(context, maxRetries, signal, deadline);
+        }
+        if (this.needsRefresh(state.cachedToken) && !state.refreshPromise) {
+          void this.refreshWithRetries(context, maxRetries).catch(() => null);
+        }
+        return state.cachedToken.token;
+      } catch (error) {
+        if (error === REFRESH_INVALIDATED) {
+          continue;
+        }
+        throw error;
+      }
     }
+  }
 
-    return this.cachedToken.token;
+  private getRefreshState(fetchOptions: MergedRequestInit | undefined): RefreshState {
+    if (fetchOptions === undefined) {
+      return this.defaultState;
+    }
+    let state = this.transportStates.get(fetchOptions);
+    if (!state) {
+      state = createRefreshState();
+      this.transportStates.set(fetchOptions, state);
+    }
+    return state;
   }
 
   private async refreshWithRetries(
@@ -299,31 +340,44 @@ export class WorkloadIdentityAuth {
     signal?: AbortSignal | null,
     deadline?: number,
   ): Promise<string> {
-    const cachedAtStart = this.cachedToken;
+    const { state } = context;
+    const cachedAtStart = state.cachedToken;
 
     for (let retryCount = 0; ; retryCount += 1) {
       throwIfAborted(signal);
-      if (this.cachedToken && this.cachedToken !== cachedAtStart && !this.isTokenExpired(this.cachedToken)) {
-        return this.cachedToken.token;
+      const retryDelayMs = state.retryNotBefore - this.source.now();
+      if (retryDelayMs > 0) {
+        // oxlint-disable-next-line no-await-in-loop -- A shared Retry-After window gates each attempt.
+        await waitForPromise(sleep(retryDelayMs), signal, this.remainingTimeout(deadline));
+      }
+      if (state.tokenGeneration !== context.generation) {
+        throw REFRESH_INVALIDATED;
+      }
+      if (
+        state.cachedToken &&
+        state.cachedToken !== cachedAtStart &&
+        !this.isTokenExpired(state.cachedToken)
+      ) {
+        return state.cachedToken.token;
       }
 
       try {
         // oxlint-disable-next-line no-await-in-loop -- Token refresh attempts are intentionally sequential.
-        return await waitForPromise(
-          this.refreshPromise ?? this.startRefresh(context, retryCount),
+        const token = await waitForPromise(
+          state.refreshPromise ?? this.startRefresh(context, retryCount),
           signal,
           this.remainingTimeout(deadline),
         );
+        return token;
       } catch (error) {
         if (!(error instanceof X509TokenExchangeRetryableError)) {
           throw error;
         }
-        if (retryCount >= maxRetries || this.tokenGeneration !== context.generation) {
-          throw error.error;
+        state.retryNotBefore = Math.max(state.retryNotBefore, this.source.now() + error.retryDelayMs);
+        if (state.tokenGeneration !== context.generation) {
+          throw REFRESH_INVALIDATED;
         }
-        // oxlint-disable-next-line no-await-in-loop -- Retry-After must elapse before the next attempt.
-        await waitForPromise(sleep(error.retryDelayMs), signal, this.remainingTimeout(deadline));
-        if (this.tokenGeneration !== context.generation) {
+        if (retryCount >= maxRetries) {
           throw error.error;
         }
       }
@@ -336,22 +390,16 @@ export class WorkloadIdentityAuth {
 
   private startRefresh(context: RefreshContext, retryCount: number): Promise<string> {
     const refreshPromise = this.refreshToken(context, retryCount);
-    this.refreshPromise = refreshPromise;
+    context.state.refreshPromise = refreshPromise;
     void refreshPromise.then(
-      () => this.clearRefresh(refreshPromise),
-      () => this.clearRefresh(refreshPromise),
+      () => clearRefresh(context.state, refreshPromise),
+      () => clearRefresh(context.state, refreshPromise),
     );
     return refreshPromise;
   }
 
-  private clearRefresh(refreshPromise: Promise<string>): void {
-    if (this.refreshPromise === refreshPromise) {
-      this.refreshPromise = null;
-    }
-  }
-
   private async refreshToken(context: RefreshContext, retryCount: number): Promise<string> {
-    const tokenResponse = await this.source.exchange(context.options, retryCount);
+    const tokenResponse = await this.source.exchange(retryCount, context.fetchOptions);
     if (
       typeof tokenResponse !== 'object' ||
       tokenResponse === null ||
@@ -376,8 +424,9 @@ export class WorkloadIdentityAuth {
       throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
     }
 
-    if (this.tokenGeneration === context.generation) {
-      this.cachedToken = {
+    if (context.state.tokenGeneration === context.generation) {
+      context.state.retryNotBefore = 0;
+      context.state.cachedToken = {
         token: accessToken,
         expiresAt,
         refreshAt: expiresAt - this.source.refreshBufferMs(durationMs),
@@ -396,12 +445,13 @@ export class WorkloadIdentityAuth {
   }
 
   /** Discards a rejected cached access token so the next request performs a fresh exchange. */
-  invalidateToken(rejectedToken?: string): void {
-    if (rejectedToken !== undefined && this.cachedToken?.token !== rejectedToken) {
+  invalidateToken(rejectedToken?: string, options: WorkloadIdentityAuthOptions = {}): void {
+    const state = this.getRefreshState(this.source.resolveFetchOptions?.(options));
+    if (rejectedToken !== undefined && state.cachedToken?.token !== rejectedToken) {
       return;
     }
-    this.tokenGeneration += 1;
-    this.cachedToken = null;
-    this.refreshPromise = null;
+    state.tokenGeneration += 1;
+    state.cachedToken = null;
+    state.refreshPromise = null;
   }
 }

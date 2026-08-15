@@ -275,12 +275,14 @@ function isCertificateCapableServerRuntime(): boolean {
   if (isRunningInBrowserOrBrowserWorker()) return false;
 
   const scope = globalThis as any;
-  if (scope.EdgeRuntime !== undefined || scope.WebSocketPair !== undefined) return false;
-  return (
-    scope.process?.versions?.node !== undefined ||
+  if (
     scope.Deno?.version?.deno !== undefined ||
-    scope.Bun?.version !== undefined
-  );
+    scope.EdgeRuntime !== undefined ||
+    scope.WebSocketPair !== undefined
+  ) {
+    return false;
+  }
+  return scope.process?.versions?.node !== undefined || scope.Bun?.version !== undefined;
 }
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
@@ -288,6 +290,10 @@ const OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
+
+interface WorkloadIdentityRequestContext {
+  fetchOptions: MergedRequestInit | undefined;
+}
 
 function defaultBaseURL(usesX509WorkloadIdentity: boolean): string {
   return usesX509WorkloadIdentity ? X509_API_BASE_URL : OPENAI_API_BASE_URL;
@@ -467,6 +473,7 @@ export class OpenAI {
   #encoder: Opts.RequestEncoder;
   // Preserve an explicit global selection without storing a second routing URL.
   #explicitDataResidency = false;
+  #workloadIdentityRequestContexts = new WeakMap<FinalizedRequestInit, WorkloadIdentityRequestContext>();
   #responseAttempts = new WeakMap<AbortController, { timeout: number; retriesRemaining: number }>();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
@@ -671,9 +678,7 @@ export class OpenAI {
       this._usesX509WorkloadIdentity &&
       client._usesX509WorkloadIdentity &&
       client._options.workloadIdentity === this._options.workloadIdentity &&
-      client.fetch === this.fetch &&
-      client.fetchOptions === this.fetchOptions &&
-      client.maxRetries === this.maxRetries
+      client.fetch === this.fetch
     ) {
       client._workloadIdentityAuth = this._workloadIdentityAuth;
     }
@@ -724,22 +729,27 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
+    context?: WorkloadIdentityRequestContext,
   ): Promise<NullableHeaders | undefined> {
     return buildHeaders([
-      schemes.bearerAuth ? await this.bearerAuth(opts) : null,
+      schemes.bearerAuth ? await this.bearerAuth(opts, context) : null,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
     ]);
   }
 
-  protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+  protected async bearerAuth(
+    opts: FinalRequestOptions,
+    context?: WorkloadIdentityRequestContext,
+  ): Promise<NullableHeaders | undefined> {
     if (this._workloadIdentityAuth) {
+      const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       return buildHeaders([
         {
           Authorization: `Bearer ${await this._workloadIdentityAuth.getToken(
             opts.signal,
             opts.timeout ?? this.timeout,
             {
-              fetchOptions: this.fetchOptions,
+              fetchOptions,
               maxRetries: opts.maxRetries ?? this.maxRetries,
             },
           )}`,
@@ -1012,6 +1022,7 @@ export class OpenAI {
     const { req, url, timeout } = await this.buildRequest(options, {
       retryCount: maxRetries - retriesRemaining,
     });
+    const workloadIdentityRequestContext = this.#workloadIdentityRequestContexts.get(req);
     const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
     await this.prepareRequest(req, { url, options });
@@ -1043,9 +1054,15 @@ export class OpenAI {
       this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
         ? createRequestController(req.signal)
         : new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller, security, maxRetries).catch(
-      castToError,
-    );
+    const response = await this.fetchWithAuth(
+      url,
+      req,
+      timeout,
+      controller,
+      security,
+      maxRetries,
+      workloadIdentityRequestContext,
+    ).catch(castToError);
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1135,6 +1152,11 @@ export class OpenAI {
         const authorization = req.headers.get('authorization');
         this._workloadIdentityAuth.invalidateToken(
           authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined,
+          {
+            fetchOptions: workloadIdentityRequestContext
+              ? workloadIdentityRequestContext.fetchOptions
+              : this.fetchOptions,
+          },
         );
 
         return this.makeRequest(
@@ -1266,13 +1288,15 @@ export class OpenAI {
       adminAPIKeyAuth: true,
     },
     maxRetries: number = this.maxRetries,
+    context?: WorkloadIdentityRequestContext,
   ): Promise<Response> {
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
+      const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
-          fetchOptions: this.fetchOptions,
+          fetchOptions,
           maxRetries,
         });
         headers.set('Authorization', `Bearer ${token}`);
@@ -1410,7 +1434,19 @@ export class OpenAI {
       };
     }
 
-    const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
+    let workloadIdentityFetchOptions = this.fetchOptions;
+    let reqHeaders: Headers;
+    do {
+      workloadIdentityFetchOptions = this.fetchOptions;
+      // oxlint-disable-next-line no-await-in-loop -- X.509 transport rotation rebuilds auth atomically.
+      reqHeaders = await this.buildHeaders({
+        options: inputOptions,
+        method,
+        bodyHeaders,
+        retryCount,
+        fetchOptions: workloadIdentityFetchOptions,
+      });
+    } while (this._usesX509WorkloadIdentity && workloadIdentityFetchOptions !== this.fetchOptions);
 
     const req: FinalizedRequestInit = {
       method,
@@ -1419,10 +1455,13 @@ export class OpenAI {
       ...((globalThis as any).ReadableStream &&
         body instanceof (globalThis as any).ReadableStream && { duplex: 'half' }),
       ...(body && { body }),
-      ...((this.fetchOptions as any) ?? {}),
+      ...((workloadIdentityFetchOptions as any) ?? {}),
       ...((options.fetchOptions as any) ?? {}),
       ...(this._usesX509WorkloadIdentity ? { redirect: 'manual' } : {}),
     };
+    if (this._usesX509WorkloadIdentity) {
+      this.#workloadIdentityRequestContexts.set(req, { fetchOptions: workloadIdentityFetchOptions });
+    }
 
     return { req, url, timeout: options.timeout };
   }
@@ -1432,11 +1471,13 @@ export class OpenAI {
     method,
     bodyHeaders,
     retryCount,
+    fetchOptions,
   }: {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
     retryCount: number;
+    fetchOptions: MergedRequestInit | undefined;
   }): Promise<Headers> {
     let idempotencyHeaders: HeadersLike = {};
     if (this.idempotencyHeader && method !== 'get') {
@@ -1459,7 +1500,7 @@ export class OpenAI {
       },
       this._provider
         ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }, { fetchOptions }),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,

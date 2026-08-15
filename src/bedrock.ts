@@ -215,13 +215,14 @@ export class BedrockOpenAI extends OpenAI {
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    context?: { fetchOptions: ClientOptions['fetchOptions'] },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if ((security.bearerAuth || security.adminAPIKeyAuth) && this.apiKey !== null) {
       return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
     }
 
-    return super.authHeaders(opts, security);
+    return super.authHeaders(opts, security, context);
   }
 
   /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */

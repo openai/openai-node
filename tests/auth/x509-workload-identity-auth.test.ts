@@ -223,6 +223,29 @@ describe('X.509 workload identity auth', () => {
     expect(customFetch).toHaveBeenCalledTimes(2);
   });
 
+  test('makes late callers share an active Retry-After window and the next attempt', async () => {
+    vi.useFakeTimers();
+    const firstExchange = deferredResponse();
+    const customFetch = vi
+      .fn()
+      .mockImplementationOnce(() => firstExchange.promise)
+      .mockResolvedValueOnce(tokenResponse('retried-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    const retrying = auth.getToken(undefined, undefined, { maxRetries: 1 });
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    firstExchange.resolve(new Response(null, { status: 429, headers: { 'Retry-After': '1' } }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const late = auth.getToken(undefined, undefined, { maxRetries: 0 });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(Promise.all([retrying, late])).resolves.toEqual(['retried-token', 'retried-token']);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
   test('bounds transient retries to maxRetries plus the initial attempt', async () => {
     const customFetch = vi.fn(
       async () => new Response(null, { status: 503, headers: { 'Retry-After': '0' } }),
@@ -257,37 +280,6 @@ describe('X.509 workload identity auth', () => {
 
     await expect(noRetry).rejects.toMatchObject({ status: 503 });
     await expect(retrying).resolves.toBe('retried-token');
-    expect(customFetch).toHaveBeenCalledTimes(2);
-  });
-
-  test('does not let an old transport retry replace a token cached for a new transport', async () => {
-    vi.useFakeTimers();
-    const originalDispatcher = { name: 'original' };
-    const originalTransport = { dispatcher: originalDispatcher } as never;
-    const replacementTransport = { dispatcher: { name: 'replacement' } } as never;
-    const customFetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) =>
-      (init as unknown as { dispatcher?: unknown })?.dispatcher === originalDispatcher
-        ? new Response(null, { status: 503, headers: { 'Retry-After': '1' } })
-        : tokenResponse('replacement-token'),
-    );
-    const auth = new WorkloadIdentityAuth(config, customFetch);
-
-    const original = auth.getToken(undefined, undefined, {
-      fetchOptions: originalTransport,
-      maxRetries: 1,
-    });
-    const originalAssertion = expect(original).rejects.toMatchObject({ status: 503 });
-    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
-
-    await expect(
-      auth.getToken(undefined, undefined, { fetchOptions: replacementTransport, maxRetries: 0 }),
-    ).resolves.toBe('replacement-token');
-    await vi.advanceTimersByTimeAsync(1000);
-    await originalAssertion;
-
-    await expect(
-      auth.getToken(undefined, undefined, { fetchOptions: replacementTransport, maxRetries: 0 }),
-    ).resolves.toBe('replacement-token');
     expect(customFetch).toHaveBeenCalledTimes(2);
   });
 

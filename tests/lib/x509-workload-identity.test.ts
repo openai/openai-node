@@ -206,6 +206,67 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(requests[3]).toMatchObject({ dispatcher: replacementDispatcher });
   });
 
+  test('restarts a cold exchange after transport rotation before sending a non-replayable body', async () => {
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const originalExchange = deferredResponse();
+    const requests: { url: string; init: RequestInit | undefined }[] = [];
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: url.toString(), init });
+      if (!url.toString().includes('/oauth/token')) {
+        return Response.json({ ok: true });
+      }
+      return (init as { dispatcher?: unknown })?.dispatcher === originalDispatcher
+        ? await originalExchange.promise
+        : tokenResponse('replacement-token');
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+      fetchOptions: { dispatcher: originalDispatcher as never },
+    });
+
+    const request = client.post('/non-replayable', { body: nonReplayableBody() });
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    client.fetchOptions = { dispatcher: replacementDispatcher as never };
+    originalExchange.resolve(tokenResponse('stale-token'));
+
+    await expect(request).resolves.toMatchObject({ ok: true });
+    expect(requests).toHaveLength(3);
+    expect(requests.map(({ init }) => (init as { dispatcher?: unknown })?.dispatcher)).toEqual([
+      originalDispatcher,
+      replacementDispatcher,
+      replacementDispatcher,
+    ]);
+    expect(new Headers(requests[2]?.init?.headers).get('Authorization')).toBe('Bearer replacement-token');
+  });
+
+  test('keeps an absent initial transport distinct when it is replaced during a cold exchange', async () => {
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const originalExchange = deferredResponse();
+    const requests: RequestInit[] = [];
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push(init ?? {});
+      if (!url.toString().includes('/oauth/token')) {
+        return Response.json({ data: [] });
+      }
+      return requests.length === 1 ? await originalExchange.promise : tokenResponse('replacement-token');
+    });
+    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
+
+    const request = client.models.list();
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    client.fetchOptions = { dispatcher: replacementDispatcher as never };
+    originalExchange.resolve(tokenResponse('stale-token'));
+
+    await expect(request).resolves.toMatchObject({ data: [] });
+    expect(requests).toHaveLength(3);
+    expect(requests[0]).not.toHaveProperty('dispatcher');
+    expect(requests[1]).toMatchObject({ dispatcher: replacementDispatcher });
+    expect(requests[2]).toMatchObject({ dispatcher: replacementDispatcher });
+  });
+
   test('honors per-request maxRetries for a cold token exchange', async () => {
     const noRetryFetch = vi.fn(
       async () => new Response(null, { status: 503, headers: { 'Retry-After': '0' } }),
@@ -250,20 +311,34 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(customFetch).not.toHaveBeenCalled();
   });
 
-  test('shares the X.509 token cache with a transport-equivalent withOptions client', async () => {
+  test('shares X.509 state by transport while isolating withOptions clients that diverge', async () => {
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
     let exchangeCount = 0;
-    const customFetch = vi.fn(async (url: string | URL | Request) => {
+    const exchangeDispatchers: unknown[] = [];
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       if (url.toString().includes('/oauth/token')) {
         exchangeCount += 1;
+        exchangeDispatchers.push((init as { dispatcher?: unknown })?.dispatcher);
         return tokenResponse(`token-${exchangeCount}`);
       }
       return Response.json({ data: [] });
     });
-    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+      fetchOptions: { dispatcher: originalDispatcher as never },
+    });
     const derivedClient = client.withOptions({ timeout: 5000 });
 
     await Promise.all([client.models.list(), derivedClient.models.list()]);
-    expect(exchangeCount).toBe(1);
+    derivedClient.fetchOptions = { dispatcher: replacementDispatcher as never };
+    await derivedClient.models.list();
+    await client.models.list();
+
+    expect(exchangeCount).toBe(2);
+    expect(exchangeDispatchers).toEqual([originalDispatcher, replacementDispatcher]);
   });
 
   test.each([
@@ -330,6 +405,20 @@ describe('OpenAI with X.509 workload identity', () => {
     ).toThrow('only supported in server runtimes');
   });
 
+  test('rejects Deno-like runtimes even when Node globals are polyfilled', () => {
+    vi.stubGlobal('Deno', { version: { deno: '2.0.0' } });
+
+    expect(
+      () =>
+        new OpenAI({
+          apiKey: null,
+          workloadIdentity: x509Identity,
+          dangerouslyAllowBrowser: true,
+          fetch: vi.fn(),
+        }),
+    ).toThrow('only supported in server runtimes');
+  });
+
   test('invalidates and retries one 401 for a replayable request body', async () => {
     let exchangeCount = 0;
     let apiCount = 0;
@@ -384,6 +473,42 @@ describe('OpenAI with X.509 workload identity', () => {
     await expect(Promise.all([client.models.list(), client.models.list()])).resolves.toHaveLength(2);
     expect(exchangeCount).toBe(2);
     expect(apiCount).toBe(4);
+  });
+
+  test('invalidates the transport that received a 401 even if the client rotates before the response', async () => {
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const firstAPIResponse = deferredResponse();
+    const exchangeDispatchers: unknown[] = [];
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const dispatcher = (init as { dispatcher?: unknown })?.dispatcher;
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        exchangeDispatchers.push(dispatcher);
+        return tokenResponse(`token-${exchangeCount}`);
+      }
+      apiCount += 1;
+      return apiCount === 1 ? await firstAPIResponse.promise : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: customFetch,
+      fetchOptions: { dispatcher: originalDispatcher as never },
+    });
+    const originalTransportClient = client.withOptions({ timeout: 5000 });
+
+    const request = client.models.list();
+    await vi.waitFor(() => expect(apiCount).toBe(1));
+    client.fetchOptions = { dispatcher: replacementDispatcher as never };
+    firstAPIResponse.resolve(Response.json({ error: { message: 'Unauthorized' } }, { status: 401 }));
+
+    await expect(request).resolves.toMatchObject({ data: [] });
+    await expect(originalTransportClient.models.list()).resolves.toMatchObject({ data: [] });
+    expect(exchangeDispatchers).toEqual([originalDispatcher, replacementDispatcher, originalDispatcher]);
+    expect(apiCount).toBe(3);
   });
 
   test('allows one independent 401 refresh for each pagination request', async () => {
