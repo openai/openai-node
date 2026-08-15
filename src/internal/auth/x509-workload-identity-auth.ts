@@ -37,6 +37,7 @@ interface RetrySequence {
 
 interface RefreshState {
   cachedToken: CachedToken | null;
+  proactiveRetryNotBefore: number;
   refreshAttempt: RefreshAttempt | null;
   retrySequence: RetrySequence | null;
   retryNotBefore: number;
@@ -56,6 +57,7 @@ interface RefreshContext {
 }
 
 const DEFAULT_REFRESH_BUFFER_MS = 1_200_000;
+const DEFAULT_PROACTIVE_REFRESH_FAILURE_COOLDOWN_MS = 30_000;
 const DEFAULT_PROACTIVE_REFRESH_TIMEOUT_MS = 600_000;
 const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
 const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
@@ -63,6 +65,7 @@ const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] a
 function createRefreshState(): RefreshState {
   return {
     cachedToken: null,
+    proactiveRetryNotBefore: 0,
     refreshAttempt: null,
     retrySequence: null,
     retryNotBefore: 0,
@@ -238,6 +241,30 @@ function rejectRefresh(state: RefreshState, refreshAttempt: RefreshAttempt, erro
   for (const waiter of takeRefreshWaiters(state, refreshAttempt)) {
     waiter.reject(error);
   }
+}
+
+function recordProactiveRefreshFailure(
+  context: RefreshContext,
+  refreshAttempt: RefreshAttempt,
+  error: unknown,
+): void {
+  const { state } = context;
+  if (
+    error === REFRESH_INVALIDATED ||
+    error instanceof X509TokenExchangeRetryableError ||
+    state.tokenGeneration !== context.generation ||
+    state.refreshAttempt !== refreshAttempt ||
+    !state.cachedToken
+  ) {
+    return;
+  }
+  state.proactiveRetryNotBefore = Math.max(
+    state.proactiveRetryNotBefore,
+    Math.min(
+      state.cachedToken.expiresAt.monotonic,
+      monotonicNow() + DEFAULT_PROACTIVE_REFRESH_FAILURE_COOLDOWN_MS,
+    ),
+  );
 }
 
 async function waitForRefresh(
@@ -461,7 +488,8 @@ export class X509WorkloadIdentityAuth {
 
   private refreshInBackground(context: RefreshContext, timeoutMs: number | undefined): void {
     const { state } = context;
-    if (state.refreshAttempt || state.retryNotBefore > monotonicNow()) {
+    const now = monotonicNow();
+    if (state.refreshAttempt || state.retryNotBefore > now || state.proactiveRetryNotBefore > now) {
       return;
     }
     // A proactive refresh has no waiting caller, so bound its transport lifetime
@@ -589,7 +617,10 @@ export class X509WorkloadIdentityAuth {
     // oxlint-disable promise/prefer-await-to-then promise/prefer-await-to-callbacks -- One shared reaction fans settlement out to removable waiters.
     void this.refreshToken(context, retryCount, refreshAttempt.controller.signal).then(
       (token) => resolveRefresh(context.state, refreshAttempt, token),
-      (error: unknown) => rejectRefresh(context.state, refreshAttempt, error),
+      (error: unknown) => {
+        recordProactiveRefreshFailure(context, refreshAttempt, error);
+        rejectRefresh(context.state, refreshAttempt, error);
+      },
     );
     // oxlint-enable promise/prefer-await-to-callbacks
     return refreshAttempt;
@@ -654,6 +685,7 @@ export class X509WorkloadIdentityAuth {
 
     if (context.state.tokenGeneration === context.generation) {
       context.state.retryNotBefore = 0;
+      context.state.proactiveRetryNotBefore = 0;
       context.state.cachedToken = {
         token: accessToken,
         expiresAt,
@@ -684,6 +716,7 @@ export class X509WorkloadIdentityAuth {
     }
     state.tokenGeneration += 1;
     state.cachedToken = null;
+    state.proactiveRetryNotBefore = 0;
     state.retryNotBefore = 0;
     state.retrySequence = null;
     const { refreshAttempt } = state;

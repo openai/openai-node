@@ -412,6 +412,43 @@ describe('X.509 workload identity auth', () => {
     await expect(auth.getToken()).resolves.toBe('refreshed-token');
   });
 
+  test.each([
+    ['a non-retryable OAuth response', () => Response.json({ error: 'invalid_grant' }, { status: 400 })],
+    ['a malformed success response', () => Response.json({ access_token: 'missing-expiration' })],
+  ])('backs off proactive refreshes after %s', async (_description, failedResponse) => {
+    vi.useFakeTimers();
+    let monotonicTime = 1000;
+    let wallTime = 9_000_000_000_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse('cached-token', 300))
+      .mockImplementationOnce(async () => failedResponse())
+      .mockResolvedValueOnce(tokenResponse('refreshed-token', 300));
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    monotonicTime += 150_000;
+    wallTime += 150_000;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+
+    monotonicTime += 29_999;
+    wallTime += 29_999;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+
+    monotonicTime += 1;
+    wallTime += 1;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(customFetch).toHaveBeenCalledTimes(3);
+    await expect(auth.getToken()).resolves.toBe('refreshed-token');
+  });
+
   test('retires a stalled proactive refresh that never gains a foreground waiter', async () => {
     vi.useFakeTimers();
     let monotonicTime = 1000;

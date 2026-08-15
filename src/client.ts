@@ -753,6 +753,13 @@ export class OpenAI {
     const context = this.#workloadIdentityBuildContexts.get(opts);
     if (this._workloadIdentityAuth) {
       if (context?.workloadIdentityTokenSuppressed) {
+        const currentOverrides = buildHeaders([opts.headers]);
+        context.workloadIdentityTokenSuppressed =
+          context.workloadIdentityTokenSuppressedByBaseHeaders ||
+          currentOverrides.values.has('authorization') ||
+          currentOverrides.nulls.has('authorization');
+      }
+      if (context?.workloadIdentityTokenSuppressed) {
         return undefined;
       }
       if (context) {
@@ -1356,6 +1363,7 @@ export class OpenAI {
     context ??= this.#workloadIdentityRequestContexts.get(init);
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
+      const workloadIdentityMaxRetries = context?.maxRetries ?? maxRetries;
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (
@@ -1366,7 +1374,7 @@ export class OpenAI {
         try {
           token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
             fetchOptions,
-            maxRetries,
+            maxRetries: workloadIdentityMaxRetries,
             ...(context ? { transportKey: context.transportKey } : {}),
           });
         } catch (error) {
@@ -1520,10 +1528,12 @@ export class OpenAI {
       const fetchOptions = this.fetchOptions;
       workloadIdentityContext = {
         fetchOptions: this._usesX509WorkloadIdentity && fetchOptions ? { ...fetchOptions } : fetchOptions,
+        maxRetries: options.maxRetries ?? this.maxRetries,
         terminalAuthenticationError: undefined,
         transportKey: x509TransportKey(fetchOptions),
         workloadIdentityAuthenticationAttempted: false,
         workloadIdentityAuthorization: undefined,
+        workloadIdentityTokenSuppressedByBaseHeaders: false,
         workloadIdentityTokenSuppressed: false,
         usesWorkloadIdentityToken: false,
       };
@@ -1594,7 +1604,10 @@ export class OpenAI {
     }
 
     const helperMethod = options.__metadata?.['helperMethod'];
-    let headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
+    const baseHeaderOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders]);
+    workloadIdentityContext.workloadIdentityTokenSuppressedByBaseHeaders =
+      baseHeaderOverrides.values.has('authorization') || baseHeaderOverrides.nulls.has('authorization');
+    let headerOverrides = buildHeaders([baseHeaderOverrides, options.headers]);
     let overridesAuthorization =
       headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization');
     let authenticationHeaders: NullableHeaders | undefined;

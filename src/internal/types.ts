@@ -95,10 +95,12 @@ export type MergedRequestInit = RequestInits &
 /** Effective client transport captured while resolving a transport-scoped workload identity. */
 export interface WorkloadIdentityRequestContext {
   fetchOptions: MergedRequestInit | undefined;
+  maxRetries: number;
   terminalAuthenticationError: Error | undefined;
   transportKey: object | undefined;
   workloadIdentityAuthenticationAttempted: boolean;
   workloadIdentityAuthorization: string | undefined;
+  workloadIdentityTokenSuppressedByBaseHeaders: boolean;
   workloadIdentityTokenSuppressed: boolean;
   usesWorkloadIdentityToken: boolean;
 }
