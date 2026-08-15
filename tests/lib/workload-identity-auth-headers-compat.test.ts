@@ -1,7 +1,7 @@
 import { expect, vi } from 'vitest';
 
 import OpenAI from 'openai';
-import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { NullableHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 
