@@ -9,6 +9,14 @@ import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import { AzureOpenAI } from '../index';
 
+function safeErrorValue(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return '[unserializable error value]';
+  }
+}
+
 /** An API-reported or client-side error encountered by an active Realtime connection. */
 export class OpenAIRealtimeError extends OpenAIError {
   /** Stable error name used to identify Realtime connection failures. */
@@ -102,7 +110,7 @@ export abstract class OpenAIRealtimeEmitter extends EventEmitter<RealtimeEvents>
   protected _onError(event: RealtimeErrorEvent, message?: string | undefined): void;
   protected _onError(event: RealtimeErrorEvent | null, message?: string | undefined, cause?: any): void {
     message = event?.error
-      ? `${event.error.message} code=${event.error.code} param=${event.error.param} type=${event.error.type} event_id=${event.error.event_id}`
+      ? `${safeErrorValue(event.error.message)} code=${safeErrorValue(event.error.code)} param=${safeErrorValue(event.error.param)} type=${safeErrorValue(event.error.type)} event_id=${safeErrorValue(event.error.event_id)}`
       : (message ?? 'unknown error');
 
     if (!this._hasListener('error')) {
