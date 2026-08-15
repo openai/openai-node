@@ -471,6 +471,70 @@ type FormEntry =
 
 type MultipartEntry = FormEntry;
 
+type CapturedUpload = Readonly<{
+  entry: Omit<Extract<FormEntry, { kind: 'upload' }>, 'key'>;
+  snapshot: MultipartDataSnapshot;
+  source: StreamingFileInput | undefined;
+  immutableBlob: Blob | undefined;
+}>;
+
+function snapshotCapturedUpload(
+  captured: CapturedUpload,
+  snapshots: WeakMap<object, MultipartDataSnapshot>,
+): MultipartDataSnapshot {
+  if (captured.source) {
+    return snapshotStreamingFileData(captured.source, snapshots);
+  }
+  if (captured.immutableBlob) {
+    return snapshotBlobData(captured.immutableBlob, snapshots);
+  }
+  return captured.snapshot;
+}
+
+function captureMultipartUpload(
+  upload: Uploadable,
+  uploadKind: Exclude<UploadableKind, undefined>,
+  options: CreateFormOptions,
+  snapshots: WeakMap<object, MultipartDataSnapshot>,
+): CapturedUpload {
+  const streamingFile = uploadKind === 'streaming-file';
+  const filename = getStreamingFileName(upload, options, uploadKind);
+  const type = getStreamingFileType(upload, uploadKind);
+  const source = streamingFile ? (upload as StreamingFile).data : undefined;
+  let immutableBlob: Blob | undefined;
+  let snapshot: MultipartDataSnapshot;
+  if (streamingFile) {
+    snapshot = snapshotStreamingFileData(source as StreamingFileInput, snapshots);
+  } else if (uploadKind === 'response') {
+    snapshot = snapshotResponseData(upload as Response, snapshots);
+  } else if (uploadKind === 'named-blob') {
+    snapshot = snapshotBlobData(upload as Blob, snapshots);
+    if (snapshot.dispose) {
+      immutableBlob = Reflect.apply(Blob.prototype.slice, upload, []) as Blob;
+    }
+  } else if (upload instanceof Response) {
+    snapshot = snapshotResponseData(upload, snapshots);
+  } else if (upload instanceof Blob) {
+    snapshot = snapshotBlobData(upload, snapshots);
+  } else {
+    snapshot = snapshotStreamingFileData(upload as StreamingFileInput, snapshots);
+  }
+  return {
+    entry: {
+      value: upload,
+      data: snapshot.data,
+      dispose: snapshot.dispose,
+      filename,
+      kind: 'upload',
+      streamingFile,
+      type,
+    },
+    snapshot,
+    source,
+    immutableBlob,
+  };
+}
+
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
   uploadableKinds: UploadableKinds,
@@ -516,10 +580,17 @@ async function* iterateMultipartBody(
   const entries: MultipartEntry[] = [];
   const pendingDisposals = new Set<() => void | Promise<void>>();
   const snapshots = new WeakMap<object, MultipartDataSnapshot>();
+  const capturedUploads = new WeakMap<object, CapturedUpload>();
   let failed = false;
 
   try {
-    for await (const entry of iterateFormEntries(body, uploadableKinds, options, snapshots)) {
+    for await (const entry of iterateFormEntries(
+      body,
+      uploadableKinds,
+      options,
+      snapshots,
+      capturedUploads,
+    )) {
       if (entry.kind === 'upload' && entry.dispose) {
         pendingDisposals.add(entry.dispose);
       }
@@ -566,13 +637,21 @@ async function* iterateFormEntries(
   uploadableKinds: UploadableKinds,
   options: CreateFormOptions,
   snapshots: WeakMap<object, MultipartDataSnapshot>,
+  capturedUploads: WeakMap<object, CapturedUpload>,
 ): AsyncGenerator<FormEntry> {
   if (!body || typeof body !== 'object') {
     return;
   }
 
   for (const key of Object.keys(body)) {
-    yield* iterateFormValue(key, (body as Record<string, unknown>)[key], uploadableKinds, options, snapshots);
+    yield* iterateFormValue(
+      key,
+      (body as Record<string, unknown>)[key],
+      uploadableKinds,
+      options,
+      snapshots,
+      capturedUploads,
+    );
   }
 }
 
@@ -582,6 +661,7 @@ async function* iterateFormValue(
   uploadableKinds: UploadableKinds,
   options: CreateFormOptions,
   snapshots: WeakMap<object, MultipartDataSnapshot>,
+  capturedUploads: WeakMap<object, CapturedUpload>,
 ): AsyncGenerator<FormEntry> {
   if (value === undefined) {
     return;
@@ -597,6 +677,13 @@ async function* iterateFormValue(
     return;
   }
 
+  const captured = typeof value === 'object' ? capturedUploads.get(value) : undefined;
+  if (captured) {
+    const snapshot = snapshotCapturedUpload(captured, snapshots);
+    yield { key, ...captured.entry, data: snapshot.data, dispose: snapshot.dispose };
+    return;
+  }
+
   const wasClassified = typeof value === 'object' && uploadableKinds.has(value);
   let uploadKind = getUploadableKind(value, uploadableKinds);
   if (!wasClassified && uploadKind !== 'streaming-file') {
@@ -604,36 +691,14 @@ async function* iterateFormValue(
   }
   if (uploadKind) {
     const upload = value as Uploadable;
-    const streamingFile = uploadKind === 'streaming-file';
-    const filename = getStreamingFileName(upload, options, uploadKind);
-    const type = getStreamingFileType(upload, uploadKind);
-    let snapshot: MultipartDataSnapshot;
-    if (streamingFile) {
-      snapshot = snapshotStreamingFileData((upload as StreamingFile).data, snapshots);
-    } else if (uploadKind === 'response') {
-      snapshot = snapshotResponseData(upload as Response, snapshots);
-    } else if (uploadKind === 'named-blob') {
-      snapshot = snapshotBlobData(upload as Blob, snapshots);
-    } else if (upload instanceof Response) {
-      snapshot = snapshotResponseData(upload, snapshots);
-    } else if (upload instanceof Blob) {
-      snapshot = snapshotBlobData(upload, snapshots);
-    } else {
-      snapshot = snapshotStreamingFileData(upload as StreamingFileInput, snapshots);
+    const uploadRecord = captureMultipartUpload(upload, uploadKind, options, snapshots);
+    if (uploadKind !== 'streaming-upload') {
+      capturedUploads.set(upload, uploadRecord);
     }
-    yield {
-      key,
-      value: upload,
-      data: snapshot.data,
-      dispose: snapshot.dispose,
-      filename,
-      kind: 'upload',
-      streamingFile,
-      type,
-    };
+    yield { key, ...uploadRecord.entry };
   } else if (Array.isArray(value)) {
     for (const entry of value) {
-      yield* iterateFormValue(key + '[]', entry, uploadableKinds, options, snapshots);
+      yield* iterateFormValue(key + '[]', entry, uploadableKinds, options, snapshots, capturedUploads);
     }
   } else if (typeof value === 'object') {
     for (const name of Object.keys(value)) {
@@ -643,6 +708,7 @@ async function* iterateFormValue(
         uploadableKinds,
         options,
         snapshots,
+        capturedUploads,
       );
     }
   } else {

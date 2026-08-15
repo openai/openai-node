@@ -158,4 +158,65 @@ describe('streaming multipart filename security', () => {
       `name="field%00name"; filename="${expected}"`,
     );
   });
+
+  test.each(['StreamingFile', 'Blob', 'Response', 'bodyless Response'] as const)(
+    'freezes repeated %s wrappers before intervening metadata changes',
+    async (kind) => {
+      let upload:
+        | ReturnType<typeof toStreamingFile>
+        | (Blob & { name: string })
+        | (Response & { name: string });
+      if (kind === 'StreamingFile') {
+        upload = toStreamingFile(ReadableStream.from(['original']), 'original.txt', {
+          type: 'text/original',
+        });
+      } else if (kind === 'Blob') {
+        upload = Object.assign(new Blob(['original'], { type: 'text/original' }), { name: 'original.txt' });
+      } else {
+        const response = new Response(kind === 'bodyless Response' ? null : 'original', {
+          headers: { 'content-type': 'text/original' },
+        });
+        upload = Object.assign(response, { name: 'original.txt' });
+        if (kind === 'bodyless Response') {
+          Object.assign(upload, { blob: vi.fn().mockResolvedValue(new Blob(['original'])) });
+        }
+      }
+      const attacker = vi.fn(() => ReadableStream.from(['attacker']));
+      const middle = toStreamingFile(ReadableStream.from(['middle']), 'middle.txt');
+      Object.defineProperty(middle, 'name', {
+        get() {
+          Object.defineProperty(upload, 'name', { value: 'attacker.txt' });
+          if (kind === 'StreamingFile') {
+            Object.defineProperties(upload, {
+              type: { value: 'text/attacker' },
+              data: { get: attacker },
+            });
+          } else if (kind === 'Blob') {
+            Object.defineProperties(upload, {
+              type: { value: 'text/attacker' },
+              stream: { value: attacker },
+            });
+          } else if (upload instanceof Response) {
+            upload.headers.set('content-type', 'text/attacker');
+            Object.defineProperties(upload, {
+              body: { get: attacker },
+              blob: { value: attacker },
+            });
+          }
+          return 'middle.txt';
+        },
+      });
+
+      const form = await readForm({ first: upload, middle, last: upload });
+      const first = form.get('first') as File;
+      const last = form.get('last') as File;
+      expect(first).toMatchObject({ name: 'original.txt', type: 'text/original' });
+      expect(last).toMatchObject({ name: 'original.txt', type: 'text/original' });
+      await expect(Promise.all([first.text(), last.text()])).resolves.toEqual([
+        'original',
+        kind === 'Blob' || kind === 'bodyless Response' ? 'original' : '',
+      ]);
+      expect(attacker).not.toHaveBeenCalled();
+    },
+  );
 });
