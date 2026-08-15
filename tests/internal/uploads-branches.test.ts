@@ -720,7 +720,11 @@ describe('lazy multipart stream encoding', () => {
             [Symbol.asyncIterator]() {
               if (outcome === 'next accessor') {
                 const iterator = source[Symbol.asyncIterator]();
-                original.return.mockImplementation(iterator.return.bind(iterator));
+                const closeIterator = iterator.return;
+                if (!closeIterator) {
+                  throw new Error('Expected native iterator cleanup');
+                }
+                original.return.mockImplementation(closeIterator.bind(iterator));
                 receiver = Object.assign(iterator, receiver);
                 Object.defineProperty(receiver, 'next', {
                   get() {
