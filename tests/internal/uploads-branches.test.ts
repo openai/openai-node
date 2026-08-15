@@ -675,6 +675,7 @@ describe('lazy multipart stream encoding', () => {
     ['iterator', 'completion', null],
     ['iterator', 'cancellation', null],
     ['iterator', 'invalid filename', null],
+    ['iterator', 'next accessor', null],
     ['proxy iterator', 'completion', null],
     ['proxy iterator', 'cancellation', null],
     ['proxy iterator', 'invalid filename', null],
@@ -686,6 +687,10 @@ describe('lazy multipart stream encoding', () => {
     ['reader', 'invalid filename', 'cancel'],
     ['reader', 'invalid filename', 'releaseLock'],
   ] as const)('preserves %s cleanup during %s (throwing: %s)', async (kind, outcome, throwing) => {
+    const error = new Error('next accessor failed');
+    const source = new ReadableStream<string>({
+      cancel: () => Promise.reject(new Error('cancellation failed')),
+    });
     const next = vi.fn();
     next.mockResolvedValueOnce({ done: false, value: 'original' }).mockResolvedValue({ done: true });
     const original = { next, read: next, return: vi.fn(), cancel: vi.fn(), releaseLock: vi.fn() };
@@ -694,7 +699,7 @@ describe('lazy multipart stream encoding', () => {
     const substituted = vi.fn();
     const { return: originalReturn, ...withoutReturn } = original;
     const getReturn = vi.fn(() => originalReturn);
-    const receiver =
+    let receiver =
       kind === 'proxy iterator'
         ? new Proxy(withoutReturn, {
             get(target, key, proxy) {
@@ -709,7 +714,23 @@ describe('lazy multipart stream encoding', () => {
       Object.defineProperty(receiver, throwing, { get: getCleanup });
     }
     const earlier =
-      kind === 'reader' ? { getReader: () => receiver } : { [Symbol.asyncIterator]: () => receiver };
+      kind === 'reader'
+        ? { getReader: () => receiver }
+        : {
+            [Symbol.asyncIterator]() {
+              if (outcome === 'next accessor') {
+                const iterator = source[Symbol.asyncIterator]();
+                original.return.mockImplementation(iterator.return.bind(iterator));
+                receiver = Object.assign(iterator, receiver);
+                Object.defineProperty(receiver, 'next', {
+                  get() {
+                    throw error;
+                  },
+                });
+              }
+              return receiver;
+            },
+          };
     const later = laterUpload();
     Object.defineProperty(later, 'name', {
       get() {
@@ -719,7 +740,9 @@ describe('lazy multipart stream encoding', () => {
         return outcome === 'invalid filename' ? undefined : 'later.txt';
       },
     });
-    const options = await multipart({ earlier, later });
+    const options = await multipart(
+      outcome === 'next accessor' ? { earlier: laterUpload(), later: earlier } : { earlier, later },
+    );
 
     if (outcome === 'completion') {
       await expect(new Response(options.body as ReadableStream).text()).resolves.toContain('original');
@@ -728,6 +751,8 @@ describe('lazy multipart stream encoding', () => {
       if (outcome === 'cancellation') {
         await reader.read();
         await reader.cancel();
+      } else if (outcome === 'next accessor') {
+        await expect(reader.read()).rejects.toBe(error);
       } else {
         await expect(reader.read()).rejects.toThrow(/file.?name/iu);
       }
@@ -741,6 +766,7 @@ describe('lazy multipart stream encoding', () => {
     expect(getReturn).toHaveBeenCalledTimes(kind === 'proxy iterator' && outcome !== 'completion' ? 1 : 0);
     expect(getCleanup).toHaveBeenCalledTimes(throwing && outcome !== 'completion' ? 1 : 0);
     expect(substituted).not.toHaveBeenCalled();
+    expect(source.locked).toBe(false);
   });
 
   test('unlocks native readers when capturing read throws and cancellation rejects', async () => {

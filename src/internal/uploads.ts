@@ -529,9 +529,15 @@ function snapshotStreamingFileData(
   const { [Symbol.asyncIterator]: createIterator } = value as AsyncIterable<BlobPart>;
   if (typeof createIterator === 'function') {
     const iterator = createIterator.call(value);
-    const isLockedNativeStream = isNativeReadableStream(value, true);
-    const { next } = iterator;
     const returnIterator = snapshotIteratorReturn(iterator);
+    const isLockedNativeStream = isNativeReadableStream(value, true);
+    let next: AsyncIterator<BlobPart>['next'];
+    try {
+      ({ next } = iterator);
+    } catch (error) {
+      void ignoreCleanupResult(() => returnIterator?.());
+      throw error;
+    }
     let consumed = false;
     const snapshot: MultipartDataSnapshot = {
       data: {
