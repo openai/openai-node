@@ -3,7 +3,6 @@ import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
-import type { WorkloadIdentityRequestContext } from './internal/types';
 import { isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
@@ -183,14 +182,12 @@ export class AzureOpenAI extends OpenAI {
     timeout: number,
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-    maxRetries?: number,
-    context?: WorkloadIdentityRequestContext,
   ): Promise<Response> {
     if (new Headers(init.headers).has('api-key')) {
       init.redirect = 'manual';
     }
 
-    return super.fetchWithAuth(url, init, timeout, controller, schemes, maxRetries, context);
+    return super.fetchWithAuth(url, init, timeout, controller, schemes);
   }
 
   protected override async authHeaders(

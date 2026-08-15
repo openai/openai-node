@@ -51,6 +51,7 @@ export class SubjectTokenWorkloadIdentityAuth {
       try {
         return await refreshPromise;
       } finally {
+        // Promise identity prevents an older refresh from clearing a newer replacement.
         if (this.refreshPromise === refreshPromise) {
           this.refreshPromise = null;
         }

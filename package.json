@@ -83,6 +83,8 @@
     "./*.js": {
       "default": "./dist/*.js"
     },
+    "./auth/x509-token-exchange": null,
+    "./internal/auth/*": null,
     "./*": {
       "import": "./dist/*.mjs",
       "require": "./dist/*.js"

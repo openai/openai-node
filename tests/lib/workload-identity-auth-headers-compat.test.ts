@@ -109,7 +109,7 @@ describe('workload identity authHeaders subclass compatibility', () => {
     };
 
     await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-    expect(exchangeCount).toBe(1);
+    expect(exchangeCount).toBe(0);
     expect(apiCount).toBe(1);
   });
 

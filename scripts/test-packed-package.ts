@@ -222,7 +222,11 @@ const packedPackagePath = require('node:path');
     for (const privateSubpath of [
       'openai/auth/x509-token-exchange',
       'openai/internal/auth/x509-token-exchange',
+      'openai/internal/auth/x509-token-exchange.js',
+      'openai/internal/auth/x509-token-exchange.mjs',
       'openai/internal/auth/x509-workload-identity-auth',
+      'openai/internal/auth/x509-workload-identity-auth.js',
+      'openai/internal/auth/x509-workload-identity-auth.mjs',
     ]) {
       run(
         process.execPath,
