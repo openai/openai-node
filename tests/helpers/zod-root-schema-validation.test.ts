@@ -178,6 +178,36 @@ it('preserves named object roots and escaped references to supplied definitions'
   });
 });
 
+describe('strict vendor converter root schemas', () => {
+  it('rejects named object roots that resolve to a root reference', () => {
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        name: 'named-object',
+        openaiStrictMode: true,
+      }),
+    ).toThrow(expectedRootError());
+  });
+
+  it('continues accepting named object roots with duplicated references', () => {
+    expect(
+      zodToJsonSchema(z3.object({ value: z3.string() }), {
+        name: 'named-object',
+        nameStrategy: 'duplicate-ref',
+        openaiStrictMode: true,
+      }),
+    ).toMatchObject({ type: 'object', properties: { value: { type: 'string' } } });
+  });
+
+  it('rejects nullable OpenAPI3 object roots', () => {
+    expect(() =>
+      zodToJsonSchema(z3.object({ value: z3.string() }).nullable(), {
+        target: 'openApi3',
+        openaiStrictMode: true,
+      }),
+    ).toThrow(expectedRootError('object,null'));
+  });
+});
+
 describe.each(['jsonSchema7', 'jsonSchema2019-09', 'openApi3'] as const)(
   'non-strict %s converter targets',
   (target) => {
@@ -204,6 +234,15 @@ describe.each(['jsonSchema7', 'jsonSchema2019-09', 'openApi3'] as const)(
     });
   },
 );
+
+it('preserves non-strict OpenAPI3 nullable object roots', () => {
+  expect(zodToJsonSchema(z3.object({ value: z3.string() }).nullable(), { target: 'openApi3' })).toMatchObject(
+    {
+      type: 'object',
+      nullable: true,
+    },
+  );
+});
 
 describe('zodRealtimeFunction non-strict root schemas', () => {
   it('continues accepting a primitive Zod v3 root', () => {

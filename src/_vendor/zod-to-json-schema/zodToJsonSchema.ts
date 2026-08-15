@@ -5,14 +5,18 @@ import { parseDef } from './parseDef';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
-function validateStrictRootSchema(schema: JsonSchema7Type, openaiStrictMode: boolean | undefined): void {
+function validateStrictRootSchema(schema: object, openaiStrictMode: boolean | undefined): void {
   if (!openaiStrictMode) {
     return;
   }
 
   const type = 'type' in schema ? schema.type : undefined;
-  if (type !== 'object') {
-    throw new Error(`Root schema must have type: 'object' but got type: ${type ? `'${type}'` : 'undefined'}`);
+  const nullable = 'nullable' in schema && schema.nullable === true;
+  if (type !== 'object' || nullable) {
+    const actualType = nullable && type ? `${type},null` : type;
+    throw new Error(
+      `Root schema must have type: 'object' but got type: ${actualType ? `'${actualType}'` : 'undefined'}`,
+    );
   }
 }
 
@@ -134,6 +138,8 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   } else if (refs.target === 'jsonSchema2019-09') {
     combined.$schema = 'https://json-schema.org/draft/2019-09/schema#';
   }
+
+  validateStrictRootSchema(combined, refs.openaiStrictMode);
 
   return combined;
 };
