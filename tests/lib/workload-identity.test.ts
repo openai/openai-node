@@ -62,9 +62,9 @@ describe('OpenAI with Workload Identity', () => {
     global.fetch = vi.fn(async (url: string) => {
       if (url.toString().includes('/oauth/token')) {
         exchangeCount += 1;
-        return Response.json({ access_token: 'exchanged-access-token', expires_in: 3600 });
+        return globalThis.Response.json({ access_token: 'exchanged-access-token', expires_in: 3600 });
       }
-      return Response.json({ data: [] });
+      return globalThis.Response.json({ data: [] });
     }) as typeof fetch;
 
     const client = new OpenAI(options);
