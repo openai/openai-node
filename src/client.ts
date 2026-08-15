@@ -480,7 +480,10 @@ export class OpenAI {
   #encoder: Opts.RequestEncoder;
   // Preserve an explicit global selection without storing a second routing URL.
   #explicitDataResidency = false;
-  #workloadIdentityRequestContexts = new WeakMap<FinalizedRequestInit, WorkloadIdentityRequestContext>();
+  // Preserve request-scoped auth provenance across the established two-argument
+  // protected auth hooks without exposing new parameters to subclasses.
+  #workloadIdentityBuildContexts = new WeakMap<FinalRequestOptions, WorkloadIdentityRequestContext>();
+  #workloadIdentityRequestContexts = new WeakMap<RequestInit, WorkloadIdentityRequestContext>();
   #responseAttempts = new WeakMap<AbortController, { timeout: number; retriesRemaining: number }>();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
@@ -736,9 +739,9 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
-    context?: WorkloadIdentityRequestContext,
   ): Promise<NullableHeaders | undefined> {
-    const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, context) : null;
+    const context = this.#workloadIdentityBuildContexts.get(opts);
+    const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts) : null;
     const adminHeaders = schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null;
     if (context && adminHeaders?.values.has('authorization')) {
       context.usesWorkloadIdentityToken = false;
@@ -746,10 +749,8 @@ export class OpenAI {
     return buildHeaders([bearerHeaders, adminHeaders]);
   }
 
-  protected async bearerAuth(
-    opts: FinalRequestOptions,
-    context?: WorkloadIdentityRequestContext,
-  ): Promise<NullableHeaders | undefined> {
+  protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    const context = this.#workloadIdentityBuildContexts.get(opts);
     if (this._workloadIdentityAuth) {
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       const token = await this._workloadIdentityAuth.getToken(opts.signal, opts.timeout ?? this.timeout, {
@@ -1345,6 +1346,7 @@ export class OpenAI {
     maxRetries: number = this.maxRetries,
     context?: WorkloadIdentityRequestContext,
   ): Promise<Response> {
+    context ??= this.#workloadIdentityRequestContexts.get(init);
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       const headers = init.headers as Headers;
@@ -1570,6 +1572,19 @@ export class OpenAI {
     const headerOverrides = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
     const overridesAuthorization =
       headerOverrides.values.has('authorization') || headerOverrides.nulls.has('authorization');
+    let authenticationHeaders: NullableHeaders | undefined;
+    if (!this._provider && !overridesAuthorization) {
+      const authOptions = { ...options };
+      this.#workloadIdentityBuildContexts.set(authOptions, workloadIdentityContext);
+      try {
+        authenticationHeaders = await this.authHeaders(
+          authOptions,
+          options.__security ?? { bearerAuth: true },
+        );
+      } finally {
+        this.#workloadIdentityBuildContexts.delete(authOptions);
+      }
+    }
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1582,15 +1597,7 @@ export class OpenAI {
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      this._provider
-        ? undefined
-        : overridesAuthorization
-          ? undefined
-          : await this.authHeaders(
-              options,
-              options.__security ?? { bearerAuth: true },
-              workloadIdentityContext,
-            ),
+      authenticationHeaders,
       headerOverrides,
     ]);
 

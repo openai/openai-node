@@ -7,7 +7,6 @@ import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import type { FinalRequestOptions, RequestOptions } from './internal/request-options';
-import type { WorkloadIdentityRequestContext } from './internal/types';
 import { readEnv } from './internal/utils';
 import { addOutputText } from './lib/ResponsesParser';
 import type { ResponseStreamParams } from './lib/responses/ResponseStream';
@@ -216,14 +215,13 @@ export class BedrockOpenAI extends OpenAI {
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-    context?: WorkloadIdentityRequestContext,
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if ((security.bearerAuth || security.adminAPIKeyAuth) && this.apiKey !== null) {
       return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
     }
 
-    return super.authHeaders(opts, security, context);
+    return super.authHeaders(opts, security);
   }
 
   /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */

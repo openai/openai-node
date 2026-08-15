@@ -196,13 +196,12 @@ export class AzureOpenAI extends OpenAI {
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-    context?: WorkloadIdentityRequestContext,
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
       return buildHeaders([{ 'api-key': this.apiKey }]);
     }
-    return super.authHeaders(opts, security, context);
+    return super.authHeaders(opts, security);
   }
 }
 

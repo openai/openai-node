@@ -219,6 +219,21 @@ const packedPackagePath = require('node:path');
     const isolatedEnvironment = { ...process.env };
     delete isolatedEnvironment['NODE_PATH'];
 
+    for (const privateSubpath of [
+      'openai/auth/x509-token-exchange',
+      'openai/internal/auth/x509-token-exchange',
+      'openai/internal/auth/x509-workload-identity-auth',
+    ]) {
+      run(
+        process.execPath,
+        [
+          '-e',
+          `try { require(${JSON.stringify(privateSubpath)}); } catch (error) { if (error.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED' || error.code === 'MODULE_NOT_FOUND') process.exit(0); throw error; } throw new Error(${JSON.stringify(`${privateSubpath} unexpectedly became a public package export`)});`,
+        ],
+        { env: isolatedEnvironment },
+      );
+    }
+
     assert(
       !fs.existsSync(path.join(temporaryDirectory, 'node_modules/@types/node')),
       'Packed browser/edge consumer unexpectedly installed @types/node',

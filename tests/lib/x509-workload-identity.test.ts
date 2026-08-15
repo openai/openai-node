@@ -3,6 +3,8 @@ import { expect, vi } from 'vitest';
 import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
 import { CursorPage } from 'openai/core/pagination';
 import type { RequestInit } from 'openai/internal/builtin-types';
+import type { NullableHeaders } from 'openai/internal/headers';
+import type { FinalRequestOptions } from 'openai/internal/request-options';
 
 const x509Identity = {
   type: 'x509' as const,
@@ -38,6 +40,13 @@ async function* nonReplayableBody() {
 
 class RequestMutatingOpenAI extends OpenAI {
   requestMutation?: (request: RequestInit) => void;
+
+  protected override async authHeaders(
+    opts: FinalRequestOptions,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<NullableHeaders | undefined> {
+    return super.authHeaders(opts, schemes);
+  }
 
   protected override async prepareRequest(request: RequestInit): Promise<void> {
     this.requestMutation?.(request);
@@ -623,6 +632,34 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(apiCount).toBe(2);
     expect(bodies).toEqual(['same-body', 'same-body']);
     expect(authorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
+  });
+
+  test('preserves workload-token provenance through a legacy authHeaders override', async () => {
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const apiAuthorizations: (string | null)[] = [];
+    const client = new RequestMutatingOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchangeCount += 1;
+          return tokenResponse(`token-${exchangeCount}`);
+        }
+        apiCount += 1;
+        apiAuthorizations.push(new Headers(init?.headers).get('Authorization'));
+        return apiCount === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      }),
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+
+    expect(exchangeCount).toBe(2);
+    expect(apiCount).toBe(2);
+    expect(apiAuthorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
   });
 
   test('retries a replayable 401 when response cleanup fails', async () => {
