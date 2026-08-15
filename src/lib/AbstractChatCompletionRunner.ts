@@ -406,7 +406,7 @@ export class AbstractChatCompletionRunner<
       return tool as any as RunnableToolFunction<any>;
     });
 
-    const functionsByName: Record<string, RunnableFunction<any, ToolContext>> = {};
+    const functionsByName: Record<string, RunnableFunction<any, ToolContext>> = Object.create(null);
     for (const f of inputTools) {
       if (f.type === 'function') {
         functionsByName[f.function.name || f.function.function.name] = f.function;

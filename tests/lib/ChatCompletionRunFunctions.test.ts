@@ -17,6 +17,15 @@ import type { RunnableToolFunction } from 'openai/lib/RunnableFunction';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';
 
+const unregisteredFunctionNames = [
+  { name: 'get_weather', tool: 'getWeather' },
+  { name: 'constructor', tool: 'getWeather' },
+  { name: 'toString', tool: 'getWeather' },
+  { name: '__proto__', tool: 'getWeather' },
+  { name: 'hasOwnProperty', tool: 'getWeather' },
+  { name: 'function', tool: '__proto__' },
+] as const;
+
 // mockChatCompletionFetch is like mockFetch, but with better a more convenient handleRequest to mock
 // chat completion request/responses.
 function mockChatCompletionFetch() {
@@ -1672,7 +1681,7 @@ describe('resource completions', () => {
       expect(listener.functionCallResults).toEqual([`must be an object`, '3']);
       await listener.sanityCheck();
     });
-    test('single function call', async () => {
+    test.each(['getWeather', '__proto__'])('single function call: %s', async (functionName) => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
@@ -1683,13 +1692,14 @@ describe('resource completions', () => {
         tool_choice: {
           type: 'function',
           function: {
-            name: 'getWeather',
+            name: functionName,
           },
         },
         tools: [
           {
             type: 'function',
             function: {
+              name: functionName,
               function: function getWeather() {
                 return `it's raining`;
               },
@@ -1722,7 +1732,7 @@ describe('resource completions', () => {
                       id: '123',
                       function: {
                         arguments: '',
-                        name: 'getWeather',
+                        name: functionName,
                       },
                     },
                   ],
@@ -1749,7 +1759,7 @@ describe('resource completions', () => {
               id: '123',
               function: {
                 arguments: '',
-                name: 'getWeather',
+                name: functionName,
                 parsed_arguments: null,
               },
             },
@@ -1760,7 +1770,7 @@ describe('resource completions', () => {
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
     });
-    test('wrong function name', async () => {
+    test.each(unregisteredFunctionNames)('wrong function name: $name', async ({ name, tool }) => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
@@ -1772,6 +1782,7 @@ describe('resource completions', () => {
           {
             type: 'function',
             function: {
+              name: tool,
               function: function getWeather() {
                 return `it's raining`;
               },
@@ -1786,6 +1797,12 @@ describe('resource completions', () => {
       await Promise.all([
         handleRequest(async (request) => {
           expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+          expect(request.tools).toEqual([
+            {
+              type: 'function',
+              function: { name: tool, parameters: {}, description: 'gets the weather' },
+            },
+          ]);
           return {
             id: '1',
             choices: [
@@ -1804,7 +1821,7 @@ describe('resource completions', () => {
                       id: '123',
                       function: {
                         arguments: '',
-                        name: 'get_weather',
+                        name,
                       },
                     },
                   ],
@@ -1828,14 +1845,14 @@ describe('resource completions', () => {
                   id: '123',
                   function: {
                     arguments: '',
-                    name: 'get_weather',
+                    name,
                   },
                 },
               ],
             },
             {
               role: 'tool',
-              content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+              content: `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
               tool_call_id: '123',
             },
           ]);
@@ -1857,7 +1874,7 @@ describe('resource completions', () => {
                       id: '1234',
                       function: {
                         arguments: '',
-                        name: 'getWeather',
+                        name: tool,
                       },
                     },
                   ],
@@ -1881,14 +1898,14 @@ describe('resource completions', () => {
                   id: '123',
                   function: {
                     arguments: '',
-                    name: 'get_weather',
+                    name,
                   },
                 },
               ],
             },
             {
               role: 'tool',
-              content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+              content: `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
               tool_call_id: '123',
             },
             {
@@ -1900,7 +1917,7 @@ describe('resource completions', () => {
                   id: '1234',
                   function: {
                     arguments: '',
-                    name: 'getWeather',
+                    name: tool,
                   },
                 },
               ],
@@ -1943,13 +1960,13 @@ describe('resource completions', () => {
             {
               type: 'function',
               id: '123',
-              function: { name: 'get_weather', arguments: '', parsed_arguments: null },
+              function: { name, arguments: '', parsed_arguments: null },
             },
           ],
         },
         {
           role: 'tool',
-          content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+          content: `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
           tool_call_id: '123',
         },
         {
@@ -1962,7 +1979,7 @@ describe('resource completions', () => {
               type: 'function',
               id: '1234',
               function: {
-                name: 'getWeather',
+                name: tool,
                 arguments: '',
                 parsed_arguments: null,
               },
@@ -1979,7 +1996,7 @@ describe('resource completions', () => {
         },
       ]);
       expect(listener.functionCallResults).toEqual([
-        `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+        `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
         `it's raining`,
       ]);
       await listener.sanityCheck();
@@ -3032,7 +3049,7 @@ describe('resource completions', () => {
       expect(listener.eventFunctionCallResults).toEqual([`must be an object`, '3']);
       await listener.sanityCheck();
     });
-    test('single function call', async () => {
+    test.each(['getWeather', '__proto__'])('single function call: %s', async (functionName) => {
       const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
@@ -3044,13 +3061,14 @@ describe('resource completions', () => {
         tool_choice: {
           type: 'function',
           function: {
-            name: 'getWeather',
+            name: functionName,
           },
         },
         tools: [
           {
             type: 'function',
             function: {
+              name: functionName,
               function: function getWeather() {
                 return `it's raining`;
               },
@@ -3082,7 +3100,7 @@ describe('resource completions', () => {
                         id: '123',
                         function: {
                           arguments: '',
-                          name: 'getWeather',
+                          name: functionName,
                         },
                       },
                     ],
@@ -3110,7 +3128,7 @@ describe('resource completions', () => {
               id: '123',
               function: {
                 arguments: '',
-                name: 'getWeather',
+                name: functionName,
               },
             },
           ],
@@ -3120,7 +3138,7 @@ describe('resource completions', () => {
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
     });
-    test('wrong function name', async () => {
+    test.each(unregisteredFunctionNames)('wrong function name: $name', async ({ name, tool }) => {
       const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
@@ -3133,6 +3151,7 @@ describe('resource completions', () => {
           {
             type: 'function',
             function: {
+              name: tool,
               function: function getWeather() {
                 return `it's raining`;
               },
@@ -3148,6 +3167,12 @@ describe('resource completions', () => {
         handleRequest(
           async function* requestHandler(request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
             expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+            expect(request.tools).toEqual([
+              {
+                type: 'function',
+                function: { name: tool, parameters: {}, description: 'gets the weather' },
+              },
+            ]);
             yield {
               id: '1',
               choices: [
@@ -3164,7 +3189,7 @@ describe('resource completions', () => {
                         id: '123',
                         function: {
                           arguments: '',
-                          name: 'get_weather',
+                          name,
                         },
                       },
                     ],
@@ -3190,14 +3215,14 @@ describe('resource completions', () => {
                     id: '123',
                     function: {
                       arguments: '',
-                      name: 'get_weather',
+                      name,
                     },
                   },
                 ],
               },
               {
                 role: 'tool',
-                content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+                content: `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
                 tool_call_id: '123',
               },
             ]);
@@ -3218,7 +3243,7 @@ describe('resource completions', () => {
                         id: '1234',
                         function: {
                           arguments: '',
-                          name: 'getWeather',
+                          name: tool,
                         },
                       },
                     ],
@@ -3244,14 +3269,14 @@ describe('resource completions', () => {
                     id: '123',
                     function: {
                       arguments: '',
-                      name: 'get_weather',
+                      name,
                     },
                   },
                 ],
               },
               {
                 role: 'tool',
-                content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+                content: `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
                 tool_call_id: '123',
               },
               {
@@ -3263,7 +3288,7 @@ describe('resource completions', () => {
                     id: '1234',
                     function: {
                       arguments: '',
-                      name: 'getWeather',
+                      name: tool,
                     },
                   },
                 ],
@@ -3300,14 +3325,14 @@ describe('resource completions', () => {
               id: '123',
               function: {
                 arguments: '',
-                name: 'get_weather',
+                name,
               },
             },
           ],
         },
         {
           role: 'tool',
-          content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+          content: `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
           tool_call_id: '123',
         },
         {
@@ -3321,7 +3346,7 @@ describe('resource completions', () => {
               id: '1234',
               function: {
                 arguments: '',
-                name: 'getWeather',
+                name: tool,
               },
             },
           ],
@@ -3336,7 +3361,7 @@ describe('resource completions', () => {
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([
-        `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+        `Invalid tool_call: "${name}". Available options are: "${tool}". Please try again`,
         `it's raining`,
       ]);
       await listener.sanityCheck();
