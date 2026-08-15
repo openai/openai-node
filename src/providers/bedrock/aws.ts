@@ -311,9 +311,9 @@ export function bedrock(options: BedrockProviderOptions = {}): Provider {
       return {
         name: 'bedrock',
         baseURL,
-        prepareRequest(request, context) {
+        async prepareRequest(request, context) {
           assertBedrockRequestOrigin(baseURL, context.url);
-          return auth.prepareRequest(request, context);
+          await auth.prepareRequest(request, context);
         },
       };
     },

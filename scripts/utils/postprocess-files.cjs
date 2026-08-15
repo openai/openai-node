@@ -55,6 +55,14 @@ async function postprocess() {
       types: './index.d.mts',
       default: './index.mjs',
     },
+    './auth': {
+      require: {
+        types: './auth/index.d.ts',
+        default: './auth/index.js',
+      },
+      types: './auth/index.d.mts',
+      default: './auth/index.mjs',
+    },
   };
 
   for (const entry of await fs.promises.readdir(distDir, { withFileTypes: true })) {

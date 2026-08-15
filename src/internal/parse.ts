@@ -1,6 +1,7 @@
 import type { FinalRequestOptions } from './request-options';
 import { Stream } from '../core/streaming';
 import { type OpenAI } from '../client';
+import { isAbortError } from './errors';
 import { formatRequestDetails, loggerFor } from './utils/log';
 import type { AbstractPage } from '../pagination';
 
@@ -76,7 +77,9 @@ export async function defaultParseResponse<T>(
 
     const text = await response.text();
     return text as unknown as T;
-  })();
+  })().catch((error: unknown) => {
+    throw asAbortError(error, props.controller.signal);
+  });
   loggerFor(client).debug(
     `[${requestLogID}] response parsed`,
     formatRequestDetails({
@@ -88,6 +91,18 @@ export async function defaultParseResponse<T>(
     }),
   );
   return body;
+}
+
+function asAbortError(error: unknown, signal: AbortSignal): unknown {
+  if (!signal.aborted || error !== signal.reason || isAbortError(error)) {
+    return error;
+  }
+
+  const message = 'This operation was aborted';
+  const DOMExceptionConstructor = (globalThis as any).DOMException;
+  return typeof DOMExceptionConstructor === 'function'
+    ? new DOMExceptionConstructor(message, 'AbortError')
+    : Object.assign(new Error(message), { name: 'AbortError' });
 }
 
 export type WithRequestID<T> = T extends Array<any> | Response | AbstractPage<any>

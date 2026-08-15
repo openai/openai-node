@@ -16,10 +16,6 @@ export const config = {
 
 type Test = { description: string; handler: () => Promise<void> };
 
-const tests: Test[] = [];
-function it(description: string, handler: () => Promise<void>) {
-  tests.push({ description, handler });
-}
 function expectEqual(a: any, b: any) {
   if (!Object.is(a, b)) {
     throw new Error(`expected values to be equal: ${JSON.stringify({ a, b })}`);
@@ -42,6 +38,11 @@ function expectSimilar(received: string, expected: string, maxDistance: number) 
 }
 
 export default async function handler(request: NextRequest) {
+  const tests: Test[] = [];
+  function it(description: string, handler: () => Promise<void>) {
+    tests.push({ description, handler });
+  }
+
   try {
     console.error('creating client');
     const client = new OpenAI();

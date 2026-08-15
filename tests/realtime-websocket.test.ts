@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
-import OpenAI, { AzureOpenAI } from 'openai';
+import OpenAI, { AzureOpenAI, OpenAIError } from 'openai';
 import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtime/websocket';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaBrowserRealtime } from 'openai/beta/realtime/websocket';
@@ -60,6 +60,20 @@ class FakeBrowserSocket {
 
 const originalWebSocket = globalThis.WebSocket;
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const azureCredentialCases = [
+  {
+    authentication: 'an Azure API key',
+    tokenProvider: false,
+    queryParameter: 'api-key',
+    credential: 'azure-key',
+  },
+  {
+    authentication: 'an Entra bearer token',
+    tokenProvider: true,
+    queryParameter: 'Authorization',
+    credential: 'Bearer azure-token',
+  },
+] as const;
 
 function lastBrowserSocket(): FakeBrowserSocket {
   return FakeBrowserSocket.instances[FakeBrowserSocket.instances.length - 1]!;
@@ -78,14 +92,24 @@ function createClient(apiKey: string | (() => Promise<string>) = 'test-key'): Op
   return new OpenAI({ apiKey, baseURL: 'https://example.com/v1/' });
 }
 
-function createAzureClient(options: { tokenProvider?: boolean; deployment?: string } = {}): AzureOpenAI {
+function createAzureClient(
+  options: {
+    tokenProvider?: boolean;
+    deployment?: string;
+    dangerouslyAllowBrowser?: boolean;
+    baseURL?: string;
+  } = {},
+): AzureOpenAI {
   return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
-    baseURL: 'https://azure.example.com/openai/',
+    baseURL: options.baseURL ?? 'https://azure.example.com/openai/',
     ...(options.tokenProvider
       ? { azureADTokenProvider: async () => 'azure-token' }
       : { apiKey: 'azure-key' }),
     ...(options.deployment === undefined ? {} : { deployment: options.deployment }),
+    ...(options.dangerouslyAllowBrowser === undefined
+      ? {}
+      : { dangerouslyAllowBrowser: options.dangerouslyAllowBrowser }),
   });
 }
 
@@ -260,6 +284,98 @@ describe.each([
     expect(connectionURL.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
     expect(connectionURL.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
     expect(connectionURL.searchParams.has('api-version')).toBe(beta);
+  });
+
+  test.each(azureCredentialCases)(
+    'redacts both Azure query credentials when the URL already contains another credential with $authentication',
+    async ({ tokenProvider, queryParameter, credential }) => {
+      const existingParameter = queryParameter === 'api-key' ? 'Authorization' : 'api-key';
+      const existingCredential = tokenProvider ? 'existing-gateway-key' : 'existing-gateway-token';
+      const baseURL = `https://azure.example.com/openai/?${existingParameter}=${existingCredential}&routing=value`;
+      const client = createAzureClient({ deployment: 'chat', tokenProvider, baseURL });
+
+      const realtime = beta
+        ? await Realtime.azure(client)
+        : await StableBrowserRealtime.azure(client, {
+            buildRealtimeURL: () => {
+              const url = new URL(client.baseURL);
+              url.protocol = 'wss:';
+              return url;
+            },
+          });
+      const connectionURL = new URL(lastBrowserSocket().url);
+
+      expect(connectionURL.searchParams.get(existingParameter)).toBe(existingCredential);
+      expect(connectionURL.searchParams.get(queryParameter)).toBe(credential);
+      expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
+      expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
+      expect(realtime.url.toString()).not.toContain(existingCredential);
+      expect(realtime.url.toString()).not.toContain(tokenProvider ? 'azure-token' : 'azure-key');
+    },
+  );
+
+  test.each(azureCredentialCases)(
+    'opens outside a browser when browser access is explicitly disabled with $authentication',
+    async ({ tokenProvider, queryParameter, credential }) => {
+      const client = createAzureClient({
+        deployment: 'chat',
+        tokenProvider,
+        dangerouslyAllowBrowser: true,
+      });
+
+      const realtime = await Realtime.azure(client, { dangerouslyAllowBrowser: false });
+
+      expect(realtime.socket).toBe(lastBrowserSocket());
+      expect(new URL(lastBrowserSocket().url).searchParams.get(queryParameter)).toBe(credential);
+    },
+  );
+
+  describe('Azure browser security', () => {
+    beforeEach(() => {
+      vi.stubGlobal('window', { document: {} });
+      vi.stubGlobal('navigator', {});
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    describe.each(azureCredentialCases)(
+      'with $authentication',
+      ({ tokenProvider, queryParameter, credential }) => {
+        test('rejects an explicit browser denial before opening a WebSocket', async () => {
+          const client = createAzureClient({
+            deployment: 'chat',
+            tokenProvider,
+            dangerouslyAllowBrowser: true,
+          });
+
+          await expect(Realtime.azure(client, { dangerouslyAllowBrowser: false })).rejects.toThrow(
+            OpenAIError,
+          );
+          expect(FakeBrowserSocket.instances).toHaveLength(0);
+        });
+
+        test.each([
+          { setting: 'explicitly enabled', dangerouslyAllowBrowser: true },
+          { setting: 'inherited from the client', dangerouslyAllowBrowser: undefined },
+        ])('opens a WebSocket when browser access is $setting', async ({ dangerouslyAllowBrowser }) => {
+          const client = createAzureClient({
+            deployment: 'chat',
+            tokenProvider,
+            dangerouslyAllowBrowser: true,
+          });
+
+          const realtime = await Realtime.azure(
+            client,
+            dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser },
+          );
+
+          expect(realtime.socket).toBe(lastBrowserSocket());
+          expect(new URL(lastBrowserSocket().url).searchParams.get(queryParameter)).toBe(credential);
+        });
+      },
+    );
   });
 
   test('rejects Azure connections without a deployment', async () => {

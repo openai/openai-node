@@ -49,7 +49,7 @@ export class WorkloadIdentityAuth {
    *
    * @throws {OAuthError} When the token endpoint rejects the subject token or identity.
    * @throws {APIError} When another unsuccessful HTTP response prevents token exchange.
-   * @throws {OpenAIError} When a successful exchange does not include an access token.
+   * @throws {OpenAIError} When a successful exchange has an invalid access token or expiration.
    */
   async getToken(): Promise<string> {
     if (!this.cachedToken || WorkloadIdentityAuth.isTokenExpired(this.cachedToken)) {
@@ -139,7 +139,15 @@ export class WorkloadIdentityAuth {
 
     const accessToken = tokenResponse.access_token;
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
-    const expiresAt = Date.now() + expiresIn * 1000;
+    if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+    }
+
+    const now = Date.now();
+    const expiresAt = now + expiresIn * 1000;
+    if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
+      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+    }
 
     if (this.tokenGeneration === generation) {
       this.cachedToken = {

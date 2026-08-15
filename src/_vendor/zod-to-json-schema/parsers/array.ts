@@ -18,7 +18,7 @@ export function parseArrayDef(def: ZodArrayDef, refs: Refs) {
   const res: JsonSchema7ArrayType = {
     type: 'array',
   };
-  if (def.type?._def?.typeName !== ZodFirstPartyTypeKind.ZodAny) {
+  if (def.type?._def?.typeName !== ZodFirstPartyTypeKind.ZodAny || refs.openaiStrictMode) {
     res.items = parseDef(def.type._def, {
       ...refs,
       currentPath: [...refs.currentPath, 'items'],

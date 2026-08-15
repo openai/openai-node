@@ -412,6 +412,7 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaInlineSkillSource</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaLocalEnvironment</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaLocalSkill</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaMcpToolCallError</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaNamespaceTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponse</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseApplyPatchToolCall</a></code>
@@ -515,6 +516,11 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningTextDoneEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseRefusalDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseRefusalDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallCommandAddedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallCommandDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallCommandDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallOutputContentDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallOutputContentDoneEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStatus</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStreamEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseTextConfig</a></code>

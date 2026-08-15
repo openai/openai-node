@@ -934,6 +934,35 @@ export interface LocalSkill {
   path: string;
 }
 
+export type McpToolCallError =
+  | McpToolCallError.McpProtocolError
+  | McpToolCallError.McpToolExecutionError
+  | McpToolCallError.HTTPError;
+
+export namespace McpToolCallError {
+  export interface McpProtocolError {
+    code: number;
+
+    message: string;
+
+    type: 'mcp_protocol_error';
+  }
+
+  export interface McpToolExecutionError {
+    content: unknown;
+
+    type: 'mcp_tool_execution_error';
+  }
+
+  export interface HTTPError {
+    code: number;
+
+    message: string;
+
+    type: 'http_error';
+  }
+}
+
 /**
  * Groups function/custom tools under a shared namespace.
  */
@@ -1235,12 +1264,16 @@ export interface Response {
    *   Responses or Chat Completions. The response will show `service_tier=priority`
    *   regardless of if you specify `service_tier=fast` or `priority` in your
    *   request.
+   * - If set to 'ultrafast', then the request will be processed with the
+   *   access-controlled Ultrafast Processing service tier. This tier is currently
+   *   available for `gpt-5.6-sol`; a response served through it will show
+   *   `service_tier=ultrafast`.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | 'ultrafast' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -3725,6 +3758,26 @@ export interface ResponseImageGenCallPartialImageEvent {
    * The type of the event. Always 'response.image_generation_call.partial_image'.
    */
   type: 'response.image_generation_call.partial_image';
+
+  /**
+   * The background setting that was used.
+   */
+  background?: string;
+
+  /**
+   * The output format that was used.
+   */
+  output_format?: string;
+
+  /**
+   * The image quality that was used.
+   */
+  quality?: string;
+
+  /**
+   * The image size that was used.
+   */
+  size?: string;
 }
 
 /**
@@ -4902,7 +4955,7 @@ export namespace ResponseInputItem {
     /**
      * The error from the tool call, if any.
      */
-    error?: string | null;
+    error?: ResponsesAPI.McpToolCallError | null;
 
     /**
      * The output from the tool call.
@@ -5487,7 +5540,7 @@ export namespace ResponseItem {
     /**
      * The error from the tool call, if any.
      */
-    error?: string | null;
+    error?: ResponsesAPI.McpToolCallError | null;
 
     /**
      * The output from the tool call.
@@ -6011,7 +6064,7 @@ export namespace ResponseOutputItem {
     /**
      * The error from the tool call, if any.
      */
-    error?: string | null;
+    error?: ResponsesAPI.McpToolCallError | null;
 
     /**
      * The output from the tool call.
@@ -6148,7 +6201,10 @@ export namespace ResponseOutputItem {
  */
 export interface ResponseOutputItemAddedEvent {
   /**
-   * The output item that was added.
+   * The output item that was added. For reasoning items, `encrypted_content` may be
+   * incomplete while the item is in progress. Use the reasoning item from the
+   * corresponding `response.output_item.done` event when passing it as input to a
+   * subsequent request.
    */
   item: ResponseOutputItem;
 
@@ -6417,9 +6473,14 @@ export namespace ResponseOutputText {
  */
 export interface ResponseOutputTextAnnotationAddedEvent {
   /**
-   * The annotation object being added. (See annotation schema for details.)
+   * An annotation that applies to a span of output text.
    */
-  annotation: unknown;
+  annotation:
+    | ResponseOutputTextAnnotationAddedEvent.FileCitation
+    | ResponseOutputTextAnnotationAddedEvent.URLCitation
+    | ResponseOutputTextAnnotationAddedEvent.ContainerFileCitation
+    | ResponseOutputTextAnnotationAddedEvent.FilePath
+    | null;
 
   /**
    * The index of the annotation within the content part.
@@ -6450,6 +6511,118 @@ export interface ResponseOutputTextAnnotationAddedEvent {
    * The type of the event. Always 'response.output_text.annotation.added'.
    */
   type: 'response.output_text.annotation.added';
+}
+
+export namespace ResponseOutputTextAnnotationAddedEvent {
+  /**
+   * A citation to a file.
+   */
+  export interface FileCitation {
+    /**
+     * The ID of the file.
+     */
+    file_id: string;
+
+    /**
+     * The filename of the file cited.
+     */
+    filename: string;
+
+    /**
+     * The index of the file in the list of files.
+     */
+    index: number;
+
+    /**
+     * The type of the file citation. Always `file_citation`.
+     */
+    type: 'file_citation';
+  }
+
+  /**
+   * A citation for a web resource used to generate a model response.
+   */
+  export interface URLCitation {
+    /**
+     * The index of the last character of the URL citation in the message.
+     */
+    end_index: number;
+
+    /**
+     * The index of the first character of the URL citation in the message.
+     */
+    start_index: number;
+
+    /**
+     * The title of the web resource.
+     */
+    title: string;
+
+    /**
+     * The type of the URL citation. Always `url_citation`.
+     */
+    type: 'url_citation';
+
+    /**
+     * The URL of the web resource.
+     */
+    url: string;
+  }
+
+  /**
+   * A citation for a container file used to generate a model response.
+   */
+  export interface ContainerFileCitation {
+    /**
+     * The ID of the container file.
+     */
+    container_id: string;
+
+    /**
+     * The index of the last character of the container file citation in the message.
+     */
+    end_index: number;
+
+    /**
+     * The ID of the file.
+     */
+    file_id: string;
+
+    /**
+     * The filename of the container file cited.
+     */
+    filename: string;
+
+    /**
+     * The index of the first character of the container file citation in the message.
+     */
+    start_index: number;
+
+    /**
+     * The type of the container file citation. Always `container_file_citation`.
+     */
+    type: 'container_file_citation';
+  }
+
+  /**
+   * A path to a file.
+   */
+  export interface FilePath {
+    /**
+     * The ID of the file.
+     */
+    file_id: string;
+
+    /**
+     * The index of the file in the list of files.
+     */
+    index: number;
+
+    /**
+     * The type of the file path. Always `file_path`.
+     */
+    type: 'file_path';
+  }
 }
 
 /**
@@ -6526,6 +6699,11 @@ export interface ResponseReasoningItem {
    * The encrypted content of the reasoning item. This is populated by default for
    * reasoning items returned by `POST /v1/responses` and WebSocket `response.create`
    * requests.
+   *
+   * When streaming, use the completed reasoning item and its `encrypted_content`
+   * from the `response.output_item.done` event in subsequent requests. The
+   * `encrypted_content` in `response.output_item.added` may be incomplete. This is
+   * especially important when `store` is `false` or when using Zero Data Retention.
    */
   encrypted_content?: string | null;
 
@@ -6889,6 +7067,243 @@ export interface ResponseRefusalDoneEvent {
 }
 
 /**
+ * A streaming event that indicated a shell command was added to a tool call.
+ */
+export interface ResponseShellCallCommandAddedEvent {
+  /**
+   * The shell command that was added.
+   */
+  command: string;
+
+  /**
+   * The index of the shell command that was added.
+   */
+  command_index: number;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.added`.
+   */
+  type: 'response.shell_call_command.added';
+}
+
+/**
+ * A streaming event that indicated a shell command was incrementally updated.
+ */
+export interface ResponseShellCallCommandDeltaEvent {
+  /**
+   * The index of the shell command that was updated.
+   */
+  command_index: number;
+
+  /**
+   * The shell command delta that was appended.
+   */
+  delta: string;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.delta`.
+   */
+  type: 'response.shell_call_command.delta';
+
+  /**
+   * An obfuscation string that was added to pad the event payload.
+   */
+  obfuscation?: string;
+}
+
+/**
+ * A streaming event that indicated a shell command was completed.
+ */
+export interface ResponseShellCallCommandDoneEvent {
+  /**
+   * The final shell command that was emitted.
+   */
+  command: string;
+
+  /**
+   * The index of the shell command that was completed.
+   */
+  command_index: number;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_command.done`.
+   */
+  type: 'response.shell_call_command.done';
+}
+
+/**
+ * A streaming event that indicated shell call output was incrementally added.
+ */
+export interface ResponseShellCallOutputContentDeltaEvent {
+  /**
+   * The index of the shell command that produced output.
+   */
+  command_index: number;
+
+  /**
+   * The stdout/stderr delta that was emitted.
+   */
+  delta: ResponseShellCallOutputContentDeltaEvent.Delta;
+
+  /**
+   * The ID of the output item that was updated.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_output_content.delta`.
+   */
+  type: 'response.shell_call_output_content.delta';
+}
+
+export namespace ResponseShellCallOutputContentDeltaEvent {
+  /**
+   * The stdout/stderr delta that was emitted.
+   */
+  export interface Delta {
+    /**
+     * The stderr delta that was emitted.
+     */
+    stderr?: string;
+
+    /**
+     * The stdout delta that was emitted.
+     */
+    stdout?: string;
+  }
+}
+
+/**
+ * A streaming event that indicated shell call output was completed.
+ */
+export interface ResponseShellCallOutputContentDoneEvent {
+  /**
+   * The index of the shell command that produced output.
+   */
+  command_index: number;
+
+  /**
+   * The ID of the output item that was updated.
+   */
+  item_id: string;
+
+  /**
+   * The output contents emitted for the shell command.
+   */
+  output: Array<ResponseShellCallOutputContentDoneEvent.Output>;
+
+  /**
+   * The index of the output item that was updated.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.shell_call_output_content.done`.
+   */
+  type: 'response.shell_call_output_content.done';
+}
+
+export namespace ResponseShellCallOutputContentDoneEvent {
+  /**
+   * The content of a shell tool call output that was emitted.
+   */
+  export interface Output {
+    /**
+     * Represents either an exit outcome (with an exit code) or a timeout outcome for a
+     * shell call output chunk.
+     */
+    outcome: Output.Timeout | Output.Exit;
+
+    /**
+     * The standard error output that was captured.
+     */
+    stderr: string;
+
+    /**
+     * The standard output that was captured.
+     */
+    stdout: string;
+
+    /**
+     * The identifier of the actor that created the item.
+     */
+    created_by?: string;
+  }
+
+  export namespace Output {
+    /**
+     * Indicates that the shell call exceeded its configured time limit.
+     */
+    export interface Timeout {
+      /**
+       * The outcome type. Always `timeout`.
+       */
+      type: 'timeout';
+    }
+
+    /**
+     * Indicates that the shell commands finished and returned an exit code.
+     */
+    export interface Exit {
+      /**
+       * Exit code from the shell process.
+       */
+      exit_code: number;
+
+      /**
+       * The outcome type. Always `exit`.
+       */
+      type: 'exit';
+    }
+  }
+}
+
+/**
  * The status of the response generation. One of `completed`, `failed`,
  * `in_progress`, `cancelled`, `queued`, or `incomplete`.
  */
@@ -6917,6 +7332,11 @@ export type ResponseStreamEvent =
   | ResponseFileSearchCallSearchingEvent
   | ResponseFunctionCallArgumentsDeltaEvent
   | ResponseFunctionCallArgumentsDoneEvent
+  | ResponseShellCallCommandAddedEvent
+  | ResponseShellCallCommandDeltaEvent
+  | ResponseShellCallCommandDoneEvent
+  | ResponseShellCallOutputContentDeltaEvent
+  | ResponseShellCallOutputContentDoneEvent
   | ResponseInProgressEvent
   | ResponseFailedEvent
   | ResponseIncompleteEvent
@@ -7583,6 +8003,10 @@ export interface ResponsesClientEvent {
    *   Responses or Chat Completions. The response will show `service_tier=priority`
    *   regardless of if you specify `service_tier=fast` or `priority` in your
    *   request.
+   * - If set to 'ultrafast', then the request will be processed with the
+   *   access-controlled Ultrafast Processing service tier. This tier is currently
+   *   available for `gpt-5.6-sol`; a response served through it will show
+   *   `service_tier=ultrafast`.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -7590,7 +8014,7 @@ export interface ResponsesClientEvent {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | 'ultrafast' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
@@ -7847,12 +8271,16 @@ export type ResponsesServerEvent =
   | ResponsesServerEvent.ResponseContentPartWsAdded
   | ResponsesServerEvent.ResponseContentPartWsDone
   | ResponsesServerEvent.ResponseWsCreated
-  | ResponsesServerEvent.ResponseWsError
   | ResponsesServerEvent.ResponseFileSearchCallWsCompleted
   | ResponsesServerEvent.ResponseFileSearchCallInWsProgress
   | ResponsesServerEvent.ResponseFileSearchCallWsSearching
   | ResponsesServerEvent.ResponseFunctionCallArgumentsWsDelta
   | ResponsesServerEvent.ResponseFunctionCallArgumentsWsDone
+  | ResponsesServerEvent.ResponseShellCallCommandWsAdded
+  | ResponsesServerEvent.ResponseShellCallCommandWsDelta
+  | ResponsesServerEvent.ResponseShellCallCommandWsDone
+  | ResponsesServerEvent.ResponseShellCallOutputContentWsDelta
+  | ResponsesServerEvent.ResponseShellCallOutputContentWsDone
   | ResponsesServerEvent.ResponseInWsProgress
   | ResponsesServerEvent.ResponseWsFailed
   | ResponsesServerEvent.ResponseWsIncomplete
@@ -7886,7 +8314,9 @@ export type ResponsesServerEvent =
   | ResponsesServerEvent.ResponseOutputTextAnnotationWsAdded
   | ResponsesServerEvent.ResponseWsQueued
   | ResponsesServerEvent.ResponseCustomToolCallInputWsDelta
-  | ResponsesServerEvent.ResponseCustomToolCallInputWsDone;
+  | ResponsesServerEvent.ResponseCustomToolCallInputWsDone
+  | ResponsesServerEvent.ResponseWsStreamingError
+  | ResponsesServerEvent.ResponseWsError;
 
 export namespace ResponsesServerEvent {
   /**
@@ -8033,17 +8463,6 @@ export namespace ResponsesServerEvent {
   }
 
   /**
-   * Emitted when an error occurs.
-   */
-  export interface ResponseWsError extends ResponseErrorEvent {
-    /**
-     * The WebSocket lane that emitted this event. This field is present when the
-     * originating `response.create` event supplied a `stream_id`.
-     */
-    stream_id?: string;
-  }
-
-  /**
    * Emitted when a file search call is completed (results found).
    */
   export interface ResponseFileSearchCallWsCompleted extends ResponseFileSearchCallCompletedEvent {
@@ -8091,6 +8510,61 @@ export namespace ResponsesServerEvent {
    * Emitted when function-call arguments are finalized.
    */
   export interface ResponseFunctionCallArgumentsWsDone extends ResponseFunctionCallArgumentsDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was added to a tool call.
+   */
+  export interface ResponseShellCallCommandWsAdded extends ResponseShellCallCommandAddedEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was incrementally updated.
+   */
+  export interface ResponseShellCallCommandWsDelta extends ResponseShellCallCommandDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated a shell command was completed.
+   */
+  export interface ResponseShellCallCommandWsDone extends ResponseShellCallCommandDoneEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated shell call output was incrementally added.
+   */
+  export interface ResponseShellCallOutputContentWsDelta extends ResponseShellCallOutputContentDeltaEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * A streaming event that indicated shell call output was completed.
+   */
+  export interface ResponseShellCallOutputContentWsDone extends ResponseShellCallOutputContentDoneEvent {
     /**
      * The WebSocket lane that emitted this event. This field is present when the
      * originating `response.create` event supplied a `stream_id`.
@@ -8474,6 +8948,80 @@ export namespace ResponsesServerEvent {
      * originating `response.create` event supplied a `stream_id`.
      */
     stream_id?: string;
+  }
+
+  /**
+   * Emitted when an error occurs while streaming a response over the WebSocket.
+   */
+  export interface ResponseWsStreamingError extends ResponseErrorEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when an error occurs while processing a Responses WebSocket request.
+   */
+  export interface ResponseWsError {
+    /**
+     * Details about the error.
+     */
+    error: ResponseWsError.Error;
+
+    /**
+     * The type of the event. Always `error`.
+     */
+    type: 'error';
+
+    /**
+     * The sequence number of an error emitted by the response stream.
+     */
+    sequence_number?: number;
+
+    /**
+     * The HTTP status code associated with a WebSocket protocol error.
+     */
+    status?: number;
+
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  export namespace ResponseWsError {
+    /**
+     * Details about the error.
+     */
+    export interface Error {
+      /**
+       * The error code that was emitted, if any.
+       */
+      code: string | null;
+
+      /**
+       * The human-readable error message that was emitted.
+       */
+      message: string;
+
+      /**
+       * The parameter name that was associated with the error, if any.
+       */
+      param: string | null;
+
+      /**
+       * The error type that was emitted.
+       */
+      type: string;
+
+      /**
+       * The response headers that were emitted with the error, if any.
+       */
+      headers?: { [key: string]: string };
+    }
   }
 }
 
@@ -9118,6 +9666,13 @@ export interface WebSearchTool {
   type: 'web_search' | 'web_search_2025_08_26';
 
   /**
+   * Allow live internet access for web search. Defaults to true when omitted. When
+   * false, the web search tool runs in offline/cache-only mode and will not fetch
+   * new external content.
+   */
+  external_web_access?: boolean;
+
+  /**
    * Filters for the search.
    */
   filters?: WebSearchTool.Filters | null;
@@ -9375,12 +9930,16 @@ export interface ResponseCreateParamsBase {
    *   Responses or Chat Completions. The response will show `service_tier=priority`
    *   regardless of if you specify `service_tier=fast` or `priority` in your
    *   request.
+   * - If set to 'ultrafast', then the request will be processed with the
+   *   access-controlled Ultrafast Processing service tier. This tier is currently
+   *   available for `gpt-5.6-sol`; a response served through it will show
+   *   `service_tier=ultrafast`.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | 'ultrafast' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
@@ -9715,6 +10274,7 @@ export interface ResponseCompactParams {
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
     | 'gpt-5.5'
+    | 'gpt-5.5-2026-04-23'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
@@ -9803,6 +10363,8 @@ export interface ResponseCompactParams {
     | 'o4-mini-deep-research-2025-06-26'
     | 'computer-use-preview'
     | 'computer-use-preview-2025-03-11'
+    | 'gpt-5.5-pro'
+    | 'gpt-5.5-pro-2026-04-23'
     | 'gpt-5-codex'
     | 'gpt-5-pro'
     | 'gpt-5-pro-2025-10-06'
@@ -9934,6 +10496,7 @@ export declare namespace Responses {
     type InlineSkillSource as InlineSkillSource,
     type LocalEnvironment as LocalEnvironment,
     type LocalSkill as LocalSkill,
+    type McpToolCallError as McpToolCallError,
     type NamespaceTool as NamespaceTool,
     type Response as Response,
     type ResponseApplyPatchToolCall as ResponseApplyPatchToolCall,
@@ -10034,6 +10597,11 @@ export declare namespace Responses {
     type ResponseReasoningTextDoneEvent as ResponseReasoningTextDoneEvent,
     type ResponseRefusalDeltaEvent as ResponseRefusalDeltaEvent,
     type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
+    type ResponseShellCallCommandAddedEvent as ResponseShellCallCommandAddedEvent,
+    type ResponseShellCallCommandDeltaEvent as ResponseShellCallCommandDeltaEvent,
+    type ResponseShellCallCommandDoneEvent as ResponseShellCallCommandDoneEvent,
+    type ResponseShellCallOutputContentDeltaEvent as ResponseShellCallOutputContentDeltaEvent,
+    type ResponseShellCallOutputContentDoneEvent as ResponseShellCallOutputContentDoneEvent,
     type ResponseStatus as ResponseStatus,
     type ResponseStreamEvent as ResponseStreamEvent,
     type ResponseTextConfig as ResponseTextConfig,

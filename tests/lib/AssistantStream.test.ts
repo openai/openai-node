@@ -1,19 +1,10 @@
 import { vi } from 'vitest';
 import { APIUserAbortError, OpenAIError } from 'openai/core/error';
-import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
+import { assistantStream, completedRun } from './assistant-stream-test-utils';
 
 type Event = Record<string, any>;
-
-function readableEvents(events: Event[]) {
-  const encoder = new TextEncoder();
-  return ReadableStreamFrom(events.map((event) => encoder.encode(JSON.stringify(event) + '\n')));
-}
-
-function assistantStream(events: Event[]): AssistantStream {
-  return AssistantStream.fromReadableStream(readableEvents(events));
-}
 
 function iterableEvents(events: Event[], controller = new AbortController()) {
   return {
@@ -24,10 +15,6 @@ function iterableEvents(events: Event[], controller = new AbortController()) {
       }
     },
   };
-}
-
-function completedRun(id = 'run_123') {
-  return { event: 'thread.run.completed', data: { id, status: 'completed' } };
 }
 
 describe('AssistantStream delta accumulation', () => {

@@ -93,9 +93,11 @@ const correctAnswer =
   'It was anxious to find him no one that expectation of a man who were giving his father enjoyment. But he was avoided in sight in the minister to which indeed,';
 const model = 'whisper-1';
 
-const params = new URLSearchParams(location.search);
+const apiKey = (
+  globalThis as typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_API_KEY__?: string }
+).__OPENAI_ECOSYSTEM_TEST_API_KEY__;
 
-const client = new OpenAI({ apiKey: params.get('apiKey') ?? undefined, dangerouslyAllowBrowser: true });
+const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 
 it('supports Bedrock bearer authentication without AWS dependencies', async () => {
   let authorization: string | null = null;

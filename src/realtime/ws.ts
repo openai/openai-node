@@ -1,4 +1,6 @@
 import * as WS from 'ws';
+import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
+import { protectWebSocketOptionsFromCredentialRedirects } from '../internal/ws';
 import type { AzureOpenAI } from '../index';
 import { OpenAI } from '../index';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../resources/realtime/realtime';
@@ -57,19 +59,19 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       );
     }
     this.url = buildRealtimeURL(client, props);
+    assertBedrockWebSocketOrigin(client, this.url);
     const headers = {
       ...props.options?.headers,
       ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${client.apiKey}` }),
     };
-    const hasSensitiveHeader = Object.keys(headers).some(
-      (name) => /^(?:authorization|cookie)$/iu.test(name) || /api[-_]?key/iu.test(name),
-    );
 
-    this.socket = new WS.WebSocket(this.url, {
-      ...props.options,
-      headers,
-      ...(hasSensitiveHeader ? { followRedirects: false } : {}),
-    });
+    this.socket = new WS.WebSocket(
+      this.url,
+      protectWebSocketOptionsFromCredentialRedirects({
+        ...props.options,
+        headers,
+      }),
+    );
 
     this.socket.on('message', (wsEvent) => {
       const event = (() => {
@@ -113,7 +115,17 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       options?: WS.ClientOptions | undefined;
     },
   ): Promise<OpenAIRealtimeWS> {
-    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: await client._callApiKey() }, client);
+    const resolvedApiKey = await client._callApiKey();
+    const url = buildRealtimeURL(client, props);
+    assertBedrockWebSocketOrigin(client, url);
+    return new OpenAIRealtimeWS(
+      {
+        ...props,
+        buildRealtimeURL: () => url,
+        __resolvedApiKey: resolvedApiKey,
+      },
+      client,
+    );
   }
 
   /**

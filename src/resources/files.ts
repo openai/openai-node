@@ -80,7 +80,7 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns the contents of the specified file.
+   * Returns a response containing the contents of the specified file.
    */
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
     return this._client.get(path`/files/${fileID}/content`, {

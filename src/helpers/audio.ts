@@ -53,6 +53,8 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       }
 
       const ffplay = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
+      ffplay.stdout?.resume();
+      ffplay.stderr?.resume();
       ffplay.on('error', reject);
 
       pipeline(source, ffplay.stdin, (error) => {
@@ -113,8 +115,51 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
   return new Promise((resolve, reject) => {
     const data: any[] = [];
     const provider = recordingProviders[platform];
+    let ffmpeg: ReturnType<typeof spawn> | undefined;
+    let internalSignal: AbortSignal | undefined;
+    let wasStopped = false;
+    let settled = false;
+
+    const collectData = (chunk: Buffer) => {
+      data.push(chunk);
+    };
+    const stopRecording = () => {
+      if (!settled && ffmpeg) {
+        wasStopped ||= ffmpeg.kill('SIGTERM');
+      }
+    };
+    const cleanup = () => {
+      if (settled) {
+        return false;
+      }
+
+      settled = true;
+      signal?.removeEventListener('abort', stopRecording);
+      internalSignal?.removeEventListener('abort', stopRecording);
+      ffmpeg?.stdout?.removeListener('data', collectData);
+      return true;
+    };
+    const rejectRecording = (error: unknown) => {
+      if (cleanup()) {
+        reject(error);
+      }
+    };
+    const returnData = () => {
+      if (!cleanup()) {
+        return;
+      }
+
+      const audioBuffer = Buffer.concat(data);
+      const audioFile = new File([audioBuffer], 'audio.wav', { type: 'audio/wav' });
+      resolve(audioFile);
+    };
+
     try {
-      const ffmpeg = spawn(
+      if (typeof timeout === 'number' && (timeout > 0 || Number.isNaN(timeout))) {
+        internalSignal = AbortSignal.timeout(timeout);
+      }
+
+      ffmpeg = spawn(
         'ffmpeg',
         [
           '-f',
@@ -130,41 +175,26 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
           'pipe:1',
         ],
         {
-          stdio: ['ignore', 'pipe', 'pipe'],
+          stdio: ['ignore', 'pipe', 'ignore'],
         },
       );
 
-      const returnData = () => {
-        const audioBuffer = Buffer.concat(data);
-        const audioFile = new File([audioBuffer], 'audio.wav', { type: 'audio/wav' });
-        resolve(audioFile);
-      };
-      let wasStopped = false;
-      const stopRecording = () => {
-        wasStopped ||= ffmpeg.kill('SIGTERM');
-      };
-
-      ffmpeg.stdout.on('data', (chunk) => {
-        data.push(chunk);
-      });
+      ffmpeg.stdout?.on('data', collectData);
 
       ffmpeg.on('error', (error) => {
         console.error(error);
-        reject(error);
+        rejectRecording(error);
       });
 
       ffmpeg.on('close', (code) => {
         if (code !== 0 && !wasStopped) {
-          reject(new Error(`ffmpeg process exited with code ${code}`));
+          rejectRecording(new Error(`ffmpeg process exited with code ${code}`));
           return;
         }
         returnData();
       });
 
-      if (typeof timeout === 'number' && timeout > 0) {
-        const internalSignal = AbortSignal.timeout(timeout);
-        internalSignal.addEventListener('abort', stopRecording, { once: true });
-      }
+      internalSignal?.addEventListener('abort', stopRecording, { once: true });
 
       if (signal) {
         if (signal.aborted) {
@@ -174,7 +204,8 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
         }
       }
     } catch (error) {
-      reject(error);
+      stopRecording();
+      rejectRecording(error);
     }
   });
 }

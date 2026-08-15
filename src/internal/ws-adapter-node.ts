@@ -1,5 +1,6 @@
 import type * as WS from 'ws';
 import type { WebSocketLike } from './ws-adapter';
+import { protectWebSocketOptionsFromCredentialRedirects } from './ws';
 
 /** A generic event listener callback. */
 type Listener = (...args: any[]) => void;
@@ -19,6 +20,22 @@ export class NodeWebSocket implements WebSocketLike {
   /** Wraps an existing socket created by the optional `ws` package. */
   constructor(ws: WS.WebSocket) {
     this._ws = ws;
+    this._ws.on('redirect', (_url, request) => {
+      try {
+        const options = protectWebSocketOptionsFromCredentialRedirects({
+          followRedirects: true,
+          headers: request.getHeaders(),
+        });
+
+        if (options.followRedirects) {
+          return;
+        }
+      } catch {
+        // Header inspection failure must never permit a credentialed redirect.
+      }
+
+      this._ws.terminate();
+    });
   }
 
   /** The underlying `ws` socket; accessing it makes calling code Node.js-specific. */

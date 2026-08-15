@@ -4,6 +4,9 @@ import type { FinalizedRequestInit } from './types';
 import type { ProviderRequestContext } from './provider';
 import { readEnv } from './utils';
 
+/** Identifies legacy Bedrock clients without importing the client class into WebSocket modules. */
+export const brand_privateBedrockClient = Symbol.for('openai.privateBedrockClient');
+
 /** Selects the regional Amazon Bedrock endpoint and its matching SigV4 service. */
 export type BedrockEndpoint = 'mantle' | 'runtime';
 
@@ -221,6 +224,46 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
 }
 
 /**
+ * Ensures Bedrock credentials are only attached to the configured endpoint origin.
+ *
+ * @throws {Errors.OpenAIError} If either URL is not HTTP(S) or the request targets a different origin.
+ */
+export function assertBedrockRequestOrigin(baseURL: string, requestURL: string): void {
+  const expectedURL = new URL(baseURL);
+  const request = new URL(requestURL);
+  const expectedOrigin = expectedURL.origin;
+  const requestOrigin = request.origin;
+  if (
+    (expectedURL.protocol !== 'http:' && expectedURL.protocol !== 'https:') ||
+    (request.protocol !== 'http:' && request.protocol !== 'https:') ||
+    requestOrigin !== expectedOrigin
+  ) {
+    throw new Errors.OpenAIError(
+      `Bedrock request origin \`${requestOrigin}\` does not match the configured base URL origin \`${expectedOrigin}\`.`,
+    );
+  }
+}
+
+/** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
+export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): void {
+  if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
+    return;
+  }
+
+  const normalizedRequestURL = new URL(requestURL);
+  if (normalizedRequestURL.protocol === 'wss:') {
+    normalizedRequestURL.protocol = 'https:';
+  } else if (normalizedRequestURL.protocol === 'ws:') {
+    normalizedRequestURL.protocol = 'http:';
+  }
+
+  assertBedrockRequestOrigin(
+    (client as unknown as { baseURL: string }).baseURL,
+    normalizedRequestURL.toString(),
+  );
+}
+
+/**
  * Rejects caller-provided authorization headers that conflict with provider authentication.
  *
  * @throws {Errors.OpenAIError} If an `Authorization` header is already present.
@@ -229,22 +272,6 @@ export function assertProviderOwnsAuthorization(headers: Headers): void {
   if (headers.has('authorization')) {
     throw new Errors.OpenAIError(
       'Bedrock provider authentication cannot be combined with a custom `Authorization` header.',
-    );
-  }
-}
-
-/**
- * Prevents Bedrock credentials from being attached to an unexpected origin.
- *
- * @throws {Errors.OpenAIError} If the request origin differs from the configured
- * Bedrock API root, including when an absolute SDK request path is supplied.
- */
-export function assertBedrockRequestOrigin(baseURL: string, requestURL: string): void {
-  const expectedOrigin = new URL(baseURL).origin;
-  const requestOrigin = new URL(requestURL).origin;
-  if (requestOrigin !== expectedOrigin) {
-    throw new Errors.OpenAIError(
-      `The Bedrock request origin \`${requestOrigin}\` does not match the configured endpoint origin \`${expectedOrigin}\`.`,
     );
   }
 }
