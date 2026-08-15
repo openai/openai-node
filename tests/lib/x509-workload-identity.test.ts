@@ -202,6 +202,36 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(closeDispatcher).not.toHaveBeenCalled();
   });
 
+  test('does not expose workload or transport secrets through debug logging', async () => {
+    const logs: unknown[] = [];
+    const log = (...values: unknown[]) => logs.push(values);
+    const dispatcher = {
+      cert: 'private-certificate-material',
+      key: 'private-key-material',
+    };
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      fetchOptions: { dispatcher: dispatcher as never },
+      fetch: vi.fn(async (url: string | URL | Request) =>
+        url.toString().includes('/oauth/token')
+          ? tokenResponse('private-access-token')
+          : Response.json({ data: [] }),
+      ),
+      logLevel: 'debug',
+      logger: { debug: log, info: log, warn: log, error: log },
+    });
+
+    await client.models.list();
+
+    const serializedLogs = JSON.stringify(logs);
+    expect(serializedLogs).not.toContain('private-access-token');
+    expect(serializedLogs).not.toContain('private-certificate-material');
+    expect(serializedLogs).not.toContain('private-key-material');
+    expect(serializedLogs).not.toContain(x509Identity.identityProviderId);
+    expect(serializedLogs).not.toContain(x509Identity.serviceAccountId);
+  });
+
   test('invalidates a warm token and uses replacement client fetchOptions for both legs', async () => {
     const originalDispatcher = { name: 'original-dispatcher' };
     const replacementDispatcher = { name: 'replacement-dispatcher' };

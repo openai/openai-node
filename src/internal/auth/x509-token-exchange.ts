@@ -1,9 +1,9 @@
-import { APIConnectionError, APIError, OAuthError, OpenAIError } from '../core/error';
-import type { Fetch } from '../internal/builtin-types';
-import * as Shims from '../internal/shims';
-import type { MergedRequestInit } from '../internal/types';
-import { parseRetryAfterMillis } from '../internal/utils/retries';
-import type { X509WorkloadIdentity } from './types';
+import { APIConnectionError, APIError, OAuthError, OpenAIError } from '../../core/error';
+import type { X509WorkloadIdentity } from '../../auth/types';
+import type { Fetch } from '../builtin-types';
+import * as Shims from '../shims';
+import type { MergedRequestInit } from '../types';
+import { parseRetryAfterMillis } from '../utils/retries';
 
 const X509_TOKEN_EXCHANGE_URL = 'https://mtls.auth.openai.com/oauth/token';
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';

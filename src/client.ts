@@ -8,6 +8,12 @@ import type {
   FinalizedRequestInit,
   WorkloadIdentityRequestContext,
 } from './internal/types';
+import {
+  hasSameX509Transport,
+  protectX509RequestOptions,
+  x509TransportKey,
+} from './internal/auth/x509-workload-identity-auth';
+import { WorkloadIdentityAuthState } from './internal/auth/workload-identity-auth-state';
 import { uuid4 } from './internal/utils/uuid';
 import { hasOwn, validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
@@ -24,12 +30,6 @@ export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import type { WorkloadIdentity } from './auth/types';
-import {
-  hasSameX509Transport,
-  protectX509RequestOptions,
-  WorkloadIdentityAuth,
-  x509TransportKey,
-} from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
@@ -485,7 +485,7 @@ export class OpenAI {
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
-  private _workloadIdentityAuth?: WorkloadIdentityAuth;
+  private _workloadIdentityAuth?: WorkloadIdentityAuthState;
   private _baseURLWasConfigured: boolean;
   private readonly _usesX509WorkloadIdentity: boolean;
 
@@ -608,7 +608,7 @@ export class OpenAI {
     this._usesX509WorkloadIdentity = usesX509WorkloadIdentity;
 
     if (workloadIdentity) {
-      this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
+      this._workloadIdentityAuth = new WorkloadIdentityAuthState(workloadIdentity, this.fetch);
     }
 
     this.apiKey = typeof apiKey === 'string' ? apiKey : null;

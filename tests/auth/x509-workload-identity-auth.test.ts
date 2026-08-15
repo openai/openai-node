@@ -2,7 +2,7 @@ import { expect, vi } from 'vitest';
 
 import { APIConnectionError, APIConnectionTimeoutError, APIUserAbortError, OAuthError } from 'openai';
 import type { X509WorkloadIdentity } from 'openai/auth';
-import { WorkloadIdentityAuth } from 'openai/auth/workload-identity-auth';
+import { X509WorkloadIdentityAuth as WorkloadIdentityAuth } from 'openai/internal/auth/x509-workload-identity-auth';
 
 const config: X509WorkloadIdentity = {
   type: 'x509',
