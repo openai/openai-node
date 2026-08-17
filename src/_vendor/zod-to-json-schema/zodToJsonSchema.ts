@@ -121,7 +121,7 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     }
 
     const definitions: Record<string, any> = {};
-    const processedDefinitions = new Set();
+    const processedDefinitions = new Map<string, boolean>();
 
     // the call to `parseDef()` here might itself add more entries to `.definitions`
     // so we need to continually evaluate definitions until we've resolved all of them
@@ -129,9 +129,10 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     // we have a generous iteration limit here to avoid blowing up the stack if there
     // are any bugs that would otherwise result in us iterating indefinitely
     for (let i = 0; i < 500; i++) {
-      const newDefinitions = Object.entries(refs.definitions).filter(
-        ([key]) => !processedDefinitions.has(key),
-      );
+      const newDefinitions = Object.entries(refs.definitions).filter(([key, definition]) => {
+        const preprocessed = getDefinitionInputRefs(zodDef(definition), refs) !== refs;
+        return !processedDefinitions.has(key) || processedDefinitions.get(key) !== preprocessed;
+      });
       if (newDefinitions.length === 0) {
         break;
       }
@@ -146,6 +147,7 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         }
         const [key, schema] = nextDefinition;
 
+        const preprocessed = getDefinitionInputRefs(zodDef(schema), refs) !== refs;
         definitions[key] =
           parseDef(
             zodDef(schema),
@@ -155,7 +157,7 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
             }),
             true,
           ) ?? {};
-        processedDefinitions.add(key);
+        processedDefinitions.set(key, preprocessed);
       }
     }
 

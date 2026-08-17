@@ -3,6 +3,22 @@ import { z as z3 } from 'zod/v3';
 
 const formatFor = (value: z3.ZodTypeAny) => zodResponseFormat(z3.object({ value }), 'strict');
 
+const nestedSchemaAt = (schema: unknown, path: readonly (string | number)[]): unknown => {
+  let current = schema;
+  for (const key of path) {
+    current = (current as Record<string, unknown>)[String(key)];
+  }
+  return current;
+};
+
+const convertLeafDate = (value: unknown): unknown => {
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  const input = value as { when: string };
+  return { when: new Date(input.when) };
+};
+
 const strictHelpers = [
   { name: 'zodResponseFormat', create: (schema: z3.ZodTypeAny) => zodResponseFormat(schema, 'strict') },
   { name: 'zodTextFormat', create: (schema: z3.ZodTypeAny) => zodTextFormat(schema, 'strict') },
@@ -256,6 +272,152 @@ describe('Zod v3 strict schema capability analysis', () => {
       ),
     ).toThrow('ZodDate');
   });
+
+  it.each([
+    {
+      name: 'object properties',
+      producer: () => z3.object({ count: z3.coerce.bigint() }),
+      consumer: () => z3.object({ count: z3.number() }),
+      input: { count: 7 },
+      output: { count: 7n },
+      path: ['properties', 'count'],
+    },
+    {
+      name: 'array items',
+      producer: () => z3.array(z3.coerce.bigint()),
+      consumer: () => z3.array(z3.number()),
+      input: [7],
+      output: [7n],
+      path: ['items'],
+    },
+    {
+      name: 'tuple positions',
+      producer: () => z3.tuple([z3.coerce.bigint()]),
+      consumer: () => z3.tuple([z3.number()]),
+      input: [7],
+      output: [7n],
+      path: ['items', 0],
+    },
+    {
+      name: 'nested object-array paths',
+      producer: () => z3.object({ values: z3.array(z3.object({ count: z3.coerce.bigint() })) }),
+      consumer: () => z3.object({ values: z3.array(z3.object({ count: z3.number() })) }),
+      input: { values: [{ count: 7 }] },
+      output: { values: [{ count: 7n }] },
+      path: ['properties', 'values', 'items', 'properties', 'count'],
+    },
+    {
+      name: 'record values',
+      producer: () => z3.record(z3.coerce.bigint()),
+      consumer: () => z3.record(z3.number()),
+      input: { count: 7 },
+      output: { count: 7n },
+      path: ['additionalProperties'],
+    },
+  ])(
+    'bounds unsafe overlap at matching $name in union alternatives',
+    ({ producer, consumer, input, output, path }) => {
+      const format = formatFor(z3.union([producer(), consumer()]));
+      const schema = format.json_schema.schema as {
+        properties: { value: { anyOf: Record<string, unknown>[] } };
+      };
+
+      expect(nestedSchemaAt(schema.properties.value.anyOf[1], path)).toMatchObject({
+        minimum: Number.MIN_SAFE_INTEGER,
+        maximum: Number.MAX_SAFE_INTEGER,
+      });
+      expect(format.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: output });
+    },
+  );
+
+  it('preserves distinct object properties and disjoint literal branches', () => {
+    const differentPaths = formatFor(
+      z3.union([z3.object({ bigint: z3.coerce.bigint() }), z3.object({ number: z3.number() })]),
+    );
+    const tagged = formatFor(
+      z3.union([
+        z3.object({ kind: z3.literal('bigint'), count: z3.coerce.bigint() }),
+        z3.object({ kind: z3.literal('number'), count: z3.number() }),
+      ]),
+    );
+
+    expect(differentPaths.json_schema.schema).toHaveProperty('properties.value.anyOf.1.properties.number', {
+      type: 'number',
+    });
+    expect(tagged.json_schema.schema).toHaveProperty('properties.value.anyOf.1.properties.count', {
+      type: 'number',
+    });
+  });
+
+  it('preserves disjoint and one-sided nested numeric interception intervals', () => {
+    const disjoint = formatFor(
+      z3.union([
+        z3.object({ count: z3.coerce.bigint().max(10n) }),
+        z3.object({ count: z3.number().min(1e20) }),
+      ]),
+    );
+    const oneSided = formatFor(
+      z3.union([z3.object({ count: z3.coerce.bigint().max(10n) }), z3.object({ count: z3.number() })]),
+    );
+
+    expect(disjoint.json_schema.schema).toHaveProperty('properties.value.anyOf.1.properties.count', {
+      type: 'number',
+      minimum: 1e20,
+    });
+    expect(oneSided.json_schema.schema).toHaveProperty('properties.value.anyOf.1.properties.count', {
+      type: 'number',
+      minimum: Number.MIN_SAFE_INTEGER,
+    });
+  });
+
+  it('bounds shared nested numeric references without changing their other uses', () => {
+    const number = z3.number();
+    const container = z3.object({ count: z3.number() });
+    const format = zodResponseFormat(
+      z3.object({
+        outsideNumber: number,
+        outsideContainer: container,
+        direct: z3.union([z3.object({ count: z3.coerce.bigint() }), z3.object({ count: number })]),
+        nested: z3.union([
+          z3.object({ child: z3.object({ count: z3.coerce.bigint() }) }),
+          z3.object({ child: container }),
+        ]),
+      }),
+      'strict',
+    );
+
+    const bounds = { minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER };
+    expect(format.json_schema.schema).toHaveProperty('properties.outsideNumber', { type: 'number' });
+    expect(format.json_schema.schema).toHaveProperty('properties.outsideContainer.properties.count', {
+      type: 'number',
+    });
+    expect(format.json_schema.schema).toHaveProperty(
+      'properties.direct.anyOf.1.properties.count.allOf.1',
+      bounds,
+    );
+    expect(format.json_schema.schema).toHaveProperty(
+      'properties.nested.anyOf.1.properties.child.allOf.1.properties.count',
+      bounds,
+    );
+  });
+
+  it.each(['leaf-first', 'holder-first'] as const)(
+    'revalidates a registered definition after a late raw edge in %s order',
+    (order) => {
+      const leaf = z3.object({ when: z3.date() });
+      const holder = z3.object({ leaf });
+      const definitions =
+        order === 'leaf-first' ? { Leaf: leaf, Holder: holder } : { Holder: holder, Leaf: leaf };
+
+      expect(() =>
+        zodResponseFormat(
+          z3.object({ converted: z3.preprocess(convertLeafDate, leaf), raw: holder }),
+          'strict',
+          { schemaDefinitions: definitions },
+        ),
+      ).toThrow('ZodDate');
+    },
+  );
 });
 
 describe.each(strictHelpers)('$name strict numeric input capability analysis', ({ create }) => {

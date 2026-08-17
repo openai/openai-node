@@ -57,9 +57,10 @@ import { parseReadonlyDef } from './parsers/readonly';
 import {
   acceptsEveryJSONNumber,
   acceptsJSONNumber,
-  acceptsUnsafeJSONInteger,
+  applyNestedNumericOverlaps,
+  applyUnsafeBigIntBounds,
   convertsJSONPipelineInput,
-  capturesUnsafeBigIntInput,
+  findNestedNumericOverlaps,
   producesBigIntAtPath,
   producesBigIntOutput,
 } from './schema-capabilities';
@@ -526,8 +527,24 @@ const selectParser = (
         (option) =>
           option._def.typeName === ZodFirstPartyTypeKind.ZodLiteral && typeof option._def.value === 'bigint',
       );
+      const nestedOverlaps = refs.openaiStrictMode
+        ? options.map((consumer, consumerIndex) =>
+            options.flatMap((producer, producerIndex) =>
+              producerIndex === consumerIndex
+                ? []
+                : findNestedNumericOverlaps(producer._def, consumer._def).filter(
+                    (overlap) =>
+                      overlap.path.length > 0 &&
+                      (producerIndex < consumerIndex || !acceptsEveryJSONNumber(overlap.consumer)),
+                  ),
+            ),
+          )
+        : [];
 
-      if (refs.openaiStrictMode && (bigintIndex !== -1 || hasBigIntLiteral)) {
+      if (
+        refs.openaiStrictMode &&
+        (bigintIndex !== -1 || hasBigIntLiteral || nestedOverlaps.some((overlaps) => overlaps.length > 0))
+      ) {
         const branches = options
           .map((option, index) => {
             const fallibleNumber = !acceptsEveryJSONNumber(option._def);
@@ -536,17 +553,22 @@ const selectParser = (
               !producesBigIntOutput(option._def) &&
               acceptsJSONNumber(option._def) &&
               (index > bigintIndex || fallibleNumber);
+            const branchOverlaps = nestedOverlaps[index] ?? [];
             const branch = parseDef(
               option._def,
               {
                 ...refs,
                 currentPath: [...refs.currentPath, 'anyOf', String(index)],
               },
-              boundNumber,
+              boundNumber || branchOverlaps.length > 0,
             );
 
-            if (!boundNumber || branch === undefined) {
+            if (branch === undefined) {
               return branch;
+            }
+            const boundedBranch = applyNestedNumericOverlaps(branch, branchOverlaps);
+            if (!boundNumber) {
+              return boundedBranch;
             }
 
             const competingBigInts = options.filter(
@@ -555,42 +577,10 @@ const selectParser = (
                 producesBigIntOutput(candidate._def) &&
                 (candidateIndex < index || fallibleNumber),
             );
-            const minimum =
-              competingBigInts.some((candidate) => capturesUnsafeBigIntInput(candidate._def, 'minimum')) &&
-              (acceptsUnsafeJSONInteger(branch, 'minimum') || (!('type' in branch) && !('$ref' in branch)));
-            const maximum =
-              competingBigInts.some((candidate) => capturesUnsafeBigIntInput(candidate._def, 'maximum')) &&
-              (acceptsUnsafeJSONInteger(branch, 'maximum') || (!('type' in branch) && !('$ref' in branch)));
-            if (!minimum && !maximum) {
-              return branch;
-            }
-
-            if ('$ref' in branch) {
-              return {
-                allOf: [
-                  branch,
-                  {
-                    ...(minimum ? { minimum: Number.MIN_SAFE_INTEGER } : undefined),
-                    ...(maximum ? { maximum: Number.MAX_SAFE_INTEGER } : undefined),
-                  } as JsonSchema7Type,
-                ],
-              };
-            }
-
-            const record = branch as unknown as Record<string, unknown>;
-            if (minimum) {
-              record['minimum'] = Math.max(
-                typeof record['minimum'] === 'number' ? record['minimum'] : Number.MIN_SAFE_INTEGER,
-                Number.MIN_SAFE_INTEGER,
-              );
-            }
-            if (maximum) {
-              record['maximum'] = Math.min(
-                typeof record['maximum'] === 'number' ? record['maximum'] : Number.MAX_SAFE_INTEGER,
-                Number.MAX_SAFE_INTEGER,
-              );
-            }
-            return branch;
+            return applyUnsafeBigIntBounds(
+              boundedBranch,
+              competingBigInts.map((candidate) => candidate._def),
+            );
           })
           .filter(
             (branch): branch is JsonSchema7Type =>

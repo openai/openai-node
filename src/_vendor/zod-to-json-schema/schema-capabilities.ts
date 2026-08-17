@@ -1,5 +1,6 @@
 import type { ZodTypeDef } from 'zod/v3';
 import { ZodFirstPartyTypeKind } from 'zod/v3';
+import type { JsonSchema7Type } from './parseDef';
 import { hasOwn } from '../../internal/utils/values';
 
 type SchemaType = { _def: ZodTypeDef };
@@ -357,3 +358,285 @@ export const producesBigIntAtPath = (
     },
     'default',
   );
+
+type NumericPathSegment =
+  | { kind: 'property'; key: string }
+  | { kind: 'array' }
+  | { kind: 'tuple'; index: number }
+  | { kind: 'record' };
+
+export type NestedNumericOverlap = {
+  path: readonly NumericPathSegment[];
+  producer: ZodTypeDef;
+  consumer: ZodTypeDef;
+};
+
+type PairedChild = {
+  producer: SchemaType;
+  consumer: SchemaType;
+  segment: NumericPathSegment;
+};
+
+const objectChildren = (producer: InspectableDefinition, consumer: InspectableDefinition): PairedChild[] => {
+  const producerShape = producer.shape();
+  const consumerShape = consumer.shape();
+  const sharedKeys = Object.keys(consumerShape).filter((key) => hasOwn(producerShape, key));
+  if (
+    sharedKeys.some((key) => {
+      const left = producerShape[key]?._def as InspectableDefinition | undefined;
+      const right = consumerShape[key]?._def as InspectableDefinition | undefined;
+      return (
+        left?.typeName === ZodFirstPartyTypeKind.ZodLiteral &&
+        right?.typeName === ZodFirstPartyTypeKind.ZodLiteral &&
+        left.value !== right.value
+      );
+    })
+  ) {
+    return [];
+  }
+
+  return sharedKeys.flatMap((key) => {
+    const left = producerShape[key];
+    const right = consumerShape[key];
+    return left && right ? [{ producer: left, consumer: right, segment: { kind: 'property', key } }] : [];
+  });
+};
+
+const tupleChildren = (producer: InspectableDefinition, consumer: InspectableDefinition): PairedChild[] => {
+  const values: PairedChild[] = consumer.items.flatMap((item, index) => {
+    const left = producer.items[index] ?? producer.rest;
+    return left ? [{ producer: left, consumer: item, segment: { kind: 'tuple' as const, index } }] : [];
+  });
+  if (producer.rest && consumer.rest) {
+    values.push({ producer: producer.rest, consumer: consumer.rest, segment: { kind: 'array' } });
+  }
+  return values;
+};
+
+const pairedContainerChildren = (
+  producer: InspectableDefinition,
+  consumer: InspectableDefinition,
+): PairedChild[] => {
+  if (
+    producer.typeName === ZodFirstPartyTypeKind.ZodObject &&
+    consumer.typeName === ZodFirstPartyTypeKind.ZodObject
+  ) {
+    return objectChildren(producer, consumer);
+  }
+  if (
+    producer.typeName === ZodFirstPartyTypeKind.ZodArray &&
+    consumer.typeName === ZodFirstPartyTypeKind.ZodArray
+  ) {
+    return [{ producer: producer.type, consumer: consumer.type, segment: { kind: 'array' } }];
+  }
+  if (
+    producer.typeName === ZodFirstPartyTypeKind.ZodTuple &&
+    consumer.typeName === ZodFirstPartyTypeKind.ZodTuple
+  ) {
+    return tupleChildren(producer, consumer);
+  }
+  if (
+    producer.typeName === ZodFirstPartyTypeKind.ZodRecord &&
+    consumer.typeName === ZodFirstPartyTypeKind.ZodRecord
+  ) {
+    return [{ producer: producer.valueType, consumer: consumer.valueType, segment: { kind: 'record' } }];
+  }
+  return [];
+};
+
+const collectNestedNumericOverlaps = (
+  producer: ZodTypeDef,
+  consumer: ZodTypeDef,
+  path: readonly NumericPathSegment[],
+  overlaps: NestedNumericOverlap[],
+  active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+): void => {
+  let activeConsumers = active.get(producer);
+  if (activeConsumers?.has(consumer)) {
+    return;
+  }
+  if (!activeConsumers) {
+    activeConsumers = new Set();
+    active.set(producer, activeConsumers);
+  }
+  activeConsumers.add(consumer);
+
+  try {
+    if (producesBigIntOutput(producer) && acceptsJSONNumber(consumer)) {
+      overlaps.push({ path, producer, consumer });
+      return;
+    }
+
+    const left = producer as InspectableDefinition;
+    const right = consumer as InspectableDefinition;
+    const containers = pairedContainerChildren(left, right);
+    if (containers.length > 0) {
+      for (const child of containers) {
+        collectNestedNumericOverlaps(
+          child.producer._def,
+          child.consumer._def,
+          [...path, child.segment],
+          overlaps,
+          active,
+        );
+      }
+      return;
+    }
+
+    for (const child of childDefinitions(left, 'output')?.values ?? []) {
+      collectNestedNumericOverlaps(child._def, consumer, path, overlaps, active);
+    }
+    for (const child of childDefinitions(right, 'input')?.values ?? []) {
+      collectNestedNumericOverlaps(producer, child._def, path, overlaps, active);
+    }
+  } finally {
+    activeConsumers.delete(consumer);
+    if (activeConsumers.size === 0) {
+      active.delete(producer);
+    }
+  }
+};
+
+export const findNestedNumericOverlaps = (
+  producer: ZodTypeDef,
+  consumer: ZodTypeDef,
+): NestedNumericOverlap[] => {
+  const overlaps: NestedNumericOverlap[] = [];
+  collectNestedNumericOverlaps(producer, consumer, [], overlaps, new Map());
+  return overlaps;
+};
+
+export const applyUnsafeBigIntBounds = (
+  schema: JsonSchema7Type,
+  producers: readonly ZodTypeDef[],
+): JsonSchema7Type => {
+  const minimum =
+    producers.some((candidate) => capturesUnsafeBigIntInput(candidate, 'minimum')) &&
+    (acceptsUnsafeJSONInteger(schema, 'minimum') || (!('type' in schema) && !('$ref' in schema)));
+  const maximum =
+    producers.some((candidate) => capturesUnsafeBigIntInput(candidate, 'maximum')) &&
+    (acceptsUnsafeJSONInteger(schema, 'maximum') || (!('type' in schema) && !('$ref' in schema)));
+  if (!minimum && !maximum) {
+    return schema;
+  }
+
+  if ('$ref' in schema) {
+    return {
+      allOf: [
+        schema,
+        {
+          ...(minimum ? { minimum: Number.MIN_SAFE_INTEGER } : undefined),
+          ...(maximum ? { maximum: Number.MAX_SAFE_INTEGER } : undefined),
+        } as JsonSchema7Type,
+      ],
+    };
+  }
+
+  const record = schema as Record<string, unknown>;
+  if (minimum) {
+    record['minimum'] = Math.max(
+      typeof record['minimum'] === 'number' ? record['minimum'] : Number.MIN_SAFE_INTEGER,
+      Number.MIN_SAFE_INTEGER,
+    );
+  }
+  if (maximum) {
+    record['maximum'] = Math.min(
+      typeof record['maximum'] === 'number' ? record['maximum'] : Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER,
+    );
+  }
+  return schema;
+};
+
+const wrapNestedConstraint = (schema: JsonSchema7Type, segment: NumericPathSegment): JsonSchema7Type => {
+  switch (segment.kind) {
+    case 'property': {
+      return { type: 'object', properties: { [segment.key]: schema } } as JsonSchema7Type;
+    }
+    case 'array': {
+      return { type: 'array', items: schema } as JsonSchema7Type;
+    }
+    case 'tuple': {
+      const items: JsonSchema7Type[] = Array.from({ length: segment.index }, () => ({}) as JsonSchema7Type);
+      items.push(schema);
+      return { type: 'array', items } as JsonSchema7Type;
+    }
+    case 'record': {
+      return { type: 'object', additionalProperties: schema } as JsonSchema7Type;
+    }
+    default: {
+      return schema;
+    }
+  }
+};
+
+const nestedConstraint = (
+  path: readonly NumericPathSegment[],
+  producer: ZodTypeDef,
+): JsonSchema7Type | null => {
+  let constrained = applyUnsafeBigIntBounds({} as JsonSchema7Type, [producer]);
+  if (!('minimum' in constrained) && !('maximum' in constrained)) {
+    return null;
+  }
+
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    const segment = path[index];
+    if (segment) {
+      constrained = wrapNestedConstraint(constrained, segment);
+    }
+  }
+  return constrained;
+};
+
+const boundNestedNumericPath = (
+  schema: JsonSchema7Type,
+  path: readonly NumericPathSegment[],
+  producer: ZodTypeDef,
+): JsonSchema7Type => {
+  if (path.length === 0) {
+    return applyUnsafeBigIntBounds(schema, [producer]);
+  }
+
+  const [segment, ...remaining] = path;
+  if (!segment) {
+    return schema;
+  }
+  const record = schema as Record<string, unknown>;
+  if ('$ref' in record) {
+    const constraint = nestedConstraint(path, producer);
+    return constraint ? ({ allOf: [schema, constraint] } as JsonSchema7Type) : schema;
+  }
+  if (segment.kind === 'property') {
+    const properties = record['properties'] as Record<string, JsonSchema7Type> | undefined;
+    const property = properties?.[segment.key];
+    if (properties && property) {
+      properties[segment.key] = boundNestedNumericPath(property, remaining, producer);
+    }
+    return schema;
+  }
+
+  const key = segment.kind === 'record' ? 'additionalProperties' : 'items';
+  const child = record[key] as JsonSchema7Type | JsonSchema7Type[] | undefined;
+  if (Array.isArray(child)) {
+    if (segment.kind === 'tuple') {
+      const item = child[segment.index];
+      if (item) {
+        child[segment.index] = boundNestedNumericPath(item, remaining, producer);
+      }
+    }
+  } else if (child && typeof child === 'object') {
+    record[key] = boundNestedNumericPath(child, remaining, producer);
+  }
+  return schema;
+};
+
+export const applyNestedNumericOverlaps = (
+  schema: JsonSchema7Type,
+  overlaps: readonly NestedNumericOverlap[],
+): JsonSchema7Type => {
+  let bounded = schema;
+  for (const overlap of overlaps) {
+    bounded = boundNestedNumericPath(bounded, overlap.path, overlap.producer);
+  }
+  return bounded;
+};
