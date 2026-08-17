@@ -570,7 +570,20 @@ const addFormValue = async (
   } else if (isNamedBlob(value)) {
     form.append(key, value, getName(value, { stripFilename: options.stripFilenames }));
   } else if (Array.isArray(value)) {
-    await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry, options)));
+    // Prepare array elements concurrently, then preserve their repeated-field order.
+    const entries = await Promise.all(
+      value.map(async (entry) => {
+        const entryForm = new FormData();
+        await addFormValue(entryForm, key + '[]', entry, options);
+        return entryForm;
+      }),
+    );
+
+    for (const entryForm of entries) {
+      for (const [entryKey, entryValue] of entryForm.entries()) {
+        form.append(entryKey, entryValue);
+      }
+    }
   } else if (typeof value === 'object') {
     await Promise.all(
       Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop, options)),
