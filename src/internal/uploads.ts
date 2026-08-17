@@ -580,6 +580,10 @@ const addFormValue = async (
     );
 
     for (const entryForm of entries) {
+      if (!entryForm) {
+        continue;
+      }
+
       for (const [entryKey, entryValue] of entryForm.entries()) {
         form.append(entryKey, entryValue);
       }

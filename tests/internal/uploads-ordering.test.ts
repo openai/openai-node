@@ -66,6 +66,41 @@ describe('buffered multipart array ordering', () => {
     expect((request.get('mask') as File).name).toBe('mask.png');
   });
 
+  test('omits sparse image slots in public image-edit requests without moving the mask', async () => {
+    const requests: FormData[] = [];
+    const transport = Object.assign(
+      async (_request: Request | URL | string, options?: RequestInit): Promise<Response> => {
+        requests.push(options?.body as FormData);
+        return Response.json({ created: 0, data: [] });
+      },
+      { Response },
+    );
+    const client = new OpenAI({ apiKey: 'test-api-key', fetch: transport as typeof fetch });
+    const images: (File | Response)[] = [];
+    images[1] = imageResponse('base.png');
+    images[3] = new File(['overlay'], 'overlay.png', { type: 'image/png' });
+    const mask = new File(['mask'], 'mask.png', { type: 'image/png' });
+
+    await client.images.edit({
+      model: 'gpt-image-1',
+      prompt: 'Preserve sparse image order',
+      image: images,
+      mask,
+    });
+
+    expect(requests).toHaveLength(1);
+    const [request] = requests;
+    if (!request) {
+      throw new Error('Expected an image-edit request');
+    }
+
+    expect(formValues(request, 'image[]')).toEqual(['base.png', 'overlay.png']);
+    expect((request.get('mask') as File).name).toBe('mask.png');
+    expect(images).toHaveLength(4);
+    expect(0 in images).toBe(false);
+    expect(2 in images).toBe(false);
+  });
+
   test('preserves asynchronous Response entries before synchronous File entries', async () => {
     const first = imageResponse('first.png', 'first');
     const second = new File(['second'], 'second.png', { type: 'image/png' });
@@ -126,6 +161,30 @@ describe('buffered multipart array ordering', () => {
     const form = await createForm({ values: [first, undefined, 'between', second, undefined] }, fetch);
 
     expect(formValues(form, 'values[]')).toEqual(['first.png', 'between', 'second.png']);
+  });
+
+  test('omits leading, middle, and trailing sparse slots in nested upload arrays', async () => {
+    const first: (File | Response | undefined)[] = [];
+    first[1] = imageResponse('first.png');
+    first[2] = undefined;
+    first[4] = new File(['second'], 'second.png');
+    const second: (File | Response | undefined)[] = [];
+    second[2] = imageResponse('third.png');
+    second.length = 4;
+    const groups: { images: (File | Response | undefined)[] }[] = [];
+    groups[1] = { images: first };
+    groups[3] = { images: second };
+    groups.length = 5;
+
+    const form = await createForm({ payload: { groups } }, fetch);
+
+    expect(formValues(form, 'payload[groups][][images][]')).toEqual(['first.png', 'second.png', 'third.png']);
+    expect(0 in first).toBe(false);
+    expect(2 in first).toBe(true);
+    expect(3 in first).toBe(false);
+    expect(0 in groups).toBe(false);
+    expect(2 in groups).toBe(false);
+    expect(4 in groups).toBe(false);
   });
 
   test('preserves explicit filename paths, file metadata, and ordinary buffered errors', async () => {
