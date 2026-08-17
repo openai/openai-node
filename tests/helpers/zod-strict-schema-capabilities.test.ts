@@ -196,6 +196,18 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(entries).not.toHaveBeenCalled();
   });
 
+  it('rejects inherited indexed array accessors without invoking their getters', () => {
+    const getter = vi.fn(() => 4n);
+    const prototype = Object.create(Array.prototype) as object;
+    Object.defineProperty(prototype, '0', { get: getter });
+    const sparse: bigint[] = [];
+    sparse.length = 1;
+    const value = Object.setPrototypeOf(sparse, prototype) as bigint[];
+
+    expect(() => formatFor(z3.array(z3.coerce.bigint()).default(value))).toThrow('array index');
+    expect(getter).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       name: 'direct',
@@ -244,6 +256,17 @@ describe('Zod v3 strict schema capability analysis', () => {
     });
     expect(() => formatFor(z3.any().default(create(hook)))).toThrow(message);
     expect(hook).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'BigInt', value: () => Reflect.construct(Object, [4n]) as object },
+    { name: 'Symbol', value: () => Reflect.construct(Object, [Symbol('default')]) as object },
+    { name: 'Number', value: () => Reflect.construct(Object, [4]) as object },
+    { name: 'String', value: () => Reflect.construct(Object, ['default']) as object },
+    { name: 'Boolean', value: () => Reflect.construct(Object, [true]) as object },
+  ])('rejects a boxed $name primitive default before normalizing objects', ({ value }) => {
+    expect(() => formatFor(z3.any().default(value()))).toThrow('boxed primitive');
+    expect(() => formatFor(z3.any().default({ nested: value() }))).toThrow('boxed primitive');
   });
 
   it.each([
@@ -1178,6 +1201,27 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       name: 'wrapped exact BigInt transform',
       schema: () => z3.intersection(z3.number().transform(BigInt).readonly(), z3.number()),
     },
+    {
+      name: 'nested object BigInt and number',
+      schema: () =>
+        z3.intersection(z3.object({ value: z3.coerce.bigint() }), z3.object({ value: z3.number() })),
+    },
+    {
+      name: 'nested array object BigInt and number',
+      schema: () =>
+        z3.intersection(
+          z3.array(z3.object({ value: z3.coerce.bigint() })),
+          z3.array(z3.object({ value: z3.number() })),
+        ),
+    },
+    {
+      name: 'wrapped nested object outputs',
+      schema: () =>
+        z3.intersection(
+          z3.object({ value: z3.coerce.bigint() }).readonly(),
+          z3.object({ value: z3.number() }),
+        ),
+    },
   ])('rejects intersections with incompatible $name parsed outputs', ({ schema }) => {
     expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
   });
@@ -1245,6 +1289,18 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       value: () => z3.union([z3.promise(z3.string()), z3.number()]),
       schema: { type: 'number' },
       raw: '{"value":7}',
+    },
+    {
+      name: 'required tuple Promise',
+      value: () => z3.union([z3.tuple([z3.promise(z3.number())]), z3.string()]),
+      schema: { type: 'string' },
+      raw: '{"value":"valid"}',
+    },
+    {
+      name: 'nested required tuple Promise',
+      value: () => z3.union([z3.tuple([z3.object({ value: z3.promise(z3.number()) })]), z3.string()]),
+      schema: { type: 'string' },
+      raw: '{"value":"valid"}',
     },
   ])('omits an uncovered $name union branch from its synchronous input schema', ({ value, schema, raw }) => {
     const result = create(z3.object({ value: value() }));

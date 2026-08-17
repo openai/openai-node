@@ -125,6 +125,9 @@ const asynchronousContainerChildren = (
   if (def.typeName === ZodFirstPartyTypeKind.ZodObject) {
     return { values: Object.values(def.shape()), every: false };
   }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodTuple) {
+    return { values: def.items, every: false };
+  }
   if (def.typeName === ZodFirstPartyTypeKind.ZodArray) {
     const nonempty = (def.minLength?.value ?? 0) > 0 || (def.exactLength?.value ?? 0) > 0;
     return nonempty ? { values: [def.type], every: false } : null;
@@ -234,6 +237,92 @@ export const knownParsedOutputType = (
       : undefined;
   } finally {
     active.delete(definition);
+  }
+};
+
+type ParsedOutputMismatch = {
+  left: ZodFirstPartyTypeKind;
+  right: ZodFirstPartyTypeKind;
+  path: readonly string[];
+};
+
+const parsedOutputContainer = (
+  definition: ZodTypeDef,
+  kind: ZodFirstPartyTypeKind,
+  active = new Set<ZodTypeDef>(),
+): InspectableDefinition | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (def.typeName === kind) {
+      return def;
+    }
+    const children = childDefinitions(def, 'output');
+    const child = children?.values[0];
+    return children?.values.length === 1 && child !== undefined
+      ? parsedOutputContainer(child._def, kind, active)
+      : undefined;
+  } finally {
+    active.delete(definition);
+  }
+};
+
+export const findIncompatibleParsedOutputs = (
+  left: ZodTypeDef,
+  right: ZodTypeDef,
+  path: readonly string[] = [],
+  active = new Map<ZodTypeDef, Set<ZodTypeDef>>(),
+): ParsedOutputMismatch | undefined => {
+  const existing = active.get(left);
+  if (existing?.has(right)) {
+    return undefined;
+  }
+  const current = existing ?? new Set<ZodTypeDef>();
+  active.set(left, current);
+  current.add(right);
+  try {
+    const leftKind = knownParsedOutputType(left);
+    const rightKind = knownParsedOutputType(right);
+    if (leftKind === undefined || rightKind === undefined) {
+      return undefined;
+    }
+    if (leftKind !== rightKind) {
+      return { left: leftKind, right: rightKind, path };
+    }
+    if (leftKind !== ZodFirstPartyTypeKind.ZodObject && leftKind !== ZodFirstPartyTypeKind.ZodArray) {
+      return undefined;
+    }
+    const first = parsedOutputContainer(left, leftKind);
+    const second = parsedOutputContainer(right, rightKind);
+    if (!first || !second) {
+      return undefined;
+    }
+    if (leftKind === ZodFirstPartyTypeKind.ZodArray) {
+      return findIncompatibleParsedOutputs(first.type._def, second.type._def, [...path, '[]'], active);
+    }
+    const firstShape = first.shape();
+    const secondShape = second.shape();
+    for (const [key, child] of Object.entries(firstShape)) {
+      if (!hasOwn(secondShape, key)) {
+        continue;
+      }
+      const sibling = secondShape[key];
+      if (sibling) {
+        const mismatch = findIncompatibleParsedOutputs(child._def, sibling._def, [...path, key], active);
+        if (mismatch) {
+          return mismatch;
+        }
+      }
+    }
+    return undefined;
+  } finally {
+    current.delete(right);
+    if (current.size === 0) {
+      active.delete(left);
+    }
   }
 };
 

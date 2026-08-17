@@ -61,11 +61,11 @@ import {
   applySafeIntegerBounds,
   applyUnsafeBigIntBounds,
   convertsJSONPipelineInput,
+  findIncompatibleParsedOutputs,
   findNestedNumericOverlaps,
   hasConstrainedPipelineOutput,
   hasOpaqueJSONValidation,
   hasOpaquePipelineTransform,
-  knownParsedOutputType,
   producesBigIntAtPath,
   producesDateAtPath,
   producesBigIntOutput,
@@ -450,6 +450,13 @@ const trustedDatePrototypeMethods = new Map<PropertyKey, unknown>([
   [Symbol.toPrimitive, Date.prototype[Symbol.toPrimitive]],
 ]);
 const trustedDateGetTime = Date.prototype.getTime;
+const trustedBoxedPrimitiveMethods = [
+  BigInt.prototype.valueOf,
+  Symbol.prototype.valueOf,
+  Number.prototype.valueOf,
+  String.prototype.valueOf,
+  Boolean.prototype.valueOf,
+];
 
 const isCanonicalDateDefault = (value: Date): boolean =>
   Object.getPrototypeOf(value) === Date.prototype &&
@@ -529,14 +536,31 @@ const normalizeStrictDefaultValue = (
       return value;
     }
 
+    const boxedPrimitive = trustedBoxedPrimitiveMethods.some((valueOf) => {
+      try {
+        Reflect.apply(valueOf, value, []);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (boxedPrimitive) {
+      throw new TypeError('Zod default cannot safely represent a boxed primitive in JSON Structured Outputs');
+    }
+
     const descriptors = strictDefaultDescriptors(value, keyword, refs, prototypes);
     if (Array.isArray(value)) {
       const normalized: unknown[] = [];
       seen.set(value, normalized);
       let changed = false;
+      const ownDescriptors = new Map(descriptors);
 
       for (let index = 0; index < value.length; index += 1) {
-        const item: unknown = value[index];
+        const descriptor = ownDescriptors.get(String(index));
+        if (!descriptor) {
+          throw new TypeError('Zod default cannot safely represent an inherited or sparse array index');
+        }
+        const item: unknown = descriptor.value;
         const normalizedItem = normalizeStrictDefaultValue(
           item,
           definition,
@@ -849,10 +873,11 @@ const selectParser = (
     }
     case ZodFirstPartyTypeKind.ZodIntersection: {
       if (refs.openaiStrictMode) {
-        const left = knownParsedOutputType(def.left._def);
-        const right = knownParsedOutputType(def.right._def);
-        if (left !== undefined && right !== undefined && left !== right) {
-          throw new TypeError(`ZodIntersection arms have incompatible parsed outputs: ${left} and ${right}`);
+        const mismatch = findIncompatibleParsedOutputs(def.left._def, def.right._def);
+        if (mismatch) {
+          throw new TypeError(
+            `ZodIntersection arms have incompatible parsed outputs: ${mismatch.left} and ${mismatch.right}`,
+          );
         }
       }
       const intersectionRefs: PreprocessedRefs = refs.openaiStrictMode
