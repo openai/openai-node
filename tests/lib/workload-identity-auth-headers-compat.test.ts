@@ -394,7 +394,7 @@ describe('workload identity authHeaders subclass compatibility', () => {
     const request = client.models.list({ timeout: 1000, maxRetries: 0 });
     const result = (async () => {
       try {
-        await request;
+        return await request;
       } catch (error) {
         return error;
       } finally {
