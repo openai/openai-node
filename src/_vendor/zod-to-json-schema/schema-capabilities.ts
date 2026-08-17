@@ -596,12 +596,39 @@ const serializedNativeDefault = (value: unknown): unknown => {
   return value;
 };
 
+const matchesPrimitiveDefaultInput = (definition: InspectableDefinition, value: unknown): boolean => {
+  if (definition.coerce) {
+    return true;
+  }
+  const serialized = serializedNativeDefault(value);
+  switch (definition.typeName) {
+    case ZodFirstPartyTypeKind.ZodString: {
+      return typeof serialized === 'string';
+    }
+    case ZodFirstPartyTypeKind.ZodNumber: {
+      return typeof serialized === 'number';
+    }
+    case ZodFirstPartyTypeKind.ZodBoolean: {
+      return typeof serialized === 'boolean';
+    }
+    case ZodFirstPartyTypeKind.ZodNull: {
+      return serialized === null;
+    }
+    case ZodFirstPartyTypeKind.ZodArray: {
+      return Array.isArray(serialized);
+    }
+    default: {
+      return true;
+    }
+  }
+};
+
 const matchesDefaultDiscriminators = (
   definition: ZodTypeDef,
   value: unknown,
   active = new Set<ZodTypeDef>(),
 ): boolean => {
-  if (active.has(definition) || !value || typeof value !== 'object' || Array.isArray(value)) {
+  if (active.has(definition)) {
     return true;
   }
   active.add(definition);
@@ -624,10 +651,13 @@ const matchesDefaultDiscriminators = (
         return matchesDefaultDiscriminators(def.getter()._def, value, active);
       }
       case ZodFirstPartyTypeKind.ZodObject: {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+          return false;
+        }
         break;
       }
       default: {
-        return true;
+        return matchesPrimitiveDefaultInput(def, value);
       }
     }
     const record = value as Record<string, unknown>;
@@ -681,11 +711,16 @@ const producesSelectedNativeUnion = (
       if (
         candidate.typeName === ZodFirstPartyTypeKind.ZodNumber &&
         typeof scalar === 'number' &&
-        candidate.checks?.some((check) =>
-          check.kind === 'min'
-            ? scalar < Number(check.value)
-            : check.kind === 'max' && scalar > Number(check.value),
-        )
+        candidate.checks?.some((check) => {
+          const boundary = Number(check.value);
+          if (check.kind === 'min') {
+            return scalar < boundary || (check.inclusive === false && scalar === boundary);
+          }
+          if (check.kind === 'max') {
+            return scalar > boundary || (check.inclusive === false && scalar === boundary);
+          }
+          return false;
+        })
       ) {
         continue;
       }

@@ -181,6 +181,21 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(format.$parseRaw('{}')).toEqual({ values: [4n], detail: { count: 5n } });
   });
 
+  it('normalizes array defaults without invoking an overridden entries method', () => {
+    const value = [4n];
+    const entries = vi.fn(function* ignoredEntries() {
+      yield* [];
+    });
+    Object.defineProperty(value, 'entries', { value: entries });
+
+    const format = formatFor(z3.array(z3.coerce.bigint()).default(value));
+
+    expect(format.json_schema.schema).toHaveProperty('properties.value.default', [4]);
+    expect(format.$parseRaw('{}')).toEqual({ value: [4n] });
+    expect(() => JSON.stringify(format)).not.toThrow();
+    expect(entries).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       name: 'direct',
@@ -407,6 +422,18 @@ describe('Zod v3 strict schema capability analysis', () => {
       normalized: 4,
     },
     {
+      name: 'exclusive numeric minimum equality',
+      schema: () => z3.union([z3.number().gt(4), z3.coerce.bigint()]).default(4n),
+      output: 4n,
+      normalized: 4,
+    },
+    {
+      name: 'exclusive numeric maximum equality',
+      schema: () => z3.union([z3.number().lt(4), z3.coerce.bigint()]).default(4n),
+      output: 4n,
+      normalized: 4,
+    },
+    {
       name: 'nested object union',
       schema: () =>
         z3.union([z3.object({ count: z3.coerce.bigint() }), z3.object({ count: z3.string() })]).default({
@@ -426,6 +453,33 @@ describe('Zod v3 strict schema capability analysis', () => {
           .default({ kind: 'bigint', count: 4n }),
       output: { kind: 'bigint', count: 4n },
       normalized: { kind: 'bigint', count: 4 },
+    },
+    {
+      name: 'primitive-type-discriminated object union',
+      schema: () =>
+        z3
+          .union([
+            z3.object({ kind: z3.number(), count: z3.number() }),
+            z3.object({ kind: z3.string(), count: z3.coerce.bigint() }),
+          ])
+          .default({ kind: 'bigint', count: 4n }),
+      output: { kind: 'bigint', count: 4n },
+      normalized: { kind: 'bigint', count: 4 },
+    },
+    {
+      name: 'nested wrapped primitive-type discriminator',
+      schema: () =>
+        z3
+          .union([
+            z3.object({ kind: z3.object({ type: z3.boolean().readonly() }), count: z3.number() }),
+            z3.object({
+              kind: z3.object({ type: z3.string().brand<'bigint-kind'>() }),
+              count: z3.coerce.bigint(),
+            }),
+          ])
+          .default({ kind: { type: 'bigint' }, count: 4n }),
+      output: { kind: { type: 'bigint' }, count: 4n },
+      normalized: { kind: { type: 'bigint' }, count: 4 },
     },
   ])(
     'normalizes a safe BigInt default through a compatible $name branch',
@@ -459,6 +513,14 @@ describe('Zod v3 strict schema capability analysis', () => {
     { name: 'number', schema: () => z3.union([z3.number(), z3.coerce.bigint()]).default(4n) },
     { name: 'any', schema: () => z3.union([z3.any(), z3.coerce.bigint()]).default(4n) },
     {
+      name: 'inclusive numeric minimum equality',
+      schema: () => z3.union([z3.number().min(4), z3.coerce.bigint()]).default(4n),
+    },
+    {
+      name: 'inclusive numeric maximum equality',
+      schema: () => z3.union([z3.number().max(4), z3.coerce.bigint()]).default(4n),
+    },
+    {
       name: 'matching literal',
       schema: () => z3.union([z3.literal(4), z3.coerce.bigint()]).default(4n),
     },
@@ -472,6 +534,16 @@ describe('Zod v3 strict schema capability analysis', () => {
         z3
           .union([z3.object({ count: z3.number() }), z3.object({ count: z3.coerce.bigint() })])
           .default({ count: 4n }),
+    },
+    {
+      name: 'coercing primitive discriminator',
+      schema: () =>
+        z3
+          .union([
+            z3.object({ kind: z3.coerce.number(), count: z3.number() }),
+            z3.object({ kind: z3.string(), count: z3.coerce.bigint() }),
+          ])
+          .default({ kind: '4', count: 4n }),
     },
   ])('rejects BigInt defaults intercepted by an earlier $name union option', ({ schema }) => {
     expect(() => formatFor(schema())).toThrow('ZodBigInt');

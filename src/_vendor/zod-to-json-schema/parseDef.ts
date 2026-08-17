@@ -523,7 +523,8 @@ const normalizeStrictDefaultValue = (
       seen.set(value, normalized);
       let changed = false;
 
-      for (const [index, item] of value.entries()) {
+      for (let index = 0; index < value.length; index += 1) {
+        const item: unknown = value[index];
         const normalizedItem = normalizeStrictDefaultValue(
           item,
           definition,
