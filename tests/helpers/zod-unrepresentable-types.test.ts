@@ -395,10 +395,6 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
       },
     },
     {
-      name: 'promise',
-      schema: () => z3.promise(z3.number()),
-    },
-    {
       name: 'numeric native enum',
       schema: () => z3.nativeEnum({ Unsafe: 9_007_199_254_740_992 } as const),
     },

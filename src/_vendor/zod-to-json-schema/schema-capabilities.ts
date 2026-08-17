@@ -26,14 +26,28 @@ type InspectableDefinition = ZodTypeDef & {
   rest?: SchemaType;
   valueType: SchemaType;
 };
-type Traversal = 'input' | 'output' | 'unsafe-output' | 'conversion' | 'default' | 'unconditional-number';
+type Traversal =
+  | 'input'
+  | 'output'
+  | 'compatible-output'
+  | 'unsafe-output'
+  | 'conversion'
+  | 'async-input'
+  | 'default'
+  | 'unconditional-number';
 type Inspector = (definition: InspectableDefinition) => boolean | null | undefined;
 
 type TraversalChildren = { values: SchemaType[]; every: boolean };
-const asynchronousOutputTraversals = new Set<Traversal>(['output', 'unsafe-output', 'default']);
+const asynchronousOutputTraversals = new Set<Traversal>([
+  'output',
+  'compatible-output',
+  'unsafe-output',
+  'default',
+]);
 const universalIntersectionTraversals = new Set<Traversal>([
   'input',
   'conversion',
+  'compatible-output',
   'unsafe-output',
   'unconditional-number',
 ]);
@@ -42,7 +56,7 @@ const pipelineChildren = (def: InspectableDefinition, traversal: Traversal): Sch
   if (traversal === 'input') {
     return [def.in];
   }
-  if (traversal === 'conversion' || traversal === 'unconditional-number') {
+  if (traversal === 'conversion' || traversal === 'async-input' || traversal === 'unconditional-number') {
     return [def.in, def.out];
   }
   return [def.out];
@@ -78,7 +92,7 @@ const childDefinitions = (def: InspectableDefinition, traversal: Traversal): Tra
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
       const values = def.options instanceof Map ? [...def.options.values()] : def.options;
-      return { values, every: traversal === 'conversion' };
+      return { values, every: traversal === 'conversion' || traversal === 'async-input' };
     }
     case ZodFirstPartyTypeKind.ZodIntersection: {
       return {
@@ -121,6 +135,13 @@ const visitDefinition = (
     active.delete(definition);
   }
 };
+
+export const requiresAsynchronousJSONInput = (definition: ZodTypeDef): boolean =>
+  visitDefinition(
+    definition,
+    (def) => (def.typeName === ZodFirstPartyTypeKind.ZodPromise ? true : undefined),
+    'async-input',
+  );
 
 export const producesBigIntOutput = (definition: ZodTypeDef): boolean =>
   visitDefinition(
@@ -343,7 +364,7 @@ export const convertsJSONPipelineInput = (definition: ZodTypeDef, output: ZodTyp
       return visitDefinition(
         output,
         (candidate) => (candidate.typeName === def.typeName ? true : undefined),
-        'output',
+        'compatible-output',
       );
     },
     'conversion',
@@ -428,8 +449,28 @@ const matchesDefaultDiscriminators = (
   active.add(definition);
   try {
     const def = definition as InspectableDefinition;
-    if (def.typeName !== ZodFirstPartyTypeKind.ZodObject) {
-      return true;
+    switch (def.typeName) {
+      case ZodFirstPartyTypeKind.ZodBranded: {
+        return matchesDefaultDiscriminators(def.type._def, value, active);
+      }
+      case ZodFirstPartyTypeKind.ZodReadonly:
+      case ZodFirstPartyTypeKind.ZodDefault: {
+        return matchesDefaultDiscriminators(def.innerType._def, value, active);
+      }
+      case ZodFirstPartyTypeKind.ZodEffects: {
+        return def.effect.type === 'refinement'
+          ? matchesDefaultDiscriminators(def.schema._def, value, active)
+          : true;
+      }
+      case ZodFirstPartyTypeKind.ZodLazy: {
+        return matchesDefaultDiscriminators(def.getter()._def, value, active);
+      }
+      case ZodFirstPartyTypeKind.ZodObject: {
+        break;
+      }
+      default: {
+        return true;
+      }
     }
     const record = value as Record<string, unknown>;
     return Object.entries(def.shape()).every(([key, child]) => {

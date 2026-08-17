@@ -65,6 +65,7 @@ import {
   hasOpaqueJSONValidation,
   producesBigIntAtPath,
   producesBigIntOutput,
+  requiresAsynchronousJSONInput,
 } from './schema-capabilities';
 import { ignoreOverride } from './Options';
 import { zodDef } from './util';
@@ -606,12 +607,20 @@ const selectParser = (
     }
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
-      const options = (def.options instanceof Map ? [...def.options.values()] : def.options) as {
+      const originalOptions = (def.options instanceof Map ? [...def.options.values()] : def.options) as {
         _def: ZodTypeDef & {
           typeName: ZodFirstPartyTypeKind;
           value?: unknown;
         };
       }[];
+      const options = refs.openaiStrictMode
+        ? originalOptions.filter((option) => !requiresAsynchronousJSONInput(option._def))
+        : originalOptions;
+      const omittedAsynchronousOptions = options.length !== originalOptions.length;
+      if (refs.openaiStrictMode && options.length === 0) {
+        throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodPromise, refs);
+      }
+
       const bigintIndex = options.findIndex((option) => producesBigIntOutput(option._def));
       const hasBigIntLiteral = options.some(
         (option) =>
@@ -635,7 +644,10 @@ const selectParser = (
 
       if (
         refs.openaiStrictMode &&
-        (bigintIndex !== -1 || hasBigIntLiteral || nestedOverlaps.some((overlaps) => overlaps.length > 0))
+        (omittedAsynchronousOptions ||
+          bigintIndex !== -1 ||
+          hasBigIntLiteral ||
+          nestedOverlaps.some((overlaps) => overlaps.length > 0))
       ) {
         const branches = options
           .map((option, index) => {
@@ -765,7 +777,7 @@ const selectParser = (
       return parseDef(def.getter()._def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodPromise: {
-      if (refs.openaiStrictMode && !refs.currentPath.includes('anyOf')) {
+      if (refs.openaiStrictMode) {
         throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodPromise, refs);
       }
       return parsePromiseDef(def, refs, forceResolution);
@@ -806,7 +818,15 @@ const selectParser = (
         );
       }
       const schema = parseEffectsDef(def, refs, forceResolution || boundNumericTransform === true);
-      return boundNumericTransform && schema !== undefined ? applySafeIntegerBounds(schema) : schema;
+      if (!boundNumericTransform || schema === undefined) {
+        return schema;
+      }
+
+      const bounded = applySafeIntegerBounds(schema);
+      if (transform === BigInt && 'type' in bounded && bounded.type === 'number') {
+        bounded.type = 'integer';
+      }
+      return bounded;
     }
     case ZodFirstPartyTypeKind.ZodAny: {
       return parseAnyDef();
@@ -853,7 +873,14 @@ const selectParser = (
         }
         const inputRefs: PreprocessedRefs =
           outputRefs === refs ? refs : { ...refs, [expectedPipelineOutput]: def.out._def };
-        const input = parsePipelineDef(def, inputRefs, forceResolution, outputRefs);
+        let input = parsePipelineDef(def, inputRefs, forceResolution, outputRefs);
+        if (input && '$ref' in input) {
+          const materializedInputRefs: PreprocessedRefs = {
+            ...inputRefs,
+            [constrainedReferenceContext]: true,
+          };
+          input = parseDef(def.in._def, materializedInputRefs, true);
+        }
         if (!input || !output) {
           return input;
         }
