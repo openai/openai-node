@@ -145,6 +145,10 @@ export class SubjectTokenWorkloadIdentityAuth {
     return Date.now() >= cachedToken.expiresAt - (this.config.refreshBufferSeconds ?? 1200) * 1000;
   }
 
+  ownsToken(token: string): boolean {
+    return this.cachedToken?.token === token;
+  }
+
   invalidateToken(rejectedToken?: string): void {
     if (rejectedToken !== undefined && this.cachedToken?.token !== rejectedToken) {
       return;

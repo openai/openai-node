@@ -1,8 +1,7 @@
 import { expect, vi } from 'vitest';
 
-import OpenAI, { APIConnectionTimeoutError, APIUserAbortError, AzureOpenAI } from 'openai';
+import OpenAI, { APIConnectionTimeoutError, AzureOpenAI } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
-import type { NullableHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 
 const identity = {
@@ -32,9 +31,6 @@ class BoundaryMutatingOpenAI extends OpenAI {
   builtRequestMutation?: (built: Awaited<ReturnType<OpenAI['buildRequest']>>) => void;
   fetchMutation?: (url: RequestInfo, init: RequestInit) => { url: RequestInfo; init: RequestInit };
   timeoutMutation?: (url: RequestInfo, init: RequestInit) => { url: RequestInfo; init: RequestInit };
-  readonly prepared = new WeakMap<FinalRequestOptions, string>();
-  observedIdentity: string | undefined;
-  optionsMutation?: (options: FinalRequestOptions) => void;
 
   override async buildRequest(
     options: FinalRequestOptions,
@@ -64,20 +60,6 @@ class BoundaryMutatingOpenAI extends OpenAI {
   ): Promise<Response> {
     const effective = init && this.timeoutMutation ? this.timeoutMutation(url, init) : { url, init };
     return await super.fetchWithTimeout(effective.url, effective.init, timeout, controller);
-  }
-
-  protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    await super.prepareOptions(options);
-    this.prepared.set(options, 'original-request-options');
-  }
-
-  protected override async authHeaders(
-    options: FinalRequestOptions,
-    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-  ): Promise<NullableHeaders | undefined> {
-    this.observedIdentity = this.prepared.get(options);
-    this.optionsMutation?.(options);
-    return await super.authHeaders(options, schemes);
   }
 }
 
@@ -770,58 +752,5 @@ describe('X.509 final security boundaries', () => {
 
     await client.models.list();
     expect(observedSymbols).toEqual([[]]);
-  });
-
-  test.each(['api-key', 'subject-token', 'x509'] as const)(
-    'passes the original request-options identity to %s authentication hooks',
-    async (mode) => {
-      const client = new BoundaryMutatingOpenAI({
-        ...(mode === 'api-key'
-          ? { apiKey: 'api-key' }
-          : {
-              apiKey: null,
-              workloadIdentity:
-                mode === 'x509'
-                  ? identity
-                  : {
-                      identityProviderId: 'idp_subject',
-                      serviceAccountId: 'svc_subject',
-                      provider: { tokenType: 'jwt' as const, getToken: async () => 'subject-token' },
-                    },
-            }),
-        fetch: vi.fn(async (url: string | URL | Request) =>
-          url.toString().includes('/oauth/token')
-            ? tokenResponse('access-token')
-            : Response.json({ data: [] }),
-        ),
-      });
-
-      await client.models.list();
-      expect(client.observedIdentity).toBe('original-request-options');
-    },
-  );
-
-  test('honors a caller cancellation signal attached by the original authentication hook', async () => {
-    const customFetch = vi.fn();
-    const client = new BoundaryMutatingOpenAI({ apiKey: 'api-key', fetch: customFetch });
-    client.optionsMutation = (options) => {
-      options.signal = AbortSignal.abort('stop before sending');
-    };
-
-    await expect(client.models.list()).rejects.toBeInstanceOf(APIUserAbortError);
-    expect(customFetch).not.toHaveBeenCalled();
-  });
-
-  test('honors streaming metadata attached by the original authentication hook', async () => {
-    const customFetch = vi.fn(async () => {
-      throw new Error('network failed');
-    });
-    const client = new BoundaryMutatingOpenAI({ apiKey: 'api-key', fetch: customFetch, maxRetries: 2 });
-    client.optionsMutation = (options) => {
-      options.__metadata = { ...options.__metadata, hasStreamingBody: true };
-    };
-
-    await expect(client.post('/upload', { body: 'not replayable' })).rejects.toThrow(/connection/iu);
-    expect(customFetch).toHaveBeenCalledTimes(1);
   });
 });

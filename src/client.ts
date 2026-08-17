@@ -318,15 +318,23 @@ interface WorkloadIdentityContextCarrier {
   [WORKLOAD_IDENTITY_REQUEST_CONTEXT]?: object;
 }
 
-function attachWorkloadIdentityContext<T extends object>(
+function associateWorkloadIdentityContext<T extends object>(
+  target: T,
+  context: WorkloadIdentityRequestContext,
+): T {
+  directWorkloadIdentityRequestContexts.set(target, context);
+  return target;
+}
+
+function attachWorkloadIdentityRequestContext<T extends object>(
   target: T,
   context: WorkloadIdentityRequestContext,
 ): T & WorkloadIdentityContextCarrier {
   const carrier = target as T & WorkloadIdentityContextCarrier;
-  directWorkloadIdentityRequestContexts.set(target, context);
+  associateWorkloadIdentityContext(target, context);
   const contextKey = Object.freeze({});
-  // Keep this enumerable so ordinary object spread in protected-hook overrides
-  // preserves request provenance without exposing the private request context.
+  // SDK-owned request init objects may be spread by fetch hooks. Keep this
+  // enumerable so the clone preserves provenance without exposing the context.
   if (Reflect.set(carrier, WORKLOAD_IDENTITY_REQUEST_CONTEXT, contextKey)) {
     carriedWorkloadIdentityRequestContexts.set(contextKey, context);
   }
@@ -1591,6 +1599,14 @@ export class OpenAI {
     inputOptions: FinalRequestOptions,
     { retryCount = 0 }: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
+    if (
+      this._usesX509WorkloadIdentity &&
+      (this.authHeaders !== OpenAI.prototype.authHeaders || this.bearerAuth !== OpenAI.prototype.bearerAuth)
+    ) {
+      throw new Errors.OpenAIError(
+        'X.509 workload identity does not support overriding `authHeaders` or `bearerAuth`; authentication hooks must remain SDK-owned.',
+      );
+    }
     const options = { ...inputOptions };
     if (this._usesX509WorkloadIdentity && options.fetchOptions !== undefined) {
       throw new Errors.OpenAIError(
@@ -1681,7 +1697,7 @@ export class OpenAI {
       ...((options.fetchOptions as any) ?? {}),
       ...(this._usesX509WorkloadIdentity ? { redirect: 'manual' } : {}),
     };
-    if (this._workloadIdentityAuth) attachWorkloadIdentityContext(req, workloadIdentityContext);
+    if (this._workloadIdentityAuth) attachWorkloadIdentityRequestContext(req, workloadIdentityContext);
 
     return { req, url, timeout: options.timeout };
   }
@@ -1711,7 +1727,7 @@ export class OpenAI {
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider) {
       const authOptions = this._workloadIdentityAuth
-        ? attachWorkloadIdentityContext(options, workloadIdentityContext)
+        ? associateWorkloadIdentityContext(options, workloadIdentityContext)
         : options;
       workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
       try {
@@ -1764,6 +1780,26 @@ export class OpenAI {
       if (!headers.values.get('authorization')) {
         workloadIdentityContext.workloadIdentityTokenSuppressed = true;
       }
+    }
+
+    const authorization = headers.values.get('authorization');
+    const bearerToken = authorization?.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length)
+      : undefined;
+    if (
+      !overridesAuthorization &&
+      !workloadIdentityContext.usesWorkloadIdentityToken &&
+      bearerToken !== undefined &&
+      this._workloadIdentityAuth?.ownsToken(bearerToken, {
+        fetchOptions: workloadIdentityContext.fetchOptions,
+        transportKey: workloadIdentityContext.transportKey,
+      })
+    ) {
+      // A protected subject-token hook may delegate with a spread clone. Derive
+      // final provenance from the selected bearer instead of clone identity.
+      workloadIdentityContext.workloadIdentityAuthorization = authorization ?? undefined;
+      workloadIdentityContext.workloadIdentityTokenSuppressed = false;
+      workloadIdentityContext.usesWorkloadIdentityToken = true;
     }
 
     if (!this._provider) {

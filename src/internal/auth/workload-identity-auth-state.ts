@@ -43,6 +43,13 @@ export class WorkloadIdentityAuthState {
     return await this.implementation.auth.getToken();
   }
 
+  ownsToken(token: string, options: X509WorkloadIdentityAuthOptions = {}): boolean {
+    if (this.implementation.type === 'x509') {
+      return this.implementation.auth.ownsToken(token, options);
+    }
+    return this.implementation.auth.ownsToken(token);
+  }
+
   invalidateToken(rejectedToken?: string, options: X509WorkloadIdentityAuthOptions = {}): void {
     if (this.implementation.type === 'x509') {
       this.implementation.auth.invalidateToken(rejectedToken, options);

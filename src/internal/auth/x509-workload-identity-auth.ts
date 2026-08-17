@@ -692,6 +692,12 @@ export class X509WorkloadIdentityAuth {
     return hasReached(cachedToken.refreshAt);
   }
 
+  ownsToken(token: string, options: X509WorkloadIdentityAuthOptions = {}): boolean {
+    const fetchOptions = this.resolveFetchOptions(options);
+    const state = this.getRefreshState(X509WorkloadIdentityAuth.resolveTransportKey(options, fetchOptions));
+    return state.cachedToken?.token === token;
+  }
+
   /** Discards a rejected cached access token so the next request performs a fresh exchange. */
   invalidateToken(rejectedToken?: string, options: X509WorkloadIdentityAuthOptions = {}): void {
     const fetchOptions = this.resolveFetchOptions(options);
