@@ -101,8 +101,14 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
 }
 
 function requestTarget(parsedURL: URL): { path: string; query: Record<string, string | string[]> } {
-  const query: Record<string, string | string[]> = {};
+  const query: Record<string, string | string[]> = Object.create(null);
   for (const [name, value] of parsedURL.searchParams) {
+    if (name === '__proto__') {
+      throw new Errors.OpenAIError(
+        'The Bedrock SigV4 signer cannot safely sign a `__proto__` query parameter.',
+      );
+    }
+
     const existing = query[name];
     if (existing === undefined) {
       query[name] = value;
@@ -217,6 +223,7 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
 
     const method = (request.method ?? 'GET').toUpperCase();
     const body = signableBody(request.body);
+    const target = requestTarget(parsedURL);
 
     let signed: { headers: Record<string, string> };
     try {
@@ -225,7 +232,7 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
         hostname: parsedURL.hostname,
         ...(parsedURL.port ? { port: Number(parsedURL.port) } : {}),
         method,
-        ...requestTarget(parsedURL),
+        ...target,
         headers: Object.fromEntries(headers.entries()),
         ...(body === undefined ? {} : { body }),
       });
