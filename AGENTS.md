@@ -11,9 +11,10 @@ explicitly requires it.
 
 - For externally observable bug or behavior fixes, reproduce the reported issue
   against the current repository and public SDK entrypoint before proposing a fix.
-  For all changes, check existing issues, pull requests, the API schema, and
-  generated/upstream ownership first; do not duplicate existing work, "fix" intended
-  API behavior, or patch a generated symptom that belongs in the schema or generator.
+  Check existing issues and pull requests; inspect the API schema and
+  generated/upstream ownership only when relevant. Do not duplicate existing work,
+  "fix" intended API behavior, or patch a generated symptom that belongs in the
+  schema or generator.
 - For those behavior fixes, include a focused regression that fails before the change
   and passes afterward. Type errors need a compile-time reproduction; stream, transport,
   and packaging bugs need coverage at the actual affected boundary, not merely a
