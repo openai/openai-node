@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+publish_token=${NPM_TOKEN:-}
+export -n publish_token
+unset NPM_TOKEN
+
 set +e
 bash ./bin/check-npm-version
 VERSION_STATUS=$?
@@ -12,14 +16,40 @@ elif [[ $VERSION_STATUS -ne 1 ]]; then
   exit "$VERSION_STATUS"
 fi
 
-if [[ ${NPM_TOKEN:-} ]]; then
-  npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
-elif [[ ! ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
+if [[ -z $publish_token && -z ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
   echo "ERROR: NPM_TOKEN must be set if not running in a Github Action with id-token permission"
   exit 1
 fi
 
 pnpm build
+
+# Install the OIDC-compatible npm before configuring publication credentials.
+npm install --prefix oidc/ npm@11.6.2
+
+if [[ -n $publish_token ]]; then
+  original_npm_config=$(npm config get userconfig)
+  publish_npm_config=''
+
+  cleanup_publish_npm_config() {
+    if [[ -n $publish_npm_config ]]; then
+      rm -f -- "$publish_npm_config"
+    fi
+  }
+  trap cleanup_publish_npm_config EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  publish_npm_config=$(mktemp "${TMPDIR:-/tmp}/openai-npmrc.XXXXXXXX")
+  chmod 600 "$publish_npm_config"
+  if [[ -f $original_npm_config && -r $original_npm_config ]]; then
+    cp -- "$original_npm_config" "$publish_npm_config"
+  fi
+  printf '\n//registry.npmjs.org/:_authToken=%s\n' "$publish_token" >> "$publish_npm_config"
+  unset publish_token
+  export NPM_CONFIG_USERCONFIG="$publish_npm_config"
+fi
+
 cd dist
 
 # Get package name and version from package.json
@@ -72,9 +102,6 @@ if $CURRENT_IS_PRERELEASE && $LAST_IS_STABLE_RELEASE; then
 else
   TAG="latest"
 fi
-
-# Install OIDC compatible npm version
-npm install --prefix ../oidc/ npm@11.6.2
 
 # Publish with the appropriate tag
 export npm_config_registry='https://registry.npmjs.org'

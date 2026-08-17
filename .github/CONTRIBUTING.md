@@ -58,7 +58,9 @@ modify the contents of the `src/lib/` and `examples/` directories.
 
 - Review direct and transitive dependency updates, `pnpm-lock.yaml`, package provenance, and install or
   build lifecycle scripts, including dependencies used by examples and ecosystem fixtures.
-- Use `pnpm install --frozen-lockfile` for reproducible installs. Do not weaken `pnpm-workspace.yaml`
+- Use `pnpm install --frozen-lockfile` in CI and when verifying an unchanged lockfile. For intentional
+  dependency updates, regenerate and review `pnpm-lock.yaml` with the corresponding dependency changes.
+  Do not weaken `pnpm-workspace.yaml`
   safeguards such as `minimumReleaseAge`, `minimumReleaseAgeStrict`, `trustPolicy`, `blockExoticSubdeps`,
   `strictDepBuilds`, `trustLockfile`, or the `allowBuilds` allowlist without explicit security review.
 - Pin third-party GitHub Actions to full, immutable commit SHAs and review action updates. Keep workflow
@@ -246,5 +248,5 @@ this trusted-publishing flow over introducing long-lived registry secrets.
 
 If a manual recovery release is necessary, run `bin/publish-npm` with `NPM_TOKEN` supplied through approved
 secret storage. Publish only a reviewed commit and use a narrowly scoped, short-lived token. Never log the
-token, place it in shell history, or commit registry configuration; remove any credential-bearing npm
-configuration created during publication afterward.
+token, place it in shell history, or commit registry configuration. The publisher builds before creating
+its private temporary npm configuration and automatically removes that configuration on exit.

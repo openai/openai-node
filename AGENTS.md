@@ -79,9 +79,12 @@ explicitly requires it.
   secrets. Read `OPENAI_API_KEY` from the environment and keep examples, fixtures,
   recordings, and snapshots synthetic.
 - Never place secret API keys in browser bundles or enable `dangerouslyAllowBrowser`
-  without explicit security review. Redact credentials, authorization headers,
-  cookies, webhook secrets, and sensitive request or response data from logs,
-  errors, test output, snapshots, and CI artifacts.
+  without explicit security review. Always redact credentials, authorization
+  headers, cookies, and webhook secrets. Keep real customer-sensitive request or
+  response data out of default or uncontrolled logs, errors, test output,
+  snapshots, and CI artifacts. Preserve documented opt-in `DEBUG` logging and
+  `APIError.body` diagnostics with clear sensitive-data warnings; redact them
+  before forwarding to untrusted sinks.
 - Treat provider endpoints, headers, filenames, schemas, and object properties as
   untrusted. At JSON object-record boundaries, validate the own properties and
   values actually emitted, accounting for serialization hooks and omitted values;
