@@ -32,6 +32,40 @@ const unrepresentableTypes = [
   { name: 'ZodBigInt', schema: () => z3.bigint(), v4: () => z4.bigint() },
 ];
 
+const preprocessDateValue = (value: unknown) => (typeof value === 'string' ? new Date(value) : value);
+
+const preprocessedTypes = [
+  {
+    name: 'ZodDate',
+    schema: () => z3.preprocess(preprocessDateValue, z3.date()),
+    input: '2026-08-17T00:00:00.000Z',
+    expected: () => new Date('2026-08-17T00:00:00.000Z'),
+  },
+  {
+    name: 'ZodBigInt',
+    schema: () => z3.preprocess((value) => (typeof value === 'number' ? BigInt(value) : value), z3.bigint()),
+    input: 7,
+    expected: () => 7n,
+  },
+  {
+    name: 'ZodSet',
+    schema: () =>
+      z3.preprocess((value) => (Array.isArray(value) ? new Set(value) : value), z3.set(z3.string())),
+    input: ['value'],
+    expected: () => new Set(['value']),
+  },
+  {
+    name: 'ZodMap',
+    schema: () =>
+      z3.preprocess(
+        (value) => (Array.isArray(value) ? new Map(value as [string, number][]) : value),
+        z3.map(z3.string(), z3.number()),
+      ),
+    input: [['value', 7]],
+    expected: () => new Map([['value', 7]]),
+  },
+];
+
 describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ create }) => {
   it.each(unrepresentableTypes)(
     'rejects nested $name fields before creating a request',
@@ -68,6 +102,68 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
     });
   });
 
+  it.each(preprocessedTypes)(
+    'preserves JSON-input preprocessors that construct $name values',
+    ({ schema, input, expected }) => {
+      const result = create(z3.object({ value: schema() }));
+
+      expect(result.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: expected() });
+      expect(() => JSON.stringify(result)).not.toThrow();
+    },
+  );
+
+  it.each([
+    { name: 'nullable BigInt', schema: () => z3.bigint().nullable() },
+    { name: 'primitive BigInt union', schema: () => z3.union([z3.bigint(), z3.string()]) },
+    { name: 'BigInt literal', schema: () => z3.literal(1n) },
+    { name: 'BigInt literal union', schema: () => z3.union([z3.literal(1n), z3.literal('value')]) },
+  ])('rejects $name before primitive fast paths or serialization', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow(/Zod(?:BigInt|Literal)/u);
+  });
+
+  it('does not allow an unprocessed schema after its shared definition was preprocessed', () => {
+    const native = z3.date();
+    const converted = z3.preprocess((value) => (typeof value === 'string' ? new Date(value) : value), native);
+
+    expect(() => create(z3.object({ converted, native }))).toThrow('#/definitions/strict/properties/native');
+  });
+
+  it('keeps shared native definitions inside their separate preprocessor contexts', () => {
+    const native = z3.date();
+    const first = z3.preprocess(preprocessDateValue, native);
+    const second = z3.preprocess(preprocessDateValue, native);
+    const result = create(z3.object({ first, second }));
+
+    expect(
+      result.$parseRaw('{"first":"2026-08-17T00:00:00.000Z","second":"2026-08-18T00:00:00.000Z"}'),
+    ).toEqual({
+      first: new Date('2026-08-17T00:00:00.000Z'),
+      second: new Date('2026-08-18T00:00:00.000Z'),
+    });
+  });
+
+  it('normalizes JSON-compatible preprocessed BigInt literals', () => {
+    const value = z3.preprocess(
+      (input) => (typeof input === 'number' ? BigInt(input) : input),
+      z3.literal(7n),
+    );
+    const result = create(z3.object({ value }));
+
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it('rejects unsafe preprocessed BigInt literals before serialization', () => {
+    const value = z3.preprocess(
+      (input) => (typeof input === 'number' ? BigInt(input) : input),
+      z3.literal(9_007_199_254_740_992n),
+    );
+
+    expect(() => create(z3.object({ value }))).toThrow(
+      'cannot represent the `const` value as a safe JSON integer',
+    );
+  });
+
   it.each([
     {
       name: 'minimum',
@@ -93,6 +189,48 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
 });
 
 describe('Zod v3 BigInt coercion JSON Schema serialization', () => {
+  it('bounds every JSON-coerced BigInt branch to the safe integer range', () => {
+    const schema = z3.object({
+      direct: z3.coerce.bigint(),
+      minimum: z3.coerce.bigint().min(1n),
+      maximum: z3.coerce.bigint().max(9n),
+      nullable: z3.coerce.bigint().nullable(),
+      stringUnion: z3.union([z3.coerce.bigint(), z3.string()]),
+      numberUnion: z3.union([z3.coerce.bigint(), z3.number()]),
+      numberFirstUnion: z3.union([z3.number(), z3.coerce.bigint()]),
+      preprocessed: z3.preprocess(
+        (value) => (typeof value === 'number' ? BigInt(value) : value),
+        z3.bigint(),
+      ),
+    });
+    const format = zodResponseFormat(schema, 'strict');
+    const safeInteger = {
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    };
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: {
+        direct: { type: 'integer', ...safeInteger },
+        minimum: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
+        maximum: { type: 'integer', minimum: Number.MIN_SAFE_INTEGER, maximum: 9 },
+        nullable: { anyOf: [{ type: 'integer', ...safeInteger }, { type: 'null' }] },
+        stringUnion: { anyOf: [{ type: 'integer', ...safeInteger }, { type: 'string' }] },
+        numberUnion: {
+          anyOf: [
+            { type: 'integer', ...safeInteger },
+            { type: 'number', ...safeInteger },
+          ],
+        },
+        numberFirstUnion: {
+          anyOf: [{ type: 'number' }, { type: 'integer', ...safeInteger }],
+        },
+        preprocessed: { type: 'integer', ...safeInteger },
+      },
+    });
+    expect(() => JSON.stringify(format.json_schema.schema)).not.toThrow();
+  });
+
   it('serializes safe constraints and defaults as JSON numbers', () => {
     const schema = z3.object({
       bounded: z3.coerce.bigint().min(2n).max(8n).multipleOf(2n),

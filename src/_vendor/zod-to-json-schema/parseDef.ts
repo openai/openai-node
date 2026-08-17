@@ -93,6 +93,38 @@ export type JsonSchema7TypeUnion =
 
 export type JsonSchema7Type = JsonSchema7TypeUnion & JsonSchema7Meta;
 
+const jsonInputPreprocessor = Symbol('openaiJsonInputPreprocessor');
+
+type PreprocessedRefs = Refs & { [jsonInputPreprocessor]?: true };
+
+const hasJSONInputPreprocessor = (refs: Refs): boolean =>
+  (refs as PreprocessedRefs)[jsonInputPreprocessor] === true;
+
+const requiresJSONInputPreprocessor = (def: ZodTypeDef): boolean => {
+  const schema = def as ZodTypeDef & {
+    typeName: ZodFirstPartyTypeKind;
+    coerce?: boolean;
+    value?: unknown;
+  };
+
+  switch (schema.typeName) {
+    case ZodFirstPartyTypeKind.ZodBigInt:
+    case ZodFirstPartyTypeKind.ZodDate: {
+      return !schema.coerce;
+    }
+    case ZodFirstPartyTypeKind.ZodMap:
+    case ZodFirstPartyTypeKind.ZodSet: {
+      return true;
+    }
+    case ZodFirstPartyTypeKind.ZodLiteral: {
+      return typeof schema.value === 'bigint';
+    }
+    default: {
+      return false;
+    }
+  }
+};
+
 export function parseDef(
   def: ZodTypeDef,
   refs: Refs,
@@ -108,7 +140,27 @@ export function parseDef(
     }
   }
 
-  if (seenItem && !forceResolution) {
+  const needsPreprocessing = refs.openaiStrictMode === true && requiresJSONInputPreprocessor(def);
+  const isPreprocessed = hasJSONInputPreprocessor(refs);
+  if (needsPreprocessing && !isPreprocessed) {
+    const registeredDefinitionPath =
+      seenItem?.jsonSchema === undefined &&
+      seenItem?.path.length === refs.basePath.length + 2 &&
+      seenItem.path[refs.basePath.length] === refs.definitionPath
+        ? seenItem.path
+        : undefined;
+    const diagnosticRefs = registeredDefinitionPath
+      ? { ...refs, currentPath: registeredDefinitionPath }
+      : refs;
+
+    throwUnrepresentableStrictZodType((def as { typeName: ZodFirstPartyTypeKind }).typeName, diagnosticRefs);
+  }
+
+  // A native schema reused by different preprocessors must not be extracted as
+  // a bare definition, because its input-conversion context would be lost.
+  const inlinePreprocessedType = needsPreprocessing && isPreprocessed;
+
+  if (seenItem && !forceResolution && !inlinePreprocessedType) {
     const seenSchema = get$ref(seenItem, refs);
 
     if (seenSchema !== undefined) {
@@ -135,7 +187,7 @@ export function parseDef(
 
     return jsonSchema;
   } finally {
-    if (forceResolution && seenItem) {
+    if ((forceResolution || inlinePreprocessedType) && seenItem) {
       // Materializing a definition temporarily moves it to the definition path. Restore the
       // original path so later references to a shared inner type don't inherit wrapper metadata.
       refs.seen.set(def, seenItem);
@@ -282,21 +334,17 @@ const selectParser = (
       return parseObjectDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodBigInt: {
-      if (refs.openaiStrictMode && !def.coerce) {
-        throwUnrepresentableStrictZodType(typeName, refs);
-      }
-
       const schema = parseBigintDef(def, refs);
       if (refs.openaiStrictMode) {
+        const record = schema as unknown as Record<string, unknown>;
         for (const [keyword, value] of Object.entries(schema)) {
           if (typeof value === 'bigint') {
-            (schema as unknown as Record<string, unknown>)[keyword] = normalizeStrictBigIntValue(
-              value,
-              keyword,
-              refs,
-            );
+            record[keyword] = normalizeStrictBigIntValue(value, keyword, refs);
           }
         }
+
+        record['minimum'] ??= Number.MIN_SAFE_INTEGER;
+        record['maximum'] ??= Number.MAX_SAFE_INTEGER;
       }
 
       return schema;
@@ -305,10 +353,6 @@ const selectParser = (
       return parseBooleanDef();
     }
     case ZodFirstPartyTypeKind.ZodDate: {
-      if (refs.openaiStrictMode && !def.coerce) {
-        throwUnrepresentableStrictZodType(typeName, refs);
-      }
-
       return parseDateDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodUndefined: {
@@ -322,6 +366,51 @@ const selectParser = (
     }
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
+      const options = (def.options instanceof Map ? [...def.options.values()] : def.options) as {
+        _def: {
+          typeName: ZodFirstPartyTypeKind;
+          value?: unknown;
+        };
+      }[];
+      const bigintIndex = options.findIndex(
+        (option) => option._def.typeName === ZodFirstPartyTypeKind.ZodBigInt,
+      );
+      const hasBigIntLiteral = options.some(
+        (option) =>
+          option._def.typeName === ZodFirstPartyTypeKind.ZodLiteral && typeof option._def.value === 'bigint',
+      );
+
+      if (refs.openaiStrictMode && (bigintIndex !== -1 || hasBigIntLiteral)) {
+        const branches = options
+          .map((option, index) =>
+            parseDef(option._def as ZodTypeDef, {
+              ...refs,
+              currentPath: [...refs.currentPath, 'anyOf', String(index)],
+            }),
+          )
+          .filter(
+            (branch): branch is JsonSchema7Type =>
+              branch !== undefined && (!refs.strictUnions || Object.keys(branch).length > 0),
+          );
+        const numberWinsBeforeBigInt =
+          bigintIndex !== -1 &&
+          options
+            .slice(0, bigintIndex)
+            .some((option) => option._def.typeName === ZodFirstPartyTypeKind.ZodNumber);
+
+        if (bigintIndex !== -1 && !numberWinsBeforeBigInt) {
+          for (const branch of branches) {
+            if ('type' in branch && branch.type === 'number') {
+              const record = branch as unknown as Record<string, unknown>;
+              record['minimum'] ??= Number.MIN_SAFE_INTEGER;
+              record['maximum'] ??= Number.MAX_SAFE_INTEGER;
+            }
+          }
+        }
+
+        return branches.length > 0 ? { anyOf: branches } : undefined;
+      }
+
       return parseUnionDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodIntersection: {
@@ -334,7 +423,19 @@ const selectParser = (
       return parseRecordDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodLiteral: {
-      return parseLiteralDef(def, refs);
+      const schema = parseLiteralDef(def, refs);
+      if (refs.openaiStrictMode && typeof def.value === 'bigint') {
+        const record = schema as unknown as Record<string, unknown>;
+        const value = normalizeStrictBigIntValue(def.value, 'const', refs);
+        if ('const' in record) {
+          record['const'] = value;
+        }
+        if (Array.isArray(record['enum'])) {
+          record['enum'] = [value];
+        }
+      }
+
+      return schema;
     }
     case ZodFirstPartyTypeKind.ZodEnum: {
       return parseEnumDef(def);
@@ -343,23 +444,28 @@ const selectParser = (
       return parseNativeEnumDef(def);
     }
     case ZodFirstPartyTypeKind.ZodNullable: {
+      if (refs.openaiStrictMode && def.innerType._def.typeName === ZodFirstPartyTypeKind.ZodBigInt) {
+        const inner = parseDef(
+          def.innerType._def,
+          {
+            ...refs,
+            currentPath: [...refs.currentPath, 'anyOf', '0'],
+          },
+          forceResolution,
+        );
+
+        return inner && { anyOf: [inner, { type: 'null' }] };
+      }
+
       return parseNullableDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodOptional: {
       return parseOptionalDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodMap: {
-      if (refs.openaiStrictMode) {
-        throwUnrepresentableStrictZodType(typeName, refs);
-      }
-
       return parseMapDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodSet: {
-      if (refs.openaiStrictMode) {
-        throwUnrepresentableStrictZodType(typeName, refs);
-      }
-
       return parseSetDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodLazy: {
@@ -373,6 +479,15 @@ const selectParser = (
       return parseNeverDef();
     }
     case ZodFirstPartyTypeKind.ZodEffects: {
+      if (refs.openaiStrictMode && def.effect?.type === 'preprocess') {
+        const preprocessedRefs: PreprocessedRefs = {
+          ...refs,
+          [jsonInputPreprocessor]: true,
+        };
+
+        return parseEffectsDef(def, preprocessedRefs, forceResolution);
+      }
+
       return parseEffectsDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodAny: {
