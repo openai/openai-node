@@ -99,6 +99,36 @@ type PreprocessedRefs = Refs & { [jsonInputPreprocessor]?: true };
 
 const hasJSONInputPreprocessor = (refs: Refs): boolean =>
   (refs as PreprocessedRefs)[jsonInputPreprocessor] === true;
+const registeredDefinitionInputContexts = new WeakMap<Seen, 'preprocessed' | 'unprocessed' | 'mixed'>();
+
+const recordDefinitionInputContext = (def: ZodTypeDef, seen: Seen, refs: Refs, preprocessed: boolean) => {
+  const definitionName = seen.path[refs.basePath.length + 1];
+  const definition = definitionName === undefined ? undefined : refs.definitions[definitionName];
+  if (
+    seen.path.length !== refs.basePath.length + 2 ||
+    seen.path[refs.basePath.length] !== refs.definitionPath ||
+    definitionName === undefined ||
+    definition === undefined ||
+    !hasOwn(refs.definitions, definitionName) ||
+    zodDef(definition) !== def
+  ) {
+    return;
+  }
+
+  const context = preprocessed ? 'preprocessed' : 'unprocessed';
+  const previous = registeredDefinitionInputContexts.get(seen);
+  registeredDefinitionInputContexts.set(seen, previous && previous !== context ? 'mixed' : context);
+};
+
+export const getDefinitionInputRefs = (def: ZodTypeDef, refs: Refs): Refs => {
+  const seen = refs.seen.get(def);
+  if (!seen || registeredDefinitionInputContexts.get(seen) !== 'preprocessed') {
+    return refs;
+  }
+
+  const preprocessedRefs: PreprocessedRefs = { ...refs, [jsonInputPreprocessor]: true };
+  return preprocessedRefs;
+};
 
 const requiresJSONInputPreprocessor = (def: ZodTypeDef): boolean => {
   const schema = def as ZodTypeDef & {
@@ -204,21 +234,28 @@ const acceptsJSONNumber = (def: any, seen = new Set<ZodTypeDef>()): boolean => {
   }
 };
 
-const convertsJSONPipelineInput = (def: any): boolean => {
+const convertsJSONPipelineInput = (def: any, output: any): boolean => {
   if (def.typeName === ZodFirstPartyTypeKind.ZodEffects) {
     return (
       def.effect.type === 'transform' ||
       def.effect.type === 'preprocess' ||
-      convertsJSONPipelineInput(def.schema._def)
+      convertsJSONPipelineInput(def.schema._def, output)
     );
   }
 
   if (def.typeName === ZodFirstPartyTypeKind.ZodPipeline) {
-    return convertsJSONPipelineInput(def.in._def) || convertsJSONPipelineInput(def.out._def);
+    return convertsJSONPipelineInput(def.in._def, output) || convertsJSONPipelineInput(def.out._def, output);
   }
 
   const inner = def.innerType?._def ?? def.type?._def;
-  return inner ? convertsJSONPipelineInput(inner) : def.coerce === true;
+  if (inner) {
+    return convertsJSONPipelineInput(inner, output);
+  }
+
+  const outputInner = output.innerType?._def ?? output.type?._def;
+  return outputInner
+    ? convertsJSONPipelineInput(def, outputInner)
+    : def.coerce === true && def.typeName === output.typeName;
 };
 
 const hasJSONIntegerBranch = (schema: unknown): boolean => {
@@ -253,6 +290,9 @@ export function parseDef(
 
   const needsPreprocessing = refs.openaiStrictMode === true && requiresJSONInputPreprocessor(def);
   const isPreprocessed = hasJSONInputPreprocessor(refs);
+  if (refs.openaiStrictMode && seenItem && !forceResolution) {
+    recordDefinitionInputContext(def, seenItem, refs, isPreprocessed);
+  }
   if (needsPreprocessing && !isPreprocessed) {
     const registeredDefinitionPath =
       seenItem?.jsonSchema === undefined &&
@@ -726,7 +766,7 @@ const selectParser = (
       return parseCatchDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodPipeline: {
-      if (refs.openaiStrictMode && convertsJSONPipelineInput(def.in._def)) {
+      if (refs.openaiStrictMode && convertsJSONPipelineInput(def.in._def, def.out._def)) {
         const outputRefs: PreprocessedRefs = {
           ...refs,
           [jsonInputPreprocessor]: true,

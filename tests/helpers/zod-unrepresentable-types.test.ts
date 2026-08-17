@@ -179,6 +179,32 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
   });
 
   it.each([
+    { name: 'coerced string to Date', schema: () => z3.coerce.string().pipe(z3.date()), native: 'ZodDate' },
+    { name: 'coerced number to Date', schema: () => z3.coerce.number().pipe(z3.date()), native: 'ZodDate' },
+    {
+      name: 'coerced string to BigInt',
+      schema: () => z3.coerce.string().pipe(z3.bigint()),
+      native: 'ZodBigInt',
+    },
+  ])('rejects incompatible built-in $name pipeline coercion', ({ schema, native }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow(native);
+  });
+
+  it('preserves built-in pipeline coercions that produce their native output type', () => {
+    const schema = z3.object({
+      date: z3.coerce.date().pipe(z3.date()),
+      count: z3.coerce.bigint().pipe(z3.bigint()),
+    });
+    const result = create(schema);
+
+    expect(result.$parseRaw('{"date":"2026-08-17T00:00:00.000Z","count":7}')).toEqual({
+      date: new Date('2026-08-17T00:00:00.000Z'),
+      count: 7n,
+    });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it.each([
     { name: 'nullable BigInt', schema: () => z3.bigint().nullable() },
     { name: 'primitive BigInt union', schema: () => z3.union([z3.bigint(), z3.string()]) },
     { name: 'BigInt literal', schema: () => z3.literal(1n) },
@@ -728,6 +754,64 @@ describe('Zod v3 non-JSON-native compatibility boundaries', () => {
         schemaDefinitions: { Shared: shared },
       }),
     ).toThrow('Zod field at `#/definitions/Shared` uses `ZodDate`');
+  });
+
+  it('preserves preprocessing context for registered shared native containers', () => {
+    const shared = z3.object({ when: z3.date() });
+    const convert = (value: unknown) => {
+      if (typeof value !== 'object' || value === null) {
+        return value;
+      }
+
+      const input = value as { when?: unknown };
+      return { ...input, when: preprocessDateValue(input.when) };
+    };
+    const format = zodResponseFormat(
+      z3.object({
+        first: z3.preprocess(convert, shared),
+        second: z3.preprocess(convert, shared),
+      }),
+      'strict',
+      { schemaDefinitions: { Shared: shared } },
+    );
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: {
+        first: { $ref: '#/definitions/Shared' },
+        second: { $ref: '#/definitions/Shared' },
+      },
+      definitions: {
+        Shared: {
+          properties: { when: { type: 'string', format: 'date-time' } },
+        },
+      },
+    });
+    expect(
+      format.$parseRaw(
+        '{"first":{"when":"2026-08-17T00:00:00.000Z"},"second":{"when":"2026-08-18T00:00:00.000Z"}}',
+      ),
+    ).toEqual({
+      first: { when: new Date('2026-08-17T00:00:00.000Z') },
+      second: { when: new Date('2026-08-18T00:00:00.000Z') },
+    });
+  });
+
+  it('rejects registered definitions shared between converted and raw inputs', () => {
+    const shared = z3.object({ when: z3.date() });
+    const converted = z3.preprocess((value) => {
+      if (typeof value !== 'object' || value === null) {
+        return value;
+      }
+
+      const input = value as { when?: unknown };
+      return { ...input, when: preprocessDateValue(input.when) };
+    }, shared);
+
+    expect(() =>
+      zodResponseFormat(z3.object({ converted, raw: shared }), 'strict', {
+        schemaDefinitions: { Shared: shared },
+      }),
+    ).toThrow('ZodDate');
   });
 
   it.each(unrepresentableTypes)('keeps non-strict Realtime $name schemas unchanged', ({ schema }) => {

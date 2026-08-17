@@ -1,7 +1,7 @@
 import type { ZodSchema } from 'zod/v3';
 import type { Options, Targets } from './Options';
 import type { JsonSchema7Type } from './parseDef';
-import { parseDef } from './parseDef';
+import { getDefinitionInputRefs, parseDef } from './parseDef';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
@@ -140,7 +140,10 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         definitions[key] =
           parseDef(
             zodDef(schema),
-            { ...refs, currentPath: [...refs.basePath, refs.definitionPath, key] },
+            getDefinitionInputRefs(zodDef(schema), {
+              ...refs,
+              currentPath: [...refs.basePath, refs.definitionPath, key],
+            }),
             true,
           ) ?? {};
         processedDefinitions.add(key);
