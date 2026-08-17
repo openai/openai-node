@@ -478,6 +478,64 @@ describe('X.509 final security boundaries', () => {
     expect(exchanges).toBe(1);
   });
 
+  test('scopes primitive-only transport identities to their fetchOptions wrapper', async () => {
+    const proxy = 'https://client:certificate-secret@proxy.example';
+    let exchanges = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchanges += 1;
+        return tokenResponse(`primitive-transport-token-${exchanges}`);
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetch: customFetch,
+      fetchOptions: { proxy } as never,
+    });
+
+    await client.models.list();
+    await client.models.list();
+    const derived = client.withOptions({ fetchOptions: { proxy } as never });
+    await derived.models.list();
+    await derived.models.list();
+
+    expect(exchanges).toBe(2);
+  });
+
+  test('does not revive cached credentials after a primitive transport value rotates away and back', async () => {
+    const fetchOptions = { proxy: 'https://client:certificate-a@proxy.example' };
+    const authorizations: (string | null)[] = [];
+    let exchanges = 0;
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetchOptions: fetchOptions as never,
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchanges += 1;
+          return tokenResponse(`primitive-transport-token-${exchanges}`);
+        }
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ data: [] });
+      }),
+    });
+
+    await client.models.list();
+    fetchOptions.proxy = 'https://client:certificate-b@proxy.example';
+    await client.models.list();
+    fetchOptions.proxy = 'https://client:certificate-a@proxy.example';
+    await client.models.list();
+
+    expect(exchanges).toBe(3);
+    expect(authorizations).toEqual([
+      'Bearer primitive-transport-token-1',
+      'Bearer primitive-transport-token-2',
+      'Bearer primitive-transport-token-3',
+    ]);
+  });
+
   test('invalidates a warm token when certificate material changes inside the same TLS object', async () => {
     const dispatcher = { name: 'shared-dispatcher' };
     const tls = { cert: 'certificate-a' };

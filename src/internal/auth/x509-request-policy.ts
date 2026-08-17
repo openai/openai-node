@@ -19,40 +19,80 @@ const TLS_IDENTITY_OPTION_KEYS = [
 
 interface TransportIdentityNode {
   objects: WeakMap<object, TransportIdentityNode>;
-  primitives: Map<unknown, TransportIdentityNode>;
   key: object | undefined;
 }
 
+interface PrimitiveTransportIdentitySlot {
+  value: unknown;
+  key: object;
+}
+
 function createTransportIdentityNode(): TransportIdentityNode {
-  return { objects: new WeakMap(), primitives: new Map(), key: undefined };
+  return { objects: new WeakMap(), key: undefined };
 }
 
 const transportIdentityRoot = createTransportIdentityNode();
+const undefinedTransportIdentity = Object.freeze({});
+const nullTransportIdentity = Object.freeze({});
+// Primitive values cannot be WeakMap keys. Their opaque tokens and source values live only as long as the
+// fetchOptions/TLS object that already owns them, and replacing a slot releases the prior primitive value.
+const primitiveTransportIdentities = new WeakMap<object, (PrimitiveTransportIdentitySlot | undefined)[]>();
 
-function transportIdentityChild(node: TransportIdentityNode, value: unknown): TransportIdentityNode {
-  if ((typeof value === 'object' && value !== null) || typeof value === 'function') {
-    const object = value as object;
-    let child = node.objects.get(object);
-    if (!child) {
-      child = createTransportIdentityNode();
-      node.objects.set(object, child);
-    }
-    return child;
+function isObjectIdentity(value: unknown): value is object {
+  return (typeof value === 'object' && value !== null) || typeof value === 'function';
+}
+
+function stableTransportIdentity(value: unknown): object | undefined {
+  if (isObjectIdentity(value)) {
+    return value;
   }
+  if (value === undefined) {
+    return undefinedTransportIdentity;
+  }
+  if (value === null) {
+    return nullTransportIdentity;
+  }
+  return undefined;
+}
 
-  let child = node.primitives.get(value);
+function transportIdentityChild(node: TransportIdentityNode, value: object): TransportIdentityNode {
+  let child = node.objects.get(value);
   if (!child) {
     child = createTransportIdentityNode();
-    node.primitives.set(value, child);
+    node.objects.set(value, child);
   }
   return child;
+}
+
+function transportIdentityValue(owner: object, index: number, value: unknown): object {
+  const existingSlots = primitiveTransportIdentities.get(owner);
+  const stableIdentity = stableTransportIdentity(value);
+  if (stableIdentity) {
+    if (existingSlots) {
+      existingSlots[index] = undefined;
+    }
+    return stableIdentity;
+  }
+
+  let slots = existingSlots;
+  if (!slots) {
+    slots = [];
+    primitiveTransportIdentities.set(owner, slots);
+  }
+  const existing = slots[index];
+  if (existing && Object.is(existing.value, value)) {
+    return existing.key;
+  }
+  const slot = { value, key: Object.freeze({}) };
+  slots[index] = slot;
+  return slot.key;
 }
 
 function transportOption(options: MergedRequestInit, key: (typeof TRANSPORT_OPTION_KEYS)[number]): unknown {
   return hasOwn(options, key) ? (options as Record<string, unknown>)[key] : undefined;
 }
 
-function transportIdentityValues(options: MergedRequestInit): readonly unknown[] | undefined {
+function transportIdentityValues(options: MergedRequestInit): readonly object[] | undefined {
   const values = TRANSPORT_OPTION_KEYS.map((key) => transportOption(options, key));
   if (values.every((value) => value === undefined)) {
     return undefined;
@@ -63,7 +103,13 @@ function transportIdentityValues(options: MergedRequestInit): readonly unknown[]
     tls !== null && (typeof tls === 'object' || typeof tls === 'function')
       ? (tls as Record<string, unknown>)
       : undefined;
-  return [...values, ...TLS_IDENTITY_OPTION_KEYS.map((key) => tlsOptions?.[key])];
+  const tlsOwner = isObjectIdentity(tls) ? tls : options;
+  return [
+    ...values.map((value, index) => transportIdentityValue(options, index, value)),
+    ...TLS_IDENTITY_OPTION_KEYS.map((key, index) =>
+      transportIdentityValue(tlsOwner, TRANSPORT_OPTION_KEYS.length + index, tlsOptions?.[key]),
+    ),
+  ];
 }
 
 /** Returns the opaque runtime transport identity used to scope X.509 refresh state. */
