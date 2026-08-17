@@ -292,9 +292,11 @@ jobs:
       - name: Run ecosystem tests without live credentials
         if: >-
           ${{
-            github.actor == 'dependabot[bot]' ||
             (github.event_name == 'pull_request' &&
-            github.event.pull_request.head.repo.full_name != github.repository)
+            (github.event.pull_request.user.login == 'dependabot[bot]' ||
+            github.event.pull_request.head.repo.full_name != github.repository)) ||
+            (github.event_name != 'pull_request' &&
+            github.event.sender.login == 'dependabot[bot]')
           }}
         run: |
           pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3
@@ -306,7 +308,10 @@ jobs:
       - name: Run ecosystem tests with live credentials
         if: >-
           ${{
-            github.actor != 'dependabot[bot]' &&
+            ((github.event_name == 'pull_request' &&
+            github.event.pull_request.user.login != 'dependabot[bot]') ||
+            (github.event_name != 'pull_request' &&
+            github.event.sender.login != 'dependabot[bot]')) &&
             (github.event_name != 'pull_request' ||
             github.event.pull_request.head.repo.full_name == github.repository)
           }}
