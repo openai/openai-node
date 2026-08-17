@@ -180,8 +180,10 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
   return path ? basename(path) : undefined;
 }
 
-function basename(value: string): string | undefined {
-  return value.split(/[\\/]/).pop() || undefined;
+function basename(value: string, preserveControlEscapes = false): string | undefined {
+  const separators = preserveControlEscapes ? /\/|\\(?!\p{Cc})/u : /[\\/]/;
+
+  return value.split(separators).pop() || undefined;
 }
 
 function normalizeFilenamePath(value: string): string {
@@ -459,7 +461,9 @@ function getStreamingFileName(value: Uploadable, options: CreateFormOptions): st
       throw new TypeError('Streaming upload file name must be a non-empty string');
     }
 
-    return options.stripFilenames === false ? normalizeFilenamePath(name) : name;
+    return options.stripFilenames === false
+      ? normalizeFilenamePath(name)
+      : (basename(name, true) ?? 'unknown_file');
   }
 
   return getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file';

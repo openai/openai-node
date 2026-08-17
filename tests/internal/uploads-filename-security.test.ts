@@ -97,7 +97,7 @@ describe('streaming upload filename security', () => {
   });
 
   test.each([
-    ['default stripping', undefined, 'nested%5Cstream.txt', 'ordinary.txt'],
+    ['default stripping', undefined, 'stream.txt', 'ordinary.txt'],
     ['preserved paths', { stripFilenames: false }, 'nested/stream.txt', 'nested/ordinary.txt'],
   ] as const)(
     'preserves existing filenames and fallback names with %s',
