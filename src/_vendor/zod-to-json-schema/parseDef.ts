@@ -64,6 +64,7 @@ import {
   findNestedNumericOverlaps,
   hasOpaqueJSONValidation,
   producesBigIntAtPath,
+  producesDateAtPath,
   producesBigIntOutput,
   requiresAsynchronousJSONInput,
 } from './schema-capabilities';
@@ -392,7 +393,13 @@ const normalizeStrictDefaultValue = (
   seen = new WeakMap<object, unknown>(),
   path: readonly (string | number)[] = [],
   rootValue: unknown = value,
+  active = new WeakSet<object>(),
 ): unknown => {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` cannot represent the non-finite \`${keyword}\` value in JSON Structured Outputs.`,
+    );
+  }
   if (typeof value === 'bigint') {
     if (!producesBigIntAtPath(definition, path, rootValue)) {
       throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodBigInt, refs);
@@ -407,27 +414,78 @@ const normalizeStrictDefaultValue = (
     throwUnrepresentableStrictZodType(typeName, refs);
   }
 
+  if (active.has(value)) {
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` cannot represent the cyclic \`${keyword}\` value in JSON Structured Outputs.`,
+    );
+  }
   const previous = seen.get(value);
   if (previous !== undefined) {
     return previous;
   }
 
-  if (Array.isArray(value)) {
-    const normalized: unknown[] = [];
+  active.add(value);
+  try {
+    if (Array.isArray(value)) {
+      const normalized: unknown[] = [];
+      seen.set(value, normalized);
+      let changed = false;
+
+      for (const [index, item] of value.entries()) {
+        const normalizedItem = normalizeStrictDefaultValue(
+          item,
+          definition,
+          refs,
+          `${keyword}[${index}]`,
+          seen,
+          [...path, index],
+          rootValue,
+          active,
+        );
+        normalized.push(normalizedItem);
+        changed ||= normalizedItem !== item;
+      }
+
+      if (!changed) {
+        seen.set(value, value);
+        return value;
+      }
+      return normalized;
+    }
+
+    const prototype: unknown = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      if (value instanceof Date) {
+        if (!producesDateAtPath(definition, path, rootValue)) {
+          throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodDate, refs);
+        }
+        return value;
+      }
+      throw new TypeError(
+        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the \`${keyword}\` custom-prototype value in JSON Structured Outputs.`,
+      );
+    }
+
+    const normalized = Object.create(prototype) as Record<string, unknown>;
     seen.set(value, normalized);
     let changed = false;
-
-    for (const [index, item] of value.entries()) {
+    for (const [key, item] of Object.entries(value)) {
       const normalizedItem = normalizeStrictDefaultValue(
         item,
         definition,
         refs,
-        `${keyword}[${index}]`,
+        `${keyword}.${key}`,
         seen,
-        [...path, index],
+        [...path, key],
         rootValue,
+        active,
       );
-      normalized.push(normalizedItem);
+      Object.defineProperty(normalized, key, {
+        value: normalizedItem,
+        configurable: true,
+        enumerable: true,
+        writable: true,
+      });
       changed ||= normalizedItem !== item;
     }
 
@@ -436,45 +494,9 @@ const normalizeStrictDefaultValue = (
       return value;
     }
     return normalized;
+  } finally {
+    active.delete(value);
   }
-
-  const prototype: unknown = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) {
-    if (value instanceof Date) {
-      return value;
-    }
-    throw new TypeError(
-      `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the \`${keyword}\` custom-prototype value in JSON Structured Outputs.`,
-    );
-  }
-
-  const normalized = Object.create(prototype) as Record<string, unknown>;
-  seen.set(value, normalized);
-  let changed = false;
-  for (const [key, item] of Object.entries(value)) {
-    const normalizedItem = normalizeStrictDefaultValue(
-      item,
-      definition,
-      refs,
-      `${keyword}.${key}`,
-      seen,
-      [...path, key],
-      rootValue,
-    );
-    Object.defineProperty(normalized, key, {
-      value: normalizedItem,
-      configurable: true,
-      enumerable: true,
-      writable: true,
-    });
-    changed ||= normalizedItem !== item;
-  }
-
-  if (!changed) {
-    seen.set(value, value);
-    return value;
-  }
-  return normalized;
 };
 
 const isNumericSchemaType = (type: unknown) => type === 'number' || type === 'integer';
@@ -851,6 +873,11 @@ const selectParser = (
         return schema;
       }
 
+      if (transform === BigInt && (!('type' in schema) || !isNumericSchemaType(schema.type))) {
+        throw new Error(
+          `ZodEffects BigInt transform at \`${refs.currentPath.join('/')}\` requires a directly representable numeric JSON input in strict Structured Outputs.`,
+        );
+      }
       const bounded = applySafeIntegerBounds(schema);
       if (transform === BigInt && 'type' in bounded && bounded.type === 'number') {
         bounded.type = 'integer';
@@ -917,6 +944,18 @@ const selectParser = (
         const combined = mergeStrictSchemas(input, output);
         if (combined) {
           return combined;
+        }
+        const alternatives = (output as Record<string, unknown>)['anyOf'];
+        if (Array.isArray(alternatives)) {
+          const projected = alternatives.map((alternative) =>
+            mergeStrictSchemas(input, alternative as JsonSchema7Type),
+          );
+          if (projected.every((alternative) => alternative !== undefined)) {
+            return { anyOf: projected } as JsonSchema7Type;
+          }
+          throw new Error(
+            `ZodPipeline output constraints at \`${refs.currentPath.join('/')}\` cannot be represented in strict Structured Outputs.`,
+          );
         }
 
         if (outputRefs !== refs) {

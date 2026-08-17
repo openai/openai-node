@@ -178,6 +178,13 @@ export const producesBigIntOutput = (definition: ZodTypeDef): boolean =>
     'output',
   );
 
+const nativeEnumValues = (definition: InspectableDefinition): readonly (string | number)[] => {
+  const values = definition.values as Record<string, string | number>;
+  return Object.entries(values)
+    .filter(([, value]) => typeof values[value] !== 'number')
+    .map(([, value]) => value);
+};
+
 export const acceptsJSONNumber = (definition: ZodTypeDef): boolean =>
   visitDefinition(
     definition,
@@ -192,7 +199,7 @@ export const acceptsJSONNumber = (definition: ZodTypeDef): boolean =>
           return typeof def.value === 'number';
         }
         case ZodFirstPartyTypeKind.ZodNativeEnum: {
-          return Object.values(def.values).some((value) => typeof value === 'number');
+          return nativeEnumValues(def).some((value) => typeof value === 'number');
         }
         case ZodFirstPartyTypeKind.ZodEffects: {
           return def.effect.type === 'preprocess' ? true : undefined;
@@ -421,6 +428,44 @@ const acceptsJSONNumberAtPath = (definition: ZodTypeDef, path: readonly (string 
     'input',
   );
 
+const acceptsJSONStringAtPath = (definition: ZodTypeDef, path: readonly (string | number)[]): boolean =>
+  visitDefinition(
+    definition,
+    (def) => {
+      if (path.length === 0) {
+        if (
+          def.typeName === ZodFirstPartyTypeKind.ZodString ||
+          def.typeName === ZodFirstPartyTypeKind.ZodAny ||
+          def.typeName === ZodFirstPartyTypeKind.ZodUnknown
+        ) {
+          return true;
+        }
+        if (def.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
+          return typeof def.value === 'string';
+        }
+        if (def.typeName === ZodFirstPartyTypeKind.ZodNativeEnum) {
+          return nativeEnumValues(def).some((value) => typeof value === 'string');
+        }
+        if (def.typeName === ZodFirstPartyTypeKind.ZodEnum) {
+          return true;
+        }
+        return def.coerce === true ? true : undefined;
+      }
+      const [key, ...remaining] = path;
+      let child: SchemaType | undefined;
+      if (def.typeName === ZodFirstPartyTypeKind.ZodObject && typeof key === 'string') {
+        const shape = def.shape();
+        child = hasOwn(shape, key) ? shape[key] : def.catchall;
+      } else if (def.typeName === ZodFirstPartyTypeKind.ZodArray && typeof key === 'number') {
+        child = def.type;
+      } else {
+        return;
+      }
+      return child !== undefined && acceptsJSONStringAtPath(child._def, remaining);
+    },
+    'input',
+  );
+
 const discriminatorValues = (
   definition: ZodTypeDef,
   active = new Set<ZodTypeDef>(),
@@ -435,9 +480,11 @@ const discriminatorValues = (
       case ZodFirstPartyTypeKind.ZodLiteral: {
         return [def.value];
       }
-      case ZodFirstPartyTypeKind.ZodEnum:
-      case ZodFirstPartyTypeKind.ZodNativeEnum: {
+      case ZodFirstPartyTypeKind.ZodEnum: {
         return Object.values(def.values);
+      }
+      case ZodFirstPartyTypeKind.ZodNativeEnum: {
+        return nativeEnumValues(def);
       }
       case ZodFirstPartyTypeKind.ZodEffects: {
         return def.effect.type === 'refinement' ? discriminatorValues(def.schema._def, active) : undefined;
@@ -510,10 +557,43 @@ const matchesDefaultDiscriminators = (
   }
 };
 
-export const producesBigIntAtPath = (
+type NativeDefaultType = ZodFirstPartyTypeKind.ZodBigInt | ZodFirstPartyTypeKind.ZodDate;
+
+const producesSelectedNativeUnion = (
+  options: readonly SchemaType[],
+  path: readonly (string | number)[],
+  value: unknown,
+  nativeType: NativeDefaultType,
+  producesNative: (
+    definition: ZodTypeDef,
+    path: readonly (string | number)[],
+    value: unknown,
+    nativeType: NativeDefaultType,
+  ) => boolean,
+): boolean => {
+  for (const option of options) {
+    if (!matchesDefaultDiscriminators(option._def, value)) {
+      continue;
+    }
+    if (producesNative(option._def, path, value, nativeType)) {
+      return true;
+    }
+    const intercepts =
+      nativeType === ZodFirstPartyTypeKind.ZodBigInt
+        ? acceptsJSONNumberAtPath(option._def, path)
+        : acceptsJSONStringAtPath(option._def, path);
+    if (intercepts) {
+      return false;
+    }
+  }
+  return false;
+};
+
+const producesNativeAtPath = (
   definition: ZodTypeDef,
-  path: readonly (string | number)[] = [],
-  value?: unknown,
+  path: readonly (string | number)[],
+  value: unknown,
+  nativeType: NativeDefaultType,
 ): boolean =>
   visitDefinition(
     definition,
@@ -523,24 +603,15 @@ export const producesBigIntAtPath = (
         def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion
       ) {
         const options = def.options instanceof Map ? [...def.options.values()] : def.options;
-        for (const option of options) {
-          if (!matchesDefaultDiscriminators(option._def, value)) {
-            continue;
-          }
-          if (producesBigIntAtPath(option._def, path, value)) {
-            return true;
-          }
-          if (acceptsJSONNumberAtPath(option._def, path)) {
-            return false;
-          }
-        }
-        return false;
+        return producesSelectedNativeUnion(options, path, value, nativeType, producesNativeAtPath);
       }
       if (path.length === 0) {
-        if (def.typeName === ZodFirstPartyTypeKind.ZodBigInt) {
+        if (def.typeName === nativeType) {
           return true;
         }
-        return def.typeName === ZodFirstPartyTypeKind.ZodLiteral ? typeof def.value === 'bigint' : undefined;
+        return def.typeName === ZodFirstPartyTypeKind.ZodLiteral
+          ? nativeType === ZodFirstPartyTypeKind.ZodBigInt && typeof def.value === 'bigint'
+          : undefined;
       }
 
       const [key, ...remaining] = path;
@@ -568,10 +639,22 @@ export const producesBigIntAtPath = (
 
       const nestedValue =
         value && typeof value === 'object' ? (value as Record<string | number, unknown>)[key] : undefined;
-      return child !== undefined && producesBigIntAtPath(child._def, remaining, nestedValue);
+      return child !== undefined && producesNativeAtPath(child._def, remaining, nestedValue, nativeType);
     },
     'default',
   );
+
+export const producesBigIntAtPath = (
+  definition: ZodTypeDef,
+  path: readonly (string | number)[] = [],
+  value?: unknown,
+): boolean => producesNativeAtPath(definition, path, value, ZodFirstPartyTypeKind.ZodBigInt);
+
+export const producesDateAtPath = (
+  definition: ZodTypeDef,
+  path: readonly (string | number)[] = [],
+  value?: unknown,
+): boolean => producesNativeAtPath(definition, path, value, ZodFirstPartyTypeKind.ZodDate);
 
 type NumericPathSegment = { kind: 'property'; key: string } | { kind: 'array' };
 
@@ -609,11 +692,11 @@ const leafJSONInputTypes = (def: InspectableDefinition): Set<string> | null | un
     const primitiveType = typeof value;
     return ['string', 'number', 'boolean'].includes(primitiveType) ? new Set([primitiveType]) : null;
   }
-  if (
-    def.typeName === ZodFirstPartyTypeKind.ZodEnum ||
-    def.typeName === ZodFirstPartyTypeKind.ZodNativeEnum
-  ) {
+  if (def.typeName === ZodFirstPartyTypeKind.ZodEnum) {
     return new Set(Object.values(def.values).map((value) => typeof value));
+  }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodNativeEnum) {
+    return new Set(nativeEnumValues(def).map((value) => typeof value));
   }
   return undefined;
 };
@@ -923,6 +1006,17 @@ const boundNestedNumericPath = (
     throw new Error(
       'A constrained nested JSON Schema reference must be materialized before applying bounds.',
     );
+  }
+  for (const keyword of ['anyOf', 'oneOf']) {
+    const alternatives = record[keyword];
+    if (Array.isArray(alternatives)) {
+      record[keyword] = alternatives.map((alternative) =>
+        alternative && typeof alternative === 'object'
+          ? boundNestedNumericPath(alternative as JsonSchema7Type, path, producer)
+          : alternative,
+      );
+      return schema;
+    }
   }
   if (segment.kind === 'property') {
     const properties = record['properties'] as Record<string, JsonSchema7Type> | undefined;

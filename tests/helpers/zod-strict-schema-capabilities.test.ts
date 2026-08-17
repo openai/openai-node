@@ -197,6 +197,58 @@ describe('Zod v3 strict schema capability analysis', () => {
   });
 
   it.each([
+    { name: 'string', first: () => z3.string() },
+    { name: 'any value', first: () => z3.any() },
+    { name: 'wrapped string', first: () => z3.string().readonly() },
+  ])('rejects a Date default intercepted by an earlier $name union option', ({ first }) => {
+    const value = z3.union([first(), z3.coerce.date()]).default(new Date('2026-08-17T00:00:00.000Z'));
+    expect(() => formatFor(value)).toThrow('ZodDate');
+  });
+
+  it('preserves Date defaults selected by direct, ordered, and discriminated native branches', () => {
+    const date = new Date('2026-08-17T00:00:00.000Z');
+    const format = zodResponseFormat(
+      z3.object({
+        direct: z3.coerce.date().default(date),
+        ordered: z3.union([z3.coerce.date(), z3.string()]).default(date),
+        tagged: z3
+          .union([
+            z3.object({ kind: z3.literal('string'), when: z3.string() }),
+            z3.object({ kind: z3.literal('date'), when: z3.coerce.date() }),
+          ])
+          .default({ kind: 'date', when: date }),
+      }),
+      'strict',
+    );
+    expect(format.$parseRaw('{}')).toEqual({
+      direct: date,
+      ordered: date,
+      tagged: { kind: 'date', when: date },
+    });
+    expect(() => JSON.stringify(format)).not.toThrow();
+  });
+
+  it.each([Infinity, -Infinity, Number.NaN])('rejects a non-finite numeric default %s', (value) => {
+    expect(() => formatFor(z3.number().default(value))).toThrow('non-finite');
+    expect(() => formatFor(z3.any().default({ nested: [value] }))).toThrow('non-finite');
+  });
+
+  it('rejects cyclic defaults while preserving completed shared default values', () => {
+    const cyclic: { nested?: unknown } = {};
+    cyclic.nested = cyclic;
+    expect(() => formatFor(z3.any().default(cyclic))).toThrow('cyclic');
+
+    const array: unknown[] = [];
+    array.push(array);
+    expect(() => formatFor(z3.any().default(array))).toThrow('cyclic');
+
+    const shared = { count: 4 };
+    const format = formatFor(z3.any().default({ first: shared, second: shared }));
+    expect(format.$parseRaw('{}')).toEqual({ value: { first: shared, second: shared } });
+    expect(() => JSON.stringify(format)).not.toThrow();
+  });
+
+  it.each([
     { name: 'tuple', schema: () => z3.tuple([z3.number()]), message: 'tuple-form' },
     { name: 'record', schema: () => z3.record(z3.number()), message: 'additionalProperties: false' },
     {
@@ -581,6 +633,22 @@ describe('Zod v3 strict schema capability analysis', () => {
       output: { values: [{ count: 7n }] },
       path: ['properties', 'values', 'items', 'properties', 'count'],
     },
+    {
+      name: 'nullable nested object',
+      producer: () => z3.object({ nested: z3.object({ count: z3.coerce.bigint() }).nullable() }),
+      consumer: () => z3.object({ nested: z3.object({ count: z3.number() }).nullable() }),
+      input: { nested: { count: 7 } },
+      output: { nested: { count: 7n } },
+      path: ['properties', 'nested', 'anyOf', 0, 'properties', 'count'],
+    },
+    {
+      name: 'nullable nested array',
+      producer: () => z3.object({ values: z3.array(z3.object({ count: z3.coerce.bigint() })).nullable() }),
+      consumer: () => z3.object({ values: z3.array(z3.object({ count: z3.number() })).nullable() }),
+      input: { values: [{ count: 7 }] },
+      output: { values: [{ count: 7n }] },
+      path: ['properties', 'values', 'anyOf', 0, 'items', 'properties', 'count'],
+    },
   ])(
     'bounds unsafe overlap at matching $name in union alternatives',
     ({ producer, consumer, input, output, path }) => {
@@ -654,6 +722,13 @@ describe('Zod v3 strict schema capability analysis', () => {
       bigint: () => z3.object({ kind: z3.object({ type: z3.number() }), count: z3.coerce.bigint() }),
       number: () => z3.object({ kind: z3.object({ type: z3.string() }), count: z3.number().min(1e20) }),
       input: { kind: { type: 'number' }, count: 1e20 },
+    },
+    {
+      name: 'numeric native enum reverse mapping',
+      bigint: () =>
+        z3.object({ kind: z3.nativeEnum({ 0: 'numeric', numeric: 0 } as const), count: z3.coerce.bigint() }),
+      number: () => z3.object({ kind: z3.literal('numeric'), count: z3.number().min(1e20) }),
+      input: { kind: 'numeric', count: 1e20 },
     },
   ])(
     'preserves unsafe-range number branches separated by a $name discriminator',
@@ -779,6 +854,11 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       maximum: Number.MAX_SAFE_INTEGER,
     });
     expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+  });
+
+  it('rejects compound inputs that the built-in BigInt transform cannot safely represent', () => {
+    const value = z3.union([z3.number(), z3.string()]).transform(BigInt);
+    expect(() => create(z3.object({ value }))).toThrow('directly representable numeric JSON input');
   });
 
   it.each([
@@ -1168,6 +1248,26 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       expect(strictHelperSchema(result)).toHaveProperty(`properties.value.${keyword}`, expected);
     },
   );
+
+  it('projects every constrained BigInt pipeline output alternative onto numeric input', () => {
+    const value = z3
+      .number()
+      .transform(BigInt)
+      .pipe(z3.union([z3.bigint().max(10n), z3.bigint().min(100n)]));
+    const result = create(z3.object({ value }));
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf', [
+      expect.objectContaining({ type: 'integer', maximum: 10 }),
+      expect.objectContaining({ type: 'integer', minimum: 100 }),
+    ]);
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(result.$parseRaw('{"value":101}')).toEqual({ value: 101n });
+    expect(() => result.$parseRaw('{"value":50}')).toThrow();
+  });
+
+  it('rejects compound pipeline outputs that cannot be projected without losing constraints', () => {
+    const value = z3.number().transform(BigInt).pipe(z3.bigint().max(10n).nullable());
+    expect(() => create(z3.object({ value }))).toThrow('ZodPipeline output constraints');
+  });
 
   it('rejects converting output constraints that cannot be projected onto their input', () => {
     const value = z3.string().transform(BigInt).pipe(z3.bigint().max(9n));

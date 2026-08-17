@@ -104,14 +104,15 @@ describe.each([
   });
 
   if (version === 'v3') {
-    it('does not recursively traverse cyclic or shared literal defaults', () => {
+    it('preserves shared literal defaults and rejects unserializable cyclic defaults', () => {
       const Account = z.object({ id: z.string() });
+      const shared = { $ref: '#/definitions/account/admin' };
       const cyclic: { $ref: string; self?: unknown } = { $ref: '#/definitions/account/admin' };
       cyclic.self = cyclic;
       const Root = z.object({
         account: Account,
-        first: z.any().default(cyclic),
-        second: z.any().default(cyclic),
+        first: z.any().default(shared),
+        second: z.any().default(shared),
       });
 
       const { schema } = zodResponseFormat(Root, 'account_response', {
@@ -123,9 +124,18 @@ describe.each([
 
       expect(properties['account']?.['$ref']).toBe('#/definitions/account~1admin');
       expect(firstDefault.$ref).toBe('#/definitions/account/admin');
-      expect(firstDefault.self).toBe(firstDefault);
       expect(secondDefault.$ref).toBe('#/definitions/account/admin');
-      expect(secondDefault.self).toBe(secondDefault);
+      expect(firstDefault).toBe(secondDefault);
+
+      expect(() =>
+        zodResponseFormat(
+          z.object({ account: Account, cyclic: z.any().default(cyclic) }),
+          'account_response',
+          {
+            schemaDefinitions: { 'account/admin': Account },
+          },
+        ),
+      ).toThrow('cyclic');
       expect(cyclic.self).toBe(cyclic);
     });
   }
