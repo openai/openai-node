@@ -483,7 +483,7 @@ describe('lazy multipart stream encoding', () => {
     const options = await multipartFormRequestOptions(
       {
         body: {
-          upload: toStreamingFile(chunks() as any, 'quote"\\\r\n.wav', { type: 'audio/custom' }),
+          upload: toStreamingFile(chunks() as any, 'quote"\r\n.wav', { type: 'audio/custom' }),
           values: ['first', 2, false],
           metadata: { enabled: true, omitted: undefined },
         },
@@ -493,7 +493,7 @@ describe('lazy multipart stream encoding', () => {
 
     const body = await new Response(options.body as ReadableStream).text();
 
-    expect(body).toContain('filename="quote%22%5C%0D%0A.wav"');
+    expect(body).toContain('filename="quote%22%0D%0A.wav"');
     expect(body).toContain('Content-Type: audio/custom');
     expect(body).toContain('ABCDEFG');
     expect(body).toContain('name="values[]"\r\n\r\nfirst');

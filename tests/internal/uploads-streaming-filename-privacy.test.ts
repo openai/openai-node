@@ -102,6 +102,29 @@ describe('streaming upload filename privacy', () => {
     expect(streamed.body).not.toContain('traces');
   });
 
+  test.each([
+    ['NUL', '\0', '%00'],
+    ['newline', '\n', '%0A'],
+    ['carriage return', '\r', '%0D'],
+    ['DEL', '\u007F', '%7F'],
+  ] as const)(
+    'strips Windows parent directories before escaping %s in streaming filenames',
+    async (_, control, escaped) => {
+      const { client, requests } = createClient();
+
+      await client.files.create({
+        file: toStreamingFile(fileChunks(), `C:\\Users\\alice\\private\\${control}recording.wav`),
+        purpose: 'assistants',
+      });
+
+      const request = capturedRequest(requests);
+      expect(uploadedFilenames(request.body)).toEqual([`${escaped}recording.wav`]);
+      expect(request.body).not.toContain('alice');
+      expect(request.body).not.toContain('private');
+      expect(request.body).not.toContain('%5C');
+    },
+  );
+
   test.each(ordinaryUploadEndpoints)(
     'never exposes POSIX or Windows parent directories through $name',
     async ({ submit }) => {

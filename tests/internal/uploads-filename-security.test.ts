@@ -80,7 +80,7 @@ describe('streaming upload filename security', () => {
     );
     const body = await new Response(options.body as ReadableStream).text();
 
-    expect(body).toContain(`name="field-${escaped}"; filename="résumé-${escaped}.txt"`);
+    expect(body).toContain(`name="field-${escaped}"; filename="%0D%0AInjected: yes.txt"`);
     expect(body).not.toContain('\r\nInjected: yes');
   });
 
