@@ -15,8 +15,9 @@ export interface BedrockProviderOptions extends BedrockEndpointOptions, BedrockB
  * Configures the standard OpenAI client for Amazon Bedrock bearer authentication.
  *
  * Supply `apiKey` or `tokenProvider`, or set `AWS_BEARER_TOKEN_BEDROCK`.
- * The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`, and a custom
- * endpoint can be supplied with `baseURL` or `AWS_BEDROCK_BASE_URL`.
+ * The endpoint defaults to Mantle; pass `endpoint: 'runtime'` to use Bedrock
+ * Runtime. The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`, and a
+ * custom endpoint can be supplied with `baseURL` or `AWS_BEDROCK_BASE_URL`.
  *
  * This entrypoint has no AWS SDK dependencies. To use AWS credentials or
  * Signature Version 4, import `bedrock` from `openai/providers/bedrock/aws`.
