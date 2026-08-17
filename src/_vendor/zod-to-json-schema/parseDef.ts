@@ -54,6 +54,15 @@ import type { JsonSchema7UnknownType } from './parsers/unknown';
 import { parseUnknownDef } from './parsers/unknown';
 import type { Refs, Seen } from './Refs';
 import { parseReadonlyDef } from './parsers/readonly';
+import {
+  acceptsEveryJSONNumber,
+  acceptsJSONNumber,
+  acceptsUnsafeJSONInteger,
+  convertsJSONPipelineInput,
+  capturesUnsafeBigIntInput,
+  producesBigIntAtPath,
+  producesBigIntOutput,
+} from './schema-capabilities';
 import { ignoreOverride } from './Options';
 import { zodDef } from './util';
 
@@ -101,12 +110,19 @@ const hasJSONInputPreprocessor = (refs: Refs): boolean =>
   (refs as PreprocessedRefs)[jsonInputPreprocessor] === true;
 const registeredDefinitionInputContexts = new WeakMap<Seen, 'preprocessed' | 'unprocessed' | 'mixed'>();
 
-const recordDefinitionInputContext = (def: ZodTypeDef, seen: Seen, refs: Refs, preprocessed: boolean) => {
-  const definitionName = seen.path[refs.basePath.length + 1];
+const recordDefinitionInputContext = (
+  def: ZodTypeDef,
+  seen: Seen,
+  refs: Refs,
+  preprocessed: boolean,
+  extractedDefinitionName?: string,
+) => {
+  const definitionName = extractedDefinitionName ?? seen.path[refs.basePath.length + 1];
   const definition = definitionName === undefined ? undefined : refs.definitions[definitionName];
   if (
-    seen.path.length !== refs.basePath.length + 2 ||
-    seen.path[refs.basePath.length] !== refs.definitionPath ||
+    (extractedDefinitionName === undefined &&
+      (seen.path.length !== refs.basePath.length + 2 ||
+        seen.path[refs.basePath.length] !== refs.definitionPath)) ||
     definitionName === undefined ||
     definition === undefined ||
     !hasOwn(refs.definitions, definitionName) ||
@@ -153,150 +169,6 @@ const requiresJSONInputPreprocessor = (def: ZodTypeDef): boolean => {
       return false;
     }
   }
-};
-
-const producesBigIntOutput = (def: any, seen = new Set<ZodTypeDef>()): boolean => {
-  if (seen.has(def)) {
-    return false;
-  }
-  seen.add(def);
-
-  switch (def.typeName as ZodFirstPartyTypeKind) {
-    case ZodFirstPartyTypeKind.ZodBigInt: {
-      return true;
-    }
-    case ZodFirstPartyTypeKind.ZodLiteral: {
-      return typeof def.value === 'bigint';
-    }
-    case ZodFirstPartyTypeKind.ZodNullable:
-    case ZodFirstPartyTypeKind.ZodOptional:
-    case ZodFirstPartyTypeKind.ZodDefault:
-    case ZodFirstPartyTypeKind.ZodCatch:
-    case ZodFirstPartyTypeKind.ZodReadonly: {
-      return producesBigIntOutput(def.innerType._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodBranded: {
-      return producesBigIntOutput(def.type._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodEffects: {
-      return producesBigIntOutput(def.schema._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodPipeline: {
-      return producesBigIntOutput(def.out._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodLazy: {
-      return producesBigIntOutput(def.getter()._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodIntersection: {
-      return (
-        producesBigIntOutput(def.left._def, new Set(seen)) ||
-        producesBigIntOutput(def.right._def, new Set(seen))
-      );
-    }
-    case ZodFirstPartyTypeKind.ZodUnion:
-    case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
-      const options = def.options instanceof Map ? [...def.options.values()] : def.options;
-      return options.some((option: { _def: ZodTypeDef }) => producesBigIntOutput(option._def, new Set(seen)));
-    }
-    default: {
-      return false;
-    }
-  }
-};
-
-const acceptsJSONNumber = (def: any, seen = new Set<ZodTypeDef>()): boolean => {
-  if (seen.has(def)) {
-    return false;
-  }
-  seen.add(def);
-
-  switch (def.typeName as ZodFirstPartyTypeKind) {
-    case ZodFirstPartyTypeKind.ZodNumber:
-    case ZodFirstPartyTypeKind.ZodAny:
-    case ZodFirstPartyTypeKind.ZodUnknown: {
-      return true;
-    }
-    case ZodFirstPartyTypeKind.ZodLiteral: {
-      return typeof def.value === 'number';
-    }
-    case ZodFirstPartyTypeKind.ZodNativeEnum: {
-      return Object.values(def.values).some((value) => typeof value === 'number');
-    }
-    case ZodFirstPartyTypeKind.ZodNullable:
-    case ZodFirstPartyTypeKind.ZodOptional:
-    case ZodFirstPartyTypeKind.ZodDefault:
-    case ZodFirstPartyTypeKind.ZodCatch:
-    case ZodFirstPartyTypeKind.ZodReadonly: {
-      return acceptsJSONNumber(def.innerType._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodBranded: {
-      return acceptsJSONNumber(def.type._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodEffects: {
-      return def.effect.type === 'preprocess' || acceptsJSONNumber(def.schema._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodPipeline: {
-      return acceptsJSONNumber(def.in._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodLazy: {
-      return acceptsJSONNumber(def.getter()._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodPromise: {
-      return acceptsJSONNumber(def.type._def, seen);
-    }
-    case ZodFirstPartyTypeKind.ZodIntersection: {
-      return (
-        acceptsJSONNumber(def.left._def, new Set(seen)) && acceptsJSONNumber(def.right._def, new Set(seen))
-      );
-    }
-    case ZodFirstPartyTypeKind.ZodUnion:
-    case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
-      const options = def.options instanceof Map ? [...def.options.values()] : def.options;
-      return options.some((option: { _def: ZodTypeDef }) => acceptsJSONNumber(option._def, new Set(seen)));
-    }
-    default: {
-      return def.coerce === true;
-    }
-  }
-};
-
-const convertsJSONPipelineInput = (def: any, output: any): boolean => {
-  if (def.typeName === ZodFirstPartyTypeKind.ZodEffects) {
-    return (
-      def.effect.type === 'transform' ||
-      def.effect.type === 'preprocess' ||
-      convertsJSONPipelineInput(def.schema._def, output)
-    );
-  }
-
-  if (def.typeName === ZodFirstPartyTypeKind.ZodPipeline) {
-    return convertsJSONPipelineInput(def.in._def, output) || convertsJSONPipelineInput(def.out._def, output);
-  }
-
-  const inner = def.innerType?._def ?? def.type?._def;
-  if (inner) {
-    return convertsJSONPipelineInput(inner, output);
-  }
-
-  const outputInner = output.innerType?._def ?? output.type?._def;
-  return outputInner
-    ? convertsJSONPipelineInput(def, outputInner)
-    : def.coerce === true && def.typeName === output.typeName;
-};
-
-const hasJSONIntegerBranch = (schema: unknown): boolean => {
-  if (!schema || typeof schema !== 'object') {
-    return false;
-  }
-
-  const record = schema as Record<string, unknown>;
-  const { type } = record;
-  if (type === 'integer' || (Array.isArray(type) && type.includes('integer'))) {
-    return true;
-  }
-
-  const branches = record['anyOf'] ?? record['allOf'];
-  return Array.isArray(branches) && branches.some((branch) => hasJSONIntegerBranch(branch));
 };
 
 export function parseDef(
@@ -430,6 +302,9 @@ const get$ref = (
         if (!hasOwn(refs.definitions, name)) {
           refs.definitions[name] = item.def;
         }
+        if (refs.openaiStrictMode) {
+          recordDefinitionInputContext(item.def, item, refs, hasJSONInputPreprocessor(refs), name);
+        }
       }
 
       return { $ref: [...refs.basePath, refs.definitionPath, name].join('/') };
@@ -498,11 +373,16 @@ const normalizeStrictBigIntValue = (value: bigint, keyword: string, refs: Refs):
 
 const normalizeStrictDefaultValue = (
   value: unknown,
+  definition: ZodTypeDef,
   refs: Refs,
   keyword = 'default',
   seen = new WeakMap<object, unknown>(),
+  path: readonly (string | number)[] = [],
 ): unknown => {
   if (typeof value === 'bigint') {
+    if (!producesBigIntAtPath(definition, path)) {
+      throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodBigInt, refs);
+    }
     return normalizeStrictBigIntValue(value, keyword, refs);
   }
   if (!value || typeof value !== 'object') {
@@ -520,7 +400,14 @@ const normalizeStrictDefaultValue = (
     let changed = false;
 
     for (const [index, item] of value.entries()) {
-      const normalizedItem = normalizeStrictDefaultValue(item, refs, `${keyword}[${index}]`, seen);
+      const normalizedItem = normalizeStrictDefaultValue(
+        item,
+        definition,
+        refs,
+        `${keyword}[${index}]`,
+        seen,
+        [...path, index],
+      );
       normalized.push(normalizedItem);
       changed ||= normalizedItem !== item;
     }
@@ -541,7 +428,10 @@ const normalizeStrictDefaultValue = (
   seen.set(value, normalized);
   let changed = false;
   for (const [key, item] of Object.entries(value)) {
-    const normalizedItem = normalizeStrictDefaultValue(item, refs, `${keyword}.${key}`, seen);
+    const normalizedItem = normalizeStrictDefaultValue(item, definition, refs, `${keyword}.${key}`, seen, [
+      ...path,
+      key,
+    ]);
     Object.defineProperty(normalized, key, {
       value: normalizedItem,
       configurable: true,
@@ -626,7 +516,7 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
       const options = (def.options instanceof Map ? [...def.options.values()] : def.options) as {
-        _def: {
+        _def: ZodTypeDef & {
           typeName: ZodFirstPartyTypeKind;
           value?: unknown;
         };
@@ -640,9 +530,14 @@ const selectParser = (
       if (refs.openaiStrictMode && (bigintIndex !== -1 || hasBigIntLiteral)) {
         const branches = options
           .map((option, index) => {
-            const boundNumber = bigintIndex !== -1 && index > bigintIndex && acceptsJSONNumber(option._def);
+            const fallibleNumber = !acceptsEveryJSONNumber(option._def);
+            const boundNumber =
+              bigintIndex !== -1 &&
+              !producesBigIntOutput(option._def) &&
+              acceptsJSONNumber(option._def) &&
+              (index > bigintIndex || fallibleNumber);
             const branch = parseDef(
-              option._def as ZodTypeDef,
+              option._def,
               {
                 ...refs,
                 currentPath: [...refs.currentPath, 'anyOf', String(index)],
@@ -654,27 +549,47 @@ const selectParser = (
               return branch;
             }
 
+            const competingBigInts = options.filter(
+              (candidate, candidateIndex) =>
+                candidateIndex !== index &&
+                producesBigIntOutput(candidate._def) &&
+                (candidateIndex < index || fallibleNumber),
+            );
+            const minimum =
+              competingBigInts.some((candidate) => capturesUnsafeBigIntInput(candidate._def, 'minimum')) &&
+              (acceptsUnsafeJSONInteger(branch, 'minimum') || (!('type' in branch) && !('$ref' in branch)));
+            const maximum =
+              competingBigInts.some((candidate) => capturesUnsafeBigIntInput(candidate._def, 'maximum')) &&
+              (acceptsUnsafeJSONInteger(branch, 'maximum') || (!('type' in branch) && !('$ref' in branch)));
+            if (!minimum && !maximum) {
+              return branch;
+            }
+
             if ('$ref' in branch) {
               return {
                 allOf: [
                   branch,
                   {
-                    minimum: Number.MIN_SAFE_INTEGER,
-                    maximum: Number.MAX_SAFE_INTEGER,
+                    ...(minimum ? { minimum: Number.MIN_SAFE_INTEGER } : undefined),
+                    ...(maximum ? { maximum: Number.MAX_SAFE_INTEGER } : undefined),
                   } as JsonSchema7Type,
                 ],
               };
             }
 
             const record = branch as unknown as Record<string, unknown>;
-            record['minimum'] = Math.max(
-              typeof record['minimum'] === 'number' ? record['minimum'] : Number.MIN_SAFE_INTEGER,
-              Number.MIN_SAFE_INTEGER,
-            );
-            record['maximum'] = Math.min(
-              typeof record['maximum'] === 'number' ? record['maximum'] : Number.MAX_SAFE_INTEGER,
-              Number.MAX_SAFE_INTEGER,
-            );
+            if (minimum) {
+              record['minimum'] = Math.max(
+                typeof record['minimum'] === 'number' ? record['minimum'] : Number.MIN_SAFE_INTEGER,
+                Number.MIN_SAFE_INTEGER,
+              );
+            }
+            if (maximum) {
+              record['maximum'] = Math.min(
+                typeof record['maximum'] === 'number' ? record['maximum'] : Number.MAX_SAFE_INTEGER,
+                Number.MAX_SAFE_INTEGER,
+              );
+            }
             return branch;
           })
           .filter(
@@ -773,15 +688,7 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodDefault: {
       const schema = parseDefaultDef(def, refs, forceResolution);
       if (refs.openaiStrictMode) {
-        if (
-          typeof schema.default === 'bigint' &&
-          !hasJSONIntegerBranch(schema) &&
-          !producesBigIntOutput(def.innerType._def)
-        ) {
-          throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodBigInt, refs);
-        }
-
-        schema.default = normalizeStrictDefaultValue(schema.default, refs);
+        schema.default = normalizeStrictDefaultValue(schema.default, def.innerType._def, refs);
       }
 
       return schema;
@@ -793,6 +700,13 @@ const selectParser = (
       return parseReadonlyDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodCatch: {
+      if (refs.openaiStrictMode) {
+        const catchRefs: PreprocessedRefs = {
+          ...refs,
+          [jsonInputPreprocessor]: true,
+        };
+        return parseCatchDef(def, catchRefs, forceResolution);
+      }
       return parseCatchDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodPipeline: {

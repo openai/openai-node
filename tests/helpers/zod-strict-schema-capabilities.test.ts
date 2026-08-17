@@ -1,0 +1,233 @@
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { z as z3 } from 'zod/v3';
+
+const formatFor = (value: z3.ZodTypeAny) => zodResponseFormat(z3.object({ value }), 'strict');
+
+interface RecursiveDateNode {
+  when: Date;
+  next: RecursiveDateNode | null;
+}
+
+const convertRegisteredDates = (value: unknown): unknown => {
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  const input = value as { middle: { leaf: { when: string } } };
+  return { middle: { leaf: { when: new Date(input.middle.leaf.when) } } };
+};
+
+const convertRecursiveDates = (value: unknown): unknown => {
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  const input = value as { when: string; next: unknown };
+  return { when: new Date(input.when), next: input.next === null ? null : convertRecursiveDates(input.next) };
+};
+
+describe('Zod v3 strict schema capability analysis', () => {
+  it.each([
+    {
+      name: 'union',
+      schema: () =>
+        z3
+          .union([
+            z3.string().transform((value) => new Date(value)),
+            z3.number().transform((value) => new Date(value)),
+          ])
+          .pipe(z3.date()),
+    },
+    {
+      name: 'lazy',
+      schema: () => z3.lazy(() => z3.string().transform((value) => new Date(value))).pipe(z3.date()),
+    },
+    {
+      name: 'intersection',
+      schema: () =>
+        z3
+          .intersection(
+            z3.string().transform((value) => new Date(value)),
+            z3.string().transform((value) => new Date(value)),
+          )
+          .pipe(z3.date()),
+    },
+  ])('recognizes native conversions inside $name pipeline inputs', ({ schema }) => {
+    expect(formatFor(schema()).$parseRaw('{"value":"2026-08-17T00:00:00.000Z"}')).toEqual({
+      value: new Date('2026-08-17T00:00:00.000Z'),
+    });
+  });
+
+  it('rejects compound pipelines when one union input does not convert', () => {
+    const value = z3.union([z3.string().transform((input) => new Date(input)), z3.number()]).pipe(z3.date());
+    expect(() => formatFor(value)).toThrow('ZodDate');
+  });
+
+  it.each([
+    { name: 'any value', schema: () => z3.any().default({ count: 4n }) },
+    { name: 'unknown value', schema: () => z3.unknown().default({ count: 4n }) },
+    { name: 'any property', schema: () => z3.object({ count: z3.any() }).default({ count: 4n }) },
+    { name: 'unknown array item', schema: () => z3.array(z3.unknown()).default([4n]) },
+    { name: 'any record value', schema: () => z3.record(z3.any()).default({ count: 4n }) },
+  ])('rejects nested BigInt defaults without a typed $name schema', ({ schema }) => {
+    expect(() => formatFor(schema())).toThrow('ZodBigInt');
+  });
+
+  it('preserves nested BigInt defaults in typed tuples and records', () => {
+    const format = zodResponseFormat(
+      z3.object({
+        tuple: z3.tuple([z3.coerce.bigint()]).default([4n]),
+        record: z3.record(z3.coerce.bigint()).default({ count: 5n }),
+      }),
+      'strict',
+    );
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: { tuple: { default: [4] }, record: { default: { count: 5 } } },
+    });
+    expect(format.$parseRaw('{}')).toEqual({ tuple: [4n], record: { count: 5n } });
+  });
+
+  it('bounds fallible numeric branches before BigInt coercion', () => {
+    const value = z3.union([z3.number().refine((input) => input < 100), z3.coerce.bigint()]);
+    const format = formatFor(value);
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [
+            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+            { type: 'integer' },
+          ],
+        },
+      },
+    });
+    expect(format.$parseRaw('{"value":101}')).toEqual({ value: 101n });
+  });
+
+  it.each([
+    {
+      name: 'disjoint positive values',
+      bigint: () => z3.coerce.bigint().max(10n),
+      number: () => z3.number().min(1e20),
+      branch: { type: 'number', minimum: 1e20 },
+      input: 1e20,
+    },
+    {
+      name: 'only negative unsafe overlap',
+      bigint: () => z3.coerce.bigint().max(10n),
+      number: () => z3.number(),
+      branch: { type: 'number', minimum: Number.MIN_SAFE_INTEGER },
+      input: 1e20,
+    },
+    {
+      name: 'only positive unsafe overlap',
+      bigint: () => z3.coerce.bigint().min(-10n),
+      number: () => z3.number(),
+      branch: { type: 'number', maximum: Number.MAX_SAFE_INTEGER },
+      input: -1e20,
+    },
+    {
+      name: 'fully bounded BigInt values',
+      bigint: () => z3.coerce.bigint().min(-10n).max(10n),
+      number: () => z3.number(),
+      branch: { type: 'number' },
+      input: 1e20,
+    },
+  ])('preserves $name in later number alternatives', ({ bigint, number, branch, input }) => {
+    const format = formatFor(z3.union([bigint(), number()]));
+    const schema = format.json_schema.schema as {
+      properties: { value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(schema.properties.value.anyOf[1]).toEqual(branch);
+    expect(format.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: input });
+  });
+
+  it('bounds numbers after Promise-wrapped BigInt producers', async () => {
+    const value = z3.union([z3.promise(z3.coerce.bigint()), z3.number()]);
+    const format = formatFor(value);
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [
+            expect.anything(),
+            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+          ],
+        },
+      },
+    });
+    await expect(value.parseAsync(7)).resolves.toBe(7n);
+  });
+
+  it.each([
+    { name: 'Date', schema: () => z3.date().catch(new Date(0)), input: 'fallback', output: new Date(0) },
+    { name: 'BigInt', schema: () => z3.bigint().catch(1n), input: 1, output: 1n },
+    {
+      name: 'Set',
+      schema: () => z3.set(z3.string()).catch(new Set(['fallback'])),
+      input: [],
+      output: new Set(['fallback']),
+    },
+    {
+      name: 'Map',
+      schema: () => z3.map(z3.string(), z3.number()).catch(new Map([['fallback', 1]])),
+      input: [],
+      output: new Map([['fallback', 1]]),
+    },
+  ])('treats typed $name catch fallbacks as native conversions', ({ schema, input, output }) => {
+    const format = formatFor(schema());
+    expect(format.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: output });
+    expect(() => JSON.stringify(format)).not.toThrow();
+  });
+
+  it('propagates preprocessing through reverse-ordered nested registered definitions', () => {
+    const leaf = z3.object({ when: z3.date() });
+    const middle = z3.object({ leaf });
+    const outer = z3.object({ middle });
+    const format = zodResponseFormat(
+      z3.object({ value: z3.preprocess(convertRegisteredDates, outer) }),
+      'strict',
+      {
+        schemaDefinitions: { Leaf: leaf, Middle: middle, Outer: outer },
+      },
+    );
+
+    expect(format.$parseRaw('{"value":{"middle":{"leaf":{"when":"2026-08-17T00:00:00.000Z"}}}}')).toEqual({
+      value: { middle: { leaf: { when: new Date('2026-08-17T00:00:00.000Z') } } },
+    });
+    expect(format.json_schema.schema).toHaveProperty('definitions.Leaf.properties.when.format', 'date-time');
+    expect(() =>
+      zodResponseFormat(
+        z3.object({ converted: z3.preprocess(convertRegisteredDates, outer), raw: leaf }),
+        'strict',
+        {
+          schemaDefinitions: { Leaf: leaf, Middle: middle, Outer: outer },
+        },
+      ),
+    ).toThrow('ZodDate');
+  });
+
+  it('preserves preprocessing context in extracted recursive lazy definitions', () => {
+    const node: z3.ZodType<RecursiveDateNode> = z3.lazy(() =>
+      z3.object({ when: z3.date(), next: node.nullable() }),
+    );
+    const format = formatFor(z3.preprocess(convertRecursiveDates, node));
+
+    expect(
+      format.$parseRaw(
+        '{"value":{"when":"2026-08-17T00:00:00.000Z","next":{"when":"2026-08-18T00:00:00.000Z","next":null}}}',
+      ),
+    ).toEqual({
+      value: {
+        when: new Date('2026-08-17T00:00:00.000Z'),
+        next: { when: new Date('2026-08-18T00:00:00.000Z'), next: null },
+      },
+    });
+    expect(() =>
+      zodResponseFormat(
+        z3.object({ converted: z3.preprocess(convertRecursiveDates, node), raw: node }),
+        'strict',
+      ),
+    ).toThrow('ZodDate');
+  });
+});

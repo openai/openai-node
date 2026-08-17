@@ -136,7 +136,16 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         break;
       }
 
-      for (const [key, schema] of newDefinitions) {
+      while (newDefinitions.length > 0) {
+        const contextualIndex = newDefinitions.findIndex(
+          ([, schema]) => getDefinitionInputRefs(zodDef(schema), refs) !== refs,
+        );
+        const [nextDefinition] = newDefinitions.splice(contextualIndex === -1 ? 0 : contextualIndex, 1);
+        if (nextDefinition === undefined) {
+          break;
+        }
+        const [key, schema] = nextDefinition;
+
         definitions[key] =
           parseDef(
             zodDef(schema),
