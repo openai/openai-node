@@ -187,6 +187,108 @@ export const producesBigIntOutput = (definition: ZodTypeDef): boolean =>
     'output',
   );
 
+const definiteParsedOutputKinds = new Set<ZodFirstPartyTypeKind>([
+  ZodFirstPartyTypeKind.ZodBigInt,
+  ZodFirstPartyTypeKind.ZodNumber,
+  ZodFirstPartyTypeKind.ZodString,
+  ZodFirstPartyTypeKind.ZodBoolean,
+  ZodFirstPartyTypeKind.ZodDate,
+  ZodFirstPartyTypeKind.ZodNull,
+  ZodFirstPartyTypeKind.ZodObject,
+  ZodFirstPartyTypeKind.ZodArray,
+]);
+
+export const knownParsedOutputType = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): ZodFirstPartyTypeKind | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (isExactBigIntTransform(def)) {
+      return ZodFirstPartyTypeKind.ZodBigInt;
+    }
+    if (definiteParsedOutputKinds.has(def.typeName)) {
+      return def.typeName;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'transform') {
+      return undefined;
+    }
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodNullable ||
+      def.typeName === ZodFirstPartyTypeKind.ZodOptional ||
+      def.typeName === ZodFirstPartyTypeKind.ZodCatch ||
+      def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
+      def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion ||
+      def.typeName === ZodFirstPartyTypeKind.ZodIntersection
+    ) {
+      return undefined;
+    }
+    const children = childDefinitions(def, 'output');
+    const child = children?.values[0];
+    return children?.values.length === 1 && child !== undefined
+      ? knownParsedOutputType(child._def, active)
+      : undefined;
+  } finally {
+    active.delete(definition);
+  }
+};
+
+const acceptsOverlappingFractionalInput = (
+  definition: InspectableDefinition,
+  schema: JsonSchema7Type,
+): boolean => {
+  const input = schema as Record<string, unknown>;
+  if (input['type'] !== 'number') {
+    return false;
+  }
+  if (
+    definition.checks?.some(
+      (check) =>
+        check.kind === 'int' ||
+        (check.kind === 'multipleOf' && typeof check.value === 'number' && Number.isInteger(check.value)),
+    )
+  ) {
+    return false;
+  }
+  let minimum = typeof input['minimum'] === 'number' ? input['minimum'] : -Infinity;
+  let maximum = typeof input['maximum'] === 'number' ? input['maximum'] : Infinity;
+  if (typeof input['exclusiveMinimum'] === 'number') {
+    minimum = Math.max(minimum, input['exclusiveMinimum']);
+  }
+  if (typeof input['exclusiveMaximum'] === 'number') {
+    maximum = Math.min(maximum, input['exclusiveMaximum']);
+  }
+  for (const check of definition.checks ?? []) {
+    if (check.kind === 'min' && typeof check.value === 'number') {
+      minimum = Math.max(minimum, check.value);
+    } else if (check.kind === 'max' && typeof check.value === 'number') {
+      maximum = Math.min(maximum, check.value);
+    }
+  }
+  return minimum < maximum || (minimum === maximum && !Number.isInteger(minimum));
+};
+
+export const throwsOnFractionalBigIntInput = (definition: ZodTypeDef, schema: JsonSchema7Type): boolean =>
+  visitDefinition(
+    definition,
+    (def) =>
+      isExactBigIntTransform(def)
+        ? visitDefinition(
+            def.schema._def,
+            (input) =>
+              input.typeName === ZodFirstPartyTypeKind.ZodNumber
+                ? acceptsOverlappingFractionalInput(input, schema)
+                : undefined,
+            'input',
+          )
+        : undefined,
+    'output',
+  );
+
 const nativeEnumValues = (definition: InspectableDefinition): readonly (string | number)[] => {
   const values = definition.values as Record<string, string | number>;
   return Object.entries(values)

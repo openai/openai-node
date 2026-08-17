@@ -273,6 +273,26 @@ describe('Zod v3 strict schema capability analysis', () => {
   });
 
   it.each([
+    { name: 'BigInt serializer', property: 'toJSON', replacement: (): bigint => 4n },
+    { name: 'malformed serializer', property: 'toJSON', replacement: (): string => 'invalid-date' },
+    { name: 'malformed ISO string', property: 'toISOString', replacement: (): string => 'invalid-date' },
+    { name: 'numeric coercion', property: 'valueOf', replacement: (): number => 0 },
+    { name: 'primitive coercion', property: Symbol.toPrimitive, replacement: (): string => 'invalid-date' },
+  ])('rejects a modified Date prototype $name without invoking it', ({ property, replacement }) => {
+    const methods = Date.prototype as unknown as Record<PropertyKey, () => unknown>;
+    const override = vi.spyOn(methods, property);
+    try {
+      override.mockImplementation(replacement);
+      expect(() => formatFor(z3.coerce.date().default(new Date('2026-08-17T00:00:00.000Z')))).toThrow(
+        'invalid or customized',
+      );
+      expect(override).not.toHaveBeenCalled();
+    } finally {
+      override.mockRestore();
+    }
+  });
+
+  it.each([
     { name: 'string', first: () => z3.string() },
     { name: 'any value', first: () => z3.any() },
     { name: 'wrapped string', first: () => z3.string().readonly() },
@@ -1110,11 +1130,56 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
   ])('bounds later numbers after an exact $name BigInt transform producer', ({ producer }) => {
     const result = create(z3.object({ value: z3.union([producer(), z3.number()]) }));
     expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
-      type: 'number',
+      type: 'integer',
       minimum: Number.MIN_SAFE_INTEGER,
       maximum: Number.MAX_SAFE_INTEGER,
     });
     expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(() => result.$parseRaw('{"value":1.5}')).toThrow(RangeError);
+  });
+
+  it('preserves fractional fallback when the earlier BigInt transform rejects non-integers', () => {
+    const value = z3.union([z3.number().int().transform(BigInt), z3.number()]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.type', 'number');
+    expect(result.$parseRaw('{"value":1.5}')).toEqual({ value: 1.5 });
+  });
+
+  it('preserves fractional numbers accepted before a later exact BigInt transform', () => {
+    const value = z3.union([z3.number(), z3.number().transform(BigInt)]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.0.type', 'number');
+    expect(result.$parseRaw('{"value":1.5}')).toEqual({ value: 1.5 });
+  });
+
+  it('preserves a disjoint fractional range after a bounded exact BigInt transform', () => {
+    const value = z3.union([z3.number().max(10).transform(BigInt), z3.number().min(20)]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
+      type: 'number',
+      minimum: 20,
+    });
+    expect(result.$parseRaw('{"value":20.5}')).toEqual({ value: 20.5 });
+  });
+
+  it.each([
+    {
+      name: 'coerced BigInt before number',
+      schema: () => z3.intersection(z3.coerce.bigint(), z3.number()),
+    },
+    {
+      name: 'number before coerced BigInt',
+      schema: () => z3.intersection(z3.number(), z3.coerce.bigint()),
+    },
+    {
+      name: 'wrapped exact BigInt transform',
+      schema: () => z3.intersection(z3.number().transform(BigInt).readonly(), z3.number()),
+    },
+  ])('rejects intersections with incompatible $name parsed outputs', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
   });
 
   it('preserves numeric intervals disjoint from an exact bounded BigInt transform', () => {

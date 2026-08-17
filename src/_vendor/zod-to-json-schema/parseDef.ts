@@ -65,10 +65,12 @@ import {
   hasConstrainedPipelineOutput,
   hasOpaqueJSONValidation,
   hasOpaquePipelineTransform,
+  knownParsedOutputType,
   producesBigIntAtPath,
   producesDateAtPath,
   producesBigIntOutput,
   requiresAsynchronousJSONInput,
+  throwsOnFractionalBigIntInput,
 } from './schema-capabilities';
 import { ignoreOverride } from './Options';
 import { zodDef } from './util';
@@ -440,13 +442,23 @@ const strictDefaultDescriptors = (
   return descriptors;
 };
 
+const trustedDatePrototypeMethods = new Map<PropertyKey, unknown>([
+  ['getTime', Date.prototype.getTime],
+  ['toJSON', Date.prototype.toJSON],
+  ['toISOString', Date.prototype.toISOString],
+  ['valueOf', Date.prototype.valueOf],
+  [Symbol.toPrimitive, Date.prototype[Symbol.toPrimitive]],
+]);
+const trustedDateGetTime = Date.prototype.getTime;
+
 const isCanonicalDateDefault = (value: Date): boolean =>
   Object.getPrototypeOf(value) === Date.prototype &&
-  Number.isFinite(Date.prototype.getTime.call(value)) &&
-  ['toJSON', 'toISOString', 'valueOf'].every(
-    (property) => !Object.getOwnPropertyDescriptor(value, property),
-  ) &&
-  !Object.getOwnPropertyDescriptor(value, Symbol.toPrimitive);
+  Number.isFinite(trustedDateGetTime.call(value)) &&
+  [...trustedDatePrototypeMethods].every(
+    ([property, method]) =>
+      Object.getOwnPropertyDescriptor(Date.prototype, property)?.value === method &&
+      !Object.getOwnPropertyDescriptor(value, property),
+  );
 
 const normalizeStrictDefaultValue = (
   value: unknown,
@@ -815,10 +827,15 @@ const selectParser = (
                 producesBigIntOutput(candidate._def) &&
                 (candidateIndex < index || fallibleNumber),
             );
-            return applyUnsafeBigIntBounds(
+            const bounded = applyUnsafeBigIntBounds(
               boundedBranch,
               competingBigInts.map((candidate) => candidate._def),
             );
+            const fractionalTransform = options.some(
+              (candidate, candidateIndex) =>
+                candidateIndex < index && throwsOnFractionalBigIntInput(candidate._def, bounded),
+            );
+            return fractionalTransform ? ({ ...bounded, type: 'integer' } as JsonSchema7Type) : bounded;
           })
           .filter(
             (branch): branch is JsonSchema7Type =>
@@ -831,6 +848,13 @@ const selectParser = (
       return parseUnionDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodIntersection: {
+      if (refs.openaiStrictMode) {
+        const left = knownParsedOutputType(def.left._def);
+        const right = knownParsedOutputType(def.right._def);
+        if (left !== undefined && right !== undefined && left !== right) {
+          throw new TypeError(`ZodIntersection arms have incompatible parsed outputs: ${left} and ${right}`);
+        }
+      }
       const intersectionRefs: PreprocessedRefs = refs.openaiStrictMode
         ? { ...refs, [constrainedReferenceContext]: true as const }
         : refs;
