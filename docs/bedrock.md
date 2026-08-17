@@ -45,6 +45,8 @@ const client = new OpenAI({
 
 Bedrock credentials are sent only to the configured API-root origin; absolute resource URLs targeting a different origin are rejected.
 
+All Bedrock authentication modes—including bearer and SigV4 providers and the legacy `BedrockOpenAI` client—disable automatic redirects, including same-origin redirects, even when client or per-request `fetchOptions` specifies `redirect: 'follow'`; configure the final API-root URL directly.
+
 ### Amazon Bedrock Runtime
 
 Set `endpoint: 'runtime'` to use the Bedrock Runtime endpoint. For example, the default API root in `us-west-2` is `https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1`. The SDK derives the AWS partition DNS suffix from the region, using `amazonaws.com` for `us-west-2`, `amazonaws.eu` for `eusc-de-east-1`, and the corresponding suffix for other AWS partitions.
