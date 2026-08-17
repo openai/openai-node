@@ -165,6 +165,9 @@ const producesBigIntOutput = (def: any, seen = new Set<ZodTypeDef>()): boolean =
     case ZodFirstPartyTypeKind.ZodBigInt: {
       return true;
     }
+    case ZodFirstPartyTypeKind.ZodLiteral: {
+      return typeof def.value === 'bigint';
+    }
     case ZodFirstPartyTypeKind.ZodNullable:
     case ZodFirstPartyTypeKind.ZodOptional:
     case ZodFirstPartyTypeKind.ZodDefault:
@@ -181,10 +184,19 @@ const producesBigIntOutput = (def: any, seen = new Set<ZodTypeDef>()): boolean =
     case ZodFirstPartyTypeKind.ZodPipeline: {
       return producesBigIntOutput(def.out._def, seen);
     }
+    case ZodFirstPartyTypeKind.ZodLazy: {
+      return producesBigIntOutput(def.getter()._def, seen);
+    }
+    case ZodFirstPartyTypeKind.ZodIntersection: {
+      return (
+        producesBigIntOutput(def.left._def, new Set(seen)) ||
+        producesBigIntOutput(def.right._def, new Set(seen))
+      );
+    }
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
       const options = def.options instanceof Map ? [...def.options.values()] : def.options;
-      return options.some((option: { _def: ZodTypeDef }) => producesBigIntOutput(option._def, seen));
+      return options.some((option: { _def: ZodTypeDef }) => producesBigIntOutput(option._def, new Set(seen)));
     }
     default: {
       return false;
@@ -207,6 +219,9 @@ const acceptsJSONNumber = (def: any, seen = new Set<ZodTypeDef>()): boolean => {
     case ZodFirstPartyTypeKind.ZodLiteral: {
       return typeof def.value === 'number';
     }
+    case ZodFirstPartyTypeKind.ZodNativeEnum: {
+      return Object.values(def.values).some((value) => typeof value === 'number');
+    }
     case ZodFirstPartyTypeKind.ZodNullable:
     case ZodFirstPartyTypeKind.ZodOptional:
     case ZodFirstPartyTypeKind.ZodDefault:
@@ -223,10 +238,21 @@ const acceptsJSONNumber = (def: any, seen = new Set<ZodTypeDef>()): boolean => {
     case ZodFirstPartyTypeKind.ZodPipeline: {
       return acceptsJSONNumber(def.in._def, seen);
     }
+    case ZodFirstPartyTypeKind.ZodLazy: {
+      return acceptsJSONNumber(def.getter()._def, seen);
+    }
+    case ZodFirstPartyTypeKind.ZodPromise: {
+      return acceptsJSONNumber(def.type._def, seen);
+    }
+    case ZodFirstPartyTypeKind.ZodIntersection: {
+      return (
+        acceptsJSONNumber(def.left._def, new Set(seen)) && acceptsJSONNumber(def.right._def, new Set(seen))
+      );
+    }
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
       const options = def.options instanceof Map ? [...def.options.values()] : def.options;
-      return options.some((option: { _def: ZodTypeDef }) => acceptsJSONNumber(option._def, seen));
+      return options.some((option: { _def: ZodTypeDef }) => acceptsJSONNumber(option._def, new Set(seen)));
     }
     default: {
       return def.coerce === true;
@@ -747,7 +773,11 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodDefault: {
       const schema = parseDefaultDef(def, refs, forceResolution);
       if (refs.openaiStrictMode) {
-        if (typeof schema.default === 'bigint' && !hasJSONIntegerBranch(schema)) {
+        if (
+          typeof schema.default === 'bigint' &&
+          !hasJSONIntegerBranch(schema) &&
+          !producesBigIntOutput(def.innerType._def)
+        ) {
           throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodBigInt, refs);
         }
 

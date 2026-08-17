@@ -282,6 +282,18 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
   });
 
   it.each([
+    { name: 'lazy', schema: () => z3.lazy(() => z3.coerce.bigint()) },
+    {
+      name: 'intersection',
+      schema: () => z3.intersection(z3.coerce.bigint(), z3.coerce.bigint()),
+    },
+    {
+      name: 'shared intersection',
+      schema: () => {
+        const count = z3.coerce.bigint();
+        return z3.intersection(count, count);
+      },
+    },
     { name: 'nullable', schema: () => z3.coerce.bigint().nullable() },
     { name: 'branded', schema: () => z3.coerce.bigint().brand<'safe-bigint'>() },
     { name: 'readonly', schema: () => z3.coerce.bigint().readonly() },
@@ -319,6 +331,41 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
     expect(() => JSON.stringify(result)).not.toThrow();
   });
 
+  it('preserves productive recursive lazy BigInt definitions', () => {
+    const recursive: z3.ZodTypeAny = z3.lazy(() =>
+      z3.union([z3.coerce.bigint(), z3.object({ next: recursive })]),
+    );
+    const result = create(z3.object({ value: z3.union([recursive, z3.number()]) }));
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [
+            expect.anything(),
+            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+          ],
+        },
+      },
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(result.$parseRaw('{"value":{"next":7}}')).toEqual({ value: { next: 7n } });
+  });
+
+  it('preserves productive recursive lazy number definitions', () => {
+    const recursive: z3.ZodTypeAny = z3.lazy(() => z3.union([z3.number(), z3.object({ next: recursive })]));
+    const result = create(z3.object({ value: z3.union([z3.coerce.bigint(), recursive]) }));
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [expect.anything(), { minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER }],
+        },
+      },
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(result.$parseRaw('{"value":{"next":7}}')).toEqual({ value: { next: 7 } });
+  });
+
   it('bounds shared number references locally without changing other fields', () => {
     const sharedNumber = z3.number();
     const result = create(
@@ -351,6 +398,29 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
     {
       name: 'nested constrained',
       schema: () => z3.union([z3.number().min(0), z3.string()]),
+    },
+    {
+      name: 'lazy',
+      schema: () => z3.lazy(() => z3.number()),
+    },
+    {
+      name: 'intersection',
+      schema: () => z3.intersection(z3.number(), z3.number()),
+    },
+    {
+      name: 'shared intersection',
+      schema: () => {
+        const number = z3.number();
+        return z3.intersection(number, number);
+      },
+    },
+    {
+      name: 'promise',
+      schema: () => z3.promise(z3.number()),
+    },
+    {
+      name: 'numeric native enum',
+      schema: () => z3.nativeEnum({ Unsafe: 9_007_199_254_740_992 } as const),
     },
   ])('bounds numeric branches inside $name unions after BigInt alternatives', ({ name, schema }) => {
     const result = create(z3.object({ value: z3.union([z3.coerce.bigint(), schema()]) }));
@@ -458,6 +528,48 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
     });
     expect(result.$parseRaw('{}')).toEqual({ value: 4n });
     expect(result.$parseRaw('{"value":null}')).toEqual({ value: null });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it.each([
+    { name: 'direct', schema: (count: z3.ZodBigInt) => count.default(4n) },
+    { name: 'nullable', schema: (count: z3.ZodBigInt) => count.nullable().default(4n) },
+    { name: 'lazy', schema: (count: z3.ZodBigInt) => z3.lazy(() => count).default(4n) },
+  ])('preserves $name BigInt defaults when the underlying schema is shared', ({ schema }) => {
+    const count = z3.coerce.bigint();
+    const result = create(
+      z3.object({
+        first: count,
+        second: schema(count),
+      }),
+    );
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        first: { type: 'integer', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+        second: { default: 4 },
+      },
+    });
+    expect(result.$parseRaw('{"first":7}')).toEqual({ first: 7n, second: 4n });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it('preserves shared preprocessed BigInt-literal defaults', () => {
+    const count = z3.preprocess(
+      (value) => (typeof value === 'number' ? BigInt(value) : value),
+      z3.literal(4n),
+    );
+    const result = create(
+      z3.object({
+        first: count,
+        second: count.default(4n),
+      }),
+    );
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: { second: { default: 4 } },
+    });
+    expect(result.$parseRaw('{"first":4}')).toEqual({ first: 4n, second: 4n });
     expect(() => JSON.stringify(result)).not.toThrow();
   });
 
@@ -705,6 +817,32 @@ describe('Zod v3 BigInt coercion JSON Schema serialization', () => {
       },
       definitions: { SharedNumber: { type: 'number' } },
     });
+  });
+
+  it('preserves registered shared BigInt definitions while normalizing defaults', () => {
+    const count = z3.coerce.bigint();
+    const format = zodResponseFormat(
+      z3.object({
+        first: count,
+        second: count.default(4n),
+        nullable: count.nullable().default(5n),
+      }),
+      'strict',
+      { schemaDefinitions: { Count: count } },
+    );
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: {
+        first: { $ref: '#/definitions/Count' },
+        second: { $ref: '#/definitions/Count', default: 4 },
+        nullable: { anyOf: [{ $ref: '#/definitions/Count' }, { type: 'null' }], default: 5 },
+      },
+      definitions: {
+        Count: { type: 'integer', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+      },
+    });
+    expect(format.$parseRaw('{"first":7}')).toEqual({ first: 7n, second: 4n, nullable: 5n });
+    expect(() => JSON.stringify(format)).not.toThrow();
   });
 
   it('normalizes safe BigInt constraints inside shared schema definitions', () => {
