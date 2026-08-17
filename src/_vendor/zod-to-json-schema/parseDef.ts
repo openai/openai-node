@@ -247,6 +247,24 @@ const getRelativePath = (pathA: string[], pathB: string[]) => {
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join('/');
 };
 
+const throwUnrepresentableStrictZodType = (typeName: ZodFirstPartyTypeKind, refs: Refs): never => {
+  throw new Error(
+    `Zod field at \`${refs.currentPath.join('/')}\` uses \`${typeName}\`, which cannot be represented in JSON Structured Outputs. Use a JSON-compatible schema or a supported coercion.`,
+  );
+};
+
+const normalizeStrictBigIntValue = (value: bigint, keyword: string, refs: Refs): number => {
+  const normalized = Number(value);
+
+  if (!Number.isSafeInteger(normalized)) {
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` uses \`ZodBigInt\` and cannot represent the \`${keyword}\` value as a safe JSON integer.`,
+    );
+  }
+
+  return normalized;
+};
+
 const selectParser = (
   def: any,
   typeName: ZodFirstPartyTypeKind,
@@ -264,12 +282,33 @@ const selectParser = (
       return parseObjectDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodBigInt: {
-      return parseBigintDef(def, refs);
+      if (refs.openaiStrictMode && !def.coerce) {
+        throwUnrepresentableStrictZodType(typeName, refs);
+      }
+
+      const schema = parseBigintDef(def, refs);
+      if (refs.openaiStrictMode) {
+        for (const [keyword, value] of Object.entries(schema)) {
+          if (typeof value === 'bigint') {
+            (schema as unknown as Record<string, unknown>)[keyword] = normalizeStrictBigIntValue(
+              value,
+              keyword,
+              refs,
+            );
+          }
+        }
+      }
+
+      return schema;
     }
     case ZodFirstPartyTypeKind.ZodBoolean: {
       return parseBooleanDef();
     }
     case ZodFirstPartyTypeKind.ZodDate: {
+      if (refs.openaiStrictMode && !def.coerce) {
+        throwUnrepresentableStrictZodType(typeName, refs);
+      }
+
       return parseDateDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodUndefined: {
@@ -310,9 +349,17 @@ const selectParser = (
       return parseOptionalDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodMap: {
+      if (refs.openaiStrictMode) {
+        throwUnrepresentableStrictZodType(typeName, refs);
+      }
+
       return parseMapDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodSet: {
+      if (refs.openaiStrictMode) {
+        throwUnrepresentableStrictZodType(typeName, refs);
+      }
+
       return parseSetDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodLazy: {
@@ -335,7 +382,16 @@ const selectParser = (
       return parseUnknownDef();
     }
     case ZodFirstPartyTypeKind.ZodDefault: {
-      return parseDefaultDef(def, refs, forceResolution);
+      const schema = parseDefaultDef(def, refs, forceResolution);
+      if (refs.openaiStrictMode && typeof schema.default === 'bigint') {
+        if (!('type' in schema) || schema.type !== 'integer') {
+          throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodBigInt, refs);
+        }
+
+        schema.default = normalizeStrictBigIntValue(schema.default, 'default', refs);
+      }
+
+      return schema;
     }
     case ZodFirstPartyTypeKind.ZodBranded: {
       return parseBrandedDef(def, refs, forceResolution);
