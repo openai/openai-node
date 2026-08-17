@@ -9,6 +9,45 @@ import type { OpenAI } from '../client';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+type StreamTeeQueue<Item> = {
+  readonly length: number;
+  enqueue: (value: Promise<IteratorResult<Item>>) => void;
+  dequeue: () => Promise<IteratorResult<Item>> | undefined;
+};
+
+function createStreamTeeQueue<Item>(): StreamTeeQueue<Item> {
+  let entries: (Promise<IteratorResult<Item>> | undefined)[] = [];
+  let head = 0;
+
+  return {
+    get length() {
+      return entries.length - head;
+    },
+    enqueue(value) {
+      entries.push(value);
+    },
+    dequeue() {
+      if (head === entries.length) {
+        return undefined;
+      }
+
+      const value = entries[head];
+      entries[head] = undefined;
+      head += 1;
+
+      if (head === entries.length) {
+        entries = [];
+        head = 0;
+      } else if (head >= 1024 && head * 2 >= entries.length) {
+        entries = entries.slice(head);
+        head = 0;
+      }
+
+      return value;
+    },
+  };
+}
+
 /** A decoded server-sent event before its JSON payload has been parsed. */
 export type ServerSentEvent = {
   /** Explicit SSE event name, or `null` when the event has no `event:` field. */
@@ -230,18 +269,18 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * independently read from at different speeds.
    */
   tee(): [Stream<Item>, Stream<Item>] {
-    const left: Promise<IteratorResult<Item>>[] = [];
-    const right: Promise<IteratorResult<Item>>[] = [];
+    const left = createStreamTeeQueue<Item>();
+    const right = createStreamTeeQueue<Item>();
     const iterator = this.iterator();
 
-    const teeIterator = (queue: Promise<IteratorResult<Item>>[]): AsyncIterator<Item> => ({
+    const teeIterator = (queue: StreamTeeQueue<Item>): AsyncIterator<Item> => ({
       next: () => {
         if (queue.length === 0) {
           const result = iterator.next();
-          left.push(result);
-          right.push(result);
+          left.enqueue(result);
+          right.enqueue(result);
         }
-        return queue.shift()!;
+        return queue.dequeue()!;
       },
     });
 
