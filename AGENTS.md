@@ -9,13 +9,18 @@ explicitly requires it.
 
 ## Start with the actual problem
 
-- Reproduce the reported issue against the current repository and public SDK entrypoint
-  before proposing a fix. Check existing issues, pull requests, the API schema, and
+- For externally observable bug or behavior fixes, reproduce the reported issue
+  against the current repository and public SDK entrypoint before proposing a fix.
+  For all changes, check existing issues, pull requests, the API schema, and
   generated/upstream ownership first; do not duplicate existing work, "fix" intended
   API behavior, or patch a generated symptom that belongs in the schema or generator.
-- Include a focused regression that fails before the change and passes afterward.
-  Type errors need a compile-time reproduction; stream, transport, and packaging bugs
-  need coverage at the actual affected boundary, not merely a passing internal mock.
+- For those behavior fixes, include a focused regression that fails before the change
+  and passes afterward. Type errors need a compile-time reproduction; stream, transport,
+  and packaging bugs need coverage at the actual affected boundary, not merely a
+  passing internal mock.
+- For docs-only, dependency-only, generated, formatting, workflow, or policy changes
+  without an observable bug, use the smallest artifact-appropriate validation, such
+  as link, render, configuration, installation, or build checks.
 
 ## Keep changes small and coherent
 
