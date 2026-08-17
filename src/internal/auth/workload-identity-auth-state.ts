@@ -8,7 +8,15 @@ import type { X509WorkloadIdentityAuthOptions } from './x509-workload-identity-a
 export function isX509WorkloadIdentity(
   config: WorkloadIdentityConfig | null | undefined,
 ): config is X509WorkloadIdentity {
-  return config !== null && config !== undefined && 'type' in config && config.type === 'x509';
+  // WorkloadIdentity is structurally extensible, so applications may already use `type` as metadata.
+  // A provider selects subject-token WIF; the X.509 variant never accepts one.
+  return (
+    config !== null &&
+    config !== undefined &&
+    'type' in config &&
+    config.type === 'x509' &&
+    config.provider === undefined
+  );
 }
 
 /** Internal mode owner used by clients that need request-scoped X.509 lifecycle controls. */

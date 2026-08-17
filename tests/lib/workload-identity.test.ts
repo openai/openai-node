@@ -26,6 +26,11 @@ interface ApplicationWorkloadIdentity extends WorkloadIdentity {
   readonly applicationMetadata: string;
 }
 
+interface ApplicationWorkloadIdentityWithX509Metadata extends WorkloadIdentity {
+  readonly type: 'x509';
+  readonly applicationMetadata: string;
+}
+
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,6 +76,44 @@ describe('OpenAI with Workload Identity', () => {
     await client.models.list();
 
     expect(exchangeCount).toBe(1);
+  });
+
+  test('preserves subject-token behavior when extensible metadata uses the X.509 type name', async () => {
+    let providerCallCount = 0;
+    let exchangeBody: Record<string, unknown> | undefined;
+    let apiAuthorization: string | null | undefined;
+    const workloadIdentity: ApplicationWorkloadIdentityWithX509Metadata = {
+      type: 'x509',
+      applicationMetadata: 'legacy-metadata',
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => {
+          providerCallCount += 1;
+          return 'subject-token';
+        },
+      },
+    };
+
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return Response.json({ access_token: 'exchanged-access-token', expires_in: 3600 });
+      }
+      apiAuthorization = new Headers(init?.headers).get('Authorization');
+      return Response.json({ data: [] });
+    }) as typeof fetch;
+
+    const client = new OpenAI({ workloadIdentity });
+    await client.models.list();
+
+    expect(providerCallCount).toBe(1);
+    expect(exchangeBody).toMatchObject({
+      subject_token: 'subject-token',
+      subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    });
+    expect(apiAuthorization).toBe('Bearer exchanged-access-token');
   });
 
   test('apiKey and workloadIdentity are mutually exclusive at runtime', () => {
