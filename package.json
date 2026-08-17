@@ -46,7 +46,7 @@
     "@types/ws": "^8.5.13",
     "@types/yargs": "^17.0.35",
     "deep-object-diff": "^1.1.9",
-    "execa": "^5.1.1",
+    "execa": "^10.0.1",
     "fast-check": "^4.9.0",
     "fast-glob": "^3.3.2",
     "iconv-lite": "^0.7.3",
