@@ -1161,6 +1161,50 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(() => result.$parseRaw('{"value":1.5}')).toThrow(RangeError);
   });
 
+  it.each([
+    {
+      name: 'object property',
+      producer: () => z3.object({ count: z3.number().transform(BigInt) }),
+      consumer: () => z3.object({ count: z3.number() }),
+      valid: { count: 7 },
+      fractional: { count: 1.5 },
+      output: { count: 7n },
+      path: 'properties.value.anyOf.1.properties.count.type',
+    },
+    {
+      name: 'array item',
+      producer: () => z3.array(z3.number().transform(BigInt)),
+      consumer: () => z3.array(z3.number()),
+      valid: [7],
+      fractional: [1.5],
+      output: [7n],
+      path: 'properties.value.anyOf.1.items.type',
+    },
+  ])(
+    'narrows fractional $name fallback after an earlier exact BigInt transform',
+    ({ producer, consumer, valid, fractional, output, path }) => {
+      const result = create(z3.object({ value: z3.union([producer(), consumer()]) }));
+
+      expect(strictHelperSchema(result)).toHaveProperty(path, 'integer');
+      expect(result.$parseRaw(JSON.stringify({ value: valid }))).toEqual({ value: output });
+      expect(() => result.$parseRaw(JSON.stringify({ value: fractional }))).toThrow(RangeError);
+    },
+  );
+
+  it('preserves nested fractional fallback after an integer-constrained BigInt transform', () => {
+    const value = z3.union([
+      z3.object({ count: z3.number().int().transform(BigInt) }),
+      z3.object({ count: z3.number() }),
+    ]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty(
+      'properties.value.anyOf.1.properties.count.type',
+      'number',
+    );
+    expect(result.$parseRaw('{"value":{"count":1.5}}')).toEqual({ value: { count: 1.5 } });
+  });
+
   it('preserves fractional fallback when the earlier BigInt transform rejects non-integers', () => {
     const value = z3.union([z3.number().int().transform(BigInt), z3.number()]);
     const result = create(z3.object({ value }));
@@ -1222,6 +1266,22 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
           z3.object({ value: z3.number() }),
         ),
     },
+    {
+      name: 'tuple BigInt and number items',
+      schema: () => z3.intersection(z3.tuple([z3.coerce.bigint()]), z3.tuple([z3.number()])),
+    },
+    {
+      name: 'wrapped nested tuple items',
+      schema: () =>
+        z3.intersection(
+          z3.tuple([z3.object({ value: z3.coerce.bigint() })]).readonly(),
+          z3.tuple([z3.object({ value: z3.number() })]),
+        ),
+    },
+    {
+      name: 'tuple and array items',
+      schema: () => z3.intersection(z3.tuple([z3.coerce.bigint()]), z3.array(z3.number())),
+    },
   ])('rejects intersections with incompatible $name parsed outputs', ({ schema }) => {
     expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
   });
@@ -1233,6 +1293,31 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       type: 'number',
       minimum: 1e20,
     });
+  });
+
+  it.each([
+    { name: 'decimal', input: '42', output: 42n },
+    { name: 'positive', input: '+7', output: 7n },
+    { name: 'negative', input: '-9', output: -9n },
+  ])('restricts exact BigInt $name string transforms to integer lexical input', ({ input, output }) => {
+    const result = create(z3.object({ value: z3.string().transform(BigInt) }));
+    const generated = strictHelperSchema(result) as {
+      properties: { value: { type: string; pattern: string } };
+    };
+
+    expect(generated.properties.value).toEqual({ type: 'string', pattern: '^[+-]?[0-9]+$' });
+    expect(new RegExp(generated.properties.value.pattern, 'u').test('not-a-bigint')).toBe(false);
+    expect(new RegExp(generated.properties.value.pattern, 'u').test('1.5')).toBe(false);
+    expect(result.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: output });
+    expect(() => result.$parseRaw('{"value":"not-a-bigint"}')).toThrow(SyntaxError);
+  });
+
+  it('rejects exact BigInt string transforms whose existing pattern cannot be safely combined', () => {
+    const value = z3
+      .string()
+      .regex(/^[0-9]+$/u)
+      .transform(BigInt);
+    expect(() => create(z3.object({ value }))).toThrow('integer-string pattern');
   });
 
   it('rejects compound inputs that the built-in BigInt transform cannot safely represent', () => {

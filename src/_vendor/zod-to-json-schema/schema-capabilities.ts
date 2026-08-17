@@ -214,6 +214,9 @@ export const knownParsedOutputType = (
     if (isExactBigIntTransform(def)) {
       return ZodFirstPartyTypeKind.ZodBigInt;
     }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodTuple) {
+      return ZodFirstPartyTypeKind.ZodArray;
+    }
     if (definiteParsedOutputKinds.has(def.typeName)) {
       return def.typeName;
     }
@@ -257,7 +260,10 @@ const parsedOutputContainer = (
   active.add(definition);
   try {
     const def = definition as InspectableDefinition;
-    if (def.typeName === kind) {
+    if (
+      def.typeName === kind ||
+      (kind === ZodFirstPartyTypeKind.ZodArray && def.typeName === ZodFirstPartyTypeKind.ZodTuple)
+    ) {
       return def;
     }
     const children = childDefinitions(def, 'output');
@@ -268,6 +274,48 @@ const parsedOutputContainer = (
   } finally {
     active.delete(definition);
   }
+};
+
+const parsedArrayOutputItem = (definition: InspectableDefinition, index?: number): SchemaType | undefined => {
+  if (definition.typeName !== ZodFirstPartyTypeKind.ZodTuple) {
+    return definition.type;
+  }
+  return index === undefined ? definition.rest : (definition.items[index] ?? definition.rest);
+};
+
+const findIncompatibleArrayOutputs = (
+  first: InspectableDefinition,
+  second: InspectableDefinition,
+  path: readonly string[],
+  active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  recurse: (
+    left: ZodTypeDef,
+    right: ZodTypeDef,
+    path: readonly string[],
+    active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  ) => ParsedOutputMismatch | undefined,
+): ParsedOutputMismatch | undefined => {
+  const firstLength = first.typeName === ZodFirstPartyTypeKind.ZodTuple ? first.items.length : 0;
+  const secondLength = second.typeName === ZodFirstPartyTypeKind.ZodTuple ? second.items.length : 0;
+  const length = Math.max(firstLength, secondLength);
+  for (let index = 0; index < length; index += 1) {
+    const firstItem = parsedArrayOutputItem(first, index);
+    const secondItem = parsedArrayOutputItem(second, index);
+    if (!firstItem || !secondItem) {
+      continue;
+    }
+
+    const mismatch = recurse(firstItem._def, secondItem._def, [...path, String(index)], active);
+    if (mismatch) {
+      return mismatch;
+    }
+  }
+
+  const firstRest = parsedArrayOutputItem(first);
+  const secondRest = parsedArrayOutputItem(second);
+  return firstRest && secondRest
+    ? recurse(firstRest._def, secondRest._def, [...path, '[]'], active)
+    : undefined;
 };
 
 export const findIncompatibleParsedOutputs = (
@@ -301,7 +349,7 @@ export const findIncompatibleParsedOutputs = (
       return undefined;
     }
     if (leftKind === ZodFirstPartyTypeKind.ZodArray) {
-      return findIncompatibleParsedOutputs(first.type._def, second.type._def, [...path, '[]'], active);
+      return findIncompatibleArrayOutputs(first, second, path, active, findIncompatibleParsedOutputs);
     }
     const firstShape = first.shape();
     const secondShape = second.shape();
@@ -996,6 +1044,7 @@ export type NestedNumericOverlap = {
   path: readonly NumericPathSegment[];
   producer: ZodTypeDef;
   consumer: ZodTypeDef;
+  producerPrecedesConsumer?: boolean;
 };
 
 type PairedChild = {
@@ -1341,10 +1390,13 @@ export const applySafeIntegerBounds = (schema: JsonSchema7Type): JsonSchema7Type
 const boundNestedNumericPath = (
   schema: JsonSchema7Type,
   path: readonly NumericPathSegment[],
-  producer: ZodTypeDef,
+  overlap: NestedNumericOverlap,
 ): JsonSchema7Type => {
   if (path.length === 0) {
-    return applyUnsafeBigIntBounds(schema, [producer]);
+    const bounded = applyUnsafeBigIntBounds(schema, [overlap.producer]);
+    return overlap.producerPrecedesConsumer && throwsOnFractionalBigIntInput(overlap.producer, bounded)
+      ? ({ ...bounded, type: 'integer' } as JsonSchema7Type)
+      : bounded;
   }
 
   const [segment, ...remaining] = path;
@@ -1362,7 +1414,7 @@ const boundNestedNumericPath = (
     if (Array.isArray(alternatives)) {
       record[keyword] = alternatives.map((alternative) =>
         alternative && typeof alternative === 'object'
-          ? boundNestedNumericPath(alternative as JsonSchema7Type, path, producer)
+          ? boundNestedNumericPath(alternative as JsonSchema7Type, path, overlap)
           : alternative,
       );
       return schema;
@@ -1372,14 +1424,14 @@ const boundNestedNumericPath = (
     const properties = record['properties'] as Record<string, JsonSchema7Type> | undefined;
     const property = properties?.[segment.key];
     if (properties && property) {
-      properties[segment.key] = boundNestedNumericPath(property, remaining, producer);
+      properties[segment.key] = boundNestedNumericPath(property, remaining, overlap);
     }
     return schema;
   }
 
   const child = record['items'] as JsonSchema7Type | undefined;
   if (child && typeof child === 'object' && !Array.isArray(child)) {
-    record['items'] = boundNestedNumericPath(child, remaining, producer);
+    record['items'] = boundNestedNumericPath(child, remaining, overlap);
   }
   return schema;
 };
@@ -1390,7 +1442,7 @@ export const applyNestedNumericOverlaps = (
 ): JsonSchema7Type => {
   let bounded = schema;
   for (const overlap of overlaps) {
-    bounded = boundNestedNumericPath(bounded, overlap.path, overlap.producer);
+    bounded = boundNestedNumericPath(bounded, overlap.path, overlap);
   }
   return bounded;
 };

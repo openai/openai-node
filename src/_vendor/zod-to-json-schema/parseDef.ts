@@ -798,13 +798,18 @@ const selectParser = (
             options.flatMap((producer, producerIndex) =>
               producerIndex === consumerIndex
                 ? []
-                : findNestedNumericOverlaps(producer._def, consumer._def).filter(
-                    (overlap) =>
-                      overlap.path.length > 0 &&
-                      (producerIndex < consumerIndex ||
-                        !acceptsEveryJSONNumber(overlap.consumer) ||
-                        hasOpaqueJSONValidation(consumer._def)),
-                  ),
+                : findNestedNumericOverlaps(producer._def, consumer._def)
+                    .filter(
+                      (overlap) =>
+                        overlap.path.length > 0 &&
+                        (producerIndex < consumerIndex ||
+                          !acceptsEveryJSONNumber(overlap.consumer) ||
+                          hasOpaqueJSONValidation(consumer._def)),
+                    )
+                    .map((overlap) => ({
+                      ...overlap,
+                      producerPrecedesConsumer: producerIndex < consumerIndex,
+                    })),
             ),
           )
         : [];
@@ -985,19 +990,37 @@ const selectParser = (
         acceptsJSONNumber(def.schema._def);
       const expectedOutput = (refs as PreprocessedRefs)[expectedPipelineOutput];
       const transform = def.effect?.transform as unknown;
+      const exactBigIntTransform = refs.openaiStrictMode === true && transform === BigInt;
       const boundNumericTransform =
         numericTransform &&
-        (transform === BigInt || (expectedOutput && producesBigIntOutput(expectedOutput)));
-      const schema = parseEffectsDef(def, refs, forceResolution || boundNumericTransform === true);
+        (exactBigIntTransform || (expectedOutput && producesBigIntOutput(expectedOutput)));
+      const schema = parseEffectsDef(
+        def,
+        refs,
+        forceResolution || boundNumericTransform === true || exactBigIntTransform,
+      );
+
+      if (exactBigIntTransform && schema !== undefined) {
+        if ('type' in schema && schema.type === 'string') {
+          const pattern = '^[+-]?[0-9]+$';
+          if ('pattern' in schema && schema.pattern !== undefined && schema.pattern !== pattern) {
+            throw new Error(
+              `ZodEffects BigInt transform at \`${refs.currentPath.join('/')}\` cannot combine an existing string constraint with the required integer-string pattern in strict Structured Outputs.`,
+            );
+          }
+          return { ...schema, pattern } as JsonSchema7Type;
+        }
+        if (!('type' in schema) || !isNumericSchemaType(schema.type)) {
+          throw new Error(
+            `ZodEffects BigInt transform at \`${refs.currentPath.join('/')}\` requires a directly representable numeric JSON input in strict Structured Outputs.`,
+          );
+        }
+      }
+
       if (!boundNumericTransform || schema === undefined) {
         return schema;
       }
 
-      if (transform === BigInt && (!('type' in schema) || !isNumericSchemaType(schema.type))) {
-        throw new Error(
-          `ZodEffects BigInt transform at \`${refs.currentPath.join('/')}\` requires a directly representable numeric JSON input in strict Structured Outputs.`,
-        );
-      }
       const bounded = applySafeIntegerBounds(schema);
       if (transform === BigInt && 'type' in bounded && bounded.type === 'number') {
         bounded.type = 'integer';
