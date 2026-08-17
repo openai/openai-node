@@ -624,6 +624,24 @@ describe('Zod v3 strict schema capability analysis', () => {
     );
   });
 
+  it('bounds a finite numeric overlap beside an unrelated recursive string subtree', () => {
+    const metadata: z3.ZodTypeAny = z3.lazy(() =>
+      z3.object({ label: z3.string(), next: metadata.nullable() }),
+    );
+    const producer = z3.object({ count: z3.coerce.bigint(), meta: metadata });
+    const consumer = z3.object({ count: z3.number(), meta: metadata });
+    const format = formatFor(z3.union([producer, consumer]));
+
+    expect(format.json_schema.schema).toHaveProperty('properties.value.anyOf.1.properties.count', {
+      type: 'number',
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(
+      format.$parseRaw('{"value":{"count":7,"meta":{"label":"outer","next":{"label":"inner","next":null}}}}'),
+    ).toEqual({ value: { count: 7n, meta: { label: 'outer', next: { label: 'inner', next: null } } } });
+  });
+
   it('preserves independently recursive and discriminator-separated numeric alternatives', () => {
     const bigintNode: z3.ZodTypeAny = z3.lazy(() =>
       z3.object({ kind: z3.literal('bigint'), value: z3.coerce.bigint(), next: bigintNode.nullable() }),

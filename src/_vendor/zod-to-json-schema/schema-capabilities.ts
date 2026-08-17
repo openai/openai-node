@@ -960,19 +960,23 @@ const collectNestedNumericOverlaps = (
   consumer: ZodTypeDef,
   path: readonly NumericPathSegment[],
   overlaps: NestedNumericOverlap[],
-  active: Map<ZodTypeDef, Set<ZodTypeDef>>,
-  traversal: { recursive: boolean; lazyTargets: WeakMap<ZodTypeDef, SchemaType> },
+  active: Map<ZodTypeDef, Map<ZodTypeDef, readonly NumericPathSegment[]>>,
+  traversal: {
+    recursivePaths: (readonly NumericPathSegment[])[];
+    lazyTargets: WeakMap<ZodTypeDef, SchemaType>;
+  },
 ): void => {
   let activeConsumers = active.get(producer);
-  if (activeConsumers?.has(consumer)) {
-    traversal.recursive = true;
+  const recursivePath = activeConsumers?.get(consumer);
+  if (recursivePath) {
+    traversal.recursivePaths.push(recursivePath);
     return;
   }
   if (!activeConsumers) {
-    activeConsumers = new Set();
+    activeConsumers = new Map();
     active.set(producer, activeConsumers);
   }
-  activeConsumers.add(consumer);
+  activeConsumers.set(consumer, path);
 
   try {
     if (producesBigIntOutput(producer) && acceptsJSONNumber(consumer)) {
@@ -1032,14 +1036,26 @@ export const findNestedNumericOverlaps = (
   consumer: ZodTypeDef,
 ): NestedNumericOverlap[] => {
   const overlaps: NestedNumericOverlap[] = [];
-  const traversal = { recursive: false, lazyTargets: new WeakMap<ZodTypeDef, SchemaType>() };
+  const traversal = {
+    recursivePaths: [] as (readonly NumericPathSegment[])[],
+    lazyTargets: new WeakMap<ZodTypeDef, SchemaType>(),
+  };
   collectNestedNumericOverlaps(producer, consumer, [], overlaps, new Map(), traversal);
   if (
-    traversal.recursive &&
     overlaps.some(
       (overlap) =>
-        capturesUnsafeBigIntInput(overlap.producer, 'minimum') ||
-        capturesUnsafeBigIntInput(overlap.producer, 'maximum'),
+        (capturesUnsafeBigIntInput(overlap.producer, 'minimum') ||
+          capturesUnsafeBigIntInput(overlap.producer, 'maximum')) &&
+        traversal.recursivePaths.some((recursivePath) =>
+          recursivePath.every((segment, index) => {
+            const candidate = overlap.path[index];
+            return (
+              candidate?.kind === segment.kind &&
+              (segment.kind !== 'property' ||
+                (candidate.kind === 'property' && candidate.key === segment.key))
+            );
+          }),
+        ),
     )
   ) {
     throw new Error(
