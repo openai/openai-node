@@ -60,7 +60,7 @@ export function toStreamingFile(
   name: string,
   options?: Pick<FilePropertyBag, 'type'>,
 ): StreamingFile {
-  if (!name) {
+  if (typeof name !== 'string' || !name) {
     throw new TypeError('toStreamingFile requires a non-empty file name');
   }
 
@@ -454,7 +454,12 @@ async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<Fo
 
 function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
   if (isStreamingFile(value)) {
-    return options.stripFilenames === false ? normalizeFilenamePath(value.name) : value.name;
+    const { name } = value;
+    if (typeof name !== 'string' || !name) {
+      throw new TypeError('Streaming upload file name must be a non-empty string');
+    }
+
+    return options.stripFilenames === false ? normalizeFilenamePath(name) : name;
   }
 
   return getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
@@ -523,7 +528,12 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
 }
 
 function escapeHeaderValue(value: string): string {
-  return value.replace(/["\\\r\n]/g, (character) => encodeURIComponent(character));
+  return Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 0x1f || codePoint === 0x7f || character === '"' || character === '\\'
+      ? encodeURIComponent(character)
+      : character;
+  }).join('');
 }
 
 const addFormValue = async (

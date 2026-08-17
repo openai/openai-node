@@ -919,6 +919,8 @@ export interface BetaFunctionTool {
   output_schema?: { [key: string]: unknown } | null;
 }
 
+export type BetaImageDetail = 'low' | 'high' | 'auto' | 'original';
+
 export interface BetaInlineSkill {
   /**
    * The description of the skill.
@@ -1439,7 +1441,7 @@ export interface BetaResponse {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | 'ultrafast' | null;
+  service_tier?: BetaServiceTier | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -4846,7 +4848,7 @@ export interface BetaResponseInputImage {
    * The detail level of the image to be sent to the model. One of `high`, `low`,
    * `auto`, or `original`. Defaults to `auto`.
    */
-  detail: 'low' | 'high' | 'auto' | 'original';
+  detail: BetaImageDetail;
 
   /**
    * The type of the input item. Always `input_image`.
@@ -4900,7 +4902,7 @@ export interface BetaResponseInputImageContent {
    * The detail level of the image to be sent to the model. One of `high`, `low`,
    * `auto`, or `original`. Defaults to `auto`.
    */
-  detail?: 'low' | 'high' | 'auto' | 'original' | null;
+  detail?: BetaImageDetail | null;
 
   /**
    * The ID of the file to be sent to the model.
@@ -6721,7 +6723,7 @@ export namespace BetaResponseItem {
        * The detail level of the screenshot image to be sent to the model. One of `high`,
        * `low`, `auto`, or `original`. Defaults to `auto`.
        */
-      detail: 'low' | 'high' | 'auto' | 'original';
+      detail: ResponsesAPI.BetaImageDetail;
 
       /**
        * The identifier of an uploaded file that contains the screenshot.
@@ -7925,7 +7927,7 @@ export namespace BetaResponseOutputItem {
        * The detail level of the screenshot image to be sent to the model. One of `high`,
        * `low`, `auto`, or `original`. Defaults to `auto`.
        */
-      detail: 'low' | 'high' | 'auto' | 'original';
+      detail: ResponsesAPI.BetaImageDetail;
 
       /**
        * The identifier of an uploaded file that contains the screenshot.
@@ -11016,7 +11018,7 @@ export namespace BetaResponsesClientEvent {
      * request. This response value may be different from the value set in the
      * parameter.
      */
-    service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | 'ultrafast' | null;
+    service_tier?: ResponsesAPI.BetaServiceTier | null;
 
     /**
      * Whether to store the generated model response for later retrieval via API.
@@ -12119,6 +12121,42 @@ export namespace BetaResponsesServerEvent {
   }
 }
 
+/**
+ * Specifies the processing type used for serving the request.
+ *
+ * - If set to 'auto', then the request will be processed with the service tier
+ *   configured in the Project settings. Unless otherwise configured, the Project
+ *   will use 'default'.
+ * - If set to 'default', then the request will be processed with the standard
+ *   pricing and performance for the selected model.
+ * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+ *   then the request will be processed with the Flex Processing service tier.
+ * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+ *   include the `service_tier=fast` or `service_tier=priority` parameter for
+ *   Responses or Chat Completions. The response will show `service_tier=priority`
+ *   regardless of if you specify `service_tier=fast` or `priority` in your
+ *   request.
+ * - If set to 'ultrafast', then the request will be processed with the
+ *   access-controlled Ultrafast Processing service tier. This tier is currently
+ *   available for `gpt-5.6-sol`; a response served through it will show
+ *   `service_tier=ultrafast`.
+ * - When not set, the default behavior is 'auto'.
+ *
+ * When the `service_tier` parameter is set, the response body will include the
+ * `service_tier` value based on the processing mode actually used to serve the
+ * request. This response value may be different from the value set in the
+ * parameter.
+ */
+export type BetaServiceTier =
+  | 'auto'
+  | 'default'
+  | 'flex'
+  | 'scale'
+  | 'priority'
+  | 'fast'
+  | 'ultrafast'
+  | null;
+
 export interface BetaSkillReference {
   /**
    * The ID of the referenced skill.
@@ -13148,7 +13186,7 @@ export interface ResponseCreateParamsBase {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | 'ultrafast' | null;
+  service_tier?: BetaServiceTier | null;
 
   /**
    * Body param: Whether to store the generated model response for later retrieval
@@ -13812,6 +13850,7 @@ export declare namespace Responses {
     type BetaFileSearchTool as BetaFileSearchTool,
     type BetaFunctionShellTool as BetaFunctionShellTool,
     type BetaFunctionTool as BetaFunctionTool,
+    type BetaImageDetail as BetaImageDetail,
     type BetaInlineSkill as BetaInlineSkill,
     type BetaInlineSkillSource as BetaInlineSkillSource,
     type BetaLocalEnvironment as BetaLocalEnvironment,
@@ -13939,6 +13978,7 @@ export declare namespace Responses {
     type BetaResponseWebSearchCallSearchingEvent as BetaResponseWebSearchCallSearchingEvent,
     type BetaResponsesClientEvent as BetaResponsesClientEvent,
     type BetaResponsesServerEvent as BetaResponsesServerEvent,
+    type BetaServiceTier as BetaServiceTier,
     type BetaSkillReference as BetaSkillReference,
     type BetaTool as BetaTool,
     type BetaToolChoiceAllowed as BetaToolChoiceAllowed,

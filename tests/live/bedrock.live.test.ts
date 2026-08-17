@@ -8,20 +8,47 @@ import { bedrock as awsBedrock } from 'openai/providers/bedrock/aws';
  * BEDROCK_LIVE_TEST=1 BEDROCK_LIVE_AUTH=profile AWS_PROFILE=my-profile \
  * AWS_REGION=us-west-2 BEDROCK_MODEL=openai.gpt-oss-120b pnpm test:live:bedrock
  *
- * BEDROCK_MODEL must support the Responses API. A model returned by the Models
- * API may support a different Bedrock inference API instead.
+ * BEDROCK_LIVE_TEST=1 BEDROCK_LIVE_ENDPOINT=runtime BEDROCK_LIVE_AUTH=default-chain \
+ * AWS_REGION=us-west-2 pnpm test:live:bedrock
  *
- * Set BEDROCK_LIVE_STREAM=1 to include a second, streaming inference request.
+ * To exercise several credential paths in one explicitly enabled run, set
+ * BEDROCK_LIVE_AUTHS to a comma-separated list such as
+ * bearer,token-provider,default-chain. The token-provider mode resolves
+ * AWS_BEARER_TOKEN_BEDROCK again before each request attempt.
+ * Every selected mode still requires its corresponding valid credential
+ * configuration.
+ *
+ * Mantle requires BEDROCK_MODEL to support the Responses API. Runtime defaults
+ * to the three US CRIS inference profiles and tests Chat Completions. Set
+ * BEDROCK_MODEL to one profile, or BEDROCK_LIVE_MODELS to a comma-separated
+ * override such as global.openai.gpt-5.6-sol.
+ *
+ * Set BEDROCK_LIVE_STREAM=1 to include streaming inference requests. Runtime
+ * Responses compatibility is opt-in with BEDROCK_LIVE_RESPONSES=1. Override the
+ * endpoint, including its route, with AWS_BEDROCK_BASE_URL when necessary.
  */
 const LIVE_TEST_FLAG = 'BEDROCK_LIVE_TEST';
 const AUTH_MODE_ENV = 'BEDROCK_LIVE_AUTH';
+const AUTH_MODE_LIST_ENV = 'BEDROCK_LIVE_AUTHS';
+const ENDPOINT_MODE_ENV = 'BEDROCK_LIVE_ENDPOINT';
 const MODEL_ENV = 'BEDROCK_MODEL';
+const MODEL_LIST_ENV = 'BEDROCK_LIVE_MODELS';
+const RESPONSES_ENV = 'BEDROCK_LIVE_RESPONSES';
 const STREAM_ENV = 'BEDROCK_LIVE_STREAM';
 const LIVE_TEST_TIMEOUT = 180_000;
+const DEFAULT_RUNTIME_MODELS = [
+  'us.openai.gpt-5.6-sol',
+  'us.openai.gpt-5.6-terra',
+  'us.openai.gpt-5.6-luna',
+] as const;
+
+const endpointModes = ['mantle', 'runtime'] as const;
+type EndpointMode = (typeof endpointModes)[number];
 
 const authModes = [
   'bearer',
   'environment-bearer',
+  'token-provider',
   'default-chain',
   'profile',
   'static',
@@ -37,17 +64,63 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-function readAuthMode(): AuthMode {
-  const value = requiredEnv(AUTH_MODE_ENV);
-  if ((authModes as readonly string[]).includes(value)) {
-    return value as AuthMode;
+function readAuthModes(): AuthMode[] {
+  const configuredModes = process.env[AUTH_MODE_LIST_ENV];
+  const configuredEnv = configuredModes === undefined ? AUTH_MODE_ENV : AUTH_MODE_LIST_ENV;
+  const values =
+    configuredModes === undefined
+      ? [requiredEnv(AUTH_MODE_ENV)]
+      : requiredEnv(AUTH_MODE_LIST_ENV)
+          .split(',')
+          .map((mode) => mode.trim())
+          .filter(Boolean);
+
+  if (values.length === 0) {
+    throw new Error(`${configuredEnv} must include at least one authentication mode.`);
   }
-  throw new Error(`${AUTH_MODE_ENV} must be one of: ${authModes.join(', ')}.`);
+
+  const invalidModes = values.filter((value) => !(authModes as readonly string[]).includes(value));
+  if (invalidModes.length > 0) {
+    throw new Error(
+      `${configuredEnv} contains unsupported mode(s): ${invalidModes.join(', ')}. ` +
+        `Use: ${authModes.join(', ')}.`,
+    );
+  }
+
+  return [...new Set(values)] as AuthMode[];
+}
+
+function readEndpointMode(): EndpointMode {
+  const value = process.env[ENDPOINT_MODE_ENV]?.trim() || 'mantle';
+  if ((endpointModes as readonly string[]).includes(value)) {
+    return value as EndpointMode;
+  }
+  throw new Error(`${ENDPOINT_MODE_ENV} must be one of: ${endpointModes.join(', ')}.`);
+}
+
+function readModels(endpoint: EndpointMode): string[] {
+  const configuredModels = process.env[MODEL_LIST_ENV];
+  if (configuredModels !== undefined) {
+    const models = requiredEnv(MODEL_LIST_ENV)
+      .split(',')
+      .map((model) => model.trim())
+      .filter(Boolean);
+    if (models.length === 0) {
+      throw new Error(`${MODEL_LIST_ENV} must include at least one Bedrock model.`);
+    }
+    return models;
+  }
+
+  if (endpoint === 'runtime') {
+    const model = process.env[MODEL_ENV]?.trim();
+    return model ? [model] : [...DEFAULT_RUNTIME_MODELS];
+  }
+  return [requiredEnv(MODEL_ENV)];
 }
 
 async function providerForAuth(
   mode: AuthMode,
-  endpoint: { region: string; baseURL?: string | undefined },
+  endpoint: { region: string; endpoint: EndpointMode; baseURL?: string | undefined },
 ): Promise<Provider> {
   switch (mode) {
     case 'bearer': {
@@ -56,6 +129,13 @@ async function providerForAuth(
     case 'environment-bearer': {
       requiredEnv('AWS_BEARER_TOKEN_BEDROCK');
       return bearerBedrock(endpoint);
+    }
+    case 'token-provider': {
+      requiredEnv('AWS_BEARER_TOKEN_BEDROCK');
+      return bearerBedrock({
+        ...endpoint,
+        tokenProvider: async () => requiredEnv('AWS_BEARER_TOKEN_BEDROCK'),
+      });
     }
     case 'default-chain': {
       return awsBedrock({ ...endpoint, apiKey: null });
@@ -96,20 +176,23 @@ if (!region) {
   throw new Error('Set AWS_REGION or AWS_DEFAULT_REGION before running the Bedrock live test.');
 }
 
-const model = requiredEnv(MODEL_ENV);
-const authMode = readAuthMode();
+const endpointMode = readEndpointMode();
+const models = readModels(endpointMode);
+const selectedAuthModes = readAuthModes();
 const baseURL = process.env['AWS_BEDROCK_BASE_URL']?.trim();
+const runResponsesTest = endpointMode === 'mantle' || process.env[RESPONSES_ENV] === '1';
 const runStreamingTest = process.env[STREAM_ENV] === '1';
 
 jest.setTimeout(LIVE_TEST_TIMEOUT);
 
-describe(`Amazon Bedrock live (${authMode})`, () => {
+describe.each(selectedAuthModes)(`Amazon Bedrock ${endpointMode} live (%s)`, (authMode) => {
   let client: OpenAI;
 
   beforeAll(async () => {
     client = new OpenAI({
       provider: await providerForAuth(authMode, {
         region,
+        endpoint: endpointMode,
         ...(baseURL ? { baseURL } : {}),
       }),
       maxRetries: 0,
@@ -117,36 +200,102 @@ describe(`Amazon Bedrock live (${authMode})`, () => {
     });
   });
 
-  test('lists the configured model and creates a response', async () => {
-    const models = await client.models.list();
-    expect(models.data.map((candidate) => candidate.id)).toContain(model);
+  (endpointMode === 'runtime' ? test.each(models) : test.skip.each(models))(
+    'creates a chat completion for %s',
+    async (model) => {
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: 'Reply with exactly: bedrock live test passed' }],
+      });
 
-    const response = await client.responses.create({
-      model,
-      input: 'Reply with exactly: bedrock live test passed',
-      store: false,
-    });
+      expect(completion.id).toEqual(expect.any(String));
+      expect(completion._request_id).toEqual(expect.any(String));
+      expect(completion.choices[0]?.message.content?.trim().length).toBeGreaterThan(0);
+      expect(completion.choices[0]?.finish_reason).toEqual(expect.any(String));
+      expect(completion.usage).toMatchObject({
+        prompt_tokens: expect.any(Number),
+        completion_tokens: expect.any(Number),
+        total_tokens: expect.any(Number),
+      });
+    },
+  );
 
-    expect(response.id).toEqual(expect.any(String));
-    expect(response.output_text.trim().length).toBeGreaterThan(0);
-  });
+  (endpointMode === 'runtime' && runStreamingTest ? test.each(models) : test.skip.each(models))(
+    'streams a chat completion for %s',
+    async (model) => {
+      const stream = await client.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: 'Reply with exactly: bedrock streaming test passed' }],
+        stream: true,
+      });
+      let chunkCount = 0;
+      let content = '';
+      let finishReason: string | null = null;
 
-  (runStreamingTest ? test : test.skip)('streams a response', async () => {
-    const stream = await client.responses.create({
-      model,
-      input: 'Reply with exactly: bedrock streaming test passed',
-      store: false,
-      stream: true,
-    });
-    let eventCount = 0;
-    let completed = false;
+      for await (const chunk of stream) {
+        chunkCount += 1;
+        const [choice] = chunk.choices;
+        content += choice?.delta.content ?? '';
+        finishReason ||= choice?.finish_reason ?? null;
+      }
 
-    for await (const event of stream) {
-      eventCount += 1;
-      completed ||= event.type === 'response.completed';
-    }
+      expect(chunkCount).toBeGreaterThan(0);
+      expect(content.trim().length).toBeGreaterThan(0);
+      expect(finishReason).toEqual(expect.any(String));
+    },
+  );
 
-    expect(eventCount).toBeGreaterThan(0);
-    expect(completed).toBe(true);
-  });
+  (runResponsesTest ? test.each(models) : test.skip.each(models))(
+    'creates a response for %s',
+    async (model) => {
+      if (endpointMode === 'mantle') {
+        const availableModels = await client.models.list();
+        expect(availableModels.data.map((candidate) => candidate.id)).toContain(model);
+      }
+
+      const response = await client.responses.create({
+        model,
+        input: 'Reply with exactly: bedrock live test passed',
+        store: false,
+      });
+
+      expect(response.id).toEqual(expect.any(String));
+      if (endpointMode === 'runtime') {
+        expect(response._request_id).toEqual(expect.any(String));
+      }
+      expect(response.output_text.trim().length).toBeGreaterThan(0);
+    },
+  );
+
+  (runResponsesTest && runStreamingTest ? test.each(models) : test.skip.each(models))(
+    'streams a response for %s',
+    async (model) => {
+      const stream = await client.responses.create({
+        model,
+        input: 'Reply with exactly: bedrock streaming test passed',
+        store: false,
+        stream: true,
+      });
+      let eventCount = 0;
+      let outputText = '';
+      let completedResponseID: string | undefined;
+      let finalEventType: string | undefined;
+
+      for await (const event of stream) {
+        eventCount += 1;
+        finalEventType = event.type;
+        if (event.type === 'response.output_text.delta') {
+          outputText += event.delta;
+        }
+        if (event.type === 'response.completed') {
+          completedResponseID = event.response.id;
+        }
+      }
+
+      expect(eventCount).toBeGreaterThan(0);
+      expect(outputText.trim().length).toBeGreaterThan(0);
+      expect(completedResponseID).toEqual(expect.any(String));
+      expect(finalEventType).toBe('response.completed');
+    },
+  );
 });

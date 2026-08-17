@@ -18,6 +18,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">FileSearchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionShellTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ImageDetail</a></code>
 - <code><a href="./src/resources/responses/responses.ts">InlineSkill</a></code>
 - <code><a href="./src/resources/responses/responses.ts">InlineSkillSource</a></code>
 - <code><a href="./src/resources/responses/responses.ts">LocalEnvironment</a></code>
@@ -142,6 +143,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponsesClientEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponsesServerEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ServiceTier</a></code>
 - <code><a href="./src/resources/responses/responses.ts">SkillReference</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceAllowed</a></code>

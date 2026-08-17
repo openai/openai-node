@@ -78,7 +78,7 @@ export interface ComputerScreenshotContent {
    * The detail level of the screenshot image to be sent to the model. One of `high`,
    * `low`, `auto`, or `original`. Defaults to `auto`.
    */
-  detail: 'low' | 'high' | 'auto' | 'original';
+  detail: ResponsesAPI.ImageDetail;
 
   /**
    * The identifier of an uploaded file that contains the screenshot.
