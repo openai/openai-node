@@ -51,8 +51,10 @@ modify the contents of the `src/lib/` and `examples/` directories.
   recordings, and snapshots.
 - Never include secret API keys in browser bundles. Enabling `dangerouslyAllowBrowser` requires explicit
   security review; examples must not suggest exposing server-side credentials to browsers.
-- Redact authentication headers, cookies, webhook secrets, and sensitive request or response data from
-  logs, errors, test output, snapshots, and CI artifacts.
+- Always redact authentication headers, cookies, and webhook secrets. Keep real customer-sensitive request or
+  response data out of default or uncontrolled logs, test output, snapshots, and CI artifacts. Preserve
+  documented opt-in `DEBUG` logging, `APIError.body` diagnostics, and clearly fake or sanitized fixtures;
+  warn that diagnostics may contain sensitive data and redact them before forwarding to untrusted sinks.
 
 ### Dependencies and release automation
 
