@@ -99,10 +99,10 @@ describe('OpenAI with Workload Identity', () => {
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.toString().includes('/oauth/token')) {
         exchangeBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-        return Response.json({ access_token: 'exchanged-access-token', expires_in: 3600 });
+        return globalThis.Response.json({ access_token: 'exchanged-access-token', expires_in: 3600 });
       }
       apiAuthorization = new Headers(init?.headers).get('Authorization');
-      return Response.json({ data: [] });
+      return globalThis.Response.json({ data: [] });
     }) as typeof fetch;
 
     const client = new OpenAI({ workloadIdentity });
