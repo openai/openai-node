@@ -125,6 +125,55 @@ const requiresJSONInputPreprocessor = (def: ZodTypeDef): boolean => {
   }
 };
 
+const acceptsJSONNumber = (def: any): boolean => {
+  switch (def.typeName as ZodFirstPartyTypeKind) {
+    case ZodFirstPartyTypeKind.ZodNumber:
+    case ZodFirstPartyTypeKind.ZodAny:
+    case ZodFirstPartyTypeKind.ZodUnknown: {
+      return true;
+    }
+    case ZodFirstPartyTypeKind.ZodLiteral: {
+      return typeof def.value === 'number';
+    }
+    case ZodFirstPartyTypeKind.ZodNullable:
+    case ZodFirstPartyTypeKind.ZodOptional:
+    case ZodFirstPartyTypeKind.ZodDefault:
+    case ZodFirstPartyTypeKind.ZodCatch:
+    case ZodFirstPartyTypeKind.ZodReadonly: {
+      return acceptsJSONNumber(def.innerType._def);
+    }
+    case ZodFirstPartyTypeKind.ZodBranded: {
+      return acceptsJSONNumber(def.type._def);
+    }
+    case ZodFirstPartyTypeKind.ZodEffects: {
+      return def.effect.type === 'preprocess' || acceptsJSONNumber(def.schema._def);
+    }
+    case ZodFirstPartyTypeKind.ZodPipeline: {
+      return acceptsJSONNumber(def.in._def);
+    }
+    default: {
+      return def.coerce === true;
+    }
+  }
+};
+
+const convertsJSONPipelineInput = (def: any): boolean => {
+  if (def.typeName === ZodFirstPartyTypeKind.ZodEffects) {
+    return (
+      def.effect.type === 'transform' ||
+      def.effect.type === 'preprocess' ||
+      convertsJSONPipelineInput(def.schema._def)
+    );
+  }
+
+  if (def.typeName === ZodFirstPartyTypeKind.ZodPipeline) {
+    return convertsJSONPipelineInput(def.in._def) || convertsJSONPipelineInput(def.out._def);
+  }
+
+  const inner = def.innerType?._def ?? def.type?._def;
+  return inner ? convertsJSONPipelineInput(inner) : def.coerce === true;
+};
+
 export function parseDef(
   def: ZodTypeDef,
   refs: Refs,
@@ -156,9 +205,11 @@ export function parseDef(
     throwUnrepresentableStrictZodType((def as { typeName: ZodFirstPartyTypeKind }).typeName, diagnosticRefs);
   }
 
-  // A native schema reused by different preprocessors must not be extracted as
-  // a bare definition, because its input-conversion context would be lost.
-  const inlinePreprocessedType = needsPreprocessing && isPreprocessed;
+  // Native leaves and their already-materialized shared ancestors must remain
+  // inside the conversion context. In-progress recursive definitions still use
+  // references so recursive schemas terminate normally.
+  const inlinePreprocessedType =
+    isPreprocessed && (needsPreprocessing || (seenItem !== undefined && seenItem.jsonSchema !== undefined));
 
   if (seenItem && !forceResolution && !inlinePreprocessedType) {
     const seenSchema = get$ref(seenItem, refs);
@@ -381,32 +432,56 @@ const selectParser = (
       );
 
       if (refs.openaiStrictMode && (bigintIndex !== -1 || hasBigIntLiteral)) {
+        const numberWinsBeforeBigInt =
+          bigintIndex !== -1 &&
+          options.slice(0, bigintIndex).some((option) => acceptsJSONNumber(option._def));
         const branches = options
-          .map((option, index) =>
-            parseDef(option._def as ZodTypeDef, {
-              ...refs,
-              currentPath: [...refs.currentPath, 'anyOf', String(index)],
-            }),
-          )
+          .map((option, index) => {
+            const boundNumber =
+              bigintIndex !== -1 &&
+              index > bigintIndex &&
+              !numberWinsBeforeBigInt &&
+              acceptsJSONNumber(option._def);
+            const branch = parseDef(
+              option._def as ZodTypeDef,
+              {
+                ...refs,
+                currentPath: [...refs.currentPath, 'anyOf', String(index)],
+              },
+              boundNumber,
+            );
+
+            if (!boundNumber || branch === undefined) {
+              return branch;
+            }
+
+            if ('$ref' in branch) {
+              return {
+                allOf: [
+                  branch,
+                  {
+                    minimum: Number.MIN_SAFE_INTEGER,
+                    maximum: Number.MAX_SAFE_INTEGER,
+                  } as JsonSchema7Type,
+                ],
+              };
+            }
+
+            const record = branch as unknown as Record<string, unknown>;
+            record['minimum'] = Math.max(
+              typeof record['minimum'] === 'number' ? record['minimum'] : Number.MIN_SAFE_INTEGER,
+              Number.MIN_SAFE_INTEGER,
+            );
+            record['maximum'] = Math.min(
+              typeof record['maximum'] === 'number' ? record['maximum'] : Number.MAX_SAFE_INTEGER,
+              Number.MAX_SAFE_INTEGER,
+            );
+            return branch;
+          })
           .filter(
             (branch): branch is JsonSchema7Type =>
               branch !== undefined && (!refs.strictUnions || Object.keys(branch).length > 0),
           );
-        const numberWinsBeforeBigInt =
-          bigintIndex !== -1 &&
-          options
-            .slice(0, bigintIndex)
-            .some((option) => option._def.typeName === ZodFirstPartyTypeKind.ZodNumber);
-
-        if (bigintIndex !== -1 && !numberWinsBeforeBigInt) {
-          for (const branch of branches) {
-            if ('type' in branch && branch.type === 'number') {
-              const record = branch as unknown as Record<string, unknown>;
-              record['minimum'] ??= Number.MIN_SAFE_INTEGER;
-              record['maximum'] ??= Number.MAX_SAFE_INTEGER;
-            }
-          }
-        }
 
         return branches.length > 0 ? { anyOf: branches } : undefined;
       }
@@ -518,6 +593,15 @@ const selectParser = (
       return parseCatchDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodPipeline: {
+      if (refs.openaiStrictMode && convertsJSONPipelineInput(def.in._def)) {
+        const outputRefs: PreprocessedRefs = {
+          ...refs,
+          [jsonInputPreprocessor]: true,
+        };
+
+        return parsePipelineDef(def, refs, forceResolution, outputRefs);
+      }
+
       return parsePipelineDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodFunction:

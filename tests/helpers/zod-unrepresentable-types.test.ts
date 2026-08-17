@@ -111,6 +111,58 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
       expect(() => JSON.stringify(result)).not.toThrow();
     },
   );
+  it.each([
+    {
+      name: 'ZodDate',
+      schema: () =>
+        z3
+          .string()
+          .transform((value) => new Date(value))
+          .pipe(z3.date()),
+      input: '2026-08-17T00:00:00.000Z',
+      expected: (): Date => new Date('2026-08-17T00:00:00.000Z'),
+    },
+    {
+      name: 'ZodBigInt',
+      schema: () => z3.number().transform(BigInt).pipe(z3.bigint()),
+      input: 7,
+      expected: (): bigint => 7n,
+    },
+    {
+      name: 'ZodSet',
+      schema: () =>
+        z3
+          .array(z3.string())
+          .transform((value) => new Set(value))
+          .pipe(z3.set(z3.string())),
+      input: ['value'],
+      expected: (): Set<string> => new Set(['value']),
+    },
+    {
+      name: 'ZodMap',
+      schema: () =>
+        z3
+          .array(z3.tuple([z3.string(), z3.number()]))
+          .transform((value) => new Map(value))
+          .pipe(z3.map(z3.string(), z3.number())),
+      input: [['value', 7]],
+      expected: (): Map<string, number> => new Map([['value', 7]]),
+    },
+  ])('preserves pipeline transforms that construct $name values', ({ schema, input, expected }) => {
+    const result = create(z3.object({ value: schema() }));
+
+    expect(result.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: expected() });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it('does not treat a refinement-only pipeline as native-value conversion', () => {
+    const value = z3
+      .string()
+      .refine((input) => input.length > 0)
+      .pipe(z3.date());
+
+    expect(() => create(z3.object({ value }))).toThrow('ZodDate');
+  });
 
   it.each([
     { name: 'nullable BigInt', schema: () => z3.bigint().nullable() },
@@ -140,6 +192,31 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
       first: new Date('2026-08-17T00:00:00.000Z'),
       second: new Date('2026-08-18T00:00:00.000Z'),
     });
+  });
+
+  it('preserves preprocessing context for shared native-value containers', () => {
+    const shared = z3.object({ when: z3.date() });
+    const convert = (value: unknown) => {
+      if (typeof value !== 'object' || value === null) {
+        return value;
+      }
+
+      const input = value as { when?: unknown };
+      return { ...input, when: preprocessDateValue(input.when) };
+    };
+    const first = z3.preprocess(convert, shared);
+    const second = z3.preprocess(convert, shared);
+    const result = create(z3.object({ first, second }));
+
+    expect(
+      result.$parseRaw(
+        '{"first":{"when":"2026-08-17T00:00:00.000Z"},"second":{"when":"2026-08-18T00:00:00.000Z"}}',
+      ),
+    ).toEqual({
+      first: { when: new Date('2026-08-17T00:00:00.000Z') },
+      second: { when: new Date('2026-08-18T00:00:00.000Z') },
+    });
+    expect(() => create(z3.object({ converted: first, raw: shared }))).toThrow('ZodDate');
   });
 
   it('normalizes JSON-compatible preprocessed BigInt literals', () => {
@@ -229,6 +306,45 @@ describe('Zod v3 BigInt coercion JSON Schema serialization', () => {
       },
     });
     expect(() => JSON.stringify(format.json_schema.schema)).not.toThrow();
+  });
+  it('bounds shared and wrapped number branches without changing their other uses', () => {
+    const number = z3.number();
+    const narrower = z3.number().min(-2).max(2);
+    const schema = z3.object({
+      unrestricted: number,
+      reference: z3.union([z3.coerce.bigint(), number]),
+      nullable: z3.union([z3.coerce.bigint(), number.nullable()]),
+      defaulted: z3.union([z3.coerce.bigint(), number.default(1)]).default(1),
+      branded: z3.union([z3.coerce.bigint(), number.brand<'counter'>()]),
+      narrower: z3.union([z3.coerce.bigint(), narrower]),
+    });
+    const format = zodResponseFormat(schema, 'strict');
+    const safeInteger = {
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    };
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: {
+        unrestricted: { type: 'number' },
+        reference: { anyOf: [{ type: 'integer' }, { type: 'number', ...safeInteger }] },
+        nullable: {
+          anyOf: [{ type: 'integer' }, { type: 'number', nullable: true, ...safeInteger }],
+        },
+        defaulted: { anyOf: [{ type: 'integer' }, { type: 'number', default: 1, ...safeInteger }] },
+        branded: { anyOf: [{ type: 'integer' }, { type: 'number', ...safeInteger }] },
+        narrower: { anyOf: [{ type: 'integer' }, { type: 'number', minimum: -2, maximum: 2 }] },
+      },
+    });
+    const { unrestricted } = (format.json_schema.schema as { properties: Record<string, unknown> })
+      .properties;
+    expect(unrestricted).not.toHaveProperty('minimum');
+    expect(unrestricted).not.toHaveProperty('maximum');
+    expect(
+      format.$parseRaw(
+        '{"unrestricted":9007199254740992,"reference":7,"nullable":null,"defaulted":8,"branded":9,"narrower":1}',
+      ),
+    ).toMatchObject({ unrestricted: 9_007_199_254_740_992, nullable: null });
   });
 
   it('serializes safe constraints and defaults as JSON numbers', () => {
