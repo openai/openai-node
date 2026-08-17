@@ -408,6 +408,7 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaFileSearchTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaFunctionShellTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaFunctionTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaImageDetail</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaInlineSkill</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaInlineSkillSource</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaLocalEnvironment</a></code>
@@ -535,6 +536,7 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseWebSearchCallSearchingEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponsesClientEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponsesServerEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaServiceTier</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaSkillReference</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceAllowed</a></code>
