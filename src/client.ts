@@ -1651,7 +1651,7 @@ export class OpenAI {
         maxRetries: options.maxRetries ?? this.maxRetries,
         selectedAuthorization: undefined,
         terminalAuthenticationError: undefined,
-        transportKey: x509TransportKey(fetchOptions),
+        transportKey: this._usesX509WorkloadIdentity ? x509TransportKey(fetchOptions) : undefined,
         workloadIdentityAuthenticationAttempted: false,
         workloadIdentityAuthorization: undefined,
         workloadIdentityTokenSuppressed: false,

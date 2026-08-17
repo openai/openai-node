@@ -195,8 +195,8 @@ import OpenAI from 'openai';
 
 const dispatcher = new Agent({
   connect: {
-    cert: await readFile('/path/to/client-chain.pem'),
-    key: await readFile('/path/to/client-key.pem'),
+    cert: await readFile('/path/to/client-chain.pem', 'utf8'),
+    key: await readFile('/path/to/client-key.pem', 'utf8'),
   },
 });
 
@@ -215,9 +215,11 @@ const client = new OpenAI({
 
 X.509 mode exchanges lazily through the pinned mTLS authentication endpoint and defaults API requests to `https://mtls.api.openai.com/v1` when `baseURL` and `OPENAI_BASE_URL` are unset. Both legs use the client-level `fetch` and `fetchOptions`, and redirects are refused. Because the cached identity is scoped to that transport, per-request `fetchOptions` are not supported in X.509 mode. Browser, Deno, and certificate-opaque edge runtimes are unsupported even with `dangerouslyAllowBrowser`. HTTP APIs are supported; Realtime/WebSockets are not yet supported with X.509 workload identity.
 
+The certificate-bearing transport must expose one static, verifiable certificate identity for both the token and API origins. With Undici, use an `Agent` with static `connect` TLS options and its default origin factory, or a `ProxyAgent` with static `requestTls`; dynamic connectors, custom origin factories, and opaque executable dispatchers are rejected. Supply PEM certificate, key, and CA values as immutable strings. Mutable arrays, `Buffer`s, typed arrays, PFX containers, and opaque `SecureContext` objects are not supported in X.509 mode because their contents can change without changing transport identity. A custom `fetch` implementation is trusted application transport code and must honor the protected `RequestInit` transport and redirect options; use the documented native Undici or Bun path when that cannot be guaranteed.
+
 X.509 authentication remains SDK-owned: subclasses may customize non-authentication request and fetch hooks, but must not override the protected `authHeaders` or `bearerAuth` methods. The SDK rejects that unsupported composition before exchanging or sending credentials.
 
-When using an Undici `ProxyAgent` with an HTTPS proxy, configure the client certificate and private key only in `requestTls`. Keep `proxyTls` separate so workload credentials are never presented during the TLS connection to the proxy.
+When using an Undici `ProxyAgent` with an HTTPS proxy, configure the client certificate and private key only in `requestTls`. Keep `proxyTls` separate so workload credentials are never presented during the TLS connection to the proxy. Bun X.509 requests support HTTP CONNECT proxies, but reject HTTPS proxies (including inherited `HTTPS_PROXY`/`ALL_PROXY`) because Bun cannot isolate destination client-certificate TLS from proxy TLS.
 
 See the [X.509 workload identity guide](https://developers.openai.com/api/docs/guides/workload-identity-federation/x509) and the runnable [`OPENAI_AUTH_MODE` Node.js toggle example](./examples/mtls/x509-wif-node.mjs). Close or replace application-owned transports when rotating certificates.
 

@@ -16,8 +16,8 @@ const dispatcher =
   authMode === 'x509'
     ? new Agent({
         connect: {
-          cert: await readFile(requiredEnv('OPENAI_MTLS_CERTIFICATE_CHAIN')),
-          key: await readFile(requiredEnv('OPENAI_MTLS_PRIVATE_KEY')),
+          cert: await readFile(requiredEnv('OPENAI_MTLS_CERTIFICATE_CHAIN'), 'utf-8'),
+          key: await readFile(requiredEnv('OPENAI_MTLS_PRIVATE_KEY'), 'utf-8'),
           ...(process.env['OPENAI_MTLS_PRIVATE_KEY_PASSWORD']
             ? { passphrase: process.env['OPENAI_MTLS_PRIVATE_KEY_PASSWORD'] }
             : {}),

@@ -3,18 +3,16 @@ import type { RequestInfo, RequestInit } from '../builtin-types';
 import { castToError } from '../errors';
 import type { MergedRequestInit, WorkloadIdentityRequestContext } from '../types';
 import { hasOwn } from '../utils/values';
+import { x509TransportIdentitySources, x509TransportIdentityValues } from './x509-transport-capability';
+import type { X509TransportIdentitySource } from './x509-transport-capability';
 
 const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
 const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
-const TLS_IDENTITY_OPTION_KEYS = [
-  'ca',
-  'cert',
-  'key',
-  'passphrase',
-  'pfx',
-  'rejectUnauthorized',
-  'secureContext',
-  'servername',
+const FORBIDDEN_PROVIDER_HOST_SUFFIXES = [
+  'openai.azure.com',
+  'services.ai.azure.com',
+  'azure-api.net',
+  'cognitiveservices.azure.com',
 ] as const;
 
 interface TransportIdentityNode {
@@ -32,11 +30,15 @@ function createTransportIdentityNode(): TransportIdentityNode {
 }
 
 const transportIdentityRoot = createTransportIdentityNode();
+const TRANSPORT_OPTIONS_SOURCE = Object.freeze({});
 const undefinedTransportIdentity = Object.freeze({});
 const nullTransportIdentity = Object.freeze({});
 // Primitive values cannot be WeakMap keys. Their opaque tokens and source values live only as long as the
 // fetchOptions/TLS object that already owns them, and replacing a slot releases the prior primitive value.
-const primitiveTransportIdentities = new WeakMap<object, (PrimitiveTransportIdentitySlot | undefined)[]>();
+const primitiveTransportIdentities = new WeakMap<
+  object,
+  WeakMap<object, (PrimitiveTransportIdentitySlot | undefined)[]>
+>();
 
 function isObjectIdentity(value: unknown): value is object {
   return (typeof value === 'object' && value !== null) || typeof value === 'function';
@@ -64,8 +66,9 @@ function transportIdentityChild(node: TransportIdentityNode, value: object): Tra
   return child;
 }
 
-function transportIdentityValue(owner: object, index: number, value: unknown): object {
-  const existingSlots = primitiveTransportIdentities.get(owner);
+function transportIdentityValue(owner: object, source: object, index: number, value: unknown): object {
+  const existingSources = primitiveTransportIdentities.get(owner);
+  const existingSlots = existingSources?.get(source);
   const stableIdentity = stableTransportIdentity(value);
   if (stableIdentity) {
     if (existingSlots) {
@@ -74,10 +77,15 @@ function transportIdentityValue(owner: object, index: number, value: unknown): o
     return stableIdentity;
   }
 
-  let slots = existingSlots;
+  let sources = existingSources;
+  if (!sources) {
+    sources = new WeakMap();
+    primitiveTransportIdentities.set(owner, sources);
+  }
+  let slots = sources.get(source);
   if (!slots) {
     slots = [];
-    primitiveTransportIdentities.set(owner, slots);
+    sources.set(source, slots);
   }
   const existing = slots[index];
   if (existing && Object.is(existing.value, value)) {
@@ -92,34 +100,36 @@ function transportOption(options: MergedRequestInit, key: (typeof TRANSPORT_OPTI
   return hasOwn(options, key) ? (options as Record<string, unknown>)[key] : undefined;
 }
 
-function transportIdentityValues(options: MergedRequestInit): readonly object[] | undefined {
+function transportIdentityValues(
+  options: MergedRequestInit,
+  identitySources: readonly X509TransportIdentitySource[],
+): readonly object[] | undefined {
   const values = TRANSPORT_OPTION_KEYS.map((key) => transportOption(options, key));
   if (values.every((value) => value === undefined)) {
     primitiveTransportIdentities.delete(options);
     return undefined;
   }
 
-  const tls = transportOption(options, 'tls');
-  const tlsOptions =
-    tls !== null && (typeof tls === 'object' || typeof tls === 'function')
-      ? (tls as Record<string, unknown>)
-      : undefined;
-  const tlsOwner = isObjectIdentity(tls) ? tls : options;
   return [
-    ...values.map((value, index) => transportIdentityValue(options, index, value)),
-    ...TLS_IDENTITY_OPTION_KEYS.map((key, index) =>
-      transportIdentityValue(tlsOwner, TRANSPORT_OPTION_KEYS.length + index, tlsOptions?.[key]),
-    ),
+    ...values.map((value, index) => transportIdentityValue(options, TRANSPORT_OPTIONS_SOURCE, index, value)),
+    ...identitySources.flatMap((source) => [
+      source.key,
+      source.owner,
+      ...x509TransportIdentityValues(source).map((value, index) =>
+        transportIdentityValue(source.owner, source.key, index, value),
+      ),
+    ]),
   ];
 }
 
 /** Returns the opaque runtime transport identity used to scope X.509 refresh state. */
 export function x509TransportKey(fetchOptions: MergedRequestInit | undefined): object | undefined {
+  const identitySources = x509TransportIdentitySources(fetchOptions);
   if (!fetchOptions) {
     return undefined;
   }
 
-  const values = transportIdentityValues(fetchOptions);
+  const values = transportIdentityValues(fetchOptions, identitySources);
   if (!values) {
     return undefined;
   }
@@ -206,6 +216,18 @@ export function x509APIOrigin(value: RequestInfo): string {
   }
   if (url.username || url.password) {
     throw new OpenAIError('X.509 workload identity API URLs must not contain user credentials.');
+  }
+  const hostname = url.hostname.toLowerCase().replace(/\.+$/u, '');
+  const isAzureOrigin = FORBIDDEN_PROVIDER_HOST_SUFFIXES.some(
+    (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
+  );
+  const isBedrockOrigin =
+    /^bedrock-mantle\.[a-z0-9-]+\.api\.aws$/u.test(hostname) ||
+    /^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com(?:\.cn)?$/u.test(hostname);
+  if (isAzureOrigin || isBedrockOrigin) {
+    throw new OpenAIError(
+      'X.509 workload identity cannot send OpenAI credentials to a recognized third-party provider origin.',
+    );
   }
   return url.origin;
 }
