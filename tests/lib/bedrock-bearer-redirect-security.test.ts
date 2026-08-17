@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import type { IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'node:http';
 import { vi } from 'vitest';
 
-import OpenAI, { APIError } from 'openai';
+import OpenAI, { APIError, BedrockOpenAI } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { configureProvider } from 'openai/internal/provider';
 import type { Provider } from 'openai/internal/provider';
@@ -48,6 +48,9 @@ const providerCases: ProviderCase[] = providerFactories.flatMap(({ entrypoint, c
 );
 const redirectCases = providerCases.flatMap((provider) =>
   [302, 307, 308].map((status) => ({ ...provider, status })),
+);
+const legacyRedirectCases = authentications.flatMap((authentication) =>
+  [302, 307, 308].map((status) => ({ authentication, status })),
 );
 const sensitiveHeaders = {
   'api-key': 'gateway-primary-secret',
@@ -168,6 +171,137 @@ describe('Bedrock bearer redirect security', () => {
       }
     },
   );
+
+  test.each(legacyRedirectCases)(
+    'contains legacy BedrockOpenAI $authentication credentials and POST bodies on HTTP $status',
+    async ({ authentication, status }) => {
+      const originRequests: CapturedRequest[] = [];
+      const attackerRequests: CapturedRequest[] = [];
+      let attackerURL = '';
+
+      const attacker = createServer((request, response) => {
+        captureRequest(request, response, attackerRequests, (capturedResponse) => {
+          capturedResponse.writeHead(200, { 'content-type': 'application/json' });
+          capturedResponse.end(JSON.stringify({ id: 'attacker', object: 'chat.completion', choices: [] }));
+        });
+      });
+      const origin = createServer((request, response) => {
+        captureRequest(request, response, originRequests, (capturedResponse) => {
+          capturedResponse.writeHead(status, { location: attackerURL });
+          capturedResponse.end();
+        });
+      });
+
+      try {
+        await Promise.all([
+          once(attacker.listen(0, '127.0.0.1'), 'listening'),
+          once(origin.listen(0, '127.0.0.1'), 'listening'),
+        ]);
+        attackerURL = `${serverURL(attacker)}/capture`;
+
+        const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
+        const client = new BedrockOpenAI({
+          baseURL: `${serverURL(origin)}/openai/v1`,
+          ...(authentication === 'static' ? { apiKey: 'static-bedrock-secret' } : { bedrockTokenProvider }),
+          defaultHeaders: sensitiveHeaders,
+          fetchOptions: { redirect: 'follow' },
+          maxRetries: 0,
+        });
+        const outcome = await client.chat.completions
+          .create(
+            {
+              model: 'us.openai.gpt-5.6-sol',
+              messages: [{ role: 'user', content: confidentialPrompt }],
+            },
+            { fetchOptions: { redirect: 'follow' } },
+          )
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+
+        expect(originRequests).toHaveLength(1);
+        expect(originRequests[0]?.headers).toMatchObject({
+          ...sensitiveHeaders,
+          authorization: `Bearer ${authentication}-bedrock-secret`,
+        });
+        expect(originRequests[0]?.body).toContain(confidentialPrompt);
+        expect(attackerRequests).toEqual([]);
+        expect(outcome).toBeInstanceOf(APIError);
+        expect(outcome).toMatchObject({ status });
+        expect(bedrockTokenProvider).toHaveBeenCalledTimes(authentication === 'rotating' ? 1 : 0);
+      } finally {
+        await closeServers([origin, attacker]);
+      }
+    },
+  );
+
+  test.each(authentications)(
+    'preserves successful legacy BedrockOpenAI requests using %s authentication',
+    async (authentication) => {
+      const bedrockTokenProvider = vi.fn(async () => 'rotating-bedrock-secret');
+      const fetch = vi.fn(async (_url: RequestInfo, init?: RequestInit) => {
+        expect(init?.redirect).toBe('manual');
+        expect(Object.fromEntries(new Headers(init?.headers))).toMatchObject({
+          ...sensitiveHeaders,
+          authorization: `Bearer ${authentication}-bedrock-secret`,
+        });
+        return Response.json({ ok: true });
+      });
+      const client = new BedrockOpenAI({
+        baseURL: 'https://bedrock.example.com/openai/v1',
+        ...(authentication === 'static' ? { apiKey: 'static-bedrock-secret' } : { bedrockTokenProvider }),
+        defaultHeaders: sensitiveHeaders,
+        fetch,
+        fetchOptions: { redirect: 'follow' },
+        maxRetries: 0,
+      });
+
+      await client.request({ method: 'get', path: '/models', fetchOptions: { redirect: 'follow' } });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(authentication === 'rotating' ? 1 : 0);
+    },
+  );
+
+  test.each([
+    {
+      scenario: 'an empty legacy bearer credential',
+      bedrockTokenProvider: async () => '',
+    },
+    {
+      scenario: 'a rejected legacy bearer credential',
+      bedrockTokenProvider: async () => {
+        throw new Error('credential provider failed');
+      },
+    },
+    {
+      scenario: 'an invalid legacy bearer header value',
+      bedrockTokenProvider: async () => 'unsafe\ncredential',
+    },
+  ])('leaves legacy caller request state unchanged for $scenario', async ({ bedrockTokenProvider }) => {
+    const headers = new Headers(sensitiveHeaders);
+    const initialHeaders = [...headers.entries()];
+    const request = {
+      method: 'get' as const,
+      path: '/models',
+      headers,
+      fetchOptions: { redirect: 'follow' as const },
+    };
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new BedrockOpenAI({
+      baseURL: 'https://bedrock.example.com/openai/v1',
+      bedrockTokenProvider,
+      fetch,
+      fetchOptions: { redirect: 'follow' },
+      maxRetries: 0,
+    });
+
+    await expect(client.request(request)).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(request.fetchOptions.redirect).toBe('follow');
+    expect([...headers.entries()]).toEqual(initialHeaders);
+  });
 
   test.each(providerCases)(
     'preserves $entrypoint $endpoint $authentication headers for successful requests',

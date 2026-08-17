@@ -203,6 +203,7 @@ export class BedrockOpenAI extends OpenAI {
   ): Promise<void> {
     assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, context.url);
     await super.prepareRequest(request, context);
+    request.redirect = 'manual';
   }
 
   protected override async authHeaders(
