@@ -42,6 +42,41 @@ Most of the SDK is generated code. Modifications to code will be persisted betwe
 result in merge conflicts between manual patches and changes from the generator. The generator will never
 modify the contents of the `src/lib/` and `examples/` directories.
 
+## Security requirements
+
+### Credentials, examples, and diagnostics
+
+- Never commit API keys, npm tokens, private keys, `.env` files, customer content, or other live credentials.
+  Read `OPENAI_API_KEY` from the environment and use synthetic values in examples, fixtures, mocks,
+  recordings, and snapshots.
+- Never include secret API keys in browser bundles. Enabling `dangerouslyAllowBrowser` requires explicit
+  security review; examples must not suggest exposing server-side credentials to browsers.
+- Redact authentication headers, cookies, webhook secrets, and sensitive request or response data from
+  logs, errors, test output, snapshots, and CI artifacts.
+
+### Dependencies and release automation
+
+- Review direct and transitive dependency updates, `pnpm-lock.yaml`, package provenance, and install or
+  build lifecycle scripts, including dependencies used by examples and ecosystem fixtures.
+- Use `pnpm install --frozen-lockfile` for reproducible installs. Do not weaken `pnpm-workspace.yaml`
+  safeguards such as `minimumReleaseAge`, `minimumReleaseAgeStrict`, `trustPolicy`, `blockExoticSubdeps`,
+  `strictDepBuilds`, `trustLockfile`, or the `allowBuilds` allowlist without explicit security review.
+- Pin third-party GitHub Actions to full, immutable commit SHAs and review action updates. Keep workflow
+  permissions minimal; grant `id-token: write`, GitHub App access, and npm publishing privileges only to
+  trusted jobs that require them.
+- Never expose `NPM_TOKEN`, GitHub App private keys, OIDC credentials, or other release secrets to untrusted
+  code, unreviewed lifecycle scripts, logs, artifacts, or public package contents.
+
+### Security-sensitive changes
+
+Require focused review and relevant regression or security tests for changes affecting authentication,
+API-key forwarding, custom `fetch`, `baseURL`, redirects, headers, browser credential handling, uploads or
+filesystem paths, webhook signature verification, parsing or serialization, and release or publishing flows.
+Exercise malformed or hostile input where relevant, including prototype-pollution and credential-leak cases.
+
+Report suspected vulnerabilities privately through [`SECURITY.md`](SECURITY.md). Do not disclose
+vulnerability details in public GitHub issues or pull requests.
+
 ## Adding and running examples
 
 All files in the `examples/` directory are not modified by the generator and can be freely edited or added to.
@@ -203,9 +238,13 @@ Release Please will then regenerate the release PR files and title with that ver
 
 ### Publish with a GitHub workflow
 
-You can release to package managers by using [the `Publish NPM` GitHub action](https://www.github.com/openai/openai-node/actions/workflows/publish-npm.yml). This requires a setup organization or repository secret to be set up.
+You can release to package managers by using [the `Publish NPM` GitHub action](https://www.github.com/openai/openai-node/actions/workflows/publish-npm.yml).
+Use its `publish` environment and job-scoped OIDC credentials, and publish only a reviewed commit. Prefer
+this trusted-publishing flow over introducing long-lived registry secrets.
 
 ### Publish manually
 
-If you need to manually release a package, you can run the `bin/publish-npm` script with an `NPM_TOKEN` set on
-the environment.
+If a manual recovery release is necessary, run `bin/publish-npm` with `NPM_TOKEN` supplied through approved
+secret storage. Publish only a reviewed commit and use a narrowly scoped, short-lived token. Never log the
+token, place it in shell history, or commit registry configuration; remove any credential-bearing npm
+configuration created during publication afterward.
