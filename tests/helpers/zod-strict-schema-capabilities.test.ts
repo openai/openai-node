@@ -309,6 +309,54 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(() => JSON.stringify(format)).not.toThrow();
   });
 
+  it('revalidates shared native default objects against every schema use site', () => {
+    const shared = { count: 4n };
+    const incompatible = z3
+      .object({
+        typed: z3.object({ count: z3.coerce.bigint() }),
+        raw: z3.any(),
+      })
+      .default({ typed: shared, raw: shared });
+    expect(() => formatFor(incompatible)).toThrow('ZodBigInt');
+
+    const compatible = z3
+      .object({
+        first: z3.object({ count: z3.coerce.bigint() }),
+        second: z3.object({ count: z3.coerce.bigint() }),
+      })
+      .default({ first: shared, second: shared });
+    const format = formatFor(compatible);
+    const value = (
+      format.json_schema.schema as {
+        properties: { value: { default: { first: object; second: object } } };
+      }
+    ).properties.value.default;
+    expect(value.first).toEqual({ count: 4 });
+    expect(value.first).toBe(value.second);
+    expect(format.$parseRaw('{}')).toEqual({ value: { first: { count: 4n }, second: { count: 4n } } });
+  });
+
+  it.each([
+    {
+      name: 'self-referencing',
+      create: () => {
+        const proxy: object = new Proxy({}, { getPrototypeOf: () => proxy });
+        return proxy;
+      },
+    },
+    {
+      name: 'unbounded',
+      create: () => {
+        const handler: ProxyHandler<object> = {
+          getPrototypeOf: () => new Proxy({}, handler),
+        };
+        return new Proxy({}, handler);
+      },
+    },
+  ])('rejects a hostile $name Proxy prototype chain without hanging', ({ create }) => {
+    expect(() => formatFor(z3.any().default(create()))).toThrow('prototype chain');
+  });
+
   it.each([
     { name: 'tuple', schema: () => z3.tuple([z3.number()]), message: 'tuple-form' },
     { name: 'record', schema: () => z3.record(z3.number()), message: 'additionalProperties: false' },
@@ -952,6 +1000,12 @@ describe('Zod v3 strict schema capability analysis', () => {
 });
 
 describe.each(strictHelpers)('$name strict numeric input capability analysis', ({ create }) => {
+  it.each([0n, -2n])('rejects an invalid BigInt multiple %s before emitting JSON Schema', (multiple) => {
+    expect(() => create(z3.object({ value: z3.coerce.bigint().multipleOf(multiple) }))).toThrow(
+      'strictly positive',
+    );
+  });
+
   it.each([
     { name: 'direct BigInt', schema: () => z3.number().int().transform(BigInt) },
     { name: 'unrestricted BigInt', schema: () => z3.number().transform(BigInt) },

@@ -376,6 +376,11 @@ const throwUnrepresentableStrictZodType = (typeName: ZodFirstPartyTypeKind, refs
 };
 
 const normalizeStrictBigIntValue = (value: bigint, keyword: string, refs: Refs): number => {
+  if (keyword === 'multipleOf' && value <= 0n) {
+    throw new RangeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` uses \`ZodBigInt\` and requires a strictly positive \`multipleOf\` value for JSON Structured Outputs.`,
+    );
+  }
   const normalized = Number(value);
 
   if (!Number.isSafeInteger(normalized)) {
@@ -387,10 +392,28 @@ const normalizeStrictBigIntValue = (value: bigint, keyword: string, refs: Refs):
   return normalized;
 };
 
+const strictDefaultPrototypeChain = (value: object, keyword: string, refs: Refs): object[] => {
+  const prototypes: object[] = [];
+  const visited = new WeakSet<object>([value]);
+  let prototype: object | null = Object.getPrototypeOf(value) as object | null;
+  while (prototype) {
+    if (visited.has(prototype) || prototypes.length >= 128) {
+      throw new TypeError(
+        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the cyclic or excessive \`${keyword}\` prototype chain in JSON Structured Outputs.`,
+      );
+    }
+    visited.add(prototype);
+    prototypes.push(prototype);
+    prototype = Object.getPrototypeOf(prototype) as object | null;
+  }
+  return prototypes;
+};
+
 const strictDefaultDescriptors = (
   value: object,
   keyword: string,
   refs: Refs,
+  prototypes: readonly object[],
 ): [string, PropertyDescriptor][] => {
   const descriptors = Object.entries(Object.getOwnPropertyDescriptors(value));
   for (const [key, descriptor] of descriptors) {
@@ -406,15 +429,13 @@ const strictDefaultDescriptors = (
     }
   }
 
-  let prototype: object | null = Object.getPrototypeOf(value) as object | null;
-  while (prototype) {
+  for (const prototype of prototypes) {
     const serializer = Object.getOwnPropertyDescriptor(prototype, 'toJSON');
     if (serializer && (serializer.get || serializer.set || typeof serializer.value === 'function')) {
       throw new TypeError(
         `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent an inherited \`${keyword}.toJSON\` serializer in JSON Structured Outputs.`,
       );
     }
-    prototype = Object.getPrototypeOf(prototype) as object | null;
   }
   return descriptors;
 };
@@ -456,6 +477,7 @@ const normalizeStrictDefaultValue = (
   if (!value || typeof value !== 'object') {
     return value;
   }
+  const prototypes = strictDefaultPrototypeChain(value, keyword, refs);
   if (value instanceof Set || value instanceof Map) {
     const typeName = value instanceof Set ? ZodFirstPartyTypeKind.ZodSet : ZodFirstPartyTypeKind.ZodMap;
     throwUnrepresentableStrictZodType(typeName, refs);
@@ -468,6 +490,16 @@ const normalizeStrictDefaultValue = (
   }
   const previous = seen.get(value);
   if (previous !== undefined) {
+    normalizeStrictDefaultValue(
+      value,
+      definition,
+      refs,
+      keyword,
+      new WeakMap<object, unknown>(),
+      path,
+      rootValue,
+      active,
+    );
     return previous;
   }
 
@@ -485,7 +517,7 @@ const normalizeStrictDefaultValue = (
       return value;
     }
 
-    const descriptors = strictDefaultDescriptors(value, keyword, refs);
+    const descriptors = strictDefaultDescriptors(value, keyword, refs, prototypes);
     if (Array.isArray(value)) {
       const normalized: unknown[] = [];
       seen.set(value, normalized);
@@ -513,7 +545,7 @@ const normalizeStrictDefaultValue = (
       return normalized;
     }
 
-    const prototype: unknown = Object.getPrototypeOf(value);
+    const prototype: unknown = prototypes[0] ?? null;
     const plainPrototype = prototype === null ? null : Object.prototype;
     const normalized = Object.create(plainPrototype) as Record<string, unknown>;
     seen.set(value, normalized);
