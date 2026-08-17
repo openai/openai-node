@@ -107,8 +107,13 @@ export type JsonSchema7Type = JsonSchema7TypeUnion & JsonSchema7Meta;
 
 const jsonInputPreprocessor = Symbol('openaiJsonInputPreprocessor');
 const constrainedReferenceContext = Symbol('openaiConstrainedReferenceContext');
+const expectedPipelineOutput = Symbol('openaiExpectedPipelineOutput');
 
-type PreprocessedRefs = Refs & { [jsonInputPreprocessor]?: true; [constrainedReferenceContext]?: true };
+type PreprocessedRefs = Refs & {
+  [jsonInputPreprocessor]?: true;
+  [constrainedReferenceContext]?: true;
+  [expectedPipelineOutput]?: ZodTypeDef;
+};
 
 const hasJSONInputPreprocessor = (refs: Refs): boolean =>
   (refs as PreprocessedRefs)[jsonInputPreprocessor] === true;
@@ -468,10 +473,7 @@ const normalizeStrictDefaultValue = (
 
 const isNumericSchemaType = (type: unknown) => type === 'number' || type === 'integer';
 
-const mergeStrictScalarSchemas = (
-  left: JsonSchema7Type,
-  right: JsonSchema7Type,
-): JsonSchema7Type | undefined => {
+const mergeStrictSchemas = (left: JsonSchema7Type, right: JsonSchema7Type): JsonSchema7Type | undefined => {
   const first = left as Record<string, unknown>;
   const second = right as Record<string, unknown>;
   if (
@@ -487,10 +489,47 @@ const mergeStrictScalarSchemas = (
   for (const [keyword, value] of Object.entries(second)) {
     if (value === undefined || merged[keyword] === undefined || Object.is(merged[keyword], value)) {
       merged[keyword] = value;
-    } else if (keyword === 'minimum' || keyword === 'exclusiveMinimum' || keyword === 'minLength') {
+    } else if (
+      keyword === 'minimum' ||
+      keyword === 'exclusiveMinimum' ||
+      keyword === 'minLength' ||
+      keyword === 'minItems'
+    ) {
       merged[keyword] = Math.max(merged[keyword] as number, value as number);
-    } else if (keyword === 'maximum' || keyword === 'exclusiveMaximum' || keyword === 'maxLength') {
+    } else if (
+      keyword === 'maximum' ||
+      keyword === 'exclusiveMaximum' ||
+      keyword === 'maxLength' ||
+      keyword === 'maxItems'
+    ) {
       merged[keyword] = Math.min(merged[keyword] as number, value as number);
+    } else if (keyword === 'properties' && value && typeof value === 'object') {
+      const original = merged[keyword] as Record<string, JsonSchema7Type>;
+      const properties = value as Record<string, JsonSchema7Type>;
+      if (Object.keys(original).length !== Object.keys(properties).length) {
+        return undefined;
+      }
+      const combined: Record<string, JsonSchema7Type> = {};
+      for (const [name, property] of Object.entries(properties)) {
+        const existing = original[name];
+        if (!hasOwn(original, name) || !existing) {
+          return undefined;
+        }
+        const nested = mergeStrictSchemas(existing, property);
+        if (!nested) {
+          return undefined;
+        }
+        combined[name] = nested;
+      }
+      merged[keyword] = combined;
+    } else if (keyword === 'items' && value && typeof value === 'object' && !Array.isArray(value)) {
+      const nested = mergeStrictSchemas(merged[keyword] as JsonSchema7Type, value as JsonSchema7Type);
+      if (!nested) {
+        return undefined;
+      }
+      merged[keyword] = nested;
+    } else if (keyword === 'required' && Array.isArray(merged[keyword]) && Array.isArray(value)) {
+      merged[keyword] = [...new Set([...(merged[keyword] as string[]), ...(value as string[])])];
     } else if (keyword === 'type' && isNumericSchemaType(merged[keyword]) && isNumericSchemaType(value)) {
       merged[keyword] = 'integer';
     } else {
@@ -666,7 +705,7 @@ const selectParser = (
         if (!merged) {
           break;
         }
-        merged = mergeStrictScalarSchemas(merged, next);
+        merged = mergeStrictSchemas(merged, next);
       }
       return merged ?? schema;
     }
@@ -726,6 +765,9 @@ const selectParser = (
       return parseDef(def.getter()._def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodPromise: {
+      if (refs.openaiStrictMode && !refs.currentPath.includes('anyOf')) {
+        throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodPromise, refs);
+      }
       return parsePromiseDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodNaN:
@@ -742,11 +784,28 @@ const selectParser = (
         return parseEffectsDef(def, preprocessedRefs, forceResolution);
       }
 
-      const boundNumericTransform =
+      const numericTransform =
         refs.openaiStrictMode === true &&
         def.effect?.type === 'transform' &&
         acceptsJSONNumber(def.schema._def);
-      const schema = parseEffectsDef(def, refs, forceResolution || boundNumericTransform);
+      const expectedOutput = (refs as PreprocessedRefs)[expectedPipelineOutput];
+      const transform = def.effect?.transform as unknown;
+      const boundNumericTransform =
+        numericTransform &&
+        (transform === BigInt || (expectedOutput && producesBigIntOutput(expectedOutput)));
+      if (
+        numericTransform &&
+        !expectedOutput &&
+        !boundNumericTransform &&
+        transform !== String &&
+        transform !== Number &&
+        transform !== Boolean
+      ) {
+        throw new Error(
+          `ZodEffects numeric transform at \`${refs.currentPath.join('/')}\` has no inspectable output type for strict Structured Outputs.`,
+        );
+      }
+      const schema = parseEffectsDef(def, refs, forceResolution || boundNumericTransform === true);
       return boundNumericTransform && schema !== undefined ? applySafeIntegerBounds(schema) : schema;
     }
     case ZodFirstPartyTypeKind.ZodAny: {
@@ -784,14 +843,44 @@ const selectParser = (
         const outputRefs: PreprocessedRefs = convertsJSONPipelineInput(def.in._def, def.out._def)
           ? { ...refs, [jsonInputPreprocessor]: true as const }
           : refs;
-        const output = parseDef(def.out._def, {
+        const outputPathRefs: PreprocessedRefs = {
           ...outputRefs,
           currentPath: [...refs.currentPath, 'output'],
-        });
-        const input = parsePipelineDef(def, refs, forceResolution, outputRefs);
-        return input && output && outputRefs === refs
-          ? (mergeStrictScalarSchemas(input, output) ?? input)
-          : input;
+        };
+        let output = parseDef(def.out._def, outputPathRefs);
+        if (output && '$ref' in output) {
+          output = parseDef(def.out._def, outputPathRefs, true);
+        }
+        const inputRefs: PreprocessedRefs =
+          outputRefs === refs ? refs : { ...refs, [expectedPipelineOutput]: def.out._def };
+        const input = parsePipelineDef(def, inputRefs, forceResolution, outputRefs);
+        if (!input || !output) {
+          return input;
+        }
+
+        const combined = mergeStrictSchemas(input, output);
+        if (combined) {
+          return combined;
+        }
+
+        if (outputRefs !== refs) {
+          const outputDef = def.out._def as ZodTypeDef & {
+            typeName: ZodFirstPartyTypeKind;
+            checks?: unknown[];
+          };
+          const structurallyConstrained =
+            outputDef.typeName === ZodFirstPartyTypeKind.ZodLiteral ||
+            outputDef.typeName === ZodFirstPartyTypeKind.ZodObject ||
+            outputDef.typeName === ZodFirstPartyTypeKind.ZodArray ||
+            (outputDef.checks?.length ?? 0) > 0;
+          if (!structurallyConstrained) {
+            return input;
+          }
+        }
+
+        throw new Error(
+          `ZodPipeline output constraints at \`${refs.currentPath.join('/')}\` cannot be represented in strict Structured Outputs.`,
+        );
       }
 
       return parsePipelineDef(def, refs, forceResolution);

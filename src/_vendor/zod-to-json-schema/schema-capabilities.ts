@@ -598,9 +598,11 @@ const collectNestedNumericOverlaps = (
   path: readonly NumericPathSegment[],
   overlaps: NestedNumericOverlap[],
   active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  traversal: { recursive: boolean; lazyTargets: WeakMap<ZodTypeDef, SchemaType> },
 ): void => {
   let activeConsumers = active.get(producer);
   if (activeConsumers?.has(consumer)) {
+    traversal.recursive = true;
     return;
   }
   if (!activeConsumers) {
@@ -617,6 +619,22 @@ const collectNestedNumericOverlaps = (
 
     const left = producer as InspectableDefinition;
     const right = consumer as InspectableDefinition;
+    if (left.typeName === ZodFirstPartyTypeKind.ZodLazy || right.typeName === ZodFirstPartyTypeKind.ZodLazy) {
+      const unwrap = (definition: InspectableDefinition): ZodTypeDef => {
+        if (definition.typeName !== ZodFirstPartyTypeKind.ZodLazy) {
+          return definition;
+        }
+        let target = traversal.lazyTargets.get(definition);
+        if (!target) {
+          target = definition.getter();
+          traversal.lazyTargets.set(definition, target);
+        }
+        return target._def;
+      };
+      collectNestedNumericOverlaps(unwrap(left), unwrap(right), path, overlaps, active, traversal);
+      return;
+    }
+
     const containers = pairedContainerChildren(left, right);
     if (containers.length > 0) {
       for (const child of containers) {
@@ -626,16 +644,17 @@ const collectNestedNumericOverlaps = (
           [...path, child.segment],
           overlaps,
           active,
+          traversal,
         );
       }
       return;
     }
 
     for (const child of childDefinitions(left, 'output')?.values ?? []) {
-      collectNestedNumericOverlaps(child._def, consumer, path, overlaps, active);
+      collectNestedNumericOverlaps(child._def, consumer, path, overlaps, active, traversal);
     }
     for (const child of childDefinitions(right, 'input')?.values ?? []) {
-      collectNestedNumericOverlaps(producer, child._def, path, overlaps, active);
+      collectNestedNumericOverlaps(producer, child._def, path, overlaps, active, traversal);
     }
   } finally {
     activeConsumers.delete(consumer);
@@ -650,7 +669,21 @@ export const findNestedNumericOverlaps = (
   consumer: ZodTypeDef,
 ): NestedNumericOverlap[] => {
   const overlaps: NestedNumericOverlap[] = [];
-  collectNestedNumericOverlaps(producer, consumer, [], overlaps, new Map());
+  const traversal = { recursive: false, lazyTargets: new WeakMap<ZodTypeDef, SchemaType>() };
+  collectNestedNumericOverlaps(producer, consumer, [], overlaps, new Map(), traversal);
+  if (
+    traversal.recursive &&
+    overlaps.some(
+      (overlap) =>
+        capturesUnsafeBigIntInput(overlap.producer, 'minimum') ||
+        capturesUnsafeBigIntInput(overlap.producer, 'maximum'),
+    )
+  ) {
+    throw new Error(
+      'Recursive BigInt and number union alternatives cannot safely preserve integer precision in strict Structured Outputs.',
+    );
+  }
+
   return overlaps;
 };
 
