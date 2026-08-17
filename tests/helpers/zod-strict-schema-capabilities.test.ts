@@ -1,7 +1,33 @@
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { zodFunction, zodResponseFormat, zodResponsesFunction, zodTextFormat } from 'openai/helpers/zod';
 import { z as z3 } from 'zod/v3';
 
 const formatFor = (value: z3.ZodTypeAny) => zodResponseFormat(z3.object({ value }), 'strict');
+
+const strictHelpers = [
+  { name: 'zodResponseFormat', create: (schema: z3.ZodTypeAny) => zodResponseFormat(schema, 'strict') },
+  { name: 'zodTextFormat', create: (schema: z3.ZodTypeAny) => zodTextFormat(schema, 'strict') },
+  {
+    name: 'zodFunction',
+    create: (schema: z3.ZodTypeAny) => zodFunction({ name: 'strict', parameters: schema }),
+  },
+  {
+    name: 'zodResponsesFunction',
+    create: (schema: z3.ZodTypeAny) => zodResponsesFunction({ name: 'strict', parameters: schema }),
+  },
+];
+
+const strictHelperSchema = (helper: ReturnType<(typeof strictHelpers)[number]['create']>) => {
+  if ('json_schema' in helper) {
+    return helper.json_schema.schema;
+  }
+  if ('schema' in helper) {
+    return helper.schema;
+  }
+  if ('function' in helper) {
+    return helper.function.parameters;
+  }
+  return helper.parameters;
+};
 
 interface RecursiveDateNode {
   when: Date;
@@ -229,5 +255,202 @@ describe('Zod v3 strict schema capability analysis', () => {
         'strict',
       ),
     ).toThrow('ZodDate');
+  });
+});
+
+describe.each(strictHelpers)('$name strict numeric input capability analysis', ({ create }) => {
+  it.each([
+    {
+      name: 'output refinement',
+      schema: () => z3.number().pipe(z3.number().refine((value) => Math.abs(value) < 10)),
+    },
+    {
+      name: 'output super refinement',
+      schema: () =>
+        z3.number().pipe(
+          z3.number().superRefine((value, context) => {
+            if (Math.abs(value) >= 10) {
+              context.addIssue({ code: z3.ZodIssueCode.custom, message: 'outside range' });
+            }
+          }),
+        ),
+    },
+    {
+      name: 'output preprocessor',
+      schema: () =>
+        z3
+          .number()
+          .pipe(
+            z3.preprocess(
+              (value) => (typeof value === 'number' && Math.abs(value) >= 10 ? 'rejected' : value),
+              z3.number(),
+            ),
+          ),
+    },
+    {
+      name: 'output transform',
+      schema: () =>
+        z3.number().pipe(
+          z3.number().transform((value, context) => {
+            if (Math.abs(value) >= 10) {
+              context.addIssue({ code: z3.ZodIssueCode.custom, message: 'outside range' });
+              return z3.NEVER;
+            }
+            return value;
+          }),
+        ),
+    },
+    {
+      name: 'nested output pipeline',
+      schema: () => z3.number().pipe(z3.number().pipe(z3.number().refine((value) => Math.abs(value) < 10))),
+    },
+    {
+      name: 'lazy output pipeline',
+      schema: () => z3.lazy(() => z3.number().pipe(z3.number().refine((value) => Math.abs(value) < 10))),
+    },
+    {
+      name: 'intersection output pipeline',
+      schema: () =>
+        z3.intersection(z3.number().pipe(z3.number().refine((value) => Math.abs(value) < 10)), z3.number()),
+    },
+  ])('bounds fallible $name branches before BigInt coercion', ({ schema }) => {
+    const result = create(z3.object({ value: z3.union([schema(), z3.coerce.bigint()]) }));
+    const generated = strictHelperSchema(result) as {
+      properties: { value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(generated.properties.value.anyOf[0]).toMatchObject({
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
+    expect(result.$parseRaw('{"value":9007199254740993}')).toEqual({ value: 9_007_199_254_740_992n });
+    expect(result.$parseRaw('{"value":-9007199254740993}')).toEqual({ value: -9_007_199_254_740_992n });
+  });
+
+  it.each([
+    {
+      name: 'positive refinement',
+      number: () => z3.number().max(9),
+      fallback: () => z3.number().refine((value) => Math.abs(value) < 10),
+      raw: '9007199254740993',
+      rounded: 9_007_199_254_740_992n,
+    },
+    {
+      name: 'negative refinement',
+      number: () => z3.number().min(-9),
+      fallback: () => z3.number().refine((value) => Math.abs(value) < 10),
+      raw: '-9007199254740993',
+      rounded: -9_007_199_254_740_992n,
+    },
+    {
+      name: 'positive Promise',
+      number: () => z3.number().max(9),
+      fallback: () => z3.promise(z3.number()),
+      raw: '9007199254740993',
+      rounded: 9_007_199_254_740_992n,
+    },
+  ])(
+    'bounds nested constrained numeric unions with $name fallthrough',
+    ({ number, fallback, raw, rounded }) => {
+      const result = create(
+        z3.object({ value: z3.union([z3.union([number(), fallback()]), z3.coerce.bigint()]) }),
+      );
+      const generated = strictHelperSchema(result) as {
+        properties: { value: { anyOf: Record<string, unknown>[] } };
+      };
+
+      expect(generated.properties.value.anyOf[0]).toMatchObject({
+        minimum: Number.MIN_SAFE_INTEGER,
+        maximum: Number.MAX_SAFE_INTEGER,
+      });
+      expect(result.$parseRaw(`{"value":${raw}}`)).toEqual({ value: rounded });
+    },
+  );
+
+  it.each([
+    { name: 'direct', schema: () => z3.promise(z3.number()) },
+    { name: 'lazy', schema: () => z3.lazy(() => z3.promise(z3.number())) },
+    {
+      name: 'intersection',
+      schema: () => z3.intersection(z3.promise(z3.number()), z3.number()),
+    },
+    {
+      name: 'pipeline output',
+      schema: () => z3.number().pipe(z3.promise(z3.number())),
+    },
+  ])('bounds $name Promise numeric branches that synchronously fall through', ({ schema }) => {
+    const result = create(z3.object({ value: z3.union([schema(), z3.coerce.bigint()]) }));
+    const generated = strictHelperSchema(result) as {
+      properties: { value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(generated.properties.value.anyOf[0]).toMatchObject({
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(result.$parseRaw('{"value":9007199254740993}')).toEqual({ value: 9_007_199_254_740_992n });
+    expect(result.$parseRaw('{"value":-9007199254740993}')).toEqual({ value: -9_007_199_254_740_992n });
+  });
+
+  it.each([
+    { name: 'plain', schema: () => z3.number(), expected: { type: 'number' } },
+    { name: 'coerced', schema: () => z3.coerce.number(), expected: { type: 'number' } },
+    { name: 'finite', schema: () => z3.number().finite(), expected: { type: 'number' } },
+    { name: 'integer', schema: () => z3.number().int(), expected: { type: 'integer' } },
+    {
+      name: 'maximum',
+      schema: () => z3.number().max(9),
+      expected: { type: 'number', maximum: 9 },
+    },
+    {
+      name: 'minimum',
+      schema: () => z3.number().min(-9),
+      expected: { type: 'number', minimum: -9 },
+    },
+    {
+      name: 'multiple',
+      schema: () => z3.number().multipleOf(2),
+      expected: { type: 'number', multipleOf: 2 },
+    },
+  ])('preserves represented $name numeric branches before BigInt coercion', ({ schema, expected }) => {
+    const result = create(z3.object({ value: z3.union([schema(), z3.coerce.bigint()]) }));
+    const generated = strictHelperSchema(result) as {
+      properties: { value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(generated.properties.value.anyOf[0]).toEqual(expected);
+  });
+
+  it('preserves nested total numeric branches ahead of opaque alternatives', () => {
+    const result = create(
+      z3.object({
+        value: z3.union([
+          z3.union([z3.number(), z3.number().refine((value) => Math.abs(value) < 10)]),
+          z3.coerce.bigint(),
+        ]),
+      }),
+    );
+    const generated = strictHelperSchema(result) as {
+      properties: { value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(generated.properties.value.anyOf[0]).not.toHaveProperty('minimum');
+    expect(generated.properties.value.anyOf[0]).not.toHaveProperty('maximum');
+    expect(result.$parseRaw('{"value":9007199254740993}')).toEqual({ value: 9_007_199_254_740_992 });
+  });
+
+  it('preserves represented restrictions in pipeline outputs', () => {
+    const result = create(
+      z3.object({ value: z3.union([z3.number().pipe(z3.number().max(9)), z3.coerce.bigint()]) }),
+    );
+    const generated = strictHelperSchema(result) as {
+      properties: { value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(generated.properties.value.anyOf[0]).toEqual({
+      allOf: [{ type: 'number' }, { type: 'number', maximum: 9 }],
+    });
   });
 });

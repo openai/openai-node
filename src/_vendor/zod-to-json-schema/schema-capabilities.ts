@@ -31,10 +31,10 @@ type Inspector = (definition: InspectableDefinition) => boolean | null | undefin
 type TraversalChildren = { values: SchemaType[]; every: boolean };
 
 const pipelineChildren = (def: InspectableDefinition, traversal: Traversal): SchemaType[] => {
-  if (traversal === 'input' || traversal === 'unconditional-number') {
+  if (traversal === 'input') {
     return [def.in];
   }
-  if (traversal === 'conversion') {
+  if (traversal === 'conversion' || traversal === 'unconditional-number') {
     return [def.in, def.out];
   }
   return [def.out];
@@ -60,7 +60,10 @@ const childDefinitions = (def: InspectableDefinition, traversal: Traversal): Tra
       return { values: [def.getter()], every: false };
     }
     case ZodFirstPartyTypeKind.ZodPipeline: {
-      return { values: pipelineChildren(def, traversal), every: false };
+      return {
+        values: pipelineChildren(def, traversal),
+        every: traversal === 'unconditional-number',
+      };
     }
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
@@ -148,26 +151,75 @@ export const acceptsJSONNumber = (definition: ZodTypeDef): boolean =>
     'input',
   );
 
-export const acceptsEveryJSONNumber = (definition: ZodTypeDef): boolean =>
-  visitDefinition(
-    definition,
-    (def) => {
-      switch (def.typeName) {
-        case ZodFirstPartyTypeKind.ZodNumber:
-        case ZodFirstPartyTypeKind.ZodAny:
-        case ZodFirstPartyTypeKind.ZodUnknown: {
-          return true;
-        }
-        case ZodFirstPartyTypeKind.ZodEffects: {
-          return false;
-        }
-        default: {
-          return null;
-        }
+type JSONNumberAcceptance = 'total' | 'represented' | 'opaque';
+
+const classifyJSONNumberChecks = (checks: InspectableDefinition['checks'] = []): JSONNumberAcceptance => {
+  if (checks.some((check) => !['int', 'min', 'max', 'multipleOf', 'finite'].includes(check.kind))) {
+    return 'opaque';
+  }
+
+  return checks.some((check) => check.kind !== 'finite') ? 'represented' : 'total';
+};
+
+const classifyJSONNumberAcceptance = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): JSONNumberAcceptance => {
+  if (active.has(definition)) {
+    return 'opaque';
+  }
+  active.add(definition);
+
+  try {
+    const def = definition as InspectableDefinition;
+    switch (def.typeName) {
+      case ZodFirstPartyTypeKind.ZodNumber: {
+        return classifyJSONNumberChecks(def.checks);
       }
-    },
-    'unconditional-number',
-  );
+      case ZodFirstPartyTypeKind.ZodAny:
+      case ZodFirstPartyTypeKind.ZodUnknown: {
+        return 'total';
+      }
+      case ZodFirstPartyTypeKind.ZodLiteral:
+      case ZodFirstPartyTypeKind.ZodNativeEnum: {
+        return 'represented';
+      }
+      case ZodFirstPartyTypeKind.ZodEffects:
+      case ZodFirstPartyTypeKind.ZodPromise: {
+        return 'opaque';
+      }
+      default: {
+        const children = childDefinitions(def, 'unconditional-number');
+        if (!children) {
+          return acceptsJSONNumber(def) ? 'opaque' : 'represented';
+        }
+
+        const union =
+          def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
+          def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion;
+        const values = union
+          ? children.values.filter((child) => acceptsJSONNumber(child._def))
+          : children.values;
+        const capabilities = values.map((child) => classifyJSONNumberAcceptance(child._def, active));
+        if (children.every) {
+          if (capabilities.includes('opaque')) {
+            return 'opaque';
+          }
+          return capabilities.every((capability) => capability === 'total') ? 'total' : 'represented';
+        }
+        if (capabilities.includes('total')) {
+          return 'total';
+        }
+        return capabilities.includes('opaque') ? 'opaque' : 'represented';
+      }
+    }
+  } finally {
+    active.delete(definition);
+  }
+};
+
+export const acceptsEveryJSONNumber = (definition: ZodTypeDef): boolean =>
+  classifyJSONNumberAcceptance(definition) !== 'opaque';
 
 type UnsafeIntegerSide = 'minimum' | 'maximum';
 
