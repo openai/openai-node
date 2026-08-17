@@ -40,8 +40,9 @@ explicitly requires it.
   narrowing and inference over broad `any`, assertions, `@ts-ignore`, or casts
   that disguise an unproven contract.
 - Keep handwritten production and test files cohesive. Extract a well-defined owner
-  before a growing file approaches 1,000 lines; do not inflate fixtures or suites to
-  justify an overly complicated implementation.
+  only when the current change materially grows a file and reveals a coherent,
+  distinct responsibility. Keep unrelated cleanup separate, and do not inflate
+  fixtures or suites to justify an overly complicated implementation.
 - Avoid hand-maintained model, endpoint, capability, or schema lists unless the
   contract requires them. Prefer the documented API/schema and server-side
   validation over brittle client-side guesses.
