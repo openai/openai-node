@@ -32,6 +32,7 @@ jobs:
         with:
           # Keep the checkout shallow; fetch the exact comparison base below.
           fetch-depth: ${{ env.FETCH_DEPTH }}
+          persist-credentials: false
 
       - name: Fetch comparison base
         run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
