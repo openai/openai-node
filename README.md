@@ -215,6 +215,8 @@ const client = new OpenAI({
 
 X.509 mode exchanges lazily through the pinned mTLS authentication endpoint and defaults API requests to `https://mtls.api.openai.com/v1` when `baseURL` and `OPENAI_BASE_URL` are unset. Both legs use the client-level `fetch` and `fetchOptions`, and redirects are refused. Because the cached identity is scoped to that transport, per-request `fetchOptions` are not supported in X.509 mode. Browser, Deno, and certificate-opaque edge runtimes are unsupported even with `dangerouslyAllowBrowser`. HTTP APIs are supported; Realtime/WebSockets are not yet supported with X.509 workload identity.
 
+When using an Undici `ProxyAgent` with an HTTPS proxy, configure the client certificate and private key only in `requestTls`. Keep `proxyTls` separate so workload credentials are never presented during the TLS connection to the proxy.
+
 See the [X.509 workload identity guide](https://developers.openai.com/api/docs/guides/workload-identity-federation/x509) and the runnable [`OPENAI_AUTH_MODE` Node.js toggle example](./examples/mtls/x509-wif-node.mjs). Close or replace application-owned transports when rotating certificates.
 
 For JWT/ID-token federation, you can customize the token refresh buffer (default is 1200 seconds (20 minutes) before expiration):

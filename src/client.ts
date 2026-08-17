@@ -9,10 +9,16 @@ import type {
   WorkloadIdentityRequestContext,
 } from './internal/types';
 import {
+  assertNoX509ConflictingCredentials,
+  assertX509APIOrigin,
+  assertX509Dispatch,
   hasSameX509Transport,
   protectX509RequestOptions,
+  revalidateWorkloadIdentityAuthorization,
+  snapshotX509FetchOptions,
+  x509APIOrigin,
   x509TransportKey,
-} from './internal/auth/x509-workload-identity-auth';
+} from './internal/auth/x509-request-policy';
 import {
   isX509WorkloadIdentity,
   WorkloadIdentityAuthState,
@@ -582,6 +588,10 @@ export class OpenAI {
       ...opts
     } = clientOptions as InternalClientOptions;
     const usesX509WorkloadIdentity = isX509WorkloadIdentity(workloadIdentity);
+    const protectedWorkloadIdentity =
+      usesX509WorkloadIdentity && !Object.isFrozen(workloadIdentity)
+        ? Object.freeze({ ...workloadIdentity })
+        : workloadIdentity;
     const providerRuntime = provider ? configureProvider(provider) : undefined;
     const options: ClientOptions = {
       apiKey,
@@ -589,7 +599,7 @@ export class OpenAI {
       organization,
       project,
       webhookSecret,
-      workloadIdentity,
+      workloadIdentity: protectedWorkloadIdentity,
       provider,
       ...opts,
       baseURL:
@@ -612,6 +622,9 @@ export class OpenAI {
       throw new Errors.OpenAIError(
         'X.509 workload identity is only supported in server runtimes with a client-certificate-capable HTTP transport. `dangerouslyAllowBrowser` does not enable it.',
       );
+    }
+    if (usesX509WorkloadIdentity) {
+      x509APIOrigin(options.baseURL!);
     }
 
     if (!options.dangerouslyAllowBrowser && isRunningInBrowserOrBrowserWorker()) {
@@ -653,8 +666,8 @@ export class OpenAI {
     this._baseURLWasConfigured = Boolean(baseURL);
     this._usesX509WorkloadIdentity = usesX509WorkloadIdentity;
 
-    if (workloadIdentity) {
-      this._workloadIdentityAuth = new WorkloadIdentityAuthState(workloadIdentity, this.fetch);
+    if (protectedWorkloadIdentity) {
+      this._workloadIdentityAuth = new WorkloadIdentityAuthState(protectedWorkloadIdentity, this.fetch);
     }
 
     this.apiKey = typeof apiKey === 'string' ? apiKey : null;
@@ -1086,9 +1099,9 @@ export class OpenAI {
       retryCount: maxRetries - retriesRemaining,
     });
     const workloadIdentityRequestContext = workloadIdentityContext(req);
-    const workloadIdentityAuthorization = workloadIdentityRequestContext?.usesWorkloadIdentityToken
-      ? req.headers.get('authorization')
-      : undefined;
+    if (this._usesX509WorkloadIdentity) {
+      assertX509APIOrigin(url, workloadIdentityRequestContext?.apiOrigin);
+    }
     const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
     const restoreX509RequestOptions = this._usesX509WorkloadIdentity
@@ -1102,19 +1115,12 @@ export class OpenAI {
       requestHookChangedX509Options = restoreX509RequestOptions?.() ?? false;
     }
     req.headers = new Headers(req.headers);
-    if (
-      workloadIdentityRequestContext?.usesWorkloadIdentityToken &&
-      req.headers.get('authorization') !== workloadIdentityAuthorization
-    ) {
-      workloadIdentityRequestContext.usesWorkloadIdentityToken = false;
-      if (!req.headers.get('authorization')) {
-        workloadIdentityRequestContext.workloadIdentityTokenSuppressed = true;
-      }
-    }
+    revalidateWorkloadIdentityAuthorization(req.headers, workloadIdentityRequestContext);
     if (
       this._usesX509WorkloadIdentity &&
       workloadIdentityRequestContext &&
       (requestHookChangedX509Options ||
+        req.redirect !== 'manual' ||
         !hasSameX509Transport(workloadIdentityRequestContext.fetchOptions, req))
     ) {
       throw new Errors.OpenAIError(
@@ -1143,6 +1149,14 @@ export class OpenAI {
     }
 
     const security = options.__security ?? { bearerAuth: true };
+    if (
+      this._usesX509WorkloadIdentity &&
+      workloadIdentityRequestContext &&
+      (!security.bearerAuth ||
+        (workloadIdentityRequestContext.workloadIdentityTokenSuppressed && !req.headers.has('Authorization')))
+    ) {
+      workloadIdentityRequestContext.selectedAuthorization = req.headers.get('Authorization');
+    }
     // Request hooks may replace the caller signal before it reaches fetch.
     const controller =
       this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
@@ -1389,6 +1403,9 @@ export class OpenAI {
     },
   ): Promise<Response> {
     const context = workloadIdentityContext(init);
+    if (this._usesX509WorkloadIdentity) {
+      assertX509Dispatch(url, init, context, this.fetchOptions);
+    }
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
       const headers = init.headers as Headers;
@@ -1413,12 +1430,15 @@ export class OpenAI {
         }
         headers.set('Authorization', `Bearer ${token}`);
         if (context) {
+          context.workloadIdentityAuthorization = `Bearer ${token}`;
           context.usesWorkloadIdentityToken = true;
         }
       }
     }
-
-    removeWorkloadIdentityContext(init);
+    revalidateWorkloadIdentityAuthorization(init.headers, context);
+    if (!this._usesX509WorkloadIdentity) {
+      removeWorkloadIdentityContext(init);
+    }
     const response = await this.fetchWithTimeout(url, init, timeout, controller);
 
     return response;
@@ -1430,6 +1450,7 @@ export class OpenAI {
     ms: number,
     controller: AbortController,
   ): Promise<Response> {
+    const context = init ? workloadIdentityContext(init) : undefined;
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
@@ -1454,6 +1475,12 @@ export class OpenAI {
     }
 
     try {
+      if (this._usesX509WorkloadIdentity) {
+        assertX509Dispatch(url, fetchOptions, context, this.fetchOptions);
+        revalidateWorkloadIdentityAuthorization(fetchOptions.headers, context);
+      }
+      removeWorkloadIdentityContext(fetchOptions);
+      if (init) removeWorkloadIdentityContext(init);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       return await this.fetch.call(undefined, url, fetchOptions);
     } catch (err) {
@@ -1539,6 +1566,13 @@ export class OpenAI {
     const { method, path, query, defaultBaseURL } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
+    const apiOrigin = this._usesX509WorkloadIdentity ? x509APIOrigin(this.baseURL) : undefined;
+    if (this._usesX509WorkloadIdentity) {
+      assertX509APIOrigin(url, apiOrigin);
+      assertNoX509ConflictingCredentials(
+        buildHeaders([this._options.defaultHeaders, options.headers]).values,
+      );
+    }
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
@@ -1555,11 +1589,13 @@ export class OpenAI {
     while (true) {
       const fetchOptions = this.fetchOptions;
       workloadIdentityContext = {
+        apiOrigin,
         baseAuthorizationOverridden: hasAuthorizationOverride(
           buildHeaders([this._options.defaultHeaders, bodyHeaders]),
         ),
-        fetchOptions: this._usesX509WorkloadIdentity && fetchOptions ? { ...fetchOptions } : fetchOptions,
+        fetchOptions: this._usesX509WorkloadIdentity ? snapshotX509FetchOptions(fetchOptions) : fetchOptions,
         maxRetries: options.maxRetries ?? this.maxRetries,
+        selectedAuthorization: undefined,
         terminalAuthenticationError: undefined,
         transportKey: x509TransportKey(fetchOptions),
         workloadIdentityAuthenticationAttempted: false,
@@ -1636,9 +1672,16 @@ export class OpenAI {
     let overridesAuthorization = hasAuthorizationOverride(headerOverrides);
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider) {
-      const authOptions = attachWorkloadIdentityContext({ ...options }, workloadIdentityContext);
+      const authOptions = attachWorkloadIdentityContext(options, workloadIdentityContext);
       workloadIdentityContext.workloadIdentityTokenSuppressed = overridesAuthorization;
-      authenticationHeaders = await this.authHeaders(authOptions, options.__security ?? { bearerAuth: true });
+      try {
+        authenticationHeaders = await this.authHeaders(
+          authOptions,
+          options.__security ?? { bearerAuth: true },
+        );
+      } finally {
+        removeWorkloadIdentityContext(authOptions);
+      }
       const authenticationOverridesWorkloadIdentity = hasNonWorkloadIdentityAuthorization(
         authenticationHeaders,
         workloadIdentityContext,

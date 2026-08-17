@@ -48,6 +48,11 @@ describe('X.509 workload identity auth', () => {
 
   test('uses the exact pinned exchange request and only inherits transport fetch options', async () => {
     const dispatcher = { name: 'client-certificate-dispatcher' };
+    const agent = { name: 'client-certificate-agent' };
+    const client = { name: 'client-certificate-client' };
+    const tls = { cert: 'client-certificate', key: 'client-private-key' };
+    const proxy = { name: 'client-certificate-proxy' };
+    const privateCarrier = Symbol('private API request option');
     const inheritedSignal = new AbortController().signal;
     const customFetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
       tokenResponse('access-token'),
@@ -55,11 +60,28 @@ describe('X.509 workload identity auth', () => {
     const auth = new WorkloadIdentityAuth(config, customFetch, {
       fetchOptions: {
         dispatcher,
+        agent,
+        client,
+        tls,
+        proxy,
         redirect: 'follow',
         method: 'DELETE',
-        headers: { Authorization: 'Bearer unsafe' },
+        headers: {
+          Authorization: 'Bearer unsafe',
+          Cookie: 'session=private-cookie',
+          'Api-Key': 'private-api-key',
+          'X-Api-Key': 'private-secondary-key',
+        },
         body: 'unsafe body',
         signal: inheritedSignal,
+        credentials: 'include',
+        referrer: 'https://api.example/private-request',
+        referrerPolicy: 'unsafe-url',
+        cache: 'force-cache',
+        integrity: 'private-integrity-value',
+        keepalive: true,
+        auth: 'private-runtime-auth',
+        [privateCarrier]: 'private-symbol-value',
       } as never,
       maxRetries: 0,
     });
@@ -75,12 +97,28 @@ describe('X.509 workload identity auth', () => {
     expect(url).toBe('https://mtls.auth.openai.com/oauth/token');
     expect(init).toMatchObject({
       dispatcher,
+      agent,
+      client,
+      tls,
+      proxy,
       method: 'POST',
       redirect: 'manual',
       headers: { 'Content-Type': 'application/json' },
     });
     expect(init?.signal).not.toBe(inheritedSignal);
     expect(init?.signal).toBeInstanceOf(AbortSignal);
+    expect(new Headers(init?.headers).get('Authorization')).toBeNull();
+    expect(new Headers(init?.headers).get('Cookie')).toBeNull();
+    expect(new Headers(init?.headers).get('Api-Key')).toBeNull();
+    expect(new Headers(init?.headers).get('X-Api-Key')).toBeNull();
+    expect(init).not.toHaveProperty('credentials');
+    expect(init).not.toHaveProperty('referrer');
+    expect(init).not.toHaveProperty('referrerPolicy');
+    expect(init).not.toHaveProperty('cache');
+    expect(init).not.toHaveProperty('integrity');
+    expect(init).not.toHaveProperty('keepalive');
+    expect(init).not.toHaveProperty('auth');
+    expect(Object.getOwnPropertySymbols(init ?? {})).toEqual([]);
 
     const body = JSON.parse(String(init?.body));
     expect(body).toEqual({
@@ -136,19 +174,26 @@ describe('X.509 workload identity auth', () => {
     ).not.toThrow();
   });
 
-  test.each([undefined, null, 0, -1, '3600', Number.NaN, Number.POSITIVE_INFINITY])(
-    'requires a positive numeric expires_in value: %s',
-    async (expiresIn) => {
-      const customFetch = vi.fn(async () =>
-        expiresIn === undefined
-          ? Response.json({ access_token: 'unsafe-token' })
-          : tokenResponse('unsafe-token', expiresIn),
-      );
-      const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 0 });
+  test.each([
+    undefined,
+    null,
+    0,
+    -1,
+    '3600',
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_VALUE,
+    Number.MAX_SAFE_INTEGER,
+  ])('requires a positive numeric expires_in value: %s', async (expiresIn) => {
+    const customFetch = vi.fn(async () =>
+      expiresIn === undefined
+        ? Response.json({ access_token: 'unsafe-token' })
+        : tokenResponse('unsafe-token', expiresIn),
+    );
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 0 });
 
-      await expect(auth.getToken()).rejects.toThrow("invalid 'expires_in'");
-    },
-  );
+    await expect(auth.getToken()).rejects.toThrow("invalid 'expires_in'");
+  });
 
   test('collapses 100 concurrent cold requests into one exchange', async () => {
     const exchange = deferredResponse();
@@ -667,6 +712,31 @@ describe('X.509 workload identity auth', () => {
     await rejection;
     expect(vi.getTimerCount()).toBe(0);
     expect(customFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('wakes stale Retry-After waiters immediately when their generation is invalidated', async () => {
+    vi.useFakeTimers();
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '60' } }))
+      .mockResolvedValueOnce(tokenResponse('replacement-token'));
+    const auth = new WorkloadIdentityAuth(config, customFetch, { maxRetries: 1 });
+    const controller = new AbortController();
+    const token = auth.getToken(controller.signal, 1000);
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    auth.invalidateToken();
+    await vi.advanceTimersByTimeAsync(0);
+
+    try {
+      expect(customFetch).toHaveBeenCalledTimes(2);
+      await expect(token).resolves.toBe('replacement-token');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      controller.abort('test cleanup');
+      await token.catch(() => null);
+    }
   });
 
   test('bounds transient retries to maxRetries plus the initial attempt', async () => {

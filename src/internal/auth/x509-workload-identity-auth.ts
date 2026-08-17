@@ -1,10 +1,11 @@
 import { APIConnectionTimeoutError, APIUserAbortError, OpenAIError } from '../../core/error';
 import type { X509WorkloadIdentity } from '../../auth/types';
-import type { Fetch, RequestInit } from '../builtin-types';
+import type { Fetch } from '../builtin-types';
 import * as Shims from '../shims';
 import type { MergedRequestInit } from '../types';
 import { hasOwn } from '../utils/values';
 import { exchangeX509Token, X509TokenExchangeRetryableError } from './x509-token-exchange';
+import { x509TransportKey } from './x509-request-policy';
 
 interface CachedToken {
   token: string;
@@ -30,6 +31,7 @@ interface RefreshAttempt {
 }
 
 interface RetrySequence {
+  invalidation: AbortController;
   lastError: X509TokenExchangeRetryableError | null;
   nextRetryCount: number;
   participantAttemptCeilings: Map<symbol, number>;
@@ -59,9 +61,6 @@ interface RefreshContext {
 const DEFAULT_REFRESH_BUFFER_MS = 1_200_000;
 const DEFAULT_PROACTIVE_REFRESH_FAILURE_COOLDOWN_MS = 30_000;
 const DEFAULT_PROACTIVE_REFRESH_TIMEOUT_MS = 600_000;
-const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
-const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
-
 function createRefreshState(): RefreshState {
   return {
     cachedToken: null,
@@ -70,52 +69,6 @@ function createRefreshState(): RefreshState {
     retrySequence: null,
     retryNotBefore: 0,
     tokenGeneration: 0,
-  };
-}
-
-/** Returns the opaque runtime transport identity used to scope X.509 refresh state. */
-export function x509TransportKey(fetchOptions: MergedRequestInit | undefined): object | undefined {
-  if (!fetchOptions) {
-    return undefined;
-  }
-  for (const key of TRANSPORT_OPTION_KEYS) {
-    const value = (fetchOptions as Record<string, unknown>)[key];
-    if ((typeof value === 'object' && value !== null) || typeof value === 'function') {
-      return value as object;
-    }
-  }
-  return fetchOptions;
-}
-
-/** Checks that request hooks preserved every runtime transport option used by X.509 mode. */
-export function hasSameX509Transport(expected: MergedRequestInit | undefined, actual: RequestInit): boolean {
-  return TRANSPORT_OPTION_KEYS.every(
-    (key) =>
-      (expected as Record<string, unknown> | undefined)?.[key] === (actual as Record<string, unknown>)[key],
-  );
-}
-
-/** Hides X.509 transport and redirect policy from request hooks, then restores them unchanged. */
-export function protectX509RequestOptions(request: RequestInit): () => boolean {
-  const requestOptions = request as Record<string, unknown>;
-  const protectedOptions: { key: (typeof X509_HOOK_PROTECTED_OPTION_KEYS)[number]; value: unknown }[] = [];
-
-  for (const key of X509_HOOK_PROTECTED_OPTION_KEYS) {
-    if (hasOwn(requestOptions, key)) {
-      protectedOptions.push({ key, value: requestOptions[key] });
-      Reflect.deleteProperty(requestOptions, key);
-    }
-  }
-
-  return () => {
-    const changed = X509_HOOK_PROTECTED_OPTION_KEYS.some((key) => hasOwn(requestOptions, key));
-    for (const key of X509_HOOK_PROTECTED_OPTION_KEYS) {
-      Reflect.deleteProperty(requestOptions, key);
-    }
-    for (const option of protectedOptions) {
-      requestOptions[option.key] = option.value;
-    }
-    return changed;
   };
 }
 
@@ -142,6 +95,34 @@ function validateMaxRetries(maxRetries: number): number {
     throw new OpenAIError('X.509 workload identity requires `maxRetries` to be a non-negative integer.');
   }
   return maxRetries;
+}
+
+function validateTokenResponse(response: unknown): { accessToken: string; expiresIn: number } {
+  if (
+    typeof response !== 'object' ||
+    response === null ||
+    !('access_token' in response) ||
+    typeof response.access_token !== 'string' ||
+    response.access_token.trim().length === 0
+  ) {
+    throw new OpenAIError("Token exchange response missing 'access_token' field");
+  }
+
+  if (!/^[A-Za-z0-9._~+/-]+=*$/u.test(response.access_token)) {
+    throw new OpenAIError("Token exchange response has invalid 'access_token' field");
+  }
+  if (
+    'token_type' in response &&
+    (typeof response.token_type !== 'string' || response.token_type.toLowerCase() !== 'bearer')
+  ) {
+    throw new OpenAIError("Token exchange response has invalid 'token_type' field");
+  }
+
+  const expiresIn = 'expires_in' in response ? response.expires_in : undefined;
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+  return { accessToken: response.access_token, expiresIn };
 }
 
 function monotonicNow(): number {
@@ -335,8 +316,12 @@ async function waitForDelay(
   delayMs: number,
   signal: AbortSignal | null | undefined,
   timeoutMs: number | undefined,
+  invalidationSignal: AbortSignal,
 ): Promise<void> {
   throwIfAborted(signal);
+  if (invalidationSignal.aborted) {
+    throw REFRESH_INVALIDATED;
+  }
   if (timeoutMs !== undefined && timeoutMs <= 0) {
     throw new APIConnectionTimeoutError();
   }
@@ -347,10 +332,13 @@ async function waitForDelay(
     let timer: ReturnType<typeof setTimeout>;
     // oxlint-disable-next-line prefer-const -- Cleanup must close over the handler before it is initialized.
     let onAbort: () => void;
+    // oxlint-disable-next-line prefer-const -- Cleanup must close over the handler before it is initialized.
+    let onInvalidation: () => void;
     const timeoutWins = timeoutMs !== undefined && timeoutMs <= delayMs;
     const cleanup = () => {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
+      invalidationSignal.removeEventListener('abort', onInvalidation);
     };
     const finish = (): boolean => {
       if (finished) {
@@ -363,6 +351,11 @@ async function waitForDelay(
     onAbort = () => {
       if (signal && finish()) {
         reject(abortError(signal));
+      }
+    };
+    onInvalidation = () => {
+      if (finish()) {
+        reject(REFRESH_INVALIDATED);
       }
     };
     timer = setTimeout(
@@ -378,6 +371,7 @@ async function waitForDelay(
       timeoutWins ? timeoutMs : delayMs,
     );
     signal?.addEventListener('abort', onAbort, { once: true });
+    invalidationSignal.addEventListener('abort', onInvalidation, { once: true });
   });
 }
 
@@ -406,7 +400,7 @@ export class X509WorkloadIdentityAuth {
    */
   constructor(config: X509WorkloadIdentity, fetch?: Fetch, options: X509WorkloadIdentityAuthOptions = {}) {
     validateX509Config(config);
-    this.config = config;
+    this.config = Object.freeze({ ...config });
     this.fetch = fetch ?? Shims.getDefaultFetch();
     this.defaultFetchOptions = options.fetchOptions;
     this.defaultMaxRetries = validateMaxRetries(options.maxRetries ?? 2);
@@ -507,6 +501,7 @@ export class X509WorkloadIdentityAuth {
     const { state } = context;
     const cachedAtStart = state.cachedToken;
     const retrySequence = state.retrySequence ?? {
+      invalidation: new AbortController(),
       lastError: null,
       nextRetryCount: 0,
       participantAttemptCeilings: new Map(),
@@ -570,7 +565,12 @@ export class X509WorkloadIdentityAuth {
     let retryDelayMs = context.state.retryNotBefore - monotonicNow();
     while (retryDelayMs > 0) {
       // oxlint-disable-next-line no-await-in-loop -- Each wake must recheck a shared backoff another attempt may extend.
-      await waitForDelay(retryDelayMs, signal, X509WorkloadIdentityAuth.remainingTimeout(deadline));
+      await waitForDelay(
+        retryDelayMs,
+        signal,
+        X509WorkloadIdentityAuth.remainingTimeout(deadline),
+        retrySequence.invalidation.signal,
+      );
       assertRetrySequence(context, retrySequence);
       X509WorkloadIdentityAuth.throwIfDeadlineExceeded(deadline);
       retryDelayMs = context.state.retryNotBefore - monotonicNow();
@@ -657,22 +657,7 @@ export class X509WorkloadIdentityAuth {
       }
       throw error;
     }
-    if (
-      typeof tokenResponse !== 'object' ||
-      tokenResponse === null ||
-      !('access_token' in tokenResponse) ||
-      typeof tokenResponse.access_token !== 'string' ||
-      tokenResponse.access_token.trim().length === 0
-    ) {
-      throw new OpenAIError("Token exchange response missing 'access_token' field");
-    }
-
-    const accessToken = tokenResponse.access_token;
-    const expiresIn = 'expires_in' in tokenResponse ? tokenResponse.expires_in : undefined;
-    if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
-
+    const { accessToken, expiresIn } = validateTokenResponse(tokenResponse);
     const durationMs = expiresIn * 1000;
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
@@ -718,6 +703,7 @@ export class X509WorkloadIdentityAuth {
     state.cachedToken = null;
     state.proactiveRetryNotBefore = 0;
     state.retryNotBefore = 0;
+    state.retrySequence?.invalidation.abort();
     state.retrySequence = null;
     const { refreshAttempt } = state;
     if (refreshAttempt) {

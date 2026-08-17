@@ -1,0 +1,242 @@
+import { OpenAIError } from '../../core/error';
+import type { RequestInfo, RequestInit } from '../builtin-types';
+import { castToError } from '../errors';
+import type { MergedRequestInit, WorkloadIdentityRequestContext } from '../types';
+import { hasOwn } from '../utils/values';
+
+const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
+const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
+const TLS_IDENTITY_OPTION_KEYS = [
+  'ca',
+  'cert',
+  'key',
+  'passphrase',
+  'pfx',
+  'rejectUnauthorized',
+  'secureContext',
+  'servername',
+] as const;
+
+interface TransportIdentityNode {
+  objects: WeakMap<object, TransportIdentityNode>;
+  primitives: Map<unknown, TransportIdentityNode>;
+  key: object | undefined;
+}
+
+function createTransportIdentityNode(): TransportIdentityNode {
+  return { objects: new WeakMap(), primitives: new Map(), key: undefined };
+}
+
+const transportIdentityRoot = createTransportIdentityNode();
+
+function transportIdentityChild(node: TransportIdentityNode, value: unknown): TransportIdentityNode {
+  if ((typeof value === 'object' && value !== null) || typeof value === 'function') {
+    const object = value as object;
+    let child = node.objects.get(object);
+    if (!child) {
+      child = createTransportIdentityNode();
+      node.objects.set(object, child);
+    }
+    return child;
+  }
+
+  let child = node.primitives.get(value);
+  if (!child) {
+    child = createTransportIdentityNode();
+    node.primitives.set(value, child);
+  }
+  return child;
+}
+
+function transportOption(options: MergedRequestInit, key: (typeof TRANSPORT_OPTION_KEYS)[number]): unknown {
+  return hasOwn(options, key) ? (options as Record<string, unknown>)[key] : undefined;
+}
+
+function transportIdentityValues(options: MergedRequestInit): readonly unknown[] | undefined {
+  const values = TRANSPORT_OPTION_KEYS.map((key) => transportOption(options, key));
+  if (values.every((value) => value === undefined)) {
+    return undefined;
+  }
+
+  const tls = transportOption(options, 'tls');
+  const tlsOptions =
+    tls !== null && (typeof tls === 'object' || typeof tls === 'function')
+      ? (tls as Record<string, unknown>)
+      : undefined;
+  return [...values, ...TLS_IDENTITY_OPTION_KEYS.map((key) => tlsOptions?.[key])];
+}
+
+/** Returns the opaque runtime transport identity used to scope X.509 refresh state. */
+export function x509TransportKey(fetchOptions: MergedRequestInit | undefined): object | undefined {
+  if (!fetchOptions) {
+    return undefined;
+  }
+
+  const values = transportIdentityValues(fetchOptions);
+  if (!values) {
+    return undefined;
+  }
+
+  let node = transportIdentityRoot;
+  for (const value of values) {
+    node = transportIdentityChild(node, value);
+  }
+  node.key ??= Object.freeze({});
+  return node.key;
+}
+
+/** Captures the request options that must remain stable across token acquisition and API dispatch. */
+export function snapshotX509FetchOptions(
+  fetchOptions: MergedRequestInit | undefined,
+): MergedRequestInit | undefined {
+  return fetchOptions ? ({ ...fetchOptions } as MergedRequestInit) : undefined;
+}
+
+/** Selects only transport options that are safe and necessary for the pinned token exchange. */
+export function x509TokenExchangeFetchOptions(fetchOptions: MergedRequestInit | undefined): RequestInit {
+  const selected: Record<string, unknown> = {};
+  if (fetchOptions) {
+    for (const key of TRANSPORT_OPTION_KEYS) {
+      if (hasOwn(fetchOptions, key)) {
+        selected[key] = (fetchOptions as Record<string, unknown>)[key];
+      }
+    }
+  }
+  return selected as RequestInit;
+}
+
+/** Checks that request hooks preserved every runtime transport option used by X.509 mode. */
+export function hasSameX509Transport(expected: MergedRequestInit | undefined, actual: RequestInit): boolean {
+  return TRANSPORT_OPTION_KEYS.every(
+    (key) =>
+      hasOwn(expected ?? {}, key) === hasOwn(actual, key) &&
+      (expected as Record<string, unknown> | undefined)?.[key] === (actual as Record<string, unknown>)[key],
+  );
+}
+
+/** Hides X.509 transport and redirect policy from request hooks, then restores them unchanged. */
+export function protectX509RequestOptions(request: RequestInit): () => boolean {
+  const requestOptions = request as Record<string, unknown>;
+  const protectedOptions: { key: (typeof X509_HOOK_PROTECTED_OPTION_KEYS)[number]; value: unknown }[] = [];
+
+  for (const key of X509_HOOK_PROTECTED_OPTION_KEYS) {
+    if (hasOwn(requestOptions, key)) {
+      protectedOptions.push({ key, value: requestOptions[key] });
+      Reflect.deleteProperty(requestOptions, key);
+    }
+  }
+
+  return () => {
+    const changed = X509_HOOK_PROTECTED_OPTION_KEYS.some((key) => hasOwn(requestOptions, key));
+    for (const key of X509_HOOK_PROTECTED_OPTION_KEYS) {
+      Reflect.deleteProperty(requestOptions, key);
+    }
+    for (const option of protectedOptions) {
+      requestOptions[option.key] = option.value;
+    }
+    return changed;
+  };
+}
+
+/** Resolves and validates the origin allowed to receive X.509-authenticated API requests. */
+export function x509APIOrigin(value: RequestInfo): string {
+  let url: URL;
+  try {
+    let urlValue: string;
+    if (typeof value === 'string') {
+      urlValue = value;
+    } else if (value instanceof URL) {
+      urlValue = value.href;
+    } else {
+      urlValue = value.url;
+    }
+    url = new URL(urlValue);
+  } catch {
+    throw new OpenAIError('X.509 workload identity requires an absolute HTTPS API URL.');
+  }
+  if (url.protocol !== 'https:') {
+    throw new OpenAIError('X.509 workload identity requires an absolute HTTPS API URL.');
+  }
+  if (url.username || url.password) {
+    throw new OpenAIError('X.509 workload identity API URLs must not contain user credentials.');
+  }
+  return url.origin;
+}
+
+/** Enforces the API origin selected before X.509 token acquisition. */
+export function assertX509APIOrigin(value: RequestInfo, expectedOrigin: string | undefined): void {
+  if (x509APIOrigin(value) !== expectedOrigin) {
+    throw new OpenAIError('X.509 workload identity requests must remain on the configured API origin.');
+  }
+}
+
+/** Rejects credential families that must not accompany an X.509 workload request. */
+export function assertNoX509ConflictingCredentials(headers: Headers): void {
+  for (const name of headers.keys()) {
+    const canonicalName = name.toLowerCase().split('_').join('-');
+    if (
+      canonicalName === 'api-key' ||
+      canonicalName === 'x-api-key' ||
+      canonicalName === 'proxy-authorization'
+    ) {
+      throw new OpenAIError(
+        'X.509 workload identity must not be combined with API-key or proxy authorization credentials.',
+      );
+    }
+  }
+}
+
+/** Clears workload-token provenance when a hook replaces or removes the selected bearer. */
+export function revalidateWorkloadIdentityAuthorization(
+  headers: RequestInit['headers'],
+  context: WorkloadIdentityRequestContext | undefined,
+): void {
+  if (!context?.usesWorkloadIdentityToken) {
+    return;
+  }
+
+  const authorization = new Headers(headers).get('Authorization');
+  if (authorization !== context.workloadIdentityAuthorization) {
+    context.usesWorkloadIdentityToken = false;
+    if (!authorization) {
+      context.workloadIdentityTokenSuppressed = true;
+    }
+  }
+}
+
+/** Enforces the complete X.509 trust boundary immediately before a network dispatch. */
+export function assertX509Dispatch(
+  url: RequestInfo,
+  init: RequestInit,
+  context: WorkloadIdentityRequestContext | undefined,
+  currentFetchOptions: MergedRequestInit | undefined,
+): void {
+  try {
+    assertX509APIOrigin(url, context?.apiOrigin);
+    const headers = new Headers(init.headers);
+    assertNoX509ConflictingCredentials(headers);
+    if (
+      context?.selectedAuthorization !== undefined &&
+      headers.get('Authorization') !== context.selectedAuthorization
+    ) {
+      throw new OpenAIError(
+        'X.509 workload identity requests must preserve their selected authorization credentials.',
+      );
+    }
+    if (
+      !context ||
+      init.redirect !== 'manual' ||
+      !hasSameX509Transport(context.fetchOptions, init) ||
+      x509TransportKey(currentFetchOptions) !== context.transportKey
+    ) {
+      throw new OpenAIError(
+        'X.509 workload identity requests must preserve their transport and manual redirect policy.',
+      );
+    }
+  } catch (error) {
+    if (context) {
+      context.terminalAuthenticationError = castToError(error);
+    }
+    throw error;
+  }
+}

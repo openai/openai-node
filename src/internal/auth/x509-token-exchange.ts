@@ -4,11 +4,13 @@ import type { Fetch } from '../builtin-types';
 import * as Shims from '../shims';
 import type { MergedRequestInit } from '../types';
 import { parseRetryAfterMillis } from '../utils/retries';
+import { x509TokenExchangeFetchOptions } from './x509-request-policy';
 
 const X509_TOKEN_EXCHANGE_URL = 'https://mtls.auth.openai.com/oauth/token';
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const X509_SUBJECT_TOKEN_TYPE = 'urn:openai:params:oauth:token-type:x509';
 const MAX_RETRY_DELAY_MS = 60_000;
+const MAX_TOKEN_EXCHANGE_RESPONSE_BYTES = 1024 * 1024;
 
 interface X509TokenExchangeOptions {
   config: X509WorkloadIdentity;
@@ -71,10 +73,48 @@ async function cancelResponseBody(response: Response): Promise<void> {
 }
 
 async function readSuccessBody(response: Response, retryCount: number): Promise<unknown> {
-  let responseText: string;
+  const declaredLength = response.headers.get('Content-Length');
+  if (
+    declaredLength !== null &&
+    /^\d+$/u.test(declaredLength) &&
+    Number(declaredLength) > MAX_TOKEN_EXCHANGE_RESPONSE_BYTES
+  ) {
+    await cancelResponseBody(response);
+    throw new OpenAIError('X.509 workload identity token exchange response exceeds the maximum size.');
+  }
+
+  let responseText = '';
+  let responseSize = 0;
   try {
-    responseText = await response.text();
-  } catch {
+    const reader = response.body?.getReader();
+    if (reader) {
+      const decoder = new TextDecoder();
+      try {
+        while (true) {
+          // oxlint-disable-next-line no-await-in-loop -- Bound each chunk before reading another.
+          const chunk = await reader.read();
+          if (chunk.done) {
+            break;
+          }
+          responseSize += chunk.value.byteLength;
+          if (responseSize > MAX_TOKEN_EXCHANGE_RESPONSE_BYTES) {
+            // oxlint-disable-next-line no-await-in-loop -- Cancel before releasing an oversized response.
+            await reader.cancel().catch(() => null);
+            throw new OpenAIError(
+              'X.509 workload identity token exchange response exceeds the maximum size.',
+            );
+          }
+          responseText += decoder.decode(chunk.value, { stream: true });
+        }
+        responseText += decoder.decode();
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  } catch (error) {
+    if (error instanceof OpenAIError) {
+      throw error;
+    }
     throw retryableConnectionError(retryCount);
   }
 
@@ -85,8 +125,11 @@ async function readSuccessBody(response: Response, retryCount: number): Promise<
   }
 }
 
-async function readOAuthErrorCode(response: Response): Promise<{ error: string } | undefined> {
-  const parsed: unknown = await response.json().catch((): undefined => undefined);
+async function readOAuthErrorCode(
+  response: Response,
+  retryCount: number,
+): Promise<{ error: string } | undefined> {
+  const parsed: unknown = await readSuccessBody(response, retryCount).catch((): undefined => undefined);
   if (
     typeof parsed === 'object' &&
     parsed !== null &&
@@ -102,7 +145,7 @@ async function exchangeAttempt(options: X509TokenExchangeOptions, body: string):
   let response: Response;
   try {
     response = await options.fetch.call(undefined, X509_TOKEN_EXCHANGE_URL, {
-      ...(options.fetchOptions as RequestInit | undefined),
+      ...x509TokenExchangeFetchOptions(options.fetchOptions),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
@@ -130,7 +173,11 @@ async function exchangeAttempt(options: X509TokenExchangeOptions, body: string):
   }
 
   if (response.status === 400 || response.status === 401 || response.status === 403) {
-    throw new OAuthError(response.status, await readOAuthErrorCode(response), response.headers);
+    throw new OAuthError(
+      response.status,
+      await readOAuthErrorCode(response, options.retryCount),
+      response.headers,
+    );
   }
 
   await cancelResponseBody(response);
