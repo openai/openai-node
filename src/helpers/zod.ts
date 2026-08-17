@@ -124,6 +124,38 @@ function getZodV3RootName(name: string, schemaDefinitions: ZodSchemaDefinitions 
   return rootName;
 }
 
+function restoreZodV3DefaultAnnotations(
+  original: unknown,
+  normalized: unknown,
+  visited = new Set<object>(),
+): void {
+  if (
+    !original ||
+    typeof original !== 'object' ||
+    !normalized ||
+    typeof normalized !== 'object' ||
+    visited.has(original)
+  ) {
+    return;
+  }
+  visited.add(original);
+  const source = original as Record<string, unknown>;
+  const target = normalized as Record<string, unknown>;
+  if (hasOwn(source, 'default')) {
+    target['default'] = source['default'];
+  }
+  forEachJSONSchemaChild(source, [], (child, path) => {
+    let corresponding: unknown = target;
+    for (const key of path) {
+      corresponding =
+        corresponding && typeof corresponding === 'object'
+          ? (corresponding as Record<string, unknown>)[key]
+          : undefined;
+    }
+    restoreZodV3DefaultAnnotations(child, corresponding, visited);
+  });
+}
+
 function zodV3ToJsonSchema(
   schema: z3.ZodType,
   options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
@@ -134,13 +166,17 @@ function zodV3ToJsonSchema(
     name: rootName,
     nameStrategy: 'duplicate-ref',
     $refStrategy: 'extract-to-root',
+    pipeStrategy: 'input',
     nullableStrategy: 'property',
     ...(options.schemaDefinitions
       ? { definitions: options.schemaDefinitions as unknown as Record<string, z3.ZodType> }
       : undefined),
   });
 
-  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  const escapedSchema = escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  const strictSchema = toStrictJsonSchema(escapedSchema as JSONSchema) as Record<string, unknown>;
+  restoreZodV3DefaultAnnotations(escapedSchema, strictSchema);
+  return strictSchema;
 }
 
 function zodV4ToJsonSchema(

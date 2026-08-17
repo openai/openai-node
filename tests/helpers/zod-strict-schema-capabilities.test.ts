@@ -98,9 +98,29 @@ describe('Zod v3 strict schema capability analysis', () => {
     });
   });
 
-  it('rejects compound pipelines when one union input does not convert', () => {
-    const value = z3.union([z3.string().transform((input) => new Date(input)), z3.number()]).pipe(z3.date());
-    expect(() => formatFor(value)).toThrow('ZodDate');
+  it.each([
+    {
+      name: 'union',
+      input: () => z3.union([z3.string().transform((value) => new Date(value)), z3.number()]),
+    },
+    {
+      name: 'intersection',
+      input: () =>
+        z3.intersection(
+          z3.string().transform((value) => new Date(value)),
+          z3.string(),
+        ),
+    },
+    {
+      name: 'nested intersection',
+      input: () =>
+        z3.intersection(
+          z3.lazy(() => z3.string().transform((value) => new Date(value))),
+          z3.string(),
+        ),
+    },
+  ])('rejects compound pipelines when one $name input does not convert', ({ input }) => {
+    expect(() => formatFor(input().pipe(z3.date()))).toThrow('ZodDate');
   });
 
   it.each([
@@ -113,19 +133,131 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(() => formatFor(schema())).toThrow('ZodBigInt');
   });
 
-  it('preserves nested BigInt defaults in typed tuples and records', () => {
+  it('preserves nested BigInt defaults in supported typed arrays and objects', () => {
     const format = zodResponseFormat(
       z3.object({
-        tuple: z3.tuple([z3.coerce.bigint()]).default([4n]),
-        record: z3.record(z3.coerce.bigint()).default({ count: 5n }),
+        values: z3.array(z3.coerce.bigint()).default([4n]),
+        detail: z3.object({ count: z3.coerce.bigint() }).default({ count: 5n }),
       }),
       'strict',
     );
 
     expect(format.json_schema.schema).toMatchObject({
-      properties: { tuple: { default: [4] }, record: { default: { count: 5 } } },
+      properties: { values: { default: [4] }, detail: { default: { count: 5 } } },
     });
-    expect(format.$parseRaw('{}')).toEqual({ tuple: [4n], record: { count: 5n } });
+    expect(format.$parseRaw('{}')).toEqual({ values: [4n], detail: { count: 5n } });
+  });
+
+  it.each([
+    { name: 'tuple', schema: () => z3.tuple([z3.number()]), message: 'tuple-form' },
+    { name: 'record', schema: () => z3.record(z3.number()), message: 'additionalProperties: false' },
+    {
+      name: 'array and tuple union',
+      schema: () => z3.union([z3.array(z3.coerce.bigint()), z3.tuple([z3.number()])]),
+      message: 'tuple-form',
+    },
+    {
+      name: 'preprocessed Map',
+      schema: () =>
+        z3.preprocess((value) => new Map(value as [string, number][]), z3.map(z3.string(), z3.number())),
+      message: 'tuple-form',
+    },
+  ])('rejects unsupported $name representations at the canonical strict boundary', ({ schema, message }) => {
+    expect(() => formatFor(schema())).toThrow(message);
+  });
+
+  it.each([
+    {
+      name: 'direct union',
+      schema: () => z3.union([z3.coerce.bigint(), z3.string()]).default(4n),
+      output: 4n,
+      normalized: 4,
+    },
+    {
+      name: 'string-prefixed union',
+      schema: () => z3.union([z3.string(), z3.coerce.bigint()]).default(4n),
+      output: 4n,
+      normalized: 4,
+    },
+    {
+      name: 'nested object union',
+      schema: () =>
+        z3.union([z3.object({ count: z3.coerce.bigint() }), z3.object({ count: z3.string() })]).default({
+          count: 4n,
+        }),
+      output: { count: 4n },
+      normalized: { count: 4 },
+    },
+    {
+      name: 'discriminated object union',
+      schema: () =>
+        z3
+          .union([
+            z3.object({ kind: z3.literal('number'), count: z3.number() }),
+            z3.object({ kind: z3.literal('bigint'), count: z3.coerce.bigint() }),
+          ])
+          .default({ kind: 'bigint', count: 4n }),
+      output: { kind: 'bigint', count: 4n },
+      normalized: { kind: 'bigint', count: 4 },
+    },
+  ])(
+    'normalizes a safe BigInt default through a compatible $name branch',
+    ({ schema, output, normalized }) => {
+      const format = formatFor(schema());
+      expect(format.json_schema.schema).toHaveProperty('properties.value.default', normalized);
+      expect(format.$parseRaw('{}')).toEqual({ value: output });
+    },
+  );
+
+  it.each([
+    { name: 'number', schema: () => z3.union([z3.number(), z3.coerce.bigint()]).default(4n) },
+    { name: 'any', schema: () => z3.union([z3.any(), z3.coerce.bigint()]).default(4n) },
+    {
+      name: 'nested number',
+      schema: () =>
+        z3
+          .union([z3.object({ count: z3.number() }), z3.object({ count: z3.coerce.bigint() })])
+          .default({ count: 4n }),
+    },
+  ])('rejects BigInt defaults intercepted by an earlier $name union option', ({ schema }) => {
+    expect(() => formatFor(schema())).toThrow('ZodBigInt');
+  });
+
+  it.each([
+    {
+      name: 'Set',
+      type: 'ZodSet',
+      schema: () =>
+        z3
+          .preprocess(
+            (value) => (value instanceof Set ? value : new Set(value as string[])),
+            z3.set(z3.string()),
+          )
+          .default(new Set(['x'])),
+    },
+    {
+      name: 'Map',
+      type: 'ZodMap',
+      schema: () =>
+        z3
+          .preprocess(
+            (value) => (value instanceof Map ? value : new Map(value as [string, number][])),
+            z3.map(z3.string(), z3.number()),
+          )
+          .default(new Map([['x', 1]])),
+    },
+    {
+      name: 'nested Set',
+      type: 'ZodSet',
+      schema: () =>
+        z3
+          .object({
+            values: z3.preprocess((value) => new Set(value as string[]), z3.set(z3.string())),
+          })
+          .default({ values: new Set(['x']) }),
+    },
+  ])('rejects native $name defaults before JSON serialization', ({ schema, type }) => {
+    expect(() => formatFor(schema())).toThrow(type);
   });
 
   it('bounds fallible numeric branches before BigInt coercion', () => {
@@ -143,6 +275,32 @@ describe('Zod v3 strict schema capability analysis', () => {
       },
     });
     expect(format.$parseRaw('{"value":101}')).toEqual({ value: 101n });
+  });
+
+  it.each([
+    {
+      name: 'whole-object refinement',
+      earlier: () => z3.object({ count: z3.number() }).refine((value) => value.count < 100),
+      later: () => z3.object({ count: z3.coerce.bigint() }),
+      input: { count: 101 },
+      output: { count: 101n },
+    },
+    {
+      name: 'sibling refinement',
+      earlier: () =>
+        z3.object({ count: z3.number(), kind: z3.string().refine((value) => value === 'number') }),
+      later: () => z3.object({ count: z3.coerce.bigint(), kind: z3.string() }),
+      input: { count: 101, kind: 'bigint' },
+      output: { count: 101n, kind: 'bigint' },
+    },
+  ])('bounds numeric leaves when an earlier $name can fall through', ({ earlier, later, input, output }) => {
+    const format = formatFor(z3.union([earlier(), later()]));
+    expect(format.json_schema.schema).toHaveProperty('properties.value.anyOf.0.properties.count', {
+      type: 'number',
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(format.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: output });
   });
 
   it.each([
@@ -174,6 +332,13 @@ describe('Zod v3 strict schema capability analysis', () => {
       branch: { type: 'number' },
       input: 1e20,
     },
+    {
+      name: 'disjoint constrained intersection',
+      bigint: () => z3.intersection(z3.coerce.bigint().max(10n), z3.coerce.bigint()),
+      number: () => z3.number().min(1e20),
+      branch: { type: 'number', minimum: 1e20 },
+      input: 1e20,
+    },
   ])('preserves $name in later number alternatives', ({ bigint, number, branch, input }) => {
     const format = formatFor(z3.union([bigint(), number()]));
     const schema = format.json_schema.schema as {
@@ -184,21 +349,18 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(format.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: input });
   });
 
-  it('bounds numbers after Promise-wrapped BigInt producers', async () => {
+  it('does not treat Promise-wrapped BigInt as a synchronous union producer', () => {
     const value = z3.union([z3.promise(z3.coerce.bigint()), z3.number()]);
     const format = formatFor(value);
 
     expect(format.json_schema.schema).toMatchObject({
       properties: {
         value: {
-          anyOf: [
-            expect.anything(),
-            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
-          ],
+          anyOf: [expect.anything(), { type: 'number' }],
         },
       },
     });
-    await expect(value.parseAsync(7)).resolves.toBe(7n);
+    expect(format.$parseRaw('{"value":7}')).toEqual({ value: 7 });
   });
 
   it.each([
@@ -209,12 +371,6 @@ describe('Zod v3 strict schema capability analysis', () => {
       schema: () => z3.set(z3.string()).catch(new Set(['fallback'])),
       input: [],
       output: new Set(['fallback']),
-    },
-    {
-      name: 'Map',
-      schema: () => z3.map(z3.string(), z3.number()).catch(new Map([['fallback', 1]])),
-      input: [],
-      output: new Map([['fallback', 1]]),
     },
   ])('treats typed $name catch fallbacks as native conversions', ({ schema, input, output }) => {
     const format = formatFor(schema());
@@ -291,28 +447,12 @@ describe('Zod v3 strict schema capability analysis', () => {
       path: ['items'],
     },
     {
-      name: 'tuple positions',
-      producer: () => z3.tuple([z3.coerce.bigint()]),
-      consumer: () => z3.tuple([z3.number()]),
-      input: [7],
-      output: [7n],
-      path: ['items', 0],
-    },
-    {
       name: 'nested object-array paths',
       producer: () => z3.object({ values: z3.array(z3.object({ count: z3.coerce.bigint() })) }),
       consumer: () => z3.object({ values: z3.array(z3.object({ count: z3.number() })) }),
       input: { values: [{ count: 7 }] },
       output: { values: [{ count: 7n }] },
       path: ['properties', 'values', 'items', 'properties', 'count'],
-    },
-    {
-      name: 'record values',
-      producer: () => z3.record(z3.coerce.bigint()),
-      consumer: () => z3.record(z3.number()),
-      input: { count: 7 },
-      output: { count: 7n },
-      path: ['additionalProperties'],
     },
   ])(
     'bounds unsafe overlap at matching $name in union alternatives',
@@ -348,6 +488,39 @@ describe('Zod v3 strict schema capability analysis', () => {
       type: 'number',
     });
   });
+
+  it.each([
+    {
+      name: 'nested literal',
+      bigint: () => z3.object({ kind: z3.object({ name: z3.literal('bigint') }), count: z3.coerce.bigint() }),
+      number: () =>
+        z3.object({ kind: z3.object({ name: z3.literal('number') }), count: z3.number().min(1e20) }),
+      input: { kind: { name: 'number' }, count: 1e20 },
+    },
+    {
+      name: 'wrapped literal',
+      bigint: () => z3.object({ kind: z3.literal('bigint').readonly(), count: z3.coerce.bigint() }),
+      number: () =>
+        z3.object({ kind: z3.literal('number').brand<'number-kind'>(), count: z3.number().min(1e20) }),
+      input: { kind: 'number', count: 1e20 },
+    },
+    {
+      name: 'enum',
+      bigint: () => z3.object({ kind: z3.enum(['bigint']), count: z3.coerce.bigint() }),
+      number: () => z3.object({ kind: z3.enum(['number']), count: z3.number().min(1e20) }),
+      input: { kind: 'number', count: 1e20 },
+    },
+  ])(
+    'preserves unsafe-range number branches separated by a $name discriminator',
+    ({ bigint, number, input }) => {
+      const format = formatFor(z3.union([bigint(), number()]));
+      expect(format.json_schema.schema).toHaveProperty('properties.value.anyOf.1.properties.count', {
+        type: 'number',
+        minimum: 1e20,
+      });
+      expect(format.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: input });
+    },
+  );
 
   it('preserves disjoint and one-sided nested numeric interception intervals', () => {
     const disjoint = formatFor(
@@ -391,14 +564,18 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(format.json_schema.schema).toHaveProperty('properties.outsideContainer.properties.count', {
       type: 'number',
     });
+    expect(format.json_schema.schema).toHaveProperty('properties.direct.anyOf.1.properties.count', {
+      type: 'number',
+      ...bounds,
+    });
     expect(format.json_schema.schema).toHaveProperty(
-      'properties.direct.anyOf.1.properties.count.allOf.1',
-      bounds,
+      'properties.nested.anyOf.1.properties.child.properties.count',
+      {
+        type: 'number',
+        ...bounds,
+      },
     );
-    expect(format.json_schema.schema).toHaveProperty(
-      'properties.nested.anyOf.1.properties.child.allOf.1.properties.count',
-      bounds,
-    );
+    expect(JSON.stringify(format.json_schema.schema)).not.toContain('"allOf"');
   });
 
   it.each(['leaf-first', 'holder-first'] as const)(
@@ -421,6 +598,30 @@ describe('Zod v3 strict schema capability analysis', () => {
 });
 
 describe.each(strictHelpers)('$name strict numeric input capability analysis', ({ create }) => {
+  it.each([
+    { name: 'direct BigInt', schema: () => z3.number().int().transform(BigInt) },
+    { name: 'opaque BigInt', schema: () => z3.number().transform((value) => BigInt(Math.trunc(value))) },
+    {
+      name: 'wrapped BigInt',
+      schema: () => z3.number().int().transform(BigInt).nullable(),
+    },
+  ])('conservatively bounds numeric $name transforms', ({ schema }) => {
+    const result = create(z3.object({ value: schema() }));
+    const generated = strictHelperSchema(result) as {
+      properties: { value: Record<string, unknown> };
+    };
+    const property = generated.properties.value;
+    const value = Array.isArray(property['anyOf'])
+      ? (property['anyOf'][0] as Record<string, unknown>)
+      : property;
+
+    expect(value).toMatchObject({
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+  });
+
   it.each([
     {
       name: 'output refinement',
@@ -611,8 +812,6 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       properties: { value: { anyOf: Record<string, unknown>[] } };
     };
 
-    expect(generated.properties.value.anyOf[0]).toEqual({
-      allOf: [{ type: 'number' }, { type: 'number', maximum: 9 }],
-    });
+    expect(generated.properties.value.anyOf[0]).toEqual({ type: 'number', maximum: 9 });
   });
 });

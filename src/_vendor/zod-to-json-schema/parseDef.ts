@@ -58,9 +58,11 @@ import {
   acceptsEveryJSONNumber,
   acceptsJSONNumber,
   applyNestedNumericOverlaps,
+  applySafeIntegerBounds,
   applyUnsafeBigIntBounds,
   convertsJSONPipelineInput,
   findNestedNumericOverlaps,
+  hasOpaqueJSONValidation,
   producesBigIntAtPath,
   producesBigIntOutput,
 } from './schema-capabilities';
@@ -104,8 +106,9 @@ export type JsonSchema7TypeUnion =
 export type JsonSchema7Type = JsonSchema7TypeUnion & JsonSchema7Meta;
 
 const jsonInputPreprocessor = Symbol('openaiJsonInputPreprocessor');
+const constrainedReferenceContext = Symbol('openaiConstrainedReferenceContext');
 
-type PreprocessedRefs = Refs & { [jsonInputPreprocessor]?: true };
+type PreprocessedRefs = Refs & { [jsonInputPreprocessor]?: true; [constrainedReferenceContext]?: true };
 
 const hasJSONInputPreprocessor = (refs: Refs): boolean =>
   (refs as PreprocessedRefs)[jsonInputPreprocessor] === true;
@@ -207,10 +210,13 @@ export function parseDef(
   }
 
   // Native leaves and their already-materialized shared ancestors must remain
-  // inside the conversion context. In-progress recursive definitions still use
-  // references so recursive schemas terminate normally.
+  // inside the conversion context. Constrained union branches similarly need
+  // materialized copies instead of unsupported allOf ref overlays.
+  const materializeConstrainedReference =
+    refs.openaiStrictMode === true && (refs as PreprocessedRefs)[constrainedReferenceContext] === true;
   const inlinePreprocessedType =
-    isPreprocessed && (needsPreprocessing || (seenItem !== undefined && seenItem.jsonSchema !== undefined));
+    (isPreprocessed || materializeConstrainedReference) &&
+    (needsPreprocessing || (seenItem !== undefined && seenItem.jsonSchema !== undefined));
 
   if (seenItem && !forceResolution && !inlinePreprocessedType) {
     const seenSchema = get$ref(seenItem, refs);
@@ -379,15 +385,20 @@ const normalizeStrictDefaultValue = (
   keyword = 'default',
   seen = new WeakMap<object, unknown>(),
   path: readonly (string | number)[] = [],
+  rootValue: unknown = value,
 ): unknown => {
   if (typeof value === 'bigint') {
-    if (!producesBigIntAtPath(definition, path)) {
+    if (!producesBigIntAtPath(definition, path, rootValue)) {
       throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodBigInt, refs);
     }
     return normalizeStrictBigIntValue(value, keyword, refs);
   }
   if (!value || typeof value !== 'object') {
     return value;
+  }
+  if (value instanceof Set || value instanceof Map) {
+    const typeName = value instanceof Set ? ZodFirstPartyTypeKind.ZodSet : ZodFirstPartyTypeKind.ZodMap;
+    throwUnrepresentableStrictZodType(typeName, refs);
   }
 
   const previous = seen.get(value);
@@ -408,6 +419,7 @@ const normalizeStrictDefaultValue = (
         `${keyword}[${index}]`,
         seen,
         [...path, index],
+        rootValue,
       );
       normalized.push(normalizedItem);
       changed ||= normalizedItem !== item;
@@ -429,10 +441,15 @@ const normalizeStrictDefaultValue = (
   seen.set(value, normalized);
   let changed = false;
   for (const [key, item] of Object.entries(value)) {
-    const normalizedItem = normalizeStrictDefaultValue(item, definition, refs, `${keyword}.${key}`, seen, [
-      ...path,
-      key,
-    ]);
+    const normalizedItem = normalizeStrictDefaultValue(
+      item,
+      definition,
+      refs,
+      `${keyword}.${key}`,
+      seen,
+      [...path, key],
+      rootValue,
+    );
     Object.defineProperty(normalized, key, {
       value: normalizedItem,
       configurable: true,
@@ -447,6 +464,40 @@ const normalizeStrictDefaultValue = (
     return value;
   }
   return normalized;
+};
+
+const isNumericSchemaType = (type: unknown) => type === 'number' || type === 'integer';
+
+const mergeStrictScalarSchemas = (
+  left: JsonSchema7Type,
+  right: JsonSchema7Type,
+): JsonSchema7Type | undefined => {
+  const first = left as Record<string, unknown>;
+  const second = right as Record<string, unknown>;
+  if (
+    '$ref' in first ||
+    '$ref' in second ||
+    (first['type'] !== second['type'] &&
+      !(isNumericSchemaType(first['type']) && isNumericSchemaType(second['type'])))
+  ) {
+    return undefined;
+  }
+
+  const merged: Record<string, unknown> = { ...first };
+  for (const [keyword, value] of Object.entries(second)) {
+    if (value === undefined || merged[keyword] === undefined || Object.is(merged[keyword], value)) {
+      merged[keyword] = value;
+    } else if (keyword === 'minimum' || keyword === 'exclusiveMinimum' || keyword === 'minLength') {
+      merged[keyword] = Math.max(merged[keyword] as number, value as number);
+    } else if (keyword === 'maximum' || keyword === 'exclusiveMaximum' || keyword === 'maxLength') {
+      merged[keyword] = Math.min(merged[keyword] as number, value as number);
+    } else if (keyword === 'type' && isNumericSchemaType(merged[keyword]) && isNumericSchemaType(value)) {
+      merged[keyword] = 'integer';
+    } else {
+      return undefined;
+    }
+  }
+  return merged as JsonSchema7Type;
 };
 
 const selectParser = (
@@ -535,7 +586,9 @@ const selectParser = (
                 : findNestedNumericOverlaps(producer._def, consumer._def).filter(
                     (overlap) =>
                       overlap.path.length > 0 &&
-                      (producerIndex < consumerIndex || !acceptsEveryJSONNumber(overlap.consumer)),
+                      (producerIndex < consumerIndex ||
+                        !acceptsEveryJSONNumber(overlap.consumer) ||
+                        hasOpaqueJSONValidation(consumer._def)),
                   ),
             ),
           )
@@ -559,6 +612,9 @@ const selectParser = (
               {
                 ...refs,
                 currentPath: [...refs.currentPath, 'anyOf', String(index)],
+                ...(boundNumber || branchOverlaps.length > 0
+                  ? { [constrainedReferenceContext]: true as const }
+                  : undefined),
               },
               boundNumber || branchOverlaps.length > 0,
             );
@@ -593,7 +649,26 @@ const selectParser = (
       return parseUnionDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodIntersection: {
-      return parseIntersectionDef(def, refs);
+      const intersectionRefs: PreprocessedRefs = refs.openaiStrictMode
+        ? { ...refs, [constrainedReferenceContext]: true as const }
+        : refs;
+      const schema = parseIntersectionDef(def, intersectionRefs);
+      if (!refs.openaiStrictMode || !schema || !('allOf' in schema)) {
+        return schema;
+      }
+
+      const [first, ...remaining] = (schema as JsonSchema7AllOfType).allOf;
+      if (!first) {
+        return schema;
+      }
+      let merged: JsonSchema7Type | undefined = first;
+      for (const next of remaining) {
+        if (!merged) {
+          break;
+        }
+        merged = mergeStrictScalarSchemas(merged, next);
+      }
+      return merged ?? schema;
     }
     case ZodFirstPartyTypeKind.ZodTuple: {
       return parseTupleDef(def, refs);
@@ -667,7 +742,12 @@ const selectParser = (
         return parseEffectsDef(def, preprocessedRefs, forceResolution);
       }
 
-      return parseEffectsDef(def, refs, forceResolution);
+      const boundNumericTransform =
+        refs.openaiStrictMode === true &&
+        def.effect?.type === 'transform' &&
+        acceptsJSONNumber(def.schema._def);
+      const schema = parseEffectsDef(def, refs, forceResolution || boundNumericTransform);
+      return boundNumericTransform && schema !== undefined ? applySafeIntegerBounds(schema) : schema;
     }
     case ZodFirstPartyTypeKind.ZodAny: {
       return parseAnyDef();
@@ -700,13 +780,18 @@ const selectParser = (
       return parseCatchDef(def, refs, forceResolution);
     }
     case ZodFirstPartyTypeKind.ZodPipeline: {
-      if (refs.openaiStrictMode && convertsJSONPipelineInput(def.in._def, def.out._def)) {
-        const outputRefs: PreprocessedRefs = {
-          ...refs,
-          [jsonInputPreprocessor]: true,
-        };
-
-        return parsePipelineDef(def, refs, forceResolution, outputRefs);
+      if (refs.openaiStrictMode) {
+        const outputRefs: PreprocessedRefs = convertsJSONPipelineInput(def.in._def, def.out._def)
+          ? { ...refs, [jsonInputPreprocessor]: true as const }
+          : refs;
+        const output = parseDef(def.out._def, {
+          ...outputRefs,
+          currentPath: [...refs.currentPath, 'output'],
+        });
+        const input = parsePipelineDef(def, refs, forceResolution, outputRefs);
+        return input && output && outputRefs === refs
+          ? (mergeStrictScalarSchemas(input, output) ?? input)
+          : input;
       }
 
       return parsePipelineDef(def, refs, forceResolution);

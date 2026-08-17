@@ -26,10 +26,17 @@ type InspectableDefinition = ZodTypeDef & {
   rest?: SchemaType;
   valueType: SchemaType;
 };
-type Traversal = 'input' | 'output' | 'conversion' | 'default' | 'unconditional-number';
+type Traversal = 'input' | 'output' | 'unsafe-output' | 'conversion' | 'default' | 'unconditional-number';
 type Inspector = (definition: InspectableDefinition) => boolean | null | undefined;
 
 type TraversalChildren = { values: SchemaType[]; every: boolean };
+const asynchronousOutputTraversals = new Set<Traversal>(['output', 'unsafe-output', 'default']);
+const universalIntersectionTraversals = new Set<Traversal>([
+  'input',
+  'conversion',
+  'unsafe-output',
+  'unconditional-number',
+]);
 
 const pipelineChildren = (def: InspectableDefinition, traversal: Traversal): SchemaType[] => {
   if (traversal === 'input') {
@@ -50,9 +57,11 @@ const childDefinitions = (def: InspectableDefinition, traversal: Traversal): Tra
     case ZodFirstPartyTypeKind.ZodReadonly: {
       return { values: [def.innerType], every: false };
     }
-    case ZodFirstPartyTypeKind.ZodBranded:
-    case ZodFirstPartyTypeKind.ZodPromise: {
+    case ZodFirstPartyTypeKind.ZodBranded: {
       return { values: [def.type], every: false };
+    }
+    case ZodFirstPartyTypeKind.ZodPromise: {
+      return asynchronousOutputTraversals.has(traversal) ? null : { values: [def.type], every: false };
     }
     case ZodFirstPartyTypeKind.ZodEffects: {
       return { values: [def.schema], every: false };
@@ -69,12 +78,12 @@ const childDefinitions = (def: InspectableDefinition, traversal: Traversal): Tra
     case ZodFirstPartyTypeKind.ZodUnion:
     case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
       const values = def.options instanceof Map ? [...def.options.values()] : def.options;
-      return { values, every: traversal === 'conversion' || traversal === 'default' };
+      return { values, every: traversal === 'conversion' };
     }
     case ZodFirstPartyTypeKind.ZodIntersection: {
       return {
         values: [def.left, def.right],
-        every: traversal === 'input' || traversal === 'unconditional-number',
+        every: universalIntersectionTraversals.has(traversal),
       };
     }
     default: {
@@ -222,6 +231,35 @@ const classifyJSONNumberAcceptance = (
 export const acceptsEveryJSONNumber = (definition: ZodTypeDef): boolean =>
   classifyJSONNumberAcceptance(definition) !== 'opaque';
 
+const validationChildren = (def: InspectableDefinition): SchemaType[] => {
+  if (def.typeName === ZodFirstPartyTypeKind.ZodObject) {
+    return Object.values(def.shape());
+  }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodArray) {
+    return [def.type];
+  }
+  return childDefinitions(def, 'input')?.values ?? [];
+};
+
+export const hasOpaqueJSONValidation = (definition: ZodTypeDef, active = new Set<ZodTypeDef>()): boolean => {
+  if (active.has(definition)) {
+    return true;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodEffects ||
+      def.typeName === ZodFirstPartyTypeKind.ZodPromise
+    ) {
+      return true;
+    }
+    return validationChildren(def).some((child) => hasOpaqueJSONValidation(child._def, active));
+  } finally {
+    active.delete(definition);
+  }
+};
+
 type UnsafeIntegerSide = 'minimum' | 'maximum';
 
 export const capturesUnsafeBigIntInput = (definition: ZodTypeDef, side: UnsafeIntegerSide): boolean =>
@@ -241,7 +279,7 @@ export const capturesUnsafeBigIntInput = (definition: ZodTypeDef, side: UnsafeIn
           (side === 'minimum' ? check.value >= safeLimit : check.value <= safeLimit),
       );
     },
-    'output',
+    'unsafe-output',
   );
 
 export const acceptsUnsafeJSONInteger = (schema: unknown, side: UnsafeIntegerSide): boolean => {
@@ -311,13 +349,129 @@ export const convertsJSONPipelineInput = (definition: ZodTypeDef, output: ZodTyp
     'conversion',
   );
 
+const acceptsJSONNumberAtPath = (definition: ZodTypeDef, path: readonly (string | number)[]): boolean =>
+  visitDefinition(
+    definition,
+    (def) => {
+      if (path.length === 0) {
+        return acceptsJSONNumber(def);
+      }
+      if (
+        def.typeName === ZodFirstPartyTypeKind.ZodAny ||
+        def.typeName === ZodFirstPartyTypeKind.ZodUnknown
+      ) {
+        return true;
+      }
+      const [key, ...remaining] = path;
+      let child: SchemaType | undefined;
+      if (def.typeName === ZodFirstPartyTypeKind.ZodObject && typeof key === 'string') {
+        const shape = def.shape();
+        child = hasOwn(shape, key) ? shape[key] : def.catchall;
+      } else if (def.typeName === ZodFirstPartyTypeKind.ZodArray && typeof key === 'number') {
+        child = def.type;
+      } else {
+        return;
+      }
+      return child !== undefined && acceptsJSONNumberAtPath(child._def, remaining);
+    },
+    'input',
+  );
+
+const discriminatorValues = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): readonly unknown[] | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    switch (def.typeName) {
+      case ZodFirstPartyTypeKind.ZodLiteral: {
+        return [def.value];
+      }
+      case ZodFirstPartyTypeKind.ZodEnum:
+      case ZodFirstPartyTypeKind.ZodNativeEnum: {
+        return Object.values(def.values);
+      }
+      case ZodFirstPartyTypeKind.ZodEffects: {
+        return def.effect.type === 'refinement' ? discriminatorValues(def.schema._def, active) : undefined;
+      }
+      case ZodFirstPartyTypeKind.ZodBranded: {
+        return discriminatorValues(def.type._def, active);
+      }
+      case ZodFirstPartyTypeKind.ZodReadonly:
+      case ZodFirstPartyTypeKind.ZodDefault: {
+        return discriminatorValues(def.innerType._def, active);
+      }
+      case ZodFirstPartyTypeKind.ZodLazy: {
+        return discriminatorValues(def.getter()._def, active);
+      }
+      default: {
+        return undefined;
+      }
+    }
+  } finally {
+    active.delete(definition);
+  }
+};
+
+const matchesDefaultDiscriminators = (
+  definition: ZodTypeDef,
+  value: unknown,
+  active = new Set<ZodTypeDef>(),
+): boolean => {
+  if (active.has(definition) || !value || typeof value !== 'object' || Array.isArray(value)) {
+    return true;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (def.typeName !== ZodFirstPartyTypeKind.ZodObject) {
+      return true;
+    }
+    const record = value as Record<string, unknown>;
+    return Object.entries(def.shape()).every(([key, child]) => {
+      if (!hasOwn(record, key)) {
+        return true;
+      }
+      const literals = discriminatorValues(child._def);
+      return literals
+        ? literals.includes(record[key])
+        : matchesDefaultDiscriminators(child._def, record[key], active);
+    });
+  } finally {
+    active.delete(definition);
+  }
+};
+
 export const producesBigIntAtPath = (
   definition: ZodTypeDef,
   path: readonly (string | number)[] = [],
+  value?: unknown,
 ): boolean =>
   visitDefinition(
     definition,
     (def) => {
+      if (
+        def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
+        def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion
+      ) {
+        const options = def.options instanceof Map ? [...def.options.values()] : def.options;
+        for (const option of options) {
+          if (!matchesDefaultDiscriminators(option._def, value)) {
+            continue;
+          }
+          if (producesBigIntAtPath(option._def, path, value)) {
+            return true;
+          }
+          if (acceptsJSONNumberAtPath(option._def, path)) {
+            return false;
+          }
+        }
+        return false;
+      }
       if (path.length === 0) {
         if (def.typeName === ZodFirstPartyTypeKind.ZodBigInt) {
           return true;
@@ -326,6 +480,9 @@ export const producesBigIntAtPath = (
       }
 
       const [key, ...remaining] = path;
+      if (key === undefined) {
+        return false;
+      }
       let child: SchemaType | undefined;
       switch (def.typeName) {
         case ZodFirstPartyTypeKind.ZodObject: {
@@ -340,30 +497,19 @@ export const producesBigIntAtPath = (
           child = typeof key === 'number' ? (def.type as SchemaType) : undefined;
           break;
         }
-        case ZodFirstPartyTypeKind.ZodTuple: {
-          child =
-            typeof key === 'number' ? ((def.items[key] ?? def.rest) as SchemaType | undefined) : undefined;
-          break;
-        }
-        case ZodFirstPartyTypeKind.ZodRecord: {
-          child = typeof key === 'string' ? (def.valueType as SchemaType) : undefined;
-          break;
-        }
         default: {
           return;
         }
       }
 
-      return child !== undefined && producesBigIntAtPath(child._def, remaining);
+      const nestedValue =
+        value && typeof value === 'object' ? (value as Record<string | number, unknown>)[key] : undefined;
+      return child !== undefined && producesBigIntAtPath(child._def, remaining, nestedValue);
     },
     'default',
   );
 
-type NumericPathSegment =
-  | { kind: 'property'; key: string }
-  | { kind: 'array' }
-  | { kind: 'tuple'; index: number }
-  | { kind: 'record' };
+type NumericPathSegment = { kind: 'property'; key: string } | { kind: 'array' };
 
 export type NestedNumericOverlap = {
   path: readonly NumericPathSegment[];
@@ -377,21 +523,46 @@ type PairedChild = {
   segment: NumericPathSegment;
 };
 
+const haveDisjointDiscriminators = (
+  producer: ZodTypeDef,
+  consumer: ZodTypeDef,
+  active = new Map<ZodTypeDef, Set<ZodTypeDef>>(),
+): boolean => {
+  if (active.get(producer)?.has(consumer)) {
+    return false;
+  }
+  const consumers = active.get(producer) ?? new Set<ZodTypeDef>();
+  active.set(producer, consumers);
+  consumers.add(consumer);
+  try {
+    const left = producer as InspectableDefinition;
+    const right = consumer as InspectableDefinition;
+    const leftValues = discriminatorValues(left);
+    const rightValues = discriminatorValues(right);
+    if (leftValues && rightValues) {
+      return leftValues.every((value) => !rightValues.includes(value));
+    }
+    if (
+      left.typeName !== ZodFirstPartyTypeKind.ZodObject ||
+      right.typeName !== ZodFirstPartyTypeKind.ZodObject
+    ) {
+      return false;
+    }
+    const leftShape = left.shape();
+    return Object.entries(right.shape()).some(([key, value]) => {
+      const candidate = hasOwn(leftShape, key) ? leftShape[key] : undefined;
+      return candidate !== undefined && haveDisjointDiscriminators(candidate._def, value._def, active);
+    });
+  } finally {
+    consumers.delete(consumer);
+  }
+};
+
 const objectChildren = (producer: InspectableDefinition, consumer: InspectableDefinition): PairedChild[] => {
   const producerShape = producer.shape();
   const consumerShape = consumer.shape();
   const sharedKeys = Object.keys(consumerShape).filter((key) => hasOwn(producerShape, key));
-  if (
-    sharedKeys.some((key) => {
-      const left = producerShape[key]?._def as InspectableDefinition | undefined;
-      const right = consumerShape[key]?._def as InspectableDefinition | undefined;
-      return (
-        left?.typeName === ZodFirstPartyTypeKind.ZodLiteral &&
-        right?.typeName === ZodFirstPartyTypeKind.ZodLiteral &&
-        left.value !== right.value
-      );
-    })
-  ) {
+  if (haveDisjointDiscriminators(producer, consumer)) {
     return [];
   }
 
@@ -400,17 +571,6 @@ const objectChildren = (producer: InspectableDefinition, consumer: InspectableDe
     const right = consumerShape[key];
     return left && right ? [{ producer: left, consumer: right, segment: { kind: 'property', key } }] : [];
   });
-};
-
-const tupleChildren = (producer: InspectableDefinition, consumer: InspectableDefinition): PairedChild[] => {
-  const values: PairedChild[] = consumer.items.flatMap((item, index) => {
-    const left = producer.items[index] ?? producer.rest;
-    return left ? [{ producer: left, consumer: item, segment: { kind: 'tuple' as const, index } }] : [];
-  });
-  if (producer.rest && consumer.rest) {
-    values.push({ producer: producer.rest, consumer: consumer.rest, segment: { kind: 'array' } });
-  }
-  return values;
 };
 
 const pairedContainerChildren = (
@@ -428,18 +588,6 @@ const pairedContainerChildren = (
     consumer.typeName === ZodFirstPartyTypeKind.ZodArray
   ) {
     return [{ producer: producer.type, consumer: consumer.type, segment: { kind: 'array' } }];
-  }
-  if (
-    producer.typeName === ZodFirstPartyTypeKind.ZodTuple &&
-    consumer.typeName === ZodFirstPartyTypeKind.ZodTuple
-  ) {
-    return tupleChildren(producer, consumer);
-  }
-  if (
-    producer.typeName === ZodFirstPartyTypeKind.ZodRecord &&
-    consumer.typeName === ZodFirstPartyTypeKind.ZodRecord
-  ) {
-    return [{ producer: producer.valueType, consumer: consumer.valueType, segment: { kind: 'record' } }];
   }
   return [];
 };
@@ -506,30 +654,15 @@ export const findNestedNumericOverlaps = (
   return overlaps;
 };
 
-export const applyUnsafeBigIntBounds = (
-  schema: JsonSchema7Type,
-  producers: readonly ZodTypeDef[],
-): JsonSchema7Type => {
-  const minimum =
-    producers.some((candidate) => capturesUnsafeBigIntInput(candidate, 'minimum')) &&
-    (acceptsUnsafeJSONInteger(schema, 'minimum') || (!('type' in schema) && !('$ref' in schema)));
-  const maximum =
-    producers.some((candidate) => capturesUnsafeBigIntInput(candidate, 'maximum')) &&
-    (acceptsUnsafeJSONInteger(schema, 'maximum') || (!('type' in schema) && !('$ref' in schema)));
+const applyIntegerBounds = (schema: JsonSchema7Type, minimum: boolean, maximum: boolean): JsonSchema7Type => {
   if (!minimum && !maximum) {
     return schema;
   }
 
   if ('$ref' in schema) {
-    return {
-      allOf: [
-        schema,
-        {
-          ...(minimum ? { minimum: Number.MIN_SAFE_INTEGER } : undefined),
-          ...(maximum ? { maximum: Number.MAX_SAFE_INTEGER } : undefined),
-        } as JsonSchema7Type,
-      ],
-    };
+    throw new Error(
+      'A constrained JSON Schema reference must be materialized before applying integer bounds.',
+    );
   }
 
   const record = schema as Record<string, unknown>;
@@ -548,45 +681,24 @@ export const applyUnsafeBigIntBounds = (
   return schema;
 };
 
-const wrapNestedConstraint = (schema: JsonSchema7Type, segment: NumericPathSegment): JsonSchema7Type => {
-  switch (segment.kind) {
-    case 'property': {
-      return { type: 'object', properties: { [segment.key]: schema } } as JsonSchema7Type;
-    }
-    case 'array': {
-      return { type: 'array', items: schema } as JsonSchema7Type;
-    }
-    case 'tuple': {
-      const items: JsonSchema7Type[] = Array.from({ length: segment.index }, () => ({}) as JsonSchema7Type);
-      items.push(schema);
-      return { type: 'array', items } as JsonSchema7Type;
-    }
-    case 'record': {
-      return { type: 'object', additionalProperties: schema } as JsonSchema7Type;
-    }
-    default: {
-      return schema;
-    }
-  }
-};
+export const applyUnsafeBigIntBounds = (
+  schema: JsonSchema7Type,
+  producers: readonly ZodTypeDef[],
+): JsonSchema7Type =>
+  applyIntegerBounds(
+    schema,
+    producers.some((candidate) => capturesUnsafeBigIntInput(candidate, 'minimum')) &&
+      (acceptsUnsafeJSONInteger(schema, 'minimum') || (!('type' in schema) && !('$ref' in schema))),
+    producers.some((candidate) => capturesUnsafeBigIntInput(candidate, 'maximum')) &&
+      (acceptsUnsafeJSONInteger(schema, 'maximum') || (!('type' in schema) && !('$ref' in schema))),
+  );
 
-const nestedConstraint = (
-  path: readonly NumericPathSegment[],
-  producer: ZodTypeDef,
-): JsonSchema7Type | null => {
-  let constrained = applyUnsafeBigIntBounds({} as JsonSchema7Type, [producer]);
-  if (!('minimum' in constrained) && !('maximum' in constrained)) {
-    return null;
-  }
-
-  for (let index = path.length - 1; index >= 0; index -= 1) {
-    const segment = path[index];
-    if (segment) {
-      constrained = wrapNestedConstraint(constrained, segment);
-    }
-  }
-  return constrained;
-};
+export const applySafeIntegerBounds = (schema: JsonSchema7Type): JsonSchema7Type =>
+  applyIntegerBounds(
+    schema,
+    acceptsUnsafeJSONInteger(schema, 'minimum'),
+    acceptsUnsafeJSONInteger(schema, 'maximum'),
+  );
 
 const boundNestedNumericPath = (
   schema: JsonSchema7Type,
@@ -603,8 +715,9 @@ const boundNestedNumericPath = (
   }
   const record = schema as Record<string, unknown>;
   if ('$ref' in record) {
-    const constraint = nestedConstraint(path, producer);
-    return constraint ? ({ allOf: [schema, constraint] } as JsonSchema7Type) : schema;
+    throw new Error(
+      'A constrained nested JSON Schema reference must be materialized before applying bounds.',
+    );
   }
   if (segment.kind === 'property') {
     const properties = record['properties'] as Record<string, JsonSchema7Type> | undefined;
@@ -615,17 +728,9 @@ const boundNestedNumericPath = (
     return schema;
   }
 
-  const key = segment.kind === 'record' ? 'additionalProperties' : 'items';
-  const child = record[key] as JsonSchema7Type | JsonSchema7Type[] | undefined;
-  if (Array.isArray(child)) {
-    if (segment.kind === 'tuple') {
-      const item = child[segment.index];
-      if (item) {
-        child[segment.index] = boundNestedNumericPath(item, remaining, producer);
-      }
-    }
-  } else if (child && typeof child === 'object') {
-    record[key] = boundNestedNumericPath(child, remaining, producer);
+  const child = record['items'] as JsonSchema7Type | undefined;
+  if (child && typeof child === 'object' && !Array.isArray(child)) {
+    record['items'] = boundNestedNumericPath(child, remaining, producer);
   }
   return schema;
 };

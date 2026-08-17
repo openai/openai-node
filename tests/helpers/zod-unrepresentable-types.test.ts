@@ -68,16 +68,6 @@ const preprocessedTypes = [
     input: ['value'],
     expected: () => new Set(['value']),
   },
-  {
-    name: 'ZodMap',
-    schema: () =>
-      z3.preprocess(
-        (value) => (Array.isArray(value) ? new Map(value as [string, number][]) : value),
-        z3.map(z3.string(), z3.number()),
-      ),
-    input: [['value', 7]],
-    expected: () => new Map([['value', 7]]),
-  },
 ];
 
 describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ create }) => {
@@ -151,16 +141,6 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
           .pipe(z3.set(z3.string())),
       input: ['value'],
       expected: (): Set<string> => new Set(['value']),
-    },
-    {
-      name: 'ZodMap',
-      schema: () =>
-        z3
-          .array(z3.tuple([z3.string(), z3.number()]))
-          .transform((value) => new Map(value))
-          .pipe(z3.map(z3.string(), z3.number())),
-      input: [['value', 7]],
-      expected: (): Map<string, number> => new Map([['value', 7]]),
     },
   ])('preserves pipeline transforms that construct $name values', ({ schema, input, expected }) => {
     const result = create(z3.object({ value: schema() }));

@@ -7,7 +7,7 @@ import type { Refs } from '../Refs';
 
 export type JsonSchema7SetType = {
   type: 'array';
-  uniqueItems: true;
+  uniqueItems?: true;
   items?: JsonSchema7Type | undefined;
   minItems?: number;
   maxItems?: number;
@@ -22,7 +22,7 @@ export function parseSetDef(def: ZodSetDef, refs: Refs): JsonSchema7SetType {
 
   const schema: JsonSchema7SetType = {
     type: 'array',
-    uniqueItems: true,
+    ...(refs.openaiStrictMode ? undefined : { uniqueItems: true as const }),
     items,
   };
 

@@ -9,8 +9,11 @@ export const parseOptionalDef = (
   forceResolution: boolean,
 ): JsonSchema7Type | undefined => {
   if (
-    refs.propertyPath &&
-    refs.currentPath.slice(0, refs.propertyPath.length).toString() === refs.propertyPath.toString()
+    (refs.openaiStrictMode &&
+      (refs.currentPath.length > refs.basePath.length + 2 ||
+        refs.currentPath[refs.basePath.length + 1] !== refs.name)) ||
+    (refs.propertyPath &&
+      refs.currentPath.slice(0, refs.propertyPath.length).toString() === refs.propertyPath.toString())
   ) {
     return parseDef(def.innerType._def, { ...refs, currentPath: refs.currentPath }, forceResolution);
   }
