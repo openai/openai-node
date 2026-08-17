@@ -297,6 +297,7 @@ class BedrockBearerAuth implements BedrockRequestAuth {
       throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
     }
     headers.set('authorization', `Bearer ${token}`);
+    request.redirect = 'manual';
     request.headers = headers;
   }
 }
