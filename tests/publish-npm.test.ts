@@ -104,15 +104,15 @@ describe('bin/publish-npm credential isolation', () => {
     const environment: NodeJS.ProcessEnv = {
       ...process.env,
       HOME: path.join(fixture, 'home'),
-      PATH: [path.join(fixture, 'mock-bin'), process.env.PATH ?? ''].join(path.delimiter),
+      PATH: [path.join(fixture, 'mock-bin'), process.env['PATH'] ?? ''].join(path.delimiter),
       NPM_TOKEN: 'synthetic-publish-token',
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: '',
       ORIGINAL_USERCONFIG: originalConfig,
       PUBLISH_EVENTS: eventsPath,
       ...overrides,
     };
-    delete environment.NPM_CONFIG_USERCONFIG;
-    delete environment.npm_config_userconfig;
+    delete environment['NPM_CONFIG_USERCONFIG'];
+    delete environment['npm_config_userconfig'];
 
     const result = spawnSync('bash', ['bin/publish-npm'], {
       cwd: fixture,
