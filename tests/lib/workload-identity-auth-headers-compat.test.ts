@@ -1,7 +1,7 @@
 import { inspect } from 'node:util';
 import { expect, vi } from 'vitest';
 
-import OpenAI from 'openai';
+import OpenAI, { APIConnectionTimeoutError } from 'openai';
 import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { buildHeaders } from 'openai/internal/headers';
 import type { NullableHeaders } from 'openai/internal/headers';
@@ -27,6 +27,7 @@ class AuthHeadersCompatibilityOpenAI extends OpenAI {
   authOptionsMutation?: (options: FinalRequestOptions) => void;
   authHeadersMutation?: (headers: NullableHeaders | undefined) => void;
   authHeadersReplacement?: NullableHeaders;
+  authHeadersDelayMs = 0;
   hookInputInspection?: (input: object) => void;
   cloneAuthOptions = false;
   cloneFetchInit = false;
@@ -37,6 +38,12 @@ class AuthHeadersCompatibilityOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     this.hookInputInspection?.(opts);
+    if (this.authHeadersDelayMs) {
+      // oxlint-disable-next-line promise/avoid-new -- This fixture models a slow legacy hook.
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, this.authHeadersDelayMs);
+      });
+    }
     if (this.authHeadersReplacement) {
       return this.authHeadersReplacement;
     }
@@ -78,6 +85,7 @@ describe('workload identity authHeaders subclass compatibility', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENAI_BASE_URL'];
@@ -360,6 +368,53 @@ describe('workload identity authHeaders subclass compatibility', () => {
       expect(exchangeCount).toBe(1);
     },
   );
+
+  test('preserves the authentication deadline through an omitted legacy authHeaders result', async () => {
+    vi.useFakeTimers();
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const client = new AuthHeadersCompatibilityOpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      maxRetries: 0,
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchangeCount += 1;
+          // oxlint-disable-next-line promise/avoid-new -- This fixture deliberately stalls fallback authentication.
+          return await new Promise<Response>(() => {});
+        }
+        apiCount += 1;
+        return Response.json({ data: [] });
+      }),
+    });
+    client.authHeadersDelayMs = 900;
+    client.omitAuthHeaders = true;
+
+    let settled = false;
+    const request = client.models.list({ timeout: 1000, maxRetries: 0 });
+    const result = (async () => {
+      try {
+        await request;
+      } catch (error) {
+        return error;
+      } finally {
+        settled = true;
+      }
+    })();
+
+    await vi.advanceTimersByTimeAsync(900);
+    expect(exchangeCount).toBe(1);
+    await vi.advanceTimersByTimeAsync(100);
+    const settledWithinOriginalBudget = settled;
+
+    // Let the old behavior's fresh fallback timeout settle so the failing regression cleans up deterministically.
+    await vi.advanceTimersByTimeAsync(900);
+
+    await expect(result).resolves.toBeInstanceOf(APIConnectionTimeoutError);
+    expect(settledWithinOriginalBudget).toBe(true);
+    expect(exchangeCount).toBe(1);
+    expect(apiCount).toBe(0);
+  });
 
   test('preserves workload-token provenance through a cloned fetchWithAuth init', async () => {
     let exchangeCount = 0;

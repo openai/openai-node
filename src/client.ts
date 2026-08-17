@@ -359,6 +359,15 @@ function x509MonotonicNow(): number {
   return now;
 }
 
+function remainingWorkloadIdentityAuthenticationTimeout(
+  context: WorkloadIdentityRequestContext | undefined,
+  fallbackTimeout: number,
+): number {
+  return context?.authenticationDeadline === undefined
+    ? fallbackTimeout
+    : Math.max(0, context.authenticationDeadline - x509MonotonicNow());
+}
+
 function hasAuthorizationOverride(headers: NullableHeaders): boolean {
   return headers.values.has('authorization') || headers.nulls.has('authorization');
 }
@@ -837,10 +846,7 @@ export class OpenAI {
         context.workloadIdentityAuthenticationAttempted = true;
       }
       const fetchOptions = context ? context.fetchOptions : this.fetchOptions;
-      const timeout =
-        context?.authenticationDeadline === undefined
-          ? (opts.timeout ?? this.timeout)
-          : Math.max(0, context.authenticationDeadline - x509MonotonicNow());
+      const timeout = remainingWorkloadIdentityAuthenticationTimeout(context, opts.timeout ?? this.timeout);
       const token = await this._workloadIdentityAuth.getToken(opts.signal, timeout, {
         fetchOptions,
         maxRetries: opts.maxRetries ?? this.maxRetries,
@@ -1440,11 +1446,15 @@ export class OpenAI {
       ) {
         let token: string;
         try {
-          token = await this._workloadIdentityAuth.getToken(init.signal ?? controller.signal, timeout, {
-            fetchOptions,
-            maxRetries: context?.maxRetries ?? this.maxRetries,
-            ...(context ? { transportKey: context.transportKey } : {}),
-          });
+          token = await this._workloadIdentityAuth.getToken(
+            init.signal ?? controller.signal,
+            remainingWorkloadIdentityAuthenticationTimeout(context, timeout),
+            {
+              fetchOptions,
+              maxRetries: context?.maxRetries ?? this.maxRetries,
+              ...(context ? { transportKey: context.transportKey } : {}),
+            },
+          );
         } catch (error) {
           const authenticationError = castToError(error);
           if (this._usesX509WorkloadIdentity && context) {
