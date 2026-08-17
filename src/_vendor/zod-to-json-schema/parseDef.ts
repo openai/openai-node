@@ -62,7 +62,9 @@ import {
   applyUnsafeBigIntBounds,
   convertsJSONPipelineInput,
   findNestedNumericOverlaps,
+  hasConstrainedPipelineOutput,
   hasOpaqueJSONValidation,
+  hasOpaquePipelineTransform,
   producesBigIntAtPath,
   producesDateAtPath,
   producesBigIntOutput,
@@ -385,6 +387,46 @@ const normalizeStrictBigIntValue = (value: bigint, keyword: string, refs: Refs):
   return normalized;
 };
 
+const strictDefaultDescriptors = (
+  value: object,
+  keyword: string,
+  refs: Refs,
+): [string, PropertyDescriptor][] => {
+  const descriptors = Object.entries(Object.getOwnPropertyDescriptors(value));
+  for (const [key, descriptor] of descriptors) {
+    if (descriptor.get || descriptor.set) {
+      throw new TypeError(
+        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the \`${keyword}.${key}\` accessor in JSON Structured Outputs.`,
+      );
+    }
+    if (key === 'toJSON' && typeof descriptor.value === 'function') {
+      throw new TypeError(
+        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent a callable \`${keyword}.toJSON\` serializer in JSON Structured Outputs.`,
+      );
+    }
+  }
+
+  let prototype: object | null = Object.getPrototypeOf(value) as object | null;
+  while (prototype) {
+    const serializer = Object.getOwnPropertyDescriptor(prototype, 'toJSON');
+    if (serializer && (serializer.get || serializer.set || typeof serializer.value === 'function')) {
+      throw new TypeError(
+        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent an inherited \`${keyword}.toJSON\` serializer in JSON Structured Outputs.`,
+      );
+    }
+    prototype = Object.getPrototypeOf(prototype) as object | null;
+  }
+  return descriptors;
+};
+
+const isCanonicalDateDefault = (value: Date): boolean =>
+  Object.getPrototypeOf(value) === Date.prototype &&
+  Number.isFinite(Date.prototype.getTime.call(value)) &&
+  ['toJSON', 'toISOString', 'valueOf'].every(
+    (property) => !Object.getOwnPropertyDescriptor(value, property),
+  ) &&
+  !Object.getOwnPropertyDescriptor(value, Symbol.toPrimitive);
+
 const normalizeStrictDefaultValue = (
   value: unknown,
   definition: ZodTypeDef,
@@ -406,6 +448,11 @@ const normalizeStrictDefaultValue = (
     }
     return normalizeStrictBigIntValue(value, keyword, refs);
   }
+  if (value === undefined || typeof value === 'symbol' || typeof value === 'function') {
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` cannot represent the non-JSON \`${keyword}\` value in JSON Structured Outputs.`,
+    );
+  }
   if (!value || typeof value !== 'object') {
     return value;
   }
@@ -426,6 +473,19 @@ const normalizeStrictDefaultValue = (
 
   active.add(value);
   try {
+    if (value instanceof Date) {
+      if (!isCanonicalDateDefault(value)) {
+        throw new TypeError(
+          `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the invalid or customized \`${keyword}\` Date in JSON Structured Outputs.`,
+        );
+      }
+      if (!producesDateAtPath(definition, path, rootValue)) {
+        throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodDate, refs);
+      }
+      return value;
+    }
+
+    const descriptors = strictDefaultDescriptors(value, keyword, refs);
     if (Array.isArray(value)) {
       const normalized: unknown[] = [];
       seen.set(value, normalized);
@@ -454,22 +514,12 @@ const normalizeStrictDefaultValue = (
     }
 
     const prototype: unknown = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) {
-      if (value instanceof Date) {
-        if (!producesDateAtPath(definition, path, rootValue)) {
-          throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodDate, refs);
-        }
-        return value;
-      }
-      throw new TypeError(
-        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the \`${keyword}\` custom-prototype value in JSON Structured Outputs.`,
-      );
-    }
-
-    const normalized = Object.create(prototype) as Record<string, unknown>;
+    const plainPrototype = prototype === null ? null : Object.prototype;
+    const normalized = Object.create(plainPrototype) as Record<string, unknown>;
     seen.set(value, normalized);
-    let changed = false;
-    for (const [key, item] of Object.entries(value)) {
+    let changed = prototype !== plainPrototype;
+    for (const [key, descriptor] of descriptors.filter(([, item]) => item.enumerable)) {
+      const item: unknown = descriptor.value;
       const normalizedItem = normalizeStrictDefaultValue(
         item,
         definition,
@@ -856,18 +906,6 @@ const selectParser = (
       const boundNumericTransform =
         numericTransform &&
         (transform === BigInt || (expectedOutput && producesBigIntOutput(expectedOutput)));
-      if (
-        numericTransform &&
-        !expectedOutput &&
-        !boundNumericTransform &&
-        transform !== String &&
-        transform !== Number &&
-        transform !== Boolean
-      ) {
-        throw new Error(
-          `ZodEffects numeric transform at \`${refs.currentPath.join('/')}\` has no inspectable output type for strict Structured Outputs.`,
-        );
-      }
       const schema = parseEffectsDef(def, refs, forceResolution || boundNumericTransform === true);
       if (!boundNumericTransform || schema === undefined) {
         return schema;
@@ -938,6 +976,15 @@ const selectParser = (
           input = parseDef(def.in._def, materializedInputRefs, true);
         }
         if (!input || !output) {
+          return input;
+        }
+
+        if (hasOpaquePipelineTransform(def.in._def)) {
+          if (hasConstrainedPipelineOutput(def.out._def)) {
+            throw new Error(
+              `ZodPipeline output constraints at \`${refs.currentPath.join('/')}\` cannot be safely projected across an opaque transform in strict Structured Outputs.`,
+            );
+          }
           return input;
         }
 

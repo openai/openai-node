@@ -17,9 +17,11 @@ type InspectableDefinition = ZodTypeDef & {
   right: SchemaType;
   value: unknown;
   values: Record<string, unknown>;
-  effect: { type: string };
+  effect: { type: string; transform?: unknown };
   coerce?: boolean;
-  checks?: { kind: string; value?: bigint }[];
+  checks?: { kind: string; value?: bigint | number; inclusive?: boolean }[];
+  minSize?: { value: number };
+  maxSize?: { value: number };
   shape: () => Record<string, SchemaType>;
   catchall: SchemaType;
   items: SchemaType[];
@@ -69,9 +71,11 @@ const childDefinitions = (def: InspectableDefinition, traversal: Traversal): Tra
     case ZodFirstPartyTypeKind.ZodNullable:
     case ZodFirstPartyTypeKind.ZodOptional:
     case ZodFirstPartyTypeKind.ZodDefault:
-    case ZodFirstPartyTypeKind.ZodCatch:
     case ZodFirstPartyTypeKind.ZodReadonly: {
       return { values: [def.innerType], every: false };
+    }
+    case ZodFirstPartyTypeKind.ZodCatch: {
+      return traversal === 'async-input' ? null : { values: [def.innerType], every: false };
     }
     case ZodFirstPartyTypeKind.ZodBranded: {
       return { values: [def.type], every: false };
@@ -166,11 +170,16 @@ export const requiresAsynchronousJSONInput = (definition: ZodTypeDef): boolean =
     'async-input',
   );
 
+const isExactBigIntTransform = (definition: InspectableDefinition): boolean =>
+  definition.typeName === ZodFirstPartyTypeKind.ZodEffects &&
+  definition.effect.type === 'transform' &&
+  definition.effect.transform === BigInt;
+
 export const producesBigIntOutput = (definition: ZodTypeDef): boolean =>
   visitDefinition(
     definition,
     (def) => {
-      if (def.typeName === ZodFirstPartyTypeKind.ZodBigInt) {
+      if (def.typeName === ZodFirstPartyTypeKind.ZodBigInt || isExactBigIntTransform(def)) {
         return true;
       }
       return def.typeName === ZodFirstPartyTypeKind.ZodLiteral ? typeof def.value === 'bigint' : undefined;
@@ -311,17 +320,86 @@ export const hasOpaqueJSONValidation = (definition: ZodTypeDef, active = new Set
   }
 };
 
+export const hasOpaquePipelineTransform = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): boolean => {
+  if (active.has(definition)) {
+    return true;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodCatch ||
+      (def.typeName === ZodFirstPartyTypeKind.ZodEffects &&
+        (def.effect.type === 'preprocess' ||
+          (def.effect.type === 'transform' && !isExactBigIntTransform(def))))
+    ) {
+      return true;
+    }
+    const children =
+      def.typeName === ZodFirstPartyTypeKind.ZodPipeline ? [def.in, def.out] : validationChildren(def);
+    return children.some((child) => hasOpaquePipelineTransform(child._def, active));
+  } finally {
+    active.delete(definition);
+  }
+};
+
+export const hasConstrainedPipelineOutput = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): boolean => {
+  if (active.has(definition)) {
+    return true;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (
+      (def.checks?.length ?? 0) > 0 ||
+      (def.minSize !== undefined && def.minSize !== null) ||
+      (def.maxSize !== undefined && def.maxSize !== null) ||
+      [
+        ZodFirstPartyTypeKind.ZodLiteral,
+        ZodFirstPartyTypeKind.ZodEnum,
+        ZodFirstPartyTypeKind.ZodNativeEnum,
+        ZodFirstPartyTypeKind.ZodObject,
+        ZodFirstPartyTypeKind.ZodArray,
+        ZodFirstPartyTypeKind.ZodEffects,
+      ].includes(def.typeName)
+    ) {
+      return true;
+    }
+    return (childDefinitions(def, 'output')?.values ?? []).some((child) =>
+      hasConstrainedPipelineOutput(child._def, active),
+    );
+  } finally {
+    active.delete(definition);
+  }
+};
+
 type UnsafeIntegerSide = 'minimum' | 'maximum';
 
 export const capturesUnsafeBigIntInput = (definition: ZodTypeDef, side: UnsafeIntegerSide): boolean =>
   visitDefinition(
     definition,
     (def) => {
+      const boundary = side === 'minimum' ? 'min' : 'max';
+      if (isExactBigIntTransform(def)) {
+        const input = def.schema._def as InspectableDefinition;
+        const safeLimit = side === 'minimum' ? Number.MIN_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+        return !input.checks?.some(
+          (check) =>
+            check.kind === boundary &&
+            typeof check.value === 'number' &&
+            (side === 'minimum' ? check.value >= safeLimit : check.value <= safeLimit),
+        );
+      }
       if (def.typeName !== ZodFirstPartyTypeKind.ZodBigInt) {
         return;
       }
 
-      const boundary = side === 'minimum' ? 'min' : 'max';
       const safeLimit = BigInt(side === 'minimum' ? Number.MIN_SAFE_INTEGER : Number.MAX_SAFE_INTEGER);
       return !(def.checks as { kind: string; value?: bigint }[] | undefined)?.some(
         (check) =>
@@ -508,6 +586,16 @@ const discriminatorValues = (
   }
 };
 
+const serializedNativeDefault = (value: unknown): unknown => {
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+  if (value instanceof Date) {
+    return Date.prototype.toISOString.call(value);
+  }
+  return value;
+};
+
 const matchesDefaultDiscriminators = (
   definition: ZodTypeDef,
   value: unknown,
@@ -548,8 +636,9 @@ const matchesDefaultDiscriminators = (
         return true;
       }
       const literals = discriminatorValues(child._def);
+      const serialized = serializedNativeDefault(record[key]);
       return literals
-        ? literals.includes(record[key])
+        ? literals.some((candidate) => Object.is(candidate, serialized))
         : matchesDefaultDiscriminators(child._def, record[key], active);
     });
   } finally {
@@ -582,6 +671,25 @@ const producesSelectedNativeUnion = (
       nativeType === ZodFirstPartyTypeKind.ZodBigInt
         ? acceptsJSONNumberAtPath(option._def, path)
         : acceptsJSONStringAtPath(option._def, path);
+    if (intercepts && path.length === 0) {
+      const scalar = serializedNativeDefault(value);
+      const literals = discriminatorValues(option._def);
+      if (literals && !literals.some((candidate) => Object.is(candidate, scalar))) {
+        continue;
+      }
+      const candidate = option._def as InspectableDefinition;
+      if (
+        candidate.typeName === ZodFirstPartyTypeKind.ZodNumber &&
+        typeof scalar === 'number' &&
+        candidate.checks?.some((check) =>
+          check.kind === 'min'
+            ? scalar < Number(check.value)
+            : check.kind === 'max' && scalar > Number(check.value),
+        )
+      ) {
+        continue;
+      }
+    }
     if (intercepts) {
       return false;
     }

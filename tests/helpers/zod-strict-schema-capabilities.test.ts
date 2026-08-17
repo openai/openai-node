@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import {
   zodFunction,
   zodRealtimeFunction,
@@ -184,6 +185,8 @@ describe('Zod v3 strict schema capability analysis', () => {
     {
       name: 'direct',
       schema: () => z3.object({ count: z3.coerce.bigint() }).default(new DefaultCounter()),
+      normalized: { count: 4 },
+      parsed: { count: 4n },
     },
     {
       name: 'nested',
@@ -191,9 +194,67 @@ describe('Zod v3 strict schema capability analysis', () => {
         z3.object({ detail: z3.object({ count: z3.coerce.bigint() }) }).default({
           detail: new DefaultCounter(),
         }),
+      normalized: { detail: { count: 4 } },
+      parsed: { detail: { count: 4n } },
     },
-  ])('rejects a $name custom-prototype default before JSON serialization', ({ schema }) => {
-    expect(() => formatFor(schema())).toThrow('custom-prototype');
+  ])(
+    'normalizes safe $name class-instance default data without invoking user code',
+    ({ schema, normalized, parsed }) => {
+      const format = formatFor(schema());
+      expect(format.json_schema.schema).toHaveProperty('properties.value.default', normalized);
+      expect(format.$parseRaw('{}')).toEqual({ value: parsed });
+      expect(() => JSON.stringify(format)).not.toThrow();
+    },
+  );
+
+  it.each([
+    {
+      name: 'plain serializer',
+      create: (hook: () => unknown) => ({ count: 4, toJSON: hook }),
+      message: 'toJSON',
+    },
+    {
+      name: 'inherited serializer',
+      create: (hook: () => unknown) => Object.assign(Object.create({ toJSON: hook }), { count: 4 }),
+      message: 'toJSON',
+    },
+    {
+      name: 'accessor',
+      create: (hook: () => unknown) => Object.defineProperty({}, 'count', { enumerable: true, get: hook }),
+      message: 'accessor',
+    },
+  ])('rejects a default $name hook without executing it', ({ create, message }) => {
+    const hook = vi.fn(() => {
+      throw new Error('must never run');
+    });
+    expect(() => formatFor(z3.any().default(create(hook)))).toThrow(message);
+    expect(hook).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'function', value: () => () => 4 },
+    { name: 'symbol', value: () => Symbol('default') },
+    { name: 'undefined', value: () => Object.getOwnPropertyDescriptor({}, 'missing') },
+  ])('rejects non-JSON $name values inside safe class data', ({ value }) => {
+    const instance = Object.assign(Object.create({ label: 'class' }), { count: value() });
+    expect(() => formatFor(z3.any().default(instance))).toThrow('non-JSON');
+  });
+
+  it.each([
+    { name: 'invalid timestamp', value: () => new Date(Number.NaN) },
+    {
+      name: 'subclass',
+      value: () => Object.setPrototypeOf(new Date('2026-08-17T00:00:00.000Z'), Object.create(Date.prototype)),
+    },
+    {
+      name: 'own serializer',
+      value: () =>
+        Object.defineProperty(new Date('2026-08-17T00:00:00.000Z'), 'toJSON', {
+          value: () => ({ value: 'unsafe' }),
+        }),
+    },
+  ])('rejects a noncanonical $name Date default', ({ value }) => {
+    expect(() => formatFor(z3.coerce.date().default(value()))).toThrow('invalid or customized');
   });
 
   it.each([
@@ -280,6 +341,24 @@ describe('Zod v3 strict schema capability analysis', () => {
       normalized: 4,
     },
     {
+      name: 'unmatched numeric literal',
+      schema: () => z3.union([z3.literal(5), z3.coerce.bigint()]).default(4n),
+      output: 4n,
+      normalized: 4,
+    },
+    {
+      name: 'unmatched native enum',
+      schema: () => z3.union([z3.nativeEnum({ Five: 5 } as const), z3.coerce.bigint()]).default(4n),
+      output: 4n,
+      normalized: 4,
+    },
+    {
+      name: 'disjoint numeric minimum',
+      schema: () => z3.union([z3.number().min(5), z3.coerce.bigint()]).default(4n),
+      output: 4n,
+      normalized: 4,
+    },
+    {
       name: 'nested object union',
       schema: () =>
         z3.union([z3.object({ count: z3.coerce.bigint() }), z3.object({ count: z3.string() })]).default({
@@ -331,6 +410,14 @@ describe('Zod v3 strict schema capability analysis', () => {
   it.each([
     { name: 'number', schema: () => z3.union([z3.number(), z3.coerce.bigint()]).default(4n) },
     { name: 'any', schema: () => z3.union([z3.any(), z3.coerce.bigint()]).default(4n) },
+    {
+      name: 'matching literal',
+      schema: () => z3.union([z3.literal(4), z3.coerce.bigint()]).default(4n),
+    },
+    {
+      name: 'matching native enum',
+      schema: () => z3.union([z3.nativeEnum({ Four: 4 } as const), z3.coerce.bigint()]).default(4n),
+    },
     {
       name: 'nested number',
       schema: () =>
@@ -618,6 +705,22 @@ describe('Zod v3 strict schema capability analysis', () => {
       path: ['properties', 'count'],
     },
     {
+      name: 'exact BigInt object transform',
+      producer: () => z3.object({ count: z3.number().transform(BigInt) }),
+      consumer: () => z3.object({ count: z3.number() }),
+      input: { count: 7 },
+      output: { count: 7n },
+      path: ['properties', 'count'],
+    },
+    {
+      name: 'exact BigInt array transform',
+      producer: () => z3.array(z3.number().transform(BigInt)),
+      consumer: () => z3.array(z3.number()),
+      input: [7],
+      output: [7n],
+      path: ['items'],
+    },
+    {
       name: 'array items',
       producer: () => z3.array(z3.coerce.bigint()),
       consumer: () => z3.array(z3.number()),
@@ -856,6 +959,29 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
   });
 
+  it.each([
+    { name: 'direct', producer: () => z3.number().transform(BigInt) },
+    { name: 'readonly', producer: () => z3.number().transform(BigInt).readonly() },
+    { name: 'lazy', producer: () => z3.lazy(() => z3.number().transform(BigInt)) },
+  ])('bounds later numbers after an exact $name BigInt transform producer', ({ producer }) => {
+    const result = create(z3.object({ value: z3.union([producer(), z3.number()]) }));
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
+      type: 'number',
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+  });
+
+  it('preserves numeric intervals disjoint from an exact bounded BigInt transform', () => {
+    const value = z3.union([z3.number().max(10).transform(BigInt), z3.number().min(1e20)]);
+    const result = create(z3.object({ value }));
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
+      type: 'number',
+      minimum: 1e20,
+    });
+  });
+
   it('rejects compound inputs that the built-in BigInt transform cannot safely represent', () => {
     const value = z3.union([z3.number(), z3.string()]).transform(BigInt);
     expect(() => create(z3.object({ value }))).toThrow('directly representable numeric JSON input');
@@ -872,10 +998,22 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
   });
 
   it.each([
-    { name: 'BigInt', schema: () => z3.number().transform((value) => BigInt(Math.trunc(value))) },
-    { name: 'string', schema: () => z3.number().transform((value) => `number: ${value}`) },
-  ])('rejects opaque numeric $name transforms without an inspectable output type', ({ schema }) => {
-    expect(() => create(z3.object({ value: schema() }))).toThrow('no inspectable output type');
+    { name: 'BigInt', schema: () => z3.number().transform((value) => BigInt(Math.trunc(value))), output: 7n },
+    {
+      name: 'string',
+      schema: () => z3.number().transform((value) => `number: ${value}`),
+      output: 'number: 7',
+    },
+    { name: 'object', schema: () => z3.number().transform((value) => ({ value })), output: { value: 7 } },
+  ])('preserves standalone opaque numeric $name transform input compatibility', ({ schema, output }) => {
+    const result = create(z3.object({ value: schema() }));
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value', { type: 'number' });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: output });
+  });
+
+  it('rejects a synchronously recoverable Promise catch rather than silently omitting its union branch', () => {
+    const fallback = z3.promise(z3.number()).catch(7 as unknown as Promise<number>);
+    expect(() => create(z3.object({ value: z3.union([fallback, z3.number()]) }))).toThrow('ZodPromise');
   });
 
   it.each([
@@ -1262,6 +1400,23 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
     expect(result.$parseRaw('{"value":101}')).toEqual({ value: 101n });
     expect(() => result.$parseRaw('{"value":50}')).toThrow();
+  });
+
+  it.each([
+    {
+      name: 'value-changing transform',
+      input: () => z3.number().transform((value) => -value),
+    },
+    {
+      name: 'value-changing preprocessor',
+      input: () => z3.preprocess((value) => (typeof value === 'number' ? -value : value), z3.number()),
+    },
+  ])('rejects constrained outputs after an opaque $name', ({ input }) => {
+    expect(() => create(z3.object({ value: input().pipe(z3.number().min(0)) }))).toThrow(
+      'cannot be safely projected across an opaque transform',
+    );
+    const unconstrained = create(z3.object({ value: input().pipe(z3.number()) }));
+    expect(unconstrained.$parseRaw('{"value":-1}')).toEqual({ value: 1 });
   });
 
   it('rejects compound pipeline outputs that cannot be projected without losing constraints', () => {
