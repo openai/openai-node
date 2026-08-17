@@ -21,6 +21,20 @@ const strictHelpers = [
   },
 ];
 
+const getStrictHelperSchema = (helper: ReturnType<(typeof strictHelpers)[number]['create']>) => {
+  if ('json_schema' in helper) {
+    return helper.json_schema.schema;
+  }
+  if ('schema' in helper) {
+    return helper.schema;
+  }
+  if ('function' in helper) {
+    return helper.function.parameters;
+  }
+
+  return helper.parameters;
+};
+
 const unrepresentableTypes = [
   { name: 'ZodDate', schema: () => z3.date(), v4: () => z4.date() },
   { name: 'ZodSet', schema: () => z3.set(z3.string()), v4: () => z4.set(z4.string()) },
@@ -242,6 +256,278 @@ describe.each(strictHelpers)('$name with Zod v3 non-JSON-native types', ({ creat
   });
 
   it.each([
+    { name: 'nullable', schema: () => z3.coerce.bigint().nullable() },
+    { name: 'branded', schema: () => z3.coerce.bigint().brand<'safe-bigint'>() },
+    { name: 'readonly', schema: () => z3.coerce.bigint().readonly() },
+    {
+      name: 'preprocessed',
+      schema: () =>
+        z3.preprocess((value) => (typeof value === 'number' ? BigInt(value) : value), z3.bigint()),
+    },
+    {
+      name: 'transform pipeline',
+      schema: () => z3.number().transform(BigInt).pipe(z3.bigint()),
+    },
+    {
+      name: 'nested wrappers',
+      schema: () => z3.coerce.bigint().brand<'safe-bigint'>().readonly().nullable(),
+    },
+    {
+      name: 'nested union',
+      schema: () => z3.union([z3.coerce.bigint(), z3.string()]),
+    },
+  ])('bounds overlapping number alternatives after $name BigInt schemas', ({ schema }) => {
+    const result = create(z3.object({ value: z3.union([schema(), z3.number()]) }));
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [
+            expect.anything(),
+            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+          ],
+        },
+      },
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it('bounds shared number references locally without changing other fields', () => {
+    const sharedNumber = z3.number();
+    const result = create(
+      z3.object({
+        outside: sharedNumber,
+        value: z3.union([z3.coerce.bigint(), sharedNumber]),
+      }),
+    );
+    const schema = getStrictHelperSchema(result) as {
+      properties: { outside: Record<string, unknown>; value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(schema.properties.outside).toEqual({ type: 'number' });
+    expect(schema.properties.value.anyOf[1]).toMatchObject({
+      type: 'number',
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(result.$parseRaw('{"outside":9007199254740992,"value":7}')).toEqual({
+      outside: 9_007_199_254_740_992,
+      value: 7n,
+    });
+  });
+
+  it.each([
+    {
+      name: 'compact primitive',
+      schema: () => z3.union([z3.number(), z3.string()]),
+    },
+    {
+      name: 'nested constrained',
+      schema: () => z3.union([z3.number().min(0), z3.string()]),
+    },
+  ])('bounds numeric branches inside $name unions after BigInt alternatives', ({ name, schema }) => {
+    const result = create(z3.object({ value: z3.union([z3.coerce.bigint(), schema()]) }));
+    const generated = getStrictHelperSchema(result) as {
+      properties: {
+        value: { anyOf: { minimum?: number; maximum?: number; anyOf?: Record<string, unknown>[] }[] };
+      };
+    };
+    const [, branch] = generated.properties.value.anyOf;
+
+    expect(branch).toMatchObject({
+      minimum: Number.MIN_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    if (name === 'nested constrained') {
+      expect(branch?.anyOf?.[0]).toMatchObject({ minimum: 0 });
+    }
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+  });
+
+  it('tightens existing number bounds that exceed the safe integer range', () => {
+    const result = create(
+      z3.object({
+        value: z3.union([z3.coerce.bigint(), z3.number().min(-1e20).max(1e20)]),
+      }),
+    );
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [
+            expect.anything(),
+            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+          ],
+        },
+      },
+    });
+  });
+
+  it.each([
+    { name: 'any', schema: () => z3.any() },
+    { name: 'unknown', schema: () => z3.unknown() },
+  ])('bounds later $name branches while preserving nonnumeric JSON inputs', ({ schema }) => {
+    const result = create(z3.object({ value: z3.union([z3.coerce.bigint(), schema()]) }));
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [expect.anything(), { minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER }],
+        },
+      },
+    });
+    expect(result.$parseRaw('{"value":"unchanged"}')).toEqual({ value: 'unchanged' });
+  });
+
+  it('bounds trailing number branches when an earlier number cannot always win', () => {
+    const result = create(
+      z3.object({
+        value: z3.union([z3.number().max(10), z3.coerce.bigint(), z3.number()]),
+      }),
+    );
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [
+            { type: 'number', maximum: 10 },
+            { type: 'integer', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+          ],
+        },
+      },
+    });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
+    expect(result.$parseRaw('{"value":12}')).toEqual({ value: 12n });
+  });
+
+  it('preserves number alternatives that win before wrapped BigInt branches', () => {
+    const result = create(
+      z3.object({
+        value: z3.union([z3.number(), z3.coerce.bigint().nullable()]),
+      }),
+    );
+    const schema = getStrictHelperSchema(result) as {
+      properties: { value: { anyOf: Record<string, unknown>[] } };
+    };
+
+    expect(schema.properties.value.anyOf[0]).toEqual({ type: 'number' });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
+  });
+
+  it('preserves and serializes safe nullable BigInt defaults', () => {
+    const result = create(z3.object({ value: z3.coerce.bigint().nullable().default(4n) }));
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: {
+          anyOf: [
+            { type: 'integer', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+            { type: 'null' },
+          ],
+          default: 4,
+        },
+      },
+    });
+    expect(result.$parseRaw('{}')).toEqual({ value: 4n });
+    expect(result.$parseRaw('{"value":null}')).toEqual({ value: null });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it('normalizes nested object and array BigInt defaults without mutating caller values', () => {
+    const objectDefault = { count: 4n, nested: { count: 5n } };
+    const arrayDefault = [6n, 7n];
+    const result = create(
+      z3.object({
+        object: z3
+          .object({
+            count: z3.coerce.bigint(),
+            nested: z3.object({ count: z3.coerce.bigint() }),
+          })
+          .default(objectDefault),
+        array: z3.array(z3.coerce.bigint()).default(arrayDefault),
+      }),
+    );
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        object: { default: { count: 4, nested: { count: 5 } } },
+        array: { default: [6, 7] },
+      },
+    });
+    expect(objectDefault).toEqual({ count: 4n, nested: { count: 5n } });
+    expect(arrayDefault).toEqual([6n, 7n]);
+    expect(result.$parseRaw('{}')).toEqual({ object: objectDefault, array: arrayDefault });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it('preserves existing Date and ordinary object defaults by reference', () => {
+    const dateDefault = new Date('2026-08-17T00:00:00.000Z');
+    const objectDefault = { label: 'unchanged' };
+    const result = create(
+      z3.object({
+        date: z3.coerce.date().default(dateDefault),
+        object: z3.object({ label: z3.string() }).default(objectDefault),
+      }),
+    );
+    const schema = getStrictHelperSchema(result) as {
+      properties: { date: { default: unknown }; object: { default: unknown } };
+    };
+
+    expect(schema.properties.date.default).toBe(dateDefault);
+    expect(schema.properties.object.default).toBe(objectDefault);
+    expect(result.$parseRaw('{}')).toEqual({ date: dateDefault, object: objectDefault });
+    expect(() => JSON.stringify(result)).not.toThrow();
+  });
+
+  it.each([
+    {
+      name: 'object property',
+      schema: () => z3.object({ count: z3.coerce.bigint() }).default({ count: 9_007_199_254_740_992n }),
+      keyword: 'default.count',
+    },
+    {
+      name: 'array item',
+      schema: () => z3.array(z3.coerce.bigint()).default([9_007_199_254_740_992n]),
+      keyword: 'default[0]',
+    },
+  ])('rejects unsafe nested BigInt defaults at the $name path', ({ schema, keyword }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow(
+      `cannot represent the \`${keyword}\` value as a safe JSON integer`,
+    );
+  });
+
+  it.each([
+    {
+      name: 'exclusive maximum safe value',
+      schema: () => z3.coerce.bigint().gt(BigInt(Number.MAX_SAFE_INTEGER)),
+    },
+    {
+      name: 'exclusive minimum safe value',
+      schema: () => z3.coerce.bigint().lt(BigInt(Number.MIN_SAFE_INTEGER)),
+    },
+    { name: 'inverted inclusive bounds', schema: () => z3.coerce.bigint().min(5n).max(4n) },
+    { name: 'adjacent exclusive bounds', schema: () => z3.coerce.bigint().gt(4n).lt(5n) },
+    { name: 'equal exclusive and inclusive bounds', schema: () => z3.coerce.bigint().gt(5n).max(5n) },
+  ])('rejects $name when no safe JSON integer satisfies a BigInt schema', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow('no safe JSON integer values');
+  });
+
+  it('preserves nonempty exclusive BigInt bounds at the safe integer edge', () => {
+    const result = create(z3.object({ value: z3.coerce.bigint().gt(BigInt(Number.MAX_SAFE_INTEGER) - 1n) }));
+
+    expect(getStrictHelperSchema(result)).toMatchObject({
+      properties: {
+        value: { exclusiveMinimum: Number.MAX_SAFE_INTEGER - 1, maximum: Number.MAX_SAFE_INTEGER },
+      },
+    });
+    expect(result.$parseRaw(`{"value":${Number.MAX_SAFE_INTEGER}}`)).toEqual({
+      value: BigInt(Number.MAX_SAFE_INTEGER),
+    });
+  });
+
+  it.each([
     {
       name: 'minimum',
       schema: () => z3.coerce.bigint().min(9_007_199_254_740_992n),
@@ -367,6 +653,31 @@ describe('Zod v3 BigInt coercion JSON Schema serialization', () => {
       bounded: 4n,
       exclusive: 3n,
       defaulted: 6n,
+    });
+  });
+
+  it('bounds registered shared number definitions only inside later union branches', () => {
+    const sharedNumber = z3.number();
+    const format = zodResponseFormat(
+      z3.object({
+        outside: sharedNumber,
+        value: z3.union([z3.coerce.bigint(), sharedNumber]),
+      }),
+      'strict',
+      { schemaDefinitions: { SharedNumber: sharedNumber } },
+    );
+
+    expect(format.json_schema.schema).toMatchObject({
+      properties: {
+        outside: { $ref: '#/definitions/SharedNumber' },
+        value: {
+          anyOf: [
+            { type: 'integer', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+            { type: 'number', minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
+          ],
+        },
+      },
+      definitions: { SharedNumber: { type: 'number' } },
     });
   });
 
