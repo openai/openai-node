@@ -65,7 +65,7 @@ export class EventStream<EventTypes extends BaseEvents> {
   #abortListeners: { signal: AbortSignal; listener: () => void }[] = [];
   #emittedListenerRegistrations = new WeakMap<
     object,
-    { event: PropertyKey; registration: { removed?: boolean } }
+    { event: PropertyKey; registration: { removed?: boolean; detached?: boolean } }
   >();
   #pendingListenerCleanup = new Set<PropertyKey>();
   #listenerDispatchDepth = 0;
@@ -201,7 +201,11 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
 
     const emittedRegistration = this.#emittedListenerRegistrations.get(listener as object);
-    if (emittedRegistration?.event === event && !emittedRegistration.registration.removed) {
+    if (
+      emittedRegistration?.event === event &&
+      !emittedRegistration.registration.removed &&
+      !emittedRegistration.registration.detached
+    ) {
       this.#removeEmittedListener(
         event,
         emittedRegistration.registration as EventListeners<EventTypes, Event>[number],
@@ -231,10 +235,17 @@ export class EventStream<EventTypes extends BaseEvents> {
     event: Event,
     listener: EventListener<EventTypes, Event>,
   ): void {
+    const previousListeners = this.#listeners[event];
+    const previousLength = previousListeners?.length ?? 0;
     this.once(event, listener);
     const listeners = this.#listeners[event];
     const [registration] = listeners?.slice(-1) ?? [];
-    if (registration?.listener === listener) {
+    if (
+      (previousListeners === undefined || listeners === previousListeners) &&
+      listeners?.length === previousLength + 1 &&
+      registration?.listener === listener &&
+      registration.once
+    ) {
       this.#emittedListenerRegistrations.set(listener as object, { event, registration });
     }
   }
@@ -524,7 +535,12 @@ export class EventStream<EventTypes extends BaseEvents> {
 
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
-      this.#listeners[event] = listeners.filter((listener) => !listener.once && !listener.removed) as any;
+      this.#listeners[event] = listeners.filter((listener) => {
+        if (listener.once) {
+          listener.detached = true;
+        }
+        return !listener.once && !listener.removed;
+      }) as any;
       this.#listenerDispatchDepth += 1;
       try {
         for (const registration of listeners as any) {
@@ -583,6 +599,7 @@ type EventListeners<Events, EventType extends keyof Events> = {
   listener: EventListener<Events, EventType>;
   once?: boolean;
   removed?: boolean;
+  detached?: boolean;
 }[];
 
 /** The positional listener arguments associated with a named event. */

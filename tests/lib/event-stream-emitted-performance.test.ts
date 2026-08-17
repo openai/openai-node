@@ -187,6 +187,113 @@ describe('EventStream.emitted companion-listener performance', () => {
     expect(remove).toHaveBeenCalledWith('error', expect.any(Function));
   });
 
+  test('preserves captured emitted event listeners removed during their dispatch snapshot', async () => {
+    const stream = new EmittedTestStream();
+    const register = vi.spyOn(stream, 'once');
+    stream.on('value', () => {
+      const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
+        | ((value: number) => void)
+        | undefined;
+      if (!callback) {
+        throw new Error('Expected an emitted event listener');
+      }
+      stream.off('value', callback);
+    });
+    const pending = stream.emitted('value');
+    const settled = vi.fn();
+    void pending.then(settled);
+
+    stream.emitValue(4);
+    await Promise.resolve();
+
+    expect(settled).toHaveBeenCalledWith(4);
+    expect(stream.hasListener('error')).toBe(false);
+  });
+
+  test('preserves captured emitted error listeners removed during their dispatch snapshot', async () => {
+    const stream = new EmittedTestStream();
+    const register = vi.spyOn(stream, 'once');
+    const failure = new OpenAIError('snapshot failure');
+    stream.on('error', () => {
+      const callback = register.mock.calls.find(([event]) => event === 'error')?.[1] as
+        | ((error: OpenAIError) => void)
+        | undefined;
+      if (!callback) {
+        throw new Error('Expected an emitted error listener');
+      }
+      stream.off('error', callback);
+    });
+    const pending = stream.emitted('value');
+    const rejected = vi.fn();
+    void pending.catch(rejected);
+
+    stream.emitFailure(failure);
+    await Promise.resolve();
+
+    expect(rejected).toHaveBeenCalledWith(failure);
+    expect(stream.hasListener('value')).toBe(false);
+  });
+
+  test('preserves captured emitted listeners removed from a nested dispatch', async () => {
+    const stream = new EmittedTestStream();
+    const register = vi.spyOn(stream, 'once');
+    stream.on('value', () => {
+      stream.emitOther('nested');
+    });
+    stream.on('other', () => {
+      const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
+        | ((value: number) => void)
+        | undefined;
+      if (!callback) {
+        throw new Error('Expected an emitted event listener');
+      }
+      stream.off('value', callback);
+    });
+    const pending = stream.emitted('value');
+    const settled = vi.fn();
+    void pending.then(settled);
+
+    stream.emitValue(5);
+    await Promise.resolve();
+
+    expect(settled).toHaveBeenCalledWith(5);
+    expect(stream.hasListener('error')).toBe(false);
+  });
+
+  test.each(['before', 'after'] as const)(
+    'preserves first-match listener removal when public once registers a duplicate %s its callback',
+    async (order) => {
+      const stream = new EmittedTestStream();
+      const originalOnce = stream.once.bind(stream);
+      const register = vi.spyOn(stream, 'once').mockImplementation((event, listener) => {
+        if (event === 'value' && order === 'before') {
+          stream.on(event, listener);
+        }
+
+        const result = originalOnce(event, listener);
+        if (event === 'value' && order === 'after') {
+          stream.on(event, listener);
+        }
+        return result;
+      });
+
+      const pending = stream.emitted('value');
+      const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
+        | ((value: number) => void)
+        | undefined;
+      if (!callback) {
+        throw new Error('Expected a duplicated emitted listener');
+      }
+
+      stream.off('value', callback);
+      stream.emitValue(7);
+
+      await expect(pending).resolves.toBe(7);
+      expect(stream.hasListener('value')).toBe(order === 'after');
+      expect(stream.hasListener('error')).toBe(false);
+    },
+  );
+
   test('preserves duplicate user callbacks, once listeners, and immediate off semantics', async () => {
     const stream = new EmittedTestStream();
     const duplicate = vi.fn();
