@@ -95,6 +95,7 @@ function transportOption(options: MergedRequestInit, key: (typeof TRANSPORT_OPTI
 function transportIdentityValues(options: MergedRequestInit): readonly object[] | undefined {
   const values = TRANSPORT_OPTION_KEYS.map((key) => transportOption(options, key));
   if (values.every((value) => value === undefined)) {
+    primitiveTransportIdentities.delete(options);
     return undefined;
   }
 

@@ -1,6 +1,6 @@
 import { expect, vi } from 'vitest';
 
-import OpenAI, { APIUserAbortError, AzureOpenAI } from 'openai';
+import OpenAI, { APIConnectionTimeoutError, APIUserAbortError, AzureOpenAI } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { NullableHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
@@ -13,6 +13,11 @@ const identity = {
 
 function tokenResponse(token: string): Response {
   return Response.json({ access_token: token, expires_in: 3600 });
+}
+
+function deferredResponse(): Promise<Response> {
+  // oxlint-disable-next-line promise/avoid-new -- This fixture deliberately leaves the exchange pending.
+  return new Promise<Response>(() => {});
 }
 
 function replaceAuthorizationWithBasic(
@@ -84,6 +89,7 @@ describe('X.509 final security boundaries', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENAI_ADMIN_KEY'];
@@ -534,6 +540,72 @@ describe('X.509 final security boundaries', () => {
       'Bearer primitive-transport-token-2',
       'Bearer primitive-transport-token-3',
     ]);
+  });
+
+  test('does not revive cached credentials after a primitive transport value disappears and returns', async () => {
+    const fetchOptions: { proxy: string | undefined } = {
+      proxy: 'https://client:certificate-a@proxy.example',
+    };
+    const authorizations: (string | null)[] = [];
+    let exchanges = 0;
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetchOptions: fetchOptions as never,
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchanges += 1;
+          return tokenResponse(`primitive-transport-token-${exchanges}`);
+        }
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ data: [] });
+      }),
+    });
+
+    await client.models.list();
+    fetchOptions.proxy = undefined;
+    await client.models.list();
+    fetchOptions.proxy = 'https://client:certificate-a@proxy.example';
+    await client.models.list();
+
+    expect(exchanges).toBe(3);
+    expect(authorizations).toEqual([
+      'Bearer primitive-transport-token-1',
+      'Bearer primitive-transport-token-2',
+      'Bearer primitive-transport-token-3',
+    ]);
+  });
+
+  test('preserves one authentication deadline when the client transport rotates', async () => {
+    vi.useFakeTimers();
+    const originalDispatcher = { name: 'original-dispatcher' };
+    const replacementDispatcher = { name: 'replacement-dispatcher' };
+    const exchange = deferredResponse();
+    let exchangeCount = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request) => {
+      if (!url.toString().includes('/oauth/token')) {
+        throw new Error('The API request must not run after the authentication deadline.');
+      }
+      exchangeCount += 1;
+      return await exchange;
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetch: customFetch,
+      fetchOptions: { dispatcher: originalDispatcher as never },
+      maxRetries: 0,
+    });
+
+    const request = client.models.list({ timeout: 1000, maxRetries: 0 });
+    const rejection = expect(request).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    await vi.waitFor(() => expect(exchangeCount).toBe(1));
+    client.fetchOptions = { dispatcher: replacementDispatcher as never };
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    await rejection;
+    expect(exchangeCount).toBe(1);
   });
 
   test('invalidates a warm token when certificate material changes inside the same TLS object', async () => {

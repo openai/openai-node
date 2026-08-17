@@ -13,6 +13,12 @@ const x509Identity = {
   serviceAccountId: 'svc_acct_test',
 };
 
+const subjectTokenIdentity = {
+  identityProviderId: 'idp_subject',
+  serviceAccountId: 'svc_subject',
+  provider: { tokenType: 'jwt' as const, getToken: async () => 'subject-token' },
+};
+
 function tokenResponse(token: string): Response {
   return Response.json({ access_token: token, expires_in: 3600 });
 }
@@ -76,6 +82,36 @@ describe('workload identity authHeaders subclass compatibility', () => {
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENAI_BASE_URL'];
   });
+
+  test.each(['API key', 'subject-token workload identity', 'X.509 workload identity'] as const)(
+    'accepts frozen low-level request options with $s authentication',
+    async (authentication) => {
+      const customFetch = vi.fn(async (url: string | URL | Request) =>
+        url.toString().includes('/oauth/token')
+          ? tokenResponse('workload-token')
+          : Response.json({ data: [] }),
+      );
+      let workloadIdentity: typeof subjectTokenIdentity | typeof x509Identity | undefined;
+      if (authentication === 'subject-token workload identity') {
+        workloadIdentity = subjectTokenIdentity;
+      } else if (authentication === 'X.509 workload identity') {
+        workloadIdentity = x509Identity;
+      }
+      const client = new AuthHeadersCompatibilityOpenAI({
+        apiKey: authentication === 'API key' ? 'api-key' : null,
+        ...(workloadIdentity ? { workloadIdentity } : {}),
+        fetch: customFetch,
+      });
+      const options = Object.freeze({ method: 'get' as const, path: '/models' });
+      const hookInputs: object[] = [];
+      client.hookInputInspection = (input) => hookInputs.push(input);
+
+      await expect(client.request(options)).resolves.toMatchObject({ data: [] });
+
+      expect(hookInputs[0]).toBe(options);
+      expect(Object.getOwnPropertySymbols(options)).toEqual([]);
+    },
+  );
 
   test.each([false, true])(
     'preserves workload-token provenance through a legacy authHeaders override (clone: %s)',
