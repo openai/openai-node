@@ -51,6 +51,10 @@ const strictHelperSchema = (helper: ReturnType<(typeof strictHelpers)[number]['c
   return helper.parameters;
 };
 
+class DefaultCounter {
+  count = 4n;
+}
+
 interface RecursiveDateNode {
   when: Date;
   next: RecursiveDateNode | null;
@@ -174,6 +178,22 @@ describe('Zod v3 strict schema capability analysis', () => {
       properties: { values: { default: [4] }, detail: { default: { count: 5 } } },
     });
     expect(format.$parseRaw('{}')).toEqual({ values: [4n], detail: { count: 5n } });
+  });
+
+  it.each([
+    {
+      name: 'direct',
+      schema: () => z3.object({ count: z3.coerce.bigint() }).default(new DefaultCounter()),
+    },
+    {
+      name: 'nested',
+      schema: () =>
+        z3.object({ detail: z3.object({ count: z3.coerce.bigint() }) }).default({
+          detail: new DefaultCounter(),
+        }),
+    },
+  ])('rejects a $name custom-prototype default before JSON serialization', ({ schema }) => {
+    expect(() => formatFor(schema())).toThrow('custom-prototype');
   });
 
   it.each([
@@ -617,6 +637,24 @@ describe('Zod v3 strict schema capability analysis', () => {
       number: () => z3.object({ kind: z3.enum(['number']), count: z3.number().min(1e20) }),
       input: { kind: 'number', count: 1e20 },
     },
+    {
+      name: 'primitive number versus string',
+      bigint: () => z3.object({ kind: z3.number(), count: z3.coerce.bigint() }),
+      number: () => z3.object({ kind: z3.string(), count: z3.number().min(1e20) }),
+      input: { kind: 'number', count: 1e20 },
+    },
+    {
+      name: 'wrapped primitive boolean versus string',
+      bigint: () => z3.object({ kind: z3.boolean().readonly(), count: z3.coerce.bigint() }),
+      number: () => z3.object({ kind: z3.string().brand<'string-kind'>(), count: z3.number().min(1e20) }),
+      input: { kind: 'number', count: 1e20 },
+    },
+    {
+      name: 'nested primitive number versus string',
+      bigint: () => z3.object({ kind: z3.object({ type: z3.number() }), count: z3.coerce.bigint() }),
+      number: () => z3.object({ kind: z3.object({ type: z3.string() }), count: z3.number().min(1e20) }),
+      input: { kind: { type: 'number' }, count: 1e20 },
+    },
   ])(
     'preserves unsafe-range number branches separated by a $name discriminator',
     ({ bigint, number, input }) => {
@@ -628,6 +666,19 @@ describe('Zod v3 strict schema capability analysis', () => {
       expect(format.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: input });
     },
   );
+
+  it('keeps overlap bounds when a coercing discriminator accepts multiple JSON primitive types', () => {
+    const format = formatFor(
+      z3.union([
+        z3.object({ kind: z3.coerce.number(), count: z3.coerce.bigint() }),
+        z3.object({ kind: z3.string(), count: z3.number() }),
+      ]),
+    );
+    expect(format.json_schema.schema).toHaveProperty(
+      'properties.value.anyOf.1.properties.count.maximum',
+      Number.MAX_SAFE_INTEGER,
+    );
+  });
 
   it('preserves disjoint and one-sided nested numeric interception intervals', () => {
     const disjoint = formatFor(
@@ -772,6 +823,63 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     const result = create(z3.object({ value: value() }));
     expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf', [schema]);
     expect(() => result.$parseRaw(raw)).not.toThrow();
+  });
+
+  it.each([
+    {
+      name: 'object',
+      asynchronous: () => z3.object({ kind: z3.literal('async'), value: z3.promise(z3.number()) }),
+      synchronous: () => z3.object({ kind: z3.literal('sync'), value: z3.number() }),
+      value: { kind: 'sync', value: 7 },
+    },
+    {
+      name: 'nested object',
+      asynchronous: () =>
+        z3.object({
+          kind: z3.literal('async'),
+          detail: z3.object({ value: z3.promise(z3.number()) }),
+        }),
+      synchronous: () =>
+        z3.object({
+          kind: z3.literal('sync'),
+          detail: z3.object({ value: z3.number() }),
+        }),
+      value: { kind: 'sync', detail: { value: 7 } },
+    },
+    {
+      name: 'nonempty array',
+      asynchronous: () => z3.array(z3.promise(z3.number())).min(1),
+      synchronous: () => z3.array(z3.number()),
+      value: [7],
+    },
+  ])('omits a synchronously unreachable $name union container', ({ asynchronous, synchronous, value }) => {
+    const result = create(z3.object({ value: z3.union([asynchronous(), synchronous()]) }));
+    const branches = (
+      strictHelperSchema(result) as {
+        properties: { value: { anyOf: unknown[] } };
+      }
+    ).properties.value.anyOf;
+
+    expect(branches).toHaveLength(1);
+    expect(result.$parseRaw(JSON.stringify({ value }))).toEqual({ value });
+  });
+
+  it('preserves empty arrays and nulls that synchronously avoid Promise elements', () => {
+    const emptyArray = create(
+      z3.object({ value: z3.union([z3.array(z3.promise(z3.number())), z3.string()]) }),
+    );
+    const nullable = create(
+      z3.object({ value: z3.union([z3.promise(z3.number()).nullable(), z3.string()]) }),
+    );
+
+    expect(strictHelperSchema(emptyArray)).toHaveProperty('properties.value.anyOf.0', {
+      type: 'array',
+      items: {},
+      maxItems: 0,
+    });
+    expect(emptyArray.$parseRaw('{"value":[]}')).toEqual({ value: [] });
+    expect(nullable.$parseRaw('{"value":null}')).toEqual({ value: null });
+    expect(nullable.$parseRaw('{"value":"sync"}')).toEqual({ value: 'sync' });
   });
 
   it('rejects a union whose options all require asynchronous Promise inputs', () => {
@@ -1009,6 +1117,35 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     const result = create(z3.object({ value: schema() }));
     expect(strictHelperSchema(result)).toHaveProperty(path, expected);
     expect(JSON.stringify(strictHelperSchema(result))).not.toContain('"allOf"');
+  });
+
+  it.each([
+    { name: 'identical', input: ['a'] as const, output: ['a'] as const, expected: ['a'] },
+    {
+      name: 'reordered',
+      input: ['a', 'b'] as const,
+      output: ['b', 'a'] as const,
+      expected: ['a', 'b'],
+    },
+    {
+      name: 'overlapping',
+      input: ['a', 'b'] as const,
+      output: ['b', 'c'] as const,
+      expected: ['b'],
+    },
+  ])('intersects value-equivalent $name pipeline enum arrays', ({ input, output, expected }) => {
+    const result = create(z3.object({ value: z3.enum(input).pipe(z3.enum(output)) }));
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.enum', expected);
+    expect(() => result.$parseRaw(JSON.stringify({ value: expected[0] }))).not.toThrow();
+  });
+
+  it('rejects pipelines with disjoint enums or incompatible enum and literal constraints', () => {
+    expect(() => create(z3.object({ value: z3.enum(['a']).pipe(z3.enum(['b'])) }))).toThrow(
+      'ZodPipeline output constraints',
+    );
+    expect(() => create(z3.object({ value: z3.enum(['a']).pipe(z3.literal('b')) }))).toThrow(
+      'ZodPipeline output constraints',
+    );
   });
 
   it.each([

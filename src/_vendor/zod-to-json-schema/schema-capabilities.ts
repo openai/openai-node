@@ -25,6 +25,8 @@ type InspectableDefinition = ZodTypeDef & {
   items: SchemaType[];
   rest?: SchemaType;
   valueType: SchemaType;
+  minLength?: { value: number };
+  exactLength?: { value: number };
 };
 type Traversal =
   | 'input'
@@ -106,6 +108,26 @@ const childDefinitions = (def: InspectableDefinition, traversal: Traversal): Tra
   }
 };
 
+const asynchronousContainerChildren = (
+  def: InspectableDefinition,
+  traversal: Traversal,
+): TraversalChildren | null | undefined => {
+  if (traversal !== 'async-input') {
+    return undefined;
+  }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodNullable) {
+    return null;
+  }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodObject) {
+    return { values: Object.values(def.shape()), every: false };
+  }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodArray) {
+    const nonempty = (def.minLength?.value ?? 0) > 0 || (def.exactLength?.value ?? 0) > 0;
+    return nonempty ? { values: [def.type], every: false } : null;
+  }
+  return undefined;
+};
+
 const visitDefinition = (
   definition: ZodTypeDef,
   inspect: Inspector,
@@ -124,7 +146,8 @@ const visitDefinition = (
       return result;
     }
 
-    const children = childDefinitions(def, traversal);
+    const containerChildren = asynchronousContainerChildren(def, traversal);
+    const children = containerChildren === undefined ? childDefinitions(def, traversal) : containerChildren;
     if (!children) {
       return false;
     }
@@ -564,6 +587,108 @@ type PairedChild = {
   segment: NumericPathSegment;
 };
 
+const jsonPrimitiveKinds = new Map<ZodFirstPartyTypeKind, string>([
+  [ZodFirstPartyTypeKind.ZodString, 'string'],
+  [ZodFirstPartyTypeKind.ZodNumber, 'number'],
+  [ZodFirstPartyTypeKind.ZodBoolean, 'boolean'],
+  [ZodFirstPartyTypeKind.ZodNull, 'null'],
+  [ZodFirstPartyTypeKind.ZodObject, 'object'],
+  [ZodFirstPartyTypeKind.ZodArray, 'array'],
+]);
+
+const leafJSONInputTypes = (def: InspectableDefinition): Set<string> | null | undefined => {
+  const primitive = jsonPrimitiveKinds.get(def.typeName);
+  if (primitive !== undefined) {
+    return def.coerce ? null : new Set([primitive]);
+  }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
+    const { value } = def;
+    if (value === null) {
+      return new Set(['null']);
+    }
+    const primitiveType = typeof value;
+    return ['string', 'number', 'boolean'].includes(primitiveType) ? new Set([primitiveType]) : null;
+  }
+  if (
+    def.typeName === ZodFirstPartyTypeKind.ZodEnum ||
+    def.typeName === ZodFirstPartyTypeKind.ZodNativeEnum
+  ) {
+    return new Set(Object.values(def.values).map((value) => typeof value));
+  }
+  return undefined;
+};
+
+const transparentJSONInput = (def: InspectableDefinition): ZodTypeDef | undefined => {
+  switch (def.typeName) {
+    case ZodFirstPartyTypeKind.ZodOptional:
+    case ZodFirstPartyTypeKind.ZodDefault:
+    case ZodFirstPartyTypeKind.ZodReadonly: {
+      return def.innerType._def;
+    }
+    case ZodFirstPartyTypeKind.ZodBranded: {
+      return def.type._def;
+    }
+    case ZodFirstPartyTypeKind.ZodEffects: {
+      return def.effect.type === 'preprocess' ? undefined : def.schema._def;
+    }
+    case ZodFirstPartyTypeKind.ZodLazy: {
+      return def.getter()._def;
+    }
+    case ZodFirstPartyTypeKind.ZodPipeline: {
+      return def.in._def;
+    }
+    default: {
+      return undefined;
+    }
+  }
+};
+
+const jsonInputTypes = (definition: ZodTypeDef, active = new Set<ZodTypeDef>()): Set<string> | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    const leaf = leafJSONInputTypes(def);
+    if (leaf !== undefined) {
+      return leaf ?? undefined;
+    }
+    const transparent = transparentJSONInput(def);
+    if (transparent !== undefined) {
+      return jsonInputTypes(transparent, active);
+    }
+
+    switch (def.typeName) {
+      case ZodFirstPartyTypeKind.ZodNullable: {
+        const inner = jsonInputTypes(def.innerType._def, active);
+        return inner && new Set([...inner, 'null']);
+      }
+      case ZodFirstPartyTypeKind.ZodUnion:
+      case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
+        const options = def.options instanceof Map ? [...def.options.values()] : def.options;
+        const types = options.map((option) => jsonInputTypes(option._def, active));
+        return types.some((option) => option === undefined)
+          ? undefined
+          : new Set(types.flatMap((option) => [...(option ?? [])]));
+      }
+      case ZodFirstPartyTypeKind.ZodIntersection: {
+        const left = jsonInputTypes(def.left._def, active);
+        const right = jsonInputTypes(def.right._def, active);
+        if (!left || !right) {
+          return left ?? right;
+        }
+        return new Set([...left].filter((type) => right.has(type)));
+      }
+      default: {
+        return undefined;
+      }
+    }
+  } finally {
+    active.delete(definition);
+  }
+};
+
 const haveDisjointDiscriminators = (
   producer: ZodTypeDef,
   consumer: ZodTypeDef,
@@ -583,6 +708,12 @@ const haveDisjointDiscriminators = (
     if (leftValues && rightValues) {
       return leftValues.every((value) => !rightValues.includes(value));
     }
+    const leftTypes = jsonInputTypes(left);
+    const rightTypes = jsonInputTypes(right);
+    if (leftTypes && rightTypes && [...leftTypes].every((type) => !rightTypes.has(type))) {
+      return true;
+    }
+
     if (
       left.typeName !== ZodFirstPartyTypeKind.ZodObject ||
       right.typeName !== ZodFirstPartyTypeKind.ZodObject

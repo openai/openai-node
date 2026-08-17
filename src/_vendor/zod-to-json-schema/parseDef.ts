@@ -440,7 +440,12 @@ const normalizeStrictDefaultValue = (
 
   const prototype: unknown = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
-    return value;
+    if (value instanceof Date) {
+      return value;
+    }
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the \`${keyword}\` custom-prototype value in JSON Structured Outputs.`,
+    );
   }
 
   const normalized = Object.create(prototype) as Record<string, unknown>;
@@ -529,6 +534,12 @@ const mergeStrictSchemas = (left: JsonSchema7Type, right: JsonSchema7Type): Json
         return undefined;
       }
       merged[keyword] = nested;
+    } else if (keyword === 'enum' && Array.isArray(merged[keyword]) && Array.isArray(value)) {
+      const intersection = (merged[keyword] as unknown[]).filter((candidate) => value.includes(candidate));
+      if (intersection.length === 0) {
+        return undefined;
+      }
+      merged[keyword] = intersection;
     } else if (keyword === 'required' && Array.isArray(merged[keyword]) && Array.isArray(value)) {
       merged[keyword] = [...new Set([...(merged[keyword] as string[]), ...(value as string[])])];
     } else if (keyword === 'type' && isNumericSchemaType(merged[keyword]) && isNumericSchemaType(value)) {
@@ -537,6 +548,10 @@ const mergeStrictSchemas = (left: JsonSchema7Type, right: JsonSchema7Type): Json
       return undefined;
     }
   }
+  if (Array.isArray(merged['enum']) && hasOwn(merged, 'const') && !merged['enum'].includes(merged['const'])) {
+    return undefined;
+  }
+
   return merged as JsonSchema7Type;
 };
 
@@ -603,6 +618,17 @@ const selectParser = (
       return parseNullDef(refs);
     }
     case ZodFirstPartyTypeKind.ZodArray: {
+      if (refs.openaiStrictMode && requiresAsynchronousJSONInput(def.type._def)) {
+        const nonempty = (def.minLength?.value ?? 0) > 0 || (def.exactLength?.value ?? 0) > 0;
+        if (nonempty) {
+          throwUnrepresentableStrictZodType(ZodFirstPartyTypeKind.ZodPromise, refs);
+        }
+        return {
+          type: 'array',
+          items: {},
+          maxItems: 0,
+        };
+      }
       return parseArrayDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodUnion:
@@ -749,6 +775,9 @@ const selectParser = (
       return parseNativeEnumDef(def);
     }
     case ZodFirstPartyTypeKind.ZodNullable: {
+      if (refs.openaiStrictMode && requiresAsynchronousJSONInput(def.innerType._def)) {
+        return { type: 'null' };
+      }
       if (refs.openaiStrictMode && def.innerType._def.typeName === ZodFirstPartyTypeKind.ZodBigInt) {
         const inner = parseDef(
           def.innerType._def,
