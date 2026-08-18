@@ -1,6 +1,8 @@
 import type { Fetch } from '../internal/builtin-types';
-import { WorkloadIdentityAuthState } from '../internal/auth/workload-identity-auth-state';
-import type { WorkloadIdentityConfig } from './types';
+import { OpenAIError } from '../core/error';
+import { SubjectTokenWorkloadIdentityAuth } from '../internal/auth/subject-token-workload-identity-auth';
+import * as Shims from '../internal/shims';
+import type { SubjectTokenWorkloadIdentity } from './types';
 
 /**
  * Exchanges external workload identities for cached OpenAI access tokens.
@@ -9,17 +11,22 @@ import type { WorkloadIdentityConfig } from './types';
  * internal state owner; this compatibility facade retains its original API.
  */
 export class WorkloadIdentityAuth {
-  #state: WorkloadIdentityAuthState;
+  #auth: SubjectTokenWorkloadIdentityAuth;
 
-  constructor(config: WorkloadIdentityConfig, fetch?: Fetch) {
-    this.#state = new WorkloadIdentityAuthState(config, fetch);
+  constructor(config: SubjectTokenWorkloadIdentity, fetch?: Fetch) {
+    if (!config.provider) {
+      throw new OpenAIError(
+        'WorkloadIdentityAuth supports subject-token identities only; configure X.509 workload identity on the OpenAI client.',
+      );
+    }
+    this.#auth = new SubjectTokenWorkloadIdentityAuth(config, fetch ?? Shims.getDefaultFetch());
   }
 
   async getToken(): Promise<string> {
-    return await this.#state.getToken();
+    return await this.#auth.getToken();
   }
 
   invalidateToken(): void {
-    this.#state.invalidateToken();
+    this.#auth.invalidateToken();
   }
 }

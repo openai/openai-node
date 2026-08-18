@@ -149,6 +149,42 @@ describe('X.509 transport capability boundary', () => {
     await dispatcher.close();
   });
 
+  test.each([
+    {
+      label: 'factory',
+      options: {
+        factory(origin: URL, options: object) {
+          return new Pool(origin, options);
+        },
+      },
+    },
+    {
+      label: 'clientFactory',
+      options: {
+        clientFactory(origin: URL, options: object) {
+          return new Pool(origin, options);
+        },
+      },
+    },
+  ])('rejects an executable ProxyAgent $label before token acquisition', async ({ options }) => {
+    const dispatcher = new ProxyAgent({
+      uri: 'https://proxy.example:8443',
+      requestTls: { cert: 'certificate-a', key: 'private-key-a' },
+      ...options,
+    });
+    const fetch = successfulFetch();
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetch,
+      fetchOptions: { dispatcher },
+    });
+
+    await expect(client.models.list()).rejects.toThrow(/ProxyAgent|factory|executable|verify/iu);
+    expect(fetch).not.toHaveBeenCalled();
+    await dispatcher.close();
+  });
+
   test('preserves a static Undici Agent certificate across token and API calls', async () => {
     const dispatcher = new Agent({ connect: { cert: 'certificate-a', key: 'private-key-a' } });
     const fetch = successfulFetch();
@@ -317,7 +353,7 @@ describe('X.509 transport capability boundary', () => {
     expect(httpFetch).toHaveBeenCalledTimes(2);
   });
 
-  test('preserves Undici ProxyAgent destination/proxy TLS separation', async () => {
+  test('rejects an unverifiable Undici ProxyAgent before token acquisition', async () => {
     const dispatcher = new ProxyAgent({
       uri: 'https://proxy.example:8443',
       requestTls: { cert: 'certificate-a', key: 'private-key-a' },
@@ -331,12 +367,12 @@ describe('X.509 transport capability boundary', () => {
       fetchOptions: { dispatcher },
     });
 
-    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    await expect(client.models.list()).rejects.toThrow(/ProxyAgent|factory|executable|verify/iu);
+    expect(fetch).not.toHaveBeenCalled();
     await dispatcher.close();
   });
 
-  test('rejects client certificate material in Undici ProxyAgent proxyTls', async () => {
+  test('rejects client certificate material in an unverifiable Undici ProxyAgent', async () => {
     const dispatcher = new ProxyAgent({
       uri: 'https://proxy.example:8443',
       requestTls: { cert: 'certificate-a', key: 'private-key-a' },
@@ -350,7 +386,7 @@ describe('X.509 transport capability boundary', () => {
       fetchOptions: { dispatcher },
     });
 
-    await expect(client.models.list()).rejects.toThrow(/proxy.*certificate|certificate.*proxy/iu);
+    await expect(client.models.list()).rejects.toThrow(/ProxyAgent|factory|executable|verify/iu);
     expect(fetch).not.toHaveBeenCalled();
     await dispatcher.close();
   });

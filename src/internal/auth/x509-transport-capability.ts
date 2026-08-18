@@ -8,9 +8,6 @@ const CLIENT_CERTIFICATE_OPTION_KEYS = ['cert', 'key', 'pfx'] as const;
 
 const TOP_LEVEL_TLS_SOURCE = Object.freeze({});
 const UNDICI_AGENT_TLS_SOURCE = Object.freeze({});
-const UNDICI_PROXY_REQUEST_TLS_SOURCE = Object.freeze({});
-const UNDICI_PROXY_TLS_SOURCE = Object.freeze({});
-const UNDICI_PROXY_OPTIONS_SOURCE = Object.freeze({});
 const NO_DEFAULT_FACTORY = Object.freeze({});
 const defaultUndiciAgentFactories = new WeakMap<object, unknown>();
 
@@ -21,9 +18,9 @@ export interface X509TransportIdentitySource {
 }
 
 function ownSymbol(target: object, description: string): symbol | undefined {
-  // Undici does not expose the effective Agent/ProxyAgent TLS configuration through
-  // a public API. These descriptions are verified against the installed runtime in
-  // tests; executable dispatchers with an unknown future shape fail closed below.
+  // Undici does not expose the effective Agent TLS configuration through a public
+  // API. These descriptions are verified against the installed runtime in tests;
+  // ProxyAgent and executable dispatchers with an unknown future shape fail closed.
   return Object.getOwnPropertySymbols(target).find((symbol) => symbol.description === description);
 }
 
@@ -53,16 +50,6 @@ function assertImmutableTLSOptions(options: Record<string, unknown>, label: stri
       );
     }
   }
-}
-
-function optionalTLSOptions(value: unknown, label: string): Record<string, unknown> | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  if (!isObject(value)) {
-    throw new OpenAIError(`X.509 workload identity cannot verify ${label}.`);
-  }
-  return value;
 }
 
 function identitySource(key: object, options: Record<string, unknown>): X509TransportIdentitySource {
@@ -140,40 +127,16 @@ function undiciAgentIdentitySource(dispatcher: object): X509TransportIdentitySou
   return identitySource(UNDICI_AGENT_TLS_SOURCE, options['connect']);
 }
 
-function undiciProxyIdentitySources(dispatcher: object): X509TransportIdentitySource[] | undefined {
+function assertNoUndiciProxyAgent(dispatcher: object): void {
   const proxyOptionsSymbol = ownSymbol(dispatcher, 'proxy agent options');
   const requestTLSSymbol = ownSymbol(dispatcher, 'request tls settings');
   const proxyTLSSymbol = ownSymbol(dispatcher, 'proxy tls settings');
   if (!proxyOptionsSymbol || !requestTLSSymbol || !proxyTLSSymbol) {
-    return undefined;
+    return;
   }
-
-  const requestTLS = optionalTLSOptions(
-    symbolValue(dispatcher, requestTLSSymbol),
-    'Undici ProxyAgent request TLS',
+  throw new OpenAIError(
+    'X.509 workload identity cannot verify Undici ProxyAgent executable factory/clientFactory behavior; use a static Agent or trusted custom fetch transport.',
   );
-  const proxyTLS = optionalTLSOptions(symbolValue(dispatcher, proxyTLSSymbol), 'Undici ProxyAgent proxy TLS');
-  const proxyOptions = symbolValue(dispatcher, proxyOptionsSymbol);
-  if (!isObject(proxyOptions)) {
-    throw new OpenAIError('X.509 workload identity cannot verify this Undici ProxyAgent configuration.');
-  }
-  if (requestTLS) {
-    assertImmutableTLSOptions(requestTLS, 'Undici ProxyAgent request TLS');
-  }
-  if (proxyTLS) {
-    assertImmutableTLSOptions(proxyTLS, 'Undici ProxyAgent proxy TLS');
-    if (hasClientCertificate(proxyTLS)) {
-      throw new OpenAIError(
-        'X.509 workload identity client certificates must remain in ProxyAgent requestTls and must not be configured in proxyTls.',
-      );
-    }
-  }
-
-  return [
-    ...(requestTLS ? [identitySource(UNDICI_PROXY_REQUEST_TLS_SOURCE, requestTLS)] : []),
-    ...(proxyTLS ? [identitySource(UNDICI_PROXY_TLS_SOURCE, proxyTLS)] : []),
-    identitySource(UNDICI_PROXY_OPTIONS_SOURCE, proxyOptions),
-  ];
 }
 
 function assertNoOpaqueExecutableTransport(
@@ -190,7 +153,7 @@ function assertNoOpaqueExecutableTransport(
       )
     ) {
       throw new OpenAIError(
-        `X.509 workload identity does not support opaque ${key} transports; use a static Undici Agent or ProxyAgent configuration.`,
+        `X.509 workload identity does not support opaque ${key} transports; use a static Undici Agent or trusted custom fetch transport.`,
       );
     }
   }
@@ -198,7 +161,7 @@ function assertNoOpaqueExecutableTransport(
   const { dispatcher } = runtimeFetchOptions;
   if (!recognizedDispatcher && isObject(dispatcher) && typeof dispatcher['dispatch'] === 'function') {
     throw new OpenAIError(
-      'X.509 workload identity cannot verify this executable dispatcher; use a static Undici Agent or ProxyAgent configuration.',
+      'X.509 workload identity cannot verify this executable dispatcher; use a static Undici Agent or trusted custom fetch transport.',
     );
   }
 }
@@ -273,19 +236,14 @@ export function x509TransportIdentitySources(
 
   let recognizedDispatcher = false;
   if (isObject(fetchOptions.dispatcher)) {
-    const proxySources = undiciProxyIdentitySources(fetchOptions.dispatcher);
-    if (proxySources) {
-      recognizedDispatcher = true;
-      sources.push(...proxySources);
-    } else {
-      recognizedDispatcher =
-        ownSymbol(fetchOptions.dispatcher, 'options') !== undefined &&
-        ownSymbol(fetchOptions.dispatcher, 'factory') !== undefined &&
-        ownSymbol(fetchOptions.dispatcher, 'clients') !== undefined;
-      const agentSource = undiciAgentIdentitySource(fetchOptions.dispatcher);
-      if (agentSource) {
-        sources.push(agentSource);
-      }
+    assertNoUndiciProxyAgent(fetchOptions.dispatcher);
+    recognizedDispatcher =
+      ownSymbol(fetchOptions.dispatcher, 'options') !== undefined &&
+      ownSymbol(fetchOptions.dispatcher, 'factory') !== undefined &&
+      ownSymbol(fetchOptions.dispatcher, 'clients') !== undefined;
+    const agentSource = undiciAgentIdentitySource(fetchOptions.dispatcher);
+    if (agentSource) {
+      sources.push(agentSource);
     }
   }
   assertNoOpaqueExecutableTransport(fetchOptions, recognizedDispatcher);

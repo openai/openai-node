@@ -5,7 +5,7 @@ import { expect, vi } from 'vitest';
 
 import { WorkloadIdentityAuth } from 'openai/auth/workload-identity-auth';
 import { APIError, OAuthError, OpenAIError } from 'openai';
-import type { WorkloadIdentity } from 'openai/auth/types';
+import type { WorkloadIdentity, X509WorkloadIdentity } from 'openai/auth/types';
 
 const originalFetch = global.fetch;
 
@@ -60,6 +60,17 @@ describe('WorkloadIdentityAuth', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  test('keeps the public compatibility facade subject-token-only', () => {
+    const x509Identity: X509WorkloadIdentity = {
+      type: 'x509',
+      identityProviderId: 'test-x509-provider',
+      serviceAccountId: 'test-x509-service-account',
+    };
+
+    // @ts-expect-error X.509 lifecycle and transport inputs are owned by the OpenAI client.
+    expect(() => new WorkloadIdentityAuth(x509Identity)).toThrow(/subject-token|provider|OpenAI client/iu);
   });
 
   test('caches tokens', async () => {
