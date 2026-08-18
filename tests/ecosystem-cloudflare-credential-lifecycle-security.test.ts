@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -114,6 +115,19 @@ function withFixture(run: (fixture: Fixture) => void) {
       '      fs.symlinkSync(process.env.CLOUDFLARE_REPLACEMENT_TARGET, vars);',
       '    }',
       '  }',
+      "  if (failure === 'capture-original' || failure === 'edit-original') {",
+      "    const held = '/proc/' + process.ppid + '/fd/' + process.env.CLOUDFLARE_HELD_FD;",
+      "    if (failure === 'capture-original') {",
+      '      fs.writeFileSync(process.env.CLOUDFLARE_HELD_CAPTURE, fs.readFileSync(held), { mode: 0o600 });',
+      '    } else {',
+      '      fs.writeFileSync(held, "original concurrently edited\\n");',
+      '      fs.chmodSync(held, 0o640);',
+      '    }',
+      '  }',
+      "  if (failure === 'edit-staged') fs.writeFileSync(vars, 'concurrent visible edit\\n');",
+      "  if (failure === 'append-staged') fs.appendFileSync(vars, '\\nconcurrent appended edit\\n');",
+      "  if (failure === 'append-staged-duplicate') fs.appendFileSync(vars, '\\nconcurrent appended edit\\n' + process.env.OPENAI_API_KEY + '\\n');",
+      "  if (failure === 'chmod-staged') fs.chmodSync(vars, 0o640);",
       "  if (failure === 'signal-int' || failure === 'signal-term') {",
       "    process.kill(process.ppid, failure === 'signal-int' ? 'SIGINT' : 'SIGTERM');",
       '    setTimeout(() => process.exit(0), 250);',
@@ -137,6 +151,30 @@ function setExistingCredentials(fixture: Fixture, state: CredentialState) {
     writeFileSync(fixture.vars, state.contents);
     chmodSync(fixture.vars, state.mode);
   }
+}
+
+function holdOriginalCredentialDescriptor(fixture: Fixture): string {
+  const preload = path.join(fixture.directory, 'hold-original-credential.cjs');
+  writeFileSync(
+    preload,
+    [
+      "const fs = require('node:fs');",
+      "const promises = require('node:fs/promises');",
+      'const originalOpen = promises.open;',
+      'promises.open = async (...args) => {',
+      '  const file = await originalOpen(...args);',
+      "  if (args[0] === '.dev.vars' && !process.env.CLOUDFLARE_HELD_FD) {",
+      "    process.env.CLOUDFLARE_HELD_FD = String(fs.openSync(args[0], 'r+'));",
+      '  }',
+      '  return file;',
+      '};',
+    ].join('\n'),
+  );
+  return preload;
+}
+
+function expectNoCloudflareCredentialArtifacts(fixture: Fixture) {
+  expect(readdirSync(fixture.worker).filter((name) => name.startsWith('.dev.vars.openai-'))).toEqual([]);
 }
 
 function runCloudflare(
@@ -203,6 +241,7 @@ function expectOriginal(observation: Observation, state: CredentialState) {
 }
 
 function expectRestored(fixture: Fixture, state: CredentialState) {
+  expectNoCloudflareCredentialArtifacts(fixture);
   if (state.contents === undefined) {
     expect(existsSync(fixture.vars)).toBe(false);
     return;
@@ -267,6 +306,96 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run test:ci']);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
+    });
+  });
+
+  test('never exposes a staged key through a pre-opened readable original inode', () => {
+    withFixture((fixture) => {
+      const state = credentialStates[1] as CredentialState;
+      setExistingCredentials(fixture, state);
+      const preload = holdOriginalCredentialDescriptor(fixture);
+      const capture = path.join(fixture.directory, 'held-original-capture');
+
+      const result = runCloudflare(fixture, ['--live'], {
+        CLOUDFLARE_FAILURE: 'capture-original',
+        CLOUDFLARE_HELD_CAPTURE: capture,
+        NODE_OPTIONS: `--require ${preload}`,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(readFileSync(capture)).toEqual(originalContents);
+      expect(readFileSync(capture).includes(apiKey)).toBe(false);
+      expectRestored(fixture, state);
+      expectNoCloudflareCredentialArtifacts(fixture);
+    });
+  });
+
+  test('preserves concurrent edits and mode changes through the original held inode', () => {
+    withFixture((fixture) => {
+      const state = credentialStates[1] as CredentialState;
+      setExistingCredentials(fixture, state);
+      const preload = holdOriginalCredentialDescriptor(fixture);
+
+      const result = runCloudflare(fixture, ['--live'], {
+        CLOUDFLARE_FAILURE: 'edit-original',
+        NODE_OPTIONS: `--require ${preload}`,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(readFileSync(fixture.vars, 'utf-8')).toBe('original concurrently edited\n');
+      expect(statSync(fixture.vars).mode % 0o1000).toBe(0o640);
+      expect(readFileSync(fixture.vars).includes(apiKey)).toBe(false);
+      expectNoCloudflareCredentialArtifacts(fixture);
+    });
+  });
+
+  test('does not retry a replaced credential path even when retries are enabled', () => {
+    withFixture((fixture) => {
+      const state = credentialStates[1] as CredentialState;
+      setExistingCredentials(fixture, state);
+
+      const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
+        CLOUDFLARE_FAILURE: 'replace-file',
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(readFileSync(fixture.attempts, 'utf-8')).toBe('1');
+      expect(readFileSync(fixture.vars, 'utf-8')).toBe('independently replaced credentials\n');
+      expect(readFileSync(fixture.vars).includes(apiKey)).toBe(false);
+      expectNoCloudflareCredentialArtifacts(fixture);
+    });
+  });
+
+  test.each([
+    { failure: 'edit-staged', contents: 'concurrent visible edit\n', mode: 0o600 },
+    { failure: 'append-staged', contents: '\nconcurrent appended edit\n', mode: 0o600 },
+    {
+      failure: 'append-staged-duplicate',
+      contents: '\nconcurrent appended edit\n[REDACTED]\n',
+      mode: 0o600,
+    },
+    { failure: 'chmod-staged', contents: originalContents, mode: 0o640 },
+  ])('preserves concurrent visible credential changes after $failure', ({ failure, contents, mode }) => {
+    withFixture((fixture) => {
+      const state = credentialStates[1] as CredentialState;
+      setExistingCredentials(fixture, state);
+
+      const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
+        CLOUDFLARE_FAILURE: failure,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(readFileSync(fixture.attempts, 'utf-8')).toBe('1');
+      expect(readFileSync(fixture.vars)).toEqual(
+        typeof contents === 'string' ? Buffer.from(contents) : contents,
+      );
+      expect(statSync(fixture.vars).mode % 0o1000).toBe(mode);
+      expect(readFileSync(fixture.vars).includes(apiKey)).toBe(false);
+      expectNoCloudflareCredentialArtifacts(fixture);
     });
   });
 
@@ -361,10 +490,8 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         }
 
         const detached = `${fixture.vars}.original`;
-        expect(readFileSync(detached)).toEqual(state.contents ?? Buffer.alloc(0));
-        if (state.contents !== undefined) {
-          expect(statSync(detached).mode % 0o1000).toBe(state.mode);
-        }
+        expect(readFileSync(detached)).toEqual(Buffer.alloc(0));
+        expect(statSync(detached).mode % 0o1000).toBe(0o600);
         expect(readFileSync(detached).includes(apiKey)).toBe(false);
       });
     },
@@ -387,7 +514,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
             'let replaced = false;',
             'promises.open = async (...args) => {',
             '  const file = await originalOpen(...args);',
-            "  if (args[0] === '.dev.vars') {",
+            "  if (args[0] === '.dev.vars' || args[0].startsWith('.dev.vars.openai-staging-')) {",
             '    const originalTruncate = file.truncate.bind(file);',
             '    file.truncate = async (...truncateArgs) => {',
             '      const result = await originalTruncate(...truncateArgs);',
@@ -414,7 +541,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         expect(result.error).toBeUndefined();
         expect(result.status).toBe(1);
         expect(readFileSync(fixture.vars, 'utf-8')).toBe('independent replacement');
-        expect(readFileSync(`${fixture.vars}.race-original`)).toEqual(state.contents ?? Buffer.alloc(0));
+        expect(readFileSync(`${fixture.vars}.race-original`)).toEqual(Buffer.alloc(0));
         expect(readFileSync(fixture.vars)).not.toContain(apiKey);
       });
     },
@@ -512,7 +639,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
             'let interrupted = false;',
             'promises.open = async (...args) => {',
             '  const file = await originalOpen(...args);',
-            "  if (args[0] === '.dev.vars') {",
+            "  if (args[0] === '.dev.vars' || args[0].startsWith('.dev.vars.openai-staging-')) {",
             '    const originalChmod = file.chmod.bind(file);',
             '    file.chmod = async (...chmodArgs) => {',
             '      if (!interrupted && chmodArgs[0] === 0o600) {',
