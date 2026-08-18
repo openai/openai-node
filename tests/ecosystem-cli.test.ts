@@ -31,10 +31,14 @@ function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}
   );
 }
 
-function workflowCondition(step: string) {
-  return step
-    .split('        if: >-\n')[1]
-    ?.split('\n        run:')[0]
+function workflowJob(workflow: string, name: string) {
+  return workflow.split(`\n  ${name}:\n`)[1]?.split(/\n {2}[a-z_]+:\n/u)[0] ?? '';
+}
+
+function workflowCondition(job: string) {
+  return job
+    .split('    if: >-\n')[1]
+    ?.split('\n    environment:')[0]
     ?.split('\n')
     .slice(1, -1)
     .map((line) => line.trim())
@@ -42,71 +46,68 @@ function workflowCondition(step: string) {
 }
 
 describe('ecosystem test CLI', () => {
-  test('limits live ecosystem CI and credentials to trusted events', () => {
+  test('limits live examples and ecosystem credentials to protected main pushes', () => {
     const workflow = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf-8');
-    const ecosystemJob = workflow.split('\n  ecosystem_tests:\n')[1] ?? '';
-    const steps = ecosystemJob.split('\n      - name: ');
-    const liveStep =
-      steps.find((step) => step.startsWith('Run ecosystem tests with live credentials\n')) ?? '';
-    const nonLiveStep =
-      steps.find((step) => step.startsWith('Run ecosystem tests without live credentials\n')) ?? '';
+    const liveJob = workflowJob(workflow, 'examples');
+    const ecosystemJob = workflowJob(workflow, 'ecosystem_tests');
 
-    expect(workflowCondition(liveStep)).toBe(
-      "github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository))",
+    expect(workflowCondition(liveJob)).toBe(
+      "github.repository == 'openai/openai-node' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'dependabot[bot]'",
     );
-    expect(liveStep).toContain(
+    expect(liveJob).toContain('\n    environment: ci\n');
+    expect(liveJob).toContain('pnpm tsn examples/chat-completions/demo.ts');
+    expect(liveJob).toContain(
       'pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3',
     );
-    expect(liveStep).toContain('OPENAI_API_KEY:');
-    expect(liveStep).toContain('secrets.OPENAI_API_KEY');
+    expect(liveJob.match(/secrets\.OPENAI_API_KEY/gu)).toHaveLength(1);
 
-    expect(workflowCondition(nonLiveStep)).toBe(
-      "!(github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)))",
-    );
-    expect(nonLiveStep).toContain('pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3');
-    expect(nonLiveStep).not.toContain('--live');
-    expect(nonLiveStep).not.toContain('OPENAI_API_KEY');
-    expect(ecosystemJob.split('OPENAI_API_KEY:')).toHaveLength(2);
+    expect(ecosystemJob).toContain('pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3');
+    expect(ecosystemJob).not.toContain('--live');
+    expect(ecosystemJob).not.toContain('OPENAI_API_KEY');
+    expect(ecosystemJob).not.toContain('environment: ci');
+    expect(workflow.match(/secrets\.OPENAI_API_KEY/gu)).toHaveLength(1);
   });
 
   test.each([
-    ['Dependabot push', 'push', 'dependabot[bot]', undefined, undefined, false],
+    ['protected main push', 'push', 'refs/heads/main', 'octocat', 'openai/openai-node', true],
+    ['Dependabot push to main', 'push', 'refs/heads/main', 'dependabot[bot]', 'openai/openai-node', false],
     [
-      'Dependabot pull request synchronized by a human',
-      'pull_request',
-      'octocat',
-      'dependabot[bot]',
-      'openai/openai-node',
-      false,
-    ],
-    ['human push', 'push', 'octocat', undefined, undefined, true],
-    ['merge group', 'merge_group', 'octocat', undefined, undefined, true],
-    ['workflow dispatch', 'workflow_dispatch', 'octocat', undefined, undefined, true],
-    [
-      'same-repository pull request synchronized by Dependabot',
-      'pull_request',
-      'dependabot[bot]',
+      'unprotected same-repository branch push',
+      'push',
+      'refs/heads/feature',
       'octocat',
       'openai/openai-node',
       false,
     ],
-    ['fork pull request', 'pull_request', 'octocat', 'octocat', 'octocat/openai-node', false],
-    ['pull request with a missing head', 'pull_request', 'octocat', 'octocat', undefined, false],
+    [
+      'same-repository pull request',
+      'pull_request',
+      'refs/pull/42/merge',
+      'octocat',
+      'openai/openai-node',
+      false,
+    ],
+    ['fork pull request', 'pull_request', 'refs/pull/43/merge', 'octocat', 'openai/openai-node', false],
+    [
+      'merge group',
+      'merge_group',
+      'refs/heads/gh-readonly-queue/main/pr-42',
+      'octocat',
+      'openai/openai-node',
+      false,
+    ],
+    ['workflow dispatch', 'workflow_dispatch', 'refs/heads/main', 'octocat', 'openai/openai-node', false],
+    ['different repository main push', 'push', 'refs/heads/main', 'octocat', 'octocat/openai-node', false],
   ])(
-    'selects exactly one ecosystem mode for a %s',
-    (_event, eventName, actor, pullRequestAuthor, headRepository, trusted) => {
-      const repository = 'openai/openai-node';
-      const keyless =
-        actor === 'dependabot[bot]' ||
-        (eventName === 'pull_request' &&
-          (pullRequestAuthor === 'dependabot[bot]' || headRepository !== repository));
+    'runs credential-free ecosystem checks and gates live checks for a %s',
+    (_event, eventName, ref, actor, repository, trusted) => {
       const live =
-        actor !== 'dependabot[bot]' &&
-        (eventName !== 'pull_request' ||
-          (pullRequestAuthor !== 'dependabot[bot]' && headRepository === repository));
+        repository === 'openai/openai-node' &&
+        eventName === 'push' &&
+        ref === 'refs/heads/main' &&
+        actor !== 'dependabot[bot]';
 
-      expect({ keyless, live }).toEqual({ keyless: !trusted, live: trusted });
-      expect([keyless, live].filter(Boolean)).toHaveLength(1);
+      expect({ credentialFree: true, live }).toEqual({ credentialFree: true, live: trusted });
     },
   );
 
