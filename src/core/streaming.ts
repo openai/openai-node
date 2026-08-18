@@ -119,6 +119,10 @@ export class Stream<Item> implements AsyncIterable<Item> {
               throw new SyntaxError('Could not parse server-sent event data as JSON.');
             }
 
+            if (sse.event === 'error') {
+              throw new APIError(undefined, data?.error ?? data, undefined, response.headers);
+            }
+
             if (data && data.error) {
               throw new APIError(undefined, data.error, undefined, response.headers);
             }
@@ -132,10 +136,6 @@ export class Stream<Item> implements AsyncIterable<Item> {
               logger.error(`Could not parse message into JSON:`);
               logger.error(`From chunk:`);
               throw new SyntaxError('Could not parse server-sent event data as JSON.');
-            }
-            // SSE error events surface as APIError instances.
-            if (sse.event === 'error') {
-              throw new APIError(undefined, data.error, data.message, undefined);
             }
             yield { event: sse.event, data } as any;
           }
