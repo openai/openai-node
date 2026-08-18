@@ -428,11 +428,13 @@ describe('Zod v3 strict schema capability analysis', () => {
       parameters: z3.object({
         literal: z3.literal(Infinity),
         native: z3.nativeEnum({ NonFinite: -Infinity, Finite: 7 } as const),
+        bound: z3.number().max(Infinity),
       }),
     });
 
     expect(realtime.parameters).toHaveProperty('properties.literal.const', Infinity);
     expect(realtime.parameters).toHaveProperty('properties.native.enum', [-Infinity, 7]);
+    expect(realtime.parameters).toHaveProperty('properties.bound.maximum', Infinity);
   });
 
   it.each([Infinity, -Infinity, Number.NaN])('rejects a non-finite numeric default %s', (value) => {
@@ -565,6 +567,18 @@ describe('Zod v3 strict schema capability analysis', () => {
       normalized: 4,
     },
     {
+      name: 'disjoint numeric multiple',
+      schema: () => z3.union([z3.number().multipleOf(2), z3.coerce.bigint()]).default(3n),
+      output: 3n,
+      normalized: 3,
+    },
+    {
+      name: 'disjoint fractional multiple',
+      schema: () => z3.union([z3.number().multipleOf(0.4), z3.coerce.bigint()]).default(3n),
+      output: 3n,
+      normalized: 3,
+    },
+    {
       name: 'nested object union',
       schema: () =>
         z3.union([z3.object({ count: z3.coerce.bigint() }), z3.object({ count: z3.string() })]).default({
@@ -650,6 +664,14 @@ describe('Zod v3 strict schema capability analysis', () => {
     {
       name: 'inclusive numeric maximum equality',
       schema: () => z3.union([z3.number().max(4), z3.coerce.bigint()]).default(4n),
+    },
+    {
+      name: 'matching numeric multiple',
+      schema: () => z3.union([z3.number().multipleOf(2), z3.coerce.bigint()]).default(4n),
+    },
+    {
+      name: 'matching fractional multiple',
+      schema: () => z3.union([z3.number().multipleOf(0.5), z3.coerce.bigint()]).default(3n),
     },
     {
       name: 'matching literal',
@@ -914,6 +936,24 @@ describe('Zod v3 strict schema capability analysis', () => {
   ])('rejects a preprocessed Set with an unrepresentable $name cardinality constraint', ({ schema }) => {
     const value = z3.preprocess((input) => new Set(input as string[]), schema());
     expect(() => formatFor(value)).toThrow(/ZodSet.*uniqueItems/u);
+  });
+
+  it.each([
+    { name: 'minimum of one', schema: () => z3.set(z3.string()).min(1), expected: { minItems: 1 } },
+    {
+      name: 'exact size of one',
+      schema: () => z3.set(z3.string()).size(1),
+      expected: { minItems: 1, maxItems: 1 },
+    },
+  ])('preserves a preprocessed Set with a representable $name constraint', ({ schema, expected }) => {
+    const value = z3.preprocess((input) => new Set(input as string[]), schema());
+    const format = formatFor(value);
+
+    expect(format.json_schema.schema).toHaveProperty(
+      'properties.value',
+      expect.objectContaining({ type: 'array', items: { type: 'string' }, ...expected }),
+    );
+    expect(format.$parseRaw('{"value":["x"]}')).toEqual({ value: new Set(['x']) });
   });
 
   it.each([
@@ -1229,6 +1269,33 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     }
   });
 
+  it.each([
+    { name: 'inclusive maximum', schema: () => z3.number().max(Infinity) },
+    { name: 'exclusive maximum', schema: () => z3.number().lt(Infinity) },
+    { name: 'inclusive minimum', schema: () => z3.number().min(-Infinity) },
+    { name: 'exclusive minimum', schema: () => z3.number().gt(-Infinity) },
+  ])('omits a vacuous infinite $name constraint', ({ schema }) => {
+    const result = create(z3.object({ value: schema() }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value', { type: 'number' });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
+    expect(JSON.stringify(strictHelperSchema(result))).not.toContain('null');
+  });
+
+  it.each([
+    { name: 'impossible inclusive minimum', schema: () => z3.number().min(Infinity) },
+    { name: 'impossible inclusive maximum', schema: () => z3.number().max(-Infinity) },
+    { name: 'impossible exclusive minimum', schema: () => z3.number().gt(Infinity) },
+    { name: 'impossible exclusive maximum', schema: () => z3.number().lt(-Infinity) },
+    { name: 'NaN minimum', schema: () => z3.number().min(Number.NaN) },
+    { name: 'NaN maximum', schema: () => z3.number().max(Number.NaN) },
+    { name: 'infinite multiple', schema: () => z3.number().multipleOf(Infinity) },
+    { name: 'negative infinite multiple', schema: () => z3.number().multipleOf(-Infinity) },
+    { name: 'NaN multiple', schema: () => z3.number().multipleOf(Number.NaN) },
+  ])('rejects an unrepresentable non-finite $name constraint', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow('non-finite');
+  });
+
   it('preserves finite literals, compact literal unions, and native enum values', () => {
     const finite = create(
       z3.object({
@@ -1381,6 +1448,54 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(result.$parseRaw('{"value":1.5}')).toEqual({ value: 1.5 });
   });
 
+  it('narrows nullable numeric fallback properties without removing null', () => {
+    const value = z3.union([z3.number().transform(BigInt), z3.number().nullable()]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.type', 'integer');
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.nullable', true);
+    expect(result.$parseRaw('{"value":null}')).toEqual({ value: null });
+    expect(() => result.$parseRaw('{"value":1.5}')).toThrow(RangeError);
+  });
+
+  it('narrows only the numeric alternative of a checked nullable fractional fallback', () => {
+    const value = z3.union([z3.number().transform(BigInt), z3.number().min(0).nullable()]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.anyOf.0.type', 'integer');
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.anyOf.1', { type: 'null' });
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(result.$parseRaw('{"value":null}')).toEqual({ value: null });
+    expect(() => result.$parseRaw('{"value":1.5}')).toThrow(RangeError);
+  });
+
+  it('narrows checked nullable numeric fallbacks nested inside object properties', () => {
+    const value = z3.union([
+      z3.object({ count: z3.number().transform(BigInt) }),
+      z3.object({ count: z3.number().min(0).nullable() }),
+    ]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty(
+      'properties.value.anyOf.1.properties.count.anyOf.0.type',
+      'integer',
+    );
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.properties.count.anyOf.1', {
+      type: 'null',
+    });
+    expect(result.$parseRaw('{"value":{"count":null}}')).toEqual({ value: { count: null } });
+    expect(() => result.$parseRaw('{"value":{"count":1.5}}')).toThrow(RangeError);
+  });
+
+  it('preserves nullable fractional fallback after an integer-constrained BigInt transform', () => {
+    const value = z3.union([z3.number().int().transform(BigInt), z3.number().min(0).nullable()]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.anyOf.0.type', 'number');
+    expect(result.$parseRaw('{"value":1.5}')).toEqual({ value: 1.5 });
+    expect(result.$parseRaw('{"value":null}')).toEqual({ value: null });
+  });
+
   it('preserves fractional numbers accepted before a later exact BigInt transform', () => {
     const value = z3.union([z3.number(), z3.number().transform(BigInt)]);
     const result = create(z3.object({ value }));
@@ -1412,6 +1527,30 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     {
       name: 'wrapped exact BigInt transform',
       schema: () => z3.intersection(z3.number().transform(BigInt).readonly(), z3.number()),
+    },
+    {
+      name: 'preprocessed BigInt and number literals',
+      schema: () =>
+        z3.intersection(
+          z3.preprocess((value) => BigInt(value as number), z3.literal(1n)),
+          z3.literal(1),
+        ),
+    },
+    {
+      name: 'number and preprocessed BigInt literals',
+      schema: () =>
+        z3.intersection(
+          z3.literal(1),
+          z3.preprocess((value) => BigInt(value as number), z3.literal(1n)),
+        ),
+    },
+    {
+      name: 'nested BigInt and number literal properties',
+      schema: () =>
+        z3.intersection(
+          z3.object({ value: z3.preprocess((input) => BigInt(input as number), z3.literal(1n)) }),
+          z3.object({ value: z3.literal(1) }),
+        ),
     },
     {
       name: 'nested object BigInt and number',

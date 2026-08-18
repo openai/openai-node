@@ -59,6 +59,7 @@ import {
   acceptsJSONNumber,
   acceptsJSONString,
   applyBigIntStringFallbackBounds,
+  applyFractionalBigIntFallbackBounds,
   applyNestedNumericOverlaps,
   applySafeIntegerBounds,
   applyUnsafeBigIntBounds,
@@ -75,7 +76,6 @@ import {
   producesDateAtPath,
   producesBigIntOutput,
   requiresAsynchronousJSONInput,
-  throwsOnFractionalBigIntInput,
 } from './schema-capabilities';
 import { ignoreOverride } from './Options';
 import { zodDef } from './util';
@@ -747,7 +747,30 @@ const selectParser = (
       return parseStringDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodNumber: {
-      return parseNumberDef(def, refs);
+      const schema = parseNumberDef(def, refs);
+      if (refs.openaiStrictMode) {
+        for (const keyword of [
+          'minimum',
+          'exclusiveMinimum',
+          'maximum',
+          'exclusiveMaximum',
+          'multipleOf',
+        ] as const) {
+          const value = schema[keyword];
+          if (typeof value !== 'number' || Number.isFinite(value)) {
+            continue;
+          }
+          const vacuous =
+            ((keyword === 'minimum' || keyword === 'exclusiveMinimum') && value === -Infinity) ||
+            ((keyword === 'maximum' || keyword === 'exclusiveMaximum') && value === Infinity);
+          if (vacuous) {
+            Reflect.deleteProperty(schema, keyword);
+          } else {
+            assertFiniteStrictSchemaValue(value, keyword, refs);
+          }
+        }
+      }
+      return schema;
     }
     case ZodFirstPartyTypeKind.ZodObject: {
       return parseObjectDef(def, refs);
@@ -927,11 +950,10 @@ const selectParser = (
               boundedBranch,
               competingBigInts.map((candidate) => candidate._def),
             );
-            const fractionalTransform = options.some(
-              (candidate, candidateIndex) =>
-                candidateIndex < index && throwsOnFractionalBigIntInput(candidate._def, bounded),
-            );
-            return fractionalTransform ? ({ ...bounded, type: 'integer' } as JsonSchema7Type) : bounded;
+            const precedingProducers = options
+              .filter((_, candidateIndex) => candidateIndex < index)
+              .map((candidate) => candidate._def);
+            return applyFractionalBigIntFallbackBounds(bounded, precedingProducers);
           })
           .filter(
             (branch): branch is JsonSchema7Type =>

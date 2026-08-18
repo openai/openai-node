@@ -217,6 +217,13 @@ export const producesBigIntOutput = (definition: ZodTypeDef): boolean =>
     'output',
   );
 
+const literalParsedOutputKinds = new Map<string, ZodFirstPartyTypeKind>([
+  ['bigint', ZodFirstPartyTypeKind.ZodBigInt],
+  ['number', ZodFirstPartyTypeKind.ZodNumber],
+  ['string', ZodFirstPartyTypeKind.ZodString],
+  ['boolean', ZodFirstPartyTypeKind.ZodBoolean],
+]);
+
 const definiteParsedOutputKinds = new Set<ZodFirstPartyTypeKind>([
   ZodFirstPartyTypeKind.ZodBigInt,
   ZodFirstPartyTypeKind.ZodNumber,
@@ -240,6 +247,11 @@ export const knownParsedOutputType = (
     const def = definition as InspectableDefinition;
     if (isExactBigIntTransform(def)) {
       return ZodFirstPartyTypeKind.ZodBigInt;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
+      return def.value === null
+        ? ZodFirstPartyTypeKind.ZodNull
+        : literalParsedOutputKinds.get(typeof def.value);
     }
     if (def.typeName === ZodFirstPartyTypeKind.ZodTuple) {
       return ZodFirstPartyTypeKind.ZodArray;
@@ -452,6 +464,42 @@ export const throwsOnFractionalBigIntInput = (definition: ZodTypeDef, schema: Js
         : undefined,
     'output',
   );
+
+export const applyFractionalBigIntFallbackBounds = (
+  schema: JsonSchema7Type,
+  producers: readonly ZodTypeDef[],
+): JsonSchema7Type => {
+  if (producers.length === 0) {
+    return schema;
+  }
+
+  const record = schema as Record<string, unknown>;
+  for (const keyword of ['anyOf', 'oneOf']) {
+    const alternatives = record[keyword];
+    if (Array.isArray(alternatives)) {
+      return {
+        ...record,
+        [keyword]: alternatives.map((alternative) =>
+          alternative && typeof alternative === 'object'
+            ? applyFractionalBigIntFallbackBounds(alternative as JsonSchema7Type, producers)
+            : alternative,
+        ),
+      } as JsonSchema7Type;
+    }
+  }
+
+  const types = record['type'];
+  if (Array.isArray(types) && types.includes('number')) {
+    const numeric = { ...record, type: 'number' } as JsonSchema7Type;
+    return producers.some((producer) => throwsOnFractionalBigIntInput(producer, numeric))
+      ? ({ ...record, type: types.map((type) => (type === 'number' ? 'integer' : type)) } as JsonSchema7Type)
+      : schema;
+  }
+
+  return producers.some((producer) => throwsOnFractionalBigIntInput(producer, schema))
+    ? ({ ...schema, type: 'integer' } as JsonSchema7Type)
+    : schema;
+};
 
 export const hasExactBigIntStringInput = (definition: ZodTypeDef): boolean =>
   visitDefinition(
@@ -1155,6 +1203,9 @@ const producesSelectedNativeUnion = (
           if (check.kind === 'max') {
             return scalar > boundary || (check.inclusive === false && scalar === boundary);
           }
+          if (check.kind === 'multipleOf') {
+            return !Number.isInteger(scalar / boundary);
+          }
           return false;
         })
       ) {
@@ -1628,8 +1679,8 @@ const boundNestedNumericPath = (
       return applyBigIntStringFallbackBounds(schema, [overlap.producer]);
     }
     const bounded = applyUnsafeBigIntBounds(schema, [overlap.producer]);
-    return overlap.producerPrecedesConsumer && throwsOnFractionalBigIntInput(overlap.producer, bounded)
-      ? ({ ...bounded, type: 'integer' } as JsonSchema7Type)
+    return overlap.producerPrecedesConsumer
+      ? applyFractionalBigIntFallbackBounds(bounded, [overlap.producer])
       : bounded;
   }
 

@@ -15,7 +15,7 @@ export type JsonSchema7SetType = {
 };
 
 export function parseSetDef(def: ZodSetDef, refs: Refs): JsonSchema7SetType {
-  if (refs.openaiStrictMode && (def.minSize?.value ?? 0) > 0) {
+  if (refs.openaiStrictMode && (def.minSize?.value ?? 0) > 1) {
     throw new Error(
       `Zod field at \`${refs.currentPath.join('/')}\` uses \`ZodSet\` size constraints, which cannot be represented without the unsupported \`uniqueItems\` keyword.`,
     );
