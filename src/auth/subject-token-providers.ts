@@ -221,8 +221,7 @@ export function gcpIDTokenProvider(
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`GCP Metadata Server returned ${response.status}: ${errorText}`);
+          throw new Error(`GCP Metadata Server returned ${response.status}`);
         }
 
         const tokenText = await response.text();
