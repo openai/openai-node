@@ -11,6 +11,10 @@ export const has = (obj: object, key: PropertyKey): boolean => {
   return resolvedHas(obj, key);
 };
 
+function isUnsafePropertyKey(key: unknown): boolean {
+  return key === '__proto__' || key === 'constructor' || key === 'prototype';
+}
+
 const hex_table = /* @__PURE__ */ (() => {
   const array = [];
   for (let i = 0; i < 256; ++i) {
@@ -68,7 +72,10 @@ export function merge(
     if (isArray(target)) {
       target.push(source);
     } else if (target && typeof target === 'object') {
-      if ((options && (options.plainObjects || options.allowPrototypes)) || !has(Object.prototype, source)) {
+      if (
+        !isUnsafePropertyKey(source) &&
+        ((options && (options.plainObjects || options.allowPrototypes)) || !has(Object.prototype, source))
+      ) {
         target[source] = true;
       }
     } else {
@@ -110,6 +117,9 @@ export function merge(
   }
 
   for (const key of Object.keys(source)) {
+    if (isUnsafePropertyKey(key)) {
+      continue;
+    }
     const value = source[key];
 
     mergeTarget[key] = has(mergeTarget, key) ? merge(mergeTarget[key], value, options) : value;
@@ -119,6 +129,9 @@ export function merge(
 
 export function assign_single_source(target: any, source: any) {
   for (const key of Object.keys(source)) {
+    if (isUnsafePropertyKey(key)) {
+      continue;
+    }
     target[key] = source[key];
   }
   return target;

@@ -1,4 +1,4 @@
-import { combine, merge, is_buffer, assign_single_source } from 'openai/internal/qs/utils';
+import { combine, merge, is_buffer, assign_single_source, has } from 'openai/internal/qs/utils';
 
 describe('merge()', () => {
   // t.deepEqual(merge(null, true), [null, true], 'merges true into null');
@@ -83,6 +83,62 @@ test('assign()', () => {
   expect(result).toEqual(target);
   expect(target).toEqual({ a: 1, b: 3, c: 4 });
   expect(source).toEqual({ b: 3, c: 4 });
+});
+
+describe('prototype-pollution safety', () => {
+  test.each([
+    {
+      name: 'merge',
+      apply: (target: Record<string, unknown>, source: Record<string, unknown>) => merge(target, source),
+    },
+    {
+      name: 'assign_single_source',
+      apply: (target: Record<string, unknown>, source: Record<string, unknown>) =>
+        assign_single_source(target, source),
+    },
+  ])('$name preserves inherited properties while ignoring unsafe own source keys', ({ apply }) => {
+    const inherited = { inherited: true };
+    const target = Object.create(inherited);
+    const source = JSON.parse(
+      '{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"prototype":{"polluted":true},"safe":"preserved"}',
+    );
+
+    expect(apply(target, source)).toBe(target);
+    expect(Object.getPrototypeOf(target)).toBe(inherited);
+    expect(target.inherited).toBe(true);
+    expect(target.safe).toBe('preserved');
+    expect(has(target, '__proto__')).toBe(false);
+    expect(has(target, 'constructor')).toBe(false);
+    expect(has(target, 'prototype')).toBe(false);
+    expect(Reflect.get(Object.prototype, 'polluted')).toBeUndefined();
+  });
+
+  test('merge ignores unsafe keys in nested objects', () => {
+    const target = { nested: {} };
+    const source = JSON.parse(
+      '{"nested":{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"prototype":{"polluted":true},"safe":true}}',
+    );
+
+    expect(merge(target, source)).toBe(target);
+    expect(Object.getPrototypeOf(target.nested)).toBe(Object.prototype);
+    expect(target.nested).toEqual({ safe: true });
+    expect(Reflect.get(Object.prototype, 'polluted')).toBeUndefined();
+  });
+
+  test.each(['__proto__', 'constructor', 'prototype'])(
+    'merge ignores unsafe scalar key %s when inherited property names are allowed',
+    (key) => {
+      const target = {};
+
+      expect(merge(target, key, { allowPrototypes: true })).toBe(target);
+      expect(Object.getPrototypeOf(target)).toBe(Object.prototype);
+      expect(has(target, key)).toBe(false);
+    },
+  );
+
+  test('merge preserves explicitly allowed safe inherited property names', () => {
+    expect(merge({}, 'toString', { allowPrototypes: true })).toEqual({ toString: true });
+  });
 });
 
 describe('combine()', () => {
