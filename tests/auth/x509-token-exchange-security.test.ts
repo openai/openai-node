@@ -51,6 +51,44 @@ describe('X.509 token exchange security boundaries', () => {
   );
 
   test.each([
+    ['access_token', 'inherited-token', { expires_in: 3600 }, /access.token/iu],
+    ['expires_in', 3600, { access_token: 'own-token' }, /expires.in/iu],
+  ] as const)(
+    'rejects an inherited %s field from a polluted Object prototype',
+    async (field, inheritedValue, response, error) => {
+      Reflect.defineProperty(Object.prototype, field, { configurable: true, value: inheritedValue });
+      try {
+        const auth = new WorkloadIdentityAuth(
+          identity,
+          vi.fn(async () => Response.json(response)),
+          { maxRetries: 0 },
+        );
+
+        await expect(auth.getToken()).rejects.toThrow(error);
+      } finally {
+        Reflect.deleteProperty(Object.prototype, field);
+      }
+    },
+  );
+
+  test('ignores an inherited optional token_type field', async () => {
+    Reflect.defineProperty(Object.prototype, 'token_type', { configurable: true, value: 'Basic' });
+    try {
+      const auth = new WorkloadIdentityAuth(
+        identity,
+        vi.fn(async () => tokenResponse('own-token')),
+        {
+          maxRetries: 0,
+        },
+      );
+
+      await expect(auth.getToken()).resolves.toBe('own-token');
+    } finally {
+      Reflect.deleteProperty(Object.prototype, 'token_type');
+    }
+  });
+
+  test.each([
     'token\r\nInjected: private',
     'token\nprivate',
     'token\u0000private',

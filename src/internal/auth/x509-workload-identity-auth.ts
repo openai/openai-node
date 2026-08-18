@@ -98,31 +98,34 @@ function validateMaxRetries(maxRetries: number): number {
 }
 
 function validateTokenResponse(response: unknown): { accessToken: string; expiresIn: number } {
+  if (typeof response !== 'object' || response === null) {
+    throw new OpenAIError("Token exchange response missing 'access_token' field");
+  }
+  const tokenResponse = response as Record<string, unknown>;
   if (
-    typeof response !== 'object' ||
-    response === null ||
-    !('access_token' in response) ||
-    typeof response.access_token !== 'string' ||
-    response.access_token.trim().length === 0
+    !hasOwn(tokenResponse, 'access_token') ||
+    typeof tokenResponse['access_token'] !== 'string' ||
+    tokenResponse['access_token'].trim().length === 0
   ) {
     throw new OpenAIError("Token exchange response missing 'access_token' field");
   }
 
-  if (!/^[A-Za-z0-9._~+/-]+=*$/u.test(response.access_token)) {
+  if (!/^[A-Za-z0-9._~+/-]+=*$/u.test(tokenResponse['access_token'])) {
     throw new OpenAIError("Token exchange response has invalid 'access_token' field");
   }
   if (
-    'token_type' in response &&
-    (typeof response.token_type !== 'string' || response.token_type.toLowerCase() !== 'bearer')
+    hasOwn(tokenResponse, 'token_type') &&
+    (typeof tokenResponse['token_type'] !== 'string' ||
+      tokenResponse['token_type'].toLowerCase() !== 'bearer')
   ) {
     throw new OpenAIError("Token exchange response has invalid 'token_type' field");
   }
 
-  const expiresIn = 'expires_in' in response ? response.expires_in : undefined;
+  const expiresIn = hasOwn(tokenResponse, 'expires_in') ? tokenResponse['expires_in'] : undefined;
   if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
     throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
   }
-  return { accessToken: response.access_token, expiresIn };
+  return { accessToken: tokenResponse['access_token'], expiresIn };
 }
 
 function monotonicNow(): number {

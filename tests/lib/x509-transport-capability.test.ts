@@ -70,6 +70,14 @@ describe('X.509 transport capability boundary', () => {
     'https://RESOURCE.OPENAI.AZURE.COM./openai/v1',
     'https://bedrock-mantle.us-west-2.api.aws/openai/v1',
     'https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1',
+    'https://bedrock-runtime-fips.us-gov-west-1.amazonaws.com/openai/v1',
+    'https://bedrock-runtime.us-east-1.api.aws/openai/v1',
+    'https://bedrock-runtime.cn-north-1.api.amazonwebservices.com.cn/openai/v1',
+    'https://bedrock-runtime.eusc-de-east-1.amazonaws.eu/openai/v1',
+    'https://bedrock-runtime.us-iso-east-1.c2s.ic.gov/openai/v1',
+    'https://bedrock-runtime.us-isob-east-1.api.aws.scloud/openai/v1',
+    'https://bedrock-runtime.eu-isoe-west-1.cloud.adc-e.uk/openai/v1',
+    'https://bedrock-runtime.us-isof-south-1.api.aws.hci.ic.gov/openai/v1',
   ])('rejects provider-owned API origin %s before token acquisition', (baseURL) => {
     const fetch = successfulFetch();
 
@@ -354,6 +362,72 @@ describe('X.509 transport capability boundary', () => {
     });
     await expect(httpProxy.models.list()).resolves.toMatchObject({ data: [] });
     expect(httpFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    ['a trusted custom fetch', undefined],
+    ['static TLS options', { tls: { cert: 'certificate-a', key: 'private-key-a' } }],
+  ] as const)(
+    'rotates cached credentials with Bun inherited HTTP CONNECT proxies using %s',
+    async (_, options) => {
+      Reflect.set(globalThis, 'Bun', { version: '1.3.0' });
+      process.env['HTTPS_PROXY'] = 'http://proxy-a.example:8080';
+      let exchanges = 0;
+      const authorizations: (string | null)[] = [];
+      const client = new OpenAI({
+        apiKey: null,
+        workloadIdentity: identity,
+        fetchOptions: options as never,
+        fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+          if (url.toString().includes('/oauth/token')) {
+            exchanges += 1;
+            return tokenResponse(`proxy-token-${exchanges}`);
+          }
+          authorizations.push(new Headers(init?.headers).get('Authorization'));
+          return globalThis.Response.json({ data: [] });
+        }),
+      });
+
+      await client.models.list();
+      process.env['HTTPS_PROXY'] = 'http://proxy-b.example:8080';
+      await client.models.list();
+      process.env['HTTPS_PROXY'] = 'http://proxy-a.example:8080';
+      await client.models.list();
+
+      expect(exchanges).toBe(3);
+      expect(authorizations).toEqual([
+        'Bearer proxy-token-1',
+        'Bearer proxy-token-2',
+        'Bearer proxy-token-3',
+      ]);
+    },
+  );
+
+  test('keeps cached credentials when an explicit Bun proxy shadows inherited changes', async () => {
+    Reflect.set(globalThis, 'Bun', { version: '1.3.0' });
+    process.env['HTTPS_PROXY'] = 'http://inherited-a.example:8080';
+    let exchanges = 0;
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetchOptions: {
+        proxy: 'http://explicit.example:8080',
+        tls: { cert: 'certificate-a', key: 'private-key-a' },
+      } as never,
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        if (url.toString().includes('/oauth/token')) {
+          exchanges += 1;
+          return tokenResponse();
+        }
+        return globalThis.Response.json({ data: [] });
+      }),
+    });
+
+    await client.models.list();
+    process.env['HTTPS_PROXY'] = 'http://inherited-b.example:8080';
+    await client.models.list();
+
+    expect(exchanges).toBe(1);
   });
 
   test('rejects an unverifiable Undici ProxyAgent before token acquisition', async () => {

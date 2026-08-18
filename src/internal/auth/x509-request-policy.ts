@@ -1,5 +1,6 @@
 import { OpenAIError } from '../../core/error';
 import type { RequestInfo, RequestInit } from '../builtin-types';
+import { parseBedrockEndpointHostname } from '../bedrock';
 import { castToError } from '../errors';
 import type { MergedRequestInit, WorkloadIdentityRequestContext } from '../types';
 import { hasOwn } from '../utils/values';
@@ -104,17 +105,23 @@ function transportOption(options: MergedRequestInit, key: (typeof TRANSPORT_OPTI
 }
 
 function transportIdentityValues(
-  options: MergedRequestInit,
+  options: MergedRequestInit | undefined,
   identitySources: readonly X509TransportIdentitySource[],
 ): readonly object[] | undefined {
-  const values = TRANSPORT_OPTION_KEYS.map((key) => transportOption(options, key));
-  if (values.every((value) => value === undefined)) {
+  const values = options ? TRANSPORT_OPTION_KEYS.map((key) => transportOption(options, key)) : [];
+  if (options && values.every((value) => value === undefined) && identitySources.length === 0) {
     primitiveTransportIdentities.delete(options);
     return undefined;
   }
+  if (values.length === 0 && identitySources.length === 0) {
+    return undefined;
+  }
+  const optionIdentities = options
+    ? values.map((value, index) => transportIdentityValue(options, TRANSPORT_OPTIONS_SOURCE, index, value))
+    : [];
 
   return [
-    ...values.map((value, index) => transportIdentityValue(options, TRANSPORT_OPTIONS_SOURCE, index, value)),
+    ...optionIdentities,
     ...identitySources.flatMap((source) => [
       source.key,
       source.owner,
@@ -128,10 +135,6 @@ function transportIdentityValues(
 /** Returns the opaque runtime transport identity used to scope X.509 refresh state. */
 export function x509TransportKey(fetchOptions: MergedRequestInit | undefined): object | undefined {
   const identitySources = x509TransportIdentitySources(fetchOptions);
-  if (!fetchOptions) {
-    return undefined;
-  }
-
   const values = transportIdentityValues(fetchOptions, identitySources);
   if (!values) {
     return undefined;
@@ -224,9 +227,7 @@ export function x509APIOrigin(value: RequestInfo): string {
   const isAzureOrigin = FORBIDDEN_PROVIDER_HOST_SUFFIXES.some(
     (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
   );
-  const isBedrockOrigin =
-    /^bedrock-mantle\.[a-z0-9-]+\.api\.aws$/u.test(hostname) ||
-    /^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com(?:\.cn)?$/u.test(hostname);
+  const isBedrockOrigin = parseBedrockEndpointHostname(hostname) !== undefined;
   if (isAzureOrigin || isBedrockOrigin) {
     throw new OpenAIError(
       'X.509 workload identity cannot send OpenAI credentials to a recognized third-party provider origin.',

@@ -8,6 +8,7 @@ const CLIENT_CERTIFICATE_OPTION_KEYS = ['cert', 'key', 'pfx'] as const;
 
 const TOP_LEVEL_TLS_SOURCE = Object.freeze({});
 const UNDICI_AGENT_TLS_SOURCE = Object.freeze({});
+const BUN_INHERITED_PROXY_SOURCE = Object.freeze({});
 const NO_DEFAULT_FACTORY = Object.freeze({});
 const defaultUndiciAgentFactories = new WeakMap<object, unknown>();
 
@@ -52,8 +53,12 @@ function assertImmutableTLSOptions(options: Record<string, unknown>, label: stri
   }
 }
 
-function identitySource(key: object, options: Record<string, unknown>): X509TransportIdentitySource {
-  return { key, options, owner: options };
+function identitySource(
+  key: object,
+  options: Record<string, unknown>,
+  owner: object = options,
+): X509TransportIdentitySource {
+  return { key, options, owner };
 }
 
 async function closeProbe(probe: object): Promise<void> {
@@ -200,10 +205,15 @@ function bunProxyURL(value: unknown): URL | undefined {
   }
 }
 
-function assertBunProxyIsolation(fetchOptions: MergedRequestInit | undefined): void {
+function inheritedBunProxyIdentity(fetchOptions: MergedRequestInit | undefined): string | undefined {
   if (!isBunRuntime()) {
-    return;
+    return undefined;
   }
+  const hasExplicitProxy =
+    fetchOptions !== undefined &&
+    hasOwn(fetchOptions, 'proxy') &&
+    fetchOptions.proxy !== undefined &&
+    fetchOptions.proxy !== null;
   const proxy = bunProxyURL(bunProxyValue(fetchOptions));
   if (proxy?.protocol === 'https:') {
     throw new OpenAIError(
@@ -213,19 +223,25 @@ function assertBunProxyIsolation(fetchOptions: MergedRequestInit | undefined): v
   if (proxy && proxy.protocol !== 'http:') {
     throw new OpenAIError('X.509 workload identity only supports HTTP CONNECT proxies in Bun.');
   }
+  return proxy && !hasExplicitProxy ? proxy.href : undefined;
 }
 
 /** Resolves the static TLS state that authorizes X.509 exchange, cache, and dispatch. */
 export function x509TransportIdentitySources(
   fetchOptions: MergedRequestInit | undefined,
 ): readonly X509TransportIdentitySource[] {
-  assertBunProxyIsolation(fetchOptions);
+  const inheritedBunProxy = inheritedBunProxyIdentity(fetchOptions);
+  const sources: X509TransportIdentitySource[] = [];
+  if (inheritedBunProxy) {
+    sources.push(
+      identitySource(BUN_INHERITED_PROXY_SOURCE, { proxy: inheritedBunProxy }, BUN_INHERITED_PROXY_SOURCE),
+    );
+  }
   if (!fetchOptions) {
-    return [];
+    return sources;
   }
 
   const runtimeFetchOptions = fetchOptions as Record<string, unknown>;
-  const sources: X509TransportIdentitySource[] = [];
   if (hasOwn(fetchOptions, 'tls') && runtimeFetchOptions['tls'] !== undefined) {
     if (!isObject(runtimeFetchOptions['tls'])) {
       throw new OpenAIError('X.509 workload identity requires static TLS options.');
