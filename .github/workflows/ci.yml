@@ -290,12 +290,12 @@ jobs:
         run: ./scripts/bootstrap
 
       - name: Run ecosystem tests without live credentials
-        if: >- # zizmor: ignore[bot-conditions] github.actor determines Dependabot secret availability
+        if: >-
           ${{
-            github.actor == 'dependabot[bot]' ||
-            (github.event_name == 'pull_request' &&
-            (github.event.pull_request.user.login == 'dependabot[bot]' ||
-            github.event.pull_request.head.repo.full_name != github.repository))
+            !(github.actor != 'dependabot[bot]' &&
+            (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login != 'dependabot[bot]' &&
+            github.event.pull_request.head.repo.full_name == github.repository)))
           }}
         run: |
           pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3

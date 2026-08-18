@@ -61,7 +61,7 @@ describe('ecosystem test CLI', () => {
     expect(liveStep).toContain('secrets.OPENAI_API_KEY');
 
     expect(workflowCondition(nonLiveStep)).toBe(
-      "github.actor == 'dependabot[bot]' || (github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository))",
+      "!(github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)))",
     );
     expect(nonLiveStep).toContain('pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3');
     expect(nonLiveStep).not.toContain('--live');
