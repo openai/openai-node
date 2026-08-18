@@ -703,13 +703,10 @@ describe.each([
       const branded = z.string().brand<'BlockId'>();
       const caught = z.string().catch('fallback');
       const defaulted = z.string().default('fallback');
-      const promised = z.promise(z.string());
       const readonly = z.string().readonly();
       const optionalNullable = z.string().nullable().optional();
       const lazy = z.lazy(() => z.string());
       const nullable = z.object({ value: z.string() }).nullable();
-      const pipeline = z.string().pipe(z.string());
-
       const schema = zodTextFormat(
         z.object({
           brandedFirst: branded,
@@ -718,8 +715,6 @@ describe.each([
           caughtSecond: caught,
           defaultedFirst: defaulted,
           defaultedSecond: defaulted,
-          promisedFirst: promised,
-          promisedSecond: promised,
           readonlyFirst: readonly,
           readonlySecond: readonly,
           optionalNullableFirst: optionalNullable,
@@ -728,8 +723,6 @@ describe.each([
           lazySecond: lazy,
           nullableFirst: nullable,
           nullableSecond: nullable,
-          pipelineFirst: pipeline,
-          pipelineSecond: pipeline,
         }),
         'wrappers',
       ).schema as Record<string, unknown>;

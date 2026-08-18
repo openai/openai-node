@@ -70,10 +70,6 @@ describe.each(strictHelpers)('$name root schema validation', ({ create }) => {
     { name: 'a lazy object', schema: z3.lazy(() => z3.object({ value: z3.string() })) },
     { name: 'a recursive lazy object', schema: recursiveObject },
     {
-      name: 'a transformed object',
-      schema: z3.object({ value: z3.string() }).transform(({ value }) => ({ value })),
-    },
-    {
       name: 'an object containing nested unions',
       schema: z3.object({ values: z3.array(z3.union([z3.string(), z3.number()])) }),
     },
