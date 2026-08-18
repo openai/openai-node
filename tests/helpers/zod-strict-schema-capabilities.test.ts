@@ -1344,6 +1344,38 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
   });
 
   it.each([
+    { name: 'direct', schema: () => z3.boolean().transform(BigInt) },
+    { name: 'readonly', schema: () => z3.boolean().transform(BigInt).readonly() },
+    { name: 'lazy', schema: () => z3.lazy(() => z3.boolean().transform(BigInt)) },
+  ])('preserves the exact boolean input of a $name BigInt transform', ({ schema }) => {
+    const result = create(z3.object({ value: schema() }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value', { type: 'boolean' });
+    expect(result.$parseRaw('{"value":true}')).toEqual({ value: 1n });
+    expect(result.$parseRaw('{"value":false}')).toEqual({ value: 0n });
+  });
+
+  it('preserves null beside a boolean BigInt transform', () => {
+    const result = create(z3.object({ value: z3.boolean().transform(BigInt).nullable() }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.0', { type: 'boolean' });
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', { type: 'null' });
+    expect(result.$parseRaw('{"value":true}')).toEqual({ value: 1n });
+    expect(result.$parseRaw('{"value":false}')).toEqual({ value: 0n });
+    expect(result.$parseRaw('{"value":null}')).toEqual({ value: null });
+  });
+
+  it('preserves independent numeric alternatives beside a boolean BigInt transform', () => {
+    const value = z3.union([z3.boolean().transform(BigInt), z3.number()]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.0', { type: 'boolean' });
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', { type: 'number' });
+    expect(result.$parseRaw('{"value":false}')).toEqual({ value: 0n });
+    expect(result.$parseRaw('{"value":1.5}')).toEqual({ value: 1.5 });
+  });
+
+  it.each([
     { name: 'direct', producer: () => z3.coerce.bigint() },
     { name: 'readonly', producer: () => z3.coerce.bigint().readonly() },
     { name: 'lazy', producer: () => z3.lazy(() => z3.coerce.bigint()) },
@@ -1517,6 +1549,66 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
 
   it.each([
     {
+      name: 'exclusive producer minimum',
+      producer: () => z3.number().gt(0.5).max(0.5),
+      fallback: () => z3.number(),
+      input: 1.5,
+    },
+    {
+      name: 'exclusive producer maximum',
+      producer: () => z3.number().min(0.5).lt(0.5),
+      fallback: () => z3.number(),
+      input: 1.5,
+    },
+    {
+      name: 'both exclusive producer endpoints',
+      producer: () => z3.number().gt(0.5).lt(0.5),
+      fallback: () => z3.number(),
+      input: 1.5,
+    },
+    {
+      name: 'exclusive producer and inclusive fallback endpoint',
+      producer: () => z3.number().gt(0.5),
+      fallback: () => z3.number().max(0.5),
+      input: 0.5,
+    },
+    {
+      name: 'inclusive producer and exclusive fallback endpoint',
+      producer: () => z3.number().max(0.5),
+      fallback: () => z3.number().gt(0.5),
+      input: 1.5,
+    },
+  ])('preserves fractional fallback across an empty $name overlap', ({ producer, fallback, input }) => {
+    const result = create(z3.object({ value: z3.union([producer().transform(BigInt), fallback()]) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.type', 'number');
+    expect(result.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: input });
+  });
+
+  it('preserves nested fractional fallback when exclusive producer bounds are empty', () => {
+    const value = z3.union([
+      z3.object({ count: z3.number().gt(0.5).max(0.5).transform(BigInt) }),
+      z3.object({ count: z3.number() }),
+    ]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty(
+      'properties.value.anyOf.1.properties.count.type',
+      'number',
+    );
+    expect(result.$parseRaw('{"value":{"count":1.5}}')).toEqual({ value: { count: 1.5 } });
+  });
+
+  it('keeps narrowing an inclusive fractional singleton that invokes BigInt', () => {
+    const value = z3.union([z3.number().min(0.5).max(0.5).transform(BigInt), z3.number()]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.type', 'integer');
+    expect(() => result.$parseRaw('{"value":0.5}')).toThrow(RangeError);
+  });
+
+  it.each([
+    {
       name: 'coerced BigInt before number',
       schema: () => z3.intersection(z3.coerce.bigint(), z3.number()),
     },
@@ -1527,6 +1619,26 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     {
       name: 'wrapped exact BigInt transform',
       schema: () => z3.intersection(z3.number().transform(BigInt).readonly(), z3.number()),
+    },
+    {
+      name: 'optional coerced BigInt before number',
+      schema: () => z3.intersection(z3.coerce.bigint().optional(), z3.number()),
+    },
+    {
+      name: 'number before optional coerced BigInt',
+      schema: () => z3.intersection(z3.number(), z3.coerce.bigint().optional()),
+    },
+    {
+      name: 'readonly optional coerced BigInt',
+      schema: () => z3.intersection(z3.coerce.bigint().optional().readonly(), z3.number()),
+    },
+    {
+      name: 'optional preprocessed BigInt literal',
+      schema: () =>
+        z3.intersection(
+          z3.preprocess((value) => BigInt(value as number), z3.literal(1n)).optional(),
+          z3.literal(1),
+        ),
     },
     {
       name: 'preprocessed BigInt and number literals',
@@ -1591,6 +1703,13 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     },
   ])('rejects intersections with incompatible $name parsed outputs', ({ schema }) => {
     expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
+  });
+
+  it('preserves intersections with compatible optional numeric outputs', () => {
+    const result = create(z3.object({ value: z3.intersection(z3.number().optional(), z3.number()) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.type', 'number');
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
   });
 
   it.each([

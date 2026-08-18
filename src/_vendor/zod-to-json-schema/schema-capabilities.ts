@@ -264,7 +264,6 @@ export const knownParsedOutputType = (
     }
     if (
       def.typeName === ZodFirstPartyTypeKind.ZodNullable ||
-      def.typeName === ZodFirstPartyTypeKind.ZodOptional ||
       def.typeName === ZodFirstPartyTypeKind.ZodCatch ||
       def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
       def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion ||
@@ -413,6 +412,21 @@ export const findIncompatibleParsedOutputs = (
   }
 };
 
+type FractionalInputBoundary = { value: number; inclusive: boolean };
+
+const tightenFractionalInputBoundary = (
+  current: FractionalInputBoundary,
+  value: number,
+  inclusive: boolean,
+  side: 'minimum' | 'maximum',
+): FractionalInputBoundary => {
+  const tighter = side === 'minimum' ? value > current.value : value < current.value;
+  if (tighter) {
+    return { value, inclusive };
+  }
+  return value === current.value && !inclusive ? { value, inclusive: false } : current;
+};
+
 const acceptsOverlappingFractionalInput = (
   definition: InspectableDefinition,
   schema: JsonSchema7Type,
@@ -430,22 +444,34 @@ const acceptsOverlappingFractionalInput = (
   ) {
     return false;
   }
-  let minimum = typeof input['minimum'] === 'number' ? input['minimum'] : -Infinity;
-  let maximum = typeof input['maximum'] === 'number' ? input['maximum'] : Infinity;
+  let minimum: FractionalInputBoundary = {
+    value: typeof input['minimum'] === 'number' ? input['minimum'] : -Infinity,
+    inclusive: true,
+  };
+  let maximum: FractionalInputBoundary = {
+    value: typeof input['maximum'] === 'number' ? input['maximum'] : Infinity,
+    inclusive: true,
+  };
   if (typeof input['exclusiveMinimum'] === 'number') {
-    minimum = Math.max(minimum, input['exclusiveMinimum']);
+    minimum = tightenFractionalInputBoundary(minimum, input['exclusiveMinimum'], false, 'minimum');
   }
   if (typeof input['exclusiveMaximum'] === 'number') {
-    maximum = Math.min(maximum, input['exclusiveMaximum']);
+    maximum = tightenFractionalInputBoundary(maximum, input['exclusiveMaximum'], false, 'maximum');
   }
   for (const check of definition.checks ?? []) {
     if (check.kind === 'min' && typeof check.value === 'number') {
-      minimum = Math.max(minimum, check.value);
+      minimum = tightenFractionalInputBoundary(minimum, check.value, check.inclusive !== false, 'minimum');
     } else if (check.kind === 'max' && typeof check.value === 'number') {
-      maximum = Math.min(maximum, check.value);
+      maximum = tightenFractionalInputBoundary(maximum, check.value, check.inclusive !== false, 'maximum');
     }
   }
-  return minimum < maximum || (minimum === maximum && !Number.isInteger(minimum));
+  return (
+    minimum.value < maximum.value ||
+    (minimum.value === maximum.value &&
+      minimum.inclusive &&
+      maximum.inclusive &&
+      !Number.isInteger(minimum.value))
+  );
 };
 
 export const throwsOnFractionalBigIntInput = (definition: ZodTypeDef, schema: JsonSchema7Type): boolean =>

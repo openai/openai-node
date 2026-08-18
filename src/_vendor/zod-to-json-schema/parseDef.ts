@@ -1104,6 +1104,9 @@ const selectParser = (
           }
           return { ...schema, pattern } as JsonSchema7Type;
         }
+        if ('type' in schema && schema.type === 'boolean') {
+          return schema;
+        }
         if (!('type' in schema) || !isNumericSchemaType(schema.type)) {
           throw new Error(
             `ZodEffects BigInt transform at \`${refs.currentPath.join('/')}\` requires a directly representable numeric JSON input in strict Structured Outputs.`,
