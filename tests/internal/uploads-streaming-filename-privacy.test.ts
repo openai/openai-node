@@ -88,6 +88,10 @@ const skillUploadModes = [
   { name: 'buffered', create: (filename: string) => new File(['skill'], filename) },
   { name: 'streaming', create: (filename: string) => toStreamingFile(fileChunks('skill'), filename) },
 ] as const;
+const skillFilenameMutations = [
+  { name: 'an unsafe pathname', filename: '/private/secret.txt' },
+  { name: 'a different safe pathname', filename: 'assets/unvalidated.txt' },
+] as const;
 
 describe('streaming upload filename privacy', () => {
   test.each([
@@ -169,6 +173,34 @@ describe('streaming upload filename privacy', () => {
     await expect(endpoint.submit(client, mode.create(path.filename))).rejects.toThrow(/safe relative/iu);
     expect(requests).toHaveLength(0);
   });
+
+  test.each(
+    skillUploadEndpoints.flatMap((endpoint) =>
+      skillUploadModes.flatMap((mode) =>
+        skillFilenameMutations.map((mutation) => ({ endpoint, mode, mutation })),
+      ),
+    ),
+  )(
+    '$endpoint.name snapshots a $mode.name filename before it changes to $mutation.name',
+    async ({ endpoint, mode, mutation }) => {
+      const { client, requests } = createClient();
+      const upload = mode.create('assets/validated.txt');
+      let nameReads = 0;
+      Object.defineProperty(upload, 'name', {
+        configurable: true,
+        get: () => {
+          nameReads += 1;
+          return nameReads === 1 ? 'assets/validated.txt' : mutation.filename;
+        },
+      });
+
+      await endpoint.submit(client, upload);
+
+      expect(nameReads).toBe(1);
+      expect(requests).toHaveLength(1);
+      expect(uploadedFilenames(capturedRequest(requests).body)).toEqual(['assets/validated.txt']);
+    },
+  );
 
   test.each(skillUploadEndpoints)(
     'preserves explicitly opted-in POSIX and Windows directories for $name',
