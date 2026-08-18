@@ -73,6 +73,22 @@ const skillUploadEndpoints = [
   },
 ] as const;
 
+const unsafeSkillFilenames = [
+  { name: 'absolute POSIX', filename: '/private/secret.txt' },
+  { name: 'absolute Windows drive', filename: 'C:\\Users\\alice\\secret.txt' },
+  { name: 'drive-relative Windows', filename: 'C:private\\secret.txt' },
+  { name: 'Windows UNC', filename: '\\\\server\\share\\secret.txt' },
+  { name: 'Windows device', filename: '\\\\?\\C:\\private\\secret.txt' },
+  { name: 'parent traversal', filename: '../secret.txt' },
+  { name: 'nested parent traversal', filename: 'assets/../secret.txt' },
+  { name: 'Windows parent traversal', filename: 'assets\\..\\secret.txt' },
+] as const;
+
+const skillUploadModes = [
+  { name: 'buffered', create: (filename: string) => new File(['skill'], filename) },
+  { name: 'streaming', create: (filename: string) => toStreamingFile(fileChunks('skill'), filename) },
+] as const;
+
 describe('streaming upload filename privacy', () => {
   test.each([
     ['/home/sdk-user/private-project/traces/input.jsonl', 'input.jsonl'],
@@ -143,6 +159,17 @@ describe('streaming upload filename privacy', () => {
     },
   );
 
+  test.each(
+    skillUploadEndpoints.flatMap((endpoint) =>
+      unsafeSkillFilenames.flatMap((path) => skillUploadModes.map((mode) => ({ endpoint, path, mode }))),
+    ),
+  )('$endpoint.name rejects $path.name paths in $mode.name uploads', async ({ endpoint, path, mode }) => {
+    const { client, requests } = createClient();
+
+    await expect(endpoint.submit(client, mode.create(path.filename))).rejects.toThrow(/safe relative/iu);
+    expect(requests).toHaveLength(0);
+  });
+
   test.each(skillUploadEndpoints)(
     'preserves explicitly opted-in POSIX and Windows directories for $name',
     async ({ submit }) => {
@@ -150,9 +177,13 @@ describe('streaming upload filename privacy', () => {
 
       await submit(client, toStreamingFile(fileChunks(), 'my-skill/assets/manifest.txt'));
       await submit(client, toStreamingFile(fileChunks(), 'my-skill\\assets\\manifest.txt'));
+      await submit(client, new File(['buffered skill'], 'my-skill/assets/manifest.txt'));
+      await submit(client, new File(['buffered skill'], 'my-skill\\assets\\manifest.txt'));
 
-      expect(requests).toHaveLength(2);
+      expect(requests).toHaveLength(4);
       expect(requests.map(({ body }) => uploadedFilenames(body))).toEqual([
+        ['my-skill/assets/manifest.txt'],
+        ['my-skill/assets/manifest.txt'],
         ['my-skill/assets/manifest.txt'],
         ['my-skill/assets/manifest.txt'],
       ]);

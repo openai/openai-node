@@ -36,7 +36,10 @@ export interface StreamingFile {
   /** Source chunks read incrementally as the multipart request body is transmitted. */
   readonly data: StreamingFileInput;
 
-  /** Filename sent in the multipart part's `Content-Disposition` header. */
+  /**
+   * Logical source filename; ordinary uploads send its basename, while Skills can preserve
+   * a validated relative directory path.
+   */
   readonly name: string;
 
   /** Optional MIME type; defaults to `application/octet-stream` when omitted. */
@@ -51,7 +54,8 @@ export interface StreamingFile {
  * form data when the request is sent.
  *
  * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
- * @param name Non-empty filename sent in the multipart request.
+ * @param name Non-empty logical/source filename. Ordinary uploads send only its basename; Skills
+ * uploads may preserve a validated relative path with normalized forward slashes.
  * @param options Optional MIME type for the streaming file.
  * @throws {TypeError} If `name` is empty or the content type contains control characters.
  */
@@ -152,7 +156,7 @@ export function makeFile(
  *
  * Directory components separated by either `/` or `\\` are discarded unless an
  * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
- * paths use forward slashes. Paths inferred from URLs and filesystem streams always
+ * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
  * discard their directories.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
@@ -185,7 +189,11 @@ function basename(value: string): string | undefined {
 }
 
 function normalizeFilenamePath(value: string): string {
-  return value.replace(/\\/g, '/');
+  const normalized = value.replace(/\\/g, '/');
+  if (normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) || normalized.split('/').includes('..')) {
+    throw new TypeError('Upload file name must be a safe relative path without parent directory segments');
+  }
+  return normalized;
 }
 
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
@@ -369,10 +377,26 @@ const hasUploadableValue = (value: unknown): boolean => {
 
 type FormEntry = { key: string; value: unknown };
 
+const validatePreservedUploadFilenames = (value: unknown): void => {
+  if (isUploadable(value)) {
+    getStreamingFileName(value, { stripFilenames: false });
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const nested of Array.isArray(value) ? value : Object.values(value)) {
+      validatePreservedUploadFilenames(nested);
+    }
+  }
+};
+
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
   options: CreateFormOptions = {},
 ): RequestOptions => {
+  if (options.stripFilenames === false) {
+    validatePreservedUploadFilenames(opts.body);
+  }
+
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
   const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options));
 
