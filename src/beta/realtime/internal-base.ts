@@ -105,6 +105,10 @@ export abstract class OpenAIRealtimeEmitter extends EventEmitter<RealtimeEvents>
   protected _onError(event: null, message: string, cause: any): void;
   protected _onError(event: ErrorEvent, message?: string | undefined): void;
   protected _onError(event: ErrorEvent | null, message?: string | undefined, cause?: any): void {
+    if (event === null && message === 'could not parse websocket event' && cause instanceof SyntaxError) {
+      cause = new SyntaxError('Could not parse Realtime WebSocket event data as JSON.');
+    }
+
     message = event?.error
       ? `${safeErrorValue(event.error.message)} code=${safeErrorValue(event.error.code)} param=${safeErrorValue(event.error.param)} type=${safeErrorValue(event.error.type)} event_id=${safeErrorValue(event.error.event_id)}`
       : (message ?? 'unknown error');
