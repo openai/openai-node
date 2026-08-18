@@ -7,6 +7,7 @@ on:
     types:
       - opened
       - synchronize
+      - edited
       - reopened
       - ready_for_review
   merge_group:
@@ -79,7 +80,20 @@ jobs:
 
             finding_count="$(jq '[.runs[] | .results // [] | .[]] | length' "${sarif_file}")"
             if [[ ${finding_count} -ne 0 ]]; then
-              jq -r '.runs[] | .results[] | "::error::CodeQL finding: \(.ruleId // "unknown")"' "${sarif_file}"
+              jq -r '
+                def escape_data:
+                  tostring | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A");
+                def escape_property:
+                  escape_data | gsub(":"; "%3A") | gsub(","; "%2C");
+
+                .runs[] | .results[] |
+                (.ruleId // "unknown" | escape_property) as $rule |
+                (.message.text // .message.markdown // "CodeQL finding" | escape_data) as $message |
+                (.locations[0].physicalLocation.artifactLocation.uri // "unknown" | escape_property) as $file |
+                (.locations[0].physicalLocation.region.startLine // 1 |
+                  if type == "number" and . > 0 then floor else 1 end) as $line |
+                "::error file=\($file),line=\($line),title=\($rule)::\($message)"
+              ' "${sarif_file}"
               exit 1
             fi
           done
