@@ -219,6 +219,95 @@ describe('prototype-pollution safety', () => {
     expect(has(result.nested, '__proto__')).toBe(false);
   });
 
+  test('revalidates and replaces every alias after a source getter mutates a safe record', () => {
+    const shared: Record<string, unknown> = { safe: true };
+    let getterCalls = 0;
+    const source = {
+      first: shared,
+      get mutate() {
+        getterCalls += 1;
+        Object.defineProperty(shared, '__proto__', {
+          configurable: true,
+          enumerable: true,
+          value: { polluted: true },
+        });
+        return true;
+      },
+      second: shared,
+    };
+    const result = merge({}, source);
+
+    expect(getterCalls).toBe(1);
+    expect(result.first).toBe(result.second);
+    expect(result.first).not.toBe(shared);
+    expect(has(result.first, '__proto__')).toBe(false);
+    expect(has(result.second, '__proto__')).toBe(false);
+    expect(has(shared, '__proto__')).toBe(true);
+  });
+
+  test('shares sanitized aliases across recursive collisions and new adoptions', () => {
+    const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}');
+    const result = merge({ first: 'existing' }, { first: unsafe, second: unsafe });
+
+    expect(result.first).toEqual(['existing', { safe: true }]);
+    expect(result.first[1]).toBe(result.second);
+    expect(has(result.second, '__proto__')).toBe(false);
+    expect(has(unsafe, '__proto__')).toBe(true);
+  });
+
+  test.each([
+    { name: 'Date', create: () => new Date('2026-08-18T00:00:00.000Z') },
+    { name: 'Map', create: () => new Map([['safe', true]]) },
+    { name: 'Set', create: () => new Set(['safe']) },
+    { name: 'typed array', create: () => new Uint8Array([1, 2]) },
+    {
+      name: 'private-field instance',
+      create: () =>
+        new (class {
+          #value = true;
+          getValue() {
+            return this.#value;
+          }
+        })(),
+    },
+  ])(
+    'preserves safe $name identity and rejects unsafe values without forging internal slots',
+    ({ create }) => {
+      const value = create();
+
+      expect(merge({}, { safe: value }).safe).toBe(value);
+      Object.defineProperty(value, '__proto__', {
+        configurable: true,
+        enumerable: true,
+        value: { polluted: true },
+      });
+      expect(() => merge({}, { unsafe: value })).toThrow(/safely sanitize|unsupported prototype/iu);
+      expect(has(value, '__proto__')).toBe(true);
+    },
+  );
+
+  test('iteratively preserves safe adopted records deeper than the JavaScript call stack', () => {
+    const root: Record<string, any> = {};
+    let current = root;
+    for (let index = 0; index < 6000; index += 1) {
+      current['next'] = {};
+      current = current['next'];
+    }
+
+    expect(merge({}, { nested: root }).nested).toBe(root);
+  });
+
+  test('fails closed when adopted records exceed the bounded traversal budget', () => {
+    const root: Record<string, any> = {};
+    let current = root;
+    for (let index = 0; index < 10_001; index += 1) {
+      current['next'] = {};
+      current = current['next'];
+    }
+
+    expect(() => merge({}, { nested: root })).toThrow(/adopted record|traversal|limit/iu);
+  });
+
   test.each(['__proto__', 'constructor', 'prototype'])(
     'merge ignores unsafe scalar key %s when inherited property names are allowed',
     (key) => {

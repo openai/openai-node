@@ -22,12 +22,23 @@ interface AdoptedRecord {
   unsafe: boolean;
 }
 
+interface MergeState {
+  sanitized: WeakMap<object, any>;
+  adopted: { target: object; key: PropertyKey }[];
+}
+
+const maxAdoptedRecords = 10_000;
+
 function sanitizeAdoptedValue(value: any, sanitized: WeakMap<object, any>): any {
   if (!value || typeof value !== 'object') {
     return value;
   }
   if (sanitized.has(value)) {
-    return sanitized.get(value);
+    const cached = sanitized.get(value);
+    if (cached !== value) {
+      return cached;
+    }
+    sanitized.delete(value);
   }
 
   const records = new WeakMap<object, AdoptedRecord>();
@@ -38,6 +49,9 @@ function sanitizeAdoptedValue(value: any, sanitized: WeakMap<object, any>): any 
     if (existing) {
       return existing;
     }
+    if (visited.length >= maxAdoptedRecords) {
+      throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    }
 
     const record: AdoptedRecord = {
       value: candidate,
@@ -47,7 +61,11 @@ function sanitizeAdoptedValue(value: any, sanitized: WeakMap<object, any>): any 
     };
     records.set(candidate, record);
     visited.push(record);
+    return record;
+  }
 
+  const root = inspect(value);
+  for (const record of visited) {
     for (const key of Reflect.ownKeys(record.descriptors)) {
       if (isUnsafePropertyKey(key)) {
         record.unsafe = true;
@@ -56,19 +74,20 @@ function sanitizeAdoptedValue(value: any, sanitized: WeakMap<object, any>): any 
       const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor;
       if ('value' in descriptor && descriptor.value && typeof descriptor.value === 'object') {
         if (sanitized.has(descriptor.value)) {
-          record.unsafe ||= sanitized.get(descriptor.value) !== descriptor.value;
-        } else {
-          inspect(descriptor.value).parents.add(record);
+          if (sanitized.get(descriptor.value) !== descriptor.value) {
+            record.unsafe = true;
+            continue;
+          }
+          sanitized.delete(descriptor.value);
         }
+        inspect(descriptor.value).parents.add(record);
       }
     }
     if (record.unsafe) {
       unsafe.push(record);
     }
-    return record;
   }
 
-  const root = inspect(value);
   for (const record of unsafe) {
     for (const parent of record.parents) {
       if (!parent.unsafe) {
@@ -82,14 +101,33 @@ function sanitizeAdoptedValue(value: any, sanitized: WeakMap<object, any>): any 
       sanitized.set(record.value, record.value);
     }
   }
+  if (!root.unsafe) {
+    return value;
+  }
 
-  function copy(record: AdoptedRecord): any {
+  const pendingCopies: AdoptedRecord[] = [];
+  function createCopy(record: AdoptedRecord): any {
     if (sanitized.has(record.value)) {
       return sanitized.get(record.value);
     }
-    const result = isArray(record.value) ? [] : Object.create(Object.getPrototypeOf(record.value));
-    sanitized.set(record.value, result);
+    const prototype = Object.getPrototypeOf(record.value);
+    const array = isArray(record.value);
+    if (
+      (array && prototype !== Array.prototype) ||
+      (!array && prototype !== Object.prototype && prototype !== null)
+    ) {
+      throw new TypeError('Cannot safely sanitize an adopted record with an unsupported prototype.');
+    }
 
+    const result = array ? [] : Object.create(prototype);
+    sanitized.set(record.value, result);
+    pendingCopies.push(record);
+    return result;
+  }
+
+  const result = createCopy(root);
+  for (const record of pendingCopies) {
+    const copy = sanitized.get(record.value);
     for (const key of Reflect.ownKeys(record.descriptors)) {
       if (isUnsafePropertyKey(key)) {
         continue;
@@ -97,14 +135,22 @@ function sanitizeAdoptedValue(value: any, sanitized: WeakMap<object, any>): any 
       const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor;
       if ('value' in descriptor && descriptor.value && typeof descriptor.value === 'object') {
         const child = records.get(descriptor.value);
-        descriptor.value = child ? copy(child) : sanitized.get(descriptor.value);
+        descriptor.value = child ? createCopy(child) : sanitized.get(descriptor.value);
       }
-      Object.defineProperty(result, key, descriptor);
+      Object.defineProperty(copy, key, descriptor);
     }
-    return result;
   }
+  return result;
+}
 
-  return root.unsafe ? copy(root) : value;
+function rememberAdoption(state: MergeState, target: object, key: PropertyKey, value: any): void {
+  if (!value || typeof value !== 'object') {
+    return;
+  }
+  if (state.adopted.length >= maxAdoptedRecords) {
+    throw new Error('Adopted record traversal exceeds the supported safety limit.');
+  }
+  state.adopted.push({ target, key });
 }
 
 const hex_table = /* @__PURE__ */ (() => {
@@ -151,11 +197,12 @@ function array_to_object(source: any[], options: { plainObjects: boolean }) {
   return obj;
 }
 
-export function merge(
+function mergeWithState(
   target: any,
   source: any,
-  options: { plainObjects?: boolean; allowPrototypes?: boolean } = {},
-) {
+  options: { plainObjects?: boolean; allowPrototypes?: boolean },
+  state: MergeState,
+): any {
   if (!source) {
     return target;
   }
@@ -177,10 +224,13 @@ export function merge(
     return target;
   }
 
-  const sanitizedValues = new WeakMap<object, any>();
   if (!target || typeof target !== 'object') {
     // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
-    return [target].concat(sanitizeAdoptedValue(source, sanitizedValues));
+    const combined = [target].concat(sanitizeAdoptedValue(source, state.sanitized));
+    for (const [index, item] of combined.entries()) {
+      rememberAdoption(state, combined, index, item);
+    }
+    return combined;
   }
 
   let mergeTarget = target;
@@ -197,12 +247,18 @@ export function merge(
         if (has(target, i)) {
           const targetItem = target[i];
           if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
-            target[i] = merge(targetItem, item, options);
+            const merged = mergeWithState(targetItem, item, options, state);
+            target[i] = merged;
+            rememberAdoption(state, target, i, merged);
           } else {
-            target.push(sanitizeAdoptedValue(item, sanitizedValues));
+            const adopted = sanitizeAdoptedValue(item, state.sanitized);
+            target.push(adopted);
+            rememberAdoption(state, target, target.length - 1, adopted);
           }
         } else {
-          target[i] = sanitizeAdoptedValue(item, sanitizedValues);
+          const adopted = sanitizeAdoptedValue(item, state.sanitized);
+          target[i] = adopted;
+          rememberAdoption(state, target, i, adopted);
         }
       }
     }
@@ -214,12 +270,34 @@ export function merge(
       continue;
     }
     const value = source[key];
-
-    mergeTarget[key] = has(mergeTarget, key)
-      ? merge(mergeTarget[key], value, options)
-      : sanitizeAdoptedValue(value, sanitizedValues);
+    const adopted = has(mergeTarget, key)
+      ? mergeWithState(mergeTarget[key], value, options, state)
+      : sanitizeAdoptedValue(value, state.sanitized);
+    mergeTarget[key] = adopted;
+    rememberAdoption(state, mergeTarget, key, adopted);
   }
   return mergeTarget;
+}
+
+export function merge(
+  target: any,
+  source: any,
+  options: { plainObjects?: boolean; allowPrototypes?: boolean } = {},
+) {
+  const state: MergeState = { sanitized: new WeakMap(), adopted: [] };
+  const result = mergeWithState(target, source, options, state);
+
+  for (const { target: adoptedTarget, key } of state.adopted) {
+    const descriptor = Object.getOwnPropertyDescriptor(adoptedTarget, key);
+    if (!descriptor || !('value' in descriptor)) {
+      continue;
+    }
+    const safe = sanitizeAdoptedValue(descriptor.value, state.sanitized);
+    if (safe !== descriptor.value) {
+      Object.defineProperty(adoptedTarget, key, { ...descriptor, value: safe });
+    }
+  }
+  return result;
 }
 
 export function assign_single_source(target: any, source: any) {
