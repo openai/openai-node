@@ -201,13 +201,10 @@ describe('bin/publish-npm credential isolation', () => {
   });
 });
 
-test.each(['.github/workflows/publish-npm.yml', '.github/workflows/create-releases.yml'])(
-  'clears OIDC grants before installing dependencies in %s',
-  (workflowPath) => {
-    const workflow = readFileSync(path.join(process.cwd(), workflowPath), 'utf-8');
+test('clears OIDC grants before installing dependencies in the protected release workflow', () => {
+  const workflow = readFileSync(path.join(process.cwd(), '.github/workflows/create-releases.yml'), 'utf-8');
 
-    expect(workflow).toMatch(
-      /- name: Install dependencies\s+run: \|\s+unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN\s+pnpm install --frozen-lockfile/u,
-    );
-  },
-);
+  expect(workflow).toMatch(
+    /- name: Install dependencies\s+run: \|\s+unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN\s+pnpm install --frozen-lockfile/u,
+  );
+});

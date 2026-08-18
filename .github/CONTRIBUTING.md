@@ -242,9 +242,10 @@ Release Please will then regenerate the release PR files and title with that ver
 
 ### Publish with a GitHub workflow
 
-You can release to package managers by using [the `Publish NPM` GitHub action](https://www.github.com/openai/openai-node/actions/workflows/publish-npm.yml).
-Use its `publish` environment and job-scoped OIDC credentials, and publish only a reviewed commit. Prefer
-this trusted-publishing flow over introducing long-lived registry secrets.
+The [`Create releases` GitHub Actions workflow](https://github.com/openai/openai-node/actions/workflows/create-releases.yml)
+publishes releases after changes land on `main`. If publication fails, rerun the failed workflow to retain the
+protected `publish` environment, immutable release checkout, and npm OIDC trusted publishing. Prefer this
+reviewed, trusted-publishing flow over introducing long-lived registry secrets.
 
 ### Publish manually
 

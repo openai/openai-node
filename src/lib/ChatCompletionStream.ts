@@ -899,16 +899,14 @@ function finalizeChatCompletion<ParsedT>(
               refusal: message.refusal ?? null,
               tool_calls: tool_calls.map((tool_call, i): ChatCompletionMessageToolCall => {
                 if (tool_call.type == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
+                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type`);
                 }
 
                 if (tool_call.type === 'custom') {
                   const { custom, type, id, ...toolRest } = tool_call;
                   const { input = '', name, ...customRest } = custom || {};
                   if (name == null) {
-                    throw new OpenAIError(
-                      `missing choices[${index}].tool_calls[${i}].custom.name\n${str(snapshot)}`,
-                    );
+                    throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name`);
                   }
                   return {
                     ...toolRest,
@@ -921,14 +919,10 @@ function finalizeChatCompletion<ParsedT>(
                 const { function: fn, type, id, ...toolRest } = tool_call;
                 const { arguments: args, name, ...fnRest } = fn || {};
                 if (name == null) {
-                  throw new OpenAIError(
-                    `missing choices[${index}].tool_calls[${i}].function.name\n${str(snapshot)}`,
-                  );
+                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name`);
                 }
                 if (args == null) {
-                  throw new OpenAIError(
-                    `missing choices[${index}].tool_calls[${i}].function.arguments\n${str(snapshot)}`,
-                  );
+                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments`);
                 }
 
                 return {
@@ -963,10 +957,6 @@ function isCompleteAudio(
   audio: Partial<ChatCompletionAudio> | null | undefined,
 ): audio is ChatCompletionAudio {
   return audio?.id != null && audio.data != null && audio.transcript != null && audio.expires_at != null;
-}
-
-function str(x: unknown) {
-  return JSON.stringify(x);
 }
 
 /**

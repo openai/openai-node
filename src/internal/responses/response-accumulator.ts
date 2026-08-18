@@ -208,8 +208,100 @@ function getShellOutputContent(
   return getContent(output.output, commandIndex);
 }
 
-function assertNever(value: never): never {
-  throw new OpenAIError(`Unhandled response stream event: ${JSON.stringify(value)}`);
+function createSupportedResponseEventTypes<EventTypes extends readonly ResponseAccumulatorEvent['type'][]>(
+  eventTypes: EventTypes &
+    (Exclude<ResponseAccumulatorEvent['type'], EventTypes[number]> extends never ? unknown : never),
+): ReadonlySet<ResponseAccumulatorEvent['type']> {
+  return new Set(eventTypes);
+}
+
+const supportedResponseEventTypes = createSupportedResponseEventTypes([
+  'response.output_item.added',
+  'response.output_item.done',
+  'response.content_part.added',
+  'response.content_part.done',
+  'response.output_text.delta',
+  'response.output_text.done',
+  'response.output_text.annotation.added',
+  'response.refusal.delta',
+  'response.refusal.done',
+  'response.function_call_arguments.delta',
+  'response.function_call_arguments.done',
+  'response.custom_tool_call_input.delta',
+  'response.custom_tool_call_input.done',
+  'response.mcp_call_arguments.delta',
+  'response.mcp_call_arguments.done',
+  'response.shell_call_command.added',
+  'response.shell_call_command.done',
+  'response.shell_call_command.delta',
+  'response.shell_call_output_content.delta',
+  'response.shell_call_output_content.done',
+  'response.reasoning_text.delta',
+  'response.reasoning_text.done',
+  'response.reasoning_summary_part.added',
+  'response.reasoning_summary_part.done',
+  'response.reasoning_summary_text.delta',
+  'response.reasoning_summary_text.done',
+  'response.code_interpreter_call_code.delta',
+  'response.code_interpreter_call_code.done',
+  'response.code_interpreter_call.in_progress',
+  'response.code_interpreter_call.interpreting',
+  'response.code_interpreter_call.completed',
+  'response.file_search_call.in_progress',
+  'response.file_search_call.searching',
+  'response.file_search_call.completed',
+  'response.web_search_call.in_progress',
+  'response.web_search_call.searching',
+  'response.web_search_call.completed',
+  'response.image_generation_call.in_progress',
+  'response.image_generation_call.generating',
+  'response.image_generation_call.completed',
+  'response.mcp_call.in_progress',
+  'response.mcp_call.completed',
+  'response.mcp_call.failed',
+  'response.created',
+  'response.queued',
+  'response.in_progress',
+  'response.completed',
+  'response.failed',
+  'response.incomplete',
+  'response.audio.delta',
+  'response.audio.done',
+  'response.audio.transcript.delta',
+  'response.audio.transcript.done',
+  'response.image_generation_call.partial_image',
+  'response.mcp_list_tools.in_progress',
+  'response.mcp_list_tools.completed',
+  'response.mcp_list_tools.failed',
+  'keepalive',
+  'error',
+] as const);
+
+function assertNever(_value: never): never {
+  throw new OpenAIError('Unhandled response stream event: unknown');
+}
+
+function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumulatorEvent {
+  let descriptor: PropertyDescriptor | undefined;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(event, 'type');
+  } catch {
+    return assertNever(event as never);
+  }
+
+  const type: unknown = descriptor?.value;
+  if (
+    typeof type !== 'string' ||
+    !supportedResponseEventTypes.has(type as ResponseAccumulatorEvent['type'])
+  ) {
+    return assertNever(event as never);
+  }
+
+  return new Proxy(event, {
+    get(target, property) {
+      return property === 'type' ? type : Reflect.get(target, property, target);
+    },
+  });
 }
 
 function accumulateOutputItemEvent(
@@ -795,51 +887,53 @@ export function accumulateResponseWithContext(
   snapshot: Response | undefined,
   context: ResponseAccumulatorContext,
 ): Response {
+  const dispatchEvent = sanitizeResponseEvent(event);
+
   if (!snapshot) {
-    if (event.type !== 'response.created') {
+    if (dispatchEvent.type !== 'response.created') {
       throw new OpenAIError(
-        `When snapshot hasn't been set yet, expected 'response.created' event, got ${event.type}`,
+        `When snapshot hasn't been set yet, expected 'response.created' event, got ${dispatchEvent.type}`,
       );
     }
-    return cloneResponse(context, event.response);
+    return cloneResponse(context, dispatchEvent.response);
   }
 
-  if (accumulateOutputItemEvent(event, snapshot, context)) {
+  if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
     return snapshot;
   }
-  if (accumulateContentPartAddedEvent(event, snapshot, context)) {
+  if (accumulateContentPartAddedEvent(dispatchEvent, snapshot, context)) {
     return snapshot;
   }
-  if (accumulateContentPartDoneEvent(event, snapshot, context)) {
+  if (accumulateContentPartDoneEvent(dispatchEvent, snapshot, context)) {
     return snapshot;
   }
-  if (accumulateOutputTextEvent(event, snapshot, context)) {
+  if (accumulateOutputTextEvent(dispatchEvent, snapshot, context)) {
     return snapshot;
   }
-  if (accumulateRefusalAndArgumentsEvent(event, snapshot)) {
+  if (accumulateRefusalAndArgumentsEvent(dispatchEvent, snapshot)) {
     return snapshot;
   }
-  if (accumulateShellEvent(event, snapshot)) {
+  if (accumulateShellEvent(dispatchEvent, snapshot)) {
     return snapshot;
   }
-  if (accumulateReasoningEvent(event, snapshot)) {
+  if (accumulateReasoningEvent(dispatchEvent, snapshot)) {
     return snapshot;
   }
-  if (accumulateCodeInterpreterEvent(event, snapshot)) {
+  if (accumulateCodeInterpreterEvent(dispatchEvent, snapshot)) {
     return snapshot;
   }
-  if (accumulateSearchStatusEvent(event, snapshot)) {
+  if (accumulateSearchStatusEvent(dispatchEvent, snapshot)) {
     return snapshot;
   }
-  if (accumulateImageAndMcpStatusEvent(event, snapshot)) {
+  if (accumulateImageAndMcpStatusEvent(dispatchEvent, snapshot)) {
     return snapshot;
   }
 
-  if (isResponseLifecycleEvent(event)) {
-    return cloneResponse(context, event.response);
+  if (isResponseLifecycleEvent(dispatchEvent)) {
+    return cloneResponse(context, dispatchEvent.response);
   }
-  if (isIgnoredResponseEvent(event)) {
+  if (isIgnoredResponseEvent(dispatchEvent)) {
     return snapshot;
   }
-  return assertNever(event);
+  return assertNever(dispatchEvent);
 }

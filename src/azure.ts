@@ -7,11 +7,15 @@ import { isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
 import type { ClientOptions } from './client';
+import { assertNoDataResidency } from './internal/data-residency';
 
 /** API Client for interfacing with the Azure OpenAI API. */
-export interface AzureClientOptions extends Omit<ClientOptions, 'provider'> {
+export interface AzureClientOptions extends Omit<ClientOptions, 'provider' | 'dataResidency'> {
   /** AzureOpenAI does not support third-party provider configuration. */
   provider?: never;
+
+  /** OpenAI data residency cannot be combined with Azure routing. */
+  dataResidency?: never;
 
   /**
    * Defaults to process.env['OPENAI_API_VERSION'].
@@ -74,8 +78,10 @@ export class AzureOpenAI extends OpenAI {
     deployment,
     azureADTokenProvider,
     dangerouslyAllowBrowser,
+    dataResidency,
     ...opts
   }: AzureClientOptions = {}) {
+    assertNoDataResidency(dataResidency, 'AzureOpenAI');
     if (!apiVersion) {
       throw new Errors.OpenAIError(
         "The OPENAI_API_VERSION environment variable is missing or empty; either provide it, or instantiate the AzureOpenAI client with an apiVersion option, like new AzureOpenAI({ apiVersion: 'My API Version' }).",
@@ -129,6 +135,11 @@ export class AzureOpenAI extends OpenAI {
 
     this.apiVersion = apiVersion;
     this.deploymentName = deployment;
+  }
+
+  /** Clones this client with Azure options; OpenAI data residency remains unsupported. */
+  override withOptions(options: Partial<AzureClientOptions>): this {
+    return super.withOptions(options);
   }
 
   /** Builds an Azure request and inserts its deployment into model-scoped endpoint paths. */

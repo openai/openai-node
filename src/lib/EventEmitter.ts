@@ -4,6 +4,8 @@ type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 type EventListeners<Events, EventType extends keyof Events> = {
   listener: EventListener<Events, EventType>;
   once?: boolean;
+  removed?: boolean;
+  detached?: boolean;
 }[];
 
 /** The positional listener arguments associated with a named event. */
@@ -17,6 +19,12 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
   } = Object.create(null);
+  #emittedListenerRegistrations = new WeakMap<
+    object,
+    { event: PropertyKey; registration: { removed?: boolean; detached?: boolean } }
+  >();
+  #pendingListenerCleanup = new Set<PropertyKey>();
+  #listenerDispatchDepth = 0;
 
   /**
    * Adds the listener function to the end of the listeners array for the event.
@@ -43,7 +51,22 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     if (!listeners) {
       return this;
     }
-    const index = listeners.findIndex((l) => l.listener === listener);
+
+    const emittedRegistration = this.#emittedListenerRegistrations.get(listener as object);
+    if (
+      emittedRegistration?.event === event &&
+      !emittedRegistration.registration.removed &&
+      !emittedRegistration.registration.detached
+    ) {
+      this.#removeEmittedListener(
+        event,
+        emittedRegistration.registration as EventListeners<EventTypes, Event>[number],
+      );
+      return this;
+    }
+    const index = listeners.findIndex(
+      (registration) => !registration.removed && registration.listener === listener,
+    );
     if (index !== -1) {
       listeners.splice(index, 1);
     }
@@ -59,6 +82,52 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     const listeners: EventListeners<EventTypes, Event> = (this.#listeners[event] ||= []);
     listeners.push({ listener, once: true });
     return this;
+  }
+
+  #onceForEmitted<Event extends keyof EventTypes>(
+    event: Event,
+    listener: EventListener<EventTypes, Event>,
+  ): void {
+    const previousListeners = this.#listeners[event];
+    const previousLength = previousListeners?.length ?? 0;
+    this.once(event, listener);
+    const listeners = this.#listeners[event];
+    const [registration] = listeners?.slice(-1) ?? [];
+    if (
+      (previousListeners === undefined || listeners === previousListeners) &&
+      listeners?.length === previousLength + 1 &&
+      registration?.listener === listener &&
+      registration.once
+    ) {
+      this.#emittedListenerRegistrations.set(listener as object, { event, registration });
+    }
+  }
+
+  #removeEmittedListener<Event extends keyof EventTypes>(
+    event: Event,
+    registration: EventListeners<EventTypes, Event>[number],
+  ): void {
+    if (registration.removed) {
+      return;
+    }
+
+    registration.removed = true;
+    this.#emittedListenerRegistrations.delete(registration.listener as object);
+    this.#pendingListenerCleanup.add(event);
+    if (this.#listenerDispatchDepth === 0) {
+      this.#cleanupEmittedListeners();
+    }
+  }
+
+  #cleanupEmittedListeners(): void {
+    for (const event of this.#pendingListenerCleanup) {
+      const eventType = event as keyof EventTypes;
+      const listeners = this.#listeners[eventType];
+      if (listeners) {
+        this.#listeners[eventType] = listeners.filter((listener) => !listener.removed) as any;
+      }
+    }
+    this.#pendingListenerCleanup.clear();
   }
 
   /**
@@ -96,9 +165,9 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
       };
 
       if (event !== 'error') {
-        this.once('error', onError as any);
+        this.#onceForEmitted('error', onError as any);
       }
-      this.once(event, onEvent as any);
+      this.#onceForEmitted(event, onEvent as any);
     });
   }
 
@@ -109,15 +178,30 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   ) {
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
-      this.#listeners[event] = listeners.filter((l) => !l.once) as any;
-      for (const { listener } of listeners as any) {
-        listener(...(args as any));
+      this.#listeners[event] = listeners.filter((listener) => {
+        if (listener.once) {
+          listener.detached = true;
+        }
+        return !listener.once && !listener.removed;
+      }) as any;
+      this.#listenerDispatchDepth += 1;
+      try {
+        for (const registration of listeners as any) {
+          if (!registration.removed) {
+            registration.listener(...(args as any));
+          }
+        }
+      } finally {
+        this.#listenerDispatchDepth -= 1;
+        if (this.#listenerDispatchDepth === 0) {
+          this.#cleanupEmittedListeners();
+        }
       }
     }
   }
 
   protected _hasListener(event: keyof EventTypes): boolean {
     const listeners = this.#listeners[event];
-    return listeners && listeners.length > 0;
+    return listeners && listeners.some((listener) => !listener.removed);
   }
 }
