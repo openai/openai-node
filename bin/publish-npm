@@ -12,10 +12,9 @@ elif [[ $VERSION_STATUS -ne 1 ]]; then
   exit "$VERSION_STATUS"
 fi
 
-if [[ ${NPM_TOKEN:-} ]]; then
-  npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
-elif [[ ! ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
-  echo "ERROR: NPM_TOKEN must be set if not running in a Github Action with id-token permission"
+if [[ ${GITHUB_ACTIONS:-} != true || -z ${ACTIONS_ID_TOKEN_REQUEST_URL:-} ||
+  -z ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
+  echo "ERROR: npm publishing requires GitHub Actions OIDC with id-token: write" >&2
   exit 1
 fi
 

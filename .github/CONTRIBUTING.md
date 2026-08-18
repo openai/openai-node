@@ -182,8 +182,8 @@ format-on-save and lint-autofix editor settings.
 
 ## Publishing and releases
 
-Changes made to this repository via the automated release PR pipeline should publish to npm automatically. If
-the changes aren't made through the automated pipeline, you may want to make releases manually.
+Changes made to this repository via the automated release PR pipeline publish to npm automatically. Publishing
+requires GitHub Actions OIDC trusted publishing; local token-based publishing is not supported.
 
 ### Override an automated release version
 
@@ -206,8 +206,3 @@ Release Please will then regenerate the release PR files and title with that ver
 The [`Create releases` GitHub Actions workflow](https://github.com/openai/openai-node/actions/workflows/create-releases.yml)
 publishes releases after changes land on `main`. If publication fails, rerun the failed workflow to retain the
 protected `publish` environment, immutable release checkout, and npm OIDC trusted publishing.
-
-### Publish manually
-
-If you need to manually release a package, you can run the `bin/publish-npm` script with an `NPM_TOKEN` set on
-the environment.
