@@ -418,6 +418,21 @@ export function assertSupportedZodV3Schema(
   }
 }
 
+function assertNoJSONSerializationHook(value: object, path: string): void {
+  for (let current: object | null = value; current !== null; current = Object.getPrototypeOf(current)) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, 'toJSON');
+    if (!descriptor) {
+      continue;
+    }
+    if (!('value' in descriptor) || typeof descriptor.value === 'function') {
+      throw new Error(
+        `Strict Structured Outputs schema field \`${path}\` contains an unsupported \`toJSON\` serialization hook`,
+      );
+    }
+    return;
+  }
+}
+
 export function assertJSONSerializableSchema(
   value: unknown,
   path = '$',
@@ -442,6 +457,7 @@ export function assertJSONSerializableSchema(
   if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
     throw new Error(`Strict Structured Outputs schema field \`${path}\` contains a non-JSON native object`);
   }
+  assertNoJSONSerializationHook(value, path);
 
   ancestors.add(value);
   if (Array.isArray(value)) {

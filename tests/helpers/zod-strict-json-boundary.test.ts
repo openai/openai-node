@@ -164,6 +164,64 @@ describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) 
     expect(result.$parseRaw('{}')).toEqual({ value: expected });
   });
 
+  it('rejects hidden typed-object default serializers without invoking them', () => {
+    const serializer = vi.fn(() => 1n);
+    const value = Object.defineProperty({ safe: 'visible' }, 'toJSON', {
+      enumerable: false,
+      value: serializer,
+    });
+
+    expect(() => create(z3.object({ value: z3.object({ safe: z3.string() }).default(value) }))).toThrow(
+      /toJSON|serialization hook/iu,
+    );
+    expect(serializer).not.toHaveBeenCalled();
+  });
+
+  it('rejects inherited typed-array default serializers without invoking them', () => {
+    const serializer = vi.fn(() => 1n);
+    const value = ['safe'];
+    const inherited = Object.defineProperty({}, 'toJSON', {
+      enumerable: false,
+      value: serializer,
+    });
+    Object.setPrototypeOf(inherited, Object.getPrototypeOf(value));
+    Object.setPrototypeOf(value, inherited);
+
+    expect(() => create(z3.object({ value: z3.array(z3.string()).default(value) }))).toThrow(
+      /toJSON|serialization hook/iu,
+    );
+    expect(serializer).not.toHaveBeenCalled();
+  });
+
+  it('rejects own and inherited serializer accessors without invoking their getters', () => {
+    const getter = vi.fn(() => {
+      throw new Error('must never run');
+    });
+    const object = Object.defineProperty({ safe: 'visible' }, 'toJSON', { get: getter });
+    const array = ['safe'];
+    const inherited = Object.defineProperty({}, 'toJSON', { get: getter });
+    Object.setPrototypeOf(inherited, Object.getPrototypeOf(array));
+    Object.setPrototypeOf(array, inherited);
+
+    expect(() => assertJSONSerializableSchema(object, '$.default')).toThrow(/toJSON|serialization hook/iu);
+    expect(() => assertJSONSerializableSchema(array, '$.default')).toThrow(/toJSON|serialization hook/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it('preserves harmless hidden metadata and non-callable serializer values', () => {
+    const value = Object.defineProperties(
+      { safe: 'visible' },
+      {
+        internal: { enumerable: false, value: 1n },
+        toJSON: { enumerable: false, value: 'ignored' },
+        [Symbol('metadata')]: { value: () => 1n },
+      },
+    );
+    const result = create(z3.object({ value: z3.object({ safe: z3.string() }).default(value) }));
+
+    expect(result.$parseRaw('{}')).toEqual({ value: { safe: 'visible' } });
+  });
+
   it('rejects sparse arrays without invoking inherited indexed getters', () => {
     const getter = vi.fn(() => {
       throw new Error('must never run');
@@ -477,6 +535,39 @@ describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) 
     expect(() => create(z3.object({ value: z3.any().default(1n) }))).toThrow(/default.*bigint/iu);
   });
 
+  it.each([
+    { name: 'native bigint', output: () => 1n, message: /bigint/iu },
+    { name: 'positive infinity', output: () => Number.POSITIVE_INFINITY, message: /non-JSON number/iu },
+    { name: 'negative infinity', output: () => Number.NEGATIVE_INFINITY, message: /non-JSON number/iu },
+    { name: 'native object', output: () => new Date(0), message: /native object/iu },
+  ])('rejects a stateful lazy schema that later produces $name', ({ output, message }) => {
+    let unsafe = false;
+    const getter = vi.fn(() => (unsafe ? z3.string().transform(() => output()) : z3.string()));
+    const result = create(z3.object({ value: z3.lazy(getter) }));
+    const callsDuringConstruction = getter.mock.calls.length;
+
+    unsafe = true;
+
+    expect(() => result.$parseRaw('{"value":"safe"}')).toThrow(message);
+    expect(getter).toHaveBeenCalledTimes(callsDuringConstruction + 1);
+  });
+
+  it('rejects hidden serializers produced by a stateful lazy schema without invoking them', () => {
+    let unsafe = false;
+    const serializer = vi.fn(() => 1n);
+    const value = Object.defineProperty({ safe: 'visible' }, 'toJSON', {
+      enumerable: false,
+      value: serializer,
+    });
+    const lazy = z3.lazy(() => (unsafe ? z3.string().transform(() => value) : z3.string()));
+    const result = create(z3.object({ value: lazy }));
+
+    unsafe = true;
+
+    expect(() => result.$parseRaw('{"value":"safe"}')).toThrow(/toJSON|serialization hook/iu);
+    expect(serializer).not.toHaveBeenCalled();
+  });
+
   it('retains shared and recursive JSON-native schemas', () => {
     interface Node {
       value: string;
@@ -484,8 +575,10 @@ describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) 
     }
     const node: z3.ZodType<Node> = z3.lazy(() => z3.object({ value: z3.string(), children: z3.array(node) }));
     const shared = z3.object({ id: z3.string() });
+    const result = create(node);
+    const expected = { value: 'parent', children: [{ value: 'child', children: [] }] };
 
-    expect(() => create(node)).not.toThrow();
+    expect(result.$parseRaw(JSON.stringify(expected))).toEqual(expected);
     expect(() => create(z3.object({ first: shared, second: shared }))).not.toThrow();
   });
 });

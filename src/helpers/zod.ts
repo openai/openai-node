@@ -210,7 +210,11 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
   const parser = (zodObject as { parse?: (data: unknown) => unknown }).parse;
 
   if (typeof parser === 'function') {
-    return parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+    const result = parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+    if (!isZodV4(zodObject as unknown as ZodSchema)) {
+      assertJSONSerializableSchema(result);
+    }
+    return result;
   }
 
   return z4.parse(zodObject as unknown as ZodV4Schema, parsed) as InferZodType<ZodInput>;
