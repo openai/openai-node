@@ -107,6 +107,8 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
   let created = false;
   let published = false;
   let staged = false;
+  let stagedSecretPresent = false;
+  let pendingIntegrityError: CloudflareCredentialIntegrityError | undefined;
   let cleanup: Promise<void> | undefined;
   let staging: Promise<void> | undefined;
 
@@ -137,6 +139,11 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
     return Buffer.concat(chunks);
   };
 
+  const scrubCredentialFile = async (handle: Awaited<ReturnType<typeof fs.open>>): Promise<void> => {
+    await handle.truncate(0);
+    stagedSecretPresent = false;
+  };
+
   const preserveChangedContents = async (
     handle: Awaited<ReturnType<typeof fs.open>>,
     contents: Buffer,
@@ -154,8 +161,9 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
       }
     }
 
+    stagedSecretPresent = false;
     if (!cloudflareCredentialMatchesIdentity(credentialPath, identity)) {
-      await handle.truncate(0);
+      await scrubCredentialFile(handle);
       throw new CloudflareCredentialIntegrityError(
         'The Cloudflare credential path was replaced while credentials were staged.',
       );
@@ -180,10 +188,11 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
     try {
       contents = await readCloudflareCredentialSnapshot(handle, metadata.size);
     } catch {
-      await handle.truncate(0);
-      throw new CloudflareCredentialIntegrityError(
+      await scrubCredentialFile(handle);
+      pendingIntegrityError = new CloudflareCredentialIntegrityError(
         'The Cloudflare credential contents changed beyond the safe size limit.',
       );
+      return false;
     }
 
     if (!contents.equals(expectedContents)) {
@@ -197,8 +206,34 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
     return changedMode;
   };
 
+  const restoreOriginalCredentialPath = (identity: CloudflareCredentialIdentity): void => {
+    if (!cloudflareCredentialMatchesIdentity(credentialPath, identity)) {
+      throw new CloudflareCredentialIntegrityError(
+        'The Cloudflare credential path was replaced while credentials were staged.',
+      );
+    }
+
+    if (created) {
+      unlinkSync(credentialPath);
+      return;
+    }
+
+    if (backupPath && backupIdentity) {
+      if (!cloudflareCredentialMatchesIdentity(backupPath, backupIdentity)) {
+        throw new CloudflareCredentialIntegrityError(
+          'The original Cloudflare credential backup was replaced.',
+        );
+      }
+      renameSync(backupPath, credentialPath);
+      backupPath = undefined;
+    }
+  };
+
   const cleanupArtifacts = async (): Promise<void> => {
     try {
+      if (stagedSecretPresent && file && (created || file !== originalFile)) {
+        await scrubCredentialFile(file);
+      }
       if (temporaryPath && stagingIdentity && file && file !== originalFile) {
         await file.truncate(0);
         unlinkCloudflareCredentialArtifact(temporaryPath, stagingIdentity);
@@ -231,31 +266,33 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
           return;
         }
 
-        if (!cloudflareCredentialMatchesIdentity(credentialPath, stagingIdentity)) {
-          await file.truncate(0);
+        try {
+          if (!cloudflareCredentialMatchesIdentity(credentialPath, stagingIdentity)) {
+            throw new CloudflareCredentialIntegrityError(
+              'The Cloudflare credential path was replaced while credentials were staged.',
+            );
+          }
+        } catch (error) {
+          await scrubCredentialFile(file);
+          try {
+            restoreOriginalCredentialPath(stagingIdentity);
+          } catch {
+            // An inaccessible or replaced pathname must never block descriptor scrubbing.
+          }
+          if (error instanceof CloudflareCredentialIntegrityError) {
+            throw error;
+          }
           throw new CloudflareCredentialIntegrityError(
-            'The Cloudflare credential path was replaced while credentials were staged.',
+            'The Cloudflare credential path could not be validated safely.',
           );
         }
 
         const changedMode = await validateStagedContents(file, stagingIdentity);
-        await file.truncate(0);
-        if (!cloudflareCredentialMatchesIdentity(credentialPath, stagingIdentity)) {
-          throw new CloudflareCredentialIntegrityError(
-            'The Cloudflare credential path was replaced while credentials were staged.',
-          );
-        }
+        await scrubCredentialFile(file);
+        restoreOriginalCredentialPath(stagingIdentity);
 
-        if (created) {
-          unlinkSync(credentialPath);
-        } else if (backupPath && backupIdentity) {
-          if (!cloudflareCredentialMatchesIdentity(backupPath, backupIdentity)) {
-            throw new CloudflareCredentialIntegrityError(
-              'The original Cloudflare credential backup was replaced.',
-            );
-          }
-          renameSync(backupPath, credentialPath);
-          backupPath = undefined;
+        if (pendingIntegrityError) {
+          throw pendingIntegrityError;
         }
 
         if (changedMode) {
@@ -329,6 +366,7 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
       }
 
       await file.chmod(0o600);
+      stagedSecretPresent = true;
       await writeCloudflareCredentialFile(file, expectedContents);
       staged = true;
 

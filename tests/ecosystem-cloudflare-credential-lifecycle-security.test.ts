@@ -128,6 +128,8 @@ function withFixture(run: (fixture: Fixture) => void) {
       "  if (failure === 'append-staged') fs.appendFileSync(vars, '\\nconcurrent appended edit\\n');",
       "  if (failure === 'append-staged-duplicate') fs.appendFileSync(vars, '\\nconcurrent appended edit\\n' + process.env.OPENAI_API_KEY + '\\n');",
       "  if (failure === 'chmod-staged') fs.chmodSync(vars, 0o640);",
+      "  if (failure === 'oversize-staged') fs.writeFileSync(vars, Buffer.alloc(64 * 1024 + 1, 0x6f));",
+      "  if (failure === 'deny-path-validation') fs.writeFileSync(process.env.CLOUDFLARE_DENIAL_READY, 'ready');",
       "  if (failure === 'signal-int' || failure === 'signal-term' || failure === 'signal-hup') {",
       "    const signal = failure === 'signal-int' ? 'SIGINT' : failure === 'signal-term' ? 'SIGTERM' : 'SIGHUP';",
       '    process.kill(process.ppid, signal);',
@@ -397,6 +399,64 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(statSync(fixture.vars).mode % 0o1000).toBe(mode);
       expect(readFileSync(fixture.vars).includes(apiKey)).toBe(false);
       expectNoCloudflareCredentialArtifacts(fixture);
+    });
+  });
+
+  test.each(credentialStates)(
+    'scrubs staged credentials and restores $name when pathname validation throws EACCES',
+    (state) => {
+      withFixture((fixture) => {
+        setExistingCredentials(fixture, state);
+        const marker = path.join(fixture.directory, 'path-validation-ready');
+        const preload = path.join(fixture.directory, 'deny-path-validation.cjs');
+        writeFileSync(
+          preload,
+          [
+            "const fs = require('node:fs');",
+            'const originalLstatSync = fs.lstatSync;',
+            'let denied = false;',
+            'fs.lstatSync = (candidate, options) => {',
+            "  if (!denied && candidate === '.dev.vars' && fs.existsSync(process.env.CLOUDFLARE_DENIAL_READY)) {",
+            '    denied = true;',
+            '    const directory = process.cwd();',
+            '    fs.chmodSync(directory, 0o600);',
+            '    try {',
+            '      return originalLstatSync(candidate, options);',
+            '    } finally {',
+            '      fs.chmodSync(directory, 0o755);',
+            '    }',
+            '  }',
+            '  return originalLstatSync(candidate, options);',
+            '};',
+          ].join('\n'),
+        );
+
+        const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
+          CLOUDFLARE_FAILURE: 'deny-path-validation',
+          CLOUDFLARE_DENIAL_READY: marker,
+          NODE_OPTIONS: `--require ${preload}`,
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(1);
+        expect(readFileSync(fixture.attempts, 'utf-8')).toBe('1');
+        expectRestored(fixture, state);
+      });
+    },
+  );
+
+  test.each(credentialStates)('restores $name after an oversized staged edit', (state) => {
+    withFixture((fixture) => {
+      setExistingCredentials(fixture, state);
+
+      const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
+        CLOUDFLARE_FAILURE: 'oversize-staged',
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(readFileSync(fixture.attempts, 'utf-8')).toBe('1');
+      expectRestored(fixture, state);
     });
   });
 
