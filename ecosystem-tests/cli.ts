@@ -1,3 +1,4 @@
+import { lstatSync, unlinkSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import execa from 'execa';
 import yargs from 'yargs';
@@ -81,6 +82,7 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
   let previousMode: number | undefined;
   let originalIdentity: { dev: number; ino: number } | undefined;
   let cleanup: Promise<void> | undefined;
+  let staging: Promise<void> | undefined;
 
   const restoreOnce = (): Promise<void> => {
     cleanup ??= (async () => {
@@ -89,10 +91,25 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
           return;
         }
 
-        let current: Awaited<ReturnType<typeof fs.lstat>> | undefined;
+        if (staging) {
+          try {
+            await staging;
+          } catch {
+            // Its owner rethrows a failed staging operation after restoration.
+          }
+        }
+
+        if (created) {
+          await file.truncate(0);
+        } else if (previousContents !== undefined && previousMode !== undefined) {
+          await writeCloudflareCredentialFile(file, previousContents);
+          await file.chmod(previousMode);
+        }
+
+        let current: ReturnType<typeof lstatSync> | undefined;
         let identityError: unknown;
         try {
-          current = await fs.lstat(credentialPath);
+          current = lstatSync(credentialPath);
         } catch (error) {
           identityError = error;
         }
@@ -102,14 +119,8 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
           current.dev === originalIdentity.dev &&
           current.ino === originalIdentity.ino;
 
-        if (created) {
-          await file.truncate(0);
-          if (unchanged) {
-            await fs.unlink(credentialPath);
-          }
-        } else if (previousContents !== undefined && previousMode !== undefined) {
-          await writeCloudflareCredentialFile(file, previousContents);
-          await file.chmod(previousMode);
+        if (created && unchanged) {
+          unlinkSync(credentialPath);
         }
 
         if (!unchanged) {
@@ -145,9 +156,12 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
       throw new Error('The Cloudflare credential path changed before credentials could be staged.');
     }
 
+    staging = (async () => {
+      await file.chmod(0o600);
+      await writeCloudflareCredentialFile(file, Buffer.from(`OPENAI_API_KEY='${apiKey}'`));
+    })();
     activeCloudflareCredentialCleanup = restoreOnce;
-    await file.chmod(0o600);
-    await writeCloudflareCredentialFile(file, Buffer.from(`OPENAI_API_KEY='${apiKey}'`));
+    await staging;
     await runLiveTest();
   } finally {
     try {
@@ -659,6 +673,10 @@ async function main() {
 
   if (!args.noCleanup) {
     await runCleanup();
+  }
+
+  if (interruptionCleanup) {
+    await interruptionCleanup;
   }
 
   if (failed.length) {

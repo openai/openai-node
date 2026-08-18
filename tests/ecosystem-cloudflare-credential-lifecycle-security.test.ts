@@ -103,6 +103,9 @@ function withFixture(run: (fixture: Fixture) => void) {
       "if (command === 'run test:ci') {",
       '  const attempt = Number(fs.existsSync(process.env.CLOUDFLARE_ATTEMPTS) ? fs.readFileSync(process.env.CLOUDFLARE_ATTEMPTS, "utf8") : 0) + 1;',
       '  fs.writeFileSync(process.env.CLOUDFLARE_ATTEMPTS, String(attempt), { mode: 0o600 });',
+      "  if (failure === 'replace-during-truncate') {",
+      "    fs.writeFileSync(process.env.CLOUDFLARE_REPLACE_READY, 'ready');",
+      '  }',
       "  if (failure === 'replace-file' || failure === 'replace-symlink') {",
       "    fs.renameSync(vars, vars + '.original');",
       "    if (failure === 'replace-file') {",
@@ -363,6 +366,114 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
           expect(statSync(detached).mode % 0o1000).toBe(state.mode);
         }
         expect(readFileSync(detached).includes(apiKey)).toBe(false);
+      });
+    },
+  );
+
+  test.each(credentialStates)(
+    'preserves a replacement installed while the original credential inode is being truncated $name',
+    (state) => {
+      withFixture((fixture) => {
+        setExistingCredentials(fixture, state);
+        const marker = path.join(fixture.directory, 'replacement-ready');
+        const preload = path.join(fixture.directory, 'replace-during-truncate.cjs');
+        writeFileSync(
+          preload,
+          [
+            "const fs = require('node:fs');",
+            "const promises = require('node:fs/promises');",
+            "const path = require('node:path');",
+            'const originalOpen = promises.open;',
+            'let replaced = false;',
+            'promises.open = async (...args) => {',
+            '  const file = await originalOpen(...args);',
+            "  if (args[0] === '.dev.vars') {",
+            '    const originalTruncate = file.truncate.bind(file);',
+            '    file.truncate = async (...truncateArgs) => {',
+            '      const result = await originalTruncate(...truncateArgs);',
+            '      if (!replaced && fs.existsSync(process.env.CLOUDFLARE_REPLACE_READY)) {',
+            '        replaced = true;',
+            "        const vars = path.join(process.cwd(), '.dev.vars');",
+            "        fs.renameSync(vars, vars + '.race-original');",
+            '        fs.writeFileSync(vars, "independent replacement", { mode: 0o640 });',
+            '      }',
+            '      return result;',
+            '    };',
+            '  }',
+            '  return file;',
+            '};',
+          ].join('\n'),
+        );
+
+        const result = runCloudflare(fixture, ['--live'], {
+          CLOUDFLARE_FAILURE: 'replace-during-truncate',
+          CLOUDFLARE_REPLACE_READY: marker,
+          NODE_OPTIONS: `--require ${preload}`,
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(1);
+        expect(readFileSync(fixture.vars, 'utf-8')).toBe('independent replacement');
+        expect(readFileSync(`${fixture.vars}.race-original`)).toEqual(state.contents ?? Buffer.alloc(0));
+        expect(readFileSync(fixture.vars)).not.toContain(apiKey);
+      });
+    },
+  );
+
+  test.each(
+    (['SIGINT', 'SIGTERM'] as const).flatMap((signal) =>
+      [true, false].map((noCleanup) => ({ signal, noCleanup })),
+    ),
+  )(
+    'serializes $signal cleanup with in-flight staging when noCleanup=$noCleanup',
+    ({ signal, noCleanup }) => {
+      withFixture((fixture) => {
+        const state = credentialStates[1] as CredentialState;
+        setExistingCredentials(fixture, state);
+        const preload = path.join(fixture.directory, 'interrupt-during-staging.cjs');
+        writeFileSync(
+          preload,
+          [
+            "const promises = require('node:fs/promises');",
+            'const originalOpen = promises.open;',
+            'let interrupted = false;',
+            'promises.open = async (...args) => {',
+            '  const file = await originalOpen(...args);',
+            "  if (args[0] === '.dev.vars') {",
+            '    const originalChmod = file.chmod.bind(file);',
+            '    file.chmod = async (...chmodArgs) => {',
+            '      if (!interrupted && chmodArgs[0] === 0o600) {',
+            '        interrupted = true;',
+            '        process.kill(process.pid, process.env.CLOUDFLARE_STAGING_SIGNAL);',
+            '        await new Promise((resolve) => setTimeout(resolve, 25));',
+            '      }',
+            '      return originalChmod(...chmodArgs);',
+            '    };',
+            '    const originalClose = file.close.bind(file);',
+            '    file.close = async (...closeArgs) => {',
+            '      await new Promise((resolve) => setTimeout(resolve, 100));',
+            '      return originalClose(...closeArgs);',
+            '    };',
+            '  }',
+            '  return file;',
+            '};',
+          ].join('\n'),
+        );
+        const flags = ['--live', ...(noCleanup ? [] : otherProjects.map((project) => `--skip=${project}`))];
+
+        const result = runCloudflare(
+          fixture,
+          flags,
+          { CLOUDFLARE_STAGING_SIGNAL: signal, NODE_OPTIONS: `--require ${preload}` },
+          noCleanup,
+        );
+
+        expect(result.error).toBeUndefined();
+        expect(result.status === 0 && result.signal === null).toBe(false);
+        expectRestored(fixture, state);
+        if (noCleanup) {
+          expect(result.signal).toBe(signal);
+        }
       });
     },
   );
