@@ -116,6 +116,26 @@ describe('OpenAI with X.509 workload identity', () => {
     );
   });
 
+  test('preserves an explicit data-residency route across copies and workload identity modes', () => {
+    const customFetch = vi.fn();
+    const regional = new OpenAI({
+      apiKey: null,
+      workloadIdentity: x509Identity,
+      dataResidency: 'eu',
+      fetch: customFetch,
+    });
+
+    expect(regional.baseURL).toBe('https://eu.api.openai.com/v1');
+    expect(regional.buildURL('/models', null, 'https://alternate.example/v1')).toBe(
+      'https://eu.api.openai.com/v1/models',
+    );
+    expect(regional.withOptions({ timeout: 5000 }).baseURL).toBe('https://eu.api.openai.com/v1');
+    expect(regional.withOptions({ workloadIdentity: subjectTokenIdentity }).baseURL).toBe(
+      'https://eu.api.openai.com/v1',
+    );
+    expect(regional.withOptions({ dataResidency: 'us' }).baseURL).toBe('https://us.api.openai.com/v1');
+  });
+
   test('preserves a runtime baseURL change when withOptions changes workload identity modes', () => {
     const customFetch = vi.fn();
     const subjectTokenClient = new OpenAI({

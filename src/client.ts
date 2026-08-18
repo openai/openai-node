@@ -640,9 +640,7 @@ export class OpenAI {
       provider,
       ...opts,
       baseURL:
-        providerRuntime?.baseURL ??
-        residencyBaseURL ??
-        (baseURL || defaultBaseURL(usesX509WorkloadIdentity)),
+        providerRuntime?.baseURL ?? residencyBaseURL ?? (baseURL || defaultBaseURL(usesX509WorkloadIdentity)),
     };
 
     if (apiKey && workloadIdentity) {
