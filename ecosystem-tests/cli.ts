@@ -15,6 +15,7 @@ const IS_CI = Boolean(process.env['CI'] && process.env['CI'] !== 'false');
 const MAX_CLOUDFLARE_CREDENTIAL_BYTES = 64 * 1024;
 
 let activeCloudflareCredentialCleanup: (() => Promise<void>) | undefined;
+let ecosystemInterruptionRequested = false;
 
 async function defaultNodeRunner() {
   await installPackage();
@@ -94,6 +95,10 @@ function unlinkCloudflareCredentialArtifact(candidate: string, identity: Cloudfl
 }
 
 async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Promise<void>): Promise<void> {
+  if (ecosystemInterruptionRequested) {
+    throw new CloudflareCredentialIntegrityError('Cannot stage Cloudflare credentials after interruption.');
+  }
+
   const credentialPath = '.dev.vars';
   const flags = fs.constants.O_RDWR + fs.constants.O_NOFOLLOW + fs.constants.O_NONBLOCK;
   const expectedContents = Buffer.from(`OPENAI_API_KEY='${apiKey}'`);
@@ -717,6 +722,7 @@ async function main() {
   let interruptionCleanup: Promise<void> | undefined;
 
   function runCleanupAndExit(signal: NodeJS.Signals): void {
+    ecosystemInterruptionRequested = true;
     interruptionCleanup ??= (async () => {
       try {
         await activeCloudflareCredentialCleanup?.();
@@ -935,6 +941,10 @@ async function withRetry(
 ): Promise<void> {
   let retriesLeft = retryAmount;
   while (true) {
+    if (ecosystemInterruptionRequested) {
+      throw new CloudflareCredentialIntegrityError('Cannot retry ecosystem tests after interruption.');
+    }
+
     try {
       return await fn();
     } catch (err) {

@@ -99,11 +99,29 @@ function withFixture(run: (fixture: Fixture) => void) {
       '}',
       'fs.appendFileSync(process.env.CLOUDFLARE_OBSERVATIONS, JSON.stringify(observation) + "\\n", { mode: 0o600 });',
       "const failure = process.env.CLOUDFLARE_FAILURE || '';",
+      "if (failure === 'interrupt-before-lease' && command === process.env.CLOUDFLARE_INTERRUPT_COMMAND) {",
+      '  process.kill(process.ppid, process.env.CLOUDFLARE_INTERRUPT_SIGNAL);',
+      '  setTimeout(() => process.exit(0), 20);',
+      '  return;',
+      '}',
       "if (failure === 'install' && command === 'install -D openai') process.exit(21);",
       "if (failure === 'tsc' && command === 'run tsc') process.exit(22);",
       "if (command === 'run test:ci') {",
       '  const attempt = Number(fs.existsSync(process.env.CLOUDFLARE_ATTEMPTS) ? fs.readFileSync(process.env.CLOUDFLARE_ATTEMPTS, "utf8") : 0) + 1;',
       '  fs.writeFileSync(process.env.CLOUDFLARE_ATTEMPTS, String(attempt), { mode: 0o600 });',
+      "  if (failure === 'interrupt-retry-delay' && attempt === 1) {",
+      "    const notifier = require('node:child_process').spawn(",
+      '      process.execPath,',
+      "      ['-e', 'setTimeout(() => process.kill(Number(process.argv[1]), process.argv[2]), 40)', String(process.ppid), process.env.CLOUDFLARE_INTERRUPT_SIGNAL],",
+      "      { detached: true, stdio: 'ignore', env: { ...process.env, NODE_OPTIONS: '' } },",
+      '    );',
+      '    notifier.unref();',
+      '    process.exit(23);',
+      '  }',
+      "  if (failure === 'interrupt-before-lease' || failure === 'interrupt-retry-delay') {",
+      '    setTimeout(() => process.exit(0), 1000);',
+      '    return;',
+      '  }',
       "  if (failure === 'replace-during-truncate') {",
       "    fs.writeFileSync(process.env.CLOUDFLARE_REPLACE_READY, 'ready');",
       '  }',
@@ -493,6 +511,79 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       } finally {
         chmodSync(fixture.worker, 0o755);
       }
+    });
+  });
+
+  test.each(
+    [
+      {
+        phase: 'install',
+        command: 'install -D openai',
+        signal: 'SIGINT' as const,
+        failure: 'interrupt-before-lease',
+        liveAttempts: 0,
+      },
+      {
+        phase: 'tsc',
+        command: 'run tsc',
+        signal: 'SIGTERM' as const,
+        failure: 'interrupt-before-lease',
+        liveAttempts: 0,
+      },
+      {
+        phase: 'retry delay',
+        command: '',
+        signal: 'SIGHUP' as const,
+        failure: 'interrupt-retry-delay',
+        liveAttempts: 1,
+      },
+    ].flatMap((interruption) =>
+      credentialStates.map((state) => ({ ...interruption, state, name: state.name })),
+    ),
+  )('does not stage credentials after $signal interrupts $phase $name', (interruption) => {
+    withFixture((fixture) => {
+      setExistingCredentials(fixture, interruption.state);
+      const preload = path.join(fixture.directory, 'delay-interrupted-global-cleanup.cjs');
+      writeFileSync(
+        preload,
+        [
+          "const promises = require('node:fs/promises');",
+          'const originalRename = promises.rename;',
+          'promises.rename = async (...args) => {',
+          "  if (args[0].endsWith('/tmp/cloudflare-worker/package.json')) {",
+          '    await new Promise((resolve) => setTimeout(resolve, 450));',
+          '  }',
+          '  return originalRename(...args);',
+          '};',
+        ].join('\n'),
+      );
+
+      const flags = [
+        '--live',
+        ...otherProjects.map((project) => `--skip=${project}`),
+        ...(interruption.phase === 'retry delay' ? ['--retry=1', '--retryDelay=100'] : []),
+      ];
+      const result = runCloudflare(
+        fixture,
+        flags,
+        {
+          CLOUDFLARE_FAILURE: interruption.failure,
+          CLOUDFLARE_INTERRUPT_COMMAND: interruption.command,
+          CLOUDFLARE_INTERRUPT_SIGNAL: interruption.signal,
+          NODE_OPTIONS: `--require ${preload}`,
+        },
+        false,
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.status === 0 && result.signal === null).toBe(false);
+      if (interruption.signal === 'SIGHUP') {
+        expect(result.signal).toBe('SIGHUP');
+      }
+      expect(observations(fixture).filter(({ command }) => command === 'run test:ci')).toHaveLength(
+        interruption.liveAttempts,
+      );
+      expectRestored(fixture, interruption.state);
     });
   });
 
