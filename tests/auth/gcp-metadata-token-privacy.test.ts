@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { vi } from 'vitest';
 
 import OpenAI, { SubjectTokenProviderError } from 'openai';
@@ -126,6 +127,110 @@ describe('GCP metadata token HTTP error privacy', () => {
       expect(readBody).not.toHaveBeenCalled();
     },
   );
+
+  it('cancels an indefinitely streaming rejected metadata body without reading it', async () => {
+    const cancelBody = vi.fn();
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(METADATA_CREDENTIAL));
+        },
+        cancel: cancelBody,
+      }),
+      { status: 503 },
+    );
+    const readBody = vi.spyOn(response, 'text');
+    const provider = gcpIDTokenProvider(undefined, { fetch: async () => response });
+
+    await expectPrivateMetadataFailure(() => provider.getToken(), 503);
+
+    expect(cancelBody).toHaveBeenCalledTimes(1);
+    expect(readBody).not.toHaveBeenCalled();
+  });
+
+  it('preserves the sanitized metadata status when body cancellation rejects', async () => {
+    const cancellationFailure = new Error(
+      `stream cancellation disclosed ${METADATA_CREDENTIAL} ${CUSTOMER_DATA}`,
+    );
+    const cancelBody = vi.fn(async () => {
+      throw cancellationFailure;
+    });
+    const response = new Response(new ReadableStream<Uint8Array>({ cancel: cancelBody }), {
+      status: 502,
+    });
+    let requestSignal: AbortSignal | null | undefined;
+    const provider = gcpIDTokenProvider(undefined, {
+      fetch: async (_input, options) => {
+        requestSignal = options?.signal;
+        return response;
+      },
+    });
+
+    await expectPrivateMetadataFailure(() => provider.getToken(), 502);
+
+    expect(cancelBody).toHaveBeenCalledTimes(1);
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it('keeps the request timeout armed while an error-body cancellation is pending', async () => {
+    vi.useFakeTimers();
+
+    let requestSignal: AbortSignal | null | undefined;
+    const cancelBody = vi.fn(async () => {
+      if (!requestSignal) {
+        throw new Error('The metadata request did not supply an abort signal.');
+      }
+
+      await once(requestSignal, 'abort');
+      throw new Error(`cancel failed with ${METADATA_CREDENTIAL}`);
+    });
+    const response = new Response(new ReadableStream<Uint8Array>({ cancel: cancelBody }), {
+      status: 503,
+    });
+    const provider = gcpIDTokenProvider(undefined, {
+      timeout: 25,
+      fetch: async (_input, options) => {
+        requestSignal = options?.signal;
+        return response;
+      },
+    });
+
+    const operation = expectPrivateMetadataFailure(() => provider.getToken(), 503);
+    await vi.advanceTimersByTimeAsync(25);
+    await operation;
+
+    expect(cancelBody).toHaveBeenCalledTimes(1);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('closes each rejected metadata stream across public authentication retries', async () => {
+    const cancelBody = vi.fn();
+    const metadataFetch = vi.fn(
+      async () =>
+        new Response(new ReadableStream<Uint8Array>({ cancel: cancelBody }), {
+          status: 503,
+        }),
+    );
+    const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = new OpenAI({
+      apiKey: null,
+      maxRetries: 0,
+      fetch: apiFetch,
+      workloadIdentity: {
+        identityProviderId: 'test-identity-provider',
+        serviceAccountId: 'test-service-account',
+        provider: gcpIDTokenProvider(undefined, { fetch: metadataFetch }),
+      },
+    });
+
+    await expectPrivateMetadataFailure(() => client.models.list(), 503);
+    await expectPrivateMetadataFailure(() => client.models.list(), 503);
+
+    expect(metadataFetch).toHaveBeenCalledTimes(2);
+    expect(cancelBody).toHaveBeenCalledTimes(2);
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
 
   it('continues to consume and trim successful metadata identity tokens', async () => {
     const response = new Response(`  ${SUCCESSFUL_TOKEN}\n`, { status: 200 });

@@ -221,6 +221,12 @@ export function gcpIDTokenProvider(
         });
 
         if (!response.ok) {
+          try {
+            await Shims.CancelReadableStream(response.body);
+          } catch {
+            controller.abort();
+          }
+
           throw new Error(`GCP Metadata Server returned ${response.status}`);
         }
 
