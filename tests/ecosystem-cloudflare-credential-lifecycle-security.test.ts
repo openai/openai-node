@@ -10,6 +10,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  truncateSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -102,6 +103,19 @@ function withFixture(run: (fixture: Fixture) => void) {
       "if (command === 'run test:ci') {",
       '  const attempt = Number(fs.existsSync(process.env.CLOUDFLARE_ATTEMPTS) ? fs.readFileSync(process.env.CLOUDFLARE_ATTEMPTS, "utf8") : 0) + 1;',
       '  fs.writeFileSync(process.env.CLOUDFLARE_ATTEMPTS, String(attempt), { mode: 0o600 });',
+      "  if (failure === 'replace-file' || failure === 'replace-symlink') {",
+      "    fs.renameSync(vars, vars + '.original');",
+      "    if (failure === 'replace-file') {",
+      '      fs.writeFileSync(vars, "independently replaced credentials\\n", { mode: 0o640 });',
+      '    } else {',
+      '      fs.symlinkSync(process.env.CLOUDFLARE_REPLACEMENT_TARGET, vars);',
+      '    }',
+      '  }',
+      "  if (failure === 'signal-int' || failure === 'signal-term') {",
+      "    process.kill(process.ppid, failure === 'signal-int' ? 'SIGINT' : 'SIGTERM');",
+      '    setTimeout(() => process.exit(0), 250);',
+      '    return;',
+      '  }',
       "  if (failure === 'live' || (failure === 'live-once' && attempt === 1)) process.exit(23);",
       "  if (failure === 'unlink') fs.chmodSync(process.cwd(), 0o500);",
       '}',
@@ -286,6 +300,131 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       } finally {
         chmodSync(fixture.worker, 0o755);
       }
+    });
+  });
+
+  test.each(
+    credentialStates.flatMap((state) =>
+      (['SIGINT', 'SIGTERM'] as const).flatMap((signal) =>
+        [true, false].map((noCleanup) => ({ state, signal, noCleanup })),
+      ),
+    ),
+  )('restores staged credentials after $signal with noCleanup=$noCleanup', ({ state, signal, noCleanup }) => {
+    withFixture((fixture) => {
+      setExistingCredentials(fixture, state);
+      const flags = ['--live', ...(noCleanup ? [] : otherProjects.map((project) => `--skip=${project}`))];
+
+      const result = runCloudflare(
+        fixture,
+        flags,
+        { CLOUDFLARE_FAILURE: signal === 'SIGINT' ? 'signal-int' : 'signal-term' },
+        noCleanup,
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.status === 0 && result.signal === null).toBe(false);
+      expectRestored(fixture, state);
+      if (noCleanup) {
+        expect(result.signal).toBe(signal);
+      }
+    });
+  });
+
+  test.each(
+    credentialStates.flatMap((state) =>
+      (['replace-file', 'replace-symlink'] as const).map((replacement) => ({ state, replacement })),
+    ),
+  )(
+    'preserves an independent $replacement without exposing the original staged inode',
+    ({ state, replacement }) => {
+      withFixture((fixture) => {
+        setExistingCredentials(fixture, state);
+        const target = path.join(fixture.directory, 'independent-replacement-target');
+        const replacementContents = 'independent symlink target\\n';
+        writeFileSync(target, replacementContents, { mode: 0o640 });
+
+        const result = runCloudflare(fixture, ['--live'], {
+          CLOUDFLARE_FAILURE: replacement,
+          CLOUDFLARE_REPLACEMENT_TARGET: target,
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(1);
+        if (replacement === 'replace-symlink') {
+          expect(lstatSync(fixture.vars).isSymbolicLink()).toBe(true);
+          expect(readFileSync(target, 'utf-8')).toBe(replacementContents);
+        } else {
+          expect(readFileSync(fixture.vars, 'utf-8')).toBe('independently replaced credentials\n');
+        }
+
+        const detached = `${fixture.vars}.original`;
+        expect(readFileSync(detached)).toEqual(state.contents ?? Buffer.alloc(0));
+        if (state.contents !== undefined) {
+          expect(statSync(detached).mode % 0o1000).toBe(state.mode);
+        }
+        expect(readFileSync(detached).includes(apiKey)).toBe(false);
+      });
+    },
+  );
+
+  test.each([
+    { name: 'oversized', sparse: false },
+    { name: 'sparse', sparse: true },
+  ])('rejects an existing $name credential snapshot before staging a key', ({ sparse }) => {
+    withFixture((fixture) => {
+      writeFileSync(fixture.vars, sparse ? Buffer.alloc(0) : Buffer.alloc(64 * 1024 + 1, 0x61), {
+        mode: 0o640,
+      });
+      if (sparse) {
+        truncateSync(fixture.vars, 64 * 1024 + 1);
+      }
+
+      const result = runCloudflare(fixture, ['--live']);
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('64 KiB');
+      expect(statSync(fixture.vars).size).toBe(64 * 1024 + 1);
+      expect(observations(fixture).map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+    });
+  });
+
+  test('bounds snapshots if an existing credential file grows after its descriptor stat', () => {
+    withFixture((fixture) => {
+      writeFileSync(fixture.vars, originalContents, { mode: 0o640 });
+      const preload = path.join(fixture.directory, 'grow-after-stat.cjs');
+      writeFileSync(
+        preload,
+        [
+          "const fs = require('node:fs/promises');",
+          'const originalOpen = fs.open;',
+          'let grown = false;',
+          'fs.open = async (...args) => {',
+          '  const file = await originalOpen(...args);',
+          "  if (args[0] === '.dev.vars' && !grown) {",
+          '    const originalStat = file.stat.bind(file);',
+          '    file.stat = async (...statArgs) => {',
+          '      const metadata = await originalStat(...statArgs);',
+          '      if (!grown) {',
+          '        grown = true;',
+          '        const contents = Buffer.alloc(64 * 1024 + 1, 0x67);',
+          '        await file.write(contents, 0, contents.length, metadata.size);',
+          '      }',
+          '      return metadata;',
+          '    };',
+          '  }',
+          '  return file;',
+          '};',
+        ].join('\n'),
+      );
+
+      const result = runCloudflare(fixture, ['--live'], { NODE_OPTIONS: `--require ${preload}` });
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('64 KiB');
+      expect(statSync(fixture.vars).size).toBe(originalContents.length + 64 * 1024 + 1);
+      expect(observations(fixture).map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
     });
   });
 
