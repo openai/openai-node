@@ -125,6 +125,100 @@ describe('prototype-pollution safety', () => {
     expect(Reflect.get(Object.prototype, 'polluted')).toBeUndefined();
   });
 
+  test('sanitizes newly adopted nested records without changing the source', () => {
+    const source = JSON.parse(
+      '{"nested":{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"prototype":{"polluted":true},"safe":{"value":true}}}',
+    );
+    const result = merge({}, source);
+    const destination = {};
+
+    expect(result.nested).not.toBe(source.nested);
+    expect(result.nested).toEqual({ safe: { value: true } });
+    expect(Object.assign(destination, result.nested)).toBe(destination);
+    expect(Object.getPrototypeOf(destination)).toBe(Object.prototype);
+    expect(has(source.nested, '__proto__')).toBe(true);
+    expect(has(source.nested, 'constructor')).toBe(true);
+    expect(has(source.nested, 'prototype')).toBe(true);
+  });
+
+  test.each([
+    {
+      name: 'nested array entries',
+      apply: (unsafe: Record<string, unknown>) => merge({}, { nested: [unsafe] }).nested[0],
+    },
+    {
+      name: 'newly assigned array entries',
+      apply: (unsafe: Record<string, unknown>) => merge([], [unsafe])[0],
+    },
+    {
+      name: 'array entries appended after a scalar collision',
+      apply: (unsafe: Record<string, unknown>) => merge(['existing'], [unsafe])[1],
+    },
+    {
+      name: 'objects adopted after a scalar target',
+      apply: (unsafe: Record<string, unknown>) => merge('existing', unsafe)[1],
+    },
+    {
+      name: 'flattened array entries after a scalar target',
+      apply: (unsafe: Record<string, unknown>) => merge('existing', [unsafe])[1],
+    },
+  ])('sanitizes $name', ({ apply }) => {
+    const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}');
+    const result = apply(unsafe);
+
+    expect(result).toEqual({ safe: true });
+    expect(has(result, '__proto__')).toBe(false);
+    expect(has(unsafe, '__proto__')).toBe(true);
+    const destination = {};
+    expect(Object.assign(destination, result)).toBe(destination);
+    expect(Object.getPrototypeOf(destination)).toBe(Object.prototype);
+  });
+
+  test('preserves safe adopted identities, array holes, and null prototypes', () => {
+    const safe = Object.assign(Object.create(null), { value: true });
+    const sparse: unknown[] = [];
+    sparse[2] = safe;
+    const result = merge({}, { safe, sparse });
+
+    expect(result.safe).toBe(safe);
+    expect(result.sparse).toBe(sparse);
+    expect(0 in result.sparse).toBe(false);
+    expect(1 in result.sparse).toBe(false);
+    expect(Object.getPrototypeOf(result.safe)).toBeNull();
+  });
+
+  test('preserves cycles and shared references when sanitizing adopted records', () => {
+    const unsafe: Record<string, any> = JSON.parse('{"__proto__":{"polluted":true},"safe":true}');
+    unsafe['self'] = unsafe;
+    const result = merge({}, { left: unsafe, right: unsafe });
+
+    expect(result.left).toBe(result.right);
+    expect(result.left.self).toBe(result.left);
+    expect(result.left.safe).toBe(true);
+    expect(has(result.left, '__proto__')).toBe(false);
+    expect(unsafe['self']).toBe(unsafe);
+    expect(has(unsafe, '__proto__')).toBe(true);
+  });
+
+  test('copies adopted getter descriptors without invoking untrusted getters', () => {
+    const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}');
+    let calls = 0;
+    Object.defineProperty(unsafe, 'observed', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        calls += 1;
+        return 'value';
+      },
+    });
+    const getter = Object.getOwnPropertyDescriptor(unsafe, 'observed')?.get;
+    const result = merge({}, { nested: unsafe });
+
+    expect(calls).toBe(0);
+    expect(Object.getOwnPropertyDescriptor(result.nested, 'observed')?.get).toBe(getter);
+    expect(has(result.nested, '__proto__')).toBe(false);
+  });
+
   test.each(['__proto__', 'constructor', 'prototype'])(
     'merge ignores unsafe scalar key %s when inherited property names are allowed',
     (key) => {

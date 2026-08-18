@@ -15,6 +15,98 @@ function isUnsafePropertyKey(key: unknown): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype';
 }
 
+interface AdoptedRecord {
+  value: object;
+  descriptors: PropertyDescriptorMap;
+  parents: Set<AdoptedRecord>;
+  unsafe: boolean;
+}
+
+function sanitizeAdoptedValue(value: any, sanitized: WeakMap<object, any>): any {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+  if (sanitized.has(value)) {
+    return sanitized.get(value);
+  }
+
+  const records = new WeakMap<object, AdoptedRecord>();
+  const visited: AdoptedRecord[] = [];
+  const unsafe: AdoptedRecord[] = [];
+  function inspect(candidate: object): AdoptedRecord {
+    const existing = records.get(candidate);
+    if (existing) {
+      return existing;
+    }
+
+    const record: AdoptedRecord = {
+      value: candidate,
+      descriptors: Object.getOwnPropertyDescriptors(candidate),
+      parents: new Set(),
+      unsafe: false,
+    };
+    records.set(candidate, record);
+    visited.push(record);
+
+    for (const key of Reflect.ownKeys(record.descriptors)) {
+      if (isUnsafePropertyKey(key)) {
+        record.unsafe = true;
+        continue;
+      }
+      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor;
+      if ('value' in descriptor && descriptor.value && typeof descriptor.value === 'object') {
+        if (sanitized.has(descriptor.value)) {
+          record.unsafe ||= sanitized.get(descriptor.value) !== descriptor.value;
+        } else {
+          inspect(descriptor.value).parents.add(record);
+        }
+      }
+    }
+    if (record.unsafe) {
+      unsafe.push(record);
+    }
+    return record;
+  }
+
+  const root = inspect(value);
+  for (const record of unsafe) {
+    for (const parent of record.parents) {
+      if (!parent.unsafe) {
+        parent.unsafe = true;
+        unsafe.push(parent);
+      }
+    }
+  }
+  for (const record of visited) {
+    if (!record.unsafe) {
+      sanitized.set(record.value, record.value);
+    }
+  }
+
+  function copy(record: AdoptedRecord): any {
+    if (sanitized.has(record.value)) {
+      return sanitized.get(record.value);
+    }
+    const result = isArray(record.value) ? [] : Object.create(Object.getPrototypeOf(record.value));
+    sanitized.set(record.value, result);
+
+    for (const key of Reflect.ownKeys(record.descriptors)) {
+      if (isUnsafePropertyKey(key)) {
+        continue;
+      }
+      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor;
+      if ('value' in descriptor && descriptor.value && typeof descriptor.value === 'object') {
+        const child = records.get(descriptor.value);
+        descriptor.value = child ? copy(child) : sanitized.get(descriptor.value);
+      }
+      Object.defineProperty(result, key, descriptor);
+    }
+    return result;
+  }
+
+  return root.unsafe ? copy(root) : value;
+}
+
 const hex_table = /* @__PURE__ */ (() => {
   const array = [];
   for (let i = 0; i < 256; ++i) {
@@ -85,9 +177,10 @@ export function merge(
     return target;
   }
 
+  const sanitizedValues = new WeakMap<object, any>();
   if (!target || typeof target !== 'object') {
     // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
-    return [target].concat(source);
+    return [target].concat(sanitizeAdoptedValue(source, sanitizedValues));
   }
 
   let mergeTarget = target;
@@ -106,10 +199,10 @@ export function merge(
           if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
             target[i] = merge(targetItem, item, options);
           } else {
-            target.push(item);
+            target.push(sanitizeAdoptedValue(item, sanitizedValues));
           }
         } else {
-          target[i] = item;
+          target[i] = sanitizeAdoptedValue(item, sanitizedValues);
         }
       }
     }
@@ -122,7 +215,9 @@ export function merge(
     }
     const value = source[key];
 
-    mergeTarget[key] = has(mergeTarget, key) ? merge(mergeTarget[key], value, options) : value;
+    mergeTarget[key] = has(mergeTarget, key)
+      ? merge(mergeTarget[key], value, options)
+      : sanitizeAdoptedValue(value, sanitizedValues);
   }
   return mergeTarget;
 }
