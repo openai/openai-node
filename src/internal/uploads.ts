@@ -377,31 +377,34 @@ const hasUploadableValue = (value: unknown): boolean => {
 
 type FormEntry = { key: string; value: unknown };
 
-const snapshotPreservedUploadFilenames = (value: unknown, filenames: WeakMap<object, string>): void => {
-  if (isUploadable(value)) {
-    if (!filenames.has(value)) {
-      filenames.set(value, getStreamingFileName(value, { stripFilenames: false }));
+const snapshotPreservedUploadEntries = (
+  entries: Iterable<FormEntry>,
+  filenames: WeakMap<object, string>,
+): FormEntry[] => {
+  const snapshot: FormEntry[] = [];
+  for (const entry of entries) {
+    if (isUploadable(entry.value) && !filenames.has(entry.value)) {
+      filenames.set(entry.value, getStreamingFileName(entry.value, { stripFilenames: false }));
     }
-    return;
+    snapshot.push(entry);
   }
-  if (value && typeof value === 'object') {
-    for (const nested of Array.isArray(value) ? value : Object.values(value)) {
-      snapshotPreservedUploadFilenames(nested, filenames);
-    }
-  }
+  return snapshot;
 };
 
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
   options: CreateFormOptions = {},
 ): RequestOptions => {
+  const entries = iterateFormEntries(opts.body);
   const preservedFilenames = options.stripFilenames === false ? new WeakMap<object, string>() : undefined;
-  if (preservedFilenames) {
-    snapshotPreservedUploadFilenames(opts.body, preservedFilenames);
-  }
+  const multipartEntries = preservedFilenames
+    ? snapshotPreservedUploadEntries(entries, preservedFilenames)
+    : entries;
 
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
-  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options, preservedFilenames));
+  const body = ReadableStreamFrom(
+    iterateMultipartBody(multipartEntries, boundary, options, preservedFilenames),
+  );
 
   return {
     ...opts,
@@ -411,12 +414,12 @@ const createStreamingFormRequestOptions = (
 };
 
 async function* iterateMultipartBody(
-  body: unknown,
+  entries: Iterable<FormEntry>,
   boundary: string,
   options: CreateFormOptions,
   preservedFilenames?: WeakMap<object, string>,
 ): AsyncGenerator<Uint8Array> {
-  for await (const { key, value } of iterateFormEntries(body)) {
+  for await (const { key, value } of entries) {
     if (isUploadable(value)) {
       const filename = preservedFilenames?.get(value) ?? getStreamingFileName(value, options);
       const type = getStreamingFileType(value);
@@ -438,7 +441,7 @@ async function* iterateMultipartBody(
   yield encodeUTF8(`--${boundary}--\r\n`);
 }
 
-async function* iterateFormEntries(body: unknown): AsyncGenerator<FormEntry> {
+function* iterateFormEntries(body: unknown): Generator<FormEntry> {
   if (!body || typeof body !== 'object') {
     return;
   }
@@ -448,7 +451,7 @@ async function* iterateFormEntries(body: unknown): AsyncGenerator<FormEntry> {
   }
 }
 
-async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<FormEntry> {
+function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
   if (value === undefined) {
     return;
   }

@@ -65,11 +65,14 @@ const skillUploadEndpoints = [
   {
     name: 'skill creation',
     submit: (client: OpenAI, file: Uploadable) => client.skills.create({ files: [file] }),
+    submitFiles: (client: OpenAI, files: Uploadable[]) => client.skills.create({ files }),
   },
   {
     name: 'skill version creation',
     submit: (client: OpenAI, file: Uploadable) =>
       client.skills.versions.create('skill_123', { files: [file] }),
+    submitFiles: (client: OpenAI, files: Uploadable[]) =>
+      client.skills.versions.create('skill_123', { files }),
   },
 ] as const;
 
@@ -199,6 +202,36 @@ describe('streaming upload filename privacy', () => {
       expect(nameReads).toBe(1);
       expect(requests).toHaveLength(1);
       expect(uploadedFilenames(capturedRequest(requests).body)).toEqual(['assets/validated.txt']);
+    },
+  );
+
+  test.each(
+    skillUploadEndpoints.flatMap((endpoint) =>
+      skillFilenameMutations.map((mutation) => ({ endpoint, mutation })),
+    ),
+  )(
+    '$endpoint.name snapshots multipart entries before replacement with $mutation.name',
+    async ({ endpoint, mutation }) => {
+      const { client, requests } = createClient();
+      let sourceReads = 0;
+      async function* originalChunks(): AsyncGenerator<Uint8Array> {
+        sourceReads += 1;
+        yield new TextEncoder().encode('validated contents');
+      }
+
+      const files: Uploadable[] = [toStreamingFile(originalChunks(), 'assets/validated.txt')];
+      const pending = endpoint.submitFiles(client, files);
+      expect(sourceReads).toBe(0);
+
+      files[0] = toStreamingFile(fileChunks('replacement contents'), mutation.filename);
+      await pending;
+
+      expect(sourceReads).toBe(1);
+      expect(requests).toHaveLength(1);
+      const request = capturedRequest(requests);
+      expect(uploadedFilenames(request.body)).toEqual(['assets/validated.txt']);
+      expect(request.body).toContain('validated contents');
+      expect(request.body).not.toContain('replacement contents');
     },
   );
 
