@@ -128,8 +128,9 @@ function withFixture(run: (fixture: Fixture) => void) {
       "  if (failure === 'append-staged') fs.appendFileSync(vars, '\\nconcurrent appended edit\\n');",
       "  if (failure === 'append-staged-duplicate') fs.appendFileSync(vars, '\\nconcurrent appended edit\\n' + process.env.OPENAI_API_KEY + '\\n');",
       "  if (failure === 'chmod-staged') fs.chmodSync(vars, 0o640);",
-      "  if (failure === 'signal-int' || failure === 'signal-term') {",
-      "    process.kill(process.ppid, failure === 'signal-int' ? 'SIGINT' : 'SIGTERM');",
+      "  if (failure === 'signal-int' || failure === 'signal-term' || failure === 'signal-hup') {",
+      "    const signal = failure === 'signal-int' ? 'SIGINT' : failure === 'signal-term' ? 'SIGTERM' : 'SIGHUP';",
+      '    process.kill(process.ppid, signal);',
       '    setTimeout(() => process.exit(0), 250);',
       '    return;',
       '  }',
@@ -435,6 +436,78 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
     });
   });
 
+  test.each(credentialStates.flatMap((state) => [true, false].map((noCleanup) => ({ state, noCleanup }))))(
+    'restores original credentials before SIGHUP with noCleanup=$noCleanup',
+    ({ state, noCleanup }) => {
+      withFixture((fixture) => {
+        setExistingCredentials(fixture, state);
+        const flags = ['--live', ...(noCleanup ? [] : otherProjects.map((project) => `--skip=${project}`))];
+
+        const result = runCloudflare(fixture, flags, { CLOUDFLARE_FAILURE: 'signal-hup' }, noCleanup);
+
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBe('SIGHUP');
+        expectRestored(fixture, state);
+      });
+    },
+  );
+
+  test.each(['dev', 'ino'] as const)(
+    'rejects replacements with rounded colliding high-bit $field identifiers',
+    (field) => {
+      withFixture((fixture) => {
+        const preload = path.join(fixture.directory, 'colliding-bigint-identities.cjs');
+        writeFileSync(
+          preload,
+          [
+            "const fs = require('node:fs');",
+            "const promises = require('node:fs/promises');",
+            'const originalLstatSync = fs.lstatSync;',
+            'const originalLstat = promises.lstat;',
+            'const originalOpen = promises.open;',
+            'function applyIdentity(metadata, options, replacement) {',
+            '  const value = 9007199254740992n + BigInt(replacement);',
+            '  const selected = process.env.CLOUDFLARE_IDENTITY_FIELD;',
+            "  metadata.dev = selected === 'dev' ? (options?.bigint ? value : Number(value)) : options?.bigint ? 1n : 1;",
+            "  metadata.ino = selected === 'ino' ? (options?.bigint ? value : Number(value)) : options?.bigint ? 1n : 1;",
+            '  return metadata;',
+            '}',
+            'function isReplacement(candidate) {',
+            "  return candidate === '.dev.vars' &&",
+            "    fs.readFileSync(candidate, 'utf8') === 'independently replaced credentials\\n';",
+            '}',
+            'fs.lstatSync = (candidate, options) =>',
+            '  applyIdentity(originalLstatSync(candidate, options), options, isReplacement(candidate));',
+            'promises.lstat = async (candidate, options) =>',
+            '  applyIdentity(await originalLstat(candidate, options), options, isReplacement(candidate));',
+            'promises.open = async (...args) => {',
+            '  const file = await originalOpen(...args);',
+            "  if (args[0] === '.dev.vars') {",
+            '    const originalStat = file.stat.bind(file);',
+            '    file.stat = async (options) =>',
+            '      applyIdentity(await originalStat(options), options, false);',
+            '  }',
+            '  return file;',
+            '};',
+          ].join('\n'),
+        );
+
+        const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
+          CLOUDFLARE_FAILURE: 'replace-file',
+          CLOUDFLARE_IDENTITY_FIELD: field,
+          NODE_OPTIONS: `--require ${preload}`,
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(1);
+        expect(readFileSync(fixture.attempts, 'utf-8')).toBe('1');
+        expect(readFileSync(fixture.vars, 'utf-8')).toBe('independently replaced credentials\n');
+        expect(readFileSync(`${fixture.vars}.original`)).toEqual(Buffer.alloc(0));
+        expectNoCloudflareCredentialArtifacts(fixture);
+      });
+    },
+  );
+
   test.each(
     credentialStates.flatMap((state) =>
       (['SIGINT', 'SIGTERM'] as const).flatMap((signal) =>
@@ -719,7 +792,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
           '      if (!grown) {',
           '        grown = true;',
           '        const contents = Buffer.alloc(64 * 1024 + 1, 0x67);',
-          '        await file.write(contents, 0, contents.length, metadata.size);',
+          '        await file.write(contents, 0, contents.length, Number(metadata.size));',
           '      }',
           '      return metadata;',
           '    };',
