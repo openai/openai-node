@@ -8,6 +8,7 @@ import type { Response as APIResponse, ResponseStreamEvent } from 'openai/resour
 const syntheticCredential = 'sk-synthetic-private-response-token-7f3e';
 const syntheticPatient = 'synthetic-patient-123-45-6789';
 const syntheticPrompt = 'synthetic confidential customer transcript';
+const syntheticPassword = 'hunter2';
 const unsupportedPrefix = 'Unhandled response stream event: ';
 const futureEventType = 'response.future_feature.delta';
 
@@ -72,13 +73,15 @@ function expectPrivateFailure(error: unknown, expectedType: string): asserts err
   expect((error as OpenAIError).message).not.toContain(syntheticCredential);
   expect((error as OpenAIError).message).not.toContain(syntheticPatient);
   expect((error as OpenAIError).message).not.toContain(syntheticPrompt);
+  expect((error as OpenAIError).message).not.toContain(syntheticPassword);
   expect((error as OpenAIError).message).not.toContain('{');
   expect((error as OpenAIError).stack).not.toContain(syntheticCredential);
   expect((error as OpenAIError).stack).not.toContain(syntheticPatient);
   expect((error as OpenAIError).stack).not.toContain(syntheticPrompt);
+  expect((error as OpenAIError).stack).not.toContain(syntheticPassword);
 }
 
-function applyUnsupported(event: unknown, snapshot: APIResponse): unknown {
+function applyUnsupported(event: unknown, snapshot?: APIResponse): unknown {
   try {
     accumulateResponse(event as ResponseStreamEvent, snapshot);
   } catch (error) {
@@ -122,9 +125,117 @@ describe('unsupported Responses event diagnostic privacy', () => {
 
     const failure = applyUnsupported(event, snapshot);
 
-    expectPrivateFailure(failure, futureEventType);
+    expectPrivateFailure(failure, 'unknown');
     expect(snapshot).toEqual(originalSnapshot);
   });
+
+  test.each(['first', 'subsequent'] as const)(
+    'redacts namespace-matching private discriminators in a %s frame',
+    (position) => {
+      for (const type of ['response.patient.ssn123456789', `response.password.${syntheticPassword}`]) {
+        const snapshot = position === 'first' ? undefined : createSnapshot();
+        const failure = applyUnsupported(unsupportedEvent(type), snapshot);
+
+        expectPrivateFailure(failure, 'unknown');
+        expect((failure as OpenAIError).message).not.toContain('ssn123456789');
+        expect((failure as OpenAIError).stack).not.toContain('ssn123456789');
+      }
+    },
+  );
+
+  test.each(['first', 'subsequent'] as const)(
+    'never invokes a credential-throwing discriminator getter in a %s frame',
+    (position) => {
+      const event = unsupportedEvent();
+      const getter = vi.fn(() => {
+        throw new Error(`sensitive discriminator getter: ${syntheticCredential}`);
+      });
+      Object.defineProperty(event, 'type', {
+        configurable: true,
+        enumerable: true,
+        get: getter,
+      });
+
+      const snapshot = position === 'first' ? undefined : createSnapshot();
+      const failure = applyUnsupported(event, snapshot);
+
+      expectPrivateFailure(failure, 'unknown');
+      expect(getter).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['first', 'subsequent'] as const)(
+    'never invokes a credential-throwing discriminator proxy get trap in a %s frame',
+    (position) => {
+      const getter = vi.fn(() => {
+        throw new Error(`sensitive discriminator proxy: ${syntheticCredential}`);
+      });
+      const event = new Proxy(unsupportedEvent(), {
+        get(target, property, receiver) {
+          if (property === 'type') {
+            return getter();
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+
+      const snapshot = position === 'first' ? undefined : createSnapshot();
+      const failure = applyUnsupported(event, snapshot);
+
+      expectPrivateFailure(failure, 'unknown');
+      expect(getter).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['first', 'subsequent'] as const)(
+    'normalizes a throwing descriptor trap before any %s-frame dispatch',
+    (position) => {
+      const descriptorFailure = new Error(`sensitive descriptor: ${syntheticCredential}`);
+      const event = new Proxy(unsupportedEvent(), {
+        getOwnPropertyDescriptor(target, property) {
+          if (property === 'type') {
+            throw descriptorFailure;
+          }
+          return Reflect.getOwnPropertyDescriptor(target, property);
+        },
+      });
+
+      const snapshot = position === 'first' ? undefined : createSnapshot();
+      const failure = applyUnsupported(event, snapshot);
+
+      expectPrivateFailure(failure, 'unknown');
+      expect(failure).not.toBe(descriptorFailure);
+    },
+  );
+
+  test.each(['first', 'subsequent'] as const)(
+    'dispatches a supported %s-frame data discriminator without invoking its proxy getter',
+    (position) => {
+      const snapshot = position === 'first' ? undefined : createSnapshot();
+      const original =
+        position === 'first' ? createdEvent() : ({ type: 'keepalive', sequence_number: 1 } as const);
+      const getter = vi.fn(() => {
+        throw new Error(`sensitive supported discriminator: ${syntheticCredential}`);
+      });
+      const event = new Proxy(original, {
+        get(target, property, receiver) {
+          if (property === 'type') {
+            return getter();
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+
+      const result = accumulateResponse(event, snapshot);
+
+      expect(getter).not.toHaveBeenCalled();
+      if (snapshot) {
+        expect(result).toBe(snapshot);
+      } else {
+        expect(result.id).toBe('resp_synthetic');
+      }
+    },
+  );
 
   test.each([
     [
@@ -146,7 +257,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
 
     const failure = applyUnsupported(event, snapshot);
 
-    expectPrivateFailure(failure, futureEventType);
+    expectPrivateFailure(failure, 'unknown');
     expect(failure).not.toBeInstanceOf(TypeError);
   });
 
@@ -164,7 +275,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
 
     const failure = applyUnsupported(event, snapshot);
 
-    expectPrivateFailure(failure, futureEventType);
+    expectPrivateFailure(failure, 'unknown');
     expect(getter).not.toHaveBeenCalled();
   });
 
@@ -182,7 +293,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
 
     const failure = applyUnsupported(event, snapshot);
 
-    expectPrivateFailure(failure, futureEventType);
+    expectPrivateFailure(failure, 'unknown');
     expect(toJSON).not.toHaveBeenCalled();
   });
 
@@ -243,15 +354,38 @@ describe('unsupported Responses event diagnostic privacy', () => {
     expectPrivateFailure(failure, 'unknown');
   });
 
-  test('preserves the longest safe future event discriminator', () => {
+  test('redacts even a syntactically valid maximum-length unsupported discriminator', () => {
     const type = `response.${'a'.repeat(119)}`;
     const snapshot = createSnapshot();
 
     const failure = applyUnsupported(unsupportedEvent(type), snapshot);
 
     expect(type).toHaveLength(128);
-    expectPrivateFailure(failure, type);
+    expectPrivateFailure(failure, 'unknown');
   });
+
+  test.each(['response.patient.ssn123456789', `response.password.${syntheticPassword}`] as const)(
+    'keeps a first-frame readable-stream discriminator %s private',
+    async (type) => {
+      const stream = ResponseStream.fromReadableStream(readableStream([unsupportedEvent(type)]));
+      const events = vi.fn();
+      const errors = vi.fn();
+      stream.on('event', events);
+      stream.on('error', errors);
+
+      const failure = await stream.finalResponse().then(
+        () => {
+          throw new Error('Expected the first response event to be rejected.');
+        },
+        (error: unknown) => error,
+      );
+
+      expectPrivateFailure(failure, 'unknown');
+      expect((failure as OpenAIError).message).not.toContain('ssn123456789');
+      expect(events).not.toHaveBeenCalled();
+      expect(errors).toHaveBeenCalledWith(failure);
+    },
+  );
 
   test.each(['done', 'finalResponse'] as const)(
     'keeps restored readable-stream %s failures private',
@@ -275,7 +409,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
         (error: unknown) => error,
       );
 
-      expectPrivateFailure(failure, futureEventType);
+      expectPrivateFailure(failure, 'unknown');
       expect(events).toHaveBeenCalledTimes(1);
       expect(events).toHaveBeenCalledWith(created);
       expect(errors).toHaveBeenCalledTimes(1);
@@ -287,60 +421,65 @@ describe('unsupported Responses event diagnostic privacy', () => {
   );
 
   test.each([
-    ['off', 'done'],
-    ['off', 'finalResponse'],
-    ['error', 'done'],
-    ['error', 'finalResponse'],
-  ] as const)('keeps public client %s logger / %s failures private', async (logLevel, completionMethod) => {
-    const created = createdEvent();
-    const event = unsupportedEvent();
-    const body = `${[created, event]
-      .map((streamEvent) => `data: ${JSON.stringify(streamEvent)}`)
-      .join('\n\n')}\n\ndata: [DONE]\n\n`;
-    const fetch = vi.fn(
-      async () =>
-        new Response(body, {
-          status: 200,
-          headers: { 'content-type': 'text/event-stream' },
-        }),
-    );
-    const logger = createLogger();
-    const client = new OpenAI({
-      apiKey: 'sk-synthetic-client-key',
-      fetch,
-      logger,
-      logLevel,
-      maxRetries: 0,
-    });
-    const stream = client.responses.stream({
-      model: 'gpt-5',
-      input: 'synthetic request',
-    });
-    const events = vi.fn();
-    const errors = vi.fn();
+    ['off', 'done', futureEventType],
+    ['off', 'finalResponse', 'response.patient.ssn123456789'],
+    ['error', 'done', `response.password.${syntheticPassword}`],
+    ['error', 'finalResponse', futureEventType],
+  ] as const)(
+    'keeps public client %s logger / %s failures private for %s',
+    async (logLevel, completionMethod, type) => {
+      const created = createdEvent();
+      const event = unsupportedEvent(type);
+      const body = `${[created, event]
+        .map((streamEvent) => `data: ${JSON.stringify(streamEvent)}`)
+        .join('\n\n')}\n\ndata: [DONE]\n\n`;
+      const fetch = vi.fn(
+        async () =>
+          new Response(body, {
+            status: 200,
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      );
+      const logger = createLogger();
+      const client = new OpenAI({
+        apiKey: 'sk-synthetic-client-key',
+        fetch,
+        logger,
+        logLevel,
+        maxRetries: 0,
+      });
+      const stream = client.responses.stream({
+        model: 'gpt-5',
+        input: 'synthetic request',
+      });
+      const events = vi.fn();
+      const errors = vi.fn();
 
-    stream.on('event', events);
-    stream.on('error', errors);
+      stream.on('event', events);
+      stream.on('error', errors);
 
-    const completion = completionMethod === 'done' ? stream.done() : stream.finalResponse();
-    const failure = await completion.then(
-      () => {
-        throw new Error('Expected the public response stream to reject.');
-      },
-      (error: unknown) => error,
-    );
+      const completion = completionMethod === 'done' ? stream.done() : stream.finalResponse();
+      const failure = await completion.then(
+        () => {
+          throw new Error('Expected the public response stream to reject.');
+        },
+        (error: unknown) => error,
+      );
 
-    expectPrivateFailure(failure, futureEventType);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(events).toHaveBeenCalledTimes(1);
-    expect(events).toHaveBeenCalledWith(created);
-    expect(errors).toHaveBeenCalledTimes(1);
-    expect(errors).toHaveBeenCalledWith(failure);
-    expect(logger.error).not.toHaveBeenCalled();
-    expect(stream.ended).toBe(true);
-    expect(stream.errored).toBe(true);
-    expect(stream.aborted).toBe(false);
-  });
+      expectPrivateFailure(failure, 'unknown');
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(events).toHaveBeenCalledTimes(1);
+      expect(events).toHaveBeenCalledWith(created);
+      expect(errors).toHaveBeenCalledTimes(1);
+      expect(errors).toHaveBeenCalledWith(failure);
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(stream.ended).toBe(true);
+      expect(stream.errored).toBe(true);
+      expect(stream.aborted).toBe(false);
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain('ssn123456789');
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain(syntheticPassword);
+    },
+  );
 
   test('preserves documented provider API-error diagnostics', async () => {
     const payload = {
