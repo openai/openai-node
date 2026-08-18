@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -17,7 +18,16 @@ interface PublishEvent {
   token?: string;
   oidcUrl?: string;
   oidcToken?: string;
+  nodeAuthToken?: string;
+  npmAuthToken?: string;
+  yarnAuthToken?: string;
+  authConfig?: string;
+  lowercaseAuthConfig?: string;
+  password?: string;
   config?: string;
+  globalConfig?: string;
+  configMode?: number;
+  configContents?: string;
   registry?: string;
 }
 
@@ -29,6 +39,7 @@ function writeExecutable(filename: string, source: string): void {
 describe('bin/publish-npm credential isolation', () => {
   let fixture: string;
   let originalConfig: string;
+  let originalConfigContents: string;
   let eventsPath: string;
 
   beforeEach(() => {
@@ -41,14 +52,16 @@ describe('bin/publish-npm credential isolation', () => {
     }
 
     copyFileSync(path.join(process.cwd(), 'bin/publish-npm'), path.join(fixture, 'bin/publish-npm'));
-    writeFileSync(originalConfig, 'registry=https://registry.example.test/\n');
+    originalConfigContents =
+      'registry=https://registry.example.test/\n//registry.npmjs.org/:_authToken=synthetic-home-token\n';
+    writeFileSync(originalConfig, originalConfigContents);
     writeFileSync(path.join(fixture, 'dist/package.json'), '{}\n');
 
     writeExecutable(
       path.join(fixture, 'bin/check-npm-version'),
       [
         '#!/usr/bin/env bash',
-        'printf \'{"command":"version-check","token":"%s","oidcUrl":"%s","oidcToken":"%s"}\\n\' "$NPM_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" >> "$PUBLISH_EVENTS"',
+        'printf \'{"command":"version-check","token":"%s","oidcUrl":"%s","oidcToken":"%s","config":"%s","globalConfig":"%s","nodeAuthToken":"%s","npmAuthToken":"%s","authConfig":"%s","lowercaseAuthConfig":"%s","password":"%s"}\\n\' "$NPM_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$NPM_CONFIG_USERCONFIG" "$NPM_CONFIG_GLOBALCONFIG" "$NODE_AUTH_TOKEN" "$NPM_AUTH_TOKEN" "$NPM_CONFIG__AUTH" "$npm_config__authToken" "$NPM_CONFIG_PASSWORD" >> "$PUBLISH_EVENTS"',
         'exit "$VERSION_STATUS"',
       ].join('\n'),
     );
@@ -57,15 +70,29 @@ describe('bin/publish-npm credential isolation', () => {
       '#!/usr/bin/env node',
       "const fs = require('node:fs');",
       'const [command, ...args] = process.argv.slice(2);',
-      'const config = process.env.NPM_CONFIG_USERCONFIG;',
+      "const config = process.env.NPM_CONFIG_USERCONFIG ?? process.env.HOME + '/.npmrc';",
       "const name = command === 'config' ? command + ':' + args[0] : command;",
       'const event = { command: name, args, token: process.env.NPM_TOKEN, config,',
+      '  globalConfig: process.env.NPM_CONFIG_GLOBALCONFIG,',
       '  oidcUrl: process.env.ACTIONS_ID_TOKEN_REQUEST_URL,',
       '  oidcToken: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,',
+      '  nodeAuthToken: process.env.NODE_AUTH_TOKEN,',
+      '  npmAuthToken: process.env.NPM_AUTH_TOKEN,',
+      '  yarnAuthToken: process.env.YARN_NPM_AUTH_TOKEN,',
+      '  authConfig: process.env.NPM_CONFIG__AUTH,',
+      '  lowercaseAuthConfig: process.env.npm_config__authToken,',
+      '  password: process.env.NPM_CONFIG_PASSWORD,',
       '  registry: process.env.npm_config_registry };',
+      'if (fs.existsSync(config)) {',
+      '  event.configMode = fs.statSync(config).mode & 0o777;',
+      "  event.configContents = fs.readFileSync(config, 'utf8');",
+      '}',
       "fs.appendFileSync(process.env.PUBLISH_EVENTS, JSON.stringify(event) + '\\n');",
       "if (command === 'view') {",
       "  process.stdout.write(JSON.stringify(process.env.LAST_VERSION ?? '1.0.0') + '\\n');",
+      '}',
+      "if (command === 'publish' && process.env.FAIL_SIGNAL) {",
+      '  process.kill(process.ppid, process.env.FAIL_SIGNAL);',
       '}',
       'if (command === process.env.FAIL_PHASE) process.exit(17);',
     ].join('\n');
@@ -78,8 +105,19 @@ describe('bin/publish-npm credential isolation', () => {
         '#!/usr/bin/env node',
         "const fs = require('node:fs');",
         'const event = { command: "build", token: process.env.NPM_TOKEN, config: process.env.NPM_CONFIG_USERCONFIG,',
+        '  globalConfig: process.env.NPM_CONFIG_GLOBALCONFIG,',
         '  oidcUrl: process.env.ACTIONS_ID_TOKEN_REQUEST_URL,',
-        '  oidcToken: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN };',
+        '  oidcToken: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,',
+        '  nodeAuthToken: process.env.NODE_AUTH_TOKEN,',
+        '  npmAuthToken: process.env.NPM_AUTH_TOKEN,',
+        '  yarnAuthToken: process.env.YARN_NPM_AUTH_TOKEN,',
+        '  authConfig: process.env.NPM_CONFIG__AUTH,',
+        '  lowercaseAuthConfig: process.env.npm_config__authToken,',
+        '  password: process.env.NPM_CONFIG_PASSWORD };',
+        'if (event.config && fs.existsSync(event.config)) {',
+        '  event.configMode = fs.statSync(event.config).mode & 0o777;',
+        "  event.configContents = fs.readFileSync(event.config, 'utf8');",
+        '}',
         "fs.appendFileSync(process.env.PUBLISH_EVENTS, JSON.stringify(event) + '\\n');",
         'if (process.env.FAIL_PHASE === "build") process.exit(17);',
       ].join('\n'),
@@ -109,6 +147,16 @@ describe('bin/publish-npm credential isolation', () => {
       PATH: [path.join(fixture, 'mock-bin'), process.env['PATH'] ?? ''].join(path.delimiter),
       GITHUB_ACTIONS: 'true',
       NPM_TOKEN: 'synthetic-ignored-legacy-token',
+      NODE_AUTH_TOKEN: 'synthetic-node-auth-token',
+      NPM_AUTH_TOKEN: 'synthetic-npm-auth-token',
+      YARN_NPM_AUTH_TOKEN: 'synthetic-yarn-auth-token',
+      NPM_CONFIG__AUTH: 'synthetic-basic-auth',
+      npm_config__authToken: 'synthetic-npm-config-token',
+      NPM_CONFIG_PASSWORD: 'synthetic-registry-password',
+      NPM_CONFIG_USERCONFIG: originalConfig,
+      npm_config_userconfig: originalConfig,
+      NPM_CONFIG_GLOBALCONFIG: originalConfig,
+      npm_config_globalconfig: originalConfig,
       ACTIONS_ID_TOKEN_REQUEST_URL: 'https://oidc.example.test/token',
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'synthetic-oidc-grant',
       ORIGINAL_USERCONFIG: originalConfig,
@@ -116,8 +164,6 @@ describe('bin/publish-npm credential isolation', () => {
       VERSION_STATUS: '1',
       ...overrides,
     };
-    delete environment['NPM_CONFIG_USERCONFIG'];
-    delete environment['npm_config_userconfig'];
 
     const result = spawnSync('bash', ['bin/publish-npm'], {
       cwd: fixture,
@@ -146,10 +192,28 @@ describe('bin/publish-npm credential isolation', () => {
     expect(events.map((event) => event.command)).toEqual(
       failedIndex === -1 ? commands : commands.slice(0, failedIndex + 1),
     );
-    expect(events.every((event) => !event.token && !event.config)).toBe(true);
-    expect(readFileSync(originalConfig, 'utf-8')).toBe('registry=https://registry.example.test/\n');
+    const isolatedConfig = events[0]?.config;
+    if (!isolatedConfig) {
+      throw new Error('Version preflight did not receive an isolated npm configuration.');
+    }
+    expect(isolatedConfig).not.toBe(originalConfig);
+    expect(existsSync(isolatedConfig)).toBe(false);
+    expect(events.every((event) => event.config === isolatedConfig)).toBe(true);
+    expect(events.every((event) => event.globalConfig === isolatedConfig)).toBe(true);
+    expect(readFileSync(originalConfig, 'utf-8')).toBe(originalConfigContents);
 
     for (const event of events) {
+      expect(event.token).toBeFalsy();
+      expect(event.nodeAuthToken).toBeFalsy();
+      expect(event.npmAuthToken).toBeFalsy();
+      expect(event.yarnAuthToken).toBeFalsy();
+      expect(event.authConfig).toBeFalsy();
+      expect(event.lowercaseAuthConfig).toBeFalsy();
+      expect(event.password).toBeFalsy();
+      if (event.command !== 'version-check') {
+        expect(event.configMode).toBe(0o600);
+        expect(event.configContents).not.toMatch(/auth|token|password/u);
+      }
       if (event.command === 'publish') {
         expect(event.oidcUrl).toBe('https://oidc.example.test/token');
         expect(event.oidcToken).toBe('synthetic-oidc-grant');
@@ -163,6 +227,36 @@ describe('bin/publish-npm credential isolation', () => {
     expect(result.stderr).not.toContain('synthetic-ignored-legacy-token');
     expect(result.stdout).not.toContain('synthetic-oidc-grant');
     expect(result.stderr).not.toContain('synthetic-oidc-grant');
+  });
+
+  test('ignores user configuration that interpolates an inherited registry token', () => {
+    originalConfigContents = `registry=https://registry.example.test/\n//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}\n`;
+    writeFileSync(originalConfig, originalConfigContents);
+
+    const { result, events } = runPublisher();
+    expect(result.status).toBe(0);
+    for (const event of events) {
+      expect(event.nodeAuthToken).toBeFalsy();
+      expect(event.config).not.toBe(originalConfig);
+      expect(event.configContents ?? '').not.toContain('NODE_AUTH_TOKEN');
+      expect(event.configContents ?? '').not.toContain('synthetic-node-auth-token');
+    }
+    expect(readFileSync(originalConfig, 'utf-8')).toBe(originalConfigContents);
+    expect(existsSync(events[0]?.config ?? '')).toBe(false);
+  });
+
+  test.each([
+    { signal: 'SIGHUP', status: 129 },
+    { signal: 'SIGINT', status: 130 },
+    { signal: 'SIGTERM', status: 143 },
+  ])('removes isolated npm configuration after $signal interrupts publishing', ({ signal, status }) => {
+    const { result, events } = runPublisher({ FAIL_SIGNAL: signal });
+
+    expect(result.status).toBe(status);
+    expect(events[4]?.command).toBe('publish');
+    expect(existsSync(events[0]?.config ?? '')).toBe(false);
+    expect(readFileSync(originalConfig, 'utf-8')).toBe(originalConfigContents);
+    expect(events.every((event) => !event.nodeAuthToken && !event.npmAuthToken)).toBe(true);
   });
 
   test.each([
@@ -182,7 +276,10 @@ describe('bin/publish-npm credential isolation', () => {
     expect(events[0]?.token).toBeFalsy();
     expect(events[0]?.oidcUrl).toBeFalsy();
     expect(events[0]?.oidcToken).toBeFalsy();
-    expect(readFileSync(originalConfig, 'utf-8')).toBe('registry=https://registry.example.test/\n');
+    expect(events[0]?.config).not.toBe(originalConfig);
+    expect(events[0]?.globalConfig).toBe(events[0]?.config);
+    expect(existsSync(events[0]?.config ?? '')).toBe(false);
+    expect(readFileSync(originalConfig, 'utf-8')).toBe(originalConfigContents);
   });
 
   test('preserves the already-published no-op without requiring credentials', () => {
