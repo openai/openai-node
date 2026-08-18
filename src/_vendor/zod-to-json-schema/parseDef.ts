@@ -378,6 +378,14 @@ const throwUnrepresentableStrictZodType = (typeName: ZodFirstPartyTypeKind, refs
   );
 };
 
+const assertFiniteStrictSchemaValue = (value: unknown, keyword: string, refs: Refs): void => {
+  if (refs.openaiStrictMode && typeof value === 'number' && !Number.isFinite(value)) {
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` cannot represent the non-finite \`${keyword}\` value in JSON Structured Outputs.`,
+    );
+  }
+};
+
 const normalizeStrictBigIntValue = (value: bigint, keyword: string, refs: Refs): number => {
   if (keyword === 'multipleOf' && value <= 0n) {
     throw new RangeError(
@@ -821,6 +829,12 @@ const selectParser = (
         (option) =>
           option._def.typeName === ZodFirstPartyTypeKind.ZodLiteral && typeof option._def.value === 'bigint',
       );
+      const hasNonFiniteLiteral = options.some(
+        (option) =>
+          option._def.typeName === ZodFirstPartyTypeKind.ZodLiteral &&
+          typeof option._def.value === 'number' &&
+          !Number.isFinite(option._def.value),
+      );
       const nestedOverlaps = refs.openaiStrictMode
         ? options.map((consumer, consumerIndex) =>
             options.flatMap((producer, producerIndex) =>
@@ -847,6 +861,7 @@ const selectParser = (
         (omittedAsynchronousOptions ||
           bigintIndex !== -1 ||
           hasBigIntLiteral ||
+          hasNonFiniteLiteral ||
           nestedOverlaps.some((overlaps) => overlaps.length > 0))
       ) {
         const branches = options
@@ -941,6 +956,7 @@ const selectParser = (
       return parseRecordDef(def, refs);
     }
     case ZodFirstPartyTypeKind.ZodLiteral: {
+      assertFiniteStrictSchemaValue(def.value, 'const', refs);
       const schema = parseLiteralDef(def, refs);
       if (refs.openaiStrictMode && typeof def.value === 'bigint') {
         const record = schema as unknown as Record<string, unknown>;
@@ -959,7 +975,11 @@ const selectParser = (
       return parseEnumDef(def);
     }
     case ZodFirstPartyTypeKind.ZodNativeEnum: {
-      return parseNativeEnumDef(def);
+      const schema = parseNativeEnumDef(def);
+      for (const value of schema.enum) {
+        assertFiniteStrictSchemaValue(value, 'enum', refs);
+      }
+      return schema;
     }
     case ZodFirstPartyTypeKind.ZodNullable: {
       if (refs.openaiStrictMode && requiresAsynchronousJSONInput(def.innerType._def)) {

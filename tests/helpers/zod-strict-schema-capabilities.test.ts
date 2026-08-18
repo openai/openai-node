@@ -422,6 +422,19 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(() => JSON.stringify(format)).not.toThrow();
   });
 
+  it('preserves non-finite literals and native enums in non-strict realtime schemas', () => {
+    const realtime = zodRealtimeFunction({
+      name: 'realtime',
+      parameters: z3.object({
+        literal: z3.literal(Infinity),
+        native: z3.nativeEnum({ NonFinite: -Infinity, Finite: 7 } as const),
+      }),
+    });
+
+    expect(realtime.parameters).toHaveProperty('properties.literal.const', Infinity);
+    expect(realtime.parameters).toHaveProperty('properties.native.enum', [-Infinity, 7]);
+  });
+
   it.each([Infinity, -Infinity, Number.NaN])('rejects a non-finite numeric default %s', (value) => {
     expect(() => formatFor(z3.number().default(value))).toThrow('non-finite');
     expect(() => formatFor(z3.any().default({ nested: [value] }))).toThrow('non-finite');
@@ -1190,6 +1203,48 @@ describe('Zod v3 strict schema capability analysis', () => {
 });
 
 describe.each(strictHelpers)('$name strict numeric input capability analysis', ({ create }) => {
+  it.each([
+    { name: 'literal', schema: (value: number) => z3.literal(value) },
+    { name: 'readonly literal', schema: (value: number) => z3.literal(value).readonly() },
+    { name: 'nullable literal', schema: (value: number) => z3.literal(value).nullable() },
+    {
+      name: 'compact literal union',
+      schema: (value: number) => z3.union([z3.literal(value), z3.literal(7)]),
+    },
+    {
+      name: 'mixed literal union',
+      schema: (value: number) => z3.union([z3.literal(value), z3.literal('finite')]),
+    },
+    {
+      name: 'native enum',
+      schema: (value: number) => z3.nativeEnum({ NonFinite: value, Finite: 7 } as const),
+    },
+    {
+      name: 'wrapped native enum',
+      schema: (value: number) => z3.nativeEnum({ NonFinite: value, Finite: 7 } as const).readonly(),
+    },
+  ])('rejects non-finite numeric values in a $name schema', ({ schema }) => {
+    for (const value of [Infinity, -Infinity, Number.NaN]) {
+      expect(() => create(z3.object({ value: schema(value) }))).toThrow('non-finite');
+    }
+  });
+
+  it('preserves finite literals, compact literal unions, and native enum values', () => {
+    const finite = create(
+      z3.object({
+        literal: z3.literal(7),
+        union: z3.union([z3.literal(7), z3.literal(9)]),
+        native: z3.nativeEnum({ Seven: 7, Nine: 9 } as const),
+      }),
+    );
+
+    expect(finite.$parseRaw('{"literal":7,"union":9,"native":7}')).toEqual({
+      literal: 7,
+      union: 9,
+      native: 7,
+    });
+  });
+
   it.each([0n, -2n])('rejects an invalid BigInt multiple %s before emitting JSON Schema', (multiple) => {
     expect(() => create(z3.object({ value: z3.coerce.bigint().multipleOf(multiple) }))).toThrow(
       'strictly positive',
