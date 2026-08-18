@@ -104,9 +104,6 @@ export class AssistantStream
   extends EventStream<AssistantStreamEvents>
   implements AsyncIterable<AssistantStreamEvent>
 {
-  //Track all events in a single list for reference
-  #events: AssistantStreamEvent[] = [];
-
   //Used to accumulate deltas
   //We are accumulating many types so the value here is not strict
   #runStepSnapshots: Record<string, Runs.RunStep> = Object.create(null);
@@ -582,7 +579,6 @@ export class AssistantStream
   }
 
   #handleEvent(this: AssistantStream, event: AssistantStreamEvent) {
-    this.#events.push(event);
     this.#emitExposed('event', event);
   }
 
