@@ -116,7 +116,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
             } catch {
               logger.error(`Could not parse message into JSON:`);
               logger.error(`From chunk:`);
-              throw new SyntaxError('Could not parse server-sent event data as JSON.');
+              throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
+            }
+
+            if (sse.event === 'error') {
+              throw new APIError(undefined, data?.error ?? data, undefined, response.headers);
             }
 
             if (data && data.error) {
@@ -131,11 +135,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
             } catch {
               logger.error(`Could not parse message into JSON:`);
               logger.error(`From chunk:`);
-              throw new SyntaxError('Could not parse server-sent event data as JSON.');
-            }
-            // SSE error events surface as APIError instances.
-            if (sse.event === 'error') {
-              throw new APIError(undefined, data.error, data.message, undefined);
+              throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
             }
             yield { event: sse.event, data } as any;
           }
