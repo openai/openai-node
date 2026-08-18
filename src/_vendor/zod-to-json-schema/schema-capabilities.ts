@@ -240,6 +240,8 @@ const definiteParsedOutputKinds = new Set<ZodFirstPartyTypeKind>([
   ZodFirstPartyTypeKind.ZodNull,
   ZodFirstPartyTypeKind.ZodObject,
   ZodFirstPartyTypeKind.ZodArray,
+  ZodFirstPartyTypeKind.ZodSet,
+  ZodFirstPartyTypeKind.ZodMap,
 ]);
 
 export const knownParsedOutputType = (
@@ -358,9 +360,26 @@ const hasOpaqueParsedOutput = (definition: ZodTypeDef): boolean =>
     'output',
   );
 
+type OpaqueParsedOutput = 'opaque' | 'preprocessed';
+
+const classifyOpaqueParsedOutput = (definition: ZodTypeDef): OpaqueParsedOutput | undefined => {
+  const preprocessed = visitDefinition(
+    definition,
+    (def) =>
+      def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'preprocess'
+        ? true
+        : undefined,
+    'output',
+  );
+  if (preprocessed) {
+    return 'preprocessed';
+  }
+  return hasOpaqueParsedOutput(definition) ? 'opaque' : undefined;
+};
+
 type ParsedOutputMismatch = {
-  left: ZodFirstPartyTypeKind | 'opaque';
-  right: ZodFirstPartyTypeKind | 'opaque';
+  left: ZodFirstPartyTypeKind | OpaqueParsedOutput;
+  right: ZodFirstPartyTypeKind | OpaqueParsedOutput;
   path: readonly string[];
 };
 
@@ -440,10 +459,38 @@ const findOpaqueParsedOutputMismatch = (
   rightKind: ZodFirstPartyTypeKind | undefined,
   path: readonly string[],
 ): ParsedOutputMismatch | undefined => {
-  const leftOpaque = leftKind === undefined && hasOpaqueParsedOutput(left);
-  const rightOpaque = rightKind === undefined && hasOpaqueParsedOutput(right);
+  const leftOpaque = classifyOpaqueParsedOutput(left);
+  const rightOpaque = classifyOpaqueParsedOutput(right);
   return leftOpaque || rightOpaque
-    ? { left: leftKind ?? 'opaque', right: rightKind ?? 'opaque', path }
+    ? {
+        left: leftOpaque ?? leftKind ?? 'opaque',
+        right: rightOpaque ?? rightKind ?? 'opaque',
+        path,
+      }
+    : undefined;
+};
+
+const unmergeableParsedOutputKinds = new Set<ZodFirstPartyTypeKind>([
+  ZodFirstPartyTypeKind.ZodSet,
+  ZodFirstPartyTypeKind.ZodMap,
+]);
+
+const findDirectParsedOutputMismatch = (
+  left: ZodTypeDef,
+  right: ZodTypeDef,
+  leftKind: ZodFirstPartyTypeKind | undefined,
+  rightKind: ZodFirstPartyTypeKind | undefined,
+  path: readonly string[],
+): ParsedOutputMismatch | undefined => {
+  if (leftKind !== undefined && rightKind !== undefined && leftKind !== rightKind) {
+    return { left: leftKind, right: rightKind, path };
+  }
+  const opaqueMismatch = findOpaqueParsedOutputMismatch(left, right, leftKind, rightKind, path);
+  if (opaqueMismatch) {
+    return opaqueMismatch;
+  }
+  return leftKind !== undefined && rightKind !== undefined && unmergeableParsedOutputKinds.has(leftKind)
+    ? { left: leftKind, right: rightKind, path }
     : undefined;
 };
 
@@ -463,11 +510,12 @@ export const findIncompatibleParsedOutputs = (
   try {
     const leftKind = knownParsedOutputType(left);
     const rightKind = knownParsedOutputType(right);
-    if (leftKind === undefined || rightKind === undefined) {
-      return findOpaqueParsedOutputMismatch(left, right, leftKind, rightKind, path);
+    const directMismatch = findDirectParsedOutputMismatch(left, right, leftKind, rightKind, path);
+    if (directMismatch) {
+      return directMismatch;
     }
-    if (leftKind !== rightKind) {
-      return { left: leftKind, right: rightKind, path };
+    if (leftKind === undefined || rightKind === undefined) {
+      return undefined;
     }
     if (leftKind !== ZodFirstPartyTypeKind.ZodObject && leftKind !== ZodFirstPartyTypeKind.ZodArray) {
       return undefined;

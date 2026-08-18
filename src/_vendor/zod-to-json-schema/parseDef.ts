@@ -1278,6 +1278,9 @@ const selectParser = (
         if (output && '$ref' in output) {
           output = parseDef(def.out._def, outputPathRefs, true);
         }
+        if (output === undefined) {
+          return throwUnrepresentableStrictZodType(def.out._def.typeName, outputPathRefs);
+        }
         const inputRefs: PreprocessedRefs =
           outputRefs === refs ? refs : { ...refs, [expectedPipelineOutput]: def.out._def };
         let input = parsePipelineDef(def, inputRefs, forceResolution, outputRefs);
@@ -1288,7 +1291,7 @@ const selectParser = (
           };
           input = parseDef(def.in._def, materializedInputRefs, true);
         }
-        if (!input || !output) {
+        if (!input) {
           return input;
         }
 
