@@ -1319,6 +1319,83 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
   });
 
   it.each([
+    {
+      name: 'descending inclusive minimum',
+      schema: () => z3.coerce.bigint().min(10n).min(5n),
+      expected: { minimum: 10 },
+      valid: 10,
+      invalid: 7,
+    },
+    {
+      name: 'ascending inclusive minimum',
+      schema: () => z3.coerce.bigint().min(5n).min(10n),
+      expected: { minimum: 10 },
+      valid: 10,
+      invalid: 7,
+    },
+    {
+      name: 'descending exclusive minimum',
+      schema: () => z3.coerce.bigint().gt(10n).gt(5n),
+      expected: { exclusiveMinimum: 10 },
+      valid: 11,
+      invalid: 10,
+    },
+    {
+      name: 'ascending inclusive maximum',
+      schema: () => z3.coerce.bigint().max(5n).max(10n),
+      expected: { maximum: 5 },
+      valid: 5,
+      invalid: 7,
+    },
+    {
+      name: 'descending inclusive maximum',
+      schema: () => z3.coerce.bigint().max(10n).max(5n),
+      expected: { maximum: 5 },
+      valid: 5,
+      invalid: 7,
+    },
+    {
+      name: 'ascending exclusive maximum',
+      schema: () => z3.coerce.bigint().lt(5n).lt(10n),
+      expected: { exclusiveMaximum: 5 },
+      valid: 4,
+      invalid: 5,
+    },
+    {
+      name: 'mixed inclusive and exclusive minima',
+      schema: () => z3.coerce.bigint().gt(10n).min(5n).gt(8n),
+      expected: { minimum: 5, exclusiveMinimum: 10 },
+      valid: 11,
+      invalid: 10,
+    },
+    {
+      name: 'mixed inclusive and exclusive maxima',
+      schema: () => z3.coerce.bigint().lt(5n).max(10n).lt(8n),
+      expected: { maximum: 10, exclusiveMaximum: 5 },
+      valid: 4,
+      invalid: 5,
+    },
+    {
+      name: 'combined divisibility',
+      schema: () => z3.coerce.bigint().multipleOf(2n).multipleOf(3n),
+      expected: { multipleOf: 6 },
+      valid: 6,
+      invalid: 3,
+    },
+  ])('retains every repeated $name BigInt constraint', ({ schema, expected, valid, invalid }) => {
+    const result = create(z3.object({ value: schema() }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value', expect.objectContaining(expected));
+    expect(result.$parseRaw(JSON.stringify({ value: valid }))).toEqual({ value: BigInt(valid) });
+    expect(() => result.$parseRaw(JSON.stringify({ value: invalid }))).toThrow();
+  });
+
+  it('rejects repeated BigInt bounds whose strongest constraint leaves no safe integers', () => {
+    const value = z3.coerce.bigint().min(10n).max(9n).max(20n);
+    expect(() => create(z3.object({ value }))).toThrow('no safe JSON integer');
+  });
+
+  it.each([
     { name: 'direct BigInt', schema: () => z3.number().int().transform(BigInt) },
     { name: 'unrestricted BigInt', schema: () => z3.number().transform(BigInt) },
     {
@@ -1621,6 +1698,50 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       schema: () => z3.intersection(z3.number().transform(BigInt).readonly(), z3.number()),
     },
     {
+      name: 'opaque BigInt transform before number',
+      schema: () =>
+        z3.intersection(
+          z3.number().transform((value) => BigInt(value.toString())),
+          z3.number(),
+        ),
+    },
+    {
+      name: 'number before opaque BigInt transform',
+      schema: () =>
+        z3.intersection(
+          z3.number(),
+          z3.number().transform((value) => BigInt(value.toString())),
+        ),
+    },
+    {
+      name: 'wrapped opaque BigInt transform',
+      schema: () =>
+        z3.intersection(
+          z3
+            .number()
+            .transform((value) => BigInt(value.toString()))
+            .readonly()
+            .optional(),
+          z3.number(),
+        ),
+    },
+    {
+      name: 'nested opaque BigInt transform',
+      schema: () =>
+        z3.intersection(
+          z3.object({ count: z3.number().transform((value) => BigInt(value.toString())) }),
+          z3.object({ count: z3.number() }),
+        ),
+    },
+    {
+      name: 'two unclassified output transforms',
+      schema: () =>
+        z3.intersection(
+          z3.number().transform((value) => BigInt(value.toString())),
+          z3.number().transform((value) => value.toString()),
+        ),
+    },
+    {
       name: 'optional coerced BigInt before number',
       schema: () => z3.intersection(z3.coerce.bigint().optional(), z3.number()),
     },
@@ -1710,6 +1831,27 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
 
     expect(strictHelperSchema(result)).toHaveProperty('properties.value.type', 'number');
     expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
+  });
+
+  it.each([
+    {
+      name: 'number',
+      schema: () => z3.intersection(z3.number().transform(Number), z3.number()),
+      input: 7,
+    },
+    {
+      name: 'string',
+      schema: () => z3.intersection(z3.string().transform(String), z3.string()),
+      input: 'safe',
+    },
+    {
+      name: 'boolean',
+      schema: () => z3.intersection(z3.boolean().transform(Boolean), z3.boolean()),
+      input: true,
+    },
+  ])('preserves an intersection with a known compatible $name transform output', ({ schema, input }) => {
+    const result = create(z3.object({ value: schema() }));
+    expect(result.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: input });
   });
 
   it.each([
@@ -2237,6 +2379,43 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(generated.properties.value.anyOf[0]).not.toHaveProperty('minimum');
     expect(generated.properties.value.anyOf[0]).not.toHaveProperty('maximum');
     expect(result.$parseRaw('{"value":9007199254740993}')).toEqual({ value: 9_007_199_254_740_992 });
+  });
+
+  it.each([
+    { name: 'ascending integer factors', input: 2, output: 4, expected: 4 },
+    { name: 'descending integer factors', input: 4, output: 2, expected: 4 },
+    { name: 'integer least common multiple', input: 4, output: 6, expected: 12 },
+    { name: 'fractional factor', input: 0.1, output: 0.2, expected: 0.2 },
+    { name: 'fractional least common multiple', input: 0.2, output: 0.3, expected: 0.6 },
+    { name: 'mixed decimal factors', input: 0.1, output: 0.25, expected: 0.5 },
+  ])('merges compatible pipeline $name constraints', ({ input, output, expected }) => {
+    const result = create(
+      z3.object({ value: z3.number().multipleOf(input).pipe(z3.number().multipleOf(output)) }),
+    );
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.multipleOf', expected);
+    expect(result.$parseRaw(JSON.stringify({ value: expected }))).toEqual({ value: expected });
+  });
+
+  it('merges nested numeric pipeline divisibility constraints', () => {
+    const input = z3.object({ values: z3.array(z3.number().multipleOf(2)) });
+    const output = z3.object({ values: z3.array(z3.number().multipleOf(3)) });
+    const result = create(z3.object({ value: input.pipe(output) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty(
+      'properties.value.properties.values.items.multipleOf',
+      6,
+    );
+    expect(result.$parseRaw('{"value":{"values":[6,12]}}')).toEqual({ value: { values: [6, 12] } });
+  });
+
+  it.each([
+    { name: 'zero divisor', input: 0, output: 2 },
+    { name: 'unsafe integer least common multiple', input: Number.MAX_SAFE_INTEGER, output: 2 },
+    { name: 'unsupported scientific decimal precision', input: 1e-7, output: 2e-7 },
+  ])('rejects an unsafely representable pipeline $name constraint', ({ input, output }) => {
+    const value = z3.number().multipleOf(input).pipe(z3.number().multipleOf(output));
+    expect(() => create(z3.object({ value }))).toThrow('ZodPipeline output constraints');
   });
 
   it.each([

@@ -217,6 +217,13 @@ export const producesBigIntOutput = (definition: ZodTypeDef): boolean =>
     'output',
   );
 
+const knownTransformOutputKinds = new Map<unknown, ZodFirstPartyTypeKind>([
+  [BigInt, ZodFirstPartyTypeKind.ZodBigInt],
+  [Number, ZodFirstPartyTypeKind.ZodNumber],
+  [String, ZodFirstPartyTypeKind.ZodString],
+  [Boolean, ZodFirstPartyTypeKind.ZodBoolean],
+]);
+
 const literalParsedOutputKinds = new Map<string, ZodFirstPartyTypeKind>([
   ['bigint', ZodFirstPartyTypeKind.ZodBigInt],
   ['number', ZodFirstPartyTypeKind.ZodNumber],
@@ -245,8 +252,8 @@ export const knownParsedOutputType = (
   active.add(definition);
   try {
     const def = definition as InspectableDefinition;
-    if (isExactBigIntTransform(def)) {
-      return ZodFirstPartyTypeKind.ZodBigInt;
+    if (def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'transform') {
+      return knownTransformOutputKinds.get(def.effect.transform);
     }
     if (def.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
       return def.value === null
@@ -258,9 +265,6 @@ export const knownParsedOutputType = (
     }
     if (definiteParsedOutputKinds.has(def.typeName)) {
       return def.typeName;
-    }
-    if (def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'transform') {
-      return undefined;
     }
     if (
       def.typeName === ZodFirstPartyTypeKind.ZodNullable ||
@@ -281,9 +285,19 @@ export const knownParsedOutputType = (
   }
 };
 
+const hasOpaqueParsedOutput = (definition: ZodTypeDef): boolean =>
+  visitDefinition(
+    definition,
+    (def) =>
+      def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'transform'
+        ? !knownTransformOutputKinds.has(def.effect.transform)
+        : undefined,
+    'output',
+  );
+
 type ParsedOutputMismatch = {
-  left: ZodFirstPartyTypeKind;
-  right: ZodFirstPartyTypeKind;
+  left: ZodFirstPartyTypeKind | 'opaque';
+  right: ZodFirstPartyTypeKind | 'opaque';
   path: readonly string[];
 };
 
@@ -356,6 +370,20 @@ const findIncompatibleArrayOutputs = (
     : undefined;
 };
 
+const findOpaqueParsedOutputMismatch = (
+  left: ZodTypeDef,
+  right: ZodTypeDef,
+  leftKind: ZodFirstPartyTypeKind | undefined,
+  rightKind: ZodFirstPartyTypeKind | undefined,
+  path: readonly string[],
+): ParsedOutputMismatch | undefined => {
+  const leftOpaque = leftKind === undefined && hasOpaqueParsedOutput(left);
+  const rightOpaque = rightKind === undefined && hasOpaqueParsedOutput(right);
+  return leftOpaque || rightOpaque
+    ? { left: leftKind ?? 'opaque', right: rightKind ?? 'opaque', path }
+    : undefined;
+};
+
 export const findIncompatibleParsedOutputs = (
   left: ZodTypeDef,
   right: ZodTypeDef,
@@ -373,7 +401,7 @@ export const findIncompatibleParsedOutputs = (
     const leftKind = knownParsedOutputType(left);
     const rightKind = knownParsedOutputType(right);
     if (leftKind === undefined || rightKind === undefined) {
-      return undefined;
+      return findOpaqueParsedOutputMismatch(left, right, leftKind, rightKind, path);
     }
     if (leftKind !== rightKind) {
       return { left: leftKind, right: rightKind, path };

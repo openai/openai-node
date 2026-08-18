@@ -72,6 +72,7 @@ import {
   hasExactBigIntStringInput,
   hasOpaqueJSONValidation,
   hasOpaquePipelineTransform,
+  knownParsedOutputType,
   producesBigIntAtPath,
   producesDateAtPath,
   producesBigIntOutput,
@@ -658,6 +659,99 @@ const normalizeStrictDefaultValue = (
   }
 };
 
+type DecimalMultiple = { numerator: bigint; places: number };
+
+const decimalMultiple = (value: unknown): DecimalMultiple | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  const text = value.toString();
+  if (!/^\d+(?:\.\d+)?$/u.test(text)) {
+    return undefined;
+  }
+  const [whole, fraction = ''] = text.split('.');
+  return { numerator: BigInt(whole + fraction), places: fraction.length };
+};
+
+const greatestCommonDivisor = (first: bigint, second: bigint): bigint => {
+  let left = first;
+  let right = second;
+  while (right !== 0n) {
+    const remainder = left % right;
+    left = right;
+    right = remainder;
+  }
+  return left;
+};
+
+const mergeStrictNumericMultiples = (first: unknown, second: unknown): number | undefined => {
+  const left = decimalMultiple(first);
+  const right = decimalMultiple(second);
+  if (!left || !right) {
+    return undefined;
+  }
+
+  const places = Math.max(left.places, right.places);
+  const firstNumerator = left.numerator * 10n ** BigInt(places - left.places);
+  const secondNumerator = right.numerator * 10n ** BigInt(places - right.places);
+  const multiple =
+    (firstNumerator / greatestCommonDivisor(firstNumerator, secondNumerator)) * secondNumerator;
+  if (multiple > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return undefined;
+  }
+
+  const combined = Number(`${multiple.toString()}e-${places}`);
+  const normalized = decimalMultiple(combined);
+  if (!normalized) {
+    return undefined;
+  }
+  const verificationPlaces = Math.max(places, normalized.places);
+  const expected = multiple * 10n ** BigInt(verificationPlaces - places);
+  const actual = normalized.numerator * 10n ** BigInt(verificationPlaces - normalized.places);
+  return expected === actual ? combined : undefined;
+};
+
+type StrictBigIntCheck = { kind: string; value?: bigint; inclusive?: boolean };
+
+const strictBigIntBoundKeywords = {
+  min: { inclusive: 'minimum', exclusive: 'exclusiveMinimum' },
+  max: { inclusive: 'maximum', exclusive: 'exclusiveMaximum' },
+} as const;
+
+const retainStrictBigIntChecks = (
+  record: Record<string, unknown>,
+  checks: readonly StrictBigIntCheck[],
+): void => {
+  for (const check of checks) {
+    if (typeof check.value !== 'bigint') {
+      continue;
+    }
+    if (check.kind === 'multipleOf') {
+      const current = record['multipleOf'];
+      if (check.value <= 0n) {
+        record['multipleOf'] = check.value;
+      } else if (typeof current !== 'bigint') {
+        record['multipleOf'] = check.value;
+      } else if (current > 0n) {
+        record['multipleOf'] = (current / greatestCommonDivisor(current, check.value)) * check.value;
+      }
+      continue;
+    }
+    if (check.kind !== 'min' && check.kind !== 'max') {
+      continue;
+    }
+    const keywords = strictBigIntBoundKeywords[check.kind];
+    const keyword = check.inclusive === false ? keywords.exclusive : keywords.inclusive;
+    const current = record[keyword];
+    if (
+      typeof current !== 'bigint' ||
+      (check.kind === 'min' ? check.value > current : check.value < current)
+    ) {
+      record[keyword] = check.value;
+    }
+  }
+};
+
 const isNumericSchemaType = (type: unknown) => type === 'number' || type === 'integer';
 
 const mergeStrictSchemas = (left: JsonSchema7Type, right: JsonSchema7Type): JsonSchema7Type | undefined => {
@@ -690,6 +784,12 @@ const mergeStrictSchemas = (left: JsonSchema7Type, right: JsonSchema7Type): Json
       keyword === 'maxItems'
     ) {
       merged[keyword] = Math.min(merged[keyword] as number, value as number);
+    } else if (keyword === 'multipleOf') {
+      const multiple = mergeStrictNumericMultiples(merged[keyword], value);
+      if (multiple === undefined) {
+        return undefined;
+      }
+      merged[keyword] = multiple;
     } else if (keyword === 'properties' && value && typeof value === 'object') {
       const original = merged[keyword] as Record<string, JsonSchema7Type>;
       const properties = value as Record<string, JsonSchema7Type>;
@@ -779,6 +879,7 @@ const selectParser = (
       const schema = parseBigintDef(def, refs);
       if (refs.openaiStrictMode) {
         const record = schema as unknown as Record<string, unknown>;
+        retainStrictBigIntChecks(record, def.checks ?? []);
         for (const [keyword, value] of Object.entries(schema)) {
           if (typeof value === 'bigint') {
             record[keyword] = normalizeStrictBigIntValue(value, keyword, refs);
@@ -969,9 +1070,18 @@ const selectParser = (
       if (refs.openaiStrictMode) {
         const mismatch = findIncompatibleParsedOutputs(def.left._def, def.right._def);
         if (mismatch) {
-          throw new TypeError(
-            `ZodIntersection arms have incompatible parsed outputs: ${mismatch.left} and ${mismatch.right}`,
-          );
+          const expectedOutput = (refs as PreprocessedRefs)[expectedPipelineOutput];
+          const expectedKind = expectedOutput ? knownParsedOutputType(expectedOutput) : undefined;
+          const compatibleExpectedOutput =
+            mismatch.path.length === 0 &&
+            expectedKind !== undefined &&
+            (mismatch.left === 'opaque' || mismatch.left === expectedKind) &&
+            (mismatch.right === 'opaque' || mismatch.right === expectedKind);
+          if (!compatibleExpectedOutput) {
+            throw new TypeError(
+              `ZodIntersection arms have incompatible parsed outputs: ${mismatch.left} and ${mismatch.right}`,
+            );
+          }
         }
       }
       const intersectionRefs: PreprocessedRefs = refs.openaiStrictMode
