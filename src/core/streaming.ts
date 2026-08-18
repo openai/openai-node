@@ -113,10 +113,10 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
             try {
               data = JSON.parse(sse.data) as any;
-            } catch (e) {
-              logger.error(`Could not parse message into JSON:`, sse.data);
-              logger.error(`From chunk:`, sse.raw);
-              throw e;
+            } catch {
+              logger.error(`Could not parse message into JSON:`);
+              logger.error(`From chunk:`);
+              throw new SyntaxError('Could not parse server-sent event data as JSON.');
             }
 
             if (data && data.error) {
@@ -128,10 +128,10 @@ export class Stream<Item> implements AsyncIterable<Item> {
             let data;
             try {
               data = JSON.parse(sse.data);
-            } catch (e) {
-              logger.error(`Could not parse message into JSON:`, sse.data);
-              logger.error(`From chunk:`, sse.raw);
-              throw e;
+            } catch {
+              logger.error(`Could not parse message into JSON:`);
+              logger.error(`From chunk:`);
+              throw new SyntaxError('Could not parse server-sent event data as JSON.');
             }
             // SSE error events surface as APIError instances.
             if (sse.event === 'error') {
