@@ -701,7 +701,6 @@ describe.each([
   if (version === 'v3') {
     it('fully resolves reused wrapper types', () => {
       const branded = z.string().brand<'BlockId'>();
-      const caught = z.string().catch('fallback');
       const defaulted = z.string().default('fallback');
       const readonly = z.string().readonly();
       const optionalNullable = z.string().nullable().optional();
@@ -711,8 +710,6 @@ describe.each([
         z.object({
           brandedFirst: branded,
           brandedSecond: branded,
-          caughtFirst: caught,
-          caughtSecond: caught,
           defaultedFirst: defaulted,
           defaultedSecond: defaulted,
           readonlyFirst: readonly,

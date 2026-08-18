@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import {
   zodFunction,
   zodRealtimeFunction,
@@ -32,6 +33,9 @@ const strictHelpers = [
       zodResponsesFunction({ name: 'boundary', parameters: schema }).parameters,
   },
 ];
+
+const numericStatus = { 0: 'Ready', 1: 'Done', Ready: 0, Done: 1 } as const;
+const mixedStatus = { 0: 'Ready', Ready: 0, Done: 'done' } as const;
 
 const unsupportedSchemas = [
   { name: 'native dates', schema: () => z3.date(), kind: 'ZodDate' },
@@ -69,6 +73,143 @@ const unsupportedSchemas = [
 ];
 
 describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) => {
+  it.each([
+    { name: 'native Date', catchall: () => z3.date(), kind: 'ZodDate' },
+    { name: 'native BigInt', catchall: () => z3.bigint(), kind: 'ZodBigInt' },
+    {
+      name: 'opaque transform',
+      catchall: () => z3.string().transform((value) => value.length),
+      kind: 'ZodEffects',
+    },
+  ])('traverses a $name object catchall at its exact path', ({ catchall, kind }) => {
+    const object = z3.object({ declared: z3.string() }).catchall(catchall());
+
+    expect(() => create(z3.object({ nested: object }))).toThrow(
+      new RegExp(String.raw`nested\.<catchall>.*${kind}`, 'u'),
+    );
+  });
+
+  it.each([
+    {
+      name: 'JSON-native catchall',
+      object: () => z3.object({ declared: z3.string() }).catchall(z3.string()),
+    },
+    {
+      name: 'passthrough object',
+      object: () => z3.object({ declared: z3.string() }).passthrough(),
+    },
+    {
+      name: 'readonly open object',
+      object: () => z3.object({ declared: z3.string() }).catchall(z3.number()).readonly(),
+    },
+  ])('rejects an open $name instead of emitting additionalProperties', ({ object }) => {
+    expect(() => create(z3.object({ nested: object() }))).toThrow(/nested.*ZodObject.*additionalProperties/u);
+  });
+
+  it('retains ordinary stripped and explicitly strict closed objects', () => {
+    const result = create(
+      z3.object({
+        stripped: z3.object({ value: z3.string() }),
+        strict: z3.object({ value: z3.string() }).strict(),
+      }),
+    );
+
+    expect(result.$parseRaw('{"stripped":{"value":"safe"},"strict":{"value":"safe"}}')).toEqual({
+      stripped: { value: 'safe' },
+      strict: { value: 'safe' },
+    });
+  });
+
+  it.each([
+    { name: 'non-finite number', caught: () => z3.number().catch(Infinity) },
+    { name: 'native BigInt', caught: () => z3.any().catch(1n) },
+    { name: 'ordinary JSON fallback', caught: () => z3.string().catch('safe') },
+    { name: 'readonly fallback', caught: () => z3.string().catch('safe').readonly() },
+  ])('rejects a $name catch fallback as unprovable', ({ caught }) => {
+    expect(() => create(z3.object({ nested: z3.object({ value: caught() }) }))).toThrow(
+      /nested\.value.*ZodCatch/u,
+    );
+  });
+
+  it('rejects function-valued catch fallbacks without invoking them', () => {
+    const fallback = vi.fn(() => Infinity);
+
+    expect(() => create(z3.object({ value: z3.number().catch(fallback) }))).toThrow(/ZodCatch/u);
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'fixed tuple', tuple: () => z3.tuple([z3.string(), z3.number()]) },
+    { name: 'empty tuple', tuple: () => z3.tuple([]) },
+    { name: 'rest tuple', tuple: () => z3.tuple([z3.string()]).rest(z3.number()) },
+    { name: 'readonly tuple', tuple: () => z3.tuple([z3.string()]).readonly() },
+    { name: 'nested array tuple', tuple: () => z3.array(z3.tuple([z3.string()])) },
+  ])('rejects unsupported Draft 7 $name item arrays', ({ tuple }) => {
+    expect(() => create(z3.object({ nested: z3.object({ value: tuple() }) }))).toThrow(
+      /nested\.value.*ZodTuple/u,
+    );
+  });
+
+  it.each([
+    { name: 'open string-key record', record: () => z3.record(z3.string()) },
+    { name: 'enum-key record', record: () => z3.record(z3.enum(['first', 'second']), z3.number()) },
+    { name: 'readonly record', record: () => z3.record(z3.string()).readonly() },
+    { name: 'nested array record', record: () => z3.array(z3.record(z3.string())) },
+  ])('rejects an unsupported $name additionalProperties schema', ({ record }) => {
+    expect(() => create(z3.object({ nested: z3.object({ value: record() }) }))).toThrow(
+      /nested\.value.*ZodRecord/u,
+    );
+  });
+
+  it.each([
+    {
+      name: 'numeric enum and any string',
+      options: () => [z3.nativeEnum(numericStatus), z3.string()] as const,
+      first: 0,
+      second: 'Ready',
+    },
+    {
+      name: 'numeric enum and reverse-mapping literal',
+      options: () => [z3.nativeEnum(numericStatus), z3.literal('Ready')] as const,
+      first: 0,
+      second: 'Ready',
+    },
+    {
+      name: 'numeric enum and disjoint numeric literal',
+      options: () => [z3.nativeEnum(numericStatus), z3.literal(7)] as const,
+      first: 0,
+      second: 7,
+    },
+    {
+      name: 'mixed enum and disjoint boolean',
+      options: () => [z3.nativeEnum(mixedStatus), z3.boolean()] as const,
+      first: 'done',
+      second: true,
+    },
+  ])('preserves genuinely disjoint $name domains', ({ options, first, second }) => {
+    const result = create(z3.object({ value: z3.union(options()) }));
+
+    expect(result.$parseRaw(JSON.stringify({ value: first }))).toEqual({ value: first });
+    expect(result.$parseRaw(JSON.stringify({ value: second }))).toEqual({ value: second });
+  });
+
+  it.each([
+    {
+      name: 'numeric enum and a matching number',
+      options: () => [z3.nativeEnum(numericStatus), z3.number()] as const,
+    },
+    {
+      name: 'numeric enum and a matching literal',
+      options: () => [z3.nativeEnum(numericStatus), z3.literal(0)] as const,
+    },
+    {
+      name: 'mixed enum and a matching string',
+      options: () => [z3.nativeEnum(mixedStatus), z3.string()] as const,
+    },
+  ])('continues rejecting overlapping $name domains', ({ options }) => {
+    expect(() => create(z3.object({ value: z3.union(options()) }))).toThrow(/ambiguous.*union/iu);
+  });
+
   it.each(unsupportedSchemas)('rejects $name at its field path', ({ schema: unsupported, kind }) => {
     expect(() => create(z3.object({ nested: z3.object({ value: unsupported() }) }))).toThrow(
       new RegExp(`nested\\.value.*${kind}`, 'u'),

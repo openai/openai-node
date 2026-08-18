@@ -12,10 +12,8 @@ interface SchemaDefinition {
   shape: () => Record<string, SchemaNode>;
   type: SchemaNode;
   innerType: SchemaNode;
-  valueType: SchemaNode;
-  keyType: SchemaNode;
-  items: readonly SchemaNode[];
-  rest?: SchemaNode | null;
+  catchall?: SchemaNode;
+  unknownKeys?: string;
   options: readonly SchemaNode[] | Map<unknown, SchemaNode>;
   getter: () => SchemaNode;
   value?: unknown;
@@ -39,12 +37,10 @@ const simpleJSONDomains: Readonly<Record<string, JSONDomain['type']>> = {
   ZodBoolean: 'boolean',
   ZodNull: 'null',
   ZodObject: 'object',
-  ZodRecord: 'object',
   ZodArray: 'array',
-  ZodTuple: 'array',
 };
 
-const transparentWrappers = new Set(['ZodOptional', 'ZodNullable', 'ZodDefault', 'ZodCatch', 'ZodReadonly']);
+const transparentWrappers = new Set(['ZodOptional', 'ZodNullable', 'ZodDefault', 'ZodReadonly']);
 
 const supportedLeaves = new Set([
   'ZodString',
@@ -67,6 +63,9 @@ const unsupportedReasons = new Map([
   ['ZodEffects', 'custom transformations and refinements are opaque to JSON Schema'],
   ['ZodPipeline', 'custom pipelines are opaque to JSON Schema'],
   ['ZodIntersection', 'intersections cannot prove that both branches produce the same value'],
+  ['ZodCatch', 'catch fallbacks cannot be proven to produce JSON-native values'],
+  ['ZodTuple', 'tuple schemas require unsupported array-valued items'],
+  ['ZodRecord', 'open-ended record schemas require unsupported additionalProperties'],
 ]);
 
 const valueChangingStringChecks = new Set(['trim', 'toLowerCase', 'toUpperCase']);
@@ -94,9 +93,23 @@ function literalDomain(value: unknown): JSONDomain | undefined {
 }
 
 function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
-  const values = Object.values(def.values ?? {}).filter(
-    (value): value is string | number => typeof value === 'string' || typeof value === 'number',
-  );
+  const definitionValues = def.values;
+  if (!definitionValues || Array.isArray(definitionValues)) {
+    return [];
+  }
+  const object = definitionValues as Record<string, unknown>;
+  const values = Object.keys(object)
+    .filter((key) => {
+      const value = object[key];
+      return (
+        (typeof value === 'string' || typeof value === 'number') && typeof object[String(value)] !== 'number'
+      );
+    })
+    .map((key) => object[key])
+    .filter(
+      (value): value is string | number =>
+        typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)),
+    );
   return (['string', 'number'] as const)
     .map((type) => ({
       type,
@@ -204,29 +217,17 @@ function assertUnambiguousUnion(options: readonly SchemaNode[], path: string): v
 function schemaChildren(def: SchemaDefinition, path: string): SchemaChild[] | undefined {
   switch (def.typeName) {
     case 'ZodObject': {
-      return Object.entries(def.shape()).map(([name, schema]) => ({
+      const children = Object.entries(def.shape()).map(([name, schema]) => ({
         schema,
         path: `${path}.${name}`,
       }));
-    }
-    case 'ZodArray': {
-      return [{ schema: def.type, path: `${path}[]` }];
-    }
-    case 'ZodTuple': {
-      const children = def.items.map((schema, index) => ({
-        schema,
-        path: `${path}[${index}]`,
-      }));
-      if (def.rest) {
-        children.push({ schema: def.rest, path: `${path}[]` });
+      if (def.catchall && def.catchall._def.typeName !== 'ZodNever') {
+        children.push({ schema: def.catchall, path: `${path}.<catchall>` });
       }
       return children;
     }
-    case 'ZodRecord': {
-      return [
-        { schema: def.keyType, path: `${path}.<key>` },
-        { schema: def.valueType, path: `${path}.<value>` },
-      ];
+    case 'ZodArray': {
+      return [{ schema: def.type, path: `${path}[]` }];
     }
     case 'ZodUnion':
     case 'ZodDiscriminatedUnion': {
@@ -238,7 +239,6 @@ function schemaChildren(def: SchemaDefinition, path: string): SchemaChild[] | un
     case 'ZodOptional':
     case 'ZodNullable':
     case 'ZodDefault':
-    case 'ZodCatch':
     case 'ZodReadonly': {
       return [{ schema: def.innerType, path }];
     }
@@ -287,6 +287,13 @@ function visit(schema: SchemaNode, path: string, visited: Set<SchemaDefinition>)
 
   for (const child of children) {
     visit(child.schema, child.path, visited);
+  }
+  if (
+    def.typeName === 'ZodObject' &&
+    (def.unknownKeys === 'passthrough' ||
+      (def.catchall !== undefined && def.catchall._def.typeName !== 'ZodNever'))
+  ) {
+    unsupported(path, def.typeName, 'open object schemas require additionalProperties: false');
   }
   if (def.typeName === 'ZodUnion' && path !== '$') {
     assertUnambiguousUnion(
