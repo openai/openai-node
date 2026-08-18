@@ -504,6 +504,13 @@ const nativeCollectionDefaultType = (
 
 const trustedInternalSlotObjectMethods = [
   { type: 'RegExp', method: Object.getOwnPropertyDescriptor(RegExp.prototype, 'source')?.get },
+  {
+    type: 'URLSearchParams',
+    method:
+      typeof URLSearchParams === 'undefined'
+        ? undefined
+        : Object.getOwnPropertyDescriptor(URLSearchParams.prototype, 'size')?.get,
+  },
   { type: 'ArrayBuffer', method: Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get },
   {
     type: 'SharedArrayBuffer',
@@ -818,6 +825,86 @@ const mergeStrictNumericMultiples = (first: unknown, second: unknown): number | 
   return expected === actual ? combined : undefined;
 };
 
+type StrictNumberCheck = { kind: string; value?: number; inclusive?: boolean };
+
+const strictNumberBoundKeywords = {
+  min: { inclusive: 'minimum', exclusive: 'exclusiveMinimum' },
+  max: { inclusive: 'maximum', exclusive: 'exclusiveMaximum' },
+} as const;
+
+const normalizeStrictNumberMultiple = (value: number, refs: Refs): number => {
+  assertFiniteStrictSchemaValue(value, 'multipleOf', refs);
+  if (value === 0) {
+    throw new RangeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` uses \`ZodNumber\` and requires a strictly positive \`multipleOf\` value for JSON Structured Outputs.`,
+    );
+  }
+  const normalized = Math.abs(value);
+  if (decimalMultiple(normalized) === undefined) {
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` uses \`ZodNumber\` and cannot safely represent its notation-sensitive \`multipleOf\` value in JSON Structured Outputs.`,
+    );
+  }
+  return normalized;
+};
+
+const retainStrictNumberBound = (
+  record: Record<string, unknown>,
+  check: StrictNumberCheck,
+  refs: Refs,
+): void => {
+  if ((check.kind !== 'min' && check.kind !== 'max') || typeof check.value !== 'number') {
+    return;
+  }
+  const keyword =
+    strictNumberBoundKeywords[check.kind][check.inclusive === false ? 'exclusive' : 'inclusive'];
+  if (!Number.isFinite(check.value)) {
+    const vacuous =
+      (check.kind === 'min' && check.value === -Infinity) ||
+      (check.kind === 'max' && check.value === Infinity);
+    if (!vacuous) {
+      assertFiniteStrictSchemaValue(check.value, keyword, refs);
+    }
+    return;
+  }
+  const previous = record[keyword];
+  if (
+    typeof previous !== 'number' ||
+    (check.kind === 'min' ? check.value > previous : check.value < previous)
+  ) {
+    record[keyword] = check.value;
+  }
+};
+
+const retainStrictNumberChecks = (
+  record: Record<string, unknown>,
+  checks: readonly StrictNumberCheck[],
+  refs: Refs,
+): void => {
+  for (const keyword of ['minimum', 'exclusiveMinimum', 'maximum', 'exclusiveMaximum', 'multipleOf']) {
+    Reflect.deleteProperty(record, keyword);
+  }
+  for (const check of checks) {
+    if (check.kind !== 'multipleOf' || typeof check.value !== 'number') {
+      retainStrictNumberBound(record, check, refs);
+      continue;
+    }
+    const multiple = normalizeStrictNumberMultiple(check.value, refs);
+    const existing = record['multipleOf'];
+    if (typeof existing !== 'number') {
+      record['multipleOf'] = multiple;
+      continue;
+    }
+    const combined = mergeStrictNumericMultiples(existing, multiple);
+    if (combined === undefined) {
+      throw new TypeError(
+        `Zod field at \`${refs.currentPath.join('/')}\` uses \`ZodNumber\` and cannot safely combine its \`multipleOf\` constraints in JSON Structured Outputs.`,
+      );
+    }
+    record['multipleOf'] = combined;
+  }
+};
+
 type StrictBigIntCheck = { kind: string; value?: bigint; inclusive?: boolean };
 
 const strictBigIntBoundKeywords = {
@@ -943,15 +1030,92 @@ const mergeStrictSchemas = (left: JsonSchema7Type, right: JsonSchema7Type): Json
   return merged as JsonSchema7Type;
 };
 
+const strictSchemaTypes = (schema: JsonSchema7Type): readonly string[] | undefined => {
+  const value = (schema as Record<string, unknown>)['type'];
+  if (typeof value === 'string') {
+    return [value];
+  }
+  return Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string')
+    ? (value as string[])
+    : undefined;
+};
+
 const hasDisjointStrictSchemaTypes = (first: JsonSchema7Type, second: JsonSchema7Type): boolean => {
-  const left = (first as Record<string, unknown>)['type'];
-  const right = (second as Record<string, unknown>)['type'];
+  const left = strictSchemaTypes(first);
+  const right = strictSchemaTypes(second);
   return (
-    typeof left === 'string' &&
-    typeof right === 'string' &&
-    left !== right &&
-    !(isNumericSchemaType(left) && isNumericSchemaType(right))
+    left !== undefined &&
+    right !== undefined &&
+    left.every((candidate) =>
+      right.every(
+        (alternative) =>
+          candidate !== alternative && !(isNumericSchemaType(candidate) && isNumericSchemaType(alternative)),
+      ),
+    )
   );
+};
+
+type StrictPipelineAlternativeProjection = {
+  alternatives: JsonSchema7Type[];
+  discarded: boolean;
+};
+
+const applyStrictPipelineAlternativeWrapper = (
+  candidate: JsonSchema7Type,
+  wrapper: Record<string, unknown>,
+): JsonSchema7Type | undefined => {
+  if (Object.keys(wrapper).length === 0) {
+    return candidate;
+  }
+  const type = wrapper['type'] ?? (candidate as Record<string, unknown>)['type'];
+  return typeof type === 'string'
+    ? mergeStrictSchemas(candidate, { ...wrapper, type } as JsonSchema7Type)
+    : undefined;
+};
+
+const projectStrictPipelineAlternative = (
+  input: JsonSchema7Type,
+  candidate: JsonSchema7Type,
+  active = new Set<object>(),
+): StrictPipelineAlternativeProjection | undefined => {
+  const combined = mergeStrictSchemas(input, candidate);
+  if (combined) {
+    return { alternatives: [combined], discarded: false };
+  }
+  if (hasDisjointStrictSchemaTypes(input, candidate)) {
+    return { alternatives: [], discarded: true };
+  }
+  const record = candidate as Record<string, unknown>;
+  const nested = record['anyOf'];
+  if (!Array.isArray(nested) || active.has(candidate)) {
+    return undefined;
+  }
+  active.add(candidate);
+  try {
+    const wrapper = Object.fromEntries(Object.entries(record).filter(([key]) => key !== 'anyOf'));
+    const projected: JsonSchema7Type[] = [];
+    let discarded = false;
+    for (const alternative of nested) {
+      if (!alternative || typeof alternative !== 'object' || Array.isArray(alternative)) {
+        return undefined;
+      }
+      const result = projectStrictPipelineAlternative(input, alternative as JsonSchema7Type, active);
+      if (!result) {
+        return undefined;
+      }
+      discarded ||= result.discarded;
+      for (const item of result.alternatives) {
+        const wrapped = applyStrictPipelineAlternativeWrapper(item, wrapper);
+        if (!wrapped) {
+          return undefined;
+        }
+        projected.push(wrapped);
+      }
+    }
+    return { alternatives: projected, discarded };
+  } finally {
+    active.delete(candidate);
+  }
 };
 
 const selectParser = (
@@ -967,6 +1131,7 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodNumber: {
       const schema = parseNumberDef(def, refs);
       if (refs.openaiStrictMode) {
+        retainStrictNumberChecks(schema as Record<string, unknown>, def.checks ?? [], refs);
         for (const keyword of [
           'minimum',
           'exclusiveMinimum',
@@ -1440,16 +1605,13 @@ const selectParser = (
           let discarded = false;
           let unprojectable = false;
           for (const alternative of alternatives) {
-            const candidate = alternative as JsonSchema7Type;
-            const combinedAlternative = mergeStrictSchemas(input, candidate);
-            if (combinedAlternative) {
-              projected.push(combinedAlternative);
-            } else if (hasDisjointStrictSchemaTypes(input, candidate)) {
-              discarded = true;
-            } else {
+            const result = projectStrictPipelineAlternative(input, alternative as JsonSchema7Type);
+            if (!result) {
               unprojectable = true;
               break;
             }
+            projected.push(...result.alternatives);
+            discarded ||= result.discarded;
           }
           const [first] = projected;
           if (!unprojectable && first !== undefined) {

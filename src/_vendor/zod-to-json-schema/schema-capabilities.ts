@@ -513,6 +513,7 @@ const findOpaqueParsedOutputMismatch = (
 const transparentNullableParsedOutputWrappers = new Set<ZodFirstPartyTypeKind>([
   ZodFirstPartyTypeKind.ZodOptional,
   ZodFirstPartyTypeKind.ZodDefault,
+  ZodFirstPartyTypeKind.ZodCatch,
   ZodFirstPartyTypeKind.ZodReadonly,
   ZodFirstPartyTypeKind.ZodBranded,
   ZodFirstPartyTypeKind.ZodLazy,
@@ -531,6 +532,9 @@ const nonNullParsedOutputAlternative = (
     const def = definition as InspectableDefinition;
     if (def.typeName === ZodFirstPartyTypeKind.ZodNullable) {
       return def.innerType._def;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodCatch && hasOpaqueJSONValidation(def.innerType._def)) {
+      return undefined;
     }
     if (
       def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
@@ -577,6 +581,151 @@ const findDirectParsedOutputMismatch = (
     : undefined;
 };
 
+const definiteIntersectionInputTypes = new Map<ZodFirstPartyTypeKind, string>([
+  [ZodFirstPartyTypeKind.ZodNumber, 'number'],
+  [ZodFirstPartyTypeKind.ZodString, 'string'],
+  [ZodFirstPartyTypeKind.ZodBoolean, 'boolean'],
+  [ZodFirstPartyTypeKind.ZodNull, 'null'],
+  [ZodFirstPartyTypeKind.ZodObject, 'object'],
+  [ZodFirstPartyTypeKind.ZodArray, 'array'],
+  [ZodFirstPartyTypeKind.ZodTuple, 'array'],
+]);
+
+const definiteIntersectionInputType = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): string | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (def.coerce === true) {
+      return undefined;
+    }
+    const known = definiteIntersectionInputTypes.get(def.typeName);
+    if (known !== undefined) {
+      return known;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
+      return def.value === null ? 'null' : typeof def.value;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodEnum) {
+      return 'string';
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'preprocess') {
+      return undefined;
+    }
+    const children = childDefinitions(def, 'input');
+    const child = children?.values[0];
+    return children?.values.length === 1 && child !== undefined
+      ? definiteIntersectionInputType(child._def, active)
+      : undefined;
+  } finally {
+    active.delete(definition);
+  }
+};
+
+const intersectionLiteralValue = (definition: ZodTypeDef): unknown =>
+  (definition as InspectableDefinition).typeName === ZodFirstPartyTypeKind.ZodLiteral
+    ? (definition as InspectableDefinition).value
+    : undefined;
+
+const haveDisjointIntersectionInputs = (left: ZodTypeDef, right: ZodTypeDef): boolean => {
+  const first = definiteIntersectionInputType(left);
+  const second = definiteIntersectionInputType(right);
+  if (first !== undefined && second !== undefined && first !== second) {
+    return true;
+  }
+  const leftLiteral = intersectionLiteralValue(left);
+  const rightLiteral = intersectionLiteralValue(right);
+  if (leftLiteral !== undefined && rightLiteral !== undefined && !Object.is(leftLiteral, rightLiteral)) {
+    return true;
+  }
+
+  const leftObject = parsedOutputContainer(left, ZodFirstPartyTypeKind.ZodObject);
+  const rightObject = parsedOutputContainer(right, ZodFirstPartyTypeKind.ZodObject);
+  if (!leftObject || !rightObject) {
+    return false;
+  }
+  const firstShape = leftObject.shape();
+  const secondShape = rightObject.shape();
+  return Object.entries(firstShape).some(([key, child]) => {
+    const sibling = hasOwn(secondShape, key) ? secondShape[key] : undefined;
+    if (!sibling) {
+      return false;
+    }
+    const firstValue = intersectionLiteralValue(child._def);
+    const secondValue = intersectionLiteralValue(sibling._def);
+    return firstValue !== undefined && secondValue !== undefined && !Object.is(firstValue, secondValue);
+  });
+};
+
+const compoundParsedOutputAlternatives = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): readonly ZodTypeDef[] | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
+      def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion
+    ) {
+      const options = def.options instanceof Map ? [...def.options.values()] : def.options;
+      return options.map((option) => option._def);
+    }
+    if (!transparentNullableParsedOutputWrappers.has(def.typeName)) {
+      return undefined;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodCatch && hasOpaqueJSONValidation(def.innerType._def)) {
+      return undefined;
+    }
+    const children = childDefinitions(def, 'output');
+    const child = children?.values[0];
+    return children?.values.length === 1 && child !== undefined
+      ? compoundParsedOutputAlternatives(child._def, active)
+      : undefined;
+  } finally {
+    active.delete(definition);
+  }
+};
+
+const findUnionParsedOutputMismatch = (
+  left: ZodTypeDef,
+  right: ZodTypeDef,
+  path: readonly string[],
+  active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  recurse: (
+    left: ZodTypeDef,
+    right: ZodTypeDef,
+    path: readonly string[],
+    active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  ) => ParsedOutputMismatch | undefined,
+): ParsedOutputMismatch | undefined => {
+  const leftAlternatives = compoundParsedOutputAlternatives(left);
+  const rightAlternatives = compoundParsedOutputAlternatives(right);
+  if (!leftAlternatives && !rightAlternatives) {
+    return undefined;
+  }
+  for (const first of leftAlternatives ?? [left]) {
+    for (const second of rightAlternatives ?? [right]) {
+      if (haveDisjointIntersectionInputs(first, second)) {
+        continue;
+      }
+      const mismatch = recurse(first, second, path, active);
+      if (mismatch) {
+        return mismatch;
+      }
+    }
+  }
+  return undefined;
+};
+
 const findNonNullParsedOutputMismatch = (
   left: ZodTypeDef,
   right: ZodTypeDef,
@@ -601,6 +750,21 @@ const findNonNullParsedOutputMismatch = (
     : undefined;
 };
 
+const findCompoundParsedOutputMismatch = (
+  left: ZodTypeDef,
+  right: ZodTypeDef,
+  path: readonly string[],
+  active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  recurse: (
+    left: ZodTypeDef,
+    right: ZodTypeDef,
+    path: readonly string[],
+    active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  ) => ParsedOutputMismatch | undefined,
+): ParsedOutputMismatch | undefined =>
+  findNonNullParsedOutputMismatch(left, right, path, active, recurse) ??
+  findUnionParsedOutputMismatch(left, right, path, active, recurse);
+
 export const findIncompatibleParsedOutputs = (
   left: ZodTypeDef,
   right: ZodTypeDef,
@@ -619,7 +783,7 @@ export const findIncompatibleParsedOutputs = (
     const rightKind = knownParsedOutputType(right);
     const directMismatch =
       findDirectParsedOutputMismatch(left, right, leftKind, rightKind, path) ??
-      findNonNullParsedOutputMismatch(left, right, path, active, findIncompatibleParsedOutputs);
+      findCompoundParsedOutputMismatch(left, right, path, active, findIncompatibleParsedOutputs);
     if (directMismatch) {
       return directMismatch;
     }
@@ -1043,7 +1207,7 @@ export const hasOpaquePipelineTransform = (
   try {
     const def = definition as InspectableDefinition;
     if (
-      def.typeName === ZodFirstPartyTypeKind.ZodCatch ||
+      (def.typeName === ZodFirstPartyTypeKind.ZodCatch && hasOpaqueJSONValidation(def.innerType._def)) ||
       (def.typeName === ZodFirstPartyTypeKind.ZodString &&
         def.checks?.some((check) => valueChangingStringChecks.has(check.kind)) === true) ||
       (def.typeName === ZodFirstPartyTypeKind.ZodEffects &&

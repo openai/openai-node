@@ -1306,6 +1306,19 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     { name: 'RegExp', value: () => /x/u as object },
     { name: 'cross-realm RegExp', value: () => runInNewContext('/x/u') as object },
     { name: 'null-prototype RegExp', value: () => Object.setPrototypeOf(/x/u, null) as object },
+    { name: 'URLSearchParams', value: () => new URLSearchParams('a=1') as object },
+    {
+      name: 'null-prototype URLSearchParams',
+      value: () => Object.setPrototypeOf(new URLSearchParams('a=1'), null) as object,
+    },
+    {
+      name: 'altered-prototype URLSearchParams',
+      value: () => Object.setPrototypeOf(new URLSearchParams('a=1'), Object.create(null) as object) as object,
+    },
+    {
+      name: 'cross-realm URLSearchParams',
+      value: () => runInNewContext("new URLSearchParams('a=1')", { URLSearchParams }) as object,
+    },
     { name: 'WeakMap', value: () => new WeakMap<object, number>() as object },
     { name: 'cross-realm WeakSet', value: () => runInNewContext('new WeakSet()') as object },
     { name: 'Promise', value: () => Promise.resolve(1) as object },
@@ -1325,12 +1338,16 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     );
   });
 
-  it('detects RegExp default slots without invoking hostile accessors or tags', () => {
+  it.each([
+    { name: 'RegExp', value: () => /x/u as object },
+    { name: 'URLSearchParams', value: () => new URLSearchParams('a=1') as object },
+  ])('detects $name default slots without invoking hostile accessors or tags', ({ value: createValue }) => {
     const getter = vi.fn(() => {
       throw new Error('must never run');
     });
     const prototype = Object.defineProperty({}, Symbol.toStringTag, { get: getter });
-    const value = Object.setPrototypeOf(/x/u, prototype);
+    const value = Object.setPrototypeOf(createValue(), prototype);
+    Object.defineProperty(value, 'size', { enumerable: true, get: getter });
     Object.defineProperty(value, 'toJSON', { enumerable: true, get: getter });
 
     expect(() => create(z3.object({ value: z3.any().default(value) }))).toThrow('internal slots');
@@ -1480,6 +1497,115 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(() => create(z3.object({ value: z3.coerce.bigint().multipleOf(multiple) }))).toThrow(
       'strictly positive',
     );
+  });
+
+  it.each([
+    {
+      name: 'descending inclusive minimum',
+      schema: () => z3.number().min(10).min(5),
+      expected: { minimum: 10 },
+      valid: 10,
+      invalid: 7,
+    },
+    {
+      name: 'ascending inclusive minimum',
+      schema: () => z3.number().min(5).min(10),
+      expected: { minimum: 10 },
+      valid: 10,
+      invalid: 7,
+    },
+    {
+      name: 'descending exclusive minimum',
+      schema: () => z3.number().gt(10).gt(5),
+      expected: { exclusiveMinimum: 10 },
+      valid: 11,
+      invalid: 10,
+    },
+    {
+      name: 'ascending inclusive maximum',
+      schema: () => z3.number().max(5).max(10),
+      expected: { maximum: 5 },
+      valid: 5,
+      invalid: 7,
+    },
+    {
+      name: 'descending exclusive maximum',
+      schema: () => z3.number().lt(10).lt(5),
+      expected: { exclusiveMaximum: 5 },
+      valid: 4,
+      invalid: 5,
+    },
+    {
+      name: 'mixed inclusive and exclusive minima',
+      schema: () => z3.number().gt(10).min(5).gt(8),
+      expected: { minimum: 5, exclusiveMinimum: 10 },
+      valid: 11,
+      invalid: 10,
+    },
+    {
+      name: 'mixed inclusive and exclusive maxima',
+      schema: () => z3.number().lt(5).max(10).lt(8),
+      expected: { maximum: 10, exclusiveMaximum: 5 },
+      valid: 4,
+      invalid: 5,
+    },
+    {
+      name: 'integer least common multiple',
+      schema: () => z3.number().multipleOf(2).multipleOf(3),
+      expected: { multipleOf: 6 },
+      valid: 6,
+      invalid: 3,
+    },
+    {
+      name: 'fractional least common multiple',
+      schema: () => z3.number().multipleOf(0.2).multipleOf(0.3),
+      expected: { multipleOf: 0.6 },
+      valid: 0.6,
+      invalid: 0.3,
+    },
+    {
+      name: 'negative repeated multiple',
+      schema: () => z3.number().multipleOf(-2).multipleOf(3),
+      expected: { multipleOf: 6 },
+      valid: -6,
+      invalid: 3,
+    },
+  ])('retains every repeated $name Number constraint', ({ schema, expected, valid, invalid }) => {
+    const result = create(z3.object({ value: schema() }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value', expect.objectContaining(expected));
+    expect(result.$parseRaw(JSON.stringify({ value: valid }))).toEqual({ value: valid });
+    expect(() => result.$parseRaw(JSON.stringify({ value: invalid }))).toThrow();
+  });
+
+  it.each([-2, -0.5])(
+    'normalizes a negative Number multiple %s without changing parsed values',
+    (multiple) => {
+      const result = create(z3.object({ value: z3.number().multipleOf(multiple) }));
+
+      expect(strictHelperSchema(result)).toHaveProperty('properties.value.multipleOf', Math.abs(multiple));
+      expect(result.$parseRaw(JSON.stringify({ value: multiple }))).toEqual({ value: multiple });
+    },
+  );
+
+  it.each([0, -0])('rejects a zero Number multiple %s before emitting JSON Schema', (multiple) => {
+    expect(() => create(z3.object({ value: z3.number().multipleOf(multiple) }))).toThrow('strictly positive');
+  });
+
+  it('rejects an earlier zero Number multiple hidden by a later valid check', () => {
+    expect(() => create(z3.object({ value: z3.number().multipleOf(0).multipleOf(2) }))).toThrow(
+      'strictly positive',
+    );
+  });
+
+  it('rejects an unsafe repeated Number least common multiple', () => {
+    const value = z3.number().multipleOf(Number.MAX_SAFE_INTEGER).multipleOf(2);
+    expect(() => create(z3.object({ value }))).toThrow('multipleOf');
+  });
+
+  it('keeps notation-sensitive scientific Number multiples fail-closed', () => {
+    expect(() => create(z3.object({ value: z3.number().multipleOf(1e-7) }))).toThrow('multipleOf');
+    expect(() => create(z3.object({ value: z3.number().multipleOf(-1e-7) }))).toThrow('multipleOf');
   });
 
   it.each([
@@ -1883,7 +2009,84 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       schema: () =>
         z3.intersection(z3.union([z3.null(), z3.coerce.bigint()]), z3.union([z3.null(), z3.number()])),
     },
+    {
+      name: 'transparent caught nullable BigInt',
+      schema: () => z3.intersection(z3.coerce.bigint().nullable().catch(null), z3.number().nullable()),
+    },
+    {
+      name: 'transparent caught nullable number',
+      schema: () => z3.intersection(z3.coerce.bigint().nullable(), z3.number().nullable().catch(null)),
+    },
+    {
+      name: 'readonly lazy caught nullable BigInt',
+      schema: () =>
+        z3.intersection(
+          z3.lazy(() => z3.coerce.bigint().nullable().catch(null).readonly()),
+          z3.number().nullable(),
+        ),
+    },
+    {
+      name: 'nested transparent caught nullable property',
+      schema: () =>
+        z3.intersection(
+          z3.object({ count: z3.coerce.bigint().nullable().catch(null) }),
+          z3.object({ count: z3.number().nullable() }),
+        ),
+    },
   ])('rejects incompatible non-null $name intersection outputs', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
+  });
+
+  it.each([
+    {
+      name: 'coercing BigInt and number alternatives',
+      schema: () =>
+        z3.intersection(z3.union([z3.coerce.bigint(), z3.string()]), z3.union([z3.number(), z3.string()])),
+    },
+    {
+      name: 'reversed coercing BigInt and number alternatives',
+      schema: () =>
+        z3.intersection(z3.union([z3.string(), z3.number()]), z3.union([z3.string(), z3.coerce.bigint()])),
+    },
+    {
+      name: 'readonly lazy alternatives',
+      schema: () =>
+        z3.intersection(
+          z3.lazy(() => z3.union([z3.coerce.bigint(), z3.string()]).readonly()),
+          z3.union([z3.number(), z3.string()]),
+        ),
+    },
+    {
+      name: 'nested object union alternatives',
+      schema: () =>
+        z3.intersection(
+          z3.object({ count: z3.union([z3.coerce.bigint(), z3.string()]) }),
+          z3.object({ count: z3.union([z3.number(), z3.string()]) }),
+        ),
+    },
+    {
+      name: 'nested array union alternatives',
+      schema: () =>
+        z3.intersection(
+          z3.array(z3.union([z3.coerce.bigint(), z3.string()])),
+          z3.array(z3.union([z3.number(), z3.string()])),
+        ),
+    },
+    {
+      name: 'matching discriminated numeric alternatives',
+      schema: () =>
+        z3.intersection(
+          z3.discriminatedUnion('kind', [
+            z3.object({ kind: z3.literal('numeric'), count: z3.coerce.bigint() }),
+            z3.object({ kind: z3.literal('text'), count: z3.string() }),
+          ]),
+          z3.discriminatedUnion('kind', [
+            z3.object({ kind: z3.literal('numeric'), count: z3.number() }),
+            z3.object({ kind: z3.literal('text'), count: z3.string() }),
+          ]),
+        ),
+    },
+  ])('rejects overlapping $name with incompatible union intersection outputs', ({ schema }) => {
     expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
   });
 
@@ -2935,7 +3138,9 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     { name: 'unsupported scientific decimal precision', input: 1e-7, output: 2e-7 },
   ])('rejects an unsafely representable pipeline $name constraint', ({ input, output }) => {
     const value = z3.number().multipleOf(input).pipe(z3.number().multipleOf(output));
-    expect(() => create(z3.object({ value }))).toThrow('ZodPipeline output constraints');
+    expect(() => create(z3.object({ value }))).toThrow(
+      /ZodPipeline output constraints|strictly positive|multipleOf/u,
+    );
   });
 
   it('keeps notation-sensitive scientific multiples fail-closed under the installed Zod runtime', () => {
@@ -2949,7 +3154,7 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       expect(pipeline.safeParse(value).success).toBe(false);
     }
     expect(pipeline.safeParse(0.0000012).success).toBe(true);
-    expect(() => create(z3.object({ value: pipeline }))).toThrow('ZodPipeline output constraints');
+    expect(() => create(z3.object({ value: pipeline }))).toThrow('multipleOf');
   });
 
   it.each([
@@ -3064,6 +3269,55 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       expect(strictHelperSchema(result)).toHaveProperty(`properties.value.${keyword}`, expected);
     },
   );
+
+  it.each([
+    {
+      name: 'nested disjoint union',
+      output: () => z3.union([z3.union([z3.null(), z3.string()]), z3.number()]),
+    },
+    {
+      name: 'deep nested disjoint union',
+      output: () =>
+        z3.union([z3.union([z3.null(), z3.union([z3.boolean(), z3.string()])]), z3.number().min(0)]),
+    },
+    {
+      name: 'nested reachable numeric branch',
+      output: () => z3.union([z3.union([z3.null(), z3.number().min(0)]), z3.string()]),
+    },
+    {
+      name: 'described nested reachable numeric branch',
+      output: () => z3.union([z3.union([z3.null(), z3.number().min(0)]).describe('reachable'), z3.string()]),
+    },
+  ])('projects reachable alternatives through a $name pipeline output', ({ output }) => {
+    const result = create(z3.object({ value: z3.number().min(0).pipe(output()) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.type', 'number');
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.minimum', 0);
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
+  });
+
+  it('retains nested anyOf annotations on their surviving projected branch', () => {
+    const output = z3.union([
+      z3.union([z3.null(), z3.number().min(0)]).describe('reachable numeric value'),
+      z3.string(),
+    ]);
+    const result = create(z3.object({ value: z3.number().pipe(output) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty(
+      'properties.value.description',
+      'reachable numeric value',
+    );
+  });
+
+  it('rejects an overlapping nested pipeline alternative that cannot be merged', () => {
+    const input = z3.object({ count: z3.number() });
+    const output = z3.union([
+      z3.union([z3.null(), z3.object({ different: z3.number() })]),
+      z3.object({ count: z3.number() }),
+    ]);
+
+    expect(() => create(z3.object({ value: input.pipe(output) }))).toThrow('ZodPipeline output constraints');
+  });
 
   it.each([
     {
@@ -3316,6 +3570,74 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
   ])('preserves an unconstrained $name string pipeline output', ({ input, raw, parsed }) => {
     const result = create(z3.object({ value: input().pipe(z3.string()) }));
     expect(result.$parseRaw(JSON.stringify({ value: raw }))).toEqual({ value: parsed });
+  });
+
+  it.each([
+    {
+      name: 'unconstrained numeric catch',
+      input: () => z3.number().catch(0),
+      output: () => z3.number().min(0),
+      raw: 7,
+      expected: 7,
+      path: 'properties.value.minimum',
+      constraint: 0,
+    },
+    {
+      name: 'constrained numeric catch',
+      input: () => z3.number().min(3).catch(0),
+      output: () => z3.number().min(0),
+      raw: 7,
+      expected: 7,
+      path: 'properties.value.minimum',
+      constraint: 3,
+    },
+    {
+      name: 'readonly lazy numeric catch',
+      input: () => z3.lazy(() => z3.number().catch(0).readonly()),
+      output: () => z3.number().min(0),
+      raw: 7,
+      expected: 7,
+      path: 'properties.value.minimum',
+      constraint: 0,
+    },
+    {
+      name: 'string catch',
+      input: () => z3.string().catch('safe'),
+      output: () => z3.string().min(2),
+      raw: 'valid',
+      expected: 'valid',
+      path: 'properties.value.minLength',
+      constraint: 2,
+    },
+    {
+      name: 'nested object catch',
+      input: () => z3.object({ count: z3.number() }).catch({ count: 0 }),
+      output: () => z3.object({ count: z3.number().min(0) }),
+      raw: { count: 7 },
+      expected: { count: 7 },
+      path: 'properties.value.properties.count.minimum',
+      constraint: 0,
+    },
+  ])(
+    'projects constrained outputs across a value-transparent $name',
+    ({ input, output, raw, expected, path, constraint }) => {
+      const result = create(z3.object({ value: input().pipe(output()) }));
+
+      expect(strictHelperSchema(result)).toHaveProperty(path, constraint);
+      expect(result.$parseRaw(JSON.stringify({ value: raw }))).toEqual({ value: expected });
+    },
+  );
+
+  it('continues rejecting a caught refinement before constrained pipeline output validation', () => {
+    const refine = vi.fn(() => false);
+    const fallback = vi.fn(() => 0);
+    const value = z3.number().refine(refine).catch(fallback).pipe(z3.number().min(0));
+
+    expect(() => create(z3.object({ value }))).toThrow(
+      'cannot be safely projected across an opaque transform',
+    );
+    expect(refine).not.toHaveBeenCalled();
+    expect(fallback).not.toHaveBeenCalled();
   });
 
   it.each([
