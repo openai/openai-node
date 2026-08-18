@@ -13,9 +13,54 @@ export const config = {
 
 const maximumMessages = 32;
 const maximumMessageCharacters = 16_384;
+const maximumRequestBodyBytes = 64 * 1024;
+
+async function cancelOversizedRequest(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  try {
+    await reader.cancel();
+  } catch {
+    // Cleanup failures must not mask the original payload-size rejection.
+  }
+}
+
+async function readRequestBody(request: NextRequest): Promise<string | null> {
+  const reader = request.body?.getReader();
+  if (!reader) {
+    return '';
+  }
+
+  const body = new Uint8Array(maximumRequestBodyBytes);
+  let length = 0;
+
+  try {
+    while (true) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- A bounded stream must consume chunks sequentially.
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (value.byteLength > maximumRequestBodyBytes - length) {
+        void cancelOversizedRequest(reader);
+        return null;
+      }
+
+      body.set(value, length);
+      length += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return new TextDecoder().decode(body.subarray(0, length));
+}
 
 export default async function handler(request: NextRequest) {
-  const { messages }: { messages: UIMessage[] } = await request.json();
+  const body = await readRequestBody(request);
+  if (body === null) {
+    return new Response('Payload Too Large', { status: 413 });
+  }
+
+  const { messages }: { messages: UIMessage[] } = JSON.parse(body);
 
   if (!Array.isArray(messages)) {
     return new Response('Invalid messages', { status: 400 });

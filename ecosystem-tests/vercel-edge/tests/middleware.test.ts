@@ -101,3 +101,17 @@ it('checks authorization before inspecting an oversized body', () => {
 
   expect(middleware(request).status).toBe(401);
 });
+
+it('rejects unauthenticated streaming requests before consuming their bodies', () => {
+  const request = new NextRequest('https://example.com/api/vercel-ai-streaming', {
+    method: 'POST',
+    body: new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(65_537));
+      },
+    }),
+  });
+
+  expect(middleware(request).status).toBe(401);
+  expect(request.bodyUsed).toBe(false);
+});
