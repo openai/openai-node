@@ -203,6 +203,8 @@ const isExactBigIntTransform = (definition: InspectableDefinition): boolean =>
   definition.effect.type === 'transform' &&
   definition.effect.transform === BigInt;
 
+export const bigIntStringPattern = '^[+-]?[0-9]+$';
+
 export const producesBigIntOutput = (definition: ZodTypeDef): boolean =>
   visitDefinition(
     definition,
@@ -451,6 +453,97 @@ export const throwsOnFractionalBigIntInput = (definition: ZodTypeDef, schema: Js
     'output',
   );
 
+export const hasExactBigIntStringInput = (definition: ZodTypeDef): boolean =>
+  visitDefinition(
+    definition,
+    (def) =>
+      isExactBigIntTransform(def)
+        ? visitDefinition(
+            def.schema._def,
+            (input) => (input.typeName === ZodFirstPartyTypeKind.ZodString ? true : undefined),
+            'input',
+          )
+        : undefined,
+    'output',
+  );
+
+const acceptsOverlappingBigIntStringInput = (
+  definition: InspectableDefinition,
+  schema: JsonSchema7Type,
+): boolean => {
+  const input = schema as Record<string, unknown>;
+  if (input['type'] !== 'string') {
+    return false;
+  }
+  let minimum = 0;
+  let maximum = Infinity;
+  for (const check of definition.checks ?? []) {
+    if (check.kind === 'min' && typeof check.value === 'number') {
+      minimum = Math.max(minimum, check.value);
+    } else if (check.kind === 'max' && typeof check.value === 'number') {
+      maximum = Math.min(maximum, check.value);
+    }
+  }
+  const fallbackMinimum = typeof input['minLength'] === 'number' ? input['minLength'] : 0;
+  const fallbackMaximum = typeof input['maxLength'] === 'number' ? input['maxLength'] : Infinity;
+  if (fallbackMaximum < minimum || fallbackMinimum > maximum) {
+    return false;
+  }
+  if (fallbackMinimum < minimum || fallbackMaximum > maximum) {
+    throw new Error(
+      'ZodUnion BigInt string transforms cannot safely preserve partially overlapping string fallbacks in strict Structured Outputs.',
+    );
+  }
+  return true;
+};
+
+const throwsOnInvalidBigIntStringInput = (definition: ZodTypeDef, schema: JsonSchema7Type): boolean =>
+  visitDefinition(
+    definition,
+    (def) =>
+      isExactBigIntTransform(def)
+        ? visitDefinition(
+            def.schema._def,
+            (input) =>
+              input.typeName === ZodFirstPartyTypeKind.ZodString
+                ? acceptsOverlappingBigIntStringInput(input, schema)
+                : undefined,
+            'input',
+          )
+        : undefined,
+    'output',
+  );
+
+export const applyBigIntStringFallbackBounds = (
+  schema: JsonSchema7Type,
+  producers: readonly ZodTypeDef[],
+): JsonSchema7Type => {
+  if ('$ref' in schema) {
+    throw new Error('A constrained BigInt string fallback reference must be materialized.');
+  }
+  const record = schema as Record<string, unknown>;
+  for (const keyword of ['anyOf', 'oneOf']) {
+    const alternatives = record[keyword];
+    if (Array.isArray(alternatives)) {
+      return {
+        ...record,
+        [keyword]: alternatives.map((alternative) =>
+          alternative && typeof alternative === 'object'
+            ? applyBigIntStringFallbackBounds(alternative as JsonSchema7Type, producers)
+            : alternative,
+        ),
+      } as JsonSchema7Type;
+    }
+  }
+  if (!producers.some((producer) => throwsOnInvalidBigIntStringInput(producer, schema))) {
+    return schema;
+  }
+  if (record['pattern'] !== undefined && record['pattern'] !== bigIntStringPattern) {
+    throw new Error('A BigInt string fallback cannot combine incompatible lexical constraints.');
+  }
+  return { ...schema, pattern: bigIntStringPattern } as JsonSchema7Type;
+};
+
 const nativeEnumValues = (definition: InspectableDefinition): readonly (string | number)[] => {
   const values = definition.values as Record<string, string | number>;
   return Object.entries(values)
@@ -473,6 +566,34 @@ export const acceptsJSONNumber = (definition: ZodTypeDef): boolean =>
         }
         case ZodFirstPartyTypeKind.ZodNativeEnum: {
           return nativeEnumValues(def).some((value) => typeof value === 'number');
+        }
+        case ZodFirstPartyTypeKind.ZodEffects: {
+          return def.effect.type === 'preprocess' ? true : undefined;
+        }
+        default: {
+          return def.coerce === true ? true : undefined;
+        }
+      }
+    },
+    'input',
+  );
+
+export const acceptsJSONString = (definition: ZodTypeDef): boolean =>
+  visitDefinition(
+    definition,
+    (def) => {
+      switch (def.typeName) {
+        case ZodFirstPartyTypeKind.ZodString:
+        case ZodFirstPartyTypeKind.ZodAny:
+        case ZodFirstPartyTypeKind.ZodUnknown:
+        case ZodFirstPartyTypeKind.ZodEnum: {
+          return true;
+        }
+        case ZodFirstPartyTypeKind.ZodLiteral: {
+          return typeof def.value === 'string';
+        }
+        case ZodFirstPartyTypeKind.ZodNativeEnum: {
+          return nativeEnumValues(def).some((value) => typeof value === 'string');
         }
         case ZodFirstPartyTypeKind.ZodEffects: {
           return def.effect.type === 'preprocess' ? true : undefined;
@@ -1098,6 +1219,7 @@ export type NestedNumericOverlap = {
   producer: ZodTypeDef;
   consumer: ZodTypeDef;
   producerPrecedesConsumer?: boolean;
+  kind?: 'string';
 };
 
 type PairedChild = {
@@ -1307,8 +1429,12 @@ const collectNestedNumericOverlaps = (
   activeConsumers.set(consumer, path);
 
   try {
-    if (producesBigIntOutput(producer) && acceptsJSONNumber(consumer)) {
+    if (producesBigIntOutput(producer) && acceptsJSONNumber(producer) && acceptsJSONNumber(consumer)) {
       overlaps.push({ path, producer, consumer });
+      return;
+    }
+    if (hasExactBigIntStringInput(producer) && acceptsJSONString(consumer)) {
+      overlaps.push({ path, producer, consumer, kind: 'string' });
       return;
     }
 
@@ -1372,6 +1498,7 @@ export const findNestedNumericOverlaps = (
   if (
     overlaps.some(
       (overlap) =>
+        overlap.kind !== 'string' &&
         (capturesUnsafeBigIntInput(overlap.producer, 'minimum') ||
           capturesUnsafeBigIntInput(overlap.producer, 'maximum')) &&
         traversal.recursivePaths.some((recursivePath) =>
@@ -1446,6 +1573,9 @@ const boundNestedNumericPath = (
   overlap: NestedNumericOverlap,
 ): JsonSchema7Type => {
   if (path.length === 0) {
+    if (overlap.kind === 'string') {
+      return applyBigIntStringFallbackBounds(schema, [overlap.producer]);
+    }
     const bounded = applyUnsafeBigIntBounds(schema, [overlap.producer]);
     return overlap.producerPrecedesConsumer && throwsOnFractionalBigIntInput(overlap.producer, bounded)
       ? ({ ...bounded, type: 'integer' } as JsonSchema7Type)

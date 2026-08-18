@@ -57,14 +57,18 @@ import { parseReadonlyDef } from './parsers/readonly';
 import {
   acceptsEveryJSONNumber,
   acceptsJSONNumber,
+  acceptsJSONString,
+  applyBigIntStringFallbackBounds,
   applyNestedNumericOverlaps,
   applySafeIntegerBounds,
   applyUnsafeBigIntBounds,
+  bigIntStringPattern,
   convertsJSONPipelineInput,
   findIncompatibleParsedOutputs,
   findNestedNumericOverlaps,
   hasConstrainedPipelineOutput,
   hasDeclaredSchemaPropertyAtPath,
+  hasExactBigIntStringInput,
   hasOpaqueJSONValidation,
   hasOpaquePipelineTransform,
   producesBigIntAtPath,
@@ -825,6 +829,9 @@ const selectParser = (
       }
 
       const bigintIndex = options.findIndex((option) => producesBigIntOutput(option._def));
+      const numericBigintIndex = options.findIndex(
+        (option) => producesBigIntOutput(option._def) && acceptsJSONNumber(option._def),
+      );
       const hasBigIntLiteral = options.some(
         (option) =>
           option._def.typeName === ZodFirstPartyTypeKind.ZodLiteral && typeof option._def.value === 'bigint',
@@ -844,9 +851,11 @@ const selectParser = (
                     .filter(
                       (overlap) =>
                         overlap.path.length > 0 &&
-                        (producerIndex < consumerIndex ||
-                          !acceptsEveryJSONNumber(overlap.consumer) ||
-                          hasOpaqueJSONValidation(consumer._def)),
+                        (overlap.kind === 'string'
+                          ? producerIndex < consumerIndex
+                          : producerIndex < consumerIndex ||
+                            !acceptsEveryJSONNumber(overlap.consumer) ||
+                            hasOpaqueJSONValidation(consumer._def)),
                     )
                     .map((overlap) => ({
                       ...overlap,
@@ -868,27 +877,41 @@ const selectParser = (
           .map((option, index) => {
             const fallibleNumber = !acceptsEveryJSONNumber(option._def);
             const boundNumber =
-              bigintIndex !== -1 &&
+              numericBigintIndex !== -1 &&
               !producesBigIntOutput(option._def) &&
               acceptsJSONNumber(option._def) &&
-              (index > bigintIndex || fallibleNumber);
+              (index > numericBigintIndex || fallibleNumber);
+            const precedingStringBigInts = options.filter(
+              (candidate, candidateIndex) =>
+                candidateIndex < index && hasExactBigIntStringInput(candidate._def),
+            );
+            const boundString =
+              !producesBigIntOutput(option._def) &&
+              acceptsJSONString(option._def) &&
+              precedingStringBigInts.length > 0;
             const branchOverlaps = nestedOverlaps[index] ?? [];
             const branch = parseDef(
               option._def,
               {
                 ...refs,
                 currentPath: [...refs.currentPath, 'anyOf', String(index)],
-                ...(boundNumber || branchOverlaps.length > 0
+                ...(boundNumber || boundString || branchOverlaps.length > 0
                   ? { [constrainedReferenceContext]: true as const }
                   : undefined),
               },
-              boundNumber || branchOverlaps.length > 0,
+              boundNumber || boundString || branchOverlaps.length > 0,
             );
 
             if (branch === undefined) {
               return branch;
             }
-            const boundedBranch = applyNestedNumericOverlaps(branch, branchOverlaps);
+            const nestedBranch = applyNestedNumericOverlaps(branch, branchOverlaps);
+            const boundedBranch = boundString
+              ? applyBigIntStringFallbackBounds(
+                  nestedBranch,
+                  precedingStringBigInts.map((candidate) => candidate._def),
+                )
+              : nestedBranch;
             if (!boundNumber) {
               return boundedBranch;
             }
@@ -897,6 +920,7 @@ const selectParser = (
               (candidate, candidateIndex) =>
                 candidateIndex !== index &&
                 producesBigIntOutput(candidate._def) &&
+                acceptsJSONNumber(candidate._def) &&
                 (candidateIndex < index || fallibleNumber),
             );
             const bounded = applyUnsafeBigIntBounds(
@@ -1050,7 +1074,7 @@ const selectParser = (
 
       if (exactBigIntTransform && schema !== undefined) {
         if ('type' in schema && schema.type === 'string') {
-          const pattern = '^[+-]?[0-9]+$';
+          const pattern = bigIntStringPattern;
           if ('pattern' in schema && schema.pattern !== undefined && schema.pattern !== pattern) {
             throw new Error(
               `ZodEffects BigInt transform at \`${refs.currentPath.join('/')}\` cannot combine an existing string constraint with the required integer-string pattern in strict Structured Outputs.`,

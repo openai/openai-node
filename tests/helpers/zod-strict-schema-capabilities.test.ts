@@ -1277,6 +1277,44 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
   });
 
   it.each([
+    { name: 'direct', producer: () => z3.coerce.bigint() },
+    { name: 'readonly', producer: () => z3.coerce.bigint().readonly() },
+    { name: 'lazy', producer: () => z3.lazy(() => z3.coerce.bigint()) },
+    { name: 'bounded', producer: () => z3.coerce.bigint().max(10n) },
+  ])('preserves fractional fallback after an earlier $name coercing BigInt producer', ({ producer }) => {
+    const result = create(z3.object({ value: z3.union([producer(), z3.number()]) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.type', 'number');
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(result.$parseRaw('{"value":1.5}')).toEqual({ value: 1.5 });
+  });
+
+  it.each([
+    {
+      name: 'object property',
+      producer: () => z3.object({ count: z3.coerce.bigint() }),
+      consumer: () => z3.object({ count: z3.number() }),
+      fractional: { count: 1.5 },
+      path: 'properties.value.anyOf.1.properties.count.type',
+    },
+    {
+      name: 'array item',
+      producer: () => z3.array(z3.coerce.bigint()),
+      consumer: () => z3.array(z3.number()),
+      fractional: [1.5],
+      path: 'properties.value.anyOf.1.items.type',
+    },
+  ])(
+    'preserves fractional $name fallback after caught BigInt coercion',
+    ({ producer, consumer, fractional, path }) => {
+      const result = create(z3.object({ value: z3.union([producer(), consumer()]) }));
+
+      expect(strictHelperSchema(result)).toHaveProperty(path, 'number');
+      expect(result.$parseRaw(JSON.stringify({ value: fractional }))).toEqual({ value: fractional });
+    },
+  );
+
+  it.each([
     { name: 'direct', producer: () => z3.number().transform(BigInt) },
     { name: 'readonly', producer: () => z3.number().transform(BigInt).readonly() },
     { name: 'lazy', producer: () => z3.lazy(() => z3.number().transform(BigInt)) },
@@ -1423,6 +1461,76 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       type: 'number',
       minimum: 1e20,
     });
+  });
+
+  it.each([
+    { name: 'direct', producer: () => z3.string().transform(BigInt) },
+    { name: 'readonly', producer: () => z3.string().transform(BigInt).readonly() },
+    { name: 'lazy', producer: () => z3.lazy(() => z3.string().transform(BigInt)) },
+  ])('narrows string fallback after an earlier $name BigInt transform', ({ producer }) => {
+    const result = create(z3.object({ value: z3.union([producer(), z3.string()]) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
+      type: 'string',
+      pattern: '^[+-]?[0-9]+$',
+    });
+    expect(result.$parseRaw('{"value":"7"}')).toEqual({ value: 7n });
+    expect(() => result.$parseRaw('{"value":"not-a-bigint"}')).toThrow(SyntaxError);
+  });
+
+  it.each([
+    {
+      name: 'object property',
+      producer: () => z3.object({ count: z3.string().transform(BigInt) }),
+      consumer: () => z3.object({ count: z3.string() }),
+      valid: { count: '7' },
+      invalid: { count: 'not-a-bigint' },
+      output: { count: 7n },
+      path: 'properties.value.anyOf.1.properties.count.pattern',
+    },
+    {
+      name: 'array item',
+      producer: () => z3.array(z3.string().transform(BigInt)),
+      consumer: () => z3.array(z3.string()),
+      valid: ['7'],
+      invalid: ['not-a-bigint'],
+      output: [7n],
+      path: 'properties.value.anyOf.1.items.pattern',
+    },
+  ])(
+    'narrows invalid $name string fallback after an earlier BigInt transform',
+    ({ producer, consumer, valid, invalid, output, path }) => {
+      const result = create(z3.object({ value: z3.union([producer(), consumer()]) }));
+
+      expect(strictHelperSchema(result)).toHaveProperty(path, '^[+-]?[0-9]+$');
+      expect(result.$parseRaw(JSON.stringify({ value: valid }))).toEqual({ value: output });
+      expect(() => result.$parseRaw(JSON.stringify({ value: invalid }))).toThrow(SyntaxError);
+    },
+  );
+
+  it('preserves disjoint string fallback after a length-constrained BigInt transform', () => {
+    const value = z3.union([z3.string().max(2).transform(BigInt), z3.string().min(3)]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
+      type: 'string',
+      minLength: 3,
+    });
+    expect(result.$parseRaw('{"value":"not-a-bigint"}')).toEqual({ value: 'not-a-bigint' });
+  });
+
+  it('rejects partially overlapping string fallback that cannot be represented without data loss', () => {
+    const value = z3.union([z3.string().max(2).transform(BigInt), z3.string()]);
+
+    expect(() => create(z3.object({ value }))).toThrow('partially overlapping string fallbacks');
+  });
+
+  it('preserves an unrestricted string branch ordered before a BigInt transform', () => {
+    const value = z3.union([z3.string(), z3.string().transform(BigInt)]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.0', { type: 'string' });
+    expect(result.$parseRaw('{"value":"not-a-bigint"}')).toEqual({ value: 'not-a-bigint' });
   });
 
   it.each([
