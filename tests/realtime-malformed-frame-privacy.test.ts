@@ -235,6 +235,43 @@ describe.each([
     expect(failure.cause).toBe(frameFailure);
   });
 
+  test('preserves the exact SyntaxError caused by an unreadable transport frame', () => {
+    const { realtime, socket } = connect();
+    const errors = vi.fn();
+    const frameFailure = new SyntaxError('frame contains an invalid transport byte sequence');
+    onRealtimeEvent(realtime, 'error', errors);
+
+    dispatchFrame(socket, transport, {
+      toString: () => {
+        throw frameFailure;
+      },
+    });
+
+    expect(errors).toHaveBeenCalledTimes(1);
+    const [[failure] = []] = errors.mock.calls;
+    expect(failure).toBeInstanceOf(RealtimeError);
+    expect(failure.message).toBe('could not parse websocket event');
+    expect(failure.cause).toBe(frameFailure);
+  });
+
+  test('preserves unreadable transport SyntaxError causes in unhandled rejections', () => {
+    const { socket } = connect();
+    const frameFailure = new SyntaxError('frame contains an invalid transport byte sequence');
+    const reject = vi.spyOn(Promise, 'reject').mockReturnValue(Promise.resolve() as Promise<never>);
+
+    dispatchFrame(socket, transport, {
+      toString: () => {
+        throw frameFailure;
+      },
+    });
+
+    expect(reject).toHaveBeenCalledTimes(1);
+    const [[failure] = []] = reject.mock.calls;
+    expect(failure).toBeInstanceOf(RealtimeError);
+    expect(failure.message).toContain('could not parse websocket event');
+    expect(failure.cause).toBe(frameFailure);
+  });
+
   test('preserves safe invalid-discriminator TypeError causes', () => {
     const { realtime, socket } = connect();
     const errors = vi.fn();
