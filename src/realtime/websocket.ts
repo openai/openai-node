@@ -26,6 +26,7 @@ type _WebSocket = typeof globalThis extends {
   : any;
 
 type RuntimeScope = typeof globalThis & {
+  process?: { versions?: { node?: string } };
   WorkerGlobalScope?: typeof Object;
   WorkerNavigator?: typeof Object;
   Deno?: { version?: { deno?: string } };

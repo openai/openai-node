@@ -293,6 +293,27 @@ describe.each(nativeRealtimeSurfaces)('$name native Azure credential security', 
     expect(realtime.url.toString()).not.toContain(fixture.credential);
   });
 
+  test.each(['22.0.0', '22.23.2', '24.0.0', '26.0.0'])(
+    'preserves authenticated native WebSocket headers on supported Node.js %s',
+    (version) => {
+      const nodeProcess = Object.create(process);
+      Object.defineProperty(nodeProcess, 'versions', { value: { node: version } });
+
+      withBrowserWorker(
+        'DedicatedWorkerGlobalScope',
+        () => {
+          const realtime = new Realtime({ model: 'chat' }, createAzureClient());
+
+          expect(realtime.socket).toBe(lastNativeSocket());
+          expect(lastNativeSocket().options).toMatchObject({
+            headers: { 'api-key': 'azure-api-key-secret' },
+          });
+        },
+        { runtime: { process: nodeProcess } },
+      );
+    },
+  );
+
   test.each([false, true])(
     'refuses unsafe browser header fallback for token provider %s',
     async (tokenProvider) => {
