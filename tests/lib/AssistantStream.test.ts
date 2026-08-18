@@ -191,7 +191,7 @@ describe('AssistantStream delta accumulation', () => {
       expect(() => AssistantStream.accumulateDelta({ entries: [{}] }, { entries: [{}] })).toThrow(
         'Expected array delta entry to have an `index` property',
       );
-      expect(consoleError).toHaveBeenCalledWith({});
+      expect(consoleError).not.toHaveBeenCalled();
     } finally {
       consoleError.mockRestore();
     }

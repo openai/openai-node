@@ -87,7 +87,6 @@ function getAssistantStreamDeltaIndex(
   const { index } = deltaEntry;
 
   if (kind === 'array' && (index === null || index === undefined)) {
-    console.error(deltaEntry);
     throw new Error('Expected array delta entry to have an `index` property');
   }
 
@@ -259,7 +258,6 @@ export function defineAssistantStreamArrayEntry(accumulator: unknown[], index: n
 function getRequiredAssistantStreamArrayIndex(deltaEntry: AssistantStreamRecord): number {
   const { index } = deltaEntry;
   if (index === null || index === undefined) {
-    console.error(deltaEntry);
     throw new Error('Expected array delta entry to have an `index` property');
   }
   if (typeof index !== 'number') {
