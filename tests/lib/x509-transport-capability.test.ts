@@ -19,6 +19,10 @@ function successfulFetch() {
   );
 }
 
+function prohibitedTransportFactory(): never {
+  throw new Error('transport factory must not run');
+}
+
 describe('X.509 transport capability boundary', () => {
   const originalBun = (globalThis as { Bun?: unknown }).Bun;
   const originalHTTPSProxy = process.env['HTTPS_PROXY'];
@@ -62,11 +66,14 @@ describe('X.509 transport capability boundary', () => {
   test.each([
     'https://resource.openai.azure.com/openai/v1',
     'https://resource.openai.azure.us/openai/v1',
+    'https://resource.openai.azure.cn/openai/v1',
     'https://resource.services.ai.azure.com/openai/v1',
     'https://resource.services.ai.azure.us/openai/v1',
+    'https://resource.services.ai.azure.cn/openai/v1',
     'https://resource.azure-api.net/openai/v1',
     'https://resource.cognitiveservices.azure.com/openai/v1',
     'https://resource.cognitiveservices.azure.us/openai/v1',
+    'https://resource.cognitiveservices.azure.cn/openai/v1',
     'https://RESOURCE.OPENAI.AZURE.COM./openai/v1',
     'https://bedrock-mantle.us-west-2.api.aws/openai/v1',
     'https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1',
@@ -272,6 +279,22 @@ describe('X.509 transport capability boundary', () => {
     },
   );
 
+  test.each(['agent', 'client'] as const)(
+    'rejects callable %s transport factories before token acquisition',
+    async (key) => {
+      const fetch = successfulFetch();
+      const client = new OpenAI({
+        apiKey: null,
+        workloadIdentity: identity,
+        fetch,
+        fetchOptions: { [key]: prohibitedTransportFactory } as never,
+      });
+
+      await expect(client.models.list()).rejects.toThrow(/opaque|static Undici/iu);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   test.each([
     { cert: ['certificate-a'], key: ['private-key-a'] },
     { cert: Buffer.from('certificate-a'), key: Buffer.from('private-key-a') },
@@ -363,6 +386,26 @@ describe('X.509 transport capability boundary', () => {
     await expect(httpProxy.models.list()).resolves.toMatchObject({ data: [] });
     expect(httpFetch).toHaveBeenCalledTimes(2);
   });
+
+  test.each([{ url: 'http://trusted-proxy.example:8080' }, new URL('http://trusted-proxy.example:8080')])(
+    'rejects mutable Bun proxy containers before token acquisition',
+    async (proxy) => {
+      Reflect.set(globalThis, 'Bun', { version: '1.3.0' });
+      const fetch = successfulFetch();
+      const client = new OpenAI({
+        apiKey: null,
+        workloadIdentity: identity,
+        fetch,
+        fetchOptions: {
+          proxy,
+          tls: { cert: 'certificate-a', key: 'private-key-a' },
+        } as never,
+      });
+
+      await expect(client.models.list()).rejects.toThrow(/immutable|mutable|proxy/iu);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
 
   test.each([
     ['a trusted custom fetch', undefined],

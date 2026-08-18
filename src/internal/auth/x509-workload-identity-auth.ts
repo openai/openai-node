@@ -235,7 +235,6 @@ function recordProactiveRefreshFailure(
   const { state } = context;
   if (
     error === REFRESH_INVALIDATED ||
-    error instanceof X509TokenExchangeRetryableError ||
     state.tokenGeneration !== context.generation ||
     state.refreshAttempt !== refreshAttempt ||
     !state.cachedToken

@@ -152,10 +152,11 @@ function assertNoOpaqueExecutableTransport(
   for (const key of ['agent', 'client'] as const) {
     const transport = runtimeFetchOptions[key];
     if (
-      isObject(transport) &&
-      ['dispatch', 'addRequest', 'createConnection', 'request'].some(
-        (method) => typeof transport[method] === 'function',
-      )
+      typeof transport === 'function' ||
+      (isObject(transport) &&
+        ['dispatch', 'addRequest', 'createConnection', 'request'].some(
+          (method) => typeof transport[method] === 'function',
+        ))
     ) {
       throw new OpenAIError(
         `X.509 workload identity does not support opaque ${key} transports; use a static Undici Agent or trusted custom fetch transport.`,
@@ -191,15 +192,16 @@ function bunProxyURL(value: unknown): URL | undefined {
   if (value === undefined || value === null || value === false || value === '') {
     return undefined;
   }
-  let urlValue: unknown = value;
-  if (isObject(value) && !(value instanceof URL)) {
-    urlValue = value['url'];
+  if (isObject(value)) {
+    throw new OpenAIError(
+      'X.509 workload identity requires immutable string Bun proxy URLs; mutable proxy containers are not supported.',
+    );
   }
-  if (typeof urlValue !== 'string' && !(urlValue instanceof URL)) {
+  if (typeof value !== 'string') {
     throw new OpenAIError('X.509 workload identity cannot verify the configured Bun proxy.');
   }
   try {
-    return new URL(urlValue);
+    return new URL(value);
   } catch {
     throw new OpenAIError('X.509 workload identity requires an absolute Bun proxy URL.');
   }

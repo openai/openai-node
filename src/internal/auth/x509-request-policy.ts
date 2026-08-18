@@ -1,5 +1,6 @@
 import { OpenAIError } from '../../core/error';
 import type { RequestInfo, RequestInit } from '../builtin-types';
+import { isAzureOpenAIEndpointHostname } from '../azure';
 import { parseBedrockEndpointHostname } from '../bedrock';
 import { castToError } from '../errors';
 import type { MergedRequestInit, WorkloadIdentityRequestContext } from '../types';
@@ -9,15 +10,6 @@ import type { X509TransportIdentitySource } from './x509-transport-capability';
 
 const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] as const;
 const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
-const FORBIDDEN_PROVIDER_HOST_SUFFIXES = [
-  'openai.azure.com',
-  'openai.azure.us',
-  'services.ai.azure.com',
-  'services.ai.azure.us',
-  'azure-api.net',
-  'cognitiveservices.azure.com',
-  'cognitiveservices.azure.us',
-] as const;
 
 interface TransportIdentityNode {
   objects: WeakMap<object, TransportIdentityNode>;
@@ -223,10 +215,8 @@ export function x509APIOrigin(value: RequestInfo): string {
   if (url.username || url.password) {
     throw new OpenAIError('X.509 workload identity API URLs must not contain user credentials.');
   }
-  const hostname = url.hostname.toLowerCase().replace(/\.+$/u, '');
-  const isAzureOrigin = FORBIDDEN_PROVIDER_HOST_SUFFIXES.some(
-    (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
-  );
+  const { hostname } = url;
+  const isAzureOrigin = isAzureOpenAIEndpointHostname(hostname);
   const isBedrockOrigin = parseBedrockEndpointHostname(hostname) !== undefined;
   if (isAzureOrigin || isBedrockOrigin) {
     throw new OpenAIError(
