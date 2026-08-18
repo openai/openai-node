@@ -468,6 +468,26 @@ const isCanonicalDateDefault = (value: Date): boolean =>
       !Object.getOwnPropertyDescriptor(value, property),
   );
 
+const invisibleDeclaredDefaultProperty = (
+  descriptors: readonly [string, PropertyDescriptor][],
+  prototypes: readonly object[],
+  definition: ZodTypeDef,
+  path: readonly (string | number)[],
+): { key: string; visibility: 'non-enumerable' | 'inherited' } | undefined => {
+  const hidden = descriptors.find(
+    ([key, descriptor]) => !descriptor.enumerable && hasDeclaredSchemaPropertyAtPath(definition, path, key),
+  );
+  if (hidden) {
+    return { key: hidden[0], visibility: 'non-enumerable' };
+  }
+
+  const ownProperties = new Set(descriptors.map(([key]) => key));
+  const inherited = prototypes
+    .flatMap((prototype) => Object.getOwnPropertyNames(prototype))
+    .find((key) => !ownProperties.has(key) && hasDeclaredSchemaPropertyAtPath(definition, path, key));
+  return inherited === undefined ? undefined : { key: inherited, visibility: 'inherited' };
+};
+
 const normalizeStrictDefaultValue = (
   value: unknown,
   definition: ZodTypeDef,
@@ -583,12 +603,10 @@ const normalizeStrictDefaultValue = (
       return normalized;
     }
 
-    const hiddenSchemaProperty = descriptors.find(
-      ([key, descriptor]) => !descriptor.enumerable && hasDeclaredSchemaPropertyAtPath(definition, path, key),
-    );
+    const hiddenSchemaProperty = invisibleDeclaredDefaultProperty(descriptors, prototypes, definition, path);
     if (hiddenSchemaProperty) {
       throw new TypeError(
-        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the non-enumerable \`${keyword}.${hiddenSchemaProperty[0]}\` schema property in JSON Structured Outputs.`,
+        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the ${hiddenSchemaProperty.visibility} \`${keyword}.${hiddenSchemaProperty.key}\` schema property in JSON Structured Outputs.`,
       );
     }
 

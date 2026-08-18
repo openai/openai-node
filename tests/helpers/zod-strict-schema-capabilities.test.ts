@@ -217,6 +217,53 @@ describe('Zod v3 strict schema capability analysis', () => {
     expect(() => formatFor(schema().default(value))).toThrow(/non-enumerable.*count/u);
   });
 
+  it.each([
+    {
+      name: 'required string',
+      schema: () => z3.object({ count: z3.string() }) as z3.ZodTypeAny,
+      prototype: () => ({ count: 'inherited' }),
+    },
+    {
+      name: 'optional string',
+      schema: () => z3.object({ count: z3.string().optional().nullable() }) as z3.ZodTypeAny,
+      prototype: () => ({ count: 'inherited' }),
+    },
+    {
+      name: 'non-enumerable BigInt',
+      schema: () => z3.object({ count: z3.coerce.bigint() }) as z3.ZodTypeAny,
+      prototype: () => Object.defineProperty({}, 'count', { value: 4n, enumerable: false }),
+    },
+    {
+      name: 'multi-level property',
+      schema: () => z3.object({ count: z3.string() }) as z3.ZodTypeAny,
+      prototype: () => Object.create({ count: 'inherited' }) as object,
+    },
+  ])('rejects an inherited declared $name default property', ({ schema, prototype }) => {
+    const value = Object.create(prototype()) as object;
+
+    expect(() => formatFor(schema().default(value))).toThrow(/inherited.*count/u);
+  });
+
+  it('rejects inherited nested schema getters without invoking them', () => {
+    const getter = vi.fn(() => 4n);
+    const prototype = Object.defineProperty({}, 'count', { get: getter });
+    const inherited = Object.create(prototype) as { count: bigint };
+    const value = z3
+      .object({ detail: z3.object({ count: z3.coerce.bigint() }) })
+      .default({ detail: inherited });
+
+    expect(() => formatFor(value)).toThrow(/inherited.*count/u);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it('preserves own schema values that shadow benign inherited metadata', () => {
+    const value = Object.assign(Object.create({ count: 'inherited', metadata: 4n }), { count: 'own' });
+    const format = formatFor(z3.object({ count: z3.string() }).default(value));
+
+    expect(format.$parseRaw('{}')).toEqual({ value: { count: 'own' } });
+    expect(() => JSON.stringify(format)).not.toThrow();
+  });
+
   it('rejects nested hidden schema properties without invoking their getters', () => {
     const getter = vi.fn(() => 4n);
     const hidden = Object.defineProperty({}, 'count', { get: getter, enumerable: false });
