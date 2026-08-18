@@ -3,22 +3,29 @@
 // This file demonstrates how to stream from the server the chunks as
 // a new-line separated JSON-encoded stream.
 // This server is for local development and binds only to 127.0.0.1 by default.
-// To deliberately expose it to another network, require bearer authentication:
+// To deliberately expose it to another network, require HTTPS and bearer authentication:
 //
 //   OPENAI_EXAMPLE_HOST=0.0.0.0 OPENAI_EXAMPLE_ALLOW_REMOTE=true \
+//     OPENAI_EXAMPLE_TLS_CERT_FILE=server-cert.pem \
+//     OPENAI_EXAMPLE_TLS_KEY_FILE=server-key.pem \
 //     OPENAI_EXAMPLE_AUTH_TOKEN="$(openssl rand -hex 32)" npm run tsn -- -T \
 //     examples/chat-completions/stream-to-client-express.ts
 //
-// Remote requests must include: Authorization: Bearer <OPENAI_EXAMPLE_AUTH_TOKEN>
+// Remote HTTPS requests must include: Authorization: Bearer <OPENAI_EXAMPLE_AUTH_TOKEN>
 
 import { timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { createServer } from 'node:https';
 import OpenAI from 'openai';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 
-const bindHost = process.env['OPENAI_EXAMPLE_HOST'] ?? '127.0.0.1';
-const isLoopback = bindHost === '127.0.0.1' || bindHost === '::1' || bindHost === 'localhost';
+const configuredHost = process.env['OPENAI_EXAMPLE_HOST'] ?? '127.0.0.1';
+const bindHost = configuredHost === 'localhost' ? '127.0.0.1' : configuredHost;
+const isLoopback = bindHost === '127.0.0.1' || bindHost === '::1';
 const authToken = process.env['OPENAI_EXAMPLE_AUTH_TOKEN'];
+const tlsCertificatePath = process.env['OPENAI_EXAMPLE_TLS_CERT_FILE'];
+const tlsPrivateKeyPath = process.env['OPENAI_EXAMPLE_TLS_KEY_FILE'];
 
 if (!isLoopback) {
   if (process.env['OPENAI_EXAMPLE_ALLOW_REMOTE'] !== 'true') {
@@ -27,10 +34,19 @@ if (!isLoopback) {
   if (!authToken || authToken.trim().length < 32) {
     throw new Error('Non-loopback binding requires an OPENAI_EXAMPLE_AUTH_TOKEN of at least 32 characters');
   }
+  if (!tlsCertificatePath || !tlsPrivateKeyPath) {
+    throw new Error(
+      'Non-loopback binding requires OPENAI_EXAMPLE_TLS_CERT_FILE and OPENAI_EXAMPLE_TLS_KEY_FILE',
+    );
+  }
 }
 
-const openai = new OpenAI();
 const app = express();
+const tlsServer =
+  !isLoopback && tlsCertificatePath && tlsPrivateKeyPath
+    ? createServer({ cert: readFileSync(tlsCertificatePath), key: readFileSync(tlsPrivateKeyPath) }, app)
+    : undefined;
+const openai = new OpenAI();
 
 if (!isLoopback) {
   const expectedAuthorization = Buffer.from(`Bearer ${authToken}`);
@@ -57,7 +73,7 @@ app.use(express.text());
 //
 // Or consumed with fetch:
 //
-//   fetch('http://localhost:3000', {
+//   fetch('http://127.0.0.1:3000', {
 //     method: 'POST',
 //     body: 'Tell me why dogs are better than cats',
 //   }).then(async res => {
@@ -84,6 +100,14 @@ const handleRequest = async (req: Request, res: Response) => {
 
 app.post('/', (req: Request, res: Response) => handleRequest(req, res).catch(console.error));
 
-app.listen(3000, bindHost, () => {
-  console.log(`Started development proxy express server on ${bindHost}:3000`);
-});
+const onListening = () => {
+  console.log(
+    `Started ${isLoopback ? 'HTTP' : 'HTTPS'} development proxy express server on ${bindHost}:3000`,
+  );
+};
+
+if (tlsServer) {
+  tlsServer.listen(3000, bindHost, onListening);
+} else {
+  app.listen(3000, bindHost, onListening);
+}
