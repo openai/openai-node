@@ -482,6 +482,9 @@ const acceptsOverlappingBigIntStringInput = (
       minimum = Math.max(minimum, check.value);
     } else if (check.kind === 'max' && typeof check.value === 'number') {
       maximum = Math.min(maximum, check.value);
+    } else if (check.kind === 'length' && typeof check.value === 'number') {
+      minimum = Math.max(minimum, check.value);
+      maximum = Math.min(maximum, check.value);
     }
   }
   const fallbackMinimum = typeof input['minLength'] === 'number' ? input['minLength'] : 0;
@@ -534,6 +537,34 @@ export const applyBigIntStringFallbackBounds = (
         ),
       } as JsonSchema7Type;
     }
+  }
+  const isReachableStringValue = (value: string): boolean => {
+    if (new RegExp(bigIntStringPattern, 'u').test(value)) {
+      return true;
+    }
+    const concrete = {
+      type: 'string',
+      minLength: value.length,
+      maxLength: value.length,
+    } as JsonSchema7Type;
+    return !producers.some((producer) => throwsOnInvalidBigIntStringInput(producer, concrete));
+  };
+  if (typeof record['const'] === 'string') {
+    if (!isReachableStringValue(record['const'])) {
+      throw new Error('A BigInt union fallback has no synchronously reachable string values.');
+    }
+    return schema;
+  }
+  if (Array.isArray(record['enum'])) {
+    const reachable = record['enum'].filter(
+      (value) => typeof value !== 'string' || isReachableStringValue(value),
+    );
+    if (reachable.length === 0) {
+      throw new Error('A BigInt union fallback has no synchronously reachable string values.');
+    }
+    return reachable.length === record['enum'].length
+      ? schema
+      : ({ ...schema, enum: reachable } as JsonSchema7Type);
   }
   if (!producers.some((producer) => throwsOnInvalidBigIntStringInput(producer, schema))) {
     return schema;
@@ -766,20 +797,40 @@ export const hasConstrainedPipelineOutput = (
 
 type UnsafeIntegerSide = 'minimum' | 'maximum';
 
+const capturesUnsafeNumericInput = (definition: ZodTypeDef, side: UnsafeIntegerSide): boolean =>
+  visitDefinition(
+    definition,
+    (input) => {
+      if (
+        input.typeName === ZodFirstPartyTypeKind.ZodAny ||
+        input.typeName === ZodFirstPartyTypeKind.ZodUnknown ||
+        (input.typeName === ZodFirstPartyTypeKind.ZodEffects && input.effect.type !== 'refinement') ||
+        (input.coerce === true && input.typeName !== ZodFirstPartyTypeKind.ZodNumber)
+      ) {
+        return true;
+      }
+      if (input.typeName !== ZodFirstPartyTypeKind.ZodNumber) {
+        return;
+      }
+      const boundary = side === 'minimum' ? 'min' : 'max';
+      const safeLimit = side === 'minimum' ? Number.MIN_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+      return !input.checks?.some(
+        (check) =>
+          check.kind === boundary &&
+          typeof check.value === 'number' &&
+          (side === 'minimum' ? check.value >= safeLimit : check.value <= safeLimit),
+      );
+    },
+    'input',
+  );
+
 export const capturesUnsafeBigIntInput = (definition: ZodTypeDef, side: UnsafeIntegerSide): boolean =>
   visitDefinition(
     definition,
     (def) => {
       const boundary = side === 'minimum' ? 'min' : 'max';
       if (isExactBigIntTransform(def)) {
-        const input = def.schema._def as InspectableDefinition;
-        const safeLimit = side === 'minimum' ? Number.MIN_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
-        return !input.checks?.some(
-          (check) =>
-            check.kind === boundary &&
-            typeof check.value === 'number' &&
-            (side === 'minimum' ? check.value >= safeLimit : check.value <= safeLimit),
-        );
+        return capturesUnsafeNumericInput(def.schema._def, side);
       }
       if (def.typeName !== ZodFirstPartyTypeKind.ZodBigInt) {
         return;

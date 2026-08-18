@@ -1454,6 +1454,53 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
   });
 
+  it.each([
+    { name: 'readonly', input: () => z3.number().max(10).readonly() },
+    { name: 'default', input: () => z3.number().max(10).default(0) },
+    { name: 'branded', input: () => z3.number().max(10).brand<'bounded'>() },
+    { name: 'lazy', input: () => z3.lazy(() => z3.number().max(10)) },
+  ])(
+    'preserves disjoint numeric fallback after a $name wrapped BigInt transform input',
+    ({ name, input }) => {
+      const union = z3.union([input().transform(BigInt), z3.number().min(1e20)]);
+      const value = name === 'default' ? union.default(0) : union;
+      const result = create(z3.object({ value }));
+
+      expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
+        type: 'number',
+        minimum: 1e20,
+      });
+      expect(result.$parseRaw('{"value":100000000000000000000}')).toEqual({ value: 1e20 });
+    },
+  );
+
+  it('preserves a negative disjoint fallback after a wrapped minimum-constrained BigInt input', () => {
+    const value = z3.union([z3.number().min(-10).readonly().transform(BigInt), z3.number().max(-1e20)]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1', {
+      type: 'number',
+      maximum: -1e20,
+    });
+    expect(result.$parseRaw('{"value":-100000000000000000000}')).toEqual({ value: -1e20 });
+  });
+
+  it('preserves nested disjoint fallback after a wrapped BigInt numeric input', () => {
+    const value = z3.union([
+      z3.object({ count: z3.number().max(10).readonly().transform(BigInt) }),
+      z3.object({ count: z3.number().min(1e20) }),
+    ]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.properties.count', {
+      type: 'number',
+      minimum: 1e20,
+    });
+    expect(result.$parseRaw('{"value":{"count":100000000000000000000}}')).toEqual({
+      value: { count: 1e20 },
+    });
+  });
+
   it('preserves numeric intervals disjoint from an exact bounded BigInt transform', () => {
     const value = z3.union([z3.number().max(10).transform(BigInt), z3.number().min(1e20)]);
     const result = create(z3.object({ value }));
@@ -1517,6 +1564,51 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
       minLength: 3,
     });
     expect(result.$parseRaw('{"value":"not-a-bigint"}')).toEqual({ value: 'not-a-bigint' });
+  });
+
+  it.each([
+    { name: 'literal', fallback: () => z3.literal('abc') },
+    { name: 'enum', fallback: () => z3.enum(['abc', 'longer']) },
+    { name: 'readonly enum', fallback: () => z3.enum(['abc', 'longer']).readonly() },
+    {
+      name: 'native enum',
+      fallback: () => z3.nativeEnum({ Short: 'abc', Long: 'longer' } as const),
+    },
+  ])('preserves a concrete disjoint $name string fallback', ({ fallback }) => {
+    const value = z3.union([z3.string().max(2).transform(BigInt), fallback()]);
+    const result = create(z3.object({ value }));
+
+    expect(result.$parseRaw('{"value":"abc"}')).toEqual({ value: 'abc' });
+    expect(strictHelperSchema(result)).not.toHaveProperty('properties.value.anyOf.1.pattern');
+  });
+
+  it('filters only unsafe overlapping members from a mixed finite string fallback', () => {
+    const value = z3.union([z3.string().max(2).transform(BigInt), z3.enum(['7', 'x', 'abc'])]);
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.anyOf.1.enum', ['7', 'abc']);
+    expect(result.$parseRaw('{"value":"7"}')).toEqual({ value: 7n });
+    expect(result.$parseRaw('{"value":"abc"}')).toEqual({ value: 'abc' });
+    expect(() => result.$parseRaw('{"value":"x"}')).toThrow(SyntaxError);
+  });
+
+  it('preserves a nested literal fallback disjoint from a bounded BigInt string transform', () => {
+    const value = z3.union([
+      z3.object({ count: z3.string().max(2).transform(BigInt) }),
+      z3.object({ count: z3.literal('abc') }),
+    ]);
+    const result = create(z3.object({ value }));
+
+    expect(result.$parseRaw('{"value":{"count":"abc"}}')).toEqual({ value: { count: 'abc' } });
+    expect(strictHelperSchema(result)).not.toHaveProperty(
+      'properties.value.anyOf.1.properties.count.pattern',
+    );
+  });
+
+  it('rejects a finite fallback whose every concrete string triggers BigInt conversion failure', () => {
+    const value = z3.union([z3.string().max(2).transform(BigInt), z3.enum(['x', 'no'])]);
+
+    expect(() => create(z3.object({ value }))).toThrow('no synchronously reachable string values');
   });
 
   it('rejects partially overlapping string fallback that cannot be represented without data loss', () => {
