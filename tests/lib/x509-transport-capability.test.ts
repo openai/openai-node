@@ -61,9 +61,12 @@ describe('X.509 transport capability boundary', () => {
 
   test.each([
     'https://resource.openai.azure.com/openai/v1',
+    'https://resource.openai.azure.us/openai/v1',
     'https://resource.services.ai.azure.com/openai/v1',
+    'https://resource.services.ai.azure.us/openai/v1',
     'https://resource.azure-api.net/openai/v1',
     'https://resource.cognitiveservices.azure.com/openai/v1',
+    'https://resource.cognitiveservices.azure.us/openai/v1',
     'https://RESOURCE.OPENAI.AZURE.COM./openai/v1',
     'https://bedrock-mantle.us-west-2.api.aws/openai/v1',
     'https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1',

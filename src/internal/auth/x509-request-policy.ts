@@ -10,9 +10,12 @@ const TRANSPORT_OPTION_KEYS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'] 
 const X509_HOOK_PROTECTED_OPTION_KEYS = [...TRANSPORT_OPTION_KEYS, 'redirect'] as const;
 const FORBIDDEN_PROVIDER_HOST_SUFFIXES = [
   'openai.azure.com',
+  'openai.azure.us',
   'services.ai.azure.com',
+  'services.ai.azure.us',
   'azure-api.net',
   'cognitiveservices.azure.com',
+  'cognitiveservices.azure.us',
 ] as const;
 
 interface TransportIdentityNode {
