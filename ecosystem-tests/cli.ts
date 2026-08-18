@@ -64,19 +64,8 @@ async function readCloudflareCredentialSnapshot(
 async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Promise<void>): Promise<void> {
   const credentialPath = '.dev.vars';
   const flags = fs.constants.O_RDWR + fs.constants.O_NOFOLLOW + fs.constants.O_NONBLOCK;
-  let file: Awaited<ReturnType<typeof fs.open>>;
+  let file: Awaited<ReturnType<typeof fs.open>> | undefined;
   let created = false;
-
-  try {
-    file = await fs.open(credentialPath, flags);
-  } catch (error) {
-    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
-      throw error;
-    }
-
-    file = await fs.open(credentialPath, flags + fs.constants.O_CREAT + fs.constants.O_EXCL, 0o600);
-    created = true;
-  }
 
   let previousContents: Buffer | undefined;
   let previousMode: number | undefined;
@@ -87,16 +76,16 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
   const restoreOnce = (): Promise<void> => {
     cleanup ??= (async () => {
       try {
-        if (!originalIdentity) {
-          return;
-        }
-
         if (staging) {
           try {
             await staging;
           } catch {
             // Its owner rethrows a failed staging operation after restoration.
           }
+        }
+
+        if (!file || !originalIdentity) {
+          return;
         }
 
         if (created) {
@@ -133,36 +122,50 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
           throw new Error('The Cloudflare credential path was replaced while credentials were staged.');
         }
       } finally {
-        await file.close();
+        await file?.close();
       }
     })();
     return cleanup;
   };
 
+  activeCloudflareCredentialCleanup = restoreOnce;
+
   try {
-    const metadata = await file.stat();
-    if (!metadata.isFile() || metadata.nlink !== 1) {
-      throw new Error('The Cloudflare credential path must be an unshared regular file.');
-    }
-    originalIdentity = { dev: metadata.dev, ino: metadata.ino };
-
-    if (!created) {
-      previousContents = await readCloudflareCredentialSnapshot(file, metadata.size);
-      previousMode = metadata.mode % 4096;
-    }
-
-    const current = await fs.lstat(credentialPath);
-    if (!current.isFile() || current.dev !== originalIdentity.dev || current.ino !== originalIdentity.ino) {
-      throw new Error('The Cloudflare credential path changed before credentials could be staged.');
-    }
-
     staging = (async () => {
+      try {
+        file = await fs.open(credentialPath, flags);
+      } catch (error) {
+        if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+          throw error;
+        }
+
+        file = await fs.open(credentialPath, flags + fs.constants.O_CREAT + fs.constants.O_EXCL, 0o600);
+        created = true;
+      }
+
+      const metadata = await file.stat();
+      if (!metadata.isFile() || metadata.nlink !== 1) {
+        throw new Error('The Cloudflare credential path must be an unshared regular file.');
+      }
+      originalIdentity = { dev: metadata.dev, ino: metadata.ino };
+
+      if (!created) {
+        previousContents = await readCloudflareCredentialSnapshot(file, metadata.size);
+        previousMode = metadata.mode % 4096;
+      }
+
+      const current = await fs.lstat(credentialPath);
+      if (!current.isFile() || current.dev !== originalIdentity.dev || current.ino !== originalIdentity.ino) {
+        throw new Error('The Cloudflare credential path changed before credentials could be staged.');
+      }
+
       await file.chmod(0o600);
       await writeCloudflareCredentialFile(file, Buffer.from(`OPENAI_API_KEY='${apiKey}'`));
     })();
-    activeCloudflareCredentialCleanup = restoreOnce;
     await staging;
-    await runLiveTest();
+    if (!cleanup) {
+      await runLiveTest();
+    }
   } finally {
     try {
       await restoreOnce();

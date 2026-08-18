@@ -421,6 +421,79 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
   );
 
   test.each(
+    (['open', 'stat', 'lstat'] as const).flatMap((phase) =>
+      credentialStates.flatMap((state) =>
+        [
+          { signal: 'SIGINT' as const, noCleanup: true },
+          { signal: 'SIGTERM' as const, noCleanup: false },
+        ].map(({ signal, noCleanup }) => ({ phase, state, signal, noCleanup, name: state.name })),
+      ),
+    ),
+  )(
+    'restores $name after $signal interrupts pending $phase with noCleanup=$noCleanup',
+    ({ phase, state, signal, noCleanup }) => {
+      withFixture((fixture) => {
+        setExistingCredentials(fixture, state);
+        const preload = path.join(fixture.directory, 'interrupt-during-acquisition.cjs');
+        writeFileSync(
+          preload,
+          [
+            "const promises = require('node:fs/promises');",
+            'const originalOpen = promises.open;',
+            'const originalLstat = promises.lstat;',
+            'let interrupted = false;',
+            'async function interrupt() {',
+            '  if (interrupted) return;',
+            '  interrupted = true;',
+            '  process.kill(process.pid, process.env.CLOUDFLARE_ACQUISITION_SIGNAL);',
+            '  await new Promise((resolve) => setTimeout(resolve, 30));',
+            '}',
+            'promises.open = async (...args) => {',
+            '  const file = await originalOpen(...args);',
+            "  if (args[0] === '.dev.vars') {",
+            '    const originalStat = file.stat.bind(file);',
+            '    file.stat = async (...statArgs) => {',
+            '      const result = await originalStat(...statArgs);',
+            "      if (process.env.CLOUDFLARE_ACQUISITION_PHASE === 'stat') await interrupt();",
+            '      return result;',
+            '    };',
+            "    if (process.env.CLOUDFLARE_ACQUISITION_PHASE === 'open') await interrupt();",
+            '  }',
+            '  return file;',
+            '};',
+            'promises.lstat = async (...args) => {',
+            '  const result = await originalLstat(...args);',
+            "  if (args[0] === '.dev.vars' && process.env.CLOUDFLARE_ACQUISITION_PHASE === 'lstat') {",
+            '    await interrupt();',
+            '  }',
+            '  return result;',
+            '};',
+          ].join('\n'),
+        );
+        const flags = ['--live', ...(noCleanup ? [] : otherProjects.map((project) => `--skip=${project}`))];
+
+        const result = runCloudflare(
+          fixture,
+          flags,
+          {
+            CLOUDFLARE_ACQUISITION_PHASE: phase,
+            CLOUDFLARE_ACQUISITION_SIGNAL: signal,
+            NODE_OPTIONS: `--require ${preload}`,
+          },
+          noCleanup,
+        );
+
+        expect(result.error).toBeUndefined();
+        expect(result.status === 0 && result.signal === null).toBe(false);
+        expectRestored(fixture, state);
+        if (noCleanup) {
+          expect(result.signal).toBe(signal);
+        }
+      });
+    },
+  );
+
+  test.each(
     (['SIGINT', 'SIGTERM'] as const).flatMap((signal) =>
       [true, false].map((noCleanup) => ({ signal, noCleanup })),
     ),
