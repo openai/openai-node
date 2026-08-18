@@ -129,8 +129,8 @@ export class Stream<Item> implements AsyncIterable<Item> {
             try {
               data = JSON.parse(sse.data);
             } catch (e) {
-              console.error(`Could not parse message into JSON:`, sse.data);
-              console.error(`From chunk:`, sse.raw);
+              logger.error(`Could not parse message into JSON:`, sse.data);
+              logger.error(`From chunk:`, sse.raw);
               throw e;
             }
             // SSE error events surface as APIError instances.
