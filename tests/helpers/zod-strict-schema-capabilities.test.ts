@@ -209,6 +209,34 @@ describe('Zod v3 strict schema capability analysis', () => {
   });
 
   it.each([
+    { name: 'BigInt', hidden: 4n, schema: () => z3.object({ count: z3.coerce.bigint() }) as z3.ZodTypeAny },
+    { name: 'string', hidden: 'secret', schema: () => z3.object({ count: z3.string() }) as z3.ZodTypeAny },
+  ])('rejects a non-enumerable declared $name default property', ({ hidden, schema }) => {
+    const value = Object.defineProperty({}, 'count', { value: hidden, enumerable: false });
+
+    expect(() => formatFor(schema().default(value))).toThrow(/non-enumerable.*count/u);
+  });
+
+  it('rejects nested hidden schema properties without invoking their getters', () => {
+    const getter = vi.fn(() => 4n);
+    const hidden = Object.defineProperty({}, 'count', { get: getter, enumerable: false });
+    const value = z3
+      .object({ detail: z3.object({ count: z3.coerce.bigint() }) })
+      .default({ detail: hidden as { count: bigint } });
+
+    expect(() => formatFor(value)).toThrow('accessor');
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it('preserves hidden metadata that is not a declared default schema property', () => {
+    const value = Object.defineProperty({ count: 7 }, 'metadata', { value: 4n, enumerable: false });
+    const format = formatFor(z3.object({ count: z3.number() }).default(value));
+
+    expect(format.$parseRaw('{}')).toEqual({ value: { count: 7 } });
+    expect(() => JSON.stringify(format)).not.toThrow();
+  });
+
+  it.each([
     {
       name: 'direct',
       schema: () => z3.object({ count: z3.coerce.bigint() }).default(new DefaultCounter()),
@@ -1347,6 +1375,33 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     const result = create(z3.object({ value: schema() }));
     expect(strictHelperSchema(result)).toHaveProperty('properties.value', { type: 'number' });
     expect(result.$parseRaw('{"value":7}')).toEqual({ value: output });
+  });
+
+  it.each([
+    {
+      name: 'preprocessor',
+      option: (convert: () => Promise<number>) => z3.preprocess(convert, z3.promise(z3.number())),
+    },
+    {
+      name: 'wrapped preprocessor',
+      option: (convert: () => Promise<number>) => z3.preprocess(convert, z3.promise(z3.number())).readonly(),
+    },
+    {
+      name: 'nested object preprocessor',
+      option: (convert: () => Promise<number>) =>
+        z3.object({ nested: z3.preprocess(convert, z3.promise(z3.number())) }),
+    },
+    {
+      name: 'pipeline transform',
+      option: (convert: () => Promise<number>) =>
+        z3.number().transform(convert).pipe(z3.promise(z3.number())),
+    },
+  ])('rejects a Promise union branch reachable through a $name', ({ option }) => {
+    const convert = vi.fn(() => Promise.resolve(1));
+    const value = z3.union([option(convert), z3.number()]);
+
+    expect(() => create(z3.object({ value }))).toThrow('ZodPromise');
+    expect(convert).not.toHaveBeenCalled();
   });
 
   it('rejects a synchronously recoverable Promise catch rather than silently omitting its union branch', () => {

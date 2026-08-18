@@ -64,6 +64,7 @@ import {
   findIncompatibleParsedOutputs,
   findNestedNumericOverlaps,
   hasConstrainedPipelineOutput,
+  hasDeclaredSchemaPropertyAtPath,
   hasOpaqueJSONValidation,
   hasOpaquePipelineTransform,
   producesBigIntAtPath,
@@ -580,6 +581,15 @@ const normalizeStrictDefaultValue = (
         return value;
       }
       return normalized;
+    }
+
+    const hiddenSchemaProperty = descriptors.find(
+      ([key, descriptor]) => !descriptor.enumerable && hasDeclaredSchemaPropertyAtPath(definition, path, key),
+    );
+    if (hiddenSchemaProperty) {
+      throw new TypeError(
+        `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the non-enumerable \`${keyword}.${hiddenSchemaProperty[0]}\` schema property in JSON Structured Outputs.`,
+      );
     }
 
     const prototype: unknown = prototypes[0] ?? null;

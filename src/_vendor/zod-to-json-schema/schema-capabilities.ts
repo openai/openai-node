@@ -166,10 +166,35 @@ const visitDefinition = (
   }
 };
 
+const hasPotentialJSONInputConversion = (definition: ZodTypeDef): boolean =>
+  visitDefinition(
+    definition,
+    (def) =>
+      def.typeName === ZodFirstPartyTypeKind.ZodEffects &&
+      (def.effect.type === 'preprocess' || def.effect.type === 'transform')
+        ? true
+        : undefined,
+    'input',
+  );
+
 export const requiresAsynchronousJSONInput = (definition: ZodTypeDef): boolean =>
   visitDefinition(
     definition,
-    (def) => (def.typeName === ZodFirstPartyTypeKind.ZodPromise ? true : undefined),
+    (def) => {
+      if (def.typeName === ZodFirstPartyTypeKind.ZodPromise) {
+        return true;
+      }
+      if (def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'preprocess') {
+        return false;
+      }
+      if (
+        def.typeName === ZodFirstPartyTypeKind.ZodPipeline &&
+        hasPotentialJSONInputConversion(def.in._def)
+      ) {
+        return false;
+      }
+      return null;
+    },
     'async-input',
   );
 
@@ -1024,6 +1049,34 @@ const producesNativeAtPath = (
       return child !== undefined && producesNativeAtPath(child._def, remaining, nestedValue, nativeType);
     },
     'default',
+  );
+
+export const hasDeclaredSchemaPropertyAtPath = (
+  definition: ZodTypeDef,
+  path: readonly (string | number)[],
+  property: string,
+): boolean =>
+  visitDefinition(
+    definition,
+    (def) => {
+      if (path.length === 0) {
+        return def.typeName === ZodFirstPartyTypeKind.ZodObject ? hasOwn(def.shape(), property) : undefined;
+      }
+
+      const [segment, ...remaining] = path;
+      let child: SchemaType | undefined;
+      if (def.typeName === ZodFirstPartyTypeKind.ZodObject && typeof segment === 'string') {
+        const shape = def.shape();
+        child = hasOwn(shape, segment) ? shape[segment] : def.catchall;
+      } else if (def.typeName === ZodFirstPartyTypeKind.ZodArray && typeof segment === 'number') {
+        child = def.type;
+      } else {
+        return;
+      }
+
+      return child !== undefined && hasDeclaredSchemaPropertyAtPath(child._def, remaining, property);
+    },
+    'input',
   );
 
 export const producesBigIntAtPath = (
