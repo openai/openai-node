@@ -171,10 +171,10 @@ describe('ecosystem test CLI', () => {
       expectedVars: existingCloudflareDevVars,
     },
     {
-      name: 'updates Cloudflare credentials when an API key is available',
+      name: 'preserves existing Cloudflare credentials in non-live mode with an API key',
       existingVars: existingCloudflareDevVars,
       apiKey: 'test-api-key',
-      expectedVars: "OPENAI_API_KEY='test-api-key'",
+      expectedVars: existingCloudflareDevVars,
     },
   ])('$name', ({ existingVars, apiKey, expectedVars }) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
