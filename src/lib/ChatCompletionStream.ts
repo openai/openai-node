@@ -256,11 +256,28 @@ type PartialToolCallSnapshot = {
 
 interface ChoiceEventState {
   content_done: boolean;
+  content_parse_state: PartialJSONParseState | undefined;
   refusal_done: boolean;
   logprobs_content_done: boolean;
   logprobs_refusal_done: boolean;
   current_tool_call_index: number | null;
   done_tool_calls: Set<number>;
+  tool_call_parse_states: Map<number, PartialJSONParseState>;
+}
+
+interface PartialJSONParseState {
+  bytes: number;
+  depth: number;
+  escaped: boolean;
+  has_non_whitespace: boolean;
+  in_string: boolean;
+  last_parsed_bytes: number;
+}
+
+interface PartialJSONParseBudget {
+  bytes: number;
+  fragments: number;
+  work: number;
 }
 
 // The Chat Completions schema limits n to 128. Replayed streams do not retain
@@ -268,6 +285,113 @@ interface ChoiceEventState {
 // conservative ceiling to prevent sparse tool-call arrays from growing unbounded.
 const MAX_STREAM_CHOICES = 128;
 const MAX_STREAM_TOOL_CALLS = 128;
+const MAX_PARTIAL_JSON_BYTES = 16 * 1024 * 1024;
+const MAX_PARTIAL_JSON_FRAGMENTS = 65_536;
+const MAX_PARTIAL_JSON_DEPTH = 128;
+const MAX_PARTIAL_JSON_PARSE_WORK = 64 * 1024 * 1024;
+const EAGER_PARTIAL_JSON_BYTES = 1024;
+
+function createPartialJSONParseState(): PartialJSONParseState {
+  return {
+    bytes: 0,
+    depth: 0,
+    escaped: false,
+    has_non_whitespace: false,
+    in_string: false,
+    last_parsed_bytes: 0,
+  };
+}
+
+function recordPartialJSONFragment(
+  state: PartialJSONParseState,
+  budget: PartialJSONParseBudget,
+  fragment: string,
+): boolean {
+  if (budget.fragments >= MAX_PARTIAL_JSON_FRAGMENTS) {
+    throw new OpenAIError('Chat completion stream exceeded its structured JSON fragment limit');
+  }
+
+  let bytes = 0;
+  let { depth, escaped, has_non_whitespace: hasNonWhitespace, in_string: inString } = state;
+  let completed = false;
+
+  for (const character of fragment) {
+    const codePoint = character.codePointAt(0)!;
+    if (codePoint <= 0x7f) {
+      bytes += 1;
+    } else if (codePoint <= 0x7_ff) {
+      bytes += 2;
+    } else if (codePoint <= 0xff_ff) {
+      bytes += 3;
+    } else {
+      bytes += 4;
+    }
+    if (budget.bytes + bytes > MAX_PARTIAL_JSON_BYTES) {
+      throw new OpenAIError('Chat completion stream exceeded its structured JSON byte limit');
+    }
+
+    if (character !== ' ' && character !== '\n' && character !== '\r' && character !== '\t') {
+      hasNonWhitespace = true;
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+        completed ||= depth === 0;
+      }
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+    } else if (character === '{' || character === '[') {
+      depth += 1;
+      if (depth > MAX_PARTIAL_JSON_DEPTH) {
+        throw new OpenAIError('Chat completion stream exceeded its structured JSON nesting depth limit');
+      }
+    } else if ((character === '}' || character === ']') && depth > 0) {
+      depth -= 1;
+      completed ||= depth === 0;
+    }
+  }
+
+  state.bytes += bytes;
+  state.depth = depth;
+  state.escaped = escaped;
+  state.has_non_whitespace = hasNonWhitespace;
+  state.in_string = inString;
+  budget.bytes += bytes;
+  budget.fragments += 1;
+
+  if (!hasNonWhitespace || bytes === 0) {
+    return false;
+  }
+
+  const minimumGrowth = Math.max(EAGER_PARTIAL_JSON_BYTES, Math.floor(state.last_parsed_bytes / 2));
+  if (
+    state.bytes > EAGER_PARTIAL_JSON_BYTES &&
+    !completed &&
+    state.bytes - state.last_parsed_bytes < minimumGrowth
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function reservePartialJSONParse(state: PartialJSONParseState, budget: PartialJSONParseBudget): boolean {
+  if (budget.work + state.bytes > MAX_PARTIAL_JSON_PARSE_WORK) {
+    return false;
+  }
+
+  budget.work += state.bytes;
+  state.last_parsed_bytes = state.bytes;
+  return true;
+}
 
 function assignOwnProperties<T extends object>(target: T, source: object): T {
   if (Object.prototype.propertyIsEnumerable.call(source, '__proto__') && !hasOwn(target, '__proto__')) {
@@ -291,6 +415,8 @@ export class ChatCompletionStream<ParsedT = null>
   #audioDoneChoiceIndexes: Set<number>;
   #choiceEventStates: ChoiceEventState[];
   #currentChatCompletionSnapshot: ChatCompletionSnapshot | undefined;
+  #hasAutoParseableTool: boolean;
+  #partialJSONParseBudget: PartialJSONParseBudget;
 
   /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ChatCompletionCreateParams | null) {
@@ -298,6 +424,12 @@ export class ChatCompletionStream<ParsedT = null>
     this.#params = params;
     this.#audioDoneChoiceIndexes = new Set();
     this.#choiceEventStates = [];
+    this.#hasAutoParseableTool =
+      params?.tools?.some(
+        (tool) =>
+          isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true),
+      ) ?? false;
+    this.#partialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
   }
 
   /** The latest accumulated completion, or `undefined` before a chunk arrives or after finalization. */
@@ -341,6 +473,7 @@ export class ChatCompletionStream<ParsedT = null>
     }
     this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
+    this.#partialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
   }
 
   #getChoiceEventState(choice: ChatCompletionSnapshot.Choice): ChoiceEventState {
@@ -351,11 +484,13 @@ export class ChatCompletionStream<ParsedT = null>
 
     state = {
       content_done: false,
+      content_parse_state: undefined,
       refusal_done: false,
       logprobs_content_done: false,
       logprobs_refusal_done: false,
       done_tool_calls: new Set(),
       current_tool_call_index: null,
+      tool_call_parse_states: new Map(),
     };
     this.#choiceEventStates[choice.index] = state;
     return state;
@@ -760,11 +895,21 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
       if (content != null) {
-        choice.message.content = (choice.message.content || '') + content;
-
         if (!choice.message.refusal && isParseableResponseFormat(this.#params?.response_format)) {
-          // The partial parser does not accept whitespace-only input.
-          choice.message.parsed = choice.message.content.trim() ? partialParse(choice.message.content) : null;
+          const eventState = this.#getChoiceEventState(choice);
+          const parseState = (eventState.content_parse_state ??= createPartialJSONParseState());
+          const shouldParse = recordPartialJSONFragment(parseState, this.#partialJSONParseBudget, content);
+          choice.message.content = (choice.message.content || '') + content;
+
+          // The partial parser does not accept whitespace-only input. Once output
+          // grows, coalesce prefix reparses while preserving every raw snapshot.
+          if (!parseState.has_non_whitespace) {
+            choice.message.parsed = null;
+          } else if (shouldParse && reservePartialJSONParse(parseState, this.#partialJSONParseBudget)) {
+            choice.message.parsed = partialParse(choice.message.content);
+          }
+        } else {
+          choice.message.content = (choice.message.content || '') + content;
         }
       }
 
@@ -801,11 +946,30 @@ export class ChatCompletionStream<ParsedT = null>
             if (fn.name) {
               functionSnapshot.name = fn.name;
             }
-            if (fn.arguments) {
-              functionSnapshot.arguments += fn.arguments;
+            if (fn.arguments != null) {
+              if (this.#hasAutoParseableTool) {
+                const eventState = this.#getChoiceEventState(choice);
+                let parseState = eventState.tool_call_parse_states.get(index);
+                if (!parseState) {
+                  parseState = createPartialJSONParseState();
+                  eventState.tool_call_parse_states.set(index, parseState);
+                }
 
-              if (shouldParseToolCall(this.#params, tool_call)) {
-                functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+                const shouldParse = recordPartialJSONFragment(
+                  parseState,
+                  this.#partialJSONParseBudget,
+                  fn.arguments,
+                );
+                functionSnapshot.arguments += fn.arguments;
+                if (
+                  shouldParse &&
+                  shouldParseToolCall(this.#params, tool_call) &&
+                  reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
+                ) {
+                  functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+                }
+              } else {
+                functionSnapshot.arguments += fn.arguments;
               }
             }
           }

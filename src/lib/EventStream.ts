@@ -1,5 +1,10 @@
 import { APIUserAbortError, OpenAIError } from '../error';
 
+const MAX_BUFFERED_ITERATOR_EVENTS = 4096;
+const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
+// Structured JSON may nest 128 levels before stream-event wrappers are added.
+const MAX_BUFFERED_EVENT_DEPTH = 256;
+
 type EventQueue<Value> = {
   readonly length: number;
   enqueue: (value: Value) => void;
@@ -42,6 +47,147 @@ function createEventQueue<Value>(): EventQueue<Value> {
       head = 0;
     },
   };
+}
+
+function estimateRetainedBufferBytes(
+  current: object,
+  visit: (value: unknown, depth: number) => void,
+  depth: number,
+): number | undefined {
+  if (ArrayBuffer.isView(current)) {
+    const prototype =
+      current instanceof DataView ? DataView.prototype : Object.getPrototypeOf(Uint8Array.prototype);
+    const buffer = Object.getOwnPropertyDescriptor(prototype, 'buffer')?.get?.call(current) as unknown;
+    if (typeof buffer !== 'object' || buffer === null) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    // Even a one-byte view retains its complete backing allocation.
+    visit(buffer, depth + 1);
+    return 0;
+  }
+
+  if (current instanceof ArrayBuffer) {
+    const byteLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get?.call(
+      current,
+    ) as unknown;
+    return typeof byteLength === 'number' ? byteLength : Number.POSITIVE_INFINITY;
+  }
+
+  if (typeof SharedArrayBuffer === 'function' && current instanceof SharedArrayBuffer) {
+    const byteLength = Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get?.call(
+      current,
+    ) as unknown;
+    return typeof byteLength === 'number' ? byteLength : Number.POSITIVE_INFINITY;
+  }
+
+  return undefined;
+}
+
+function visitHiddenEventValues(
+  current: object,
+  visit: (value: unknown, overhead: number) => boolean,
+): boolean {
+  if (current instanceof Map) {
+    for (const [key, entry] of Map.prototype.entries.call(current)) {
+      if (!visit(key, 8) || !visit(entry, 8)) {
+        return false;
+      }
+    }
+  }
+
+  if (current instanceof Set) {
+    for (const entry of Set.prototype.values.call(current)) {
+      if (!visit(entry, 8)) {
+        return false;
+      }
+    }
+  }
+
+  if (current instanceof Error) {
+    for (const key of ['message', 'cause', 'errors', 'stack', 'name']) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (
+        descriptor &&
+        !descriptor.enumerable &&
+        'value' in descriptor &&
+        !visit(descriptor.value, key.length * 2 + 8)
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function estimateBufferedEventBytes(value: unknown, remainingBytes: number): number {
+  let bytes = 0;
+  const visited = new WeakSet<object>();
+
+  const visit = (current: unknown, depth: number): void => {
+    if (bytes > remainingBytes) {
+      return;
+    }
+
+    if (typeof current === 'string') {
+      bytes += current.length * 2;
+      return;
+    }
+
+    if (current === null || typeof current !== 'object') {
+      bytes += 8;
+      return;
+    }
+
+    if (depth >= MAX_BUFFERED_EVENT_DEPTH) {
+      bytes = remainingBytes + 1;
+      return;
+    }
+
+    if (visited.has(current)) {
+      bytes += 8;
+      return;
+    }
+    visited.add(current);
+    bytes += 16;
+
+    const bufferBytes = estimateRetainedBufferBytes(current, visit, depth);
+    if (bufferBytes !== undefined) {
+      bytes += bufferBytes;
+      return;
+    }
+
+    if (
+      !visitHiddenEventValues(current, (hiddenValue, overhead) => {
+        bytes += overhead;
+        visit(hiddenValue, depth + 1);
+        return bytes <= remainingBytes;
+      })
+    ) {
+      return;
+    }
+
+    for (const key of Object.keys(current)) {
+      bytes += key.length * 2 + 8;
+      if (bytes > remainingBytes) {
+        return;
+      }
+
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (descriptor && 'value' in descriptor) {
+        visit(descriptor.value, depth + 1);
+      }
+    }
+  };
+
+  try {
+    visit(value, 0);
+  } catch {
+    return remainingBytes + 1;
+  }
+
+  return bytes;
 }
 
 /** An abortable event stream with typed listeners, asynchronous iteration, and lifecycle state. */
@@ -358,6 +504,8 @@ export class EventStream<EventTypes extends BaseEvents> {
    * here: the iterator ends when the stream ends, listeners are removed on
    * end/return, and a terminal error is retained until buffered values have
    * drained so it is surfaced even when no reader was waiting when it fired.
+   * Detached consumers have bounded event and byte queues; exceeding either
+   * limit fails the stream and aborts its underlying request.
    */
   protected _createIterator<T>(
     attach: (push: (value: T) => void) => () => void,
@@ -374,7 +522,9 @@ export class EventStream<EventTypes extends BaseEvents> {
     };
 
     const pushQueue = createEventQueue<T>();
+    const bufferedEventSizes = createEventQueue<number>();
     const readQueue = createEventQueue<Reader>();
+    let bufferedBytes = 0;
     let ended = this.ended;
     let failure: OpenAIError | undefined;
     let failureDelivered = false;
@@ -411,7 +561,28 @@ export class EventStream<EventTypes extends BaseEvents> {
       if (reader) {
         reader.resolve({ value, done: false });
       } else {
+        const remainingBytes = MAX_BUFFERED_ITERATOR_BYTES - bufferedBytes;
+        const eventBytes =
+          pushQueue.length < MAX_BUFFERED_ITERATOR_EVENTS
+            ? estimateBufferedEventBytes(value, remainingBytes)
+            : remainingBytes + 1;
+
+        if (pushQueue.length >= MAX_BUFFERED_ITERATOR_EVENTS || eventBytes > remainingBytes) {
+          const error = new OpenAIError(
+            `Event stream iterator buffer limit exceeded (${MAX_BUFFERED_ITERATOR_EVENTS} events or ${MAX_BUFFERED_ITERATOR_BYTES} bytes); consume events as they arrive.`,
+          );
+
+          try {
+            this.#handleError(error);
+          } finally {
+            this.controller.abort();
+          }
+          return;
+        }
+
         pushQueue.enqueue(value);
+        bufferedEventSizes.enqueue(eventBytes);
+        bufferedBytes += eventBytes;
       }
     };
     const onFailure = (error: OpenAIError) => {
@@ -443,7 +614,9 @@ export class EventStream<EventTypes extends BaseEvents> {
     return {
       next: (): Promise<Result> => {
         if (pushQueue.length) {
-          return Promise.resolve({ value: pushQueue.dequeue()!, done: false });
+          const value = pushQueue.dequeue()!;
+          bufferedBytes -= bufferedEventSizes.dequeue()!;
+          return Promise.resolve({ value, done: false });
         }
 
         if (failure && !failureDelivered) {
@@ -462,6 +635,8 @@ export class EventStream<EventTypes extends BaseEvents> {
       return: () => {
         ended = true;
         pushQueue.clear();
+        bufferedEventSizes.clear();
+        bufferedBytes = 0;
         cleanup();
         finishReaders();
         if (onReturn) {

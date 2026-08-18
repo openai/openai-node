@@ -336,6 +336,17 @@ export class AssistantStream
       return;
     }
 
+    switch (event.event) {
+      case 'thread.message.created':
+      case 'thread.message.in_progress':
+      case 'thread.message.delta':
+      case 'thread.message.completed':
+      case 'thread.message.incomplete': {
+        this.#validateMessageEvent(event);
+        break;
+      }
+    }
+
     this.#currentEvent = event;
 
     this.#handleEvent(event);
@@ -402,6 +413,46 @@ export class AssistantStream
     }
 
     return this.#finalRun;
+  }
+
+  #validateMessageEvent(event: MessageStreamEvent): void {
+    const messageID = event.data.id;
+
+    if (typeof messageID !== 'string' || messageID.length === 0) {
+      throw new OpenAIError('Received assistant message event with an invalid message ID');
+    }
+
+    if (event.event === 'thread.message.created') {
+      if (this.#messageSnapshot) {
+        throw new OpenAIError(
+          `Received message creation for "${messageID}" before the active message "${this.#messageSnapshot.id}" reached a terminal state`,
+        );
+      }
+
+      if (hasOwn(this.#messageSnapshots, messageID)) {
+        throw new OpenAIError(
+          `Received message creation for message "${messageID}", which has already been created`,
+        );
+      }
+
+      return;
+    }
+
+    if (!this.#messageSnapshot) {
+      if (event.event === 'thread.message.delta') {
+        throw new OpenAIError(
+          'Received a delta with no existing snapshot (there should be one from message creation)',
+        );
+      }
+
+      throw new OpenAIError('Received thread message event with no existing snapshot');
+    }
+
+    if (messageID !== this.#messageSnapshot.id) {
+      throw new OpenAIError(
+        `Received ${event.event} for message "${messageID}", which does not match the active message "${this.#messageSnapshot.id}"`,
+      );
+    }
   }
 
   #handleMessage(this: AssistantStream, event: MessageStreamEvent) {

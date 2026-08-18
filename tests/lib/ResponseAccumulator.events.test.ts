@@ -27,7 +27,12 @@ function makeResponse(output: OutputItem[] = []): Response {
 }
 
 function outputItem(value: Record<string, unknown>): OutputItem {
-  return value as unknown as OutputItem;
+  const { type } = value;
+  return {
+    id: 'item_123',
+    ...(type === 'function_call' || type === 'custom_tool_call' ? { call_id: 'call_123' } : {}),
+    ...value,
+  } as unknown as OutputItem;
 }
 
 function snapshotFor(item: Record<string, unknown>): Response {
@@ -39,7 +44,27 @@ function snapshotFor(item: Record<string, unknown>): Response {
 }
 
 function applyEvent(snapshot: Response, event: Record<string, unknown>): Response {
-  return accumulateResponse({ sequence_number: 1, ...event } as ResponseStreamEvent, snapshot);
+  const { type, output_index: outputIndex } = event;
+  const output =
+    typeof outputIndex === 'number' &&
+    Number.isSafeInteger(outputIndex) &&
+    hasOwn(snapshot.output, outputIndex)
+      ? snapshot.output[outputIndex]
+      : undefined;
+  const requiresItemID =
+    typeof type === 'string' &&
+    hasOwn(event, 'output_index') &&
+    !type.startsWith('response.output_item.') &&
+    !type.startsWith('response.shell_call_command.');
+
+  return accumulateResponse(
+    {
+      sequence_number: 1,
+      ...(requiresItemID && !hasOwn(event, 'item_id') ? { item_id: output?.id ?? 'item_123' } : {}),
+      ...event,
+    } as ResponseStreamEvent,
+    snapshot,
+  );
 }
 
 describe('ResponseAccumulator output and content events', () => {
@@ -196,7 +221,7 @@ describe('ResponseAccumulator output and content events', () => {
 
   test('appends output, content, and summary at their declared contiguous indices', () => {
     const outputSnapshot = snapshotFor({ type: 'function_call', id: 'original', arguments: '' });
-    const replayedOutput = { type: 'function_call', id: 'replayed', arguments: '' };
+    const replayedOutput = { type: 'function_call', id: 'replayed', call_id: 'call_replayed', arguments: '' };
 
     applyEvent(outputSnapshot, {
       type: 'response.output_item.added',
@@ -302,15 +327,19 @@ describe('ResponseAccumulator tool-call deltas', () => {
     expect(snapshot.output[0]).toMatchObject({ type: outputType, status: expectedStatus });
   });
 
-  test('does not apply tool-call events to a different output type', () => {
+  test('rejects tool-call events targeting a different output type', () => {
     const snapshot = snapshotFor({ type: 'message', content: [], status: 'in_progress' });
 
-    applyEvent(snapshot, {
-      type: 'response.function_call_arguments.delta',
-      output_index: 0,
-      delta: 'ignored',
-    });
-    applyEvent(snapshot, { type: 'response.file_search_call.completed', output_index: 0 });
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.function_call_arguments.delta',
+        output_index: 0,
+        delta: 'ignored',
+      }),
+    ).toThrow("expected output item type 'function_call', got 'message'");
+    expect(() =>
+      applyEvent(snapshot, { type: 'response.file_search_call.completed', output_index: 0 }),
+    ).toThrow("expected output item type 'file_search_call', got 'message'");
 
     expect(snapshot.output[0]).toMatchObject({ type: 'message', status: 'in_progress' });
   });
@@ -516,7 +545,7 @@ describe('ResponseAccumulator hosted shell events', () => {
     ).toThrow('missing content at index 0');
   });
 
-  test('does not apply hosted shell events to an incompatible output item', () => {
+  test('rejects hosted shell output events targeting an incompatible output item', () => {
     const snapshot = snapshotFor({ type: 'message', content: [], status: 'in_progress' });
 
     applyEvent(snapshot, {
@@ -525,14 +554,17 @@ describe('ResponseAccumulator hosted shell events', () => {
       command_index: 0,
       command: 'ignored',
     });
-    applyEvent(snapshot, {
-      type: 'response.shell_call_output_content.delta',
-      output_index: 0,
-      command_index: 0,
-      delta: { stdout: 'ignored' },
-    });
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.shell_call_output_content.delta',
+        output_index: 0,
+        command_index: 0,
+        delta: { stdout: 'ignored' },
+      }),
+    ).toThrow("expected output item type 'shell_call_output', got 'message'");
 
     expect(snapshot.output[0]).toEqual({
+      id: 'item_123',
       type: 'message',
       content: [],
       status: 'in_progress',
@@ -629,16 +661,23 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     'response.audio.done',
     'response.audio.transcript.delta',
     'response.audio.transcript.done',
-    'response.image_generation_call.partial_image',
-    'response.mcp_list_tools.in_progress',
-    'response.mcp_list_tools.completed',
-    'response.mcp_list_tools.failed',
     'keepalive',
     'error',
   ])('ignores stateless %s events', (type) => {
     const snapshot = makeResponse();
 
     expect(applyEvent(snapshot, { type })).toBe(snapshot);
+  });
+
+  test.each([
+    ['response.image_generation_call.partial_image', 'image_generation_call'],
+    ['response.mcp_list_tools.in_progress', 'mcp_list_tools'],
+    ['response.mcp_list_tools.completed', 'mcp_list_tools'],
+    ['response.mcp_list_tools.failed', 'mcp_list_tools'],
+  ])('validates but does not accumulate %s events', (type, itemType) => {
+    const snapshot = snapshotFor({ type: itemType });
+
+    expect(applyEvent(snapshot, { type, output_index: 0 })).toBe(snapshot);
   });
 
   test('requires a created event before receiving incremental updates', () => {

@@ -32,7 +32,7 @@ const message = (index: number, content: Content[] = []): ResponseOutputMessage 
   status: 'in_progress',
   content,
 });
-const tool = (index: number): Output => ({
+const tool = (index: number): Extract<Output, { type: 'function_call' }> => ({
   id: `tool_${index}`,
   type: 'function_call',
   call_id: `call_${index}`,
@@ -143,17 +143,18 @@ function middleEvents(count: number, kind: 'added' | 'delta') {
   const earlier = 16;
   const last = count - 1;
   const parts = Array.from({ length: count }, (_, index) => [String.fromCodePoint(65 + index)]);
+  const initialOutput = (index: number): Output => {
+    if (index === earlier) {
+      return message(index, [refusal(), text('')]);
+    }
+    if (index >= middle && index < middle + count) {
+      return message(index, [text(requiredAt(requiredAt(parts, index - middle), 0)), refusal()]);
+    }
+    return tool(index);
+  };
   const events = [
     created(),
-    ...Array.from({ length: 257 }, (_, index) =>
-      outputFrame(
-        'added',
-        index,
-        index >= middle && index < middle + count
-          ? message(index, [text(requiredAt(requiredAt(parts, index - middle), 0)), refusal()])
-          : tool(index),
-      ),
-    ),
+    ...Array.from({ length: 257 }, (_, index) => outputFrame('added', index, initialOutput(index))),
   ];
   const expected = new Map<number, string>();
   let prefix = '';
@@ -162,11 +163,11 @@ function middleEvents(count: number, kind: 'added' | 'delta') {
     events.push(event);
     expected.set(events.length - 1, canonical());
   };
-  const replaceEarlier = (value: string, type: 'output' | 'content' | 'tool' | 'delta') => {
+  const replaceEarlier = (value: string, type: 'output' | 'content' | 'delta') => {
     prefix = type === 'delta' ? prefix + value : value;
-    const item = type === 'tool' ? tool(earlier) : message(earlier, [refusal(), text(value)]);
+    const item = message(earlier, [refusal(), text(value)]);
     let event: ResponseStreamEvent;
-    if (type === 'output' || type === 'tool') {
+    if (type === 'output') {
       event = outputFrame('done', earlier, item);
     } else if (type === 'delta') {
       event = textFrame('delta', earlier, 1, value);
@@ -205,7 +206,7 @@ function middleEvents(count: number, kind: 'added' | 'delta') {
     [88, () => appendPart(last, '++', 'delta', true)],
     [96, () => replaceMiddle(0, 'first replacement')],
     [112, () => replaceMiddle(last, 'a much longer last replacement')],
-    [128, () => replaceEarlier('', 'tool')],
+    [128, () => replaceEarlier('', 'output')],
     [160, () => replaceEarlier('back', 'output')],
     [176, () => replaceMiddle(1, 'middle replacement', true)],
     [192, () => replaceEarlier('!', 'delta')],
@@ -321,8 +322,18 @@ describe('canonical streamed response output text', () => {
     ['earlier output delta', [first(), second()], textFrame('delta', 0, 0, 'X'), 'AXB'],
     ['earlier content delta', [both()], textFrame('delta', 0, 0, 'X'), 'AXB'],
     ['earlier content append', [first(), second()], contentFrame('added', 0, 1, text('X')), 'AXB'],
-    ['message becomes tool', [first(), second()], outputFrame('done', 0, tool(0)), 'B'],
-    ['tool becomes message', [tool(0), second()], outputFrame('done', 0, first()), 'AB'],
+    [
+      'message output is replaced without changing identity',
+      [first(), second()],
+      outputFrame('done', 0, message(0, [text('replacement')])),
+      'replacementB',
+    ],
+    [
+      'tool output is replaced without changing identity',
+      [tool(0), second()],
+      outputFrame('done', 0, { ...tool(0), arguments: '{"value":1}' }),
+      'B',
+    ],
     ['text becomes refusal', [both()], contentFrame('done', 0, 0, refusal()), 'B'],
     [
       'refusal becomes text',

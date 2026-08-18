@@ -5,11 +5,16 @@ import type { BaseEvents } from 'openai/lib/EventStream';
 
 interface TestEvents extends BaseEvents {
   foo: (value: string, index: number) => void;
+  payload: (value: unknown) => void;
 }
 
 class TestStream extends EventStream<TestEvents> {
   emitFoo(value: string, index: number) {
     this._emit('foo', value, index);
+  }
+
+  emitPayload(value: unknown) {
+    this._emit('payload', value);
   }
 
   emitNamed(event: string, value: string, index: number) {
@@ -232,5 +237,207 @@ describe('EventStream.events', () => {
     } finally {
       reject.mockRestore();
     }
+  });
+});
+
+describe('EventStream iterator buffer limits', () => {
+  test('aborts detached iterators after the queued-event high-water mark', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('foo');
+    const bufferedEvents = 4096;
+
+    for (let index = 0; index < bufferedEvents; index += 1) {
+      stream.emitFoo('buffered', index);
+    }
+
+    expect(stream.controller.signal.aborted).toBe(false);
+
+    stream.emitFoo('overflow', bufferedEvents);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(stream.ended).toBe(true);
+    expect(stream.errored).toBe(true);
+    await expect(stream.done()).rejects.toThrow(/iterator buffer limit/iu);
+
+    const buffered = await Promise.all(Array.from({ length: bufferedEvents }, () => iterator.next()));
+
+    expect(buffered.every((result, index) => !result.done && result.value[1] === index)).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/4096 events/iu);
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
+  });
+
+  test('aborts detached iterators when nested event payloads exceed the byte high-water mark', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const fragment = 'x'.repeat(1024 * 1024);
+    let emitted = 0;
+
+    while (!stream.controller.signal.aborted && emitted < 8) {
+      stream.emitPayload({ nested: [{ text: fragment }] });
+      emitted += 1;
+    }
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(emitted).toBeLessThanOrEqual(4);
+    await expect(stream.done()).rejects.toThrow(/8388608 bytes/iu);
+
+    const buffered = await Promise.all(Array.from({ length: emitted - 1 }, () => iterator.next()));
+
+    expect(buffered.every((result) => !result.done)).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects an oversized event before retaining it', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload({ text: 'x'.repeat(4 * 1024 * 1024 + 1) });
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
+  });
+
+  test.each([
+    { name: 'Map keys', create: (value: string) => new Map([[value, 'small']]) },
+    { name: 'Map values', create: (value: string) => new Map([['small', value]]) },
+    { name: 'Set values', create: (value: string) => new Set([value]) },
+    { name: 'non-enumerable Error messages', create: (value: string) => new Error(value) },
+    {
+      name: 'non-enumerable Error causes',
+      create: (value: string) => {
+        const error = new Error('small');
+        Object.defineProperty(error, 'cause', { value, enumerable: false });
+        return error;
+      },
+    },
+  ])('rejects oversized data hidden in $name', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(create('x'.repeat(5 * 1024 * 1024)));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([
+    { name: 'SharedArrayBuffer', create: () => new SharedArrayBuffer(9 * 1024 * 1024) },
+    {
+      name: 'ArrayBuffer-backed views',
+      create: () => new Uint8Array(new ArrayBuffer(9 * 1024 * 1024), 0, 1),
+    },
+    {
+      name: 'SharedArrayBuffer-backed views',
+      create: () => new Uint8Array(new SharedArrayBuffer(9 * 1024 * 1024), 0, 1),
+    },
+  ])('accounts for the entire retained backing store of $name', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(create());
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('delivers oversized events directly to waiting consumers without buffering', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const next = iterator.next();
+    const payload = { text: 'x'.repeat(4 * 1024 * 1024 + 1) };
+
+    stream.emitPayload(payload);
+
+    await expect(next).resolves.toEqual({ done: false, value: [payload] });
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test('restores the byte budget when buffered events are consumed', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = { text: 'x'.repeat(1024 * 1024) };
+
+    const received = await Promise.all(
+      Array.from({ length: 12 }, () => {
+        stream.emitPayload(payload);
+        return iterator.next();
+      }),
+    );
+
+    expect(received.every((result) => !result.done && result.value[0] === payload)).toBe(true);
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test('buffers valid deeply nested parsed event snapshots without aborting the request', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    let parsed: unknown = 0;
+
+    for (let depth = 0; depth < 128; depth += 1) {
+      parsed = [parsed];
+    }
+
+    const payload = { snapshot: 'valid nested JSON', parsed };
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(false);
+
+    const result = await iterator.next();
+
+    expect(result.done).toBe(false);
+    expect(result.value?.[0]).toBe(payload);
+    stream.end();
+  });
+
+  test('sizes cyclic event payloads without invoking accessor properties', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const readAccessor = vi.fn(() => {
+      throw new Error('accessor should not run');
+    });
+    const payload: { self?: unknown } = {};
+
+    payload.self = payload;
+    Object.defineProperty(payload, 'accessor', { enumerable: true, get: readAccessor });
+    stream.emitPayload(payload);
+
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(readAccessor).not.toHaveBeenCalled();
+    stream.end();
+  });
+
+  test('sizes cyclic Maps, Sets, and Error causes without invoking accessor properties', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const readAccessor = vi.fn(() => {
+      throw new Error('accessor should not run');
+    });
+    const map = new Map<unknown, unknown>();
+    const set = new Set<unknown>();
+    const error = new Error('small');
+    const backingBuffer = new ArrayBuffer(16);
+    const view = new Uint8Array(backingBuffer);
+    const payload = { map, set, error, view, backingBuffer };
+
+    map.set(map, set);
+    set.add(map);
+    Object.defineProperty(error, 'cause', { value: error, enumerable: false });
+    Object.defineProperty(map, 'accessor', { enumerable: true, get: readAccessor });
+    Object.defineProperty(map, 'entries', { enumerable: true, get: readAccessor });
+    Object.defineProperty(set, Symbol.iterator, { get: readAccessor });
+    Object.defineProperty(error, 'hiddenAccessor', { enumerable: false, get: readAccessor });
+    Object.defineProperty(backingBuffer, 'byteLength', { enumerable: true, get: readAccessor });
+    Object.defineProperty(view, 'buffer', { enumerable: true, get: readAccessor });
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+
+    expect(result.value?.[0]).toBe(payload);
+    expect(stream.controller.signal.aborted).toBe(false);
+    expect(readAccessor).not.toHaveBeenCalled();
+    stream.end();
   });
 });

@@ -17,6 +17,7 @@ interface ResponseKeepAliveEvent {
 }
 
 type ResponseAccumulatorEvent = ResponseStreamEvent | ResponseKeepAliveEvent;
+type ResponseItemScopedEvent = Extract<ResponseAccumulatorEvent, { item_id: string; output_index: number }>;
 type ResponseOutputItemEvent = Extract<
   ResponseAccumulatorEvent,
   { type: 'response.output_item.added' | 'response.output_item.done' }
@@ -136,6 +137,15 @@ type ResponseIgnoredEvent = Extract<
   }
 >;
 
+interface ResponseOutputIdentityIndex {
+  snapshot: Response;
+  output: Response['output'];
+  length: number;
+  identities: Set<string>;
+}
+
+const responseOutputIdentityIndexes = new WeakMap<ResponseAccumulatorContext, ResponseOutputIdentityIndex>();
+
 function validateArrayIndex(
   collection: readonly unknown[],
   index: number,
@@ -170,6 +180,210 @@ function getOutput(snapshot: Response, outputIndex: number): Response['output'][
     throw new OpenAIError(`missing output at index ${outputIndex}`);
   }
   return output;
+}
+
+function getOutputItemIdentityKeys(output: Response['output'][number], eventType: string): string[] {
+  if (!hasOwn(output, 'type') || typeof output.type !== 'string') {
+    throw new OpenAIError(`expected an own output item type for ${eventType}`);
+  }
+
+  const optionalPlatformID = output.type === 'function_call' || output.type === 'custom_tool_call';
+  const identities: string[] = [];
+
+  if (hasOwn(output, 'id')) {
+    if (typeof output.id !== 'string' || output.id.length === 0) {
+      throw new OpenAIError(`expected a non-empty output item id for ${eventType}`);
+    }
+    identities.push(`id:${output.id}`);
+  } else if (!optionalPlatformID) {
+    throw new OpenAIError(`expected a non-empty output item id for ${eventType}`);
+  }
+
+  if (optionalPlatformID) {
+    if (!hasOwn(output, 'call_id') || typeof output.call_id !== 'string' || output.call_id.length === 0) {
+      throw new OpenAIError(`expected a non-empty output item call_id for ${eventType}`);
+    }
+    identities.push(`call:${output.type}:${output.call_id}`);
+  }
+
+  return identities;
+}
+
+function assertOutputItemIdentitiesAvailable(identities: Set<string>, keys: readonly string[]): void {
+  for (const key of keys) {
+    if (identities.has(key)) {
+      throw new OpenAIError(`duplicate output item identity '${key}'`);
+    }
+  }
+}
+
+function addOutputItemIdentities(identities: Set<string>, keys: readonly string[]): void {
+  assertOutputItemIdentitiesAvailable(identities, keys);
+  for (const key of keys) {
+    identities.add(key);
+  }
+}
+
+function createResponseOutputIdentityIndex(snapshot: Response): ResponseOutputIdentityIndex {
+  const identityIndex: ResponseOutputIdentityIndex = {
+    snapshot,
+    output: snapshot.output,
+    length: snapshot.output.length,
+    identities: new Set(),
+  };
+
+  for (let index = 0; index < snapshot.output.length; index += 1) {
+    const output = getOutput(snapshot, index);
+    addOutputItemIdentities(identityIndex.identities, getOutputItemIdentityKeys(output, 'response snapshot'));
+  }
+
+  return identityIndex;
+}
+
+function getResponseOutputIdentityIndex(
+  context: ResponseAccumulatorContext,
+  snapshot: Response,
+): ResponseOutputIdentityIndex {
+  const cached = responseOutputIdentityIndexes.get(context);
+  if (
+    cached &&
+    cached.snapshot === snapshot &&
+    cached.output === snapshot.output &&
+    cached.length === snapshot.output.length
+  ) {
+    return cached;
+  }
+
+  const identityIndex = createResponseOutputIdentityIndex(snapshot);
+  responseOutputIdentityIndexes.set(context, identityIndex);
+  return identityIndex;
+}
+
+function cloneValidatedResponse(context: ResponseAccumulatorContext, response: Response): Response {
+  const { identities } = createResponseOutputIdentityIndex(response);
+  const snapshot = cloneResponse(context, response);
+
+  responseOutputIdentityIndexes.set(context, {
+    snapshot,
+    output: snapshot.output,
+    length: snapshot.output.length,
+    identities: new Set(identities),
+  });
+
+  return snapshot;
+}
+
+const expectedOutputItemTypes = {
+  'response.output_text.delta': 'message',
+  'response.output_text.done': 'message',
+  'response.output_text.annotation.added': 'message',
+  'response.refusal.delta': 'message',
+  'response.refusal.done': 'message',
+  'response.function_call_arguments.delta': 'function_call',
+  'response.function_call_arguments.done': 'function_call',
+  'response.custom_tool_call_input.delta': 'custom_tool_call',
+  'response.custom_tool_call_input.done': 'custom_tool_call',
+  'response.mcp_call_arguments.delta': 'mcp_call',
+  'response.mcp_call_arguments.done': 'mcp_call',
+  'response.mcp_call.in_progress': 'mcp_call',
+  'response.mcp_call.completed': 'mcp_call',
+  'response.mcp_call.failed': 'mcp_call',
+  'response.shell_call_output_content.delta': 'shell_call_output',
+  'response.shell_call_output_content.done': 'shell_call_output',
+  'response.reasoning_text.delta': 'reasoning',
+  'response.reasoning_text.done': 'reasoning',
+  'response.reasoning_summary_part.added': 'reasoning',
+  'response.reasoning_summary_part.done': 'reasoning',
+  'response.reasoning_summary_text.delta': 'reasoning',
+  'response.reasoning_summary_text.done': 'reasoning',
+  'response.code_interpreter_call_code.delta': 'code_interpreter_call',
+  'response.code_interpreter_call_code.done': 'code_interpreter_call',
+  'response.code_interpreter_call.in_progress': 'code_interpreter_call',
+  'response.code_interpreter_call.interpreting': 'code_interpreter_call',
+  'response.code_interpreter_call.completed': 'code_interpreter_call',
+  'response.file_search_call.in_progress': 'file_search_call',
+  'response.file_search_call.searching': 'file_search_call',
+  'response.file_search_call.completed': 'file_search_call',
+  'response.web_search_call.in_progress': 'web_search_call',
+  'response.web_search_call.searching': 'web_search_call',
+  'response.web_search_call.completed': 'web_search_call',
+  'response.image_generation_call.in_progress': 'image_generation_call',
+  'response.image_generation_call.generating': 'image_generation_call',
+  'response.image_generation_call.completed': 'image_generation_call',
+  'response.image_generation_call.partial_image': 'image_generation_call',
+  'response.mcp_list_tools.in_progress': 'mcp_list_tools',
+  'response.mcp_list_tools.completed': 'mcp_list_tools',
+  'response.mcp_list_tools.failed': 'mcp_list_tools',
+} satisfies Record<
+  Exclude<ResponseItemScopedEvent['type'], 'response.content_part.added' | 'response.content_part.done'>,
+  Response['output'][number]['type']
+>;
+
+function getExpectedOutputItemType(event: ResponseItemScopedEvent): Response['output'][number]['type'] {
+  if (event.type === 'response.content_part.added' || event.type === 'response.content_part.done') {
+    return event.part.type === 'reasoning_text' ? 'reasoning' : 'message';
+  }
+
+  return expectedOutputItemTypes[event.type];
+}
+
+function validateCompletedOutputItemIdentity(
+  event: Extract<ResponseOutputItemEvent, { type: 'response.output_item.done' }>,
+  snapshot: Response,
+): void {
+  const output = getOutput(snapshot, event.output_index);
+  const replacement = event.item;
+  getOutputItemIdentityKeys(output, event.type);
+  getOutputItemIdentityKeys(replacement, event.type);
+
+  if (!hasOwn(replacement, 'type') || output.type !== replacement.type) {
+    throw new OpenAIError(`expected output item type '${output.type}', got '${replacement.type}'`);
+  }
+
+  const outputID = hasOwn(output, 'id') ? output.id : undefined;
+  const replacementID = hasOwn(replacement, 'id') ? replacement.id : undefined;
+  if (outputID !== replacementID) {
+    throw new OpenAIError(`expected output item id '${outputID}', got '${replacementID}'`);
+  }
+
+  if (
+    (output.type === 'function_call' || output.type === 'custom_tool_call') &&
+    (replacement.type === 'function_call' || replacement.type === 'custom_tool_call') &&
+    output.call_id !== replacement.call_id
+  ) {
+    throw new OpenAIError(`expected output item call_id '${output.call_id}', got '${replacement.call_id}'`);
+  }
+}
+
+function validateOutputItemIdentity(event: ResponseAccumulatorEvent, snapshot: Response): void {
+  if (event.type === 'response.output_item.done') {
+    validateCompletedOutputItemIdentity(event, snapshot);
+    return;
+  }
+
+  if (
+    event.type !== 'response.content_part.added' &&
+    event.type !== 'response.content_part.done' &&
+    !hasOwn(expectedOutputItemTypes, event.type)
+  ) {
+    return;
+  }
+
+  const itemEvent = event as ResponseItemScopedEvent;
+  if (!hasOwn(event, 'item_id') || typeof itemEvent.item_id !== 'string' || itemEvent.item_id.length === 0) {
+    throw new OpenAIError(`expected a non-empty item_id for ${event.type}`);
+  }
+
+  const output = getOutput(snapshot, itemEvent.output_index);
+  const outputID = hasOwn(output, 'id') ? output.id : undefined;
+  if (outputID !== itemEvent.item_id) {
+    throw new OpenAIError(`expected item_id '${outputID}', got '${itemEvent.item_id}'`);
+  }
+
+  const expectedType = getExpectedOutputItemType(itemEvent);
+  if (output.type !== expectedType) {
+    throw new OpenAIError(`expected output item type '${expectedType}', got '${output.type}'`);
+  }
 }
 
 function getContent<T>(content: T[], contentIndex: number): T {
@@ -312,11 +526,16 @@ function accumulateOutputItemEvent(
   switch (event.type) {
     case 'response.output_item.added': {
       validateArrayAppend(snapshot.output, event.output_index, 'output');
+      const identityIndex = getResponseOutputIdentityIndex(context, snapshot);
+      const identities = getOutputItemIdentityKeys(event.item, event.type);
+      assertOutputItemIdentitiesAvailable(identityIndex.identities, identities);
       const output = structuredClone(event.item);
       if (output.type === 'message') {
         ensureCanonicalOutputText(context, snapshot);
       }
       snapshot.output.push(output);
+      addOutputItemIdentities(identityIndex.identities, identities);
+      identityIndex.length = snapshot.output.length;
       const text = getOutputText(context, output);
       if (context.canonicalSnapshot === snapshot) {
         context.outputTextIndex.append(text.length);
@@ -895,8 +1114,10 @@ export function accumulateResponseWithContext(
         `When snapshot hasn't been set yet, expected 'response.created' event, got ${dispatchEvent.type}`,
       );
     }
-    return cloneResponse(context, dispatchEvent.response);
+    return cloneValidatedResponse(context, dispatchEvent.response);
   }
+
+  validateOutputItemIdentity(dispatchEvent, snapshot);
 
   if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
     return snapshot;
@@ -930,7 +1151,7 @@ export function accumulateResponseWithContext(
   }
 
   if (isResponseLifecycleEvent(dispatchEvent)) {
-    return cloneResponse(context, dispatchEvent.response);
+    return cloneValidatedResponse(context, dispatchEvent.response);
   }
   if (isIgnoredResponseEvent(dispatchEvent)) {
     return snapshot;
