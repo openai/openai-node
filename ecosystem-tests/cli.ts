@@ -19,6 +19,71 @@ async function defaultNodeRunner() {
   }
 }
 
+async function writeCloudflareCredentialFile(
+  file: Awaited<ReturnType<typeof fs.open>>,
+  contents: Buffer,
+): Promise<void> {
+  await file.truncate(0);
+
+  let offset = 0;
+  while (offset < contents.length) {
+    const { bytesWritten } = await file.write(contents, offset, contents.length - offset, offset);
+    if (bytesWritten === 0) {
+      throw new Error('Unable to update the Cloudflare credential file.');
+    }
+    offset += bytesWritten;
+  }
+}
+
+async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Promise<void>): Promise<void> {
+  const credentialPath = '.dev.vars';
+  const flags = fs.constants.O_RDWR + fs.constants.O_NOFOLLOW + fs.constants.O_NONBLOCK;
+  let file: Awaited<ReturnType<typeof fs.open>>;
+  let created = false;
+
+  try {
+    file = await fs.open(credentialPath, flags);
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+      throw error;
+    }
+
+    file = await fs.open(credentialPath, flags + fs.constants.O_CREAT + fs.constants.O_EXCL, 0o600);
+    created = true;
+  }
+
+  let previousContents: Buffer | undefined;
+  let previousMode: number | undefined;
+
+  try {
+    const metadata = await file.stat();
+    if (!metadata.isFile() || metadata.nlink !== 1) {
+      throw new Error('The Cloudflare credential path must be an unshared regular file.');
+    }
+
+    if (!created) {
+      previousContents = await file.readFile();
+      previousMode = metadata.mode % 4096;
+    }
+
+    await file.chmod(0o600);
+    await writeCloudflareCredentialFile(file, Buffer.from(`OPENAI_API_KEY='${apiKey}'`));
+    await runLiveTest();
+  } finally {
+    try {
+      if (created) {
+        await file.truncate(0);
+        await fs.unlink(credentialPath);
+      } else if (previousContents !== undefined && previousMode !== undefined) {
+        await writeCloudflareCredentialFile(file, previousContents);
+        await file.chmod(previousMode);
+      }
+    } finally {
+      await file.close();
+    }
+  }
+}
+
 const projectRunners = {
   'node-ts-cjs': defaultNodeRunner,
   'node-ts-cjs-web': defaultNodeRunner,
@@ -70,15 +135,14 @@ const projectRunners = {
   },
   'cloudflare-worker': async () => {
     await installPackage();
-
-    const apiKey = process.env['OPENAI_API_KEY'];
-    if (apiKey) {
-      await fs.writeFile('.dev.vars', `OPENAI_API_KEY='${apiKey}'`);
-    }
     await run('npm', ['run', 'tsc']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      const apiKey = process.env['OPENAI_API_KEY'];
+      assert.ok(apiKey);
+      await withCloudflareCredentials(apiKey, async () => {
+        await run('npm', ['run', 'test:ci']);
+      });
     }
     if (state.deploy) {
       await run('npm', ['run', 'deploy']);
