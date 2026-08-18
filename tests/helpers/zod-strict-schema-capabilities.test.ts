@@ -99,8 +99,14 @@ describe('Zod v3 strict schema capability analysis', () => {
       schema: () =>
         z3
           .intersection(
-            z3.string().transform((value) => new Date(value)),
-            z3.string().transform((value) => new Date(value)),
+            z3
+              .string()
+              .transform((value) => new Date(value))
+              .pipe(z3.date()),
+            z3
+              .string()
+              .transform((value) => new Date(value))
+              .pipe(z3.date()),
           )
           .pipe(z3.date()),
     },
@@ -1297,6 +1303,64 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
   });
 
   it.each([
+    { name: 'RegExp', value: () => /x/u as object },
+    { name: 'cross-realm RegExp', value: () => runInNewContext('/x/u') as object },
+    { name: 'null-prototype RegExp', value: () => Object.setPrototypeOf(/x/u, null) as object },
+    { name: 'WeakMap', value: () => new WeakMap<object, number>() as object },
+    { name: 'cross-realm WeakSet', value: () => runInNewContext('new WeakSet()') as object },
+    { name: 'Promise', value: () => Promise.resolve(1) as object },
+    { name: 'Error', value: () => new Error('hidden') as object },
+    { name: 'ArrayBuffer', value: () => new ArrayBuffer(4) as object },
+    { name: 'cross-realm ArrayBuffer', value: () => runInNewContext('new ArrayBuffer(4)') as object },
+    {
+      name: 'null-prototype ArrayBuffer',
+      value: () => Object.setPrototypeOf(new ArrayBuffer(4), null) as object,
+    },
+    { name: 'DataView', value: () => new DataView(new ArrayBuffer(4)) as object },
+    { name: 'typed array', value: () => new Uint8Array([1, 2]) as object },
+  ])('rejects a genuine $name default with hidden internal slots', ({ value }) => {
+    expect(() => create(z3.object({ value: z3.any().default(value()) }))).toThrow('internal slots');
+    expect(() => create(z3.object({ value: z3.unknown().default({ nested: value() }) }))).toThrow(
+      'internal slots',
+    );
+  });
+
+  it('detects RegExp default slots without invoking hostile accessors or tags', () => {
+    const getter = vi.fn(() => {
+      throw new Error('must never run');
+    });
+    const prototype = Object.defineProperty({}, Symbol.toStringTag, { get: getter });
+    const value = Object.setPrototypeOf(/x/u, prototype);
+    Object.defineProperty(value, 'toJSON', { enumerable: true, get: getter });
+
+    expect(() => create(z3.object({ value: z3.any().default(value) }))).toThrow('internal slots');
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it('preserves a plain custom default prototype without invoking its toStringTag getter', () => {
+    const getter = vi.fn(() => 'RegExp');
+    const prototype = Object.defineProperty({}, Symbol.toStringTag, { get: getter });
+    const value = Object.assign(Object.create(prototype) as { label: string }, { label: 'safe' });
+    const result = create(z3.object({ value: z3.any().default(value) }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value.default', { label: 'safe' });
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'null-prototype Date',
+      value: () => Object.setPrototypeOf(new Date('2026-01-01T00:00:00.000Z'), null) as object,
+    },
+    {
+      name: 'cross-realm Date',
+      value: () => runInNewContext("new Date('2026-01-01T00:00:00.000Z')") as object,
+    },
+  ])('rejects an unsupported $name default without trusting its prototype', ({ value }) => {
+    expect(() => create(z3.object({ value: z3.any().default(value()) }))).toThrow('invalid or customized');
+  });
+
+  it.each([
     { name: 'coerced minimum', schema: () => z3.coerce.date().min(new Date('2025-01-01T00:00:00.000Z')) },
     { name: 'coerced maximum', schema: () => z3.coerce.date().max(new Date('2025-12-31T00:00:00.000Z')) },
     {
@@ -1786,6 +1850,54 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
 
   it.each([
     {
+      name: 'nullable BigInt before nullable number',
+      schema: () => z3.intersection(z3.coerce.bigint().nullable(), z3.number().nullable()),
+    },
+    {
+      name: 'nullable number before nullable BigInt',
+      schema: () => z3.intersection(z3.number().nullable(), z3.coerce.bigint().nullable()),
+    },
+    {
+      name: 'readonly lazy nullable BigInt',
+      schema: () =>
+        z3.intersection(
+          z3.lazy(() => z3.coerce.bigint().nullable().readonly()),
+          z3.number().nullable(),
+        ),
+    },
+    {
+      name: 'nullable nested object properties',
+      schema: () =>
+        z3.intersection(
+          z3.object({ count: z3.coerce.bigint().nullable() }),
+          z3.object({ count: z3.number().nullable() }),
+        ),
+    },
+    {
+      name: 'nullable array items',
+      schema: () =>
+        z3.intersection(z3.array(z3.coerce.bigint().nullable()), z3.array(z3.number().nullable())),
+    },
+    {
+      name: 'explicit null unions',
+      schema: () =>
+        z3.intersection(z3.union([z3.null(), z3.coerce.bigint()]), z3.union([z3.null(), z3.number()])),
+    },
+  ])('rejects incompatible non-null $name intersection outputs', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
+  });
+
+  it('preserves compatible nullable numeric intersection outputs', () => {
+    const nullable = create(
+      z3.object({ value: z3.intersection(z3.number().nullable(), z3.number().nullable()) }),
+    );
+
+    expect(nullable.$parseRaw('{"value":7}')).toEqual({ value: 7 });
+    expect(nullable.$parseRaw('{"value":null}')).toEqual({ value: null });
+  });
+
+  it.each([
+    {
       name: 'coerced BigInt before number',
       schema: () => z3.intersection(z3.coerce.bigint(), z3.number()),
     },
@@ -1928,6 +2040,48 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
 
   it.each([
     {
+      name: 'two direct numeric transforms',
+      schema: (first: (value: number) => number, second: (value: number) => number) =>
+        z3.intersection(z3.number().transform(first), z3.number().transform(second)).pipe(z3.number()),
+    },
+    {
+      name: 'readonly lazy numeric transforms',
+      schema: (first: (value: number) => number, second: (value: number) => number) =>
+        z3
+          .intersection(
+            z3.lazy(() => z3.number().transform(first).readonly()),
+            z3.number().transform(second),
+          )
+          .pipe(z3.number()),
+    },
+    {
+      name: 'nullable downstream output',
+      schema: (first: (value: number) => number, second: (value: number) => number) =>
+        z3
+          .intersection(z3.number().transform(first), z3.number().transform(second))
+          .pipe(z3.number().nullable()),
+    },
+    {
+      name: 'nested object transforms',
+      schema: (first: (value: number) => number, second: (value: number) => number) =>
+        z3
+          .intersection(
+            z3.object({ count: z3.number().transform(first) }),
+            z3.object({ count: z3.number().transform(second) }),
+          )
+          .pipe(z3.object({ count: z3.number() })),
+    },
+  ])('rejects $name before a downstream pipeline can validate opaque values', ({ schema }) => {
+    const first = vi.fn(() => 1);
+    const second = vi.fn(() => 2);
+
+    expect(() => create(z3.object({ value: schema(first, second) }))).toThrow('incompatible parsed outputs');
+    expect(first).not.toHaveBeenCalled();
+    expect(second).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
       name: 'opaque arm before a numeric arm',
       schema: (convert: (value: number) => bigint) =>
         z3.intersection(z3.number().transform(convert), z3.number()).pipe(z3.number()),
@@ -2028,6 +2182,68 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     const value = z3.intersection(z3.coerce.bigint().catch(fallback), z3.number());
 
     expect(() => create(z3.object({ value }))).toThrow('incompatible parsed outputs');
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'caught refinement before number',
+      schema: (refine: (value: number) => boolean) =>
+        z3.intersection(z3.number().refine(refine).catch(0), z3.number()),
+    },
+    {
+      name: 'number before a caught refinement',
+      schema: (refine: (value: number) => boolean) =>
+        z3.intersection(z3.number(), z3.number().refine(refine).catch(0)),
+    },
+    {
+      name: 'readonly lazy caught refinement',
+      schema: (refine: (value: number) => boolean) =>
+        z3.intersection(
+          z3.lazy(() => z3.number().refine(refine).catch(0).readonly()),
+          z3.number(),
+        ),
+    },
+    {
+      name: 'nested object caught refinement',
+      schema: (refine: (value: number) => boolean) =>
+        z3.intersection(
+          z3.object({ count: z3.number().refine(refine).catch(0) }),
+          z3.object({ count: z3.number() }),
+        ),
+    },
+    {
+      name: 'nested array caught refinement',
+      schema: (refine: (value: number) => boolean) =>
+        z3.intersection(z3.array(z3.number().refine(refine).catch(0)), z3.array(z3.number())),
+    },
+    {
+      name: 'caught object with a nested refinement',
+      schema: (refine: (value: number) => boolean) =>
+        z3.intersection(
+          z3.object({ count: z3.number().refine(refine) }).catch({ count: 0 }),
+          z3.object({ count: z3.number() }),
+        ),
+    },
+    {
+      name: 'caught array with a nested refinement',
+      schema: (refine: (value: number) => boolean) =>
+        z3.intersection(z3.array(z3.number().refine(refine)).catch([0]), z3.array(z3.number())),
+    },
+  ])('rejects an opaque $name intersection fallback without invoking refinements', ({ schema }) => {
+    const refine = vi.fn(() => false);
+
+    expect(() => create(z3.object({ value: schema(refine) }))).toThrow('incompatible parsed outputs');
+    expect(refine).not.toHaveBeenCalled();
+  });
+
+  it('inspects caught refinement outputs without invoking fallback callbacks', () => {
+    const refine = vi.fn(() => false);
+    const fallback = vi.fn(() => 0);
+    const value = z3.intersection(z3.number().refine(refine).catch(fallback), z3.number());
+
+    expect(() => create(z3.object({ value }))).toThrow('incompatible parsed outputs');
+    expect(refine).not.toHaveBeenCalled();
     expect(fallback).not.toHaveBeenCalled();
   });
 
@@ -2849,6 +3065,61 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     },
   );
 
+  it.each([
+    {
+      name: 'checked nullable number',
+      input: () => z3.number().min(0),
+      output: () => z3.number().min(0).nullable(),
+      valid: 7,
+      invalid: -1,
+      expected: { type: 'number', minimum: 0 },
+    },
+    {
+      name: 'readonly nullable number',
+      input: () => z3.number().min(0).readonly(),
+      output: () => z3.number().min(0).nullable().readonly(),
+      valid: 7,
+      invalid: -1,
+      expected: { type: 'number', minimum: 0 },
+    },
+    {
+      name: 'explicit null-first numeric union',
+      input: () => z3.number().min(0),
+      output: () => z3.union([z3.null(), z3.number().min(0)]),
+      valid: 7,
+      invalid: -1,
+      expected: { type: 'number', minimum: 0 },
+    },
+    {
+      name: 'incompatible string alternative',
+      input: () => z3.number().min(0),
+      output: () => z3.union([z3.string().min(1), z3.number().min(0)]),
+      valid: 7,
+      invalid: -1,
+      expected: { type: 'number', minimum: 0 },
+    },
+    {
+      name: 'checked nullable string',
+      input: () => z3.string().min(2),
+      output: () => z3.string().min(2).nullable(),
+      valid: 'safe',
+      invalid: 'x',
+      expected: { type: 'string', minLength: 2 },
+    },
+  ])(
+    'retains only reachable $name pipeline output alternatives',
+    ({ input, output, valid, invalid, expected }) => {
+      const result = create(z3.object({ value: input().pipe(output()) }));
+
+      expect(strictHelperSchema(result)).toHaveProperty(
+        'properties.value',
+        expect.objectContaining(expected),
+      );
+      expect(result.$parseRaw(JSON.stringify({ value: valid }))).toEqual({ value: valid });
+      expect(() => result.$parseRaw(JSON.stringify({ value: invalid }))).toThrow();
+    },
+  );
+
   it('projects every constrained BigInt pipeline output alternative onto numeric input', () => {
     const value = z3
       .number()
@@ -3001,6 +3272,54 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
 
   it.each([
     {
+      name: 'trim before a minimum',
+      schema: () => z3.string().trim().pipe(z3.string().min(2)),
+    },
+    {
+      name: 'lowercase before a literal',
+      schema: () => z3.string().toLowerCase().pipe(z3.literal('ABC')),
+    },
+    {
+      name: 'uppercase before an enum',
+      schema: () =>
+        z3
+          .string()
+          .toUpperCase()
+          .pipe(z3.enum(['abc'])),
+    },
+    {
+      name: 'readonly trim',
+      schema: () => z3.string().trim().readonly().pipe(z3.string().min(2)),
+    },
+    {
+      name: 'lazy lowercase',
+      schema: () => z3.lazy(() => z3.string().toLowerCase()).pipe(z3.string().regex(/^ABC$/u)),
+    },
+    {
+      name: 'nested object trim',
+      schema: () => z3.object({ text: z3.string().trim() }).pipe(z3.object({ text: z3.string().min(2) })),
+    },
+    {
+      name: 'nested array uppercase',
+      schema: () => z3.array(z3.string().toUpperCase()).pipe(z3.array(z3.string().regex(/^lower$/u))),
+    },
+  ])('rejects a value-changing $name before constrained pipeline output validation', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow(
+      'cannot be safely projected across an opaque transform',
+    );
+  });
+
+  it.each([
+    { name: 'trim', input: () => z3.string().trim(), raw: ' a ', parsed: 'a' },
+    { name: 'lowercase', input: () => z3.string().toLowerCase(), raw: 'SAFE', parsed: 'safe' },
+    { name: 'uppercase', input: () => z3.string().toUpperCase(), raw: 'safe', parsed: 'SAFE' },
+  ])('preserves an unconstrained $name string pipeline output', ({ input, raw, parsed }) => {
+    const result = create(z3.object({ value: input().pipe(z3.string()) }));
+    expect(result.$parseRaw(JSON.stringify({ value: raw }))).toEqual({ value: parsed });
+  });
+
+  it.each([
+    {
       name: 'value-changing transform',
       input: () => z3.number().transform((value) => -value),
     },
@@ -3016,9 +3335,16 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(unconstrained.$parseRaw('{"value":-1}')).toEqual({ value: 1 });
   });
 
-  it('rejects compound pipeline outputs that cannot be projected without losing constraints', () => {
+  it('projects a nullable native output through a known exact BigInt conversion', () => {
     const value = z3.number().transform(BigInt).pipe(z3.bigint().max(10n).nullable());
-    expect(() => create(z3.object({ value }))).toThrow('ZodPipeline output constraints');
+    const result = create(z3.object({ value }));
+
+    expect(strictHelperSchema(result)).toHaveProperty(
+      'properties.value',
+      expect.objectContaining({ type: 'integer', maximum: 10 }),
+    );
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
+    expect(() => result.$parseRaw('{"value":11}')).toThrow();
   });
 
   it('rejects converting output constraints that cannot be projected onto their input', () => {

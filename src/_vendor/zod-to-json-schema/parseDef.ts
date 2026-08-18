@@ -502,6 +502,44 @@ const nativeCollectionDefaultType = (
   return undefined;
 };
 
+const trustedInternalSlotObjectMethods = [
+  { type: 'RegExp', method: Object.getOwnPropertyDescriptor(RegExp.prototype, 'source')?.get },
+  { type: 'ArrayBuffer', method: Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get },
+  {
+    type: 'SharedArrayBuffer',
+    method:
+      typeof SharedArrayBuffer === 'undefined'
+        ? undefined
+        : Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get,
+  },
+  { type: 'DataView', method: Object.getOwnPropertyDescriptor(DataView.prototype, 'byteLength')?.get },
+  { type: 'WeakMap', method: WeakMap.prototype.has },
+  { type: 'WeakSet', method: WeakSet.prototype.has },
+] as const;
+const trustedArrayBufferIsView = ArrayBuffer.isView;
+const trustedInternalSlotObjectPrototypes = new Map<object, string>([
+  [Object.getOwnPropertyDescriptor(Promise, 'prototype')?.value as object, 'Promise'],
+  [Error.prototype, 'Error'],
+]);
+
+const unsupportedInternalSlotDefaultType = (value: object): string | undefined => {
+  if (trustedArrayBufferIsView(value)) {
+    return 'ArrayBuffer view';
+  }
+  for (const { type, method } of trustedInternalSlotObjectMethods) {
+    if (typeof method !== 'function') {
+      continue;
+    }
+    try {
+      Reflect.apply(method, value, []);
+      return type;
+    } catch {
+      // Captured intrinsic methods reject receivers without their corresponding native slot.
+    }
+  }
+  return undefined;
+};
+
 const trustedDatePrototypeMethods = new Map<PropertyKey, unknown>([
   ['getTime', Date.prototype.getTime],
   ['toJSON', Date.prototype.toJSON],
@@ -510,6 +548,16 @@ const trustedDatePrototypeMethods = new Map<PropertyKey, unknown>([
   [Symbol.toPrimitive, Date.prototype[Symbol.toPrimitive]],
 ]);
 const trustedDateGetTime = Date.prototype.getTime;
+
+const hasNativeDateInternalSlot = (value: object): value is Date => {
+  try {
+    Reflect.apply(trustedDateGetTime, value, []);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const trustedBoxedPrimitiveMethods = [
   BigInt.prototype.valueOf,
   Symbol.prototype.valueOf,
@@ -580,7 +628,20 @@ const normalizeStrictDefaultValue = (
   if (nativeCollection !== undefined) {
     throwUnrepresentableStrictZodType(nativeCollection, refs);
   }
+  const nativeObject = unsupportedInternalSlotDefaultType(value);
+  if (nativeObject !== undefined) {
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the \`${keyword}\` ${nativeObject} object with hidden internal slots in JSON Structured Outputs.`,
+    );
+  }
   const prototypes = strictDefaultPrototypeChain(value, keyword, refs);
+  const nativePrototype = prototypes.find((prototype) => trustedInternalSlotObjectPrototypes.has(prototype));
+  if (nativePrototype !== undefined) {
+    const nativeType = trustedInternalSlotObjectPrototypes.get(nativePrototype);
+    throw new TypeError(
+      `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the \`${keyword}\` ${nativeType} object with hidden internal slots in JSON Structured Outputs.`,
+    );
+  }
 
   if (active.has(value)) {
     throw new TypeError(
@@ -604,7 +665,7 @@ const normalizeStrictDefaultValue = (
 
   active.add(value);
   try {
-    if (value instanceof Date) {
+    if (hasNativeDateInternalSlot(value)) {
       if (!isCanonicalDateDefault(value)) {
         throw new TypeError(
           `Zod field at \`${refs.currentPath.join('/')}\` cannot safely represent the invalid or customized \`${keyword}\` Date in JSON Structured Outputs.`,
@@ -882,6 +943,17 @@ const mergeStrictSchemas = (left: JsonSchema7Type, right: JsonSchema7Type): Json
   return merged as JsonSchema7Type;
 };
 
+const hasDisjointStrictSchemaTypes = (first: JsonSchema7Type, second: JsonSchema7Type): boolean => {
+  const left = (first as Record<string, unknown>)['type'];
+  const right = (second as Record<string, unknown>)['type'];
+  return (
+    typeof left === 'string' &&
+    typeof right === 'string' &&
+    left !== right &&
+    !(isNumericSchemaType(left) && isNumericSchemaType(right))
+  );
+};
+
 const selectParser = (
   def: any,
   typeName: ZodFirstPartyTypeKind,
@@ -1126,18 +1198,9 @@ const selectParser = (
       if (refs.openaiStrictMode) {
         const mismatch = findIncompatibleParsedOutputs(def.left._def, def.right._def);
         if (mismatch) {
-          const expectedOutput = (refs as PreprocessedRefs)[expectedPipelineOutput];
-          const expectedKind = expectedOutput ? knownParsedOutputType(expectedOutput) : undefined;
-          const compatibleExpectedOutput =
-            mismatch.path.length === 0 &&
-            expectedKind !== undefined &&
-            mismatch.left === 'opaque' &&
-            mismatch.right === 'opaque';
-          if (!compatibleExpectedOutput) {
-            throw new TypeError(
-              `ZodIntersection arms have incompatible parsed outputs: ${mismatch.left} and ${mismatch.right}`,
-            );
-          }
+          throw new TypeError(
+            `ZodIntersection arms have incompatible parsed outputs: ${mismatch.left} and ${mismatch.right}`,
+          );
         }
       }
       const intersectionRefs: PreprocessedRefs = refs.openaiStrictMode
@@ -1373,11 +1436,24 @@ const selectParser = (
         }
         const alternatives = (output as Record<string, unknown>)['anyOf'];
         if (Array.isArray(alternatives)) {
-          const projected = alternatives.map((alternative) =>
-            mergeStrictSchemas(input, alternative as JsonSchema7Type),
-          );
-          if (projected.every((alternative) => alternative !== undefined)) {
-            return { anyOf: projected } as JsonSchema7Type;
+          const projected: JsonSchema7Type[] = [];
+          let discarded = false;
+          let unprojectable = false;
+          for (const alternative of alternatives) {
+            const candidate = alternative as JsonSchema7Type;
+            const combinedAlternative = mergeStrictSchemas(input, candidate);
+            if (combinedAlternative) {
+              projected.push(combinedAlternative);
+            } else if (hasDisjointStrictSchemaTypes(input, candidate)) {
+              discarded = true;
+            } else {
+              unprojectable = true;
+              break;
+            }
+          }
+          const [first] = projected;
+          if (!unprojectable && first !== undefined) {
+            return discarded && projected.length === 1 ? first : ({ anyOf: projected } as JsonSchema7Type);
           }
           throw new Error(
             `ZodPipeline output constraints at \`${refs.currentPath.join('/')}\` cannot be represented in strict Structured Outputs.`,

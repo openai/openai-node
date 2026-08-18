@@ -349,6 +349,35 @@ export const requiresNativeBigIntPipelineOutput = (
   }
 };
 
+const validationChildren = (def: InspectableDefinition): SchemaType[] => {
+  if (def.typeName === ZodFirstPartyTypeKind.ZodObject) {
+    return Object.values(def.shape());
+  }
+  if (def.typeName === ZodFirstPartyTypeKind.ZodArray) {
+    return [def.type];
+  }
+  return childDefinitions(def, 'input')?.values ?? [];
+};
+
+export const hasOpaqueJSONValidation = (definition: ZodTypeDef, active = new Set<ZodTypeDef>()): boolean => {
+  if (active.has(definition)) {
+    return true;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodEffects ||
+      def.typeName === ZodFirstPartyTypeKind.ZodPromise
+    ) {
+      return true;
+    }
+    return validationChildren(def).some((child) => hasOpaqueJSONValidation(child._def, active));
+  } finally {
+    active.delete(definition);
+  }
+};
+
 const hasOpaqueParsedOutput = (definition: ZodTypeDef): boolean =>
   visitDefinition(
     definition,
@@ -359,9 +388,21 @@ const hasOpaqueParsedOutput = (definition: ZodTypeDef): boolean =>
     'output',
   );
 
-type OpaqueParsedOutput = 'opaque' | 'preprocessed';
+type OpaqueParsedOutput = 'opaque' | 'preprocessed' | 'caught';
 
 const classifyOpaqueParsedOutput = (definition: ZodTypeDef): OpaqueParsedOutput | undefined => {
+  const caught = visitDefinition(
+    definition,
+    (def) =>
+      def.typeName === ZodFirstPartyTypeKind.ZodCatch
+        ? hasOpaqueJSONValidation(def.innerType._def)
+        : undefined,
+    'output',
+  );
+  if (caught) {
+    return 'caught';
+  }
+
   const preprocessed = visitDefinition(
     definition,
     (def) =>
@@ -469,6 +510,49 @@ const findOpaqueParsedOutputMismatch = (
     : undefined;
 };
 
+const transparentNullableParsedOutputWrappers = new Set<ZodFirstPartyTypeKind>([
+  ZodFirstPartyTypeKind.ZodOptional,
+  ZodFirstPartyTypeKind.ZodDefault,
+  ZodFirstPartyTypeKind.ZodReadonly,
+  ZodFirstPartyTypeKind.ZodBranded,
+  ZodFirstPartyTypeKind.ZodLazy,
+  ZodFirstPartyTypeKind.ZodPipeline,
+]);
+
+const nonNullParsedOutputAlternative = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): ZodTypeDef | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (def.typeName === ZodFirstPartyTypeKind.ZodNullable) {
+      return def.innerType._def;
+    }
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
+      def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion
+    ) {
+      const options = def.options instanceof Map ? [...def.options.values()] : def.options;
+      const nonNull = options.filter((option) => !isNullishParsedOutput(option._def));
+      return nonNull.length === 1 && nonNull.length < options.length ? nonNull[0]?._def : undefined;
+    }
+    if (!transparentNullableParsedOutputWrappers.has(def.typeName)) {
+      return undefined;
+    }
+    const children = childDefinitions(def, 'output');
+    const child = children?.values[0];
+    return children?.values.length === 1 && child !== undefined
+      ? nonNullParsedOutputAlternative(child._def, active)
+      : undefined;
+  } finally {
+    active.delete(definition);
+  }
+};
+
 const unmergeableParsedOutputKinds = new Set<ZodFirstPartyTypeKind>([
   ZodFirstPartyTypeKind.ZodSet,
   ZodFirstPartyTypeKind.ZodMap,
@@ -493,6 +577,30 @@ const findDirectParsedOutputMismatch = (
     : undefined;
 };
 
+const findNonNullParsedOutputMismatch = (
+  left: ZodTypeDef,
+  right: ZodTypeDef,
+  path: readonly string[],
+  active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  recurse: (
+    left: ZodTypeDef,
+    right: ZodTypeDef,
+    path: readonly string[],
+    active: Map<ZodTypeDef, Set<ZodTypeDef>>,
+  ) => ParsedOutputMismatch | undefined,
+): ParsedOutputMismatch | undefined => {
+  const nonNullLeft = nonNullParsedOutputAlternative(left);
+  const nonNullRight = nonNullParsedOutputAlternative(right);
+  if (!nonNullLeft && !nonNullRight) {
+    return undefined;
+  }
+  const first = nonNullLeft ?? left;
+  const second = nonNullRight ?? right;
+  return !isNullishParsedOutput(first) && !isNullishParsedOutput(second)
+    ? recurse(first, second, path, active)
+    : undefined;
+};
+
 export const findIncompatibleParsedOutputs = (
   left: ZodTypeDef,
   right: ZodTypeDef,
@@ -509,10 +617,13 @@ export const findIncompatibleParsedOutputs = (
   try {
     const leftKind = knownParsedOutputType(left);
     const rightKind = knownParsedOutputType(right);
-    const directMismatch = findDirectParsedOutputMismatch(left, right, leftKind, rightKind, path);
+    const directMismatch =
+      findDirectParsedOutputMismatch(left, right, leftKind, rightKind, path) ??
+      findNonNullParsedOutputMismatch(left, right, path, active, findIncompatibleParsedOutputs);
     if (directMismatch) {
       return directMismatch;
     }
+
     if (leftKind === undefined || rightKind === undefined) {
       return undefined;
     }
@@ -919,34 +1030,7 @@ const classifyJSONNumberAcceptance = (
 export const acceptsEveryJSONNumber = (definition: ZodTypeDef): boolean =>
   classifyJSONNumberAcceptance(definition) !== 'opaque';
 
-const validationChildren = (def: InspectableDefinition): SchemaType[] => {
-  if (def.typeName === ZodFirstPartyTypeKind.ZodObject) {
-    return Object.values(def.shape());
-  }
-  if (def.typeName === ZodFirstPartyTypeKind.ZodArray) {
-    return [def.type];
-  }
-  return childDefinitions(def, 'input')?.values ?? [];
-};
-
-export const hasOpaqueJSONValidation = (definition: ZodTypeDef, active = new Set<ZodTypeDef>()): boolean => {
-  if (active.has(definition)) {
-    return true;
-  }
-  active.add(definition);
-  try {
-    const def = definition as InspectableDefinition;
-    if (
-      def.typeName === ZodFirstPartyTypeKind.ZodEffects ||
-      def.typeName === ZodFirstPartyTypeKind.ZodPromise
-    ) {
-      return true;
-    }
-    return validationChildren(def).some((child) => hasOpaqueJSONValidation(child._def, active));
-  } finally {
-    active.delete(definition);
-  }
-};
+const valueChangingStringChecks = new Set(['trim', 'toLowerCase', 'toUpperCase']);
 
 export const hasOpaquePipelineTransform = (
   definition: ZodTypeDef,
@@ -960,6 +1044,8 @@ export const hasOpaquePipelineTransform = (
     const def = definition as InspectableDefinition;
     if (
       def.typeName === ZodFirstPartyTypeKind.ZodCatch ||
+      (def.typeName === ZodFirstPartyTypeKind.ZodString &&
+        def.checks?.some((check) => valueChangingStringChecks.has(check.kind)) === true) ||
       (def.typeName === ZodFirstPartyTypeKind.ZodEffects &&
         (def.effect.type === 'preprocess' ||
           (def.effect.type === 'transform' && !isExactBigIntTransform(def))))
