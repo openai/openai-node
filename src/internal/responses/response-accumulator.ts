@@ -209,7 +209,22 @@ function getShellOutputContent(
 }
 
 function assertNever(value: never): never {
-  throw new OpenAIError(`Unhandled response stream event: ${JSON.stringify(value)}`);
+  let eventType: unknown;
+
+  try {
+    eventType = Object.getOwnPropertyDescriptor(value, 'type')?.value;
+  } catch {
+    eventType = undefined;
+  }
+
+  const safeEventType =
+    typeof eventType === 'string' &&
+    eventType.length <= 128 &&
+    /^response\.(?:[a-z][a-z0-9_]*)(?:\.[a-z][a-z0-9_]*)*$/u.test(eventType)
+      ? eventType
+      : 'unknown';
+
+  throw new OpenAIError(`Unhandled response stream event: ${safeEventType}`);
 }
 
 function accumulateOutputItemEvent(
