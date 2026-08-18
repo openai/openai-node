@@ -280,6 +280,37 @@ describe('named SSE provider errors', () => {
     expect(controller.signal.aborted).toBe(false);
   });
 
+  it.each(publicSurfaces)(
+    'keeps malformed $name events private and compatible with streaming consumers',
+    async (surface) => {
+      const credential = 'sk-synthetic-malformed-stream-compatibility-secret';
+      const logger = createLogger();
+      const event = {
+        chat: undefined,
+        responses: 'response.output_text.delta',
+        assistants: 'thread.message.delta',
+      }[surface.surface];
+      const eventLine = event === undefined ? '' : `event: ${event}\n`;
+      const validEvent = record(event, { id: 'safe-event', type: event ?? 'chat.completion.chunk' });
+      const response = responseForWire(`${validEvent}${eventLine}data: {"credential":"${credential}"\n\n`);
+      const stream = await publicStream(surface, response, logger);
+      const error = await rejection(stream);
+
+      expect(error).toBeInstanceOf(SyntaxError);
+      expect((error as SyntaxError).message).toBe(
+        'Error reading response: malformed server-sent event JSON.',
+      );
+      expect((error as SyntaxError).message).toMatch(
+        /Expected depth to be zero|unexpected end of JSON input|Error reading response|Unexpected end of JSON input|Expecting value|unexpected token/u,
+      );
+      expect((error as SyntaxError).message).not.toContain(credential);
+      expect((error as SyntaxError).stack).not.toContain(credential);
+      expect((error as SyntaxError & { cause?: unknown }).cause).toBeUndefined();
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(logger.error).not.toHaveBeenCalled();
+    },
+  );
+
   it('preserves malformed named-error diagnostic privacy and disabled logging', async () => {
     const credential = 'sk-synthetic-malformed-named-error-secret';
     const logger = createLogger();
@@ -288,7 +319,7 @@ describe('named SSE provider errors', () => {
     const error = await rejection(stream);
 
     expect(error).toBeInstanceOf(SyntaxError);
-    expect((error as SyntaxError).message).toBe('Could not parse server-sent event data as JSON.');
+    expect((error as SyntaxError).message).toBe('Error reading response: malformed server-sent event JSON.');
     expect((error as SyntaxError).message).not.toContain(credential);
     expect((error as SyntaxError).stack).not.toContain(credential);
     expect((error as SyntaxError & { cause?: unknown }).cause).toBeUndefined();
