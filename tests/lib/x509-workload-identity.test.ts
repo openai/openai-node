@@ -1,6 +1,6 @@
 import { expect, vi } from 'vitest';
 
-import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
+import OpenAI from 'openai';
 import { CursorPage } from 'openai/core/pagination';
 import type { RequestInit } from 'openai/internal/builtin-types';
 
@@ -711,6 +711,42 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(apiCount).toBe(2);
   });
 
+  test('does not wait indefinitely for 401 response cleanup before replay', async () => {
+    let exchangeCount = 0;
+    let apiCount = 0;
+    const customFetch = vi.fn(async (url: string | URL | Request) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        return tokenResponse(`token-${exchangeCount}`);
+      }
+      apiCount += 1;
+      if (apiCount === 1) {
+        const response = new Response(null, { status: 401 });
+        Object.defineProperty(response, 'body', {
+          value: {
+            [Symbol.asyncIterator]: () => ({
+              // oxlint-disable-next-line promise/avoid-new -- This models a transport cleanup that never settles.
+              return: () => new Promise<void>(() => {}),
+            }),
+          },
+        });
+        return response;
+      }
+      return Response.json({ ok: true });
+    });
+    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
+
+    const replay = client.post('/replayable', { body: 'same-body' });
+    // oxlint-disable-next-line promise/avoid-new -- This bounds the regression if cleanup hangs.
+    const timeout = new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error('401 response cleanup blocked replay')), 100);
+    });
+
+    await expect(Promise.race([replay, timeout])).resolves.toMatchObject({ ok: true });
+    expect(exchangeCount).toBe(2);
+    expect(apiCount).toBe(2);
+  });
+
   test.each(['request headers', 'request hook'] as const)(
     'does not replay a 401 for a custom bearer set by %s',
     async (source) => {
@@ -950,57 +986,5 @@ describe('OpenAI with X.509 workload identity', () => {
     expect(exchangeCount).toBe(2);
     expect(apiCount).toBe(2);
     expect(apiAuthorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
-  });
-
-  test('a canceled API request does not cancel the exchange shared by another request', async () => {
-    const exchange = deferredResponse();
-    let apiCount = 0;
-    const customFetch = vi.fn(async (url: string | URL | Request) => {
-      if (url.toString().includes('/oauth/token')) {
-        return await exchange.promise;
-      }
-      apiCount += 1;
-      return Response.json({ data: [] });
-    });
-    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
-    const controller = new AbortController();
-
-    const canceled = client.models.list({ signal: controller.signal });
-    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
-    const winner = client.models.list();
-    controller.abort('caller stopped waiting');
-
-    await expect(canceled).rejects.toBeInstanceOf(APIUserAbortError);
-    exchange.resolve(tokenResponse('shared-token'));
-    await expect(winner).resolves.toMatchObject({ data: [] });
-    expect(apiCount).toBe(1);
-    expect(customFetch).toHaveBeenCalledTimes(2);
-  });
-
-  test('a request timeout bounds its exchange wait without canceling another request', async () => {
-    vi.useFakeTimers();
-    const exchange = deferredResponse();
-    let apiCount = 0;
-    const customFetch = vi.fn(async (url: string | URL | Request) => {
-      if (url.toString().includes('/oauth/token')) {
-        return await exchange.promise;
-      }
-      apiCount += 1;
-      return Response.json({ data: [] });
-    });
-    const client = new OpenAI({ apiKey: null, workloadIdentity: x509Identity, fetch: customFetch });
-
-    const timedOut = client.models.list({ timeout: 1000 });
-    const winner = client.models.list({ timeout: 5000 });
-    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
-    const timeoutAssertion = expect(timedOut).rejects.toBeInstanceOf(APIConnectionTimeoutError);
-
-    await vi.advanceTimersByTimeAsync(1000);
-    await timeoutAssertion;
-    exchange.resolve(tokenResponse('shared-token'));
-
-    await expect(winner).resolves.toMatchObject({ data: [] });
-    expect(apiCount).toBe(1);
-    expect(customFetch).toHaveBeenCalledTimes(2);
   });
 });

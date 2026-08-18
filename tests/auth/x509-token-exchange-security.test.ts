@@ -146,6 +146,51 @@ describe('X.509 token exchange security boundaries', () => {
     expect(customFetch).toHaveBeenCalledTimes(1);
   });
 
+  test('accepts a bounded token response from an async-iterable custom fetch body', async () => {
+    const encoded = new TextEncoder().encode(
+      JSON.stringify({ access_token: 'async-iterable-token', expires_in: 3600 }),
+    );
+    const customFetch = vi.fn(async () => {
+      const body = {
+        async *[Symbol.asyncIterator]() {
+          yield encoded.subarray(0, 17);
+          yield encoded.subarray(17);
+        },
+      };
+      return {
+        body,
+        headers: new Headers(),
+        ok: true,
+        status: 200,
+      } as unknown as Response;
+    });
+    const auth = new WorkloadIdentityAuth(identity, customFetch, { maxRetries: 0 });
+
+    await expect(auth.getToken()).resolves.toBe('async-iterable-token');
+    expect(customFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('bounds an oversized async-iterable token response', async () => {
+    const customFetch = vi.fn(async () => {
+      const body = {
+        async *[Symbol.asyncIterator]() {
+          yield new Uint8Array(1024 * 1024);
+          yield new Uint8Array(1);
+        },
+      };
+      return {
+        body,
+        headers: new Headers(),
+        ok: true,
+        status: 200,
+      } as unknown as Response;
+    });
+    const auth = new WorkloadIdentityAuth(identity, customFetch, { maxRetries: 0 });
+
+    await expect(auth.getToken()).rejects.toThrow(/response.*(?:size|large|exceed)/iu);
+    expect(customFetch).toHaveBeenCalledTimes(1);
+  });
+
   test('rejects an oversized declared token exchange response without consuming its body', async () => {
     const customFetch = vi.fn(async () =>
       Response.json(

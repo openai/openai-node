@@ -274,6 +274,7 @@ describe('X.509 final security boundaries', () => {
           ...(mode === 'api-key'
             ? { apiKey: 'azure-secret' }
             : { azureADTokenProvider: async () => 'entra-token' }),
+          // @ts-expect-error Azure clients do not support OpenAI workload identity.
           workloadIdentity: identity,
           fetch: customFetch,
         }),

@@ -23,6 +23,12 @@ function prohibitedTransportFactory(): never {
   throw new Error('transport factory must not run');
 }
 
+class OverriddenDispatchAgent extends Agent {
+  override dispatch(...args: Parameters<Agent['dispatch']>): ReturnType<Agent['dispatch']> {
+    return super.dispatch(...args);
+  }
+}
+
 describe('X.509 transport capability boundary', () => {
   const originalBun = (globalThis as { Bun?: unknown }).Bun;
   const originalHTTPSProxy = process.env['HTTPS_PROXY'];
@@ -91,6 +97,21 @@ describe('X.509 transport capability boundary', () => {
     expect(() => new OpenAI({ apiKey: null, workloadIdentity: identity, baseURL, fetch })).toThrow(
       /provider|origin/iu,
     );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('rejects executable TLS accessors before token acquisition', async () => {
+    const tls = { key: 'private-key-a' } as { cert?: string; key: string };
+    Object.defineProperty(tls, 'cert', { enumerable: false, get: () => 'certificate-a' });
+    const fetch = successfulFetch();
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetch,
+      fetchOptions: { tls } as never,
+    });
+
+    await expect(client.models.list()).rejects.toThrow(/static|accessor|inherited/iu);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -221,6 +242,23 @@ describe('X.509 transport capability boundary', () => {
     await dispatcher.close();
   });
 
+  test('rejects an Undici Agent subclass with an overridden dispatch before token acquisition', async () => {
+    const dispatcher = new OverriddenDispatchAgent({
+      connect: { cert: 'certificate-a', key: 'private-key-a' },
+    });
+    const fetch = successfulFetch();
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetch,
+      fetchOptions: { dispatcher },
+    });
+
+    await expect(client.models.list()).rejects.toThrow(/dispatch|executable|static Undici/iu);
+    expect(fetch).not.toHaveBeenCalled();
+    await dispatcher.close();
+  });
+
   test('fails closed for executable dispatchers whose certificate identity cannot be verified', async () => {
     const dispatcher = { dispatch() {} };
     const fetch = successfulFetch();
@@ -344,6 +382,39 @@ describe('X.509 transport capability boundary', () => {
       'Bearer certificate-token-2',
       'Bearer certificate-token-3',
     ]);
+  });
+
+  test('rotates cached credentials when a non-enumerable TLS certificate changes', async () => {
+    const tls: { cert?: string; key: string } = { key: 'private-key-a' };
+    Object.defineProperty(tls, 'cert', {
+      configurable: true,
+      enumerable: false,
+      value: 'certificate-a',
+      writable: true,
+    });
+    const authorizations: (string | null)[] = [];
+    let exchanges = 0;
+    const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (url.toString().includes('/oauth/token')) {
+        exchanges += 1;
+        return tokenResponse(`certificate-token-${exchanges}`);
+      }
+      authorizations.push(new Headers(init?.headers).get('Authorization'));
+      return globalThis.Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      workloadIdentity: identity,
+      fetch,
+      fetchOptions: { tls } as never,
+    });
+
+    await client.models.list();
+    tls.cert = 'certificate-b';
+    await client.models.list();
+
+    expect(exchanges).toBe(2);
+    expect(authorizations).toEqual(['Bearer certificate-token-1', 'Bearer certificate-token-2']);
   });
 
   test('rejects inherited and explicit Bun HTTPS proxies but preserves HTTP CONNECT', async () => {

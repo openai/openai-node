@@ -72,6 +72,31 @@ async function cancelResponseBody(response: Response): Promise<void> {
   }
 }
 
+function responseChunkBytes(chunk: unknown): Uint8Array {
+  if (typeof chunk === 'string') {
+    return new TextEncoder().encode(chunk);
+  }
+  if (chunk instanceof Uint8Array) {
+    return chunk;
+  }
+  if (chunk instanceof ArrayBuffer) {
+    return new Uint8Array(chunk);
+  }
+  if (ArrayBuffer.isView(chunk)) {
+    return new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+  }
+  throw new TypeError('X.509 token response body yielded an unsupported chunk.');
+}
+
+function retireAsyncIterator(iterator: AsyncIterator<unknown>): void {
+  try {
+    // oxlint-disable-next-line promise/prefer-await-to-then -- Cleanup must not block authentication recovery.
+    void iterator.return?.().catch(() => null);
+  } catch {
+    // Cleanup is best-effort and must not replace the bounded response error.
+  }
+}
+
 async function readSuccessBody(response: Response, retryCount: number): Promise<unknown> {
   const declaredLength = response.headers.get('Content-Length');
   if (
@@ -86,9 +111,21 @@ async function readSuccessBody(response: Response, retryCount: number): Promise<
   let responseText = '';
   let responseSize = 0;
   try {
-    const reader = response.body?.getReader();
-    if (reader) {
-      const decoder = new TextDecoder();
+    const body = response.body as unknown as {
+      getReader?: () => ReadableStreamDefaultReader<Uint8Array>;
+      [Symbol.asyncIterator]?: () => AsyncIterator<unknown>;
+    } | null;
+    const decoder = new TextDecoder();
+    const appendChunk = (value: unknown): void => {
+      const chunk = responseChunkBytes(value);
+      responseSize += chunk.byteLength;
+      if (responseSize > MAX_TOKEN_EXCHANGE_RESPONSE_BYTES) {
+        throw new OpenAIError('X.509 workload identity token exchange response exceeds the maximum size.');
+      }
+      responseText += decoder.decode(chunk, { stream: true });
+    };
+    if (body && typeof body.getReader === 'function') {
+      const reader = body.getReader();
       try {
         while (true) {
           // oxlint-disable-next-line no-await-in-loop -- Bound each chunk before reading another.
@@ -96,21 +133,39 @@ async function readSuccessBody(response: Response, retryCount: number): Promise<
           if (chunk.done) {
             break;
           }
-          responseSize += chunk.value.byteLength;
-          if (responseSize > MAX_TOKEN_EXCHANGE_RESPONSE_BYTES) {
+          try {
+            appendChunk(chunk.value);
+          } catch (error) {
             // oxlint-disable-next-line no-await-in-loop -- Cancel before releasing an oversized response.
             await reader.cancel().catch(() => null);
-            throw new OpenAIError(
-              'X.509 workload identity token exchange response exceeds the maximum size.',
-            );
+            throw error;
           }
-          responseText += decoder.decode(chunk.value, { stream: true });
         }
-        responseText += decoder.decode();
       } finally {
         reader.releaseLock();
       }
+    } else {
+      const iteratorFactory = body?.[Symbol.asyncIterator];
+      if (typeof iteratorFactory === 'function') {
+        const iterator = iteratorFactory.call(body);
+        try {
+          while (true) {
+            // oxlint-disable-next-line no-await-in-loop -- Bound each chunk before reading another.
+            const chunk = await iterator.next();
+            if (chunk.done) {
+              break;
+            }
+            appendChunk(chunk.value);
+          }
+        } catch (error) {
+          retireAsyncIterator(iterator);
+          throw error;
+        }
+      } else if (body) {
+        throw new TypeError('X.509 token response body is not readable.');
+      }
     }
+    responseText += decoder.decode();
   } catch (error) {
     if (error instanceof OpenAIError) {
       throw error;

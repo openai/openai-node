@@ -1303,11 +1303,9 @@ export class OpenAI {
           !options.__metadata?.['hasStreamingBody'] &&
           !options.__metadata?.['workloadIdentityTokenRefreshed']
         ) {
-          try {
-            await Shims.CancelReadableStream(response.body);
-          } catch {
-            // Response cleanup is best-effort and must not prevent authentication recovery.
-          }
+          // Start best-effort cleanup, but do not let an untrusted stream's cancellation
+          // promise block workload-token recovery after the response headers arrived.
+          void Shims.CancelReadableStream(response.body).catch(() => null);
           return this.makeRequest(
             {
               ...options,

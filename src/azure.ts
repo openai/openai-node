@@ -10,12 +10,18 @@ import type { ClientOptions } from './client';
 import { assertNoDataResidency } from './internal/data-residency';
 
 /** API Client for interfacing with the Azure OpenAI API. */
-export interface AzureClientOptions extends Omit<ClientOptions, 'provider' | 'dataResidency'> {
+export interface AzureClientOptions extends Omit<
+  ClientOptions,
+  'provider' | 'dataResidency' | 'workloadIdentity'
+> {
   /** AzureOpenAI does not support third-party provider configuration. */
   provider?: never;
 
   /** OpenAI data residency cannot be combined with Azure routing. */
   dataResidency?: never;
+
+  /** OpenAI workload identity cannot be combined with Azure authentication and routing. */
+  workloadIdentity?: never;
 
   /**
    * Defaults to process.env['OPENAI_API_VERSION'].

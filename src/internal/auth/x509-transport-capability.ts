@@ -43,6 +43,20 @@ function hasClientCertificate(options: Record<string, unknown> | undefined): boo
 }
 
 function assertImmutableTLSOptions(options: Record<string, unknown>, label: string): void {
+  const prototype = Object.getPrototypeOf(options);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new OpenAIError(
+      `X.509 workload identity requires plain static ${label} options; inherited TLS configuration is not supported.`,
+    );
+  }
+  for (const key of Object.getOwnPropertyNames(options)) {
+    const descriptor = Object.getOwnPropertyDescriptor(options, key);
+    if (!descriptor || !hasOwn(descriptor, 'value')) {
+      throw new OpenAIError(
+        `X.509 workload identity requires static ${label} data properties; TLS accessors are not supported.`,
+      );
+    }
+  }
   for (const key of MUTABLE_TLS_OPTION_KEYS) {
     const value = options[key];
     if (value !== undefined && value !== null && (typeof value === 'object' || typeof value === 'function')) {
@@ -111,6 +125,23 @@ function undiciAgentIdentitySource(dispatcher: object): X509TransportIdentitySou
   const factory = symbolValue(dispatcher, factorySymbol);
   if (!isObject(options)) {
     throw new OpenAIError('X.509 workload identity cannot verify this Undici Agent configuration.');
+  }
+  let foundUndiciDispatchControl = false;
+  for (let current: object | null = dispatcher; current; current = Object.getPrototypeOf(current)) {
+    if (ownSymbol(current, 'dispatch')) {
+      foundUndiciDispatchControl = true;
+    }
+    if (hasOwn(current, 'dispatch')) {
+      if (!foundUndiciDispatchControl) {
+        throw new OpenAIError(
+          'X.509 workload identity does not support overridden Undici dispatch methods; use an unmodified static Agent.',
+        );
+      }
+      break;
+    }
+  }
+  if (!foundUndiciDispatchControl) {
+    throw new OpenAIError('X.509 workload identity cannot verify this Undici Agent dispatch method.');
   }
   if (typeof options['connect'] === 'function') {
     throw new OpenAIError(
@@ -276,10 +307,13 @@ export function x509TransportIdentitySources(
 }
 
 export function x509TransportIdentityValues(source: X509TransportIdentitySource): readonly unknown[] {
-  const keys = Object.keys(source.options);
-  // oxlint-disable-next-line unicorn/no-array-sort -- Object.keys creates a private array; ES2023 toSorted would break TS 4.9 consumers.
+  const keys = Object.getOwnPropertyNames(source.options);
+  // oxlint-disable-next-line unicorn/no-array-sort -- getOwnPropertyNames creates a private array; ES2023 toSorted would break TS 4.9 consumers.
   keys.sort();
   // The shape participates in generation identity so removing and later restoring
   // a primitive option cannot revive the bearer cached before the removal.
-  return [JSON.stringify(keys), ...keys.flatMap((key) => [key, source.options[key]])];
+  return [
+    JSON.stringify(keys),
+    ...keys.flatMap((key) => [key, Object.getOwnPropertyDescriptor(source.options, key)?.value]),
+  ];
 }
