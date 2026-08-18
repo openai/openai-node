@@ -237,6 +237,71 @@ describe('unsupported Responses event diagnostic privacy', () => {
     },
   );
 
+  test.each(['first', 'subsequent'] as const)(
+    'preserves the original receiver for a %s-frame own response accessor',
+    (position) => {
+      const response = makeResponse();
+      const event =
+        position === 'first'
+          ? { type: 'response.created' as const, sequence_number: 0, response }
+          : { type: 'response.completed' as const, sequence_number: 1, response };
+      const receivedOriginalEvent: boolean[] = [];
+      const getter = vi.fn(function recordOriginalEventReceiver(this: typeof event) {
+        receivedOriginalEvent.push(this === event);
+        return response;
+      });
+
+      Object.defineProperty(event, 'response', {
+        configurable: true,
+        enumerable: true,
+        get: getter,
+      });
+
+      const snapshot = position === 'first' ? undefined : createSnapshot();
+
+      expect(accumulateResponse(event, snapshot).id).toBe('resp_synthetic');
+      expect(getter).toHaveBeenCalledTimes(1);
+      expect(receivedOriginalEvent).toEqual([true]);
+    },
+  );
+
+  test.each(['first', 'subsequent'] as const)(
+    'preserves a %s-frame private-field response accessor',
+    (position) => {
+      class ReceiverSensitiveEvent<Type extends 'response.created' | 'response.completed'> {
+        readonly type: Type;
+        readonly sequence_number = 0;
+        #response = makeResponse();
+
+        constructor(type: Type) {
+          this.type = type;
+        }
+
+        get response(): APIResponse {
+          return this.#response;
+        }
+      }
+
+      const event =
+        position === 'first'
+          ? new ReceiverSensitiveEvent('response.created')
+          : new ReceiverSensitiveEvent('response.completed');
+      const snapshot = position === 'first' ? undefined : createSnapshot();
+
+      expect(accumulateResponse(event, snapshot).id).toBe('resp_synthetic');
+    },
+  );
+
+  test.each(['response.mcp_list_tools.failed', 'response.audio.transcript.done'] as const)(
+    'continues dispatching the generated %s discriminator',
+    (type) => {
+      const snapshot = createSnapshot();
+      const event = { type, sequence_number: 1 } as ResponseStreamEvent;
+
+      expect(accumulateResponse(event, snapshot)).toBe(snapshot);
+    },
+  );
+
   test.each([
     [
       'a circular event payload',

@@ -208,7 +208,14 @@ function getShellOutputContent(
   return getContent(output.output, commandIndex);
 }
 
-const supportedResponseEventTypes = new Set<ResponseAccumulatorEvent['type']>([
+function createSupportedResponseEventTypes<EventTypes extends readonly ResponseAccumulatorEvent['type'][]>(
+  eventTypes: EventTypes &
+    (Exclude<ResponseAccumulatorEvent['type'], EventTypes[number]> extends never ? unknown : never),
+): ReadonlySet<ResponseAccumulatorEvent['type']> {
+  return new Set(eventTypes);
+}
+
+const supportedResponseEventTypes = createSupportedResponseEventTypes([
   'response.output_item.added',
   'response.output_item.done',
   'response.content_part.added',
@@ -268,7 +275,7 @@ const supportedResponseEventTypes = new Set<ResponseAccumulatorEvent['type']>([
   'response.mcp_list_tools.failed',
   'keepalive',
   'error',
-]);
+] as const);
 
 function assertNever(_value: never): never {
   throw new OpenAIError('Unhandled response stream event: unknown');
@@ -290,14 +297,11 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
     return assertNever(event as never);
   }
 
-  return Object.create(event, {
-    type: {
-      configurable: true,
-      enumerable: true,
-      value: type,
-      writable: false,
+  return new Proxy(event, {
+    get(target, property) {
+      return property === 'type' ? type : Reflect.get(target, property, target);
     },
-  }) as ResponseAccumulatorEvent;
+  });
 }
 
 function accumulateOutputItemEvent(
