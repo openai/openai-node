@@ -359,6 +359,12 @@ const validationChildren = (def: InspectableDefinition): SchemaType[] => {
   return childDefinitions(def, 'input')?.values ?? [];
 };
 
+const valueChangingStringChecks = new Set(['trim', 'toLowerCase', 'toUpperCase']);
+
+const hasValueChangingStringChecks = (definition: InspectableDefinition): boolean =>
+  definition.typeName === ZodFirstPartyTypeKind.ZodString &&
+  definition.checks?.some((check) => valueChangingStringChecks.has(check.kind)) === true;
+
 export const hasOpaqueJSONValidation = (definition: ZodTypeDef, active = new Set<ZodTypeDef>()): boolean => {
   if (active.has(definition)) {
     return true;
@@ -368,11 +374,52 @@ export const hasOpaqueJSONValidation = (definition: ZodTypeDef, active = new Set
     const def = definition as InspectableDefinition;
     if (
       def.typeName === ZodFirstPartyTypeKind.ZodEffects ||
-      def.typeName === ZodFirstPartyTypeKind.ZodPromise
+      def.typeName === ZodFirstPartyTypeKind.ZodPromise ||
+      hasValueChangingStringChecks(def)
     ) {
       return true;
     }
     return validationChildren(def).some((child) => hasOpaqueJSONValidation(child._def, active));
+  } finally {
+    active.delete(definition);
+  }
+};
+
+const unconstrainedPipelineOutputWrappers = new Set<ZodFirstPartyTypeKind>([
+  ZodFirstPartyTypeKind.ZodNullable,
+  ZodFirstPartyTypeKind.ZodOptional,
+  ZodFirstPartyTypeKind.ZodDefault,
+  ZodFirstPartyTypeKind.ZodReadonly,
+  ZodFirstPartyTypeKind.ZodCatch,
+  ZodFirstPartyTypeKind.ZodBranded,
+  ZodFirstPartyTypeKind.ZodLazy,
+]);
+
+export const hasUnconstrainedPipelineOutput = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): boolean => {
+  if (active.has(definition)) {
+    return false;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (def.typeName === ZodFirstPartyTypeKind.ZodAny || def.typeName === ZodFirstPartyTypeKind.ZodUnknown) {
+      return true;
+    }
+    if (!unconstrainedPipelineOutputWrappers.has(def.typeName)) {
+      return false;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodCatch && hasOpaqueJSONValidation(def.innerType._def)) {
+      return false;
+    }
+
+    const children = childDefinitions(def, 'output');
+    const child = children?.values[0];
+    return children?.values.length === 1 && child !== undefined
+      ? hasUnconstrainedPipelineOutput(child._def, active)
+      : false;
   } finally {
     active.delete(definition);
   }
@@ -388,7 +435,7 @@ const hasOpaqueParsedOutput = (definition: ZodTypeDef): boolean =>
     'output',
   );
 
-type OpaqueParsedOutput = 'opaque' | 'preprocessed' | 'caught';
+type OpaqueParsedOutput = 'opaque' | 'preprocessed' | 'caught' | 'string-transformed';
 
 const classifyOpaqueParsedOutput = (definition: ZodTypeDef): OpaqueParsedOutput | undefined => {
   const caught = visitDefinition(
@@ -414,7 +461,60 @@ const classifyOpaqueParsedOutput = (definition: ZodTypeDef): OpaqueParsedOutput 
   if (preprocessed) {
     return 'preprocessed';
   }
+  const transformedString = visitDefinition(
+    definition,
+    (def) => (hasValueChangingStringChecks(def) ? true : undefined),
+    'output',
+  );
+  if (transformedString) {
+    return 'string-transformed';
+  }
   return hasOpaqueParsedOutput(definition) ? 'opaque' : undefined;
+};
+
+const parsedStringTransformSignature = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): readonly string[] | undefined => {
+  if (active.has(definition)) {
+    return undefined;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (def.typeName === ZodFirstPartyTypeKind.ZodString) {
+      const checks = def.checks
+        ?.filter((check) => valueChangingStringChecks.has(check.kind))
+        .map((check) => check.kind);
+      return checks && checks.length > 0 ? checks : undefined;
+    }
+    if (
+      (def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type !== 'refinement') ||
+      (def.typeName === ZodFirstPartyTypeKind.ZodCatch && hasOpaqueJSONValidation(def.innerType._def)) ||
+      def.typeName === ZodFirstPartyTypeKind.ZodPipeline
+    ) {
+      return undefined;
+    }
+
+    const children = childDefinitions(def, 'output');
+    const child = children?.values[0];
+    return children?.values.length === 1 && child !== undefined
+      ? parsedStringTransformSignature(child._def, active)
+      : undefined;
+  } finally {
+    active.delete(definition);
+  }
+};
+
+const haveMatchingStringTransformSignatures = (left: ZodTypeDef, right: ZodTypeDef): boolean => {
+  const first = parsedStringTransformSignature(left);
+  const second = parsedStringTransformSignature(right);
+  return (
+    first !== undefined &&
+    second !== undefined &&
+    first.length === second.length &&
+    first.every((kind, index) => kind === second[index])
+  );
 };
 
 type ParsedOutputMismatch = {
@@ -501,6 +601,13 @@ const findOpaqueParsedOutputMismatch = (
 ): ParsedOutputMismatch | undefined => {
   const leftOpaque = classifyOpaqueParsedOutput(left);
   const rightOpaque = classifyOpaqueParsedOutput(right);
+  if (
+    leftOpaque === 'string-transformed' &&
+    rightOpaque === 'string-transformed' &&
+    haveMatchingStringTransformSignatures(left, right)
+  ) {
+    return undefined;
+  }
   return leftOpaque || rightOpaque
     ? {
         left: leftOpaque ?? leftKind ?? 'opaque',
@@ -1194,8 +1301,6 @@ const classifyJSONNumberAcceptance = (
 export const acceptsEveryJSONNumber = (definition: ZodTypeDef): boolean =>
   classifyJSONNumberAcceptance(definition) !== 'opaque';
 
-const valueChangingStringChecks = new Set(['trim', 'toLowerCase', 'toUpperCase']);
-
 export const hasOpaquePipelineTransform = (
   definition: ZodTypeDef,
   active = new Set<ZodTypeDef>(),
@@ -1208,8 +1313,7 @@ export const hasOpaquePipelineTransform = (
     const def = definition as InspectableDefinition;
     if (
       (def.typeName === ZodFirstPartyTypeKind.ZodCatch && hasOpaqueJSONValidation(def.innerType._def)) ||
-      (def.typeName === ZodFirstPartyTypeKind.ZodString &&
-        def.checks?.some((check) => valueChangingStringChecks.has(check.kind)) === true) ||
+      hasValueChangingStringChecks(def) ||
       (def.typeName === ZodFirstPartyTypeKind.ZodEffects &&
         (def.effect.type === 'preprocess' ||
           (def.effect.type === 'transform' && !isExactBigIntTransform(def))))

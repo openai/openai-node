@@ -72,6 +72,7 @@ import {
   hasExactBigIntStringInput,
   hasOpaqueJSONValidation,
   hasOpaquePipelineTransform,
+  hasUnconstrainedPipelineOutput,
   knownParsedOutputType,
   producesBigIntAtPath,
   producesDateAtPath,
@@ -1397,6 +1398,15 @@ const selectParser = (
     }
     case ZodFirstPartyTypeKind.ZodLiteral: {
       assertFiniteStrictSchemaValue(def.value, 'const', refs);
+      if (
+        refs.openaiStrictMode &&
+        def.value !== null &&
+        !['string', 'number', 'boolean', 'bigint'].includes(typeof def.value)
+      ) {
+        throw new TypeError(
+          `ZodLiteral at \`${refs.currentPath.join('/')}\` has a non-JSON literal value that cannot be represented in strict Structured Outputs.`,
+        );
+      }
       const schema = parseLiteralDef(def, refs);
       if (refs.openaiStrictMode && typeof def.value === 'bigint') {
         const record = schema as unknown as Record<string, unknown>;
@@ -1592,6 +1602,10 @@ const selectParser = (
               `ZodPipeline output constraints at \`${refs.currentPath.join('/')}\` cannot be safely projected across an opaque transform in strict Structured Outputs.`,
             );
           }
+          return input;
+        }
+
+        if (hasUnconstrainedPipelineOutput(def.out._def)) {
           return input;
         }
 
