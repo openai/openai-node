@@ -3,8 +3,10 @@
 set -euo pipefail
 
 publish_token=${NPM_TOKEN:-}
-export -n publish_token
-unset NPM_TOKEN
+publish_oidc_request_url=${ACTIONS_ID_TOKEN_REQUEST_URL:-}
+publish_oidc_request_token=${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}
+export -n publish_token publish_oidc_request_url publish_oidc_request_token
+unset NPM_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN
 
 set +e
 bash ./bin/check-npm-version
@@ -16,7 +18,7 @@ elif [[ $VERSION_STATUS -ne 1 ]]; then
   exit "$VERSION_STATUS"
 fi
 
-if [[ -z $publish_token && -z ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
+if [[ -z $publish_token && -z $publish_oidc_request_token ]]; then
   echo "ERROR: NPM_TOKEN must be set if not running in a Github Action with id-token permission"
   exit 1
 fi
@@ -105,4 +107,6 @@ fi
 
 # Publish with the appropriate tag
 export npm_config_registry='https://registry.npmjs.org'
-../oidc/node_modules/.bin/npm publish --tag "$TAG"
+ACTIONS_ID_TOKEN_REQUEST_URL=$publish_oidc_request_url \
+  ACTIONS_ID_TOKEN_REQUEST_TOKEN=$publish_oidc_request_token \
+  ../oidc/node_modules/.bin/npm publish --tag "$TAG"

@@ -15,6 +15,8 @@ import path from 'node:path';
 interface PublishEvent {
   command: string;
   token?: string;
+  oidcUrl?: string;
+  oidcToken?: string;
   config?: string;
   mode?: number;
   contents?: string;
@@ -47,7 +49,7 @@ describe('bin/publish-npm credential isolation', () => {
       path.join(fixture, 'bin/check-npm-version'),
       [
         '#!/usr/bin/env bash',
-        'printf \'{"command":"version-check","token":"%s"}\\n\' "$NPM_TOKEN" >> "$PUBLISH_EVENTS"',
+        'printf \'{"command":"version-check","token":"%s","oidcUrl":"%s","oidcToken":"%s"}\\n\' "$NPM_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" >> "$PUBLISH_EVENTS"',
         'exit 1',
       ].join('\n'),
     );
@@ -58,7 +60,9 @@ describe('bin/publish-npm credential isolation', () => {
       'const [command, ...args] = process.argv.slice(2);',
       'const config = process.env.NPM_CONFIG_USERCONFIG;',
       "const name = command === 'config' ? command + ':' + args[0] : command;",
-      'const event = { command: name, token: process.env.NPM_TOKEN, config };',
+      'const event = { command: name, token: process.env.NPM_TOKEN, config,',
+      '  oidcUrl: process.env.ACTIONS_ID_TOKEN_REQUEST_URL,',
+      '  oidcToken: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN };',
       "if (command === 'publish' && config) {",
       '  event.mode = fs.statSync(config).mode & 0o777;',
       "  event.contents = fs.readFileSync(config, 'utf8');",
@@ -80,7 +84,9 @@ describe('bin/publish-npm credential isolation', () => {
       [
         '#!/usr/bin/env node',
         "const fs = require('node:fs');",
-        'const event = { command: "build", token: process.env.NPM_TOKEN, config: process.env.NPM_CONFIG_USERCONFIG };',
+        'const event = { command: "build", token: process.env.NPM_TOKEN, config: process.env.NPM_CONFIG_USERCONFIG,',
+        '  oidcUrl: process.env.ACTIONS_ID_TOKEN_REQUEST_URL,',
+        '  oidcToken: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN };',
         "fs.appendFileSync(process.env.PUBLISH_EVENTS, JSON.stringify(event) + '\\n');",
         'if (process.env.FAIL_PHASE === "build") process.exit(17);',
       ].join('\n'),
@@ -106,6 +112,7 @@ describe('bin/publish-npm credential isolation', () => {
       HOME: path.join(fixture, 'home'),
       PATH: [path.join(fixture, 'mock-bin'), process.env['PATH'] ?? ''].join(path.delimiter),
       NPM_TOKEN: 'synthetic-publish-token',
+      ACTIONS_ID_TOKEN_REQUEST_URL: '',
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: '',
       ORIGINAL_USERCONFIG: originalConfig,
       PUBLISH_EVENTS: eventsPath,
@@ -159,10 +166,13 @@ describe('bin/publish-npm credential isolation', () => {
     expect(result.stderr).not.toContain('synthetic-publish-token');
   });
 
-  test('preserves tokenless trusted publishing without creating registry credentials', () => {
+  test('limits tokenless trusted-publishing credentials to the pinned publish subprocess', () => {
+    const oidcUrl = 'https://oidc.example.test/token';
+    const oidcToken = 'synthetic-oidc-grant';
     const { result, events } = runPublisher({
       NPM_TOKEN: undefined,
-      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'synthetic-oidc-grant',
+      ACTIONS_ID_TOKEN_REQUEST_URL: oidcUrl,
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: oidcToken,
     });
 
     expect(result.status).toBe(0);
@@ -175,5 +185,29 @@ describe('bin/publish-npm credential isolation', () => {
     ]);
     expect(events.every((event) => !event.token && !event.config)).toBe(true);
     expect(readFileSync(originalConfig, 'utf-8')).toBe('registry=https://registry.example.test/\n');
+    const publication = events.find((event) => event.command === 'publish');
+    expect(publication?.oidcUrl).toBe(oidcUrl);
+    expect(publication?.oidcToken).toBe(oidcToken);
+    for (const event of events) {
+      if (event.command !== 'publish') {
+        expect(event.oidcUrl).toBeFalsy();
+        expect(event.oidcToken).toBeFalsy();
+      }
+    }
+    expect(result.stdout).not.toContain(oidcToken);
+    expect(result.stderr).not.toContain(oidcToken);
+    expect(result.stdout).not.toContain(oidcUrl);
+    expect(result.stderr).not.toContain(oidcUrl);
   });
 });
+
+test.each(['.github/workflows/publish-npm.yml', '.github/workflows/create-releases.yml'])(
+  'clears OIDC grants before installing dependencies in %s',
+  (workflowPath) => {
+    const workflow = readFileSync(path.join(process.cwd(), workflowPath), 'utf-8');
+
+    expect(workflow).toMatch(
+      /- name: Install dependencies\s+run: \|\s+unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN\s+pnpm install --frozen-lockfile/u,
+    );
+  },
+);

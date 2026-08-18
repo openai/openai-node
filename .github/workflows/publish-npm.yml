@@ -28,6 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN
           pnpm install --frozen-lockfile
 
       - name: Publish to NPM
