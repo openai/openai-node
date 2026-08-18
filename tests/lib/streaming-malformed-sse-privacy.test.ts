@@ -113,6 +113,33 @@ describe('malformed SSE diagnostic privacy', () => {
     },
   );
 
+  it.each(
+    streamSurfaces.flatMap((surface) =>
+      ['hunter2', 'sk-live9'].map((secret) => ({ name: surface.name, surface, secret })),
+    ),
+  )(
+    'never exposes sensitive malformed $name payloads in propagated exceptions',
+    async ({ surface, secret }) => {
+      const logger = createLogger();
+      const stream = await createPublicStream(surface, { logger, data: secret });
+
+      const thrown = await collect(stream).then(
+        () => {
+          throw new Error('Expected the malformed SSE payload to be rejected.');
+        },
+        (error: unknown) => error,
+      );
+
+      expect(thrown).toBeInstanceOf(SyntaxError);
+      const syntaxError = thrown as SyntaxError & { cause?: unknown };
+      expect(syntaxError.message).not.toContain(secret);
+      expect(syntaxError.stack).not.toContain(secret);
+      expect(syntaxError.cause).toBeUndefined();
+      expect(stream.controller.signal.aborted).toBe(true);
+      expectPrivateDiagnostics(logger.error.mock.calls);
+    },
+  );
+
   it('never passes sensitive public-stream payloads to the default console logger', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
