@@ -20,14 +20,124 @@ type _WebSocket = typeof globalThis extends {
     InstanceType<ws>
   : any;
 
-/** Removes Azure credential query values from the publicly exposed connection URL. */
-function redactAzureCredentials(url: URL): void {
-  const hasAuthorization = url.searchParams.has('Authorization');
-  if (url.searchParams.has('api-key') || !hasAuthorization) {
+type RuntimeScope = typeof globalThis & {
+  WorkerGlobalScope?: typeof Object;
+  WorkerNavigator?: typeof Object;
+  Deno?: { version?: { deno?: string } };
+  Bun?: { version?: string };
+  EdgeRuntime?: unknown;
+  WebSocketPair?: unknown;
+};
+
+/** Identifies browser pages and workers without blocking trusted server runtimes. */
+function isRunningInBrowserOrBrowserWorker(): boolean {
+  if (isRunningInBrowser()) {
+    return true;
+  }
+
+  const scope = globalThis as RuntimeScope;
+  return (
+    typeof scope.WorkerGlobalScope === 'function' &&
+    scope instanceof scope.WorkerGlobalScope &&
+    typeof scope.WorkerNavigator === 'function' &&
+    scope.navigator instanceof scope.WorkerNavigator &&
+    typeof scope.navigator?.userAgent === 'string' &&
+    scope.navigator.userAgent !== 'Cloudflare-Workers' &&
+    scope.process?.versions?.node === undefined &&
+    scope.Deno === undefined &&
+    scope.Bun === undefined &&
+    scope.EdgeRuntime === undefined &&
+    scope.WebSocketPair === undefined
+  );
+}
+
+/** Reports whether the runtime supports request headers in native WebSocket options. */
+function supportsWebSocketRequestHeaders(): boolean {
+  const scope = globalThis as RuntimeScope;
+  if (
+    isRunningInBrowserOrBrowserWorker() ||
+    scope.EdgeRuntime !== undefined ||
+    scope.WebSocketPair !== undefined ||
+    scope.navigator?.userAgent === 'Cloudflare-Workers'
+  ) {
+    return false;
+  }
+
+  if (scope.Deno !== undefined) {
+    const [major, minor] = (scope.Deno.version?.deno ?? '').split('.').map(Number);
+    return major !== undefined && minor !== undefined && (major > 2 || (major === 2 && minor >= 5));
+  }
+
+  if (typeof scope.Bun?.version === 'string') {
+    return true;
+  }
+
+  return (
+    Object.prototype.toString.call(scope.process) === '[object process]' &&
+    typeof scope.process?.versions?.node === 'string'
+  );
+}
+
+/** Removes Azure credentials while preserving the existing public URL redaction contract. */
+function redactAzureCredentials(url: URL, isBearerToken: boolean): void {
+  let hasApiKey = !isBearerToken;
+  let hasAuthorization = isBearerToken;
+  const parameterNames = [...url.searchParams.keys()];
+
+  for (const name of parameterNames) {
+    if (name.toLowerCase() === 'api-key') {
+      hasApiKey = true;
+      url.searchParams.delete(name);
+    } else if (name.toLowerCase() === 'authorization') {
+      hasAuthorization = true;
+      url.searchParams.delete(name);
+    }
+  }
+
+  if (hasApiKey) {
     url.searchParams.set('api-key', '<REDACTED>');
   }
   if (hasAuthorization) {
     url.searchParams.set('Authorization', '<REDACTED>');
+  }
+}
+
+/** Opens an Azure native socket with header authentication and a credential-free URL. */
+function createAzureWebSocket(
+  url: URL,
+  apiKey: string | null,
+  isBearerToken: boolean,
+  protocols: string[],
+): _WebSocket {
+  if (!supportsWebSocketRequestHeaders()) {
+    throw new OpenAIError(
+      'Azure OpenAI Realtime credentials require a WebSocket transport that supports request headers; use openai/realtime/ws or a server-side authentication proxy.',
+    );
+  }
+  if (!apiKey) {
+    throw new Error('Azure OpenAI Realtime requires an API key');
+  }
+
+  redactAzureCredentials(url, isBearerToken);
+  const socketURL = new URL(url);
+  socketURL.searchParams.delete('api-key');
+  socketURL.searchParams.delete('Authorization');
+  const headers = isBearerToken ? { Authorization: `Bearer ${apiKey}` } : { 'api-key': apiKey };
+
+  // @ts-ignore
+  return new WebSocket(socketURL.toString(), { protocols, headers });
+}
+
+/** Prevents credentials from being attached outside the configured secure origin. */
+function assertTrustedRealtimeURL(client: Pick<OpenAI, 'apiKey' | 'baseURL'>, url: URL): void {
+  if (url.protocol !== 'wss:') {
+    throw new OpenAIError('Realtime WebSocket URLs must use the wss: protocol.');
+  }
+
+  const configuredURL = new URL(client.baseURL);
+  configuredURL.protocol = 'wss:';
+  if (url.origin !== configuredURL.origin) {
+    throw new OpenAIError('Realtime WebSocket URL origin must match the configured client origin.');
   }
 }
 
@@ -39,13 +149,6 @@ function redactAzureCredentials(url: URL): void {
  * listener before using the connection. Use the stable Realtime helper for
  * Azure sideband calls.
  */
-function resolveRealtimeURL(
-  client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
-  props: RealtimeConnectionConfig & { __url?: URL | undefined },
-): URL {
-  return props.__url ?? buildRealtimeURL(client, props);
-}
-
 export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   /** Secure beta Realtime WebSocket URL; Azure authentication query parameters are redacted. */
   url: URL;
@@ -77,9 +180,6 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       onURL?: (url: URL) => void;
       /** Indicates the token was resolved by the factory just before connecting. @internal */
       __resolvedApiKey?: boolean;
-
-      /** Final URL validated before an asynchronous credential provider ran. @internal */
-      __url?: URL;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
@@ -89,7 +189,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       props.dangerouslyAllowBrowser ??
       (client as any)?._options?.dangerouslyAllowBrowser ??
       (client?.apiKey?.startsWith('ek_') ? true : null);
-    if (!dangerouslyAllowBrowser && isRunningInBrowser()) {
+    if (!dangerouslyAllowBrowser && isRunningInBrowserOrBrowserWorker()) {
       throw new OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",
       );
@@ -106,16 +206,21 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       );
     }
 
-    this.url = resolveRealtimeURL(client, props);
+    this.url = buildRealtimeURL(client, props);
     props.onURL?.(this.url);
+    assertTrustedRealtimeURL(client, this.url);
     assertBedrockWebSocketOrigin(client, this.url);
 
-    // @ts-ignore
-    this.socket = new WebSocket(this.url.toString(), [
+    const azure = isAzure(client);
+    const protocols = [
       'realtime',
-      ...(isAzure(client) ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
+      ...(azure ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
       'openai-beta.realtime-v1',
-    ]);
+    ];
+
+    this.socket = azure
+      ? createAzureWebSocket(this.url, client.apiKey, props.__resolvedApiKey === true, protocols)
+      : new WebSocket(this.url.toString(), protocols);
 
     this.socket.addEventListener('message', (websocketEvent: MessageEvent) => {
       const event = (() => {
@@ -154,10 +259,6 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     this.socket.addEventListener('error', (event: any) => {
       this._onError(null, event.message, null);
     });
-
-    if (isAzure(client)) {
-      redactAzureCredentials(this.url);
-    }
   }
 
   /**
@@ -176,17 +277,20 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     },
   ): Promise<OpenAIRealtimeWebSocket> {
     const url = buildRealtimeURL(client, props);
+    assertTrustedRealtimeURL(client, url);
     assertBedrockWebSocketOrigin(client, url);
     const resolvedApiKey = await client._callApiKey();
-    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: resolvedApiKey, __url: url }, client);
+    assertTrustedRealtimeURL(client, url);
+    assertBedrockWebSocketOrigin(client, url);
+    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: resolvedApiKey }, client);
   }
 
   /**
    * Opens a native beta Azure OpenAI Realtime session for a model deployment.
    *
-   * Azure credentials are redacted from the exposed `url` property immediately
-   * after connection setup. Use the stable Realtime helper to attach to an
-   * existing Azure call.
+   * Azure credentials are sent in WebSocket handshake headers and never appear
+   * in the native socket URL. Browser WebSockets cannot set these headers;
+   * use a server-side authentication proxy or the Node.js `ws` transport.
    *
    * @param client Azure OpenAI client that supplies the endpoint and credential.
    * @param options Optional deployment override and browser-safety settings.
@@ -207,14 +311,6 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     if (!apiKey) {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
-    const azureApiKey = apiKey;
-    function onURL(url: URL) {
-      if (isApiKeyProvider) {
-        url.searchParams.set('Authorization', `Bearer ${azureApiKey}`);
-      } else {
-        url.searchParams.set('api-key', azureApiKey);
-      }
-    }
     const deploymentName = options.deploymentName ?? client.deploymentName;
     if (!deploymentName) {
       throw new Error('No deployment name provided');
@@ -223,7 +319,6 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     return new OpenAIRealtimeWebSocket(
       {
         model: deploymentName,
-        onURL,
         ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
         __resolvedApiKey: isApiKeyProvider,
       },
