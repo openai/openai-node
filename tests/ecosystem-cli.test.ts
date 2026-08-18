@@ -52,7 +52,7 @@ describe('ecosystem test CLI', () => {
       steps.find((step) => step.startsWith('Run ecosystem tests without live credentials\n')) ?? '';
 
     expect(workflowCondition(liveStep)).toBe(
-      "((github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]') || (github.event_name != 'pull_request' && github.event.sender.login != 'dependabot[bot]')) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)",
+      "github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository))",
     );
     expect(liveStep).toContain(
       'pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3',
@@ -61,7 +61,7 @@ describe('ecosystem test CLI', () => {
     expect(liveStep).toContain('secrets.OPENAI_API_KEY');
 
     expect(workflowCondition(nonLiveStep)).toBe(
-      "(github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository)) || (github.event_name != 'pull_request' && github.event.sender.login == 'dependabot[bot]')",
+      "github.actor == 'dependabot[bot]' || (github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository))",
     );
     expect(nonLiveStep).toContain('pnpm tsn ecosystem-tests/cli.ts --verbose --parallel --jobs=4 --retry=3');
     expect(nonLiveStep).not.toContain('--live');
@@ -88,21 +88,22 @@ describe('ecosystem test CLI', () => {
       'dependabot[bot]',
       'octocat',
       'openai/openai-node',
-      true,
+      false,
     ],
     ['fork pull request', 'pull_request', 'octocat', 'octocat', 'octocat/openai-node', false],
     ['pull request with a missing head', 'pull_request', 'octocat', 'octocat', undefined, false],
   ])(
     'selects exactly one ecosystem mode for a %s',
-    (_event, eventName, sender, pullRequestAuthor, headRepository, trusted) => {
+    (_event, eventName, actor, pullRequestAuthor, headRepository, trusted) => {
       const repository = 'openai/openai-node';
-      const eventOriginator = eventName === 'pull_request' ? pullRequestAuthor : sender;
       const keyless =
-        eventOriginator === 'dependabot[bot]' ||
-        (eventName === 'pull_request' && headRepository !== repository);
+        actor === 'dependabot[bot]' ||
+        (eventName === 'pull_request' &&
+          (pullRequestAuthor === 'dependabot[bot]' || headRepository !== repository));
       const live =
-        eventOriginator !== 'dependabot[bot]' &&
-        (eventName !== 'pull_request' || headRepository === repository);
+        actor !== 'dependabot[bot]' &&
+        (eventName !== 'pull_request' ||
+          (pullRequestAuthor !== 'dependabot[bot]' && headRepository === repository));
 
       expect({ keyless, live }).toEqual({ keyless: !trusted, live: trusted });
       expect([keyless, live].filter(Boolean)).toHaveLength(1);
