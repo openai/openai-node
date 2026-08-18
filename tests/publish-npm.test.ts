@@ -2,7 +2,6 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -14,12 +13,12 @@ import path from 'node:path';
 
 interface PublishEvent {
   command: string;
+  args?: string[];
   token?: string;
   oidcUrl?: string;
   oidcToken?: string;
   config?: string;
-  mode?: number;
-  contents?: string;
+  registry?: string;
 }
 
 function writeExecutable(filename: string, source: string): void {
@@ -50,7 +49,7 @@ describe('bin/publish-npm credential isolation', () => {
       [
         '#!/usr/bin/env bash',
         'printf \'{"command":"version-check","token":"%s","oidcUrl":"%s","oidcToken":"%s"}\\n\' "$NPM_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" >> "$PUBLISH_EVENTS"',
-        'exit 1',
+        'exit "$VERSION_STATUS"',
       ].join('\n'),
     );
 
@@ -60,20 +59,14 @@ describe('bin/publish-npm credential isolation', () => {
       'const [command, ...args] = process.argv.slice(2);',
       'const config = process.env.NPM_CONFIG_USERCONFIG;',
       "const name = command === 'config' ? command + ':' + args[0] : command;",
-      'const event = { command: name, token: process.env.NPM_TOKEN, config,',
+      'const event = { command: name, args, token: process.env.NPM_TOKEN, config,',
       '  oidcUrl: process.env.ACTIONS_ID_TOKEN_REQUEST_URL,',
-      '  oidcToken: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN };',
-      "if (command === 'publish' && config) {",
-      '  event.mode = fs.statSync(config).mode & 0o777;',
-      "  event.contents = fs.readFileSync(config, 'utf8');",
-      '}',
+      '  oidcToken: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,',
+      '  registry: process.env.npm_config_registry };',
       "fs.appendFileSync(process.env.PUBLISH_EVENTS, JSON.stringify(event) + '\\n');",
-      "if (command === 'config' && args[0] === 'get') process.stdout.write(process.env.ORIGINAL_USERCONFIG);",
-      "if (command === 'config' && args[0] === 'set') {",
-      "  fs.writeFileSync(process.env.ORIGINAL_USERCONFIG, args[1] + '=' + args[2] + '\\n');",
+      "if (command === 'view') {",
+      "  process.stdout.write(JSON.stringify(process.env.LAST_VERSION ?? '1.0.0') + '\\n');",
       '}',
-      "if (command === 'view') process.stdout.write('\"1.0.0\"\\n');",
-      "if (command === 'publish' && process.env.FAIL_PHASE === 'signal') process.kill(process.ppid, 'SIGTERM');",
       'if (command === process.env.FAIL_PHASE) process.exit(17);',
     ].join('\n');
     writeExecutable(path.join(fixture, 'mock-bin/npm'), npmMock);
@@ -97,7 +90,10 @@ describe('bin/publish-npm credential isolation', () => {
       [
         '#!/usr/bin/env node',
         "const field = process.argv.find((arg) => ['.name', '.version', '.'].includes(arg));",
-        "process.stdout.write(field === '.name' ? 'openai' : field === '.version' ? '1.2.0' : '1.0.0');",
+        "const value = field === '.name' ? 'openai'",
+        "  : field === '.version' ? process.env.PUBLISH_VERSION ?? '1.2.0'",
+        "  : process.env.LAST_VERSION ?? '1.0.0';",
+        'process.stdout.write(value);',
       ].join('\n'),
     );
   });
@@ -111,11 +107,13 @@ describe('bin/publish-npm credential isolation', () => {
       ...process.env,
       HOME: path.join(fixture, 'home'),
       PATH: [path.join(fixture, 'mock-bin'), process.env['PATH'] ?? ''].join(path.delimiter),
-      NPM_TOKEN: 'synthetic-publish-token',
-      ACTIONS_ID_TOKEN_REQUEST_URL: '',
-      ACTIONS_ID_TOKEN_REQUEST_TOKEN: '',
+      GITHUB_ACTIONS: 'true',
+      NPM_TOKEN: 'synthetic-ignored-legacy-token',
+      ACTIONS_ID_TOKEN_REQUEST_URL: 'https://oidc.example.test/token',
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'synthetic-oidc-grant',
       ORIGINAL_USERCONFIG: originalConfig,
       PUBLISH_EVENTS: eventsPath,
+      VERSION_STATUS: '1',
       ...overrides,
     };
     delete environment['NPM_CONFIG_USERCONFIG'];
@@ -137,67 +135,99 @@ describe('bin/publish-npm credential isolation', () => {
   test.each([
     { name: 'successful publication', failure: '', status: 0 },
     { name: 'failed publication', failure: 'publish', status: 17 },
-    { name: 'termination signal', failure: 'signal', status: 143 },
-  ])('isolates and removes temporary credentials after $name', ({ failure, status }) => {
+    { name: 'failed build', failure: 'build', status: 17 },
+    { name: 'failed pinned npm installation', failure: 'install', status: 17 },
+  ])('isolates trusted-publishing credentials during $name', ({ failure, status }) => {
     const { result, events } = runPublisher({ FAIL_PHASE: failure });
 
     expect(result.status).toBe(status);
-    expect(events.map((event) => event.command)).toEqual([
-      'version-check',
-      'build',
-      'install',
-      'config:get',
-      'view',
-      'publish',
-    ]);
-    expect(events.every((event) => !event.token)).toBe(true);
-
-    const publication = events.find((event) => event.command === 'publish');
-    if (!publication?.config) {
-      throw new Error('Mock publication did not receive a temporary npm configuration.');
-    }
-    expect(publication.config).not.toBe(originalConfig);
-    expect(publication.mode).toBe(0o600);
-    expect(publication.contents).toContain('registry=https://registry.example.test/');
-    expect(publication.contents).toContain('//registry.npmjs.org/:_authToken=synthetic-publish-token');
-    expect(existsSync(publication.config)).toBe(false);
-    expect(readFileSync(originalConfig, 'utf-8')).toBe('registry=https://registry.example.test/\n');
-    expect(result.stdout).not.toContain('synthetic-publish-token');
-    expect(result.stderr).not.toContain('synthetic-publish-token');
-  });
-
-  test('limits tokenless trusted-publishing credentials to the pinned publish subprocess', () => {
-    const oidcUrl = 'https://oidc.example.test/token';
-    const oidcToken = 'synthetic-oidc-grant';
-    const { result, events } = runPublisher({
-      NPM_TOKEN: undefined,
-      ACTIONS_ID_TOKEN_REQUEST_URL: oidcUrl,
-      ACTIONS_ID_TOKEN_REQUEST_TOKEN: oidcToken,
-    });
-
-    expect(result.status).toBe(0);
-    expect(events.map((event) => event.command)).toEqual([
-      'version-check',
-      'build',
-      'install',
-      'view',
-      'publish',
-    ]);
+    const commands = ['version-check', 'build', 'install', 'view', 'publish'];
+    const failedIndex = commands.indexOf(failure);
+    expect(events.map((event) => event.command)).toEqual(
+      failedIndex === -1 ? commands : commands.slice(0, failedIndex + 1),
+    );
     expect(events.every((event) => !event.token && !event.config)).toBe(true);
     expect(readFileSync(originalConfig, 'utf-8')).toBe('registry=https://registry.example.test/\n');
-    const publication = events.find((event) => event.command === 'publish');
-    expect(publication?.oidcUrl).toBe(oidcUrl);
-    expect(publication?.oidcToken).toBe(oidcToken);
+
     for (const event of events) {
-      if (event.command !== 'publish') {
+      if (event.command === 'publish') {
+        expect(event.oidcUrl).toBe('https://oidc.example.test/token');
+        expect(event.oidcToken).toBe('synthetic-oidc-grant');
+        expect(event.registry).toBe('https://registry.npmjs.org');
+      } else {
         expect(event.oidcUrl).toBeFalsy();
         expect(event.oidcToken).toBeFalsy();
       }
     }
-    expect(result.stdout).not.toContain(oidcToken);
-    expect(result.stderr).not.toContain(oidcToken);
-    expect(result.stdout).not.toContain(oidcUrl);
-    expect(result.stderr).not.toContain(oidcUrl);
+    expect(result.stdout).not.toContain('synthetic-ignored-legacy-token');
+    expect(result.stderr).not.toContain('synthetic-ignored-legacy-token');
+    expect(result.stdout).not.toContain('synthetic-oidc-grant');
+    expect(result.stderr).not.toContain('synthetic-oidc-grant');
+  });
+
+  test.each([
+    { name: 'outside GitHub Actions', overrides: { GITHUB_ACTIONS: 'false' } },
+    { name: 'without the OIDC request URL', overrides: { ACTIONS_ID_TOKEN_REQUEST_URL: '' } },
+    { name: 'without the OIDC request token', overrides: { ACTIONS_ID_TOKEN_REQUEST_TOKEN: '' } },
+    {
+      name: 'with only an unsupported legacy token',
+      overrides: { ACTIONS_ID_TOKEN_REQUEST_URL: '', ACTIONS_ID_TOKEN_REQUEST_TOKEN: '' },
+    },
+  ])('rejects publishing $name before building', ({ overrides }) => {
+    const { result, events } = runPublisher(overrides);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('npm publishing requires GitHub Actions OIDC with id-token: write');
+    expect(events.map((event) => event.command)).toEqual(['version-check']);
+    expect(events[0]?.token).toBeFalsy();
+    expect(events[0]?.oidcUrl).toBeFalsy();
+    expect(events[0]?.oidcToken).toBeFalsy();
+    expect(readFileSync(originalConfig, 'utf-8')).toBe('registry=https://registry.example.test/\n');
+  });
+
+  test('preserves the already-published no-op without requiring credentials', () => {
+    const { result, events } = runPublisher({
+      VERSION_STATUS: '0',
+      GITHUB_ACTIONS: 'false',
+      ACTIONS_ID_TOKEN_REQUEST_URL: '',
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: '',
+    });
+    expect(result.status).toBe(0);
+    expect(events.map((event) => event.command)).toEqual(['version-check']);
+  });
+
+  test('propagates version-preflight failures before inspecting credentials', () => {
+    const { result, events } = runPublisher({
+      VERSION_STATUS: '17',
+      GITHUB_ACTIONS: 'false',
+      ACTIONS_ID_TOKEN_REQUEST_URL: '',
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: '',
+    });
+
+    expect(result.status).toBe(17);
+    expect(events.map((event) => event.command)).toEqual(['version-check']);
+  });
+
+  test.each([
+    { name: 'stable version', version: '1.2.0', previous: '1.0.0', tag: 'latest' },
+    { name: 'alpha after a stable release', version: '1.2.0-alpha.1', previous: '1.0.0', tag: 'alpha' },
+    { name: 'beta after a stable release', version: '1.2.0-beta.1', previous: '1.0.0', tag: 'beta' },
+    {
+      name: 'prerelease without an earlier stable release',
+      version: '1.2.0-alpha.1',
+      previous: '1.0.0-beta.1',
+      tag: 'latest',
+    },
+  ])('preserves the registry tag for a $name', ({ version, previous, tag }) => {
+    const { result, events } = runPublisher({ PUBLISH_VERSION: version, LAST_VERSION: previous });
+
+    expect(result.status).toBe(0);
+    expect(events.find((event) => event.command === 'install')?.args).toEqual([
+      '--prefix',
+      'oidc/',
+      'npm@11.6.2',
+    ]);
+    expect(events.find((event) => event.command === 'publish')?.args).toEqual(['--tag', tag]);
   });
 });
 

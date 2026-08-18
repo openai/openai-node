@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-publish_token=${NPM_TOKEN:-}
+running_in_github_actions=${GITHUB_ACTIONS:-}
 publish_oidc_request_url=${ACTIONS_ID_TOKEN_REQUEST_URL:-}
 publish_oidc_request_token=${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}
-export -n publish_token publish_oidc_request_url publish_oidc_request_token
+export -n running_in_github_actions publish_oidc_request_url publish_oidc_request_token
 unset NPM_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN
 
 set +e
@@ -18,39 +18,16 @@ elif [[ $VERSION_STATUS -ne 1 ]]; then
   exit "$VERSION_STATUS"
 fi
 
-if [[ -z $publish_token && -z $publish_oidc_request_token ]]; then
-  echo "ERROR: NPM_TOKEN must be set if not running in a Github Action with id-token permission"
+if [[ $running_in_github_actions != true || -z $publish_oidc_request_url ||
+  -z $publish_oidc_request_token ]]; then
+  echo "ERROR: npm publishing requires GitHub Actions OIDC with id-token: write" >&2
   exit 1
 fi
 
 pnpm build
 
-# Install the OIDC-compatible npm before configuring publication credentials.
+# Install the OIDC-compatible npm without exposing publication credentials.
 npm install --prefix oidc/ npm@11.6.2
-
-if [[ -n $publish_token ]]; then
-  original_npm_config=$(npm config get userconfig)
-  publish_npm_config=''
-
-  cleanup_publish_npm_config() {
-    if [[ -n $publish_npm_config ]]; then
-      rm -f -- "$publish_npm_config"
-    fi
-  }
-  trap cleanup_publish_npm_config EXIT
-  trap 'exit 129' HUP
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
-
-  publish_npm_config=$(mktemp "${TMPDIR:-/tmp}/openai-npmrc.XXXXXXXX")
-  chmod 600 "$publish_npm_config"
-  if [[ -f $original_npm_config && -r $original_npm_config ]]; then
-    cp -- "$original_npm_config" "$publish_npm_config"
-  fi
-  printf '\n//registry.npmjs.org/:_authToken=%s\n' "$publish_token" >> "$publish_npm_config"
-  unset publish_token
-  export NPM_CONFIG_USERCONFIG="$publish_npm_config"
-fi
 
 cd dist
 

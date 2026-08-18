@@ -75,7 +75,10 @@ export function makeParseableResponseFormat<ParsedT>(
   response_format: ResponseFormatJSONSchema,
   parser: (content: string) => ParsedT,
 ): AutoParseableResponseFormat<ParsedT> {
-  const obj = { ...response_format };
+  const obj = { ...response_format, type: 'json_schema' as const };
+  obj.json_schema = { ...obj.json_schema };
+  delete (obj as { toJSON?: unknown }).toJSON;
+  delete (obj.json_schema as { toJSON?: unknown }).toJSON;
 
   Object.defineProperties(obj, {
     $brand: {

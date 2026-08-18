@@ -102,8 +102,9 @@ explicitly requires it.
   Bind privileged checkout, release, and publication operations to the validated,
   immutable commit; do not trust floating refs, mutable tags, optional checks, or
   assumptions about repository settings and app permissions.
-- Pin third-party GitHub Actions to full, immutable commit SHAs. Expose `NPM_TOKEN`,
-  GitHub App private keys, OIDC credentials, and publishing permissions only to
+- Pin third-party GitHub Actions to full, immutable commit SHAs. Publish npm packages
+  only through protected GitHub Actions OIDC trusted publishing; never add token-based
+  release paths. Expose GitHub App private keys, OIDC credentials, and permissions only to
   trusted release jobs; never expose them to unreviewed scripts or untrusted code.
 - For streaming, uploads, authentication, retries, timeouts, and cancellation,
   exercise the complete request/response lifetime: headers, JSON/error/binary/SSE

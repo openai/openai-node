@@ -68,8 +68,9 @@ modify the contents of the `src/lib/` and `examples/` directories.
 - Pin third-party GitHub Actions to full, immutable commit SHAs and review action updates. Keep workflow
   permissions minimal; grant `id-token: write`, GitHub App access, and npm publishing privileges only to
   trusted jobs that require them.
-- Never expose `NPM_TOKEN`, GitHub App private keys, OIDC credentials, or other release secrets to untrusted
-  code, unreviewed lifecycle scripts, logs, artifacts, or public package contents.
+- Publish npm packages only through protected GitHub Actions OIDC trusted publishing. Never expose GitHub
+  App private keys, OIDC credentials, long-lived registry tokens, or other release secrets to untrusted code,
+  unreviewed lifecycle scripts, logs, artifacts, or public package contents.
 
 ### Security-sensitive changes
 
@@ -221,8 +222,8 @@ format-on-save and lint-autofix editor settings.
 
 ## Publishing and releases
 
-Changes made to this repository via the automated release PR pipeline should publish to npm automatically. If
-the changes aren't made through the automated pipeline, you may want to make releases manually.
+Changes made to this repository via the automated release PR pipeline publish to npm automatically. Publishing
+requires GitHub Actions OIDC trusted publishing; local token-based publishing is not supported.
 
 ### Override an automated release version
 
@@ -244,12 +245,4 @@ Release Please will then regenerate the release PR files and title with that ver
 
 The [`Create releases` GitHub Actions workflow](https://github.com/openai/openai-node/actions/workflows/create-releases.yml)
 publishes releases after changes land on `main`. If publication fails, rerun the failed workflow to retain the
-protected `publish` environment, immutable release checkout, and npm OIDC trusted publishing. Prefer this
-reviewed, trusted-publishing flow over introducing long-lived registry secrets.
-
-### Publish manually
-
-If a manual recovery release is necessary, run `bin/publish-npm` with `NPM_TOKEN` supplied through approved
-secret storage. Publish only a reviewed commit and use a narrowly scoped, short-lived token. Never log the
-token, place it in shell history, or commit registry configuration. The publisher builds before creating
-its private temporary npm configuration and automatically removes that configuration on exit.
+protected `publish` environment, immutable release checkout, and npm OIDC trusted publishing.
