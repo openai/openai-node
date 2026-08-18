@@ -53,8 +53,9 @@ modify the contents of the `src/lib/` and `examples/` directories.
   security review; examples must not suggest exposing server-side credentials to browsers.
 - Always redact authentication headers, cookies, and webhook secrets. Keep real customer-sensitive request or
   response data out of default or uncontrolled logs, test output, snapshots, and CI artifacts. Preserve
-  documented opt-in `DEBUG` logging, `APIError.body` diagnostics, and clearly fake or sanitized fixtures;
-  warn that diagnostics may contain sensitive data and redact them before forwarding to untrusted sinks.
+  documented opt-in `OPENAI_LOG=debug` or `logLevel: 'debug'` logging, `APIError.error` diagnostics,
+  and clearly fake or sanitized fixtures; warn that diagnostics may contain sensitive data and redact them
+  before forwarding to untrusted sinks.
 
 ### Dependencies and release automation
 

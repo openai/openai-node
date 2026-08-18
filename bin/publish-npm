@@ -2,39 +2,6 @@
 
 set -euo pipefail
 
-running_in_github_actions=${GITHUB_ACTIONS:-}
-publish_oidc_request_url=${ACTIONS_ID_TOKEN_REQUEST_URL:-}
-publish_oidc_request_token=${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}
-export -n running_in_github_actions publish_oidc_request_url publish_oidc_request_token
-unset NPM_TOKEN NODE_AUTH_TOKEN NPM_AUTH_TOKEN YARN_NPM_AUTH_TOKEN YARN_NPM_AUTH_IDENT \
-  NPM_CONFIG_USERCONFIG npm_config_userconfig NPM_CONFIG_GLOBALCONFIG npm_config_globalconfig \
-  ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN
-
-for npm_config_variable in "${!NPM_CONFIG_@}" "${!npm_config_@}"; do
-  case "${npm_config_variable,,}" in
-    *auth*|*token*|*password*)
-      unset "$npm_config_variable"
-      ;;
-  esac
-done
-unset npm_config_variable
-
-publish_npm_config=''
-cleanup_publish_npm_config() {
-  if [[ -n $publish_npm_config ]]; then
-    rm -f -- "$publish_npm_config"
-  fi
-}
-trap cleanup_publish_npm_config EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-publish_npm_config=$(mktemp "${TMPDIR:-/tmp}/openai-npmrc.XXXXXXXX")
-chmod 600 "$publish_npm_config"
-export NPM_CONFIG_USERCONFIG="$publish_npm_config"
-export NPM_CONFIG_GLOBALCONFIG="$publish_npm_config"
-
 set +e
 bash ./bin/check-npm-version
 VERSION_STATUS=$?
@@ -45,17 +12,13 @@ elif [[ $VERSION_STATUS -ne 1 ]]; then
   exit "$VERSION_STATUS"
 fi
 
-if [[ $running_in_github_actions != true || -z $publish_oidc_request_url ||
-  -z $publish_oidc_request_token ]]; then
+if [[ ${GITHUB_ACTIONS:-} != true || -z ${ACTIONS_ID_TOKEN_REQUEST_URL:-} ||
+  -z ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
   echo "ERROR: npm publishing requires GitHub Actions OIDC with id-token: write" >&2
   exit 1
 fi
 
 pnpm build
-
-# Install the OIDC-compatible npm without exposing publication credentials.
-npm install --prefix oidc/ npm@11.6.2
-
 cd dist
 
 # Get package name and version from package.json
@@ -109,8 +72,9 @@ else
   TAG="latest"
 fi
 
+# Install OIDC compatible npm version
+npm install --prefix ../oidc/ npm@11.6.2
+
 # Publish with the appropriate tag
 export npm_config_registry='https://registry.npmjs.org'
-ACTIONS_ID_TOKEN_REQUEST_URL=$publish_oidc_request_url \
-  ACTIONS_ID_TOKEN_REQUEST_TOKEN=$publish_oidc_request_token \
-  ../oidc/node_modules/.bin/npm publish --tag "$TAG"
+../oidc/node_modules/.bin/npm publish --tag "$TAG"
