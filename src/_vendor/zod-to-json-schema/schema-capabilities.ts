@@ -285,6 +285,69 @@ export const knownParsedOutputType = (
   }
 };
 
+const isNullishParsedOutput = (definition: ZodTypeDef): boolean => {
+  const def = definition as InspectableDefinition;
+  return (
+    knownParsedOutputType(definition) === ZodFirstPartyTypeKind.ZodNull ||
+    def.typeName === ZodFirstPartyTypeKind.ZodUndefined
+  );
+};
+
+const unionRequiresNativeBigIntOutput = (
+  definition: InspectableDefinition,
+  active: Set<ZodTypeDef>,
+  inspect: (definition: ZodTypeDef, active: Set<ZodTypeDef>) => boolean,
+): boolean => {
+  const options = definition.options instanceof Map ? [...definition.options.values()] : definition.options;
+  const required = options.map((option) => inspect(option._def, active));
+  return (
+    required.includes(true) &&
+    options.every((option, index) => required[index] || isNullishParsedOutput(option._def))
+  );
+};
+
+export const requiresNativeBigIntPipelineOutput = (
+  definition: ZodTypeDef,
+  active = new Set<ZodTypeDef>(),
+): boolean => {
+  if (active.has(definition)) {
+    return false;
+  }
+  active.add(definition);
+  try {
+    const def = definition as InspectableDefinition;
+    if (def.typeName === ZodFirstPartyTypeKind.ZodBigInt) {
+      return def.coerce !== true;
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
+      return typeof def.value === 'bigint';
+    }
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodCatch ||
+      (def.typeName === ZodFirstPartyTypeKind.ZodEffects && def.effect.type === 'preprocess')
+    ) {
+      return false;
+    }
+    if (
+      def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
+      def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion
+    ) {
+      return unionRequiresNativeBigIntOutput(def, active, requiresNativeBigIntPipelineOutput);
+    }
+    if (def.typeName === ZodFirstPartyTypeKind.ZodIntersection) {
+      return [def.left, def.right].some((child) => requiresNativeBigIntPipelineOutput(child._def, active));
+    }
+    const children =
+      def.typeName === ZodFirstPartyTypeKind.ZodPipeline ? [def.in] : childDefinitions(def, 'output')?.values;
+    const child = children?.[0];
+    return children?.length === 1 && child !== undefined
+      ? requiresNativeBigIntPipelineOutput(child._def, active)
+      : false;
+  } finally {
+    active.delete(definition);
+  }
+};
+
 const hasOpaqueParsedOutput = (definition: ZodTypeDef): boolean =>
   visitDefinition(
     definition,

@@ -1826,6 +1826,58 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
   });
 
+  it.each([
+    {
+      name: 'opaque arm before a numeric arm',
+      schema: (convert: (value: number) => bigint) =>
+        z3.intersection(z3.number().transform(convert), z3.number()).pipe(z3.number()),
+    },
+    {
+      name: 'opaque arm before a classified numeric transform',
+      schema: (convert: (value: number) => bigint) =>
+        z3.intersection(z3.number().transform(convert), z3.number().transform(Number)).pipe(z3.number()),
+    },
+    {
+      name: 'classified numeric transform before an opaque arm',
+      schema: (convert: (value: number) => bigint) =>
+        z3.intersection(z3.number().transform(Number), z3.number().transform(convert)).pipe(z3.number()),
+    },
+    {
+      name: 'opaque arm before a coercing numeric arm',
+      schema: (convert: (value: number) => bigint) =>
+        z3.intersection(z3.number().transform(convert), z3.coerce.number()).pipe(z3.number()),
+    },
+    {
+      name: 'numeric arm before an opaque arm',
+      schema: (convert: (value: number) => bigint) =>
+        z3.intersection(z3.number(), z3.number().transform(convert)).pipe(z3.number()),
+    },
+    {
+      name: 'readonly lazy opaque arm',
+      schema: (convert: (value: number) => bigint) =>
+        z3
+          .intersection(
+            z3.lazy(() => z3.number().transform(convert).readonly()),
+            z3.number(),
+          )
+          .pipe(z3.number()),
+    },
+    {
+      name: 'nested object opaque arm',
+      schema: (convert: (value: number) => bigint) =>
+        z3
+          .intersection(
+            z3.object({ count: z3.number().transform(convert) }),
+            z3.object({ count: z3.number() }),
+          )
+          .pipe(z3.object({ count: z3.number() })),
+    },
+  ])('rejects an $name intersection before downstream pipeline validation', ({ schema }) => {
+    const convert = vi.fn((value: number) => BigInt(value.toString()));
+    expect(() => create(z3.object({ value: schema(convert) }))).toThrow('incompatible parsed outputs');
+    expect(convert).not.toHaveBeenCalled();
+  });
+
   it('preserves intersections with compatible optional numeric outputs', () => {
     const result = create(z3.object({ value: z3.intersection(z3.number().optional(), z3.number()) }));
 
@@ -2544,6 +2596,116 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7n });
     expect(result.$parseRaw('{"value":101}')).toEqual({ value: 101n });
     expect(() => result.$parseRaw('{"value":50}')).toThrow();
+  });
+
+  it.each([
+    {
+      name: 'numeric identity transform',
+      schema: (convert: (value: number) => number) => z3.number().transform(convert).pipe(z3.bigint()),
+    },
+    {
+      name: 'readonly input transform',
+      schema: (convert: (value: number) => number) =>
+        z3.number().transform(convert).readonly().pipe(z3.bigint()),
+    },
+    {
+      name: 'lazy input transform',
+      schema: (convert: (value: number) => number) =>
+        z3.lazy(() => z3.number().transform(convert)).pipe(z3.bigint()),
+    },
+    {
+      name: 'readonly native output',
+      schema: (convert: (value: number) => number) =>
+        z3.number().transform(convert).pipe(z3.bigint().readonly()),
+    },
+    {
+      name: 'optional native output',
+      schema: (convert: (value: number) => number) =>
+        z3.number().transform(convert).pipe(z3.bigint().optional()),
+    },
+    {
+      name: 'nullable native output',
+      schema: (convert: (value: number) => number) =>
+        z3.number().transform(convert).pipe(z3.bigint().nullable()),
+    },
+    {
+      name: 'nullable native output union',
+      schema: (convert: (value: number) => number) =>
+        z3
+          .number()
+          .transform(convert)
+          .pipe(z3.union([z3.bigint(), z3.null()])),
+    },
+    {
+      name: 'nested object property',
+      schema: (convert: (value: number) => number) =>
+        z3.object({ count: z3.number().transform(convert).pipe(z3.bigint()) }),
+    },
+    {
+      name: 'nested array item',
+      schema: (convert: (value: number) => number) =>
+        z3.array(z3.number().transform(convert).pipe(z3.bigint())),
+    },
+  ])('rejects an unverifiable $name before native BigInt pipeline validation', ({ schema }) => {
+    const convert = vi.fn((value: number) => value);
+    expect(() => create(z3.object({ value: schema(convert) }))).toThrow('ZodBigInt');
+    expect(convert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'exact built-in BigInt transform',
+      schema: () => z3.number().transform(BigInt).pipe(z3.bigint()),
+      expected: 7n,
+    },
+    {
+      name: 'independently validated opaque BigInt preprocessor',
+      schema: () =>
+        z3
+          .preprocess((value) => (typeof value === 'number' ? BigInt(value) : value), z3.bigint())
+          .pipe(z3.bigint()),
+      expected: 7n,
+    },
+    {
+      name: 'coercing downstream BigInt',
+      schema: () =>
+        z3
+          .number()
+          .transform((value) => value)
+          .pipe(z3.coerce.bigint()),
+      expected: 7n,
+    },
+    {
+      name: 'readonly coercing downstream BigInt',
+      schema: () =>
+        z3
+          .number()
+          .transform((value) => value)
+          .pipe(z3.coerce.bigint().readonly()),
+      expected: 7n,
+    },
+    {
+      name: 'mixed numeric and native BigInt output union',
+      schema: () =>
+        z3
+          .number()
+          .transform((value) => value)
+          .pipe(z3.union([z3.bigint(), z3.number()])),
+      expected: 7,
+    },
+    {
+      name: 'known built-in numeric transform',
+      schema: () => z3.number().transform(Number).pipe(z3.number()),
+      expected: 7,
+    },
+    {
+      name: 'known built-in string transform',
+      schema: () => z3.number().transform(String).pipe(z3.string()),
+      expected: '7',
+    },
+  ])('preserves a provably compatible $name pipeline output', ({ schema, expected }) => {
+    const result = create(z3.object({ value: schema() }));
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: expected });
   });
 
   it.each([

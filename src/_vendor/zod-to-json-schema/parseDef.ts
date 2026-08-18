@@ -77,6 +77,7 @@ import {
   producesDateAtPath,
   producesBigIntOutput,
   requiresAsynchronousJSONInput,
+  requiresNativeBigIntPipelineOutput,
 } from './schema-capabilities';
 import { ignoreOverride } from './Options';
 import { zodDef } from './util';
@@ -1075,8 +1076,8 @@ const selectParser = (
           const compatibleExpectedOutput =
             mismatch.path.length === 0 &&
             expectedKind !== undefined &&
-            (mismatch.left === 'opaque' || mismatch.left === expectedKind) &&
-            (mismatch.right === 'opaque' || mismatch.right === expectedKind);
+            mismatch.left === 'opaque' &&
+            mismatch.right === 'opaque';
           if (!compatibleExpectedOutput) {
             throw new TypeError(
               `ZodIntersection arms have incompatible parsed outputs: ${mismatch.left} and ${mismatch.right}`,
@@ -1292,6 +1293,14 @@ const selectParser = (
         }
 
         if (hasOpaquePipelineTransform(def.in._def)) {
+          if (
+            requiresNativeBigIntPipelineOutput(def.out._def) &&
+            knownParsedOutputType(def.in._def) !== ZodFirstPartyTypeKind.ZodBigInt
+          ) {
+            throw new TypeError(
+              `ZodPipeline opaque transform at \`${refs.currentPath.join('/')}\` cannot establish a compatible native ZodBigInt output in strict Structured Outputs.`,
+            );
+          }
           if (hasConstrainedPipelineOutput(def.out._def)) {
             throw new Error(
               `ZodPipeline output constraints at \`${refs.currentPath.join('/')}\` cannot be safely projected across an opaque transform in strict Structured Outputs.`,
