@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import { vi } from 'vitest';
 import {
   zodFunction,
@@ -1244,6 +1245,105 @@ describe('Zod v3 strict schema capability analysis', () => {
 
 describe.each(strictHelpers)('$name strict numeric input capability analysis', ({ create }) => {
   it.each([
+    {
+      name: 'null-prototype Set',
+      type: 'ZodSet',
+      value: () => Object.setPrototypeOf(new Set([1]), null) as object,
+    },
+    {
+      name: 'altered-prototype Set',
+      type: 'ZodSet',
+      value: () => Object.setPrototypeOf(new Set([1]), Object.create(null) as object) as object,
+    },
+    {
+      name: 'cross-realm Set',
+      type: 'ZodSet',
+      value: () => runInNewContext('new Set([1])') as object,
+    },
+    {
+      name: 'null-prototype Map',
+      type: 'ZodMap',
+      value: () => Object.setPrototypeOf(new Map([['value', 1]]), null) as object,
+    },
+    {
+      name: 'altered-prototype Map',
+      type: 'ZodMap',
+      value: () => Object.setPrototypeOf(new Map([['value', 1]]), Object.create(null) as object) as object,
+    },
+    {
+      name: 'cross-realm Map',
+      type: 'ZodMap',
+      value: () => runInNewContext("new Map([['value', 1]])") as object,
+    },
+  ])('rejects a genuine $name default without trusting its prototype', ({ type, value }) => {
+    const native = value();
+    expect(() => create(z3.object({ value: z3.any().default(native) }))).toThrow(type);
+    expect(() => create(z3.object({ value: z3.unknown().default({ nested: native }) }))).toThrow(type);
+  });
+
+  it.each([
+    { name: 'Set', type: 'ZodSet', value: () => new Set([1]) as object },
+    { name: 'Map', type: 'ZodMap', value: () => new Map([['value', 1]]) as object },
+  ])('detects genuine $name default slots without invoking hostile accessors', ({ type, value }) => {
+    const getter = vi.fn(() => {
+      throw new Error('must never run');
+    });
+    const prototype = Object.defineProperty({}, 'size', { get: getter });
+    const native = Object.setPrototypeOf(value(), prototype);
+    Object.defineProperty(native, 'toJSON', { enumerable: true, get: getter });
+
+    expect(() => create(z3.object({ value: z3.any().default(native) }))).toThrow(type);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'coerced minimum', schema: () => z3.coerce.date().min(new Date('2025-01-01T00:00:00.000Z')) },
+    { name: 'coerced maximum', schema: () => z3.coerce.date().max(new Date('2025-12-31T00:00:00.000Z')) },
+    {
+      name: 'coerced minimum and maximum',
+      schema: () =>
+        z3.coerce.date().min(new Date('2025-01-01T00:00:00.000Z')).max(new Date('2025-12-31T00:00:00.000Z')),
+    },
+    {
+      name: 'readonly constrained date',
+      schema: () => z3.coerce.date().min(new Date('2025-01-01T00:00:00.000Z')).readonly(),
+    },
+    {
+      name: 'lazy constrained date',
+      schema: () => z3.lazy(() => z3.coerce.date().max(new Date('2025-12-31T00:00:00.000Z'))),
+    },
+    {
+      name: 'nested object constrained date',
+      schema: () => z3.object({ when: z3.coerce.date().min(new Date('2025-01-01T00:00:00.000Z')) }),
+    },
+    {
+      name: 'nested array constrained date',
+      schema: () => z3.array(z3.coerce.date().max(new Date('2025-12-31T00:00:00.000Z'))),
+    },
+    {
+      name: 'preprocessed native date minimum',
+      schema: () =>
+        z3.preprocess(
+          (value) => new Date(value as string),
+          z3.date().min(new Date('2025-01-01T00:00:00.000Z')),
+        ),
+    },
+  ])('rejects an unrepresentable $name Date bound', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow(/ZodDate.*bounds/u);
+  });
+
+  it('preserves an unconstrained coerced Date and its date-time input', () => {
+    const value = '2024-01-01T00:00:00.000Z';
+    const result = create(z3.object({ value: z3.coerce.date() }));
+
+    expect(strictHelperSchema(result)).toHaveProperty('properties.value', {
+      type: 'string',
+      format: 'date-time',
+    });
+    expect(result.$parseRaw(JSON.stringify({ value }))).toEqual({ value: new Date(value) });
+  });
+
+  it.each([
     { name: 'literal', schema: (value: number) => z3.literal(value) },
     { name: 'readonly literal', schema: (value: number) => z3.literal(value).readonly() },
     { name: 'nullable literal', schema: (value: number) => z3.literal(value).nullable() },
@@ -1876,6 +1976,64 @@ describe.each(strictHelpers)('$name strict numeric input capability analysis', (
     const convert = vi.fn((value: number) => BigInt(value.toString()));
     expect(() => create(z3.object({ value: schema(convert) }))).toThrow('incompatible parsed outputs');
     expect(convert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'BigInt catch before number',
+      schema: () => z3.intersection(z3.coerce.bigint().catch(0n), z3.number()),
+    },
+    {
+      name: 'number before BigInt catch',
+      schema: () => z3.intersection(z3.number(), z3.coerce.bigint().catch(0n)),
+    },
+    {
+      name: 'readonly BigInt catch',
+      schema: () => z3.intersection(z3.coerce.bigint().catch(0n).readonly(), z3.number()),
+    },
+    {
+      name: 'lazy BigInt catch',
+      schema: () =>
+        z3.intersection(
+          z3.lazy(() => z3.coerce.bigint().catch(0n)),
+          z3.number(),
+        ),
+    },
+    {
+      name: 'nested BigInt catch object',
+      schema: () =>
+        z3.intersection(
+          z3.object({ count: z3.coerce.bigint().catch(0n) }),
+          z3.object({ count: z3.number() }),
+        ),
+    },
+    {
+      name: 'nested BigInt catch array',
+      schema: () => z3.intersection(z3.array(z3.coerce.bigint().catch(0n)), z3.array(z3.number())),
+    },
+    {
+      name: 'Date catch before string',
+      schema: () => z3.intersection(z3.coerce.date().catch(new Date(0)), z3.string()),
+    },
+    {
+      name: 'Set catch before array',
+      schema: () => z3.intersection(z3.set(z3.string()).catch(new Set(['fallback'])), z3.array(z3.string())),
+    },
+  ])('rejects incompatible successful $name intersection outputs', ({ schema }) => {
+    expect(() => create(z3.object({ value: schema() }))).toThrow('incompatible parsed outputs');
+  });
+
+  it('inspects caught native intersection outputs without invoking fallback callbacks', () => {
+    const fallback = vi.fn(() => 0n);
+    const value = z3.intersection(z3.coerce.bigint().catch(fallback), z3.number());
+
+    expect(() => create(z3.object({ value }))).toThrow('incompatible parsed outputs');
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
+  it('preserves intersections with a compatible caught numeric output', () => {
+    const result = create(z3.object({ value: z3.intersection(z3.number().catch(0), z3.number()) }));
+    expect(result.$parseRaw('{"value":7}')).toEqual({ value: 7 });
   });
 
   it.each([

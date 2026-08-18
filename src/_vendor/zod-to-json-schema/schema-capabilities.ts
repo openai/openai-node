@@ -270,7 +270,6 @@ export const knownParsedOutputType = (
     }
     if (
       def.typeName === ZodFirstPartyTypeKind.ZodNullable ||
-      def.typeName === ZodFirstPartyTypeKind.ZodCatch ||
       def.typeName === ZodFirstPartyTypeKind.ZodUnion ||
       def.typeName === ZodFirstPartyTypeKind.ZodDiscriminatedUnion ||
       def.typeName === ZodFirstPartyTypeKind.ZodIntersection

@@ -384,6 +384,32 @@ const throwUnrepresentableStrictZodType = (typeName: ZodFirstPartyTypeKind, refs
   );
 };
 
+type StrictDateCheck = { kind: 'min' | 'max'; value: number };
+
+const dateSchemaPreservesBounds = (
+  schema: JsonSchema7DateType,
+  checks: readonly StrictDateCheck[],
+): boolean => {
+  if ('anyOf' in schema) {
+    return (
+      schema.anyOf.length > 0 &&
+      schema.anyOf.every((candidate) => dateSchemaPreservesBounds(candidate, checks))
+    );
+  }
+  if (schema.type !== 'integer') {
+    return false;
+  }
+  return checks.every((check) => {
+    const bound = check.kind === 'min' ? schema.minimum : schema.maximum;
+    return (
+      typeof bound === 'number' &&
+      Number.isFinite(bound) &&
+      Number.isFinite(check.value) &&
+      (check.kind === 'min' ? bound >= check.value : bound <= check.value)
+    );
+  });
+};
+
 const assertFiniteStrictSchemaValue = (value: unknown, keyword: string, refs: Refs): void => {
   if (refs.openaiStrictMode && typeof value === 'number' && !Number.isFinite(value)) {
     throw new TypeError(
@@ -455,6 +481,25 @@ const strictDefaultDescriptors = (
     }
   }
   return descriptors;
+};
+
+const trustedNativeCollectionMethods = [
+  { type: ZodFirstPartyTypeKind.ZodSet, has: Set.prototype.has },
+  { type: ZodFirstPartyTypeKind.ZodMap, has: Map.prototype.has },
+] as const;
+
+const nativeCollectionDefaultType = (
+  value: object,
+): ZodFirstPartyTypeKind.ZodSet | ZodFirstPartyTypeKind.ZodMap | undefined => {
+  for (const { type, has } of trustedNativeCollectionMethods) {
+    try {
+      Reflect.apply(has, value, [undefined]);
+      return type;
+    } catch {
+      // Native methods reject receivers without their corresponding internal collection slot.
+    }
+  }
+  return undefined;
 };
 
 const trustedDatePrototypeMethods = new Map<PropertyKey, unknown>([
@@ -531,11 +576,11 @@ const normalizeStrictDefaultValue = (
   if (!value || typeof value !== 'object') {
     return value;
   }
-  const prototypes = strictDefaultPrototypeChain(value, keyword, refs);
-  if (value instanceof Set || value instanceof Map) {
-    const typeName = value instanceof Set ? ZodFirstPartyTypeKind.ZodSet : ZodFirstPartyTypeKind.ZodMap;
-    throwUnrepresentableStrictZodType(typeName, refs);
+  const nativeCollection = nativeCollectionDefaultType(value);
+  if (nativeCollection !== undefined) {
+    throwUnrepresentableStrictZodType(nativeCollection, refs);
   }
+  const prototypes = strictDefaultPrototypeChain(value, keyword, refs);
 
   if (active.has(value)) {
     throw new TypeError(
@@ -915,7 +960,17 @@ const selectParser = (
       return parseBooleanDef();
     }
     case ZodFirstPartyTypeKind.ZodDate: {
-      return parseDateDef(def, refs);
+      const schema = parseDateDef(def, refs);
+      if (
+        refs.openaiStrictMode &&
+        def.checks.length > 0 &&
+        !dateSchemaPreservesBounds(schema, def.checks as StrictDateCheck[])
+      ) {
+        throw new TypeError(
+          `Zod field at \`${refs.currentPath.join('/')}\` uses \`ZodDate\` bounds that cannot be represented by its configured JSON Structured Outputs date strategy.`,
+        );
+      }
+      return schema;
     }
     case ZodFirstPartyTypeKind.ZodUndefined: {
       return parseUndefinedDef();
