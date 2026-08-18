@@ -221,10 +221,26 @@ export function gcpIDTokenProvider(
         });
 
         if (!response.ok) {
+          let abortListener: (() => void) | undefined;
+
           try {
-            await Shims.CancelReadableStream(response.body);
+            // oxlint-disable-next-line promise/avoid-new -- AbortSignal is callback-only across supported runtimes.
+            const requestAborted = new Promise<void>((resolve) => {
+              abortListener = () => resolve();
+              if (controller.signal.aborted) {
+                abortListener();
+              } else {
+                controller.signal.addEventListener('abort', abortListener, { once: true });
+              }
+            });
+
+            await Promise.race([Shims.CancelReadableStream(response.body), requestAborted]);
           } catch {
             controller.abort();
+          } finally {
+            if (abortListener) {
+              controller.signal.removeEventListener('abort', abortListener);
+            }
           }
 
           throw new Error(`GCP Metadata Server returned ${response.status}`);

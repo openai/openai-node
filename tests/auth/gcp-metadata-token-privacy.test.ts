@@ -204,6 +204,78 @@ describe('GCP metadata token HTTP error privacy', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('bounds never-settling metadata cancellation during public workload authentication', async () => {
+    vi.useFakeTimers();
+
+    const neverReleased = new EventTarget();
+    const cancelBody = vi.fn(async () => {
+      await once(neverReleased, 'release');
+    });
+    let requestSignal: AbortSignal | null | undefined;
+    const metadataFetch = vi.fn(async (_input: string | URL | Request, options?: RequestInit) => {
+      requestSignal = options?.signal;
+      return new Response(new ReadableStream<Uint8Array>({ cancel: cancelBody }), {
+        status: 504,
+      });
+    });
+    const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = new OpenAI({
+      apiKey: null,
+      maxRetries: 0,
+      fetch: apiFetch,
+      workloadIdentity: {
+        identityProviderId: 'test-identity-provider',
+        serviceAccountId: 'test-service-account',
+        provider: gcpIDTokenProvider(undefined, { fetch: metadataFetch, timeout: 25 }),
+      },
+    });
+    const completed = vi.fn();
+    const operation = expectPrivateMetadataFailure(() => client.models.list(), 504).then(completed);
+
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(completed).toHaveBeenCalledTimes(1);
+    await operation;
+    expect(cancelBody).toHaveBeenCalledTimes(1);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['resolve', 'reject'] as const)(
+    'safely observes a cancellation that later %ss after the request deadline',
+    async (settlement) => {
+      vi.useFakeTimers();
+
+      const releaseCancellation = new EventTarget();
+      const cancelBody = vi.fn(async () => {
+        await once(releaseCancellation, 'release');
+        if (settlement === 'reject') {
+          throw new Error(`late cancellation leaked ${METADATA_CREDENTIAL} ${CUSTOMER_DATA}`);
+        }
+      });
+      const response = new Response(new ReadableStream<Uint8Array>({ cancel: cancelBody }), {
+        status: 503,
+      });
+      const provider = gcpIDTokenProvider(undefined, {
+        timeout: 25,
+        fetch: async () => response,
+      });
+      const completed = vi.fn();
+      const operation = expectPrivateMetadataFailure(() => provider.getToken(), 503).then(completed);
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      expect(completed).toHaveBeenCalledTimes(1);
+      await operation;
+      releaseCancellation.dispatchEvent(new Event('release'));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(cancelBody).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
   it('closes each rejected metadata stream across public authentication retries', async () => {
     const cancelBody = vi.fn();
     const metadataFetch = vi.fn(
