@@ -6,6 +6,28 @@ const MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH = 65_536;
 
 type AssistantStreamRecord = Record<string, unknown>;
 
+function getAssistantStreamDiagnosticProperty(property: string): string {
+  switch (property) {
+    case 'value':
+    case 'arguments':
+    case 'input':
+    case 'text':
+    case 'content':
+    case 'annotations':
+    case 'metadata':
+    case 'name':
+    case 'role':
+    case 'status':
+    case 'tool_calls':
+    case 'step_details': {
+      return property;
+    }
+    default: {
+      return 'unknown';
+    }
+  }
+}
+
 interface AssistantStreamArrayState {
   length: number;
   ownEntryCount: number;
@@ -91,7 +113,9 @@ function getAssistantStreamDeltaIndex(
   }
 
   if (kind === 'array' && typeof index !== 'number') {
-    throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+    throw new TypeError(
+      'Expected array delta entry `index` property to be a number but got an invalid value',
+    );
   }
 
   if (
@@ -100,7 +124,8 @@ function getAssistantStreamDeltaIndex(
     (index as number) >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH ||
     (index as number) >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH
   ) {
-    throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
+    const safeIndex = typeof index === 'number' ? index : 'unknown';
+    throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${safeIndex}`);
   }
 
   return index as number;
@@ -138,7 +163,7 @@ function assertValidAssistantStreamArrayDelta(
 
   for (const deltaEntry of delta) {
     if (!isObj(deltaEntry)) {
-      throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+      throw new Error('Expected array delta entry to be an object but got an invalid value');
     }
 
     const validatedIndex = getAssistantStreamDeltaIndex(deltaEntry, kind, projectedArray.baselineLength);
@@ -261,7 +286,9 @@ function getRequiredAssistantStreamArrayIndex(deltaEntry: AssistantStreamRecord)
     throw new Error('Expected array delta entry to have an `index` property');
   }
   if (typeof index !== 'number') {
-    throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+    throw new TypeError(
+      'Expected array delta entry `index` property to be a number but got an invalid value',
+    );
   }
   return index;
 }
@@ -284,7 +311,7 @@ function applyAssistantStreamArrayDelta(
 
   for (const deltaEntry of delta) {
     if (!isObj(deltaEntry)) {
-      throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+      throw new Error('Expected array delta entry to be an object but got an invalid value');
     }
 
     const index = getRequiredAssistantStreamArrayIndex(deltaEntry);
@@ -347,9 +374,7 @@ function applyAssistantStreamDelta(
       applyAssistantStreamArrayDelta(accumulatedValue, deltaValue, applyAssistantStreamDelta);
       continue;
     } else {
-      throw new TypeError(
-        `Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accumulatedValue}`,
-      );
+      throw new TypeError(`Unhandled record type: ${getAssistantStreamDiagnosticProperty(key)}`);
     }
     accumulator[key] = accumulatedValue;
   }
