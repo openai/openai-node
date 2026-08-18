@@ -81,7 +81,19 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     this.socket.on('message', (wsEvent) => {
       const event = (() => {
         try {
-          return JSON.parse(wsEvent.toString()) as RealtimeServerEvent;
+          const parsedEvent = JSON.parse(wsEvent.toString()) as RealtimeServerEvent;
+
+          if (
+            typeof parsedEvent !== 'object' ||
+            parsedEvent === null ||
+            Array.isArray(parsedEvent) ||
+            !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
+            typeof parsedEvent.type !== 'string'
+          ) {
+            throw new TypeError('Realtime WebSocket event must be an object with a string type.');
+          }
+
+          return parsedEvent;
         } catch (err) {
           this._onError(null, 'could not parse websocket event', err);
           return null;
