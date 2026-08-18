@@ -3,7 +3,7 @@
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
-import { validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
+import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
@@ -13,6 +13,8 @@ import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
 import { stringifyQuery } from './internal/utils/query';
 import { VERSION } from './version';
+import { resolveDataResidency, type DataResidency } from './internal/data-residency';
+export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import type { WorkloadIdentity } from './auth/types';
@@ -269,6 +271,8 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
 }
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
+const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
+type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
 
 export type ApiKeySetter = () => Promise<string>;
 
@@ -313,6 +317,14 @@ export interface ClientOptions {
    * Defaults to process.env['OPENAI_BASE_URL'].
    */
   baseURL?: string | null | undefined;
+
+  /**
+   * Select an OpenAI regional endpoint. This overrides an inherited or environment
+   * base URL and is mutually exclusive with an explicit `baseURL` or `provider`.
+   * Availability depends on your project and model; no fallback is performed.
+   * `null` and `undefined` leave ordinary base URL resolution unchanged.
+   */
+  dataResidency?: DataResidency | null | undefined;
 
   /**
    * The maximum amount of time (in milliseconds) that the client should wait for a response
@@ -431,6 +443,8 @@ export class OpenAI {
 
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
+  // Preserve an explicit global selection without storing a second routing URL.
+  #explicitDataResidency = false;
   #responseAttempts = new WeakMap<AbortController, { timeout: number; retriesRemaining: number }>();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
@@ -456,11 +470,12 @@ export class OpenAI {
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
   constructor(clientOptions: ClientOptions = {}) {
+    const residencyBaseURL = resolveDataResidency(clientOptions);
     const provider = clientOptions.provider;
     if (provider) {
-      const conflictingOptions = (['apiKey', 'adminAPIKey', 'workloadIdentity', 'baseURL'] as const).filter(
-        (key) => clientOptions[key] != null,
-      );
+      const conflictingOptions = (
+        ['apiKey', 'adminAPIKey', 'workloadIdentity', 'baseURL', 'dataResidency'] as const
+      ).filter((key) => clientOptions[key] != null);
       if (conflictingOptions.length) {
         throw new Errors.OpenAIError(
           `The \`provider\` option cannot be used with ${conflictingOptions
@@ -472,6 +487,8 @@ export class OpenAI {
 
     const {
       baseURL = provider ? null : readEnv('OPENAI_BASE_URL'),
+      dataResidency: _dataResidency,
+      [inheritedDataResidencySelection]: inheritedResidencySelection = false,
       apiKey = provider ? null : (readEnv('OPENAI_API_KEY') ?? null),
       adminAPIKey = provider ? null : (readEnv('OPENAI_ADMIN_KEY') ?? null),
       organization = provider ? null : (readEnv('OPENAI_ORG_ID') ?? null),
@@ -479,7 +496,7 @@ export class OpenAI {
       webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
       workloadIdentity,
       ...opts
-    } = clientOptions;
+    } = clientOptions as InternalClientOptions;
     const providerRuntime = provider ? configureProvider(provider) : undefined;
     const options: ClientOptions = {
       apiKey,
@@ -490,7 +507,7 @@ export class OpenAI {
       workloadIdentity,
       provider,
       ...opts,
-      baseURL: providerRuntime?.baseURL ?? (baseURL || `https://api.openai.com/v1`),
+      baseURL: providerRuntime?.baseURL ?? residencyBaseURL ?? (baseURL || `https://api.openai.com/v1`),
     };
 
     if (apiKey && workloadIdentity) {
@@ -510,6 +527,7 @@ export class OpenAI {
     }
 
     this.baseURL = options.baseURL!;
+    this.#explicitDataResidency = residencyBaseURL !== undefined || inheritedResidencySelection;
     this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT; /* 10 minutes */
     this.logger = options.logger ?? console;
     const defaultLogLevel = 'warn';
@@ -554,6 +572,7 @@ export class OpenAI {
    * Create a new client instance re-using the same options given to the current client with optional overriding.
    */
   withOptions(options: Partial<ClientOptions>): this {
+    const residencyBaseURL = resolveDataResidency(options);
     const inheritedProvider = this._options.provider;
     const provider = options.provider ?? inheritedProvider;
     const inheritedOptions: ClientOptions = {
@@ -572,6 +591,9 @@ export class OpenAI {
       project: this.project,
       webhookSecret: this.webhookSecret,
     };
+    if (residencyBaseURL !== undefined) {
+      delete inheritedOptions.baseURL;
+    }
     if (provider) {
       delete inheritedOptions.apiKey;
       delete inheritedOptions.adminAPIKey;
@@ -584,19 +606,28 @@ export class OpenAI {
       }
     }
 
-    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)({
+    const clientOptions: InternalClientOptions = {
       ...inheritedOptions,
       ...options,
       provider,
-    });
-    return client;
+      [inheritedDataResidencySelection]:
+        this.#explicitDataResidency &&
+        residencyBaseURL === undefined &&
+        !hasOwn(options, 'baseURL') &&
+        !provider,
+    };
+    return new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
   }
 
   /**
    * Check whether the base URL is set to its default.
    */
   #baseURLOverridden(): boolean {
-    return this._provider !== undefined || this.baseURL !== 'https://api.openai.com/v1';
+    return (
+      this.#explicitDataResidency ||
+      this._provider !== undefined ||
+      this.baseURL !== 'https://api.openai.com/v1'
+    );
   }
 
   protected defaultQuery(): Record<string, string | undefined> | undefined {
@@ -1619,6 +1650,7 @@ function isUndiciDispatcherVersionMismatchError(error: unknown): boolean {
 }
 
 export declare namespace OpenAI {
+  export { type DataResidency as DataResidency };
   export type RequestOptions = Opts.RequestOptions;
 
   export import Page = Pagination.Page;
