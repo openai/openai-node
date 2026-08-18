@@ -10,8 +10,8 @@
     "edge-runtime": "edge-runtime",
     "vercel": "vercel",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:ci:dev": "start-server-and-test dev http://localhost:3000 test",
-    "test:ci": "start-server-and-test start http://localhost:3000 test"
+    "test:ci:dev": "VERCEL_EDGE_TEST_TOKEN=$(node -e \"process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))\") start-server-and-test dev http://localhost:3000 test",
+    "test:ci": "VERCEL_EDGE_TEST_TOKEN=$(node -e \"process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))\") start-server-and-test start http://localhost:3000 test"
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.20",

@@ -20,6 +20,7 @@ export default async function handler(request: NextRequest) {
   const stream = await openai.completions.create({
     prompt: 'Reply with exactly this text and nothing else: This is a test',
     model: 'gpt-3.5-turbo-instruct',
+    max_tokens: 128,
     stream: true,
   });
 

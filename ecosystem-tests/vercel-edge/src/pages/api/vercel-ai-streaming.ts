@@ -11,15 +11,26 @@ export const config = {
   ],
 };
 
-export default async function handler(request: NextRequest) {
-  const openai = new OpenAI();
+const maximumMessages = 32;
+const maximumMessageCharacters = 16_384;
 
+export default async function handler(request: NextRequest) {
   const { messages }: { messages: UIMessage[] } = await request.json();
+
+  if (!Array.isArray(messages)) {
+    return new Response('Invalid messages', { status: 400 });
+  }
+  if (messages.length > maximumMessages) {
+    return new Response('Too many messages', { status: 413 });
+  }
+
+  let totalCharacters = 0;
   const openAIMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = messages.map((message) => {
     const content = message.parts
       .filter((part) => part.type === 'text')
       .map((part) => part.text)
       .join('');
+    totalCharacters += content.length;
 
     switch (message.role) {
       case 'system': {
@@ -37,8 +48,14 @@ export default async function handler(request: NextRequest) {
     }
   });
 
+  if (totalCharacters > maximumMessageCharacters) {
+    return new Response('Messages are too large', { status: 413 });
+  }
+
+  const openai = new OpenAI();
   const completion = await openai.chat.completions.create({
     model: 'gpt-3.5-turbo',
+    max_tokens: 128,
     stream: true,
     messages: openAIMessages,
   });

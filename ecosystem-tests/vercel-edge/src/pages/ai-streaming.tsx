@@ -7,13 +7,14 @@ const transport = new DefaultChatTransport({ api: '/api/vercel-ai-streaming' });
 
 export default function Chat() {
   const [input, setInput] = useState('');
+  const [accessToken, setAccessToken] = useState('');
   const { messages, sendMessage } = useChat({ transport });
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!input.trim()) {return;}
+    if (!input.trim() || !accessToken.trim()) {return;}
 
-    void sendMessage({ text: input });
+    void sendMessage({ text: input }, { headers: { authorization: `Bearer ${accessToken.trim()}` } });
     setInput('');
   };
 
@@ -30,6 +31,15 @@ export default function Chat() {
       ))}
 
       <form onSubmit={handleSubmit}>
+        <label>
+          Test access token
+          <input
+            autoComplete="off"
+            onChange={(event) => setAccessToken(event.target.value)}
+            type="password"
+            value={accessToken}
+          />
+        </label>
         <label>
           Say something...
           <input
