@@ -4,6 +4,7 @@ import { makeReadableStream, ReadableStreamToAsyncIterable } from '../internal/s
 import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
 import { isAbortError } from '../internal/errors';
 import { encodeUTF8 } from '../internal/utils/bytes';
+import { readEnv } from '../internal/utils/env';
 import { loggerFor } from '../internal/utils/log';
 import type { OpenAI } from '../client';
 
@@ -325,6 +326,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
 /**
  * Decodes complete SSE records from a response and aborts when its body is absent.
+ * Frames default to an 8 MiB limit, configurable with `OPENAI_MAX_SSE_EVENT_BYTES`.
  *
  * @yields {ServerSentEvent} Each decoded server-sent event in wire order.
  */
@@ -345,11 +347,12 @@ export async function* _iterSSEMessages(
     throw new OpenAIError(`Attempted to iterate over a response with no body`);
   }
 
+  const maxEventBytes = maximumSSEEventBytes();
   const sseDecoder = new SSEDecoder();
-  const lineDecoder = new LineDecoder();
+  const lineDecoder = new LineDecoder({ maxLineBytes: maxEventBytes });
 
   const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
-  for await (const sseChunk of iterSSEChunks(iter)) {
+  for await (const sseChunk of iterSSEChunks(iter, controller, maxEventBytes)) {
     for (const line of lineDecoder.decode(sseChunk)) {
       const sse = sseDecoder.decode(line);
       if (sse) {
@@ -368,6 +371,46 @@ export async function* _iterSSEMessages(
 
 // A `\r\n\r\n` separator may retain up to three bytes from the previous chunk.
 const DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES = 3;
+const DEFAULT_MAX_SSE_EVENT_BYTES = 8 * 1024 * 1024;
+
+function maximumSSEEventBytes(): number {
+  const configured = readEnv('OPENAI_MAX_SSE_EVENT_BYTES');
+  if (configured === undefined) {
+    return DEFAULT_MAX_SSE_EVENT_BYTES;
+  }
+
+  const maximum = Number(configured);
+  return Number.isSafeInteger(maximum) && maximum >= 4 ? maximum : DEFAULT_MAX_SSE_EVENT_BYTES;
+}
+
+function* binarySSEChunks(chunk: NonNullable<Bytes>, maxEventBytes: number): Generator<Uint8Array> {
+  if (chunk instanceof ArrayBuffer) {
+    yield new Uint8Array(chunk);
+    return;
+  }
+
+  if (typeof chunk !== 'string') {
+    yield chunk;
+    return;
+  }
+
+  // Four bytes per UTF-16 code unit also leaves room for a surrogate pair at the boundary.
+  const maxTextChunkLength = Math.max(1, Math.floor(maxEventBytes / 4));
+  for (let start = 0; start < chunk.length;) {
+    let end = Math.min(start + maxTextChunkLength, chunk.length);
+    if (end < chunk.length && chunk.codePointAt(end - 1)! > 0xff_ff) {
+      end += 1;
+    }
+
+    yield encodeUTF8(chunk.slice(start, end));
+    start = end;
+  }
+}
+
+function throwSSEFrameTooLarge(controller: AbortController, maxEventBytes: number): never {
+  controller.abort();
+  throw new OpenAIError(`Server-sent event exceeded the maximum size of ${maxEventBytes} bytes.`);
+}
 
 /**
  * Given an async iterable iterator, iterates over it and yields full
@@ -375,7 +418,11 @@ const DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES = 3;
  *
  * @yields {Uint8Array} A complete SSE chunk.
  */
-async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGenerator<Uint8Array> {
+async function* iterSSEChunks(
+  iterator: AsyncIterableIterator<Bytes>,
+  controller: AbortController,
+  maxEventBytes: number,
+): AsyncGenerator<Uint8Array> {
   let data = new Uint8Array();
   let dataStart = 0;
   let dataEnd = 0;
@@ -386,44 +433,49 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
       continue;
     }
 
-    let binaryChunk: Uint8Array;
-    if (chunk instanceof ArrayBuffer) {
-      binaryChunk = new Uint8Array(chunk);
-    } else if (typeof chunk === 'string') {
-      binaryChunk = encodeUTF8(chunk);
-    } else {
-      binaryChunk = chunk;
-    }
+    for (const binaryChunk of binarySSEChunks(chunk, maxEventBytes)) {
+      let chunkStart = 0;
 
-    if (dataEnd + binaryChunk.length > data.length) {
-      const bufferedLength = dataEnd - dataStart;
+      while (chunkStart < binaryChunk.length) {
+        const bufferedLength = dataEnd - dataStart;
+        if (bufferedLength === maxEventBytes) {
+          throwSSEFrameTooLarge(controller, maxEventBytes);
+        }
 
-      // Compact only when it reclaims substantial space without moving a large live tail repeatedly.
-      if (dataStart >= data.length / 2 && bufferedLength + binaryChunk.length <= data.length) {
-        data.copyWithin(0, dataStart, dataEnd);
-      } else {
-        const newData = new Uint8Array(Math.max(data.length * 2, bufferedLength + binaryChunk.length));
-        newData.set(data.subarray(dataStart, dataEnd));
-        data = newData;
+        const chunkLength = Math.min(binaryChunk.length - chunkStart, maxEventBytes - bufferedLength);
+
+        if (dataEnd + chunkLength > data.length) {
+          // Compact only when it reclaims substantial space without moving a large live tail repeatedly.
+          if (dataStart >= data.length / 2 && bufferedLength + chunkLength <= data.length) {
+            data.copyWithin(0, dataStart, dataEnd);
+          } else {
+            const capacity = Math.min(maxEventBytes, Math.max(data.length * 2, bufferedLength + chunkLength));
+            const newData = new Uint8Array(capacity);
+            newData.set(data.subarray(dataStart, dataEnd));
+            data = newData;
+          }
+
+          searchStartIndex -= dataStart;
+          dataStart = 0;
+          dataEnd = bufferedLength;
+        }
+
+        const chunkEnd = chunkStart + chunkLength;
+        data.set(binaryChunk.subarray(chunkStart, chunkEnd), dataEnd);
+        dataEnd += chunkLength;
+        chunkStart = chunkEnd;
+
+        let patternIndex;
+        while ((patternIndex = findDoubleNewlineIndex(data.subarray(searchStartIndex, dataEnd))) !== -1) {
+          patternIndex += searchStartIndex;
+          yield data.slice(dataStart, patternIndex);
+          dataStart = patternIndex;
+          searchStartIndex = dataStart;
+        }
+
+        searchStartIndex = Math.max(dataStart, dataEnd - DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES);
       }
-
-      searchStartIndex -= dataStart;
-      dataStart = 0;
-      dataEnd = bufferedLength;
     }
-
-    data.set(binaryChunk, dataEnd);
-    dataEnd += binaryChunk.length;
-
-    let patternIndex;
-    while ((patternIndex = findDoubleNewlineIndex(data.subarray(searchStartIndex, dataEnd))) !== -1) {
-      patternIndex += searchStartIndex;
-      yield data.slice(dataStart, patternIndex);
-      dataStart = patternIndex;
-      searchStartIndex = dataStart;
-    }
-
-    searchStartIndex = Math.max(dataStart, dataEnd - DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES);
   }
 
   if (dataEnd > dataStart) {
