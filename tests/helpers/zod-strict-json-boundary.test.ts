@@ -8,6 +8,7 @@ import {
 } from 'openai/helpers/zod';
 import { z as z3 } from 'zod/v3';
 import { z as z4 } from 'zod/v4';
+import { assertJSONSerializableSchema } from '../../src/helpers/zod-v3-strict-schema';
 
 const strictHelpers = [
   {
@@ -73,6 +74,209 @@ const unsupportedSchemas = [
 ];
 
 describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) => {
+  it.each([
+    { name: 'unbounded coercion', number: () => z3.coerce.number() },
+    { name: 'minimum-only coercion', number: () => z3.coerce.number().min(0) },
+    { name: 'maximum-only coercion', number: () => z3.coerce.number().max(10) },
+    { name: 'readonly coercion', number: () => z3.coerce.number().readonly() },
+    { name: 'nested array coercion', number: () => z3.array(z3.coerce.number()) },
+  ])('rejects $name that can produce non-finite numbers', ({ number }) => {
+    expect(() => create(z3.object({ value: number() }))).toThrow(/ZodNumber.*finite/u);
+  });
+
+  it.each([
+    { name: 'explicit finite check', number: () => z3.coerce.number().finite() },
+    { name: 'integer check', number: () => z3.coerce.number().int() },
+    { name: 'finite lower and upper bounds', number: () => z3.coerce.number().min(0).max(10) },
+    { name: 'safe integer bounds', number: () => z3.coerce.number().safe() },
+  ])('preserves coercion with a provable $name', ({ number }) => {
+    const result = create(z3.object({ value: number() }));
+
+    expect(result.$parseRaw('{"value":"7"}')).toEqual({ value: 7 });
+    expect(() => result.$parseRaw('{"value":"Infinity"}')).toThrow();
+    expect(() => result.$parseRaw('{"value":"-Infinity"}')).toThrow();
+  });
+
+  it.each([
+    { name: 'any', inner: () => z3.any() },
+    { name: 'unknown', inner: () => z3.unknown() },
+    { name: 'unbounded number', inner: () => z3.number() },
+    { name: 'unconstrained array item', inner: () => z3.array(z3.any()) },
+    { name: 'unsafe nested object field', inner: () => z3.object({ value: z3.unknown() }) },
+  ])('rejects an unsafe $name default factory before invoking it', ({ inner }) => {
+    const factory = vi.fn(() => 1n);
+    const unsafe = inner() as z3.ZodTypeAny;
+
+    expect(() => create(z3.object({ value: unsafe.default(factory) }))).toThrow(/ZodDefault.*JSON-native/u);
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it('rejects a mutable any default that would change after schema construction', () => {
+    let calls = 0;
+    const factory = vi.fn(() => {
+      calls += 1;
+      return calls === 1 ? 'safe' : 1n;
+    });
+
+    expect(() => create(z3.object({ value: z3.any().default(factory) }))).toThrow(/ZodDefault.*JSON-native/u);
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'string',
+      value: () => z3.string().default('safe'),
+      expected: 'safe',
+    },
+    {
+      name: 'boolean',
+      value: () => z3.boolean().default(false),
+      expected: false,
+    },
+    {
+      name: 'finite number',
+      value: () => z3.number().finite().default(7),
+      expected: 7,
+    },
+    {
+      name: 'enum',
+      value: () => z3.enum(['safe', 'other']).default('safe'),
+      expected: 'safe',
+    },
+    {
+      name: 'nullable literal',
+      value: () => z3.literal(null).nullable().default(null),
+      expected: null,
+    },
+    {
+      name: 'typed array',
+      value: () => z3.array(z3.string()).default(['safe']),
+      expected: ['safe'],
+    },
+    {
+      name: 'closed typed object',
+      value: () => z3.object({ value: z3.string() }).default({ value: 'safe' }),
+      expected: { value: 'safe' },
+    },
+  ])('preserves a provably JSON-native $name default', ({ value, expected }) => {
+    const result = create(z3.object({ value: value() }));
+
+    expect(result.$parseRaw('{}')).toEqual({ value: expected });
+  });
+
+  it('rejects sparse arrays without invoking inherited indexed getters', () => {
+    const getter = vi.fn(() => {
+      throw new Error('must never run');
+    });
+    const inherited = Object.defineProperty(Object.create(null) as object, '0', {
+      enumerable: true,
+      get: getter,
+    });
+    const sparse: string[] = [];
+    sparse.length = 1;
+    Object.setPrototypeOf(sparse, inherited);
+
+    expect(() => assertJSONSerializableSchema(sparse, '$.default')).toThrow(/sparse.*array|array.*sparse/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it('rejects indexed array accessors without invoking hostile getters', () => {
+    const getter = vi.fn(() => {
+      throw new Error('must never run');
+    });
+    const values = ['safe'];
+    Object.defineProperty(values, '0', { enumerable: true, get: getter });
+
+    expect(() => assertJSONSerializableSchema(values, '$.default')).toThrow(/accessor/u);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it('rejects sparse typed-array defaults before sending a request', () => {
+    const sparse: string[] = [];
+    sparse.length = 1;
+
+    expect(() => create(z3.object({ value: z3.array(z3.string()).default(sparse) }))).toThrow(
+      /sparse.*array|array.*sparse/iu,
+    );
+  });
+
+  it('retains dense nested typed-array defaults', () => {
+    const result = create(
+      z3.object({ value: z3.array(z3.array(z3.string())).default([['first'], ['second']]) }),
+    );
+
+    expect(result.$parseRaw('{}')).toEqual({ value: [['first'], ['second']] });
+  });
+
+  it.each([
+    {
+      name: 'nested literal union',
+      options: () => [z3.union([z3.literal('first'), z3.literal('second')]), z3.literal('third')] as const,
+      values: ['first', 'second', 'third'],
+    },
+    {
+      name: 'nested primitive union',
+      options: () => [z3.union([z3.string(), z3.number()]), z3.boolean()] as const,
+      values: ['safe', 7, true],
+    },
+    {
+      name: 'readonly nested union',
+      options: () =>
+        [z3.union([z3.literal('first'), z3.literal('second')]).readonly(), z3.literal('third')] as const,
+      values: ['first', 'third'],
+    },
+  ])('expands provably disjoint $name domains recursively', ({ options, values }) => {
+    const result = create(z3.object({ value: z3.union(options()) }));
+
+    for (const value of values) {
+      expect(result.$parseRaw(JSON.stringify({ value }))).toEqual({ value });
+    }
+  });
+
+  it('continues rejecting overlap hidden in a nested union', () => {
+    const value = z3.union([z3.union([z3.literal('first'), z3.literal('second')]), z3.literal('second')]);
+
+    expect(() => create(z3.object({ value }))).toThrow(/ambiguous.*union/iu);
+  });
+
+  it.each([
+    {
+      name: 'string enum and literal',
+      first: () => z3.object({ kind: z3.enum(['first', 'second']), value: z3.string() }),
+      second: () => z3.object({ kind: z3.literal('third'), value: z3.number() }),
+      one: { kind: 'first', value: 'safe' },
+      two: { kind: 'third', value: 7 },
+    },
+    {
+      name: 'numeric native enum and string literal',
+      first: () => z3.object({ kind: z3.nativeEnum(numericStatus), value: z3.string() }),
+      second: () => z3.object({ kind: z3.literal('Ready'), value: z3.number() }),
+      one: { kind: 0, value: 'safe' },
+      two: { kind: 'Ready', value: 7 },
+    },
+    {
+      name: 'mixed native enum and disjoint literal',
+      first: () => z3.object({ kind: z3.nativeEnum(mixedStatus), value: z3.string() }),
+      second: () => z3.object({ kind: z3.literal('other'), value: z3.number() }),
+      one: { kind: 'done', value: 'safe' },
+      two: { kind: 'other', value: 7 },
+    },
+  ])('recognizes finite $name object discriminators', ({ first, second, one, two }) => {
+    const result = create(z3.object({ value: z3.union([first(), second()]) }));
+
+    expect(result.$parseRaw(JSON.stringify({ value: one }))).toEqual({ value: one });
+    expect(result.$parseRaw(JSON.stringify({ value: two }))).toEqual({ value: two });
+  });
+
+  it('continues rejecting overlapping finite object discriminators', () => {
+    const value = z3.union([
+      z3.object({ kind: z3.enum(['first', 'second']), value: z3.string() }),
+      z3.object({ kind: z3.literal('second'), value: z3.number() }),
+    ]);
+
+    expect(() => create(z3.object({ value }))).toThrow(/ambiguous.*union/iu);
+  });
+
   it.each([
     { name: 'native Date', catchall: () => z3.date(), kind: 'ZodDate' },
     { name: 'native BigInt', catchall: () => z3.bigint(), kind: 'ZodBigInt' },

@@ -19,6 +19,8 @@ describe.each([
   { version: 'v3', z: zv3 },
   { version: 'v4', z: zv4 as unknown as typeof zv3 },
 ])('Zod $version schema reference literals', ({ version, z }) => {
+  const referenceLiteral = () => z.object({ $ref: z.string() });
+  const nestedReferenceLiteral = () => z.object({ $ref: z.string(), nested: referenceLiteral() });
   it('preserves literal defaults and caller-owned objects while escaping real definition references', () => {
     const Account = z.object({ id: z.string() });
     const definitionName = 'account/admin~team%2Fowner #';
@@ -42,7 +44,23 @@ describe.each([
     const Root = z.object({
       account: Account,
       nested: z.object({ accounts: z.array(Account) }),
-      payload: z.any().default(payload),
+      payload: z
+        .object({
+          $ref: z.string(),
+          tag: z.string(),
+          nested: z.object({
+            $ref: z.string(),
+            children: z.array(
+              z.object({
+                default: referenceLiteral(),
+                const: referenceLiteral(),
+                enum: z.array(referenceLiteral()),
+                examples: z.array(referenceLiteral()),
+              }),
+            ),
+          }),
+        })
+        .default(payload),
     });
 
     const { schema } = zodResponseFormat(Root, 'account_response', {
@@ -68,7 +86,7 @@ describe.each([
       $ref: '#/definitions/account/admin',
       nested: Object.freeze({ $ref: '#/definitions/account/admin' }),
     });
-    const Root = z.object({ payload: z.any().default(payload) });
+    const Root = z.object({ payload: nestedReferenceLiteral().default(payload) });
     const helpers: (() => unknown)[] = [
       () => zodResponseFormat(Root, 'account').json_schema.schema,
       () => zodTextFormat(Root, 'account').schema,
@@ -91,7 +109,7 @@ describe.each([
       $ref: '#/definitions/account/admin',
       nested: Object.freeze({ $ref: '#/definitions/account/admin' }),
     });
-    const Root = z.object({ account: Account, payload: z.any().default(payload) });
+    const Root = z.object({ account: Account, payload: nestedReferenceLiteral().default(payload) });
 
     const { schema } = zodResponseFormat(Root, 'account_response', {
       schemaDefinitions: { 'account/admin': Account },
@@ -111,8 +129,8 @@ describe.each([
       cyclic.self = cyclic;
       const Root = z.object({
         account: Account,
-        first: z.any().default(shared),
-        second: z.any().default(shared),
+        first: referenceLiteral().default(shared),
+        second: referenceLiteral().default(shared),
       });
 
       const { schema } = zodResponseFormat(Root, 'account_response', {
@@ -125,9 +143,9 @@ describe.each([
       expect(properties['account']?.['$ref']).toBe('#/definitions/account~1admin');
       expect(firstDefault.$ref).toBe('#/definitions/account/admin');
       expect(secondDefault.$ref).toBe('#/definitions/account/admin');
-      expect(() => zodResponseFormat(z.object({ value: z.any().default(cyclic) }), 'cyclic')).toThrow(
-        /circular JSON value/u,
-      );
+      expect(() =>
+        zodResponseFormat(z.object({ value: z.string().default(cyclic as unknown as string) }), 'cyclic'),
+      ).toThrow(/circular JSON value/u);
       expect(cyclic.self).toBe(cyclic);
     });
   }

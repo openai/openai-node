@@ -8,7 +8,8 @@ interface ZodV3Schema {
 
 interface SchemaDefinition {
   typeName: string;
-  checks?: readonly { kind: string }[];
+  checks?: readonly { kind: string; value?: unknown }[];
+  coerce?: boolean;
   shape: () => Record<string, SchemaNode>;
   type: SchemaNode;
   innerType: SchemaNode;
@@ -23,7 +24,7 @@ interface SchemaDefinition {
 interface JSONDomain {
   type: 'array' | 'boolean' | 'null' | 'number' | 'object' | 'string' | 'unknown';
   values?: ReadonlySet<string | number | boolean | null>;
-  discriminators?: ReadonlyMap<string, JSONDomain>;
+  discriminators?: ReadonlyMap<string, readonly JSONDomain[]>;
 }
 
 interface SchemaChild {
@@ -118,15 +119,30 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
     .filter((domain) => domain.values.size > 0);
 }
 
+function stringEnumDomain(def: SchemaDefinition): JSONDomain {
+  const values = Array.isArray(def.values)
+    ? def.values.filter((value): value is string => typeof value === 'string')
+    : [];
+  return { type: 'string', values: new Set(values) };
+}
+
+function finiteDiscriminatorDomains(def: SchemaDefinition): JSONDomain[] {
+  if (def.typeName === 'ZodLiteral') {
+    const domain = literalDomain(def.value);
+    return domain ? [domain] : [];
+  }
+  if (def.typeName === 'ZodEnum') {
+    return [stringEnumDomain(def)];
+  }
+  return def.typeName === 'ZodNativeEnum' ? nativeEnumDomains(def) : [];
+}
+
 function objectDomain(def: SchemaDefinition): JSONDomain {
-  const discriminators = new Map<string, JSONDomain>();
+  const discriminators = new Map<string, readonly JSONDomain[]>();
   for (const [name, child] of Object.entries(def.shape())) {
-    if (child._def.typeName !== 'ZodLiteral') {
-      continue;
-    }
-    const domain = literalDomain(child._def.value);
-    if (domain) {
-      discriminators.set(name, domain);
+    const domains = finiteDiscriminatorDomains(child._def);
+    if (domains.length > 0 && domains.every(({ values }) => values !== undefined && values.size > 0)) {
+      discriminators.set(name, domains);
     }
   }
   return { type: 'object', discriminators };
@@ -151,13 +167,13 @@ function domainsFor(schema: SchemaNode, seen = new Set<SchemaDefinition>()): JSO
     return domain ? [domain] : [{ type: 'unknown' }];
   }
   if (def.typeName === 'ZodEnum') {
-    const values = Array.isArray(def.values)
-      ? def.values.filter((value): value is string => typeof value === 'string')
-      : [];
-    return [{ type: 'string', values: new Set(values) }];
+    return [stringEnumDomain(def)];
   }
   if (def.typeName === 'ZodNativeEnum') {
     return nativeEnumDomains(def);
+  }
+  if (def.typeName === 'ZodUnion' || def.typeName === 'ZodDiscriminatedUnion') {
+    return [...def.options.values()].flatMap((option) => domainsFor(option, new Set(seen)));
   }
   if (def.typeName === 'ZodNullable') {
     return [...domainsFor(def.innerType, new Set(seen)), { type: 'null' }];
@@ -185,7 +201,10 @@ function domainsOverlap(left: JSONDomain, right: JSONDomain): boolean {
   if (left.discriminators && right.discriminators) {
     for (const [name, first] of left.discriminators) {
       const second = right.discriminators.get(name);
-      if (second && !domainsOverlap(first, second)) {
+      if (
+        second &&
+        !first.some((leftDomain) => second.some((rightDomain) => domainsOverlap(leftDomain, rightDomain)))
+      ) {
         return false;
       }
     }
@@ -254,6 +273,100 @@ function schemaChildren(def: SchemaDefinition, path: string): SchemaChild[] | un
   }
 }
 
+function hasFiniteNumberOutput(def: SchemaDefinition): boolean {
+  const checks = def.checks ?? [];
+  if (checks.some(({ kind }) => kind === 'finite' || kind === 'int')) {
+    return true;
+  }
+  return (
+    checks.some(({ kind, value }) => kind === 'min' && typeof value === 'number' && Number.isFinite(value)) &&
+    checks.some(({ kind, value }) => kind === 'max' && typeof value === 'number' && Number.isFinite(value))
+  );
+}
+
+function hasClosedJSONNativeObjectOutput(
+  def: SchemaDefinition,
+  active: Set<SchemaDefinition>,
+  inspect: (schema: SchemaNode, active: Set<SchemaDefinition>) => boolean,
+): boolean {
+  return (
+    def.unknownKeys !== 'passthrough' &&
+    (def.catchall === undefined || def.catchall._def.typeName === 'ZodNever') &&
+    Object.values(def.shape()).every((child) => inspect(child, new Set(active)))
+  );
+}
+
+function hasProvablyJSONNativeOutput(schema: SchemaNode, active = new Set<SchemaDefinition>()): boolean {
+  const def = schema._def;
+  if (active.has(def)) {
+    return true;
+  }
+  active.add(def);
+
+  switch (def.typeName) {
+    case 'ZodString':
+    case 'ZodBoolean':
+    case 'ZodNull':
+    case 'ZodEnum':
+    case 'ZodNativeEnum': {
+      return true;
+    }
+    case 'ZodLiteral': {
+      return literalDomain(def.value) !== undefined;
+    }
+    case 'ZodNumber': {
+      return hasFiniteNumberOutput(def);
+    }
+    case 'ZodArray': {
+      return hasProvablyJSONNativeOutput(def.type, active);
+    }
+    case 'ZodObject': {
+      return hasClosedJSONNativeObjectOutput(def, active, hasProvablyJSONNativeOutput);
+    }
+    case 'ZodUnion':
+    case 'ZodDiscriminatedUnion': {
+      return [...def.options.values()].every((child) => hasProvablyJSONNativeOutput(child, new Set(active)));
+    }
+    case 'ZodNullable':
+    case 'ZodDefault':
+    case 'ZodReadonly': {
+      return hasProvablyJSONNativeOutput(def.innerType, active);
+    }
+    case 'ZodBranded': {
+      return hasProvablyJSONNativeOutput(def.type, active);
+    }
+    case 'ZodLazy': {
+      return hasProvablyJSONNativeOutput(def.getter(), active);
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+function assertSupportedSchemaValue(def: SchemaDefinition, path: string): void {
+  const rejection = unsupportedReasons.get(def.typeName);
+  if (rejection) {
+    unsupported(path, def.typeName, rejection);
+  }
+  if (def.typeName === 'ZodLiteral' && !literalDomain(def.value)) {
+    unsupported(path, def.typeName, 'literal values must be finite JSON primitives');
+  }
+  if (def.typeName === 'ZodNumber' && def.coerce === true && !hasFiniteNumberOutput(def)) {
+    unsupported(path, def.typeName, 'number coercion must prove its parsed output is finite');
+  }
+  if (def.typeName === 'ZodDefault' && !hasProvablyJSONNativeOutput(def.innerType)) {
+    unsupported(
+      path,
+      def.typeName,
+      'default factory output is not independently guaranteed to be finite and JSON-native; it may contain bigint',
+    );
+  }
+  if (def.typeName === 'ZodString' && def.checks?.some(({ kind }) => valueChangingStringChecks.has(kind))) {
+    unsupported(path, def.typeName, 'value-changing string checks are not represented in JSON Schema');
+  }
+}
+
 function visit(schema: SchemaNode, path: string, visited: Set<SchemaDefinition>): void {
   const def = schema._def;
   if (visited.has(def)) {
@@ -266,16 +379,7 @@ function visit(schema: SchemaNode, path: string, visited: Set<SchemaDefinition>)
     return;
   }
 
-  const rejection = unsupportedReasons.get(def.typeName);
-  if (rejection) {
-    unsupported(path, def.typeName, rejection);
-  }
-  if (def.typeName === 'ZodLiteral' && !literalDomain(def.value)) {
-    unsupported(path, def.typeName, 'literal values must be finite JSON primitives');
-  }
-  if (def.typeName === 'ZodString' && def.checks?.some(({ kind }) => valueChangingStringChecks.has(kind))) {
-    unsupported(path, def.typeName, 'value-changing string checks are not represented in JSON Schema');
-  }
+  assertSupportedSchemaValue(def, path);
 
   const children = schemaChildren(def, path);
   if (!children) {
@@ -340,8 +444,29 @@ export function assertJSONSerializableSchema(
   }
 
   ancestors.add(value);
-  for (const [key, child] of Object.entries(value)) {
-    assertJSONSerializableSchema(child, `${path}.${key}`, ancestors);
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor) {
+        throw new Error(
+          `Strict Structured Outputs schema field \`${path}[${index}]\` contains a sparse array`,
+        );
+      }
+      if (!('value' in descriptor)) {
+        throw new Error(
+          `Strict Structured Outputs schema field \`${path}[${index}]\` contains an array accessor`,
+        );
+      }
+      assertJSONSerializableSchema(descriptor.value, `${path}[${index}]`, ancestors);
+    }
+  } else {
+    for (const key of Object.keys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !('value' in descriptor)) {
+        throw new Error(`Strict Structured Outputs schema field \`${path}.${key}\` contains an accessor`);
+      }
+      assertJSONSerializableSchema(descriptor.value, `${path}.${key}`, ancestors);
+    }
   }
   ancestors.delete(value);
 }
