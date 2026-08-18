@@ -262,6 +262,100 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     expect(JSON.stringify(format)).not.toContain('$parseRaw');
   });
 
+  test.each([
+    ['plain-text serializer', 'text', false],
+    ['unconstrained JSON serializer', 'json_object', false],
+    ['accessor-returned serializer', 'text', true],
+  ] as const)(
+    'never lets an own %s downgrade the actual Responses request',
+    async (_kind, override, useAccessor) => {
+      const serializer = vi.fn(() => ({
+        type: override,
+        name: 'attacker_controlled_name',
+        strict: false,
+        schema: { type: 'string', secret: 'synthetic-private-schema-fragment' },
+      }));
+      const getter = vi.fn(() => serializer);
+      const metadataSymbol = Symbol('preserved-serializer-metadata');
+      const metadata: UnsafeFormatMetadata = {
+        description: trustedDescription,
+        [metadataSymbol]: 'preserved',
+      };
+
+      if (useAccessor) {
+        Object.defineProperty(metadata, 'toJSON', {
+          configurable: true,
+          enumerable: true,
+          get: getter,
+        });
+      } else {
+        metadata['toJSON'] = serializer;
+      }
+      Object.freeze(metadata);
+
+      let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
+      const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
+        requestBody = JSON.parse(init?.body as string) as typeof requestBody;
+        return Response.json(makeResponsePayload(), { status: 200 });
+      });
+      const client = new OpenAI({
+        apiKey: 'sk-synthetic-structured-format',
+        maxRetries: 0,
+        fetch,
+      });
+      const format = create(metadata);
+      const response = await client.responses.parse({
+        model: 'gpt-5.4-mini',
+        input: 'Describe the weather in Paris',
+        text: { format },
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(requestBody?.text?.format).toMatchObject({
+        type: 'json_schema',
+        name: trustedName,
+        strict: true,
+        description: trustedDescription,
+        schema: {
+          type: 'object',
+          properties: { city: { type: 'string' } },
+          required: ['city'],
+          additionalProperties: false,
+        },
+      });
+      expect(JSON.stringify(requestBody?.text?.format)).not.toContain('synthetic-private-schema-fragment');
+      expect(serializer).not.toHaveBeenCalled();
+      expect(getter).toHaveBeenCalledTimes(useAccessor ? 1 : 0);
+      expect(Object.getOwnPropertyDescriptor(format, 'toJSON')).toBeUndefined();
+      expect((format as unknown as UnsafeFormatMetadata)[metadataSymbol]).toBe('preserved');
+      expect(Object.isFrozen(metadata)).toBe(true);
+      expect(response.output_parsed).toEqual(expectedParsed);
+    },
+  );
+
+  test('ignores inherited and non-enumerable metadata serialization hooks', () => {
+    const inheritedSerializer = vi.fn(() => ({ type: 'text' }));
+    const hiddenSerializer = vi.fn(() => ({ type: 'json_object' }));
+    const inherited = Object.assign(Object.create({ toJSON: inheritedSerializer }), {
+      description: trustedDescription,
+    }) as UnsafeFormatMetadata;
+    const hidden: UnsafeFormatMetadata = { description: trustedDescription };
+    Object.defineProperty(hidden, 'toJSON', { enumerable: false, value: hiddenSerializer });
+
+    for (const metadata of [inherited, hidden]) {
+      const format = create(metadata);
+      const wire = JSON.stringify(format);
+      const serialized = JSON.parse(wire) as Record<string, unknown>;
+
+      expectTrustedFormat(format);
+      expect(serialized).toMatchObject({ type: 'json_schema', name: trustedName, strict: true });
+      expect(Object.getOwnPropertyDescriptor(format, 'toJSON')).toBeUndefined();
+    }
+
+    expect(inheritedSerializer).not.toHaveBeenCalled();
+    expect(hiddenSerializer).not.toHaveBeenCalled();
+  });
+
   test.each(['text', 'json_object'])(
     'sends a strict schema and validates the public Responses parse result despite %s metadata',
     async (override) => {
@@ -313,6 +407,11 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     expectTrustedFormat(format);
     expect(format.$parseRaw(responseText)).toEqual(expectedParsed);
     expect(() => format.$parseRaw('{"city":42}')).toThrow();
+
+    const mutableFormat = format as unknown as UnsafeFormatMetadata;
+    mutableFormat['type'] = 'text';
+    mutableFormat['strict'] = false;
+    expect(mutableFormat).toMatchObject({ type: 'text', strict: false });
   });
 
   test('preserves exceptions from hostile metadata getters', () => {
@@ -352,6 +451,48 @@ describe('shared structured text-format factory', () => {
     expect(parser).toHaveBeenCalledWith(responseText);
     expect(original.type).toBe('text');
     expect(Object.isFrozen(original)).toBe(true);
+  });
+
+  test('removes an own serializer from direct frozen factory configurations', () => {
+    const serializer = vi.fn(() => ({
+      type: 'text',
+      strict: false,
+      schema: { type: 'string' },
+    }));
+    const parser = vi.fn((content: string) => JSON.parse(content) as ParsedWeather);
+    const original = Object.freeze({
+      type: 'json_schema' as const,
+      name: trustedName,
+      strict: true,
+      description: trustedDescription,
+      schema: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+        additionalProperties: false,
+      },
+      toJSON: serializer,
+    });
+
+    const format = makeParseableTextFormat(original, parser);
+    const wire = JSON.stringify({ text: { format } });
+    const serialized = JSON.parse(wire) as {
+      text: { format: Record<string, unknown> };
+    };
+
+    expectTrustedFormat(format);
+    expect(serialized.text.format).toMatchObject({
+      type: 'json_schema',
+      name: trustedName,
+      strict: true,
+      schema: { type: 'object' },
+    });
+    expect(serializer).not.toHaveBeenCalled();
+    expect(Object.getOwnPropertyDescriptor(format, 'toJSON')).toBeUndefined();
+    expect(original.toJSON).toBe(serializer);
+    expect(Object.isFrozen(original)).toBe(true);
+    expect(format.$parseRaw(responseText)).toEqual({ city: 'Paris' });
+    expect(parser).toHaveBeenCalledWith(responseText);
   });
 
   test('preserves intentional Standard Schema overrides while enforcing the text-format discriminator', () => {

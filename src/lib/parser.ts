@@ -108,6 +108,7 @@ export function makeParseableTextFormat<ParsedT>(
   parser: (content: string) => ParsedT,
 ): AutoParseableTextFormat<ParsedT> {
   const obj = { ...response_format, type: 'json_schema' as const };
+  delete (obj as { toJSON?: unknown }).toJSON;
 
   Object.defineProperties(obj, {
     $brand: {
