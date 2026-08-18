@@ -1,6 +1,7 @@
 import * as Errors from './error';
 import { OpenAI } from './client';
 import type { ApiKeySetter, ClientOptions } from './client';
+import { assertNoDataResidency } from './internal/data-residency';
 import { assertBedrockRequestOrigin, brand_privateBedrockClient } from './internal/bedrock';
 import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
@@ -15,7 +16,7 @@ import type * as ResponsesAPI from './resources/responses/responses';
 /** Configures Amazon Bedrock's OpenAI-compatible endpoint and bearer-token authentication. */
 export interface BedrockClientOptions extends Omit<
   ClientOptions,
-  'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity'
+  'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity' | 'dataResidency'
 > {
   /**
    * Bedrock bearer token used for authentication.
@@ -37,6 +38,9 @@ export interface BedrockClientOptions extends Omit<
    * BedrockOpenAI only supports Bedrock bearer token authentication.
    */
   adminAPIKey?: never;
+
+  /** OpenAI data residency cannot be combined with Bedrock routing. */
+  dataResidency?: never;
 
   /**
    * BedrockOpenAI only supports Bedrock bearer token authentication.
@@ -129,8 +133,10 @@ export class BedrockOpenAI extends OpenAI {
     bedrockTokenProvider,
     adminAPIKey,
     workloadIdentity,
+    dataResidency,
     ...opts
   }: BedrockClientOptions = {}) {
+    assertNoDataResidency(dataResidency, 'BedrockOpenAI');
     if (adminAPIKey || workloadIdentity) {
       throw new Errors.OpenAIError('BedrockOpenAI only supports Bedrock bearer token authentication.');
     }
