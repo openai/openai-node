@@ -70,6 +70,17 @@ const unsupportedReasons = new Map([
 ]);
 
 const valueChangingStringChecks = new Set(['trim', 'toLowerCase', 'toUpperCase']);
+const patternProducingStringChecks = new Set([
+  'regex',
+  'cuid',
+  'cuid2',
+  'startsWith',
+  'endsWith',
+  'includes',
+  'emoji',
+  'ulid',
+  'nanoid',
+]);
 
 function unsupported(path: string, kind: string, explanation: string): never {
   throw new Error(
@@ -365,6 +376,12 @@ function assertSupportedSchemaValue(def: SchemaDefinition, path: string): void {
   if (def.typeName === 'ZodString' && def.checks?.some(({ kind }) => valueChangingStringChecks.has(kind))) {
     unsupported(path, def.typeName, 'value-changing string checks are not represented in JSON Schema');
   }
+  if (
+    def.typeName === 'ZodString' &&
+    (def.checks?.filter(({ kind }) => patternProducingStringChecks.has(kind)).length ?? 0) > 1
+  ) {
+    unsupported(path, def.typeName, 'multiple pattern-producing checks require unsupported allOf');
+  }
 }
 
 function visit(schema: SchemaNode, path: string, visited: Set<SchemaDefinition>): void {
@@ -433,6 +450,14 @@ function assertNoJSONSerializationHook(value: object, path: string): void {
   }
 }
 
+function assertJSONSerializableNumber(value: number, path: string): void {
+  if (Object.is(value, -0)) {
+    throw new TypeError(
+      `Strict Structured Outputs schema field \`${path}\` contains negative zero, which cannot round-trip through JSON`,
+    );
+  }
+}
+
 export function assertJSONSerializableSchema(
   value: unknown,
   path = '$',
@@ -442,6 +467,7 @@ export function assertJSONSerializableSchema(
     return;
   }
   if (typeof value === 'number' && Number.isFinite(value)) {
+    assertJSONSerializableNumber(value, path);
     return;
   }
   if (typeof value !== 'object') {

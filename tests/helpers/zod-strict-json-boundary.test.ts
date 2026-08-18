@@ -98,6 +98,39 @@ describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) 
   });
 
   it.each([
+    { name: 'repeated regular expressions', value: () => z3.string().regex(/a/u).regex(/b/u) },
+    { name: 'prefix and suffix checks', value: () => z3.string().startsWith('a').endsWith('b') },
+    { name: 'substring and regular expression', value: () => z3.string().includes('a').regex(/b/u) },
+    { name: 'repeated prefix checks', value: () => z3.string().startsWith('a').startsWith('ab') },
+    { name: 'identifier and regular expression', value: () => z3.string().cuid().regex(/^c/u) },
+    { name: 'readonly repeated expressions', value: () => z3.string().regex(/a/u).regex(/b/u).readonly() },
+    { name: 'nested repeated expressions', value: () => z3.array(z3.string().startsWith('a').endsWith('b')) },
+  ])('rejects $name before generating unsupported allOf patterns', ({ value }) => {
+    expect(() => create(z3.object({ value: value() }))).toThrow(/value.*ZodString.*pattern.*allOf/iu);
+  });
+
+  it.each([
+    { name: 'single regular expression', value: () => z3.string().regex(/safe/u), input: 'safe' },
+    { name: 'single prefix', value: () => z3.string().startsWith('safe'), input: 'safe-value' },
+    { name: 'single suffix', value: () => z3.string().endsWith('safe'), input: 'value-safe' },
+    { name: 'single substring', value: () => z3.string().includes('safe'), input: 'a-safe-value' },
+    {
+      name: 'one pattern alongside format and length checks',
+      value: () =>
+        z3
+          .string()
+          .email()
+          .min(5)
+          .regex(/@example\.com$/u),
+      input: 'reader@example.com',
+    },
+  ])('preserves a supported $name constraint', ({ value, input }) => {
+    const result = create(z3.object({ value: value() }));
+
+    expect(result.$parseRaw(JSON.stringify({ value: input }))).toEqual({ value: input });
+  });
+
+  it.each([
     { name: 'any', inner: () => z3.any() },
     { name: 'unknown', inner: () => z3.unknown() },
     { name: 'unbounded number', inner: () => z3.number() },
@@ -162,6 +195,60 @@ describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) 
     const result = create(z3.object({ value: value() }));
 
     expect(result.$parseRaw('{}')).toEqual({ value: expected });
+  });
+
+  it.each([
+    { name: 'finite numeric default', value: () => z3.number().finite().default(-0) },
+    { name: 'readonly numeric default', value: () => z3.number().finite().readonly().default(-0) },
+    {
+      name: 'nested typed-object default',
+      value: () => z3.object({ amount: z3.number().finite() }).default({ amount: -0 }),
+    },
+    { name: 'nested typed-array default', value: () => z3.array(z3.number().finite()).default([-0]) },
+    { name: 'numeric literal', value: () => z3.literal(-0) },
+    { name: 'inclusive minimum', value: () => z3.number().min(-0) },
+    { name: 'exclusive minimum', value: () => z3.number().gt(-0) },
+    { name: 'inclusive maximum', value: () => z3.number().max(-0) },
+    { name: 'exclusive maximum', value: () => z3.number().lt(-0) },
+    { name: 'numeric multiple', value: () => z3.number().multipleOf(-0) },
+  ])('rejects a $name that cannot round-trip negative zero', ({ value }) => {
+    expect(() => create(z3.object({ value: value() }))).toThrow(/negative zero/iu);
+  });
+
+  it('rejects negative zero produced after construction by coercion and mutable defaults', () => {
+    const coercing = create(z3.object({ value: z3.coerce.number().finite() }));
+    expect(() => coercing.$parseRaw('{"value":"-0"}')).toThrow(/negative zero/iu);
+
+    let negative = false;
+    const defaulted = create(
+      z3.object({
+        value: z3
+          .number()
+          .finite()
+          .default(() => (negative ? -0 : 0)),
+      }),
+    );
+    negative = true;
+
+    expect(() => defaulted.$parseRaw('{}')).toThrow(/negative zero/iu);
+  });
+
+  it('preserves positive zero defaults, literals, finite bounds, and ordinary negative numbers', () => {
+    const result = create(
+      z3.object({
+        defaulted: z3.number().finite().default(0),
+        literal: z3.literal(0),
+        bounded: z3.number().min(0).max(1),
+        negative: z3.number().finite().default(-1),
+      }),
+    );
+
+    expect(result.$parseRaw('{"literal":0,"bounded":0}')).toEqual({
+      defaulted: 0,
+      literal: 0,
+      bounded: 0,
+      negative: -1,
+    });
   });
 
   it('rejects hidden typed-object default serializers without invoking them', () => {
