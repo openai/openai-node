@@ -18,6 +18,7 @@ export interface X509TestLab {
   certificateAuthority: Buffer;
   proxyCertificateAuthority: Buffer;
   server: TestCertificate;
+  proxyServer: TestCertificate;
   firstClient: TestCertificate;
   secondClient: TestCertificate;
   proxyClient: TestCertificate;
@@ -158,6 +159,7 @@ export function createX509TestLab(): X509TestLab {
     certificateAuthority: workloadAuthority.certificate,
     proxyCertificateAuthority: proxyAuthority.certificate,
     server: issueCertificate('localhost', 'server', workloadAuthority),
+    proxyServer: issueCertificate('localhost', 'server', proxyAuthority),
     firstClient: issueCertificate('workload-a', 'client', workloadAuthority),
     secondClient: issueCertificate('workload-b', 'client', workloadAuthority),
     proxyClient: issueCertificate('proxy-only', 'client', proxyAuthority),
@@ -198,14 +200,18 @@ export function createMutualTLSServer(
   return { server, requests, connections: new Set() };
 }
 
-export function createConnectProxy(lab: X509TestLab, encrypted: boolean): ObservedServer {
+export function createConnectProxy(
+  lab: X509TestLab,
+  encrypted: boolean,
+  serverCertificate: TestCertificate = lab.proxyServer,
+): ObservedServer {
   const requests: ObservedRequest[] = [];
   const connections = new Set<Duplex>();
   const server = encrypted
     ? createHTTPSServer({
         ca: lab.proxyCertificateAuthority,
-        cert: lab.server.certificate,
-        key: lab.server.privateKey,
+        cert: serverCertificate.certificate,
+        key: serverCertificate.privateKey,
         requestCert: true,
         rejectUnauthorized: true,
       })

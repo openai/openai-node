@@ -29,6 +29,29 @@ function createAgent(certificate: TestCertificate): Agent {
   });
 }
 
+function createProxyAgent(proxyURL: URL, encrypted: boolean): ProxyAgent {
+  return new ProxyAgent({
+    uri: proxyURL.href,
+    token: PROXY_AUTHORIZATION,
+    requestTls: {
+      ca: lab.certificateAuthority,
+      cert: lab.firstClient.certificate,
+      key: lab.firstClient.privateKey,
+      servername: 'localhost',
+    },
+    ...(encrypted
+      ? {
+          proxyTls: {
+            ca: lab.proxyCertificateAuthority,
+            cert: lab.proxyClient.certificate,
+            key: lab.proxyClient.privateKey,
+            servername: 'localhost',
+          },
+        }
+      : {}),
+  });
+}
+
 function createSDKClient(
   issuerURL: URL,
   apiURL: URL,
@@ -159,6 +182,31 @@ describe('real-wire X.509 transport conformance', () => {
     }
   });
 
+  test('rejects a workload-signed HTTPS proxy before disclosing CONNECT credentials', async () => {
+    const issuer = createTokenServer();
+    const api = createAPIServer();
+    const proxy = createConnectProxy(lab, true, lab.server);
+    let dispatcher: ProxyAgent | undefined;
+
+    try {
+      const [issuerURL, apiURL, proxyURL] = await Promise.all([
+        listenLoopback(issuer),
+        listenLoopback(api),
+        listenLoopback(proxy),
+      ]);
+      dispatcher = createProxyAgent(proxyURL, true);
+      const client = createSDKClient(issuerURL, apiURL, dispatcher);
+
+      await expect(client.models.list()).rejects.toThrow();
+      expect(proxy.requests).toEqual([]);
+      expect(issuer.requests).toEqual([]);
+      expect(api.requests).toEqual([]);
+    } finally {
+      await dispatcher?.close();
+      await closeObservedServers(issuer, api, proxy);
+    }
+  });
+
   test('demonstrates that an ordinary bearer remains transferable between distinct enrolled certificates', async () => {
     const issuer = createTokenServer();
     const api = createAPIServer();
@@ -229,26 +277,7 @@ describe('real-wire X.509 transport conformance', () => {
           listenLoopback(api),
           listenLoopback(proxy, encrypted),
         ]);
-        dispatcher = new ProxyAgent({
-          uri: proxyURL.href,
-          token: PROXY_AUTHORIZATION,
-          requestTls: {
-            ca: lab.certificateAuthority,
-            cert: lab.firstClient.certificate,
-            key: lab.firstClient.privateKey,
-            servername: 'localhost',
-          },
-          ...(encrypted
-            ? {
-                proxyTls: {
-                  ca: lab.certificateAuthority,
-                  cert: lab.proxyClient.certificate,
-                  key: lab.proxyClient.privateKey,
-                  servername: 'localhost',
-                },
-              }
-            : {}),
-        });
+        dispatcher = createProxyAgent(proxyURL, encrypted);
 
         const client = createSDKClient(issuerURL, apiURL, dispatcher);
 
