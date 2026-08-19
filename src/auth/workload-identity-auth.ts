@@ -127,18 +127,18 @@ export class WorkloadIdentityAuth {
     }
 
     const tokenResponse: unknown = await response.json();
+    const accessToken =
+      typeof tokenResponse === 'object' && tokenResponse !== null && 'access_token' in tokenResponse
+        ? tokenResponse.access_token
+        : undefined;
     if (
-      typeof tokenResponse !== 'object' ||
-      tokenResponse === null ||
-      !('access_token' in tokenResponse) ||
-      typeof tokenResponse.access_token !== 'string' ||
-      tokenResponse.access_token.trim().length === 0 ||
-      /[^\t\u0020-\u007E\u0080-\u00FF]|^[\t ]|[\t ]$/u.test(tokenResponse.access_token)
+      typeof accessToken !== 'string' ||
+      accessToken.trim().length === 0 ||
+      /[^\t\u0020-\u007E\u0080-\u00FF]|^[\t ]|[\t ]$/u.test(accessToken)
     ) {
       throw new OpenAIError("Token exchange response missing 'access_token' field");
     }
 
-    const accessToken = tokenResponse.access_token;
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
     if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
       throw new OpenAIError("Token exchange response has invalid 'expires_in' field");

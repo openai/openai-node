@@ -74,6 +74,26 @@ function oauthResponse(accessToken: string, expiresIn = 3600): Response {
   });
 }
 
+function accessorResponse(readAccessToken: () => unknown, useProxy = false): Response {
+  const payload: { access_token: unknown; expires_in: number } = {
+    access_token: undefined,
+    expires_in: 3600,
+  };
+  const body = useProxy
+    ? new Proxy(payload, {
+        get(target, property, receiver) {
+          return property === 'access_token' ? readAccessToken() : Reflect.get(target, property, receiver);
+        },
+      })
+    : Object.defineProperty(payload, 'access_token', {
+        enumerable: true,
+        get: readAccessToken,
+      });
+  const response = new Response(null, { status: 200 });
+  Object.defineProperty(response, 'json', { value: async () => body });
+  return response;
+}
+
 function createHarness(accessToken: string, tokenType: TokenType = 'jwt') {
   const subjectToken = vi.fn(async () => 'external-subject-token');
   const exchange = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => oauthResponse(accessToken));
@@ -182,6 +202,103 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
       expect(harness.exchange.mock.calls[0]?.[1]?.redirect).toBe('manual');
     },
   );
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      tokenTypes.flatMap((tokenType) =>
+        [false, true].flatMap((useProxy) =>
+          [1, 3].map((safeReads) => ({ surface, tokenType, useProxy, safeReads })),
+        ),
+      ),
+    ),
+  )(
+    '$surface snapshots a $tokenType accessor once before unsafe read $safeReads (proxy=$useProxy)',
+    async ({ surface, tokenType, useProxy, safeReads }) => {
+      const safe = 'safe-one-read-access-token';
+      const unsafe = [ACCESS_SECRET, String.fromCodePoint(0x0a), PRIVATE_PATIENT].join('');
+      const read = vi.fn(() => (read.mock.calls.length <= safeReads ? safe : unsafe));
+      const harness = createHarness(safe, tokenType);
+      harness.exchange.mockResolvedValueOnce(accessorResponse(read, useProxy));
+      const operation = operationFor(surface, harness);
+
+      await expect(operation()).resolves.toBeDefined();
+      await expect(operation()).resolves.toBeDefined();
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+      if (surface === 'public-client') {
+        expect(harness.api).toHaveBeenCalledTimes(2);
+        for (const [, init] of harness.api.mock.calls) {
+          expect(new Headers(init?.headers).get('authorization')).toBe(['Bearer ', safe].join(''));
+        }
+      }
+    },
+  );
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      tokenTypes.flatMap((tokenType) => [false, true].map((useProxy) => ({ surface, tokenType, useProxy }))),
+    ),
+  )(
+    '$surface rejects the first unsafe $tokenType accessor snapshot even when later reads become safe (proxy=$useProxy)',
+    async ({ surface, tokenType, useProxy }) => {
+      const unsafe = [ACCESS_SECRET, String.fromCodePoint(0x0a), PRIVATE_PATIENT].join('');
+      const read = vi.fn().mockReturnValueOnce(unsafe).mockReturnValue('safe-later-access-token');
+      const harness = createHarness('unused-safe-token', tokenType);
+      harness.exchange.mockResolvedValueOnce(accessorResponse(read, useProxy));
+
+      await expectPrivateFailure(operationFor(surface, harness), unsafe, surface);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(harness.api).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(surfaces)('%s retries after rejecting an unsafe one-read accessor snapshot', async (surface) => {
+    const unsafe = [ACCESS_SECRET, String.fromCodePoint(0x0a), PRIVATE_PATIENT].join('');
+    const read = vi.fn().mockReturnValueOnce(unsafe).mockReturnValue('safe-recovered-token');
+    const harness = createHarness('unused-safe-token');
+    harness.exchange.mockResolvedValue(accessorResponse(read, true));
+    const operation = operationFor(surface, harness);
+
+    await expectPrivateFailure(operation, unsafe, surface);
+    await expect(operation()).resolves.toBeDefined();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+    expect(harness.api).toHaveBeenCalledTimes(surface === 'public-client' ? 1 : 0);
+  });
+
+  test.each(surfaces)(
+    '%s preserves the original accessor exception without additional reads',
+    async (surface) => {
+      const original = new OpenAIError('Custom OAuth accessor failed safely.');
+      const read = vi.fn(() => {
+        throw original;
+      });
+      const harness = createHarness('unused-safe-token');
+      harness.exchange.mockResolvedValueOnce(accessorResponse(read));
+
+      await expect(operationFor(surface, harness)()).rejects.toBe(original);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(harness.api).not.toHaveBeenCalled();
+    },
+  );
+
+  test('shares one failed accessor read across concurrent refreshes and recovers', async () => {
+    const unsafe = [ACCESS_SECRET, String.fromCodePoint(0x0a), PRIVATE_PATIENT].join('');
+    const read = vi.fn().mockReturnValueOnce(unsafe).mockReturnValue('unsafe-later-value');
+    const harness = createHarness('unused-safe-token');
+    harness.exchange
+      .mockResolvedValueOnce(accessorResponse(read, true))
+      .mockResolvedValueOnce(oauthResponse('safe-concurrent-recovery'));
+    const auth = new WorkloadIdentityAuth(harness.config, harness.fetch);
+
+    const attempts = await Promise.allSettled(Array.from({ length: 24 }, async () => auth.getToken()));
+
+    expect(attempts.every((attempt) => attempt.status === 'rejected')).toBe(true);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(harness.exchange).toHaveBeenCalledTimes(1);
+    await expect(auth.getToken()).resolves.toBe('safe-concurrent-recovery');
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+  });
 
   test.each(leadingWhitespaceCases)(
     '$surface rejects $tokenType $name before caching or attaching the bearer credential',
@@ -497,6 +614,61 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
       expect(exchangeRequests).toBe(1);
       expect(apiRequests).toBe(0);
       expect(transport).toHaveBeenCalledTimes(1);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test('keeps one validated accessor snapshot across the real public HTTP transport', async () => {
+    const safe = 'safe-loopback-access-token';
+    const unsafe = [ACCESS_SECRET, String.fromCodePoint(0x0a), PRIVATE_PATIENT].join('');
+    const read = vi.fn(() => (read.mock.calls.length <= 3 ? safe : unsafe));
+    let exchangeRequests = 0;
+    let apiRequests = 0;
+    let authorization: string | undefined;
+    const server = createServer((request, response) => {
+      if (request.url === '/oauth/token') {
+        exchangeRequests += 1;
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ access_token: safe, expires_in: 3600 }));
+      } else {
+        apiRequests += 1;
+        ({ authorization } = request.headers);
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ object: 'list', data: [] }));
+      }
+    });
+    const listening = once(server, 'listening');
+    server.listen(0, '127.0.0.1');
+    await listening;
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected an authenticated loopback TCP address.');
+    }
+    const baseURL = ['http://127.0.0.1:', String(address.port)].join('');
+    const nativeFetch = globalThis.fetch;
+    const transport = vi.fn(async (url: RequestInfo, init?: RequestInit) => {
+      if (String(url) !== OAUTH_URL) {
+        return nativeFetch(url, init);
+      }
+      await nativeFetch([baseURL, '/oauth/token'].join(''), init);
+      return accessorResponse(read, true);
+    });
+    const client = new OpenAI({
+      apiKey: null,
+      baseURL: [baseURL, '/v1'].join(''),
+      maxRetries: 0,
+      fetch: transport,
+      workloadIdentity: {
+        identityProviderId: 'safe-identity-provider',
+        serviceAccountId: 'safe-service-account',
+        provider: { tokenType: 'jwt', getToken: async () => 'subject-token' },
+      },
+    });
+    try {
+      await expect(client.models.list()).resolves.toBeDefined();
+      expect([exchangeRequests, apiRequests, read.mock.calls.length]).toEqual([1, 1, 1]);
+      expect(authorization).toBe(['Bearer ', safe].join(''));
     } finally {
       await closeServer(server);
     }
