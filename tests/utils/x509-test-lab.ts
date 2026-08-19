@@ -189,8 +189,7 @@ export function createConnectProxy(lab: X509TestLab, encrypted: boolean): Observ
         cert: lab.server.certificate,
         key: lab.server.privateKey,
         requestCert: true,
-        // Observe leaked client certificates while allowing the expected certificate-free proxy handshake.
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
       })
     : createHTTPServer();
 

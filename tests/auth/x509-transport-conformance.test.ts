@@ -208,7 +208,16 @@ describe('real-wire X.509 transport conformance', () => {
             key: lab.firstClient.privateKey,
             servername: 'localhost',
           },
-          ...(encrypted ? { proxyTls: { ca: lab.certificateAuthority, servername: 'localhost' } } : {}),
+          ...(encrypted
+            ? {
+                proxyTls: {
+                  ca: lab.certificateAuthority,
+                  cert: lab.secondClient.certificate,
+                  key: lab.secondClient.privateKey,
+                  servername: 'localhost',
+                },
+              }
+            : {}),
         });
 
         const exchange = await fetch(new URL('/oauth/token', issuerURL), {
@@ -226,14 +235,18 @@ describe('real-wire X.509 transport conformance', () => {
         expect(proxy.requests).toEqual([
           expect.objectContaining({
             authorization: undefined,
-            certificateFingerprint: undefined,
+            certificateFingerprint: encrypted
+              ? new X509Certificate(lab.secondClient.certificate).fingerprint256
+              : undefined,
             cookie: undefined,
             path: issuerURL.host,
             proxyAuthorization: PROXY_AUTHORIZATION,
           }),
           expect.objectContaining({
             authorization: undefined,
-            certificateFingerprint: undefined,
+            certificateFingerprint: encrypted
+              ? new X509Certificate(lab.secondClient.certificate).fingerprint256
+              : undefined,
             cookie: undefined,
             path: apiURL.host,
             proxyAuthorization: PROXY_AUTHORIZATION,
