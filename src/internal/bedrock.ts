@@ -296,7 +296,15 @@ class BedrockBearerAuth implements BedrockRequestAuth {
     if (typeof token !== 'string' || !token.trim()) {
       throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
     }
-    headers.set('authorization', `Bearer ${token}`);
+    try {
+      headers.set('authorization', `Bearer ${token}`);
+    } catch (error) {
+      if (error instanceof TypeError) {
+        // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
+        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+      }
+      throw error;
+    }
     request.redirect = 'manual';
     request.headers = headers;
   }

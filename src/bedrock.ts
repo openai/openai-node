@@ -223,7 +223,15 @@ export class BedrockOpenAI extends OpenAI {
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if ((security.bearerAuth || security.adminAPIKeyAuth) && this.apiKey !== null) {
-      return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+      try {
+        return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+      } catch (error) {
+        if (error instanceof TypeError) {
+          // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
+          throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+        }
+        throw error;
+      }
     }
 
     return super.authHeaders(opts, security);
