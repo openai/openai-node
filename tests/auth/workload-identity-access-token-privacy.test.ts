@@ -34,12 +34,35 @@ const malformedCases = surfaces.flatMap((surface) =>
     malformedCharacters.map(({ name, code, character }) => ({ surface, tokenType, name, code, character })),
   ),
 );
+const trailingHttpWhitespace = [
+  { name: 'single trailing space', suffix: ' ' },
+  { name: 'single trailing horizontal tab', suffix: String.fromCodePoint(0x09) },
+  { name: 'repeated trailing spaces', suffix: '   ' },
+  { name: 'repeated trailing horizontal tabs', suffix: String.fromCodePoint(0x09, 0x09) },
+  { name: 'mixed trailing HTTP whitespace', suffix: [' ', String.fromCodePoint(0x09), ' '].join('') },
+] as const;
+const trailingWhitespaceCases = surfaces.flatMap((surface) =>
+  tokenTypes.flatMap((tokenType) =>
+    trailingHttpWhitespace.map(({ name, suffix }) => ({ surface, tokenType, name, suffix })),
+  ),
+);
+const leadingHttpWhitespace = trailingHttpWhitespace.map(({ name, suffix }) => ({
+  name: name.replace('trailing', 'leading'),
+  prefix: suffix,
+}));
+const leadingWhitespaceCases = surfaces.flatMap((surface) =>
+  tokenTypes.flatMap((tokenType) =>
+    leadingHttpWhitespace.map(({ name, prefix }) => ({ surface, tokenType, name, prefix })),
+  ),
+);
 const validTokens = [
   { name: 'ordinary bearer token', token: 'safe-access-token-0ac8' },
   { name: 'horizontal tab', token: ['safe', String.fromCodePoint(0x09), 'access-token'].join('') },
   { name: 'space', token: 'safe access-token' },
   { name: 'lowest obs-text', token: ['safe', String.fromCodePoint(0x80), 'token'].join('') },
   { name: 'highest obs-text', token: ['safe', String.fromCodePoint(0xff), 'token'].join('') },
+  { name: 'leading non-breaking space', token: [String.fromCodePoint(0xa0), 'safe-access-token'].join('') },
+  { name: 'trailing non-breaking space', token: ['safe-access-token', String.fromCodePoint(0xa0)].join('') },
 ] as const;
 
 function oauthResponse(accessToken: string, expiresIn = 3600): Response {
@@ -159,6 +182,99 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
       expect(harness.exchange.mock.calls[0]?.[1]?.redirect).toBe('manual');
     },
   );
+
+  test.each(leadingWhitespaceCases)(
+    '$surface rejects $tokenType $name before caching or attaching the bearer credential',
+    async ({ surface, tokenType, prefix }) => {
+      const token = [prefix, ACCESS_SECRET, PRIVATE_PATIENT].join('');
+      const harness = createHarness(token, tokenType);
+
+      await expectPrivateFailure(operationFor(surface, harness), token, surface);
+
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+      expect(harness.subjectToken).toHaveBeenCalledTimes(1);
+      expect(harness.api).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(trailingWhitespaceCases)(
+    '$surface rejects $tokenType $name before header normalization can rewrite the bearer',
+    async ({ surface, tokenType, suffix }) => {
+      const token = [ACCESS_SECRET, PRIVATE_PATIENT, suffix].join('');
+      const harness = createHarness(token, tokenType);
+
+      expect(new Headers({ authorization: ['Bearer ', token].join('') }).get('authorization')).toBe(
+        ['Bearer ', ACCESS_SECRET, PRIVATE_PATIENT].join(''),
+      );
+      await expectPrivateFailure(operationFor(surface, harness), token, surface);
+
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+      expect(harness.subjectToken).toHaveBeenCalledTimes(1);
+      expect(harness.api).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      leadingHttpWhitespace.slice(0, 2).map(({ name, prefix }) => ({ surface, name, prefix })),
+    ),
+  )('$surface never caches a bearer beginning in $name', async ({ surface, prefix }) => {
+    const token = [prefix, ACCESS_SECRET, PRIVATE_PATIENT].join('');
+    const harness = createHarness(token);
+    const operation = operationFor(surface, harness);
+
+    await expectPrivateFailure(operation, token, surface);
+    await expectPrivateFailure(operation, token, surface);
+
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+    expect(harness.subjectToken).toHaveBeenCalledTimes(2);
+    expect(harness.api).not.toHaveBeenCalled();
+  });
+
+  test.each(surfaces)('recovers after rejecting a leading-whitespace %s bearer', async (surface) => {
+    const token = [String.fromCodePoint(0x09), ACCESS_SECRET, PRIVATE_PATIENT].join('');
+    const harness = createHarness(token);
+    harness.exchange
+      .mockResolvedValueOnce(oauthResponse(token))
+      .mockResolvedValueOnce(oauthResponse('safe-replacement-token'));
+    const operation = operationFor(surface, harness);
+
+    await expectPrivateFailure(operation, token, surface);
+    await expect(operation()).resolves.toBeDefined();
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+    expect(harness.api).toHaveBeenCalledTimes(surface === 'public-client' ? 1 : 0);
+  });
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      trailingHttpWhitespace.slice(0, 2).map(({ name, suffix }) => ({ surface, name, suffix })),
+    ),
+  )('$surface never caches a bearer ending in $name', async ({ surface, suffix }) => {
+    const token = [ACCESS_SECRET, PRIVATE_PATIENT, suffix].join('');
+    const harness = createHarness(token);
+    const operation = operationFor(surface, harness);
+
+    await expectPrivateFailure(operation, token, surface);
+    await expectPrivateFailure(operation, token, surface);
+
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+    expect(harness.subjectToken).toHaveBeenCalledTimes(2);
+    expect(harness.api).not.toHaveBeenCalled();
+  });
+
+  test.each(surfaces)('recovers after rejecting a trailing-whitespace %s bearer', async (surface) => {
+    const token = [ACCESS_SECRET, PRIVATE_PATIENT, String.fromCodePoint(0x09)].join('');
+    const harness = createHarness(token);
+    harness.exchange
+      .mockResolvedValueOnce(oauthResponse(token))
+      .mockResolvedValueOnce(oauthResponse('safe-replacement-token'));
+    const operation = operationFor(surface, harness);
+
+    await expectPrivateFailure(operation, token, surface);
+    await expect(operation()).resolves.toBeDefined();
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+    expect(harness.api).toHaveBeenCalledTimes(surface === 'public-client' ? 1 : 0);
+  });
 
   test.each(surfaces)('never caches malformed access tokens across repeated %s calls', async (surface) => {
     const token = [ACCESS_SECRET, String.fromCodePoint(0x0a), PRIVATE_PATIENT].join('');
@@ -322,10 +438,22 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
   });
 
   test.each([
-    { name: 'line-feed', character: String.fromCodePoint(0x0a) },
-    { name: 'accepted C0 byte', character: String.fromCodePoint(0x01) },
-  ])('blocks a $name access token at the real public OAuth and HTTP boundary', async ({ character }) => {
-    const token = [ACCESS_SECRET, character, PRIVATE_PATIENT].join('');
+    { name: 'line-feed', token: [ACCESS_SECRET, String.fromCodePoint(0x0a), PRIVATE_PATIENT].join('') },
+    {
+      name: 'accepted C0 byte',
+      token: [ACCESS_SECRET, String.fromCodePoint(0x01), PRIVATE_PATIENT].join(''),
+    },
+    { name: 'leading space', token: [' ', ACCESS_SECRET, PRIVATE_PATIENT].join('') },
+    {
+      name: 'leading horizontal tab',
+      token: [String.fromCodePoint(0x09), ACCESS_SECRET, PRIVATE_PATIENT].join(''),
+    },
+    { name: 'trailing space', token: [ACCESS_SECRET, PRIVATE_PATIENT, ' '].join('') },
+    {
+      name: 'trailing horizontal tab',
+      token: [ACCESS_SECRET, PRIVATE_PATIENT, String.fromCodePoint(0x09)].join(''),
+    },
+  ])('blocks a $name access token at the real public OAuth and HTTP boundary', async ({ token }) => {
     let exchangeRequests = 0;
     let apiRequests = 0;
     const server = createServer((request, response) => {

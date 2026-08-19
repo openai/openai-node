@@ -133,7 +133,7 @@ export class WorkloadIdentityAuth {
       !('access_token' in tokenResponse) ||
       typeof tokenResponse.access_token !== 'string' ||
       tokenResponse.access_token.trim().length === 0 ||
-      /[^\t\u0020-\u007E\u0080-\u00FF]/u.test(tokenResponse.access_token)
+      /[^\t\u0020-\u007E\u0080-\u00FF]|^[\t ]|[\t ]$/u.test(tokenResponse.access_token)
     ) {
       throw new OpenAIError("Token exchange response missing 'access_token' field");
     }
