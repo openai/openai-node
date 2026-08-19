@@ -2,8 +2,8 @@ import type { AzureOpenAI } from '../../index';
 import { assertBedrockWebSocketOrigin } from '../../internal/bedrock';
 import { OpenAI } from '../../index';
 import { OpenAIError } from '../../error';
-import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
-import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
+import type { RealtimeClientEvent } from '../../resources/beta/realtime/realtime';
+import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure, parseRealtimeEvent } from './internal-base';
 import type { RealtimeConnectionConfig } from './internal-base';
 import { isRunningInBrowser } from '../../internal/detect-platform';
 
@@ -226,7 +226,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     this.socket.addEventListener('message', (websocketEvent: MessageEvent) => {
       const event = (() => {
         try {
-          const parsedEvent = JSON.parse(websocketEvent.data.toString()) as RealtimeServerEvent;
+          const parsedEvent = parseRealtimeEvent(websocketEvent.data.toString());
 
           if (
             typeof parsedEvent !== 'object' ||
