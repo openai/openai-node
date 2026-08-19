@@ -31,12 +31,14 @@ const nativeErrorBrand =
     ? (errorBrandDescriptor.value as (value: unknown) => boolean)
     : undefined;
 const nativeErrorConstructorSource = functionToString.call(Error);
+const nativeFunctionConstructorSource = functionToString.call(Function);
 const trustedIntrinsicPrototypes = new Set<object>([
   OpenAIError.prototype,
   APIUserAbortError.prototype,
   Object.getPrototypeOf(APIUserAbortError.prototype) as object,
 ]);
 const trustedNativeConstructorSources = new Set<string>();
+const canonicalIntrinsicDescriptors = new Map<string, ReadonlyMap<PropertyKey, PropertyDescriptor>>();
 const foreignErrorStackDescriptors = new WeakMap<object, PropertyDescriptor>();
 
 type NativeErrorConstructor = (...args: never[]) => unknown;
@@ -50,7 +52,7 @@ function rememberTrustedIntrinsic(constructor: unknown): void {
   if (
     !prototypeDescriptor ||
     !('value' in prototypeDescriptor) ||
-    typeof prototypeDescriptor.value !== 'object'
+    (typeof prototypeDescriptor.value !== 'object' && typeof prototypeDescriptor.value !== 'function')
   ) {
     return;
   }
@@ -63,11 +65,20 @@ function rememberTrustedIntrinsic(constructor: unknown): void {
     prototypeDescriptor.writable === false
   ) {
     trustedNativeConstructorSources.add(source);
+    const descriptors = new Map<PropertyKey, PropertyDescriptor>();
+    for (const key of Reflect.ownKeys(prototypeDescriptor.value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(prototypeDescriptor.value, key);
+      if (descriptor) {
+        descriptors.set(key, descriptor);
+      }
+    }
+    canonicalIntrinsicDescriptors.set(source, descriptors);
   }
 }
 
 for (const constructor of [
   Object,
+  Function,
   Array,
   Map,
   Set,
@@ -108,6 +119,14 @@ for (const name of [
   }
 }
 
+const typedArrayConstructorDescriptor = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype) as object,
+  'constructor',
+);
+if (typedArrayConstructorDescriptor && 'value' in typedArrayConstructorDescriptor) {
+  rememberTrustedIntrinsic(typedArrayConstructorDescriptor.value);
+}
+
 if (typeof Buffer === 'function') {
   rememberTrustedIntrinsic(Buffer);
 }
@@ -137,28 +156,106 @@ const mapEntries = Map.prototype.entries;
 const setValues = Set.prototype.values;
 const retainedStorageBrands = new Set(['ArrayBuffer', 'SharedArrayBuffer', 'Blob', 'File', 'Map', 'Set']);
 
-function isTrustedIntrinsicPrototype(prototype: object): boolean {
-  if (trustedIntrinsicPrototypes.has(prototype)) {
-    return true;
-  }
+interface TrustedForeignIntrinsic {
+  constructor: NativeErrorConstructor;
+  descriptors: ReadonlyMap<PropertyKey, PropertyDescriptor>;
+  functionPrototype: object;
+}
 
+function getTrustedForeignIntrinsic(prototype: object): TrustedForeignIntrinsic | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
   if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
-    return false;
+    return undefined;
   }
 
   const constructor = descriptor.value as NativeErrorConstructor;
-  if (!trustedNativeConstructorSources.has(functionToString.call(constructor))) {
-    return false;
+  const source = functionToString.call(constructor);
+  const descriptors = canonicalIntrinsicDescriptors.get(source);
+  if (!trustedNativeConstructorSources.has(source) || !descriptors) {
+    return undefined;
   }
 
   const constructorPrototype = Object.getOwnPropertyDescriptor(constructor, 'prototype');
-  return Boolean(
-    constructorPrototype &&
-    'value' in constructorPrototype &&
-    constructorPrototype.value === prototype &&
-    constructorPrototype.configurable === false &&
-    constructorPrototype.writable === false,
+  if (
+    !constructorPrototype ||
+    !('value' in constructorPrototype) ||
+    constructorPrototype.value !== prototype ||
+    constructorPrototype.configurable !== false ||
+    constructorPrototype.writable !== false
+  ) {
+    return undefined;
+  }
+
+  return { constructor, descriptors, functionPrototype: Object.getPrototypeOf(constructor) as object };
+}
+
+function isTrustedIntrinsicPrototype(prototype: object): boolean {
+  return trustedIntrinsicPrototypes.has(prototype) || getTrustedForeignIntrinsic(prototype) !== undefined;
+}
+
+function isCanonicalIntrinsicFunction(
+  value: unknown,
+  canonical: unknown,
+  functionPrototype: object,
+): boolean {
+  if (canonical === undefined) {
+    return value === undefined;
+  }
+
+  if (typeof value !== 'function' || typeof canonical !== 'function') {
+    return false;
+  }
+
+  const source = functionToString.call(canonical);
+  if (functionToString.call(value) !== source) {
+    return false;
+  }
+
+  const actualFunctionPrototype = Object.getPrototypeOf(value) as object;
+  if (actualFunctionPrototype === functionPrototype) {
+    return true;
+  }
+  if (!/^function [A-Za-z_$][\w$]*\(\) \{ \[native code\] \}$/u.test(source)) {
+    return false;
+  }
+
+  const intrinsic = getTrustedForeignIntrinsic(actualFunctionPrototype);
+  return (
+    intrinsic !== undefined &&
+    functionToString.call(intrinsic.constructor) === nativeFunctionConstructorSource
+  );
+}
+
+function isCanonicalIntrinsicDescriptor(
+  descriptor: PropertyDescriptor,
+  canonical: PropertyDescriptor | undefined,
+  functionPrototype: object,
+): boolean {
+  if (
+    !canonical ||
+    descriptor.configurable !== canonical.configurable ||
+    descriptor.enumerable !== canonical.enumerable ||
+    'value' in descriptor !== 'value' in canonical
+  ) {
+    return false;
+  }
+
+  if ('value' in descriptor && 'value' in canonical) {
+    if (descriptor.writable !== canonical.writable) {
+      return false;
+    }
+    if (typeof canonical.value === 'function') {
+      return isCanonicalIntrinsicFunction(descriptor.value, canonical.value, functionPrototype);
+    }
+    if (canonical.value !== null && typeof canonical.value === 'object') {
+      return false;
+    }
+    return Object.is(descriptor.value, canonical.value);
+  }
+
+  return (
+    isCanonicalIntrinsicFunction(descriptor.get, canonical.get, functionPrototype) &&
+    isCanonicalIntrinsicFunction(descriptor.set, canonical.set, functionPrototype)
   );
 }
 
@@ -507,7 +604,7 @@ function visitRetainedEventPrototypes(
       return false;
     }
     if (
-      isTrustedIntrinsicPrototype(prototype) ||
+      trustedIntrinsicPrototypes.has(prototype) ||
       (isBlobInternalHandle && prototype === blobInternalHandlePrototype)
     ) {
       return true;
@@ -517,10 +614,35 @@ function visitRetainedEventPrototypes(
     }
 
     visited.add(prototype);
-    if (
-      !charge(16) ||
-      !visitInspectableEventProperties(prototype, undefined, prototypeDepth, charge, visit)
-    ) {
+    if (!charge(16)) {
+      return false;
+    }
+
+    const intrinsic = getTrustedForeignIntrinsic(prototype);
+    if (intrinsic) {
+      for (const key of Reflect.ownKeys(prototype)) {
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, key);
+        if (!descriptor) {
+          return false;
+        }
+        if (
+          isCanonicalIntrinsicDescriptor(
+            descriptor,
+            intrinsic.descriptors.get(key),
+            intrinsic.functionPrototype,
+          )
+        ) {
+          continue;
+        }
+        if (
+          !charge((typeof key === 'string' ? key.length : (key.description?.length ?? 0)) * 2 + 8) ||
+          !('value' in descriptor)
+        ) {
+          return false;
+        }
+        visit(descriptor.value, prototypeDepth + 1);
+      }
+    } else if (!visitInspectableEventProperties(prototype, undefined, prototypeDepth, charge, visit)) {
       return false;
     }
 

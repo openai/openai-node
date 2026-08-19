@@ -295,6 +295,56 @@ describe('.stream()', () => {
     ]);
   });
 
+  it.each(
+    (
+      [
+        'response.shell_call_command.added',
+        'response.shell_call_command.delta',
+        'response.shell_call_command.done',
+      ] as const
+    ).flatMap((type) =>
+      (['message', 'reasoning', 'shell_call_output'] as const).map((itemType) => ({ type, itemType })),
+    ),
+  )('rejects public $type targeting $itemType before any emission', async ({ type, itemType }) => {
+    const outputByType: Record<typeof itemType, Response['output'][number]> = {
+      message: {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [],
+      },
+      reasoning: { id: 'reasoning_123', type: 'reasoning', summary: [] },
+      shell_call_output: {
+        id: 'shell_output_123',
+        type: 'shell_call_output',
+        call_id: 'call_123',
+        max_output_length: null,
+        output: [],
+        status: 'in_progress',
+      },
+    };
+    const output = outputByType[itemType];
+    const shellEvent: ResponseStreamEvent =
+      type === 'response.shell_call_command.delta'
+        ? { type, sequence_number: 1, output_index: 0, command_index: 0, delta: 'injected' }
+        : { type, sequence_number: 1, output_index: 0, command_index: 0, command: 'injected' };
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse({ output: [output] }) },
+      shellEvent,
+    ];
+    const emitted = vi.fn();
+    const rawEvents: string[] = [];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    stream.on(type, emitted).on('event', (event) => rawEvents.push(event.type));
+
+    await expect(stream.finalResponse()).rejects.toThrow(
+      `expected output item type 'shell_call', got '${itemType}'`,
+    );
+    expect(emitted).not.toHaveBeenCalled();
+    expect(rawEvents).toEqual(['response.created']);
+  });
+
   it('converts an error event into an APIError', async () => {
     const events: ResponseStreamEvent[] = [
       {

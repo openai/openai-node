@@ -368,9 +368,26 @@ function validateCompletedOutputItemIdentity(
   }
 }
 
-function validateOutputItemIdentity(event: ResponseAccumulatorEvent, snapshot: Response): void {
+function validateOutputItemIdentity(
+  event: ResponseAccumulatorEvent,
+  snapshot: Response,
+  rejectInvalidShellTargets: boolean,
+): void {
   if (event.type === 'response.output_item.done') {
     validateCompletedOutputItemIdentity(event, snapshot);
+    return;
+  }
+
+  if (
+    rejectInvalidShellTargets &&
+    (event.type === 'response.shell_call_command.added' ||
+      event.type === 'response.shell_call_command.delta' ||
+      event.type === 'response.shell_call_command.done')
+  ) {
+    const output = getOutput(snapshot, event.output_index);
+    if (!hasOwn(output, 'type') || output.type !== 'shell_call') {
+      throw new OpenAIError(`expected output item type 'shell_call', got '${output.type}'`);
+    }
     return;
   }
 
@@ -1155,6 +1172,7 @@ export function accumulateResponseWithContext(
   event: ResponseAccumulatorEvent,
   snapshot: Response | undefined,
   context: ResponseAccumulatorContext,
+  rejectInvalidShellTargets = false,
 ): Response {
   const dispatchEvent = sanitizeResponseEvent(event);
 
@@ -1167,7 +1185,7 @@ export function accumulateResponseWithContext(
     return cloneValidatedResponse(context, dispatchEvent.response);
   }
 
-  validateOutputItemIdentity(dispatchEvent, snapshot);
+  validateOutputItemIdentity(dispatchEvent, snapshot, rejectInvalidShellTargets);
 
   if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
     return snapshot;

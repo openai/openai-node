@@ -158,6 +158,7 @@ export class ResponseStream<ParsedT = null>
       event,
       this.#currentResponseSnapshot,
       this.#accumulatorContext,
+      true,
     );
     this.#currentResponseSnapshot = response;
     maybeEmit('event', event);

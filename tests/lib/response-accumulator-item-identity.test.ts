@@ -181,6 +181,32 @@ const itemScopedEvents: readonly (readonly [string, string, EventFields])[] = [
 ];
 
 describe('ResponseAccumulator output item identity', () => {
+  test.each(
+    (
+      [
+        'response.shell_call_command.added',
+        'response.shell_call_command.delta',
+        'response.shell_call_command.done',
+      ] as const
+    ).flatMap((type) =>
+      (['message', 'reasoning', 'shell_call_output'] as const).map((itemType) => ({ type, itemType })),
+    ),
+  )('preserves direct accumulator no-op for $type targeting a $itemType', ({ type, itemType }) => {
+    const snapshot = createSnapshot(makeOutput(itemType));
+    const original = structuredClone(snapshot);
+
+    expect(
+      applyEvent(snapshot, {
+        type,
+        output_index: 0,
+        command_index: 0,
+        ...(type === 'response.shell_call_command.delta' ? { delta: 'injected' } : { command: 'injected' }),
+      }),
+    ).toBe(snapshot);
+
+    expect(snapshot).toEqual(original);
+  });
+
   test.each(itemScopedEvents)(
     'rejects a missing required item ID before applying %s',
     (type, itemType, fields) => {

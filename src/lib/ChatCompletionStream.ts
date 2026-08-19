@@ -406,6 +406,35 @@ function reservePartialJSONParse(state: PartialJSONParseState, budget: PartialJS
   return true;
 }
 
+function captureStructuredJSONSnapshot(
+  snapshot: object,
+  property: 'content' | 'arguments',
+): string | null | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
+  if (!descriptor) {
+    return undefined;
+  }
+  if (
+    !('value' in descriptor) ||
+    (typeof descriptor.value !== 'string' && descriptor.value !== null && descriptor.value !== undefined)
+  ) {
+    throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+  }
+
+  return descriptor.value as string | null | undefined;
+}
+
+function validateStructuredJSONSnapshot(value: string, budget?: PartialJSONParseBudget): string {
+  const state = createPartialJSONParseState();
+  const parseBudget = budget ?? { bytes: 0, fragments: 0, work: 0 };
+  recordPartialJSONFragment(state, parseBudget, value);
+  if (!reservePartialJSONParse(state, parseBudget)) {
+    throw new OpenAIError('Chat completion stream exceeded its structured JSON parse-work limit');
+  }
+
+  return value;
+}
+
 function ownFunctionToolIdentity(
   toolCall: PartialToolCallSnapshot,
 ): Pick<ToolCallIdentity, 'type' | 'name'> | undefined {
@@ -610,16 +639,17 @@ export class ChatCompletionStream<ParsedT = null>
     for (const choice of chunk.choices) {
       const choiceSnapshot = completion.choices[choice.index]!;
       const { delta } = choice;
+      const parseableContent =
+        !choiceSnapshot.message.refusal && isParseableResponseFormat(this.#params?.response_format);
+      const messageContent = parseableContent
+        ? captureStructuredJSONSnapshot(choiceSnapshot.message, 'content')
+        : choiceSnapshot.message.content;
 
-      if (
-        delta?.content != null &&
-        choiceSnapshot.message?.role === 'assistant' &&
-        choiceSnapshot.message?.content
-      ) {
-        this._emit('content', delta.content, choiceSnapshot.message.content);
+      if (delta?.content != null && choiceSnapshot.message?.role === 'assistant' && messageContent) {
+        this._emit('content', delta.content, messageContent);
         this._emit('content.delta', {
           delta: delta.content,
-          snapshot: choiceSnapshot.message.content,
+          snapshot: messageContent,
           parsed: choiceSnapshot.message.parsed,
         });
       }
@@ -679,10 +709,21 @@ export class ChatCompletionStream<ParsedT = null>
         }
 
         if (toolCallSnapshot.type === 'function') {
+          const boundIdentity = state.tool_call_identities.get(toolCallDelta.index);
+          let argumentsSnapshot: string;
+          if (boundIdentity?.parseable) {
+            const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
+            if (typeof capturedArguments !== 'string') {
+              throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+            }
+            argumentsSnapshot = capturedArguments;
+          } else {
+            argumentsSnapshot = toolCallSnapshot.function.arguments;
+          }
           this._emit('tool_calls.function.arguments.delta', {
             name: toolCallSnapshot.function.name,
             index: toolCallDelta.index,
-            arguments: toolCallSnapshot.function.arguments,
+            arguments: argumentsSnapshot,
             parsed_arguments: toolCallSnapshot.function.parsed_arguments,
             arguments_delta: toolCallArgumentFragments.get(toolCallDelta) ?? '',
           });
@@ -719,16 +760,27 @@ export class ChatCompletionStream<ParsedT = null>
       ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
 
       let parsedArguments: unknown = null;
+      const parseable = isAutoParsableTool(inputTool) || inputTool?.function.strict === true;
+      let argumentsSnapshot: string;
+      if (parseable) {
+        const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
+        if (typeof capturedArguments !== 'string') {
+          throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        argumentsSnapshot = capturedArguments;
+      } else {
+        argumentsSnapshot = toolCallSnapshot.function.arguments;
+      }
       if (isAutoParsableTool(inputTool)) {
-        parsedArguments = inputTool.$parseRaw(toolCallSnapshot.function.arguments);
+        parsedArguments = inputTool.$parseRaw(validateStructuredJSONSnapshot(argumentsSnapshot));
       } else if (inputTool?.function.strict) {
-        parsedArguments = JSON.parse(toolCallSnapshot.function.arguments);
+        parsedArguments = JSON.parse(validateStructuredJSONSnapshot(argumentsSnapshot));
       }
 
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,
-        arguments: toolCallSnapshot.function.arguments,
+        arguments: argumentsSnapshot,
         parsed_arguments: parsedArguments,
       });
     } else if (toolCallSnapshot.type !== 'custom') {
@@ -738,24 +790,27 @@ export class ChatCompletionStream<ParsedT = null>
 
   #emitContentDoneEvents(choiceSnapshot: ChatCompletionSnapshot.Choice) {
     const state = this.#getChoiceEventState(choiceSnapshot);
+    const { refusal } = choiceSnapshot.message;
+    const parseableContent = !refusal && isParseableResponseFormat(this.#params?.response_format);
+    const content = parseableContent
+      ? captureStructuredJSONSnapshot(choiceSnapshot.message, 'content')
+      : choiceSnapshot.message.content;
 
     if (
-      choiceSnapshot.message.content != null &&
-      (choiceSnapshot.message.content !== '' ||
-        (!choiceSnapshot.message.refusal &&
-          !choiceSnapshot.message.tool_calls?.length &&
-          !choiceSnapshot.message.function_call)) &&
+      content != null &&
+      (content !== '' ||
+        (!refusal && !choiceSnapshot.message.tool_calls?.length && !choiceSnapshot.message.function_call)) &&
       !state.content_done
     ) {
       state.content_done = true;
 
       this._emit('content.done', {
-        content: choiceSnapshot.message.content,
-        parsed: choiceSnapshot.message.refusal
+        content,
+        parsed: refusal
           ? null
           : parseResponseFormatContent<ParsedT>(
               this.#params?.response_format,
-              choiceSnapshot.message.content,
+              parseableContent ? validateStructuredJSONSnapshot(content) : content,
             ),
       });
     }
@@ -787,17 +842,65 @@ export class ChatCompletionStream<ParsedT = null>
     if (!snapshot) {
       throw new OpenAIError(`request ended without sending any chunks`);
     }
+    const finalJSONBudget: PartialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
+    const parseableContent = isParseableResponseFormat(this.#params?.response_format);
     for (const choice of snapshot.choices) {
       if (!choice) {
         continue;
       }
       const state = this.#choiceEventStates[choice.index];
+      if (parseableContent && !choice.message.refusal) {
+        const content = captureStructuredJSONSnapshot(choice.message, 'content');
+        if (typeof content === 'string') {
+          validateStructuredJSONSnapshot(content, finalJSONBudget);
+        }
+      }
       for (const [index, identity] of state?.tool_call_identities ?? []) {
         const toolCall = choice.message.tool_calls?.[index];
         if (!toolCall) {
           throw new OpenAIError('Chat completion stream contains a changed tool call identity');
         }
         assertBoundToolCallIdentity(toolCall, identity);
+      }
+      if (!this.#hasAutoParseableTool) {
+        continue;
+      }
+      for (const toolCall of choice.message.tool_calls ?? []) {
+        const identity = ownFunctionToolIdentity(toolCall);
+        if (!identity) {
+          const type = Object.getOwnPropertyDescriptor(toolCall, 'type');
+          if (type && !('value' in type)) {
+            throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+          }
+          if (type?.value !== 'function') {
+            continue;
+          }
+          const fn = Object.getOwnPropertyDescriptor(toolCall, 'function');
+          if (fn && !('value' in fn)) {
+            throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+          }
+          if (fn && typeof fn.value === 'object' && fn.value !== null) {
+            const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
+            if (name && !('value' in name)) {
+              throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+            }
+          }
+          continue;
+        }
+        if (
+          toolCall.type !== 'function' ||
+          !shouldParseToolCall(this.#params, {
+            type: identity.type,
+            function: { name: identity.name },
+          })
+        ) {
+          continue;
+        }
+        const argumentsSnapshot = captureStructuredJSONSnapshot(toolCall.function, 'arguments');
+        if (typeof argumentsSnapshot !== 'string') {
+          throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget);
       }
     }
     const audioDoneChoiceIndexes = this.#audioDoneChoiceIndexes;
@@ -1031,14 +1134,14 @@ export class ChatCompletionStream<ParsedT = null>
           const eventState = this.#getChoiceEventState(choice);
           const parseState = (eventState.content_parse_state ??= createPartialJSONParseState());
           const shouldParse = recordPartialJSONFragment(parseState, this.#partialJSONParseBudget, content);
-          choice.message.content = (choice.message.content || '') + content;
+          choice.message.content = (captureStructuredJSONSnapshot(choice.message, 'content') || '') + content;
 
           // The partial parser does not accept whitespace-only input. Once output
           // grows, coalesce prefix reparses while preserving every raw snapshot.
           if (!parseState.has_non_whitespace) {
             choice.message.parsed = null;
           } else if (shouldParse && reservePartialJSONParse(parseState, this.#partialJSONParseBudget)) {
-            choice.message.parsed = partialParse(choice.message.content);
+            choice.message.parsed = partialParse(validateStructuredJSONSnapshot(choice.message.content));
           } else if (content.length > 0) {
             choice.message.parsed = null;
           }
@@ -1136,13 +1239,19 @@ export class ChatCompletionStream<ParsedT = null>
                   this.#partialJSONParseBudget,
                   argumentFragment,
                 );
-                functionSnapshot.arguments += argumentFragment;
+                const previousArguments = captureStructuredJSONSnapshot(functionSnapshot, 'arguments');
+                if (typeof previousArguments !== 'string') {
+                  throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                }
+                functionSnapshot.arguments = previousArguments + argumentFragment;
                 if (
                   shouldParse &&
                   boundIdentity?.parseable === true &&
                   reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
                 ) {
-                  functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+                  functionSnapshot.parsed_arguments = partialParse(
+                    validateStructuredJSONSnapshot(functionSnapshot.arguments),
+                  );
                 } else if (argumentFragment.length > 0 && hasOwn(functionSnapshot, 'parsed_arguments')) {
                   functionSnapshot.parsed_arguments = undefined;
                 }

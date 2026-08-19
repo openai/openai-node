@@ -936,6 +936,316 @@ it.each(['name', 'type'] as const)(
   },
 );
 
+it.each(['content', 'tool'] as const)(
+  'preserves a bounded public %s snapshot edit and its original identity',
+  async (kind) => {
+    const stream = createStructuredStream(kind, ['{}']);
+    const edited = '{"value":"edited"}';
+    let publicSnapshot: unknown;
+
+    stream.on('chunk', (current, snapshot) => {
+      const delta = current.choices[0]?.delta;
+      if (kind === 'content' && typeof delta?.content === 'string') {
+        publicSnapshot = snapshot;
+        const message = snapshot.choices[0]?.message;
+        if (message) {
+          message.content = edited;
+        }
+      } else if (kind === 'tool' && delta?.tool_calls?.length) {
+        const toolCall = snapshot.choices[0]?.message.tool_calls?.[0];
+        if (toolCall?.type === 'function') {
+          publicSnapshot = snapshot;
+          toolCall.function.arguments = edited;
+        }
+      }
+    });
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(publicSnapshot).toBeDefined();
+    if (kind === 'content') {
+      expect(completion.choices[0]?.message).toMatchObject({ content: edited, parsed: { value: 'edited' } });
+    } else {
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { arguments: edited, parsed_arguments: { value: 'edited' } },
+      });
+    }
+  },
+);
+
+it.each(
+  (['content', 'tool'] as const).flatMap((kind) =>
+    (['byte', 'depth'] as const).flatMap((limit) =>
+      (['final', 'next-partial'] as const).map((boundary) => ({ kind, limit, boundary })),
+    ),
+  ),
+)(
+  'rejects a public $kind snapshot $limit mutation before its $boundary parser',
+  async ({ kind, limit, boundary }) => {
+    const unsafe =
+      limit === 'byte'
+        ? `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`
+        : `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    const stream = createStructuredStream(kind, boundary === 'next-partial' ? ['{}', ' '] : ['{}']);
+    let changed = false;
+    const parse = vi.spyOn(partialJSONParser, 'partialParse');
+
+    stream.on('chunk', (current, snapshot) => {
+      if (changed) {
+        return;
+      }
+      const delta = current.choices[0]?.delta;
+      if (kind === 'content' && typeof delta?.content === 'string') {
+        const message = snapshot.choices[0]?.message;
+        if (message) {
+          message.content = unsafe;
+        }
+        changed = true;
+      } else if (kind === 'tool' && delta?.tool_calls?.length) {
+        const toolCall = snapshot.choices[0]?.message.tool_calls?.[0];
+        if (toolCall?.type === 'function') {
+          toolCall.function.arguments = unsafe;
+          changed = true;
+        }
+      }
+    });
+
+    const failure = await stream.finalChatCompletion().then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(
+      limit === 'byte' ? /structured JSON byte limit/u : /structured JSON nesting depth limit/u,
+    );
+    expect(parse.mock.calls.every(([value]) => value.length < 16 * 1024 * 1024)).toBe(true);
+  },
+);
+
+it.each(['content', 'tool'] as const)(
+  'revalidates a public %s snapshot changed after its done-event parser',
+  async (kind) => {
+    const stream = createStructuredStream(kind, ['{}']);
+    const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    let snapshot: typeof stream.currentChatCompletionSnapshot;
+
+    stream.on('chunk', (_current, currentSnapshot) => {
+      snapshot = currentSnapshot;
+    });
+    if (kind === 'content') {
+      stream.on('content.done', () => {
+        const message = snapshot?.choices[0]?.message;
+        if (message) {
+          message.content = unsafe;
+        }
+      });
+    } else {
+      stream.on('tool_calls.function.arguments.done', () => {
+        const toolCall = snapshot?.choices[0]?.message.tool_calls?.[0];
+        if (toolCall?.type === 'function') {
+          toolCall.function.arguments = unsafe;
+        }
+      });
+    }
+
+    const failure = await stream.finalChatCompletion().then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+  },
+);
+
+it.each(['content', 'tool'] as const)(
+  'rejects an accessor-backed public %s snapshot before invoking its stateful getter',
+  async (kind) => {
+    const stream = createStructuredStream(kind, ['{}']);
+    const readSnapshot = vi.fn(() => '{"value":"changed"}');
+
+    stream.on('chunk', (current, snapshot) => {
+      const delta = current.choices[0]?.delta;
+      if (kind === 'content' && typeof delta?.content === 'string') {
+        const message = snapshot.choices[0]?.message;
+        if (message) {
+          Object.defineProperty(message, 'content', { configurable: true, get: readSnapshot });
+        }
+      } else if (kind === 'tool' && delta?.tool_calls?.length) {
+        const toolCall = snapshot.choices[0]?.message.tool_calls?.[0];
+        if (toolCall?.type === 'function') {
+          Object.defineProperty(toolCall.function, 'arguments', { configurable: true, get: readSnapshot });
+        }
+      }
+    });
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(/unsafe structured JSON snapshot/u);
+    expect(readSnapshot).not.toHaveBeenCalled();
+  },
+);
+
+it('enforces an aggregate final budget across independently bounded public parser snapshots', async () => {
+  const edited = `{"value":"${'x'.repeat(9 * 1024 * 1024)}"}`;
+
+  async function* mixedStructuredFragments(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      content: '{}',
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_bounded',
+          type: 'function',
+          function: { name: strictTool.function.name, arguments: '{}' },
+        },
+      ],
+    });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const stream = ChatCompletionStream.createChatCompletion(createClient(mixedStructuredFragments()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Bound the final content and strict-tool aggregate' }],
+    response_format: structuredResponseFormat,
+    tools: [strictTool],
+  });
+  stream.on('chunk', (current, snapshot) => {
+    if (typeof current.choices[0]?.delta.content !== 'string') {
+      return;
+    }
+    const message = snapshot.choices[0]?.message;
+    const toolCall = message?.tool_calls?.[0];
+    if (message && toolCall?.type === 'function') {
+      message.content = edited;
+      toolCall.function.arguments = edited;
+    }
+  });
+
+  const failure = await stream.finalChatCompletion().then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+});
+
+it('bounds a new strict tool appended to the public snapshot before its final parser', async () => {
+  const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+  const stream = createStructuredStream('tool', ['{}']);
+  const parse = vi.spyOn(JSON, 'parse');
+
+  stream.on('chunk', (current, snapshot) => {
+    if (!current.choices[0]?.delta.tool_calls?.length) {
+      return;
+    }
+    snapshot.choices[0]?.message.tool_calls?.push({
+      id: 'call_injected',
+      type: 'function',
+      function: { name: strictTool.function.name, arguments: unsafe },
+    });
+  });
+
+  const failure = await stream.finalChatCompletion().then(
+    () => null,
+    (error: unknown) => error,
+  );
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+  expect(
+    parse.mock.calls.every(([value]) => typeof value !== 'string' || value.length < 16 * 1024 * 1024),
+  ).toBe(true);
+});
+
+it.each(['type', 'function', 'name', 'arguments'] as const)(
+  'rejects an injected strict tool %s accessor without invoking its getter',
+  async (property) => {
+    const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    const stream = createStructuredStream('tool', ['{}']);
+    const injectedFunction = { name: strictTool.function.name, arguments: unsafe };
+    const injectedTool = { id: 'call_injected', type: 'function' as const, function: injectedFunction };
+    const target = property === 'type' || property === 'function' ? injectedTool : injectedFunction;
+    const values: Record<typeof property, unknown> = {
+      type: 'function',
+      function: injectedFunction,
+      name: strictTool.function.name,
+      arguments: unsafe,
+    };
+    const value = values[property];
+    const readProperty = vi.fn(() => value);
+    Object.defineProperty(target, property, { configurable: true, get: readProperty });
+
+    stream.on('chunk', (current, snapshot) => {
+      if (current.choices[0]?.delta.tool_calls?.length) {
+        snapshot.choices[0]?.message.tool_calls?.push(injectedTool);
+      }
+    });
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(/unsafe structured JSON snapshot/u);
+    expect(readProperty).not.toHaveBeenCalled();
+  },
+);
+
+it.each(['content', 'tool'] as const)(
+  'preserves the exact user-owned %s parser error and cause after bounded validation',
+  async (kind) => {
+    const expected = new SyntaxError('User-owned structured parser diagnostic');
+    const expectedCause = new Error('User-owned structured parser cause');
+    (expected as SyntaxError & { cause?: unknown }).cause = expectedCause;
+    const parser = vi.fn(() => {
+      throw expected;
+    });
+    const stream =
+      kind === 'content'
+        ? ChatCompletionStream.createChatCompletion(createClient(contentFragments(['{}'])), {
+            model: 'gpt-test',
+            messages: [{ role: 'user', content: 'Preserve the custom response parser' }],
+            response_format: makeParseableResponseFormat(structuredResponseFormat, parser),
+          })
+        : ChatCompletionStream.createChatCompletion(createClient(argumentFragments(['{}'])), {
+            model: 'gpt-test',
+            messages: [{ role: 'user', content: 'Preserve the custom tool parser' }],
+            tools: [makeParseableTool(strictTool, { parser, callback: undefined })],
+          });
+
+    const failure = await stream.finalChatCompletion().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect((failure as Error & { cause?: unknown }).cause).toBe(expected);
+    expect((expected as SyntaxError & { cause?: unknown }).cause).toBe(expectedCause);
+    expect(parser).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('preserves an oversized known non-strict tool snapshot mutation without parsing it', async () => {
+  const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+  const stream = ChatCompletionStream.createChatCompletion(
+    createClient(namedArgumentFragments(nonStrictTool.function.name, ['{}'])),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Keep the non-strict snapshot unparsed' }],
+      tools: [strictTool, nonStrictTool],
+    },
+  );
+
+  stream.on('chunk', (current, snapshot) => {
+    if (!current.choices[0]?.delta.tool_calls?.length) {
+      return;
+    }
+    const toolCall = snapshot.choices[0]?.message.tool_calls?.[0];
+    if (toolCall?.type === 'function') {
+      toolCall.function.arguments = unsafe;
+    }
+  });
+
+  const completion = await stream.finalChatCompletion();
+
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { arguments: unsafe },
+  });
+});
+
 it.each(['content', 'tool'] as const)('rejects an excessive number of empty %s fragments', async (kind) => {
   const stream = createStructuredStream(kind, emptyStructuredJSONFragments());
 

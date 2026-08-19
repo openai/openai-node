@@ -936,6 +936,170 @@ describe('EventStream iterator buffer limits', () => {
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
 
+  test.each([
+    { name: 'Map', prototype: 'Map.prototype', expression: 'new Map()' },
+    { name: 'Set', prototype: 'Set.prototype', expression: 'new Set()' },
+    { name: 'ArrayBuffer', prototype: 'ArrayBuffer.prototype', expression: 'new ArrayBuffer(8)' },
+    { name: 'DataView', prototype: 'DataView.prototype', expression: 'new DataView(new ArrayBuffer(8))' },
+    { name: 'typed array', prototype: 'Uint8Array.prototype', expression: 'new Uint8Array(8)' },
+    {
+      name: 'shared typed-array parent',
+      prototype: 'Object.getPrototypeOf(Uint8Array.prototype)',
+      expression: 'new Uint8Array(8)',
+    },
+    { name: 'Array', prototype: 'Array.prototype', expression: '[1, 2, 3]' },
+    { name: 'Error', prototype: 'Error.prototype', expression: "new Error('safe')" },
+    { name: 'Object parent', prototype: 'Object.prototype', expression: 'new Map()' },
+  ])('charges oversized data added directly to a foreign $name intrinsic prototype', async (scenario) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = runInNewContext(
+      `Object.defineProperty(${scenario.prototype}, 'retained', {
+         value: 'x'.repeat(5 * 1024 * 1024),
+       });
+       ${scenario.expression}`,
+    ) as object;
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each(['Map.prototype', 'Object.prototype'] as const)(
+    'rejects an accessor added to foreign %s without invoking its retained closure',
+    async (prototype) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const readAccessor = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      const payload = runInNewContext(
+        `Object.defineProperty(${prototype}, 'retained', { get: readAccessor }); new Map()`,
+        { readAccessor },
+      ) as object;
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(readAccessor).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test('rejects a producer-replaced foreign intrinsic method without invoking its closure', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const invokeMethod = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+    const payload = runInNewContext('Map.prototype.get = invokeMethod; new Map()', { invokeMethod }) as Map<
+      unknown,
+      unknown
+    >;
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(invokeMethod).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects a replaced foreign intrinsic getter without invoking its retained closure', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const readSize = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+    const payload = runInNewContext(
+      "Object.defineProperty(Map.prototype, 'size', { get: readSize }); new Map()",
+      { readSize },
+    ) as Map<unknown, unknown>;
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(readSize).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each(['toBase64', 'toHex'] as const)(
+    'rejects a replaced cross-realm typed-array %s method without invoking it',
+    async (method) => {
+      if (!Object.getOwnPropertyDescriptor(Uint8Array.prototype, method)) {
+        return;
+      }
+
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const invokeMethod = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      const payload = runInNewContext(`Uint8Array.prototype.${method} = invokeMethod; new Uint8Array(8)`, {
+        invokeMethod,
+      }) as Uint8Array;
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(invokeMethod).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test('rejects a proxied hidden native Function realm without invoking its constructor', async () => {
+    if (!Object.getOwnPropertyDescriptor(Uint8Array.prototype, 'toHex')) {
+      return;
+    }
+
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const invokeConstructor = vi.fn(() => {
+      throw new Error('producer Function constructor must not run');
+    });
+    const payload = runInNewContext(
+      `const prototype = Object.getPrototypeOf(Uint8Array.prototype.toHex);
+       const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor').value;
+       Object.defineProperty(prototype, 'constructor', {
+         value: new Proxy(constructor, { construct() { return invokeConstructor(); } }),
+       });
+       new Uint8Array(8)`,
+      { invokeConstructor },
+    ) as Uint8Array;
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(invokeConstructor).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('revalidates a foreign intrinsic prototype changed by a later listener', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = runInNewContext('new Map()') as Map<unknown, unknown>;
+    stream.on('payload', () => {
+      Object.defineProperty(Object.getPrototypeOf(payload) as object, 'retained', {
+        value: 'x'.repeat(5 * 1024 * 1024),
+      });
+    });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each(['Map.prototype', 'Object.prototype'] as const)(
+    'preserves safe data added to foreign %s and the queued payload identity',
+    async (prototype) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const payload = runInNewContext(
+        `Object.defineProperty(${prototype}, 'safe', { value: 'small' }); new Map()`,
+      ) as Map<unknown, unknown>;
+
+      stream.emitPayload(payload);
+
+      const result = await iterator.next();
+      expect(result.value?.[0]).toBe(payload);
+      expect(stream.controller.signal.aborted).toBe(false);
+      stream.end();
+    },
+  );
+
   test('preserves safe custom prototype data on a genuine cross-realm Map', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
