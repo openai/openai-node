@@ -9,6 +9,7 @@ import type { FinalRequestOptions } from 'openai/internal/request-options';
 type Authentication = 'static-api-key' | 'rotating-entra-token';
 type PublicRoute = 'generic-request' | 'models-list' | 'chat-completion';
 type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
+type CarrierAuthenticationScheme = 'auth' | 'bearer' | 'admin';
 
 class ProtectedHookAzure extends AzureOpenAI {
   injectedHeaders: Record<string, string> | undefined;
@@ -16,6 +17,8 @@ class ProtectedHookAzure extends AzureOpenAI {
   adminCalls = 0;
   fetchFailures = 0;
   mutation: 'auth' | 'auth-null' | 'bearer' | 'admin' | undefined;
+  mutationScheme: CarrierAuthenticationScheme = 'auth';
+  mutateCarrier: ((headers: Headers) => void) | undefined;
 
   protected override async prepareRequest(request: RequestInit): Promise<void> {
     if (this.injectedHeaders) {
@@ -59,17 +62,24 @@ class ProtectedHookAzure extends AzureOpenAI {
     } else if (this.mutation === 'auth-null') {
       carrier?.nulls.add('api-key');
     }
+    if (carrier && this.mutationScheme === 'auth') {
+      this.mutateCarrier?.(carrier.values);
+    }
     return carrier;
   }
 
   protected override async bearerAuth(options: FinalRequestOptions): Promise<NullableHeaders> {
     this.bearerCalls += 1;
-    if (this.mutation === 'bearer') {
+    if (this.mutation === 'bearer' || (this.mutationScheme === 'bearer' && this.mutateCarrier)) {
       const carrier = await super.bearerAuth(options);
       if (!carrier) {
         throw new Error('Expected a deferred bearer authentication carrier.');
       }
-      carrier.values.set('AUTHORIZATION', 'Bearer mutated-bearer-token');
+      if (this.mutation === 'bearer') {
+        carrier.values.set('AUTHORIZATION', 'Bearer mutated-bearer-token');
+      } else {
+        this.mutateCarrier?.(carrier.values);
+      }
       return carrier;
     }
     return buildHeaders([{ Authorization: 'Bearer custom-bearer-token' }]);
@@ -77,12 +87,16 @@ class ProtectedHookAzure extends AzureOpenAI {
 
   protected override async adminAPIKeyAuth(options: FinalRequestOptions): Promise<NullableHeaders> {
     this.adminCalls += 1;
-    if (this.mutation === 'admin') {
+    if (this.mutation === 'admin' || (this.mutationScheme === 'admin' && this.mutateCarrier)) {
       const carrier = await super.adminAPIKeyAuth(options);
       if (!carrier) {
         throw new Error('Expected a deferred admin authentication carrier.');
       }
-      carrier.values.set('authorization', 'Bearer mutated-admin-token');
+      if (this.mutation === 'admin') {
+        carrier.values.set('authorization', 'Bearer mutated-admin-token');
+      } else {
+        this.mutateCarrier?.(carrier.values);
+      }
       return carrier;
     }
     return buildHeaders([{ Authorization: 'Bearer custom-admin-token' }]);
@@ -966,6 +980,171 @@ describe('Azure credential header diagnostic privacy', () => {
       }
       expect(provider).toHaveBeenCalledTimes(isStatic ? 0 : 1);
       expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([
+    {
+      name: 'deletes a configured static key before setting bearer authentication',
+      scheme: 'auth',
+      configured: 'valid',
+      mutate: (headers: Headers) => {
+        headers.delete('API-KEY');
+        headers.set('Authorization', 'Bearer replacement-token');
+      },
+      apiKey: null,
+      authorization: 'Bearer replacement-token',
+    },
+    {
+      name: 'deletes a malformed static key without ever validating it',
+      scheme: 'auth',
+      configured: 'malformed',
+      mutate: (headers: Headers) => {
+        headers.delete('aPi-KeY');
+        headers.set('AUTHORIZATION', 'Bearer replacement-token');
+      },
+      apiKey: null,
+      authorization: 'Bearer replacement-token',
+    },
+    {
+      name: 'appends to the deferred configured static credential',
+      scheme: 'auth',
+      configured: 'valid',
+      mutate: (headers: Headers) => {
+        headers.append('API-KEY', 'appended-token');
+        headers.append('api-key', 'second-token');
+      },
+      apiKey: 'configured-token, appended-token, second-token',
+      authorization: null,
+    },
+    {
+      name: 'does not revive a deleted malformed key when appending a replacement',
+      scheme: 'auth',
+      configured: 'malformed',
+      mutate: (headers: Headers) => {
+        headers.delete('API-KEY');
+        headers.append('api-key', 'appended-token');
+      },
+      apiKey: 'appended-token',
+      authorization: null,
+    },
+    {
+      name: 'deletes an appended key before replacing its authentication scheme',
+      scheme: 'auth',
+      configured: 'valid',
+      mutate: (headers: Headers) => {
+        headers.append('api-key', 'discarded-token');
+        headers.delete('API-KEY');
+        headers.set('Authorization', 'Bearer replacement-token');
+      },
+      apiKey: null,
+      authorization: 'Bearer replacement-token',
+    },
+    {
+      name: 'replaces an invalid intermediate protected-hook value safely',
+      scheme: 'auth',
+      configured: 'valid',
+      mutate: (headers: Headers) => {
+        headers.set('api-key', [PRIVATE_CREDENTIAL, PRIVATE_SUFFIX].join('\n'));
+        headers.set('API-KEY', 'safe-final-token');
+      },
+      apiKey: 'safe-final-token',
+      authorization: null,
+    },
+    {
+      name: 'deletes an invalid appended protected-hook value safely',
+      scheme: 'auth',
+      configured: 'valid',
+      mutate: (headers: Headers) => {
+        headers.append('API-KEY', [PRIVATE_CREDENTIAL, PRIVATE_SUFFIX].join('\r'));
+        headers.delete('api-key');
+        headers.set('authorization', 'Bearer safe-final-token');
+      },
+      apiKey: null,
+      authorization: 'Bearer safe-final-token',
+    },
+    {
+      name: 'deletes a malformed rotating bearer credential',
+      scheme: 'bearer',
+      configured: 'malformed',
+      mutate: (headers: Headers) => {
+        headers.delete('AUTHORIZATION');
+        headers.set('api-key', 'safe-bearer-replacement');
+      },
+      apiKey: 'safe-bearer-replacement',
+      authorization: null,
+    },
+    {
+      name: 'appends to the deferred rotating bearer credential',
+      scheme: 'bearer',
+      configured: 'valid',
+      mutate: (headers: Headers) => {
+        headers.append('authorization', 'Bearer appended-token');
+      },
+      apiKey: null,
+      authorization: 'Bearer configured-token, Bearer appended-token',
+    },
+    {
+      name: 'deletes a malformed administrator credential without losing bearer auth',
+      scheme: 'admin',
+      configured: 'malformed',
+      mutate: (headers: Headers) => {
+        headers.delete('Authorization');
+        headers.set('API-KEY', 'safe-admin-replacement');
+      },
+      apiKey: 'safe-admin-replacement',
+      authorization: 'Bearer custom-bearer-token',
+    },
+  ] as const)('preserves subclass carrier mutation: $name', async (scenario) => {
+    const credential =
+      scenario.configured === 'malformed'
+        ? [PRIVATE_CREDENTIAL, PRIVATE_SUFFIX].join('\n')
+        : 'configured-token';
+    const provider = vi.fn(async () => (scenario.scheme === 'admin' ? 'safe-provider-token' : credential));
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      ...(scenario.scheme === 'auth'
+        ? { apiKey: credential }
+        : { azureADTokenProvider: provider, adminAPIKey: credential }),
+      fetch,
+      maxRetries: 0,
+    });
+    client.mutationScheme = scenario.scheme;
+    client.mutateCarrier = scenario.mutate;
+    await client.request({
+      method: 'get',
+      path: '/models',
+      __security: { bearerAuth: true, adminAPIKeyAuth: scenario.scheme === 'admin' },
+    });
+    const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('api-key')).toBe(scenario.apiKey);
+    expect(headers.get('authorization')).toBe(scenario.authorization);
+    expect(provider).toHaveBeenCalledTimes(scenario.scheme === 'auth' ? 0 : 1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['set', 'append'] as const)(
+    'rejects an effective malformed protected-carrier %s without leaking it',
+    async (operation) => {
+      const credential = [PRIVATE_CREDENTIAL, PRIVATE_SUFFIX].join('\n');
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutateCarrier = (headers) => {
+        headers[operation]('api-key', credential);
+      };
+      await expectPrivateCredentialFailure(
+        () => client.request({ method: 'get', path: '/models' }),
+        credential,
+      );
+      expect(fetch).not.toHaveBeenCalled();
     },
   );
 });

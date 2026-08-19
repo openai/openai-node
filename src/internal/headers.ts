@@ -28,9 +28,78 @@ export type NullableHeaders = {
 };
 
 type AzureAuthenticationValues = ReadonlyArray<HeadersLike>;
+type AzureAuthenticationHeaderMutation = {
+  kind: 'append' | 'replace' | 'delete';
+  values: string[];
+};
 
 // Object-identity branding cannot be forged by caller-provided header records.
 const azureAuthenticationHeaders = new WeakMap<NullableHeaders, AzureAuthenticationValues>();
+const azureAuthenticationHeaderMutations = new WeakMap<
+  Headers,
+  Map<string, AzureAuthenticationHeaderMutation>
+>();
+
+class DeferredAzureAuthenticationHeaders extends Headers {
+  constructor() {
+    super();
+    azureAuthenticationHeaderMutations.set(this, new Map());
+  }
+
+  override append = (name: string, value: string): void => {
+    this.update(name, value, 'append');
+  };
+
+  override set = (name: string, value: string): void => {
+    this.update(name, value, 'replace');
+  };
+
+  override delete = (name: string): void => {
+    const normalized = String(name).toLowerCase();
+    Headers.prototype.delete.call(this, normalized);
+    azureAuthenticationHeaderMutations.get(this)?.set(normalized, { kind: 'delete', values: [] });
+  };
+
+  private update(name: string, value: string, operation: 'append' | 'replace'): void {
+    const normalized = String(name).toLowerCase();
+    const authentication = isAzureAuthenticationHeader(normalized);
+    const normalizedValue = authentication ? String(value) : value;
+    let safe = true;
+
+    if (authentication) {
+      try {
+        assertAzureCredentialHeaderValue(normalizedValue);
+      } catch {
+        safe = false;
+      }
+    }
+
+    if (safe) {
+      if (operation === 'append') {
+        Headers.prototype.append.call(this, normalized, normalizedValue);
+      } else {
+        Headers.prototype.set.call(this, normalized, normalizedValue);
+      }
+    } else if (operation === 'replace') {
+      Headers.prototype.delete.call(this, normalized);
+    } else {
+      Headers.prototype.has.call(this, normalized);
+    }
+
+    const mutations = azureAuthenticationHeaderMutations.get(this);
+    if (!mutations) return;
+    const previous = mutations.get(normalized);
+    const kind =
+      operation === 'replace' || previous?.kind === 'delete' || previous?.kind === 'replace'
+        ? 'replace'
+        : 'append';
+    const previousValues = operation === 'replace' || previous?.kind === 'delete' ? [] : previous?.values;
+    mutations.set(normalized, {
+      kind,
+      values: authentication ? [...(previousValues ?? []), normalizedValue] : [],
+    });
+  }
+}
 
 /**
  * Creates an authenticated Azure header carrier without first appending a raw
@@ -39,7 +108,7 @@ const azureAuthenticationHeaders = new WeakMap<NullableHeaders, AzureAuthenticat
 export const buildAzureAuthenticationHeaders = (...headers: AzureAuthenticationValues): NullableHeaders => {
   const carrier: NullableHeaders = {
     [brand_privateNullableHeaders]: true,
-    values: new Headers(),
+    values: new DeferredAzureAuthenticationHeaders(),
     nulls: new Set<string>(),
   };
   azureAuthenticationHeaders.set(carrier, headers);
@@ -51,14 +120,24 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
 
   if (brand_privateNullableHeaders in headers) {
     const { values, nulls } = headers;
-    const visibleNames = new Set([...values.keys(), ...nulls].map((name) => name.toLowerCase()));
+    const nullNames = new Set([...nulls].map((name) => name.toLowerCase()));
+    const visibleNames = new Set([...values.keys(), ...nullNames].map((name) => name.toLowerCase()));
+    const mutations = azureAuthenticationHeaderMutations.get(values);
     const azureHeaders = azureAuthenticationHeaders.get(headers);
     if (azureHeaders !== undefined) {
       for (const layer of azureHeaders) {
         const seen = new Set<string>();
         for (const [name, value] of iterateHeaders(layer)) {
           const normalized = name.toLowerCase();
-          if (visibleNames.has(normalized)) continue;
+          const mutation = mutations?.get(normalized);
+          if (
+            nullNames.has(normalized) ||
+            mutation?.kind === 'delete' ||
+            mutation?.kind === 'replace' ||
+            (visibleNames.has(normalized) && mutation?.kind !== 'append')
+          ) {
+            continue;
+          }
           if (!seen.has(normalized)) {
             seen.add(normalized);
             yield [name, null];
@@ -67,7 +146,27 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
         }
       }
     }
-    yield* values.entries();
+    const emitted = new Set<string>();
+    for (const [name, value] of values.entries()) {
+      const normalized = name.toLowerCase();
+      const mutation = mutations?.get(normalized);
+      if (mutation && isAzureAuthenticationHeader(normalized)) {
+        emitted.add(normalized);
+        for (const pending of mutation.values) {
+          yield [name, pending];
+        }
+      } else {
+        yield [name, value];
+      }
+    }
+    if (mutations) {
+      for (const [name, mutation] of mutations) {
+        if (!isAzureAuthenticationHeader(name) || emitted.has(name)) continue;
+        for (const pending of mutation.values) {
+          yield [name, pending];
+        }
+      }
+    }
     for (const name of nulls) {
       yield [name, null];
     }
