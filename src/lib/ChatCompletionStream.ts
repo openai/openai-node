@@ -406,8 +406,26 @@ function assignOwnProperties<T extends object>(target: T, source: object): T {
   return Object.assign(target, source);
 }
 
-function cloneParserConfigObject<Value extends object>(value: Value): Value {
-  return Object.create(Object.getPrototypeOf(value), Object.getOwnPropertyDescriptors(value)) as Value;
+function cloneParserConfigObject<Value extends object>(
+  value: Value,
+  stableFields: readonly PropertyKey[] = [],
+): Value {
+  const descriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(value);
+  for (const field of stableFields) {
+    const descriptor = descriptors[field];
+    if (!descriptor && !(field in value)) {
+      continue;
+    }
+
+    descriptors[field] = {
+      value: descriptor && 'value' in descriptor ? descriptor.value : Reflect.get(value, field, value),
+      enumerable: descriptor?.enumerable ?? false,
+      configurable: descriptor?.configurable ?? true,
+      writable: descriptor && 'writable' in descriptor ? descriptor.writable : false,
+    };
+  }
+
+  return Object.create(Object.getPrototypeOf(value), descriptors) as Value;
 }
 
 function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams): ChatCompletionCreateParams {
@@ -415,15 +433,22 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
 
   if (params.tools) {
     snapshot.tools = params.tools.map((tool) => {
-      const descriptors = Object.getOwnPropertyDescriptors(tool);
+      const stableTool = cloneParserConfigObject(tool, [
+        'type',
+        '$brand',
+        '$parseRaw',
+        '$callback',
+        'function',
+      ]);
+      const descriptors = Object.getOwnPropertyDescriptors(stableTool);
 
-      if (isChatCompletionFunctionTool(tool)) {
+      if (isChatCompletionFunctionTool(stableTool)) {
         const descriptor = descriptors.function;
         descriptors.function = {
           ...(descriptor && 'value' in descriptor
             ? descriptor
             : { configurable: true, enumerable: true, writable: true }),
-          value: cloneParserConfigObject(tool.function),
+          value: cloneParserConfigObject(stableTool.function, ['name', 'strict']),
         };
       }
 
@@ -432,7 +457,11 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
   }
 
   if (params.response_format) {
-    snapshot.response_format = cloneParserConfigObject(params.response_format);
+    snapshot.response_format = cloneParserConfigObject(params.response_format, [
+      'type',
+      '$brand',
+      '$parseRaw',
+    ]);
   }
 
   return snapshot;
@@ -947,6 +976,8 @@ export class ChatCompletionStream<ParsedT = null>
             choice.message.parsed = null;
           } else if (shouldParse && reservePartialJSONParse(parseState, this.#partialJSONParseBudget)) {
             choice.message.parsed = partialParse(choice.message.content);
+          } else if (content.length > 0) {
+            choice.message.parsed = null;
           }
         } else {
           choice.message.content = (choice.message.content || '') + content;
@@ -1007,6 +1038,8 @@ export class ChatCompletionStream<ParsedT = null>
                   reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
                 ) {
                   functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+                } else if (fn.arguments.length > 0 && hasOwn(functionSnapshot, 'parsed_arguments')) {
+                  functionSnapshot.parsed_arguments = undefined;
                 }
               } else {
                 functionSnapshot.arguments += fn.arguments;

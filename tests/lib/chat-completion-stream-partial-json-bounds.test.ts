@@ -255,6 +255,108 @@ it('retains dispatched strict parsing when caller tools become non-strict during
   });
 });
 
+it('materializes accessor-backed strictness once before consuming streamed arguments', async () => {
+  const parse = vi.spyOn(partialJSONParser, 'partialParse');
+  const tool: OpenAI.Chat.ChatCompletionFunctionTool = {
+    ...strictTool,
+    function: { ...strictTool.function, strict: false },
+  };
+  let strict = false;
+  const readStrict = vi.fn(() => strict);
+  Object.defineProperty(tool.function, 'strict', { configurable: true, enumerable: true, get: readStrict });
+  const nestedJSON = `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+
+  async function* mutateAccessorDuringStreaming(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_bounded',
+          type: 'function',
+          function: { name: 'bounded_tool', arguments: '' },
+        },
+      ],
+    });
+    strict = true;
+    yield chunk({ tool_calls: [{ index: 0, function: { arguments: nestedJSON } }] });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createClient(mutateAccessorDuringStreaming()),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Keep the dispatched accessor non-strict' }],
+      tools: [tool],
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.tool_calls?.[0]).not.toHaveProperty('function.parsed_arguments');
+  expect(parse).not.toHaveBeenCalled();
+  expect(readStrict).toHaveBeenCalledTimes(2);
+});
+
+it('materializes accessor-backed structured format types for the complete request lifetime', async () => {
+  const responseFormat: OpenAI.Chat.ChatCompletionCreateParams['response_format'] = {
+    type: 'json_schema',
+    json_schema: { name: 'accessor_format', schema: { type: 'object' } },
+  };
+  let formatType = 'json_schema';
+  const readType = vi.fn(() => formatType);
+  Object.defineProperty(responseFormat, 'type', { configurable: true, enumerable: true, get: readType });
+
+  async function* mutateAccessorDuringStreaming(): AsyncGenerator<Chunk> {
+    yield chunk({ role: 'assistant', content: '{"value":' });
+    formatType = 'text';
+    yield chunk({ content: '1}' });
+    yield chunk({}, 'stop');
+  }
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createClient(mutateAccessorDuringStreaming()),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Keep the dispatched format type' }],
+      response_format: responseFormat,
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.parsed).toEqual({ value: 1 });
+});
+
+it.each(['content', 'tool'] as const)(
+  'does not expose a stale %s partial parse when coalescing a changed raw snapshot',
+  async (kind) => {
+    const fragments = ['{"value":"', 'a'.repeat(1100), 'b', '"}'];
+    const stream = createStructuredStream(kind, fragments);
+    const snapshots: { raw: string; parsed: unknown }[] = [];
+
+    if (kind === 'content') {
+      stream.on('content.delta', (event) => {
+        snapshots.push({ raw: event.snapshot, parsed: event.parsed });
+      });
+    } else {
+      stream.on('tool_calls.function.arguments.delta', (event) => {
+        snapshots.push({ raw: event.arguments, parsed: event.parsed_arguments });
+      });
+    }
+
+    const completion = await stream.finalChatCompletion();
+    const skipped = snapshots.find((snapshot) => snapshot.raw.endsWith('b'));
+
+    expect(skipped).toBeDefined();
+    expect(skipped?.parsed).toBe(kind === 'content' ? null : undefined);
+    if (kind === 'content') {
+      expect(completion.choices[0]?.message.parsed).toEqual({ value: `${'a'.repeat(1100)}b` });
+    } else {
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { parsed_arguments: { value: `${'a'.repeat(1100)}b` } },
+      });
+    }
+  },
+);
+
 it('preserves non-enumerable tool parsing brands and executable callbacks in private snapshots', async () => {
   const parser = vi.fn((content: string) => JSON.parse(content) as { value: string });
   const callback = vi.fn();

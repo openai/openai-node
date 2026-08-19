@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { OpenAIError } from 'openai/core/error';
 import { hasOwn } from 'openai/internal/utils';
 import { accumulateResponse } from 'openai/lib/responses/ResponseAccumulator';
@@ -346,6 +347,39 @@ describe('ResponseAccumulator tool-call deltas', () => {
 });
 
 describe('ResponseAccumulator hosted shell events', () => {
+  test.each(['added', 'delta', 'done'] as const)(
+    'captures the own command index exactly once before validating and applying a shell %s event',
+    (suffix) => {
+      const snapshot = snapshotFor({
+        type: 'shell_call',
+        id: 'sh_123',
+        call_id: 'call_123',
+        action: { commands: ['first', 'second'], timeout_ms: null, max_output_length: null },
+      });
+      const readIndex = vi.fn(() => (readIndex.mock.calls.length === 1 ? 0 : 1));
+      const event = {
+        type: `response.shell_call_command.${suffix}`,
+        sequence_number: 1,
+        output_index: 0,
+        ...(suffix === 'delta' ? { delta: ' updated' } : { command: 'updated' }),
+      };
+      Object.defineProperty(event, 'command_index', {
+        configurable: true,
+        enumerable: true,
+        get: readIndex,
+      });
+
+      accumulateResponse(event as ResponseStreamEvent, snapshot);
+
+      const [output] = snapshot.output;
+      expect(output).toMatchObject({
+        type: 'shell_call',
+        action: { commands: [suffix === 'delta' ? 'first updated' : 'updated', 'second'] },
+      });
+      expect(readIndex).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test('accumulates interleaved commands and replaces each with its authoritative value', () => {
     const snapshot = snapshotFor({
       type: 'shell_call',

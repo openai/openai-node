@@ -525,6 +525,9 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
     type === 'response.output_item.done' ||
     type === 'response.content_part.added' ||
     type === 'response.content_part.done' ||
+    type === 'response.shell_call_command.added' ||
+    type === 'response.shell_call_command.delta' ||
+    type === 'response.shell_call_command.done' ||
     hasOwn(expectedOutputItemTypes, type);
 
   if (itemScoped) {

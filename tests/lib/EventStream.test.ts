@@ -314,6 +314,114 @@ describe('EventStream iterator buffer limits', () => {
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
 
+  test.each([
+    {
+      name: 'a callable with oversized own data',
+      create: () => Object.assign(() => {}, { payload: 'x'.repeat(5 * 1024 * 1024) }),
+    },
+    {
+      name: 'a callable with an uninspectable retained closure',
+      create: () => {
+        const retained = 'x'.repeat(5 * 1024 * 1024);
+        return () => retained;
+      },
+    },
+    {
+      name: 'oversized URLSearchParams internal slots',
+      create: () => new URLSearchParams([['payload', 'x'.repeat(5 * 1024 * 1024)]]),
+    },
+    { name: 'unsupported URL internal slots', create: () => new URL('https://example.com/private') },
+    { name: 'unsupported Promise internal slots', create: () => Promise.resolve('private') },
+    { name: 'unsupported WeakMap internal slots', create: () => new WeakMap() },
+    { name: 'unsupported RegExp internal slots', create: () => /private/u },
+    {
+      name: 'an unsupported custom object prototype',
+      create: () => Object.create({ inspect: () => 'private' }) as object,
+    },
+  ])('rejects $name before it enters a detached queue', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(create());
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([4096, 4097])(
+    'bounds ordinary queued arrays at the %i-element inspection boundary',
+    async (length) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const payload = Array.from({ length }, () => 0);
+
+      stream.emitPayload(payload);
+
+      if (length === 4096) {
+        await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+        stream.end();
+        return;
+      }
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test.each([
+    { name: 'dense', create: () => Array.from({ length: 1_000_000 }, () => 0) },
+    {
+      name: 'sparse',
+      create: () => {
+        const values: number[] = [];
+        values.length = 1_000_000;
+        return values;
+      },
+    },
+  ])('rejects large $name arrays before materializing dense own keys', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = create();
+    const ownKeys = vi.spyOn(Reflect, 'ownKeys');
+
+    try {
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(ownKeys.mock.calls.some(([value]) => value === payload)).toBe(false);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    } finally {
+      ownKeys.mockRestore();
+    }
+  });
+
+  test('revalidates queued payloads after later listeners mutate them in the same dispatch', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload: { text: string; hidden?: string } = { text: 'small' };
+    stream.on('payload', (value) => {
+      (value as typeof payload).hidden = 'x'.repeat(5 * 1024 * 1024);
+    });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('revalidates preserved payload identities after mutation and before dequeue', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload: { text: string; hidden?: string } = { text: 'small' };
+
+    stream.emitPayload(payload);
+    payload.hidden = 'x'.repeat(5 * 1024 * 1024);
+    const next = iterator.next();
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(next).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
   test('rejects an oversized event before retaining it', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -680,6 +788,25 @@ describe('EventStream iterator buffer limits', () => {
     expect(stream.controller.signal.aborted).toBe(false);
     stream.end();
   });
+
+  test.each([
+    { name: 'a callable', value: () => 'retained' },
+    { name: 'an unsupported host object', value: new URLSearchParams([['key', 'value']]) },
+    { name: 'a large ordinary array', value: Array.from({ length: 4097 }, () => 0) },
+  ])(
+    'delivers $name directly to waiting consumers without detached-queue restrictions',
+    async ({ value }) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const next = iterator.next();
+
+      stream.emitPayload(value);
+
+      await expect(next).resolves.toEqual({ done: false, value: [value] });
+      expect(stream.controller.signal.aborted).toBe(false);
+      stream.end();
+    },
+  );
 
   test('delivers oversized events directly to waiting consumers without buffering', async () => {
     const stream = new TestStream();
