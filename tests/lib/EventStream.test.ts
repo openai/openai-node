@@ -348,6 +348,122 @@ describe('EventStream iterator buffer limits', () => {
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
 
+  test('charges oversized data retained through a custom immediate prototype', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const prototype: object = Object.create(null);
+    Object.defineProperty(prototype, 'hidden', {
+      enumerable: false,
+      value: 'x'.repeat(5 * 1024 * 1024),
+    });
+
+    stream.emitPayload(Object.create(prototype));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects inherited accessor closures without invoking their getters', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const retained = 'x'.repeat(5 * 1024 * 1024);
+    const readAccessor = vi.fn(() => retained);
+    const prototype: object = Object.create(null);
+    Object.defineProperty(prototype, 'hidden', { get: readAccessor });
+
+    stream.emitPayload(Object.create(prototype));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(readAccessor).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects callable data retained through a custom immediate prototype', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const prototype: object = Object.create(null);
+    Object.defineProperty(prototype, 'hidden', { value: () => 'uninspectable closure' });
+
+    stream.emitPayload(Object.create(prototype));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('preserves safe accessor-free custom-prototype data, cycles, and identity', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const prototype: { retained?: unknown } = Object.create(null);
+    const payload: { own?: string } = Object.create(prototype);
+    prototype.retained = payload;
+    payload.own = 'safe';
+
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(payload);
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test.each([
+    { name: 'a root object', create: () => ({}) },
+    { name: 'a Map', create: () => new Map() },
+    { name: 'a Set', create: () => new Set() },
+    { name: 'an Error', create: () => new Error('small') },
+    { name: 'an ArrayBuffer', create: () => new ArrayBuffer(8) },
+    { name: 'a SharedArrayBuffer', create: () => new SharedArrayBuffer(8) },
+    { name: 'a DataView', create: () => new DataView(new ArrayBuffer(8)) },
+    { name: 'a typed array', create: () => new Uint8Array(8) },
+    { name: 'a Blob', create: () => new Blob(['small']) },
+  ])('rejects a retained accessor closure on $name without invoking it', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const retained = 'x'.repeat(9 * 1024 * 1024);
+    const readAccessor = vi.fn(() => retained);
+    const payload = create();
+    Object.defineProperty(payload, Symbol('hidden closure'), { enumerable: false, get: readAccessor });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(readAccessor).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects nested accessor closures without invoking them', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const retained = 'x'.repeat(9 * 1024 * 1024);
+    const readAccessor = vi.fn(() => retained);
+    const nested = Object.defineProperty({}, 'hidden', { enumerable: false, get: readAccessor });
+
+    stream.emitPayload({ nested });
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(readAccessor).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each(['get', 'set'] as const)(
+    'rejects an Error stack accessor with a producer-controlled %s closure',
+    async (accessor) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const retained = 'x'.repeat(9 * 1024 * 1024);
+      const untrusted = vi.fn(() => retained);
+      const payload = new Error('small');
+      const descriptor = Object.getOwnPropertyDescriptor(payload, 'stack');
+      Object.defineProperty(payload, 'stack', { ...descriptor, [accessor]: untrusted });
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(untrusted).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
   test.each([4096, 4097])(
     'bounds ordinary queued arrays at the %i-element inspection boundary',
     async (length) => {
@@ -409,6 +525,55 @@ describe('EventStream iterator buffer limits', () => {
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
 
+  test('does not revalidate events discarded by an iterator returning during the same dispatch', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload: { text: string; hidden?: string } = { text: 'small' };
+    stream.on('payload', (value) => {
+      void iterator.return?.();
+      (value as typeof payload).hidden = 'x'.repeat(5 * 1024 * 1024);
+    });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(false);
+    expect(stream.errored).toBe(false);
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
+    stream.end();
+  });
+
+  test('keeps another iterator protected when its sibling returns during dispatch', async () => {
+    const stream = new TestStream();
+    const returned = stream.events('payload');
+    const retained = stream.events('payload');
+    const payload: { text: string; hidden?: string } = { text: 'small' };
+    stream.on('payload', (value) => {
+      void returned.return?.();
+      (value as typeof payload).hidden = 'x'.repeat(5 * 1024 * 1024);
+    });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(returned.next()).resolves.toEqual({ done: true, value: undefined });
+    await expect(retained.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('revalidates custom-prototype data mutated later in the same dispatch', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const prototype: { hidden: string } = Object.assign(Object.create(null), { hidden: 'small' });
+    const payload: object = Object.create(prototype);
+    stream.on('payload', () => {
+      prototype.hidden = 'x'.repeat(5 * 1024 * 1024);
+    });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
   test('revalidates preserved payload identities after mutation and before dequeue', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -453,7 +618,7 @@ describe('EventStream iterator buffer limits', () => {
     },
   );
 
-  test('delivers a small Blob without invoking an own size accessor', async () => {
+  test('rejects a small queued Blob with an own size accessor without invoking it', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const payload = new Blob(['small']);
@@ -464,9 +629,9 @@ describe('EventStream iterator buffer limits', () => {
 
     stream.emitPayload(payload);
 
-    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
     expect(readSize).not.toHaveBeenCalled();
-    stream.end();
   });
 
   test('fails closed on a spoofed Blob receiver without invoking its size accessor', async () => {
@@ -550,7 +715,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Map', expression: "new Map([['small', 'value']])", method: 'entries' },
     { name: 'Set', expression: "new Set(['small'])", method: 'values' },
   ])(
-    'inspects small cross-realm $name entries without invoking hostile iterators',
+    'rejects cross-realm $name own iterator accessors without invoking them',
     async ({ expression, method }) => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
@@ -563,12 +728,9 @@ describe('EventStream iterator buffer limits', () => {
 
       stream.emitPayload(payload);
 
-      const result = await iterator.next();
-
-      expect(result.done).toBe(false);
-      expect(result.value?.[0]).toBe(payload);
+      expect(stream.controller.signal.aborted).toBe(true);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
       expect(invokeHostileIterator).not.toHaveBeenCalled();
-      stream.end();
     },
   );
 
@@ -757,7 +919,7 @@ describe('EventStream iterator buffer limits', () => {
     }
   });
 
-  test('inspects small typed-array properties without invoking overridden accessors', async () => {
+  test('rejects small queued typed arrays with own accessors without invoking them', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const payload = new Uint8Array(16);
@@ -771,9 +933,9 @@ describe('EventStream iterator buffer limits', () => {
 
     stream.emitPayload(payload);
 
-    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
     expect(readAccessor).not.toHaveBeenCalled();
-    stream.end();
   });
 
   test('delivers large typed arrays directly to waiting consumers without inspecting dense indices', async () => {
@@ -821,6 +983,29 @@ describe('EventStream iterator buffer limits', () => {
     stream.end();
   });
 
+  test.each([
+    { name: 'a root object', create: () => ({}) },
+    { name: 'a Map', create: () => new Map() },
+    { name: 'a typed array', create: () => new Uint8Array(8) },
+    { name: 'a Blob', create: () => new Blob(['small']) },
+  ])('delivers accessor-backed $name directly to a waiting consumer', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const next = iterator.next();
+    const retained = 'x'.repeat(9 * 1024 * 1024);
+    const readAccessor = vi.fn(() => retained);
+    const payload = create();
+    Object.defineProperty(payload, Symbol('hidden closure'), { get: readAccessor });
+
+    stream.emitPayload(payload);
+
+    const result = await next;
+    expect(result.value?.[0]).toBe(payload);
+    expect(stream.controller.signal.aborted).toBe(false);
+    expect(readAccessor).not.toHaveBeenCalled();
+    stream.end();
+  });
+
   test('restores the byte budget when buffered events are consumed', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -859,7 +1044,7 @@ describe('EventStream iterator buffer limits', () => {
     stream.end();
   });
 
-  test('sizes cyclic event payloads without invoking accessor properties', async () => {
+  test('rejects queued cyclic event payload accessors without invoking them', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const readAccessor = vi.fn(() => {
@@ -872,17 +1057,14 @@ describe('EventStream iterator buffer limits', () => {
     Object.defineProperty(payload, Symbol('hidden accessor'), { get: readAccessor });
     stream.emitPayload(payload);
 
-    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
     expect(readAccessor).not.toHaveBeenCalled();
-    stream.end();
   });
 
-  test('sizes cyclic Maps, Sets, and Error causes without invoking accessor properties', async () => {
+  test('preserves accessor-free cyclic Maps, Sets, Errors, and backing stores', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
-    const readAccessor = vi.fn(() => {
-      throw new Error('accessor should not run');
-    });
     const map = new Map<unknown, unknown>();
     const set = new Set<unknown>();
     const error = new Error('small');
@@ -893,20 +1075,12 @@ describe('EventStream iterator buffer limits', () => {
     map.set(map, set);
     set.add(map);
     Object.defineProperty(error, 'cause', { value: error, enumerable: false });
-    Object.defineProperty(map, 'accessor', { enumerable: true, get: readAccessor });
-    Object.defineProperty(map, 'entries', { enumerable: true, get: readAccessor });
-    Object.defineProperty(set, Symbol.iterator, { get: readAccessor });
-    Object.defineProperty(error, 'hiddenAccessor', { enumerable: false, get: readAccessor });
-    Object.defineProperty(backingBuffer, 'byteLength', { enumerable: true, get: readAccessor });
-    Object.defineProperty(view, 'buffer', { enumerable: true, get: readAccessor });
-    Object.defineProperty(view, Symbol('hidden accessor'), { get: readAccessor });
     stream.emitPayload(payload);
 
     const result = await iterator.next();
 
     expect(result.value?.[0]).toBe(payload);
     expect(stream.controller.signal.aborted).toBe(false);
-    expect(readAccessor).not.toHaveBeenCalled();
     stream.end();
   });
 });

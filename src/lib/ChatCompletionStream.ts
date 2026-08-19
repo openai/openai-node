@@ -603,7 +603,8 @@ export class ChatCompletionStream<ParsedT = null>
       return;
     }
 
-    const completion = this.#accumulateChatCompletion(chunk);
+    const toolCallArgumentFragments = new WeakMap<object, string>();
+    const completion = this.#accumulateChatCompletion(chunk, toolCallArgumentFragments);
     this._emit('chunk', chunk, completion);
 
     for (const choice of chunk.choices) {
@@ -683,7 +684,7 @@ export class ChatCompletionStream<ParsedT = null>
             index: toolCallDelta.index,
             arguments: toolCallSnapshot.function.arguments,
             parsed_arguments: toolCallSnapshot.function.parsed_arguments,
-            arguments_delta: toolCallDelta.function?.arguments ?? '',
+            arguments_delta: toolCallArgumentFragments.get(toolCallDelta) ?? '',
           });
         } else if (toolCallSnapshot.type !== 'custom') {
           assertNever(toolCallSnapshot);
@@ -892,7 +893,10 @@ export class ChatCompletionStream<ParsedT = null>
     throw new OpenAIError(`request ended without sending any chunks`);
   }
 
-  #accumulateChatCompletion(chunk: ChatCompletionChunk): ChatCompletionSnapshot {
+  #accumulateChatCompletion(
+    chunk: ChatCompletionChunk,
+    toolCallArgumentFragments: WeakMap<object, string>,
+  ): ChatCompletionSnapshot {
     let snapshot = this.#currentChatCompletionSnapshot;
     const { choices, ...rest } = chunk;
     if (!snapshot) {
@@ -1049,7 +1053,8 @@ export class ChatCompletionStream<ParsedT = null>
         // once every delta for them has been accumulated.
         const toolCallSnapshots = (choice.message.tool_calls ??= []) as PartialToolCallSnapshot[];
 
-        for (const { index, id, type, function: fn, custom, ...rest } of tool_calls) {
+        for (const toolCallDelta of tool_calls) {
+          const { index, id, type, function: fn, custom, ...rest } = toolCallDelta;
           if (!Number.isSafeInteger(index) || index < 0 || index >= MAX_STREAM_TOOL_CALLS) {
             throw new OpenAIError(`Chat completion stream contains an invalid tool call index: ${index}`);
           }
@@ -1116,7 +1121,9 @@ export class ChatCompletionStream<ParsedT = null>
                 }
               }
             }
-            if (fn.arguments != null) {
+            const argumentFragment = fn.arguments;
+            if (argumentFragment != null) {
+              toolCallArgumentFragments.set(toolCallDelta, argumentFragment);
               if (eventState && boundIdentity?.parseable !== false) {
                 let parseState = eventState.tool_call_parse_states.get(index);
                 if (!parseState) {
@@ -1127,20 +1134,20 @@ export class ChatCompletionStream<ParsedT = null>
                 const shouldParse = recordPartialJSONFragment(
                   parseState,
                   this.#partialJSONParseBudget,
-                  fn.arguments,
+                  argumentFragment,
                 );
-                functionSnapshot.arguments += fn.arguments;
+                functionSnapshot.arguments += argumentFragment;
                 if (
                   shouldParse &&
                   boundIdentity?.parseable === true &&
                   reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
                 ) {
                   functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
-                } else if (fn.arguments.length > 0 && hasOwn(functionSnapshot, 'parsed_arguments')) {
+                } else if (argumentFragment.length > 0 && hasOwn(functionSnapshot, 'parsed_arguments')) {
                   functionSnapshot.parsed_arguments = undefined;
                 }
               } else {
-                functionSnapshot.arguments += fn.arguments;
+                functionSnapshot.arguments += argumentFragment;
               }
             }
           }

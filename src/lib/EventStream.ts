@@ -21,6 +21,8 @@ const sharedArrayBufferByteLengthGetter =
   typeof SharedArrayBuffer === 'function'
     ? Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get
     : undefined;
+// V8 uses the same trusted lazy-stack accessor pair for native Error instances.
+const errorStackDescriptor = Object.getOwnPropertyDescriptor(new Error('native stack descriptor'), 'stack');
 const blobSizeGetter =
   typeof Blob === 'function' ? Object.getOwnPropertyDescriptor(Blob.prototype, 'size')?.get : undefined;
 const blobInternalHandlePrototype = (() => {
@@ -230,6 +232,28 @@ function hasInspectableEventPrototype(
   );
 }
 
+function getRetainedCustomEventPrototype(
+  current: object,
+  kind: RetainedStorage['kind'] | undefined,
+  isBlobInternalHandle: boolean,
+): object | undefined {
+  if (kind !== undefined || Array.isArray(current)) {
+    return undefined;
+  }
+
+  const prototype = Object.getPrototypeOf(current) as object | null;
+  if (
+    prototype === null ||
+    prototype === Object.prototype ||
+    (isBlobInternalHandle && prototype === blobInternalHandlePrototype) ||
+    Object.prototype.isPrototypeOf.call(Error.prototype, current)
+  ) {
+    return undefined;
+  }
+
+  return prototype;
+}
+
 function getInspectableEventKeys(
   current: object,
   kind: RetainedStorage['kind'] | undefined,
@@ -288,9 +312,24 @@ function visitInspectableEventProperties(
     }
 
     const descriptor = Object.getOwnPropertyDescriptor(current, key);
-    if (descriptor && 'value' in descriptor) {
-      visit(descriptor.value, depth + 1, kind === 'blob');
+    if (!descriptor) {
+      return false;
     }
+    if (!('value' in descriptor)) {
+      if (
+        key === 'stack' &&
+        errorStackDescriptor &&
+        !('value' in errorStackDescriptor) &&
+        typeof errorStackDescriptor.get === 'function' &&
+        Object.prototype.isPrototypeOf.call(Error.prototype, current) &&
+        descriptor.get === errorStackDescriptor.get &&
+        descriptor.set === errorStackDescriptor.set
+      ) {
+        continue;
+      }
+      return false;
+    }
+    visit(descriptor.value, depth + 1, kind === 'blob');
   }
 
   return true;
@@ -336,6 +375,17 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     if (!hasInspectableEventPrototype(current, retainedStorage?.kind, isBlobInternalHandle)) {
       bytes = remainingBytes + 1;
       return;
+    }
+    const retainedPrototype = getRetainedCustomEventPrototype(
+      current,
+      retainedStorage?.kind,
+      isBlobInternalHandle,
+    );
+    if (retainedPrototype) {
+      visit(retainedPrototype, depth + 1);
+      if (bytes > remainingBytes) {
+        return;
+      }
     }
     if (retainedStorage !== undefined) {
       bytes += retainedStorage.bytes;
@@ -695,7 +745,9 @@ export class EventStream<EventTypes extends BaseEvents> {
    * end/return, and a terminal error is retained until buffered values have
    * drained so it is surfaced even when no reader was waiting when it fired.
    * Detached consumers have bounded event and byte queues; exceeding either
-   * limit fails the stream and aborts its underlying request.
+   * limit fails the stream and aborts its underlying request. Detached queues
+   * also reject accessor-backed payloads because getter closures cannot be
+   * safely sized without executing untrusted code.
    */
   protected _createIterator<T>(
     attach: (push: (value: T) => void) => () => void,
@@ -710,9 +762,14 @@ export class EventStream<EventTypes extends BaseEvents> {
       resolve: (result: Result) => void;
       reject: (error: OpenAIError) => void;
     };
+    type BufferedEvent = {
+      bytes: number;
+      active: boolean;
+      check: (() => void) | undefined;
+    };
 
     const pushQueue = createEventQueue<T>();
-    const bufferedEventSizes = createEventQueue<{ bytes: number; active: boolean }>();
+    const bufferedEventSizes = createEventQueue<BufferedEvent>();
     const readQueue = createEventQueue<Reader>();
     let bufferedBytes = 0;
     let ended = this.ended;
@@ -743,10 +800,17 @@ export class EventStream<EventTypes extends BaseEvents> {
         this.off('abort', onFailure);
       }
     };
+    const deactivateBufferedEvent = (entry: BufferedEvent): void => {
+      entry.active = false;
+      if (entry.check) {
+        this.#pendingBufferedEventChecks.delete(entry.check);
+        entry.check = undefined;
+      }
+    };
     const failBufferedEvents = (discardRetained = false): OpenAIError => {
       if (discardRetained) {
         while (bufferedEventSizes.length) {
-          bufferedEventSizes.dequeue()!.active = false;
+          deactivateBufferedEvent(bufferedEventSizes.dequeue()!);
         }
         pushQueue.clear();
         bufferedBytes = 0;
@@ -763,7 +827,7 @@ export class EventStream<EventTypes extends BaseEvents> {
       return error;
     };
 
-    const revalidateBufferedEvent = (value: T, entry: { bytes: number; active: boolean }): void => {
+    const revalidateBufferedEvent = (value: T, entry: BufferedEvent): void => {
       if (!entry.active || this.#ended) {
         return;
       }
@@ -798,11 +862,16 @@ export class EventStream<EventTypes extends BaseEvents> {
           return;
         }
 
-        const entry = { bytes: eventBytes, active: true };
+        const entry: BufferedEvent = { bytes: eventBytes, active: true, check: undefined };
         pushQueue.enqueue(value);
         bufferedEventSizes.enqueue(entry);
         bufferedBytes += eventBytes;
-        this.#pendingBufferedEventChecks.add(() => revalidateBufferedEvent(value, entry));
+        const check = () => {
+          entry.check = undefined;
+          revalidateBufferedEvent(value, entry);
+        };
+        entry.check = check;
+        this.#pendingBufferedEventChecks.add(check);
       }
     };
     const onFailure = (error: OpenAIError) => {
@@ -836,7 +905,7 @@ export class EventStream<EventTypes extends BaseEvents> {
         if (pushQueue.length) {
           const value = pushQueue.dequeue()!;
           const entry = bufferedEventSizes.dequeue()!;
-          entry.active = false;
+          deactivateBufferedEvent(entry);
           bufferedBytes -= entry.bytes;
           const remainingBytes = MAX_BUFFERED_ITERATOR_BYTES - bufferedBytes;
           if (estimateBufferedEventBytes(value, remainingBytes) > remainingBytes) {
@@ -862,8 +931,10 @@ export class EventStream<EventTypes extends BaseEvents> {
       },
       return: () => {
         ended = true;
+        while (bufferedEventSizes.length) {
+          deactivateBufferedEvent(bufferedEventSizes.dequeue()!);
+        }
         pushQueue.clear();
-        bufferedEventSizes.clear();
         bufferedBytes = 0;
         cleanup();
         finishReaders();

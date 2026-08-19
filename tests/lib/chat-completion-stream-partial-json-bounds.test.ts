@@ -185,6 +185,163 @@ function createStructuredStream(kind: 'content' | 'tool', fragments: Iterable<st
 
 afterEach(() => vi.restoreAllMocks());
 
+it.each(['strict', 'auto-parseable'] as const)(
+  'captures receiver-bound %s argument accessors exactly once before all accounting and events',
+  async (kind) => {
+    const parse = vi.spyOn(partialJSONParser, 'partialParse');
+    const oversized = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    let reads = 0;
+    const functionDelta = {
+      name: strictTool.function.name,
+      get arguments(): string {
+        expect(this).toBe(functionDelta);
+        reads += 1;
+        return reads <= 2 ? '{"value":"safe"}' : oversized;
+      },
+    };
+
+    async function* accessorChunks(): AsyncGenerator<Chunk> {
+      yield chunk({
+        role: 'assistant',
+        tool_calls: [{ index: 0, id: 'call_accessor', type: 'function', function: functionDelta }],
+      });
+      yield chunk({}, 'tool_calls');
+    }
+
+    const configuredTool =
+      kind === 'strict'
+        ? strictTool
+        : makeParseableTool(
+            { ...strictTool, function: { ...strictTool.function, strict: false } },
+            { parser: (value: string) => JSON.parse(value) as unknown, callback: vi.fn() },
+          );
+    const stream = ChatCompletionStream.createChatCompletion(createClient(accessorChunks()), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Read each strict argument fragment once' }],
+      tools: [configuredTool],
+    });
+    const emittedFragments: string[] = [];
+    stream.on('tool_calls.function.arguments.delta', (event) => emittedFragments.push(event.arguments_delta));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(reads).toBe(1);
+    expect(emittedFragments).toEqual(['{"value":"safe"}']);
+    expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+      function: { arguments: '{"value":"safe"}', parsed_arguments: { value: 'safe' } },
+    });
+    expect(parse.mock.calls.every(([value]) => value === '{"value":"safe"}')).toBe(true);
+  },
+);
+
+it('captures known non-strict mixed-tool argument accessors exactly once', async () => {
+  let reads = 0;
+  const functionDelta = {
+    name: nonStrictTool.function.name,
+    get arguments(): string {
+      expect(this).toBe(functionDelta);
+      reads += 1;
+      return reads === 1 ? '{"value":"safe"}' : '{"value":"changed"}';
+    },
+  };
+
+  async function* accessorChunks(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      tool_calls: [{ index: 0, id: 'call_accessor', type: 'function', function: functionDelta }],
+    });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const stream = ChatCompletionStream.createChatCompletion(createClient(accessorChunks()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Read the non-strict argument fragment once' }],
+    tools: [strictTool, nonStrictTool],
+  });
+  const emittedFragments: string[] = [];
+  stream.on('tool_calls.function.arguments.delta', (event) => emittedFragments.push(event.arguments_delta));
+
+  const completion = await stream.finalChatCompletion();
+
+  expect(reads).toBe(1);
+  expect(emittedFragments).toEqual(['{"value":"safe"}']);
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { arguments: '{"value":"safe"}', parsed_arguments: null },
+  });
+});
+
+it('captures an argument accessor once while its strict tool identity is incomplete', async () => {
+  const oversizedPrefix = `{"value":"${'x'.repeat(17 * 1024 * 1024)}`;
+  let reads = 0;
+  const functionDelta = {
+    get arguments(): string {
+      expect(this).toBe(functionDelta);
+      reads += 1;
+      return reads <= 2 ? '{"value":"' : oversizedPrefix;
+    },
+  };
+
+  async function* accessorChunks(): AsyncGenerator<Chunk> {
+    yield chunk({ role: 'assistant', tool_calls: [{ index: 0, function: functionDelta }] });
+    yield chunk({
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_accessor',
+          type: 'function',
+          function: { name: strictTool.function.name, arguments: 'safe"}' },
+        },
+      ],
+    });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const completion = await ChatCompletionStream.createChatCompletion(createClient(accessorChunks()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Protect the provisional strict argument fragment' }],
+    tools: [strictTool, nonStrictTool],
+  }).finalChatCompletion();
+
+  expect(reads).toBe(1);
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { arguments: '{"value":"safe"}', parsed_arguments: { value: 'safe' } },
+  });
+});
+
+it.each(['byte', 'depth'] as const)(
+  'rejects an accessor argument fragment exceeding the structured %s limit after one read',
+  async (limit) => {
+    const parse = vi.spyOn(partialJSONParser, 'partialParse');
+    const unsafe =
+      limit === 'byte'
+        ? `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`
+        : `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    const readArguments = vi.fn(() => unsafe);
+    const functionDelta: { name: string; arguments?: string } = { name: strictTool.function.name };
+    Object.defineProperty(functionDelta, 'arguments', { enumerable: true, get: readArguments });
+
+    async function* accessorChunks(): AsyncGenerator<Chunk> {
+      yield chunk({
+        role: 'assistant',
+        tool_calls: [{ index: 0, id: 'call_accessor', type: 'function', function: functionDelta }],
+      });
+      yield chunk({}, 'tool_calls');
+    }
+
+    const stream = ChatCompletionStream.createChatCompletion(createClient(accessorChunks()), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Reject the unsafe captured argument fragment' }],
+      tools: [strictTool],
+    });
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(
+      limit === 'byte' ? /structured JSON byte limit/u : /structured JSON nesting depth limit/u,
+    );
+    expect(readArguments).toHaveBeenCalledTimes(1);
+    expect(parse).not.toHaveBeenCalled();
+  },
+);
+
 it.each(['mutate', 'replace'] as const)(
   'enforces structured JSON limits for strict tools %sd before deferred dispatch',
   async (mutation) => {
