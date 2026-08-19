@@ -11,6 +11,325 @@ export const has = (obj: object, key: PropertyKey): boolean => {
   return resolvedHas(obj, key);
 };
 
+function isUnsafePropertyKey(key: unknown): boolean {
+  return key === '__proto__' || key === 'constructor' || key === 'prototype';
+}
+
+interface AdoptedRecord {
+  value: object;
+  descriptors: PropertyDescriptorMap;
+  keys: PropertyKey[];
+  prototype: object | null;
+  parents: Set<AdoptedRecord>;
+  ordinary: boolean;
+  array: boolean;
+  detached: boolean;
+  unsafe: boolean;
+  extensible: boolean;
+}
+
+interface MergeState {
+  adopted: { target: object; key: PropertyKey }[];
+  preparedTargets: WeakMap<object, Map<PropertyKey, any>>;
+  preparedSources: WeakMap<object, WeakMap<object, object>>;
+  inspectedSources: number;
+  inspectedSourceProperties: number;
+}
+
+const maxAdoptedRecords = 10_000;
+
+function isIntrinsicFunctionPrototype(
+  value: object,
+  key: PropertyKey,
+  descriptor: PropertyDescriptor,
+): boolean {
+  return (
+    typeof value === 'function' && key === 'prototype' && !descriptor.enumerable && !descriptor.configurable
+  );
+}
+
+function isObjectLike(value: unknown): value is object {
+  return value !== null && (typeof value === 'object' || typeof value === 'function');
+}
+
+function rememberAdoption(state: MergeState, target: object, key: PropertyKey, value: any): void {
+  if (!isObjectLike(value)) {
+    return;
+  }
+  if (state.adopted.length >= maxAdoptedRecords) {
+    throw new Error('Adopted record traversal exceeds the supported safety limit.');
+  }
+  state.adopted.push({ target, key });
+}
+
+function sanitizeAdoptions(state: MergeState): void {
+  if (state.adopted.length === 0) {
+    return;
+  }
+
+  const records = new WeakMap<object, AdoptedRecord>();
+  const visited: AdoptedRecord[] = [];
+  const locations: {
+    target: object;
+    key: PropertyKey;
+    descriptor: PropertyDescriptor;
+    record: AdoptedRecord;
+  }[] = [];
+  let inspectedProperties = 0;
+
+  function inspect(value: object): AdoptedRecord {
+    const known = records.get(value);
+    if (known) {
+      return known;
+    }
+    if (visited.length >= maxAdoptedRecords) {
+      throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    }
+
+    const keys = Reflect.ownKeys(value);
+    if (keys.length > maxAdoptedRecords - inspectedProperties) {
+      throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    }
+    inspectedProperties += keys.length;
+    const descriptors: PropertyDescriptorMap = Object.create(null);
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor) {
+        Reflect.set(descriptors, key, descriptor);
+      }
+    }
+    const prototype = Object.getPrototypeOf(value);
+    const array = isArray(value);
+    const extensible = Object.isExtensible(value);
+    const ordinary =
+      typeof value !== 'function' &&
+      (array ? prototype === Array.prototype : prototype === Object.prototype || prototype === null);
+    const record: AdoptedRecord = {
+      value,
+      descriptors,
+      keys,
+      prototype,
+      parents: new Set(),
+      ordinary,
+      array,
+      detached: ordinary && (extensible || !Object.isFrozen(value)),
+      unsafe: false,
+      extensible,
+    };
+    records.set(value, record);
+    visited.push(record);
+    return record;
+  }
+
+  for (const { target, key } of state.adopted) {
+    const descriptor = Object.getOwnPropertyDescriptor(target, key);
+    if (descriptor && 'value' in descriptor && isObjectLike(descriptor.value)) {
+      locations.push({ target, key, descriptor, record: inspect(descriptor.value) });
+    }
+  }
+
+  const detached: AdoptedRecord[] = [];
+  for (const record of visited) {
+    for (const key of record.keys) {
+      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      if (!descriptor) {
+        continue;
+      }
+      if (isUnsafePropertyKey(key)) {
+        if (record.ordinary) {
+          record.detached = true;
+          record.unsafe = true;
+        } else if (!isIntrinsicFunctionPrototype(record.value, key, descriptor)) {
+          throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+        }
+        continue;
+      }
+      if (!record.ordinary && !descriptor.enumerable) {
+        continue;
+      }
+      if ('value' in descriptor && isObjectLike(descriptor.value)) {
+        inspect(descriptor.value).parents.add(record);
+      }
+    }
+    if (record.detached) {
+      detached.push(record);
+    }
+  }
+
+  for (let index = visited.length - 1; index >= 0; index -= 1) {
+    const record = visited[index]!;
+    if (record.ordinary) {
+      continue;
+    }
+    for (const key of ['__proto__', 'constructor', 'prototype'] as const) {
+      const descriptor = Object.getOwnPropertyDescriptor(record.value, key);
+      if (descriptor && !isIntrinsicFunctionPrototype(record.value, key, descriptor)) {
+        throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+      }
+    }
+  }
+
+  const unsafe = visited.filter((record) => record.unsafe);
+  for (const record of unsafe) {
+    for (const parent of record.parents) {
+      if (!parent.ordinary) {
+        throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+      }
+      if (!parent.unsafe) {
+        parent.unsafe = true;
+        unsafe.push(parent);
+      }
+    }
+  }
+
+  for (const record of detached) {
+    for (const parent of record.parents) {
+      if (!parent.ordinary) {
+        continue;
+      }
+      if (!parent.detached) {
+        parent.detached = true;
+        detached.push(parent);
+      }
+    }
+  }
+
+  const copies = new WeakMap<object, any>();
+  for (const record of detached) {
+    copies.set(record.value, record.array ? [] : Object.create(record.prototype));
+  }
+  for (const record of detached) {
+    const copy = copies.get(record.value);
+    for (const key of record.keys) {
+      if (isUnsafePropertyKey(key)) {
+        continue;
+      }
+      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      if (!descriptor) {
+        continue;
+      }
+      if ('value' in descriptor && isObjectLike(descriptor.value) && copies.has(descriptor.value)) {
+        descriptor.value = copies.get(descriptor.value);
+      }
+      Object.defineProperty(copy, key, descriptor);
+    }
+  }
+
+  for (const { target, key, descriptor, record } of locations) {
+    const value = copies.get(record.value) ?? record.value;
+    if (value !== descriptor.value) {
+      Object.defineProperty(copies.get(target) ?? target, key, { ...descriptor, value });
+    }
+  }
+
+  for (const record of detached) {
+    if (!record.extensible) {
+      Object.preventExtensions(copies.get(record.value));
+    }
+  }
+}
+
+function readPreparedTarget(state: MergeState, target: any, key: PropertyKey): any {
+  const prepared = state.preparedTargets.get(target);
+  if (prepared?.has(key)) {
+    const value = prepared.get(key);
+    prepared.delete(key);
+    return value;
+  }
+  return target[key];
+}
+
+function previewTarget(state: MergeState, target: object, key: PropertyKey): any {
+  const descriptor = Object.getOwnPropertyDescriptor(target, key);
+  if (descriptor && 'value' in descriptor) {
+    return descriptor.value;
+  }
+
+  const value = Reflect.get(target, key, target);
+  let prepared = state.preparedTargets.get(target);
+  if (!prepared) {
+    prepared = new Map();
+    state.preparedTargets.set(target, prepared);
+  }
+  prepared.set(key, value);
+  return value;
+}
+
+function prepareMergeSource(target: any, source: any, state: MergeState, assign = false): any {
+  if (!source || typeof source !== 'object' || !target || typeof target !== 'object') {
+    return source;
+  }
+
+  let preparedTargets = state.preparedSources.get(source);
+  if (!preparedTargets) {
+    preparedTargets = new WeakMap();
+    state.preparedSources.set(source, preparedTargets);
+  }
+  const existing = preparedTargets.get(target);
+  if (existing) {
+    return existing;
+  }
+  state.inspectedSources += 1;
+  if (state.inspectedSources > maxAdoptedRecords) {
+    throw new Error('Adopted record traversal exceeds the supported safety limit.');
+  }
+
+  const sourceKeys = Reflect.ownKeys(source);
+  if (sourceKeys.length > maxAdoptedRecords - state.inspectedSourceProperties) {
+    throw new Error('Adopted record traversal exceeds the supported safety limit.');
+  }
+  state.inspectedSourceProperties += sourceKeys.length;
+  const sourceIsArray = isArray(source);
+  const prepared: Record<string, any> = sourceIsArray ? [] : Object.create(null);
+  preparedTargets.set(target, prepared);
+
+  if (isArray(target) && sourceIsArray && !assign) {
+    const sourceLength = source.length;
+    (prepared as any[]).length = sourceLength;
+    for (let index = 0; index < sourceLength; index += 1) {
+      if (!(index in source)) {
+        continue;
+      }
+      const value = source[index];
+      if (has(target, index)) {
+        const targetValue = previewTarget(state, target, index);
+        prepared[index] =
+          targetValue && typeof targetValue === 'object' && value && typeof value === 'object'
+            ? prepareMergeSource(targetValue, value, state)
+            : value;
+      } else {
+        prepared[index] = value;
+      }
+    }
+    return prepared;
+  }
+
+  const enumerableKeys: string[] = [];
+  for (const key of sourceKeys) {
+    if (typeof key === 'string' && Object.getOwnPropertyDescriptor(source, key)?.enumerable) {
+      enumerableKeys.push(key);
+    }
+  }
+  for (const key of enumerableKeys) {
+    if (isUnsafePropertyKey(key)) {
+      continue;
+    }
+    const value = source[key];
+    prepared[key] =
+      !assign && has(target, key) && value && typeof value === 'object'
+        ? prepareMergeSource(previewTarget(state, target, key), value, state)
+        : value;
+  }
+  return prepared;
+}
+
+function prepareSource(target: any, source: any, state: MergeState, assign = false): any {
+  const holder = { value: prepareMergeSource(target, source, state, assign) };
+  rememberAdoption(state, holder, 'value', holder.value);
+  sanitizeAdoptions(state);
+  return holder.value;
+}
+
 const hex_table = /* @__PURE__ */ (() => {
   const array = [];
   for (let i = 0; i < 256; ++i) {
@@ -55,11 +374,12 @@ function array_to_object(source: any[], options: { plainObjects: boolean }) {
   return obj;
 }
 
-export function merge(
+function mergeWithState(
   target: any,
   source: any,
-  options: { plainObjects?: boolean; allowPrototypes?: boolean } = {},
-) {
+  options: { plainObjects?: boolean; allowPrototypes?: boolean },
+  state: MergeState,
+): any {
   if (!source) {
     return target;
   }
@@ -68,8 +388,16 @@ export function merge(
     if (isArray(target)) {
       target.push(source);
     } else if (target && typeof target === 'object') {
-      if ((options && (options.plainObjects || options.allowPrototypes)) || !has(Object.prototype, source)) {
-        target[source] = true;
+      const propertyKey =
+        typeof source === 'string' || typeof source === 'symbol'
+          ? source
+          : Reflect.ownKeys({ [source]: true })[0]!;
+      if (
+        !isUnsafePropertyKey(propertyKey) &&
+        ((options && (options.plainObjects || options.allowPrototypes)) ||
+          !has(Object.prototype, propertyKey))
+      ) {
+        target[propertyKey] = true;
       }
     } else {
       return [target, source];
@@ -95,14 +423,17 @@ export function merge(
       if (i in source) {
         const item = source[i];
         if (has(target, i)) {
-          const targetItem = target[i];
+          const targetItem = readPreparedTarget(state, target, i);
           if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
-            target[i] = merge(targetItem, item, options);
+            const merged = mergeWithState(targetItem, item, options, state);
+            target[i] = merged;
           } else {
-            target.push(item);
+            const adopted = item;
+            target.push(adopted);
           }
         } else {
-          target[i] = item;
+          const adopted = item;
+          target[i] = adopted;
         }
       }
     }
@@ -110,16 +441,47 @@ export function merge(
   }
 
   for (const key of Object.keys(source)) {
+    if (isUnsafePropertyKey(key)) {
+      continue;
+    }
     const value = source[key];
-
-    mergeTarget[key] = has(mergeTarget, key) ? merge(mergeTarget[key], value, options) : value;
+    const adopted = has(mergeTarget, key)
+      ? mergeWithState(readPreparedTarget(state, mergeTarget, key), value, options, state)
+      : value;
+    mergeTarget[key] = adopted;
   }
   return mergeTarget;
 }
 
+export function merge(
+  target: any,
+  source: any,
+  options: { plainObjects?: boolean; allowPrototypes?: boolean } = {},
+) {
+  const state: MergeState = {
+    adopted: [],
+    preparedTargets: new WeakMap(),
+    preparedSources: new WeakMap(),
+    inspectedSources: 0,
+    inspectedSourceProperties: 0,
+  };
+  return mergeWithState(target, prepareSource(target, source, state), options, state);
+}
+
 export function assign_single_source(target: any, source: any) {
-  for (const key of Object.keys(source)) {
-    target[key] = source[key];
+  const state: MergeState = {
+    adopted: [],
+    preparedTargets: new WeakMap(),
+    preparedSources: new WeakMap(),
+    inspectedSources: 0,
+    inspectedSourceProperties: 0,
+  };
+  const prepared = prepareSource(target, source, state, true);
+  for (const key of Object.keys(prepared)) {
+    if (isUnsafePropertyKey(key)) {
+      continue;
+    }
+    target[key] = prepared[key];
   }
   return target;
 }

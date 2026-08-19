@@ -68,6 +68,11 @@ function deriveBedrockBaseURL(awsRegion: string | undefined): string {
       'Must provide one of the `baseURL` or `awsRegion` arguments, or set the `AWS_BEDROCK_BASE_URL`, `AWS_REGION`, or `AWS_DEFAULT_REGION` environment variable.',
     );
   }
+  if (!/^[a-z]{2,8}(?:-[a-z0-9]+)+-\d+$/u.test(region)) {
+    throw new Errors.OpenAIError(
+      'The Bedrock AWS `region` is invalid. Use a standard AWS region such as `us-east-1`.',
+    );
+  }
 
   return `https://bedrock-mantle.${region}.api.aws/openai/v1`;
 }

@@ -252,8 +252,43 @@ describe('vector store file batch helpers', () => {
     await expect(batches.uploadAndPoll('vs_123', { files: [new File(['a'], 'a.txt')] })).rejects.toThrow(
       '1 promise(s) failed',
     );
-    expect(logError).toHaveBeenCalledWith(expect.objectContaining({ message: 'upload failed' }));
+    expect(logError).not.toHaveBeenCalled();
     expect(createAndPoll).not.toHaveBeenCalled();
+  });
+
+  test('keeps sensitive concurrent upload failures out of disabled logs', async () => {
+    const secret = 'sk-synthetic-private-upload-secret';
+    const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const fetch = vi.fn(async (_url: string | URL | Request) =>
+      Response.json(
+        { error: { message: `Provider rejected ${secret}`, type: 'invalid_request_error' } },
+        { status: 400, headers: { 'set-cookie': `session=${secret}` } },
+      ),
+    );
+    const client = new OpenAI({
+      apiKey: 'sk-synthetic-client-key',
+      baseURL: 'https://example.com/v1/',
+      logLevel: 'off',
+      logger,
+      maxRetries: 0,
+      fetch,
+    });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const upload = client.vectorStores.fileBatches.uploadAndPoll(
+      'vs_123',
+      { files: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')] },
+      { maxConcurrency: 2 },
+    );
+
+    await expect(upload).rejects.toThrow('2 promise(s) failed');
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/v1/files'))).toHaveLength(2);
+    await expect(upload).rejects.toMatchObject({
+      name: 'Error',
+      message: '2 promise(s) failed',
+      rejections: [expect.objectContaining({ status: 400 }), expect.objectContaining({ status: 400 })],
+    });
   });
 });
 
