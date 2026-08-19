@@ -631,7 +631,7 @@ export class ChatCompletionStream<ParsedT = null>
 
   #accumulateChatCompletion(chunk: ChatCompletionChunk): ChatCompletionSnapshot {
     let snapshot = this.#currentChatCompletionSnapshot;
-    const { choices, ...rest } = chunk;
+    const { choices, obfuscation: _obfuscation, ...rest } = chunk;
     if (!snapshot) {
       const newSnapshot: ChatCompletionSnapshot = {
         ...rest,
