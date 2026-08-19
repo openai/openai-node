@@ -99,6 +99,29 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
+function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
+  event: AssistantStreamEvent;
+  exposedEvent: AssistantStreamEvent;
+} {
+  const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
+  const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
+  const eventType = Reflect.get(event, 'event', event) as AssistantStreamEvent['event'];
+  const data = Reflect.get(event, 'data', event) as AssistantStreamEvent['data'];
+  const stableEvent = Object.freeze({ event: eventType, data }) as AssistantStreamEvent;
+  const ordinaryEvent =
+    eventDescriptor !== undefined &&
+    'value' in eventDescriptor &&
+    eventDescriptor.value === eventType &&
+    dataDescriptor !== undefined &&
+    'value' in dataDescriptor &&
+    dataDescriptor.value === data;
+
+  return {
+    event: stableEvent,
+    exposedEvent: ordinaryEvent ? event : ({ event: eventType, data } as AssistantStreamEvent),
+  };
+}
+
 /** Streams assistant-run events while accumulating messages, run steps, and tool-call snapshots. */
 export class AssistantStream
   extends EventStream<AssistantStreamEvents>
@@ -337,22 +360,24 @@ export class AssistantStream
       return;
     }
 
-    switch (event.event) {
+    const { event: stableEvent, exposedEvent } = stabilizeAssistantStreamEvent(event);
+
+    switch (stableEvent.event) {
       case 'thread.message.created':
       case 'thread.message.in_progress':
       case 'thread.message.delta':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
-        this.#validateMessageEvent(event);
+        this.#validateMessageEvent(stableEvent);
         break;
       }
     }
 
-    this.#currentEvent = event;
+    this.#currentEvent = exposedEvent;
 
-    this.#handleEvent(event);
+    this.#handleEvent(exposedEvent);
 
-    switch (event.event) {
+    switch (stableEvent.event) {
       case 'thread.created': {
         //No action on this event.
         break;
@@ -368,7 +393,7 @@ export class AssistantStream
       case 'thread.run.cancelling':
       case 'thread.run.cancelled':
       case 'thread.run.expired': {
-        this.#handleRun(event);
+        this.#handleRun(stableEvent);
         break;
       }
 
@@ -379,7 +404,7 @@ export class AssistantStream
       case 'thread.run.step.failed':
       case 'thread.run.step.cancelled':
       case 'thread.run.step.expired': {
-        this.#handleRunStep(event);
+        this.#handleRunStep(stableEvent);
         break;
       }
 
@@ -388,7 +413,7 @@ export class AssistantStream
       case 'thread.message.delta':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
-        this.#handleMessage(event);
+        this.#handleMessage(stableEvent);
         break;
       }
 
@@ -399,7 +424,7 @@ export class AssistantStream
         );
       }
       default: {
-        assertNever(event);
+        assertNever(stableEvent);
       }
     }
   }

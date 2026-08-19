@@ -23,6 +23,95 @@ const sharedArrayBufferByteLengthGetter =
     : undefined;
 // V8 uses the same trusted lazy-stack accessor pair for native Error instances.
 const errorStackDescriptor = Object.getOwnPropertyDescriptor(new Error('native stack descriptor'), 'stack');
+const functionToString = Function.prototype.toString;
+const objectToString = Object.prototype.toString;
+const errorBrandDescriptor = Object.getOwnPropertyDescriptor(Error, 'isError');
+const nativeErrorBrand =
+  errorBrandDescriptor && 'value' in errorBrandDescriptor && typeof errorBrandDescriptor.value === 'function'
+    ? (errorBrandDescriptor.value as (value: unknown) => boolean)
+    : undefined;
+const nativeErrorConstructorSource = functionToString.call(Error);
+const trustedIntrinsicPrototypes = new Set<object>([
+  OpenAIError.prototype,
+  APIUserAbortError.prototype,
+  Object.getPrototypeOf(APIUserAbortError.prototype) as object,
+]);
+const trustedNativeConstructorSources = new Set<string>();
+const foreignErrorStackDescriptors = new WeakMap<object, PropertyDescriptor>();
+
+type NativeErrorConstructor = (...args: never[]) => unknown;
+
+function rememberTrustedIntrinsic(constructor: unknown): void {
+  if (typeof constructor !== 'function') {
+    return;
+  }
+
+  const prototypeDescriptor = Object.getOwnPropertyDescriptor(constructor, 'prototype');
+  if (
+    !prototypeDescriptor ||
+    !('value' in prototypeDescriptor) ||
+    typeof prototypeDescriptor.value !== 'object'
+  ) {
+    return;
+  }
+
+  trustedIntrinsicPrototypes.add(prototypeDescriptor.value as object);
+  const source = functionToString.call(constructor);
+  if (
+    /^function [A-Za-z_$][\w$]*\(\) \{ \[native code\] \}$/u.test(source) &&
+    prototypeDescriptor.configurable === false &&
+    prototypeDescriptor.writable === false
+  ) {
+    trustedNativeConstructorSources.add(source);
+  }
+}
+
+for (const constructor of [
+  Object,
+  Array,
+  Map,
+  Set,
+  ArrayBuffer,
+  DataView,
+  Error,
+  EvalError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError,
+  Uint8Array,
+  Uint8ClampedArray,
+  Uint16Array,
+  Uint32Array,
+  Int8Array,
+  Int16Array,
+  Int32Array,
+  Float32Array,
+  Float64Array,
+]) {
+  rememberTrustedIntrinsic(constructor);
+}
+
+for (const name of [
+  'SharedArrayBuffer',
+  'AggregateError',
+  'Float16Array',
+  'BigInt64Array',
+  'BigUint64Array',
+  'Blob',
+  'File',
+] as const) {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
+  if (descriptor && 'value' in descriptor) {
+    rememberTrustedIntrinsic(descriptor.value);
+  }
+}
+
+if (typeof Buffer === 'function') {
+  rememberTrustedIntrinsic(Buffer);
+}
+
 const blobSizeGetter =
   typeof Blob === 'function' ? Object.getOwnPropertyDescriptor(Blob.prototype, 'size')?.get : undefined;
 const blobInternalHandlePrototype = (() => {
@@ -47,6 +136,132 @@ const blobInternalHandlePrototype = (() => {
 const mapEntries = Map.prototype.entries;
 const setValues = Set.prototype.values;
 const retainedStorageBrands = new Set(['ArrayBuffer', 'SharedArrayBuffer', 'Blob', 'File', 'Map', 'Set']);
+
+function isTrustedIntrinsicPrototype(prototype: object): boolean {
+  if (trustedIntrinsicPrototypes.has(prototype)) {
+    return true;
+  }
+
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+  if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
+    return false;
+  }
+
+  const constructor = descriptor.value as NativeErrorConstructor;
+  if (!trustedNativeConstructorSources.has(functionToString.call(constructor))) {
+    return false;
+  }
+
+  const constructorPrototype = Object.getOwnPropertyDescriptor(constructor, 'prototype');
+  return Boolean(
+    constructorPrototype &&
+    'value' in constructorPrototype &&
+    constructorPrototype.value === prototype &&
+    constructorPrototype.configurable === false &&
+    constructorPrototype.writable === false,
+  );
+}
+
+function hasNativeErrorBrand(current: object): boolean {
+  if (nativeErrorBrand) {
+    return nativeErrorBrand.call(Error, current);
+  }
+
+  let prototype: object | null = current;
+  for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
+    if (Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)) {
+      return false;
+    }
+    prototype = Object.getPrototypeOf(prototype) as object | null;
+  }
+
+  return prototype === null && objectToString.call(current) === '[object Error]';
+}
+
+function getVerifiedForeignErrorConstructor(
+  current: object,
+  stackDescriptor: PropertyDescriptor,
+): { constructor: NativeErrorConstructor; prototype: object } | undefined {
+  if (
+    !nativeErrorBrand ||
+    typeof stackDescriptor.get !== 'function' ||
+    typeof stackDescriptor.set !== 'function'
+  ) {
+    return undefined;
+  }
+
+  let prototype = Object.getPrototypeOf(current) as object | null;
+  for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+    if (descriptor && 'value' in descriptor && typeof descriptor.value === 'function') {
+      const constructor = descriptor.value as NativeErrorConstructor;
+      if (
+        functionToString.call(constructor) === nativeErrorConstructorSource &&
+        isTrustedIntrinsicPrototype(prototype)
+      ) {
+        const functionPrototype = Object.getPrototypeOf(constructor) as object;
+        if (
+          Object.getPrototypeOf(stackDescriptor.get) === functionPrototype &&
+          Object.getPrototypeOf(stackDescriptor.set) === functionPrototype
+        ) {
+          return { constructor, prototype };
+        }
+        return undefined;
+      }
+    }
+    prototype = Object.getPrototypeOf(prototype) as object | null;
+  }
+
+  return undefined;
+}
+
+function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescriptor): boolean {
+  if (!hasNativeErrorBrand(current)) {
+    return false;
+  }
+
+  if (
+    errorStackDescriptor &&
+    !('value' in errorStackDescriptor) &&
+    typeof errorStackDescriptor.get === 'function' &&
+    Object.prototype.isPrototypeOf.call(Error.prototype, current) &&
+    descriptor.get === errorStackDescriptor.get &&
+    descriptor.set === errorStackDescriptor.set
+  ) {
+    return true;
+  }
+
+  const verified = getVerifiedForeignErrorConstructor(current, descriptor);
+  if (!verified) {
+    return false;
+  }
+
+  let canonicalDescriptor = foreignErrorStackDescriptors.get(verified.prototype);
+  if (!canonicalDescriptor) {
+    const canonical = Reflect.construct(verified.constructor, []) as unknown;
+    if (
+      typeof canonical !== 'object' ||
+      canonical === null ||
+      !nativeErrorBrand?.call(Error, canonical) ||
+      Object.getPrototypeOf(canonical) !== verified.prototype
+    ) {
+      return false;
+    }
+
+    canonicalDescriptor = Object.getOwnPropertyDescriptor(canonical, 'stack');
+    if (
+      !canonicalDescriptor ||
+      'value' in canonicalDescriptor ||
+      typeof canonicalDescriptor.get !== 'function' ||
+      typeof canonicalDescriptor.set !== 'function'
+    ) {
+      return false;
+    }
+    foreignErrorStackDescriptors.set(verified.prototype, canonicalDescriptor);
+  }
+
+  return descriptor.get === canonicalDescriptor.get && descriptor.set === canonicalDescriptor.set;
+}
 
 type RetainedStorage = {
   bytes: number;
@@ -208,52 +423,6 @@ function visitHiddenEventValues(
   return true;
 }
 
-function hasInspectableEventPrototype(
-  current: object,
-  kind: RetainedStorage['kind'] | undefined,
-  isBlobInternalHandle: boolean,
-): boolean {
-  if (kind !== undefined || Array.isArray(current)) {
-    return true;
-  }
-
-  const prototype: unknown = Object.getPrototypeOf(current);
-  if (prototype === null) {
-    return true;
-  }
-  if (typeof prototype !== 'object') {
-    return false;
-  }
-
-  return (
-    Object.getPrototypeOf(prototype) === null ||
-    (isBlobInternalHandle && prototype === blobInternalHandlePrototype) ||
-    Object.prototype.isPrototypeOf.call(Error.prototype, current)
-  );
-}
-
-function getRetainedCustomEventPrototype(
-  current: object,
-  kind: RetainedStorage['kind'] | undefined,
-  isBlobInternalHandle: boolean,
-): object | undefined {
-  if (kind !== undefined || Array.isArray(current)) {
-    return undefined;
-  }
-
-  const prototype = Object.getPrototypeOf(current) as object | null;
-  if (
-    prototype === null ||
-    prototype === Object.prototype ||
-    (isBlobInternalHandle && prototype === blobInternalHandlePrototype) ||
-    Object.prototype.isPrototypeOf.call(Error.prototype, current)
-  ) {
-    return undefined;
-  }
-
-  return prototype;
-}
-
 function getInspectableEventKeys(
   current: object,
   kind: RetainedStorage['kind'] | undefined,
@@ -316,20 +485,50 @@ function visitInspectableEventProperties(
       return false;
     }
     if (!('value' in descriptor)) {
-      if (
-        key === 'stack' &&
-        errorStackDescriptor &&
-        !('value' in errorStackDescriptor) &&
-        typeof errorStackDescriptor.get === 'function' &&
-        Object.prototype.isPrototypeOf.call(Error.prototype, current) &&
-        descriptor.get === errorStackDescriptor.get &&
-        descriptor.set === errorStackDescriptor.set
-      ) {
+      if (key === 'stack' && isTrustedNativeErrorStack(current, descriptor)) {
         continue;
       }
       return false;
     }
     visit(descriptor.value, depth + 1, kind === 'blob');
+  }
+
+  return true;
+}
+
+function visitRetainedEventPrototypes(
+  current: object,
+  depth: number,
+  isBlobInternalHandle: boolean,
+  visited: WeakSet<object>,
+  charge: (bytes: number) => boolean,
+  visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
+): boolean {
+  let prototype = Object.getPrototypeOf(current) as object | null;
+
+  for (let prototypeDepth = depth + 1; prototype !== null; prototypeDepth += 1) {
+    if (prototypeDepth >= MAX_BUFFERED_EVENT_DEPTH) {
+      return false;
+    }
+    if (
+      isTrustedIntrinsicPrototype(prototype) ||
+      (isBlobInternalHandle && prototype === blobInternalHandlePrototype)
+    ) {
+      return true;
+    }
+    if (visited.has(prototype)) {
+      return charge(8);
+    }
+
+    visited.add(prototype);
+    if (
+      !charge(16) ||
+      !visitInspectableEventProperties(prototype, undefined, prototypeDepth, charge, visit)
+    ) {
+      return false;
+    }
+
+    prototype = Object.getPrototypeOf(prototype) as object | null;
   }
 
   return true;
@@ -372,20 +571,21 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     bytes += 16;
 
     const retainedStorage = estimateRetainedBufferBytes(current, visit, depth);
-    if (!hasInspectableEventPrototype(current, retainedStorage?.kind, isBlobInternalHandle)) {
+    if (
+      !visitRetainedEventPrototypes(
+        current,
+        depth,
+        isBlobInternalHandle,
+        visited,
+        (overhead) => {
+          bytes += overhead;
+          return bytes <= remainingBytes;
+        },
+        visit,
+      )
+    ) {
       bytes = remainingBytes + 1;
       return;
-    }
-    const retainedPrototype = getRetainedCustomEventPrototype(
-      current,
-      retainedStorage?.kind,
-      isBlobInternalHandle,
-    );
-    if (retainedPrototype) {
-      visit(retainedPrototype, depth + 1);
-      if (bytes > remainingBytes) {
-        return;
-      }
     }
     if (retainedStorage !== undefined) {
       bytes += retainedStorage.bytes;

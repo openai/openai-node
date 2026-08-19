@@ -67,6 +67,13 @@ function makeOutput(type: string, id = 'item_123'): OutputItem {
       item['status'] = 'in_progress';
       break;
     }
+    case 'shell_call': {
+      item['call_id'] = `call_${id}`;
+      item['action'] = { commands: ['echo safe'], max_output_length: null, timeout_ms: null };
+      item['environment'] = null;
+      item['status'] = 'in_progress';
+      break;
+    }
     case 'shell_call_output': {
       item['call_id'] = 'call_123';
       item['output'] = [{ stdout: 'safe stdout', stderr: '', outcome: { type: 'exit', exit_code: 0 } }];
@@ -581,6 +588,132 @@ describe('ResponseAccumulator output item identity', () => {
     ).toThrow("duplicate output item identity 'id:shared_item'");
 
     expect(snapshot).toEqual(original);
+  });
+
+  test.each(['shell_call', 'shell_call_output'] as const)(
+    'rejects duplicate %s routing call IDs despite distinct platform IDs',
+    (type) => {
+      const first = makeOutput(type, 'first_item');
+      const duplicate = makeOutput(type, 'second_item');
+      (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
+      const snapshot = createSnapshot(first);
+      const original = structuredClone(snapshot);
+      const callID = (first as unknown as EventFields)['call_id'];
+
+      expect(() =>
+        applyEvent(snapshot, {
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: duplicate,
+        }),
+      ).toThrow(`duplicate output item identity 'call:${type}:${callID}'`);
+
+      expect(snapshot).toEqual(original);
+    },
+  );
+
+  test.each(['shell_call', 'shell_call_output'] as const)(
+    'rejects a response created with duplicate %s routing call IDs',
+    (type) => {
+      const first = makeOutput(type, 'first_item');
+      const duplicate = makeOutput(type, 'second_item');
+      (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
+
+      expect(() => createSnapshot(first, duplicate)).toThrow(`duplicate output item identity 'call:${type}:`);
+    },
+  );
+
+  test.each(['shell_call', 'shell_call_output'] as const)(
+    'rejects lifecycle responses with duplicate %s routing call IDs before mutating the snapshot',
+    (type) => {
+      const snapshot = createSnapshot(makeOutput('message'));
+      const original = structuredClone(snapshot);
+      const first = makeOutput(type, 'first_item');
+      const duplicate = makeOutput(type, 'second_item');
+      (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
+
+      expect(() =>
+        applyEvent(snapshot, {
+          type: 'response.completed',
+          response: makeResponse([first, duplicate]),
+        }),
+      ).toThrow(`duplicate output item identity 'call:${type}:`);
+
+      expect(snapshot).toEqual(original);
+    },
+  );
+
+  test.each(['shell_call', 'shell_call_output'] as const)(
+    'rejects %s snapshots and additions without their required routing call ID',
+    (type) => {
+      const item = makeOutput(type);
+      Reflect.deleteProperty(item, 'call_id');
+
+      expect(() => createSnapshot(item)).toThrow(
+        'expected a non-empty output item call_id for response snapshot',
+      );
+
+      const snapshot = createSnapshot();
+      expect(() =>
+        applyEvent(snapshot, {
+          type: 'response.output_item.added',
+          output_index: 0,
+          item,
+        }),
+      ).toThrow('expected a non-empty output item call_id for response.output_item.added');
+      expect(snapshot.output).toEqual([]);
+    },
+  );
+
+  test.each(['shell_call', 'shell_call_output'] as const)(
+    'continues to require the platform ID on %s items',
+    (type) => {
+      const item = makeOutput(type);
+      Reflect.deleteProperty(item, 'id');
+
+      expect(() => createSnapshot(item)).toThrow('expected a non-empty output item id for response snapshot');
+    },
+  );
+
+  test.each(['shell_call', 'shell_call_output'] as const)(
+    'rejects %s completion that mutates the routing call ID',
+    (type) => {
+      const item = makeOutput(type);
+      const snapshot = createSnapshot(item);
+      const original = structuredClone(snapshot);
+      const replacement = structuredClone(item);
+      (replacement as unknown as EventFields)['call_id'] = 'foreign_call';
+      const originalCallID = (item as unknown as EventFields)['call_id'];
+
+      expect(() =>
+        applyEvent(snapshot, {
+          type: 'response.output_item.done',
+          output_index: 0,
+          item: replacement,
+        }),
+      ).toThrow(`expected output item call_id '${originalCallID}', got 'foreign_call'`);
+
+      expect(snapshot).toEqual(original);
+    },
+  );
+
+  test('preserves a valid shell call and matching output under namespaced routing identities', () => {
+    const shell = makeOutput('shell_call', 'shell_item');
+    const output = makeOutput('shell_call_output', 'output_item');
+    (output as unknown as EventFields)['call_id'] = (shell as unknown as EventFields)['call_id'];
+    const snapshot = createSnapshot(shell, output);
+
+    expect(
+      applyEvent(snapshot, {
+        type: 'response.shell_call_output_content.delta',
+        output_index: 1,
+        item_id: 'output_item',
+        command_index: 0,
+        delta: { stdout: ' appended' },
+      }),
+    ).toBe(snapshot);
+
+    expect(snapshot.output[1]).toMatchObject({ output: [{ stdout: 'safe stdout appended' }] });
   });
 
   test('detects duplicate IDs after an exposed output is replaced without changing the array length', () => {

@@ -407,6 +407,86 @@ describe('EventStream iterator buffer limits', () => {
   });
 
   test.each([
+    { name: 'Map', create: () => new Map() },
+    { name: 'Set', create: () => new Set() },
+    { name: 'ArrayBuffer', create: () => new ArrayBuffer(8) },
+    { name: 'SharedArrayBuffer', create: () => new SharedArrayBuffer(8) },
+    { name: 'DataView', create: () => new DataView(new ArrayBuffer(8)) },
+    { name: 'typed array', create: () => new Uint8Array(8) },
+    { name: 'Array', create: () => [1, 2, 3] },
+    { name: 'Error', create: () => new Error('safe') },
+    { name: 'Blob', create: () => new Blob(['safe']) },
+  ])('charges oversized data retained by a custom $name prototype', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = create();
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
+    Object.setPrototypeOf(payload, prototype);
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([
+    { name: 'Map', create: () => new Map() },
+    { name: 'typed array', create: () => new Uint8Array(8) },
+    { name: 'Error', create: () => new Error('safe') },
+  ])('rejects a custom $name prototype accessor without invoking it', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = create();
+    const retained = 'x'.repeat(9 * 1024 * 1024);
+    const readAccessor = vi.fn(() => retained);
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, Symbol('hidden closure'), { get: readAccessor });
+    Object.setPrototypeOf(payload, prototype);
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(readAccessor).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([
+    { name: 'Map', create: () => new Map() },
+    { name: 'typed array', create: () => new Uint8Array(8) },
+    { name: 'Error', create: () => new Error('safe') },
+  ])('preserves small safe custom $name prototype data and payload identity', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = create();
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, 'safe', { value: 'small retained data' });
+    Object.setPrototypeOf(payload, prototype);
+
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(payload);
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test('charges custom data through multiple branded prototype levels', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = new Map();
+    const first = Object.create(Map.prototype) as object;
+    const second = Object.create(first) as object;
+    Object.defineProperty(first, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
+    Object.setPrototypeOf(payload, second);
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([
     { name: 'a root object', create: () => ({}) },
     { name: 'a Map', create: () => new Map() },
     { name: 'a Set', create: () => new Set() },
@@ -463,6 +543,83 @@ describe('EventStream iterator buffer limits', () => {
       await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
     },
   );
+
+  test('rejects a foreign Error with a producer-controlled constructor without invoking it', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const invokeConstructor = vi.fn(() => {
+      throw new Error('producer constructor must not run');
+    });
+    const payload = runInNewContext(
+      `const error = new Error('safe');
+       const custom = Object.create(Error.prototype);
+       Object.defineProperty(custom, 'constructor', { value: invokeConstructor });
+       Object.setPrototypeOf(error, custom);
+       error`,
+      { invokeConstructor },
+    ) as Error;
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(invokeConstructor).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects a proxied foreign Error constructor without invoking its construct trap', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const invokeConstructor = vi.fn(() => {
+      throw new Error('proxied constructor must not run');
+    });
+    const payload = runInNewContext(
+      `const RealError = Error;
+       const proxy = new Proxy(RealError, {
+         construct() { return invokeConstructor(); },
+       });
+       Object.defineProperty(RealError.prototype, 'constructor', { value: proxy });
+       new RealError('safe')`,
+      { invokeConstructor },
+    ) as Error;
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(invokeConstructor).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects an Error-brand spoof without invoking Symbol.toStringTag or stack getters', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const readTag = vi.fn(() => 'Error');
+    const readStack = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+    const payload = Object.create(null) as object;
+    Object.defineProperty(payload, Symbol.toStringTag, { get: readTag });
+    Object.defineProperty(payload, 'stack', { get: readStack });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(readTag).not.toHaveBeenCalled();
+    expect(readStack).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('preserves safe custom prototype data on a genuine cross-realm Error', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = runInNewContext("new Error('safe foreign error')") as Error;
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, 'safe', { value: 'small' });
+    Object.setPrototypeOf(payload, prototype);
+
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(payload);
+    stream.end();
+  });
 
   test.each([4096, 4097])(
     'bounds ordinary queued arrays at the %i-element inspection boundary',
@@ -661,6 +818,75 @@ describe('EventStream iterator buffer limits', () => {
 
     await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
     expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test.each([
+    { name: 'Error', expression: "new Error('safe foreign error')" },
+    { name: 'TypeError', expression: "new TypeError('safe foreign type error')" },
+    { name: 'AggregateError', expression: "new AggregateError([], 'safe foreign aggregate error')" },
+  ])('accepts a small genuine cross-realm $name and preserves its identity', async ({ expression }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = runInNewContext(expression) as Error;
+
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(payload);
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test.each(['get', 'set'] as const)(
+    'rejects a producer-replaced cross-realm Error stack %s without invoking it',
+    async (accessor) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const payload = runInNewContext("new Error('safe foreign error')") as Error;
+      const descriptor = Object.getOwnPropertyDescriptor(payload, 'stack');
+      const readAccessor = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      Object.defineProperty(payload, 'stack', { ...descriptor, [accessor]: readAccessor });
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(readAccessor).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test.each([
+    { name: 'Map', expression: 'new Map()' },
+    { name: 'Set', expression: 'new Set()' },
+    { name: 'ArrayBuffer', expression: 'new ArrayBuffer(8)' },
+    { name: 'typed array', expression: 'new Uint8Array(8)' },
+  ])('charges custom prototype data retained by a cross-realm $name', async ({ expression }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = runInNewContext(expression) as object;
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
+    Object.setPrototypeOf(payload, prototype);
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('preserves safe custom prototype data on a genuine cross-realm Map', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = runInNewContext("new Map([['safe', 'value']])") as Map<string, string>;
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, 'safe', { value: 'small' });
+    Object.setPrototypeOf(payload, prototype);
+
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(payload);
     stream.end();
   });
 

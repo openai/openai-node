@@ -182,6 +182,20 @@ function getOutput(snapshot: Response, outputIndex: number): Response['output'][
   return output;
 }
 
+function hasRoutedOutputCallIdentity(
+  output: Response['output'][number],
+): output is Extract<
+  Response['output'][number],
+  { type: 'function_call' | 'custom_tool_call' | 'shell_call' | 'shell_call_output' }
+> {
+  return (
+    output.type === 'function_call' ||
+    output.type === 'custom_tool_call' ||
+    output.type === 'shell_call' ||
+    output.type === 'shell_call_output'
+  );
+}
+
 function getOutputItemIdentityKeys(output: Response['output'][number], eventType: string): string[] {
   if (!hasOwn(output, 'type') || typeof output.type !== 'string') {
     throw new OpenAIError(`expected an own output item type for ${eventType}`);
@@ -199,7 +213,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
     throw new OpenAIError(`expected a non-empty output item id for ${eventType}`);
   }
 
-  if (optionalPlatformID) {
+  if (hasRoutedOutputCallIdentity(output)) {
     if (!hasOwn(output, 'call_id') || typeof output.call_id !== 'string' || output.call_id.length === 0) {
       throw new OpenAIError(`expected a non-empty output item call_id for ${eventType}`);
     }
@@ -346,8 +360,8 @@ function validateCompletedOutputItemIdentity(
   }
 
   if (
-    (output.type === 'function_call' || output.type === 'custom_tool_call') &&
-    (replacement.type === 'function_call' || replacement.type === 'custom_tool_call') &&
+    hasRoutedOutputCallIdentity(output) &&
+    hasRoutedOutputCallIdentity(replacement) &&
     output.call_id !== replacement.call_id
   ) {
     throw new OpenAIError(`expected output item call_id '${output.call_id}', got '${replacement.call_id}'`);

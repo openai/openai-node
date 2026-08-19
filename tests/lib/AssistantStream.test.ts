@@ -205,6 +205,191 @@ describe('AssistantStream delta accumulation', () => {
 });
 
 describe('AssistantStream snapshots and message lifecycle', () => {
+  test('preserves ordinary raw-event and message snapshot identities', async () => {
+    const message = { id: 'msg_identity', role: 'assistant', content: [] };
+    const createdEvent = { event: 'thread.message.created', data: message };
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawEvents: AssistantStreamEvent[] = [];
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => rawEvents.push(event));
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    const finalMessages = await runner.finalMessages();
+
+    expect(rawEvents[0]).toBe(createdEvent);
+    expect(createdMessages[0]).toBe(message);
+    expect(finalMessages[0]).toBe(message);
+  });
+
+  test('captures accessor-backed event data once before exposing or routing its message', async () => {
+    const first = { id: 'msg_first', role: 'assistant', content: [] };
+    const second = { id: 'msg_second', role: 'assistant', content: [] };
+    const createdEvent: Event = { event: 'thread.message.created' };
+    const readData = vi.fn(function readStableData(this: Event) {
+      expect(this).toBe(createdEvent);
+      return readData.mock.calls.length === 1 ? first : second;
+    });
+    Object.defineProperty(createdEvent, 'data', { enumerable: true, get: readData });
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: first },
+              { event: 'thread.message.created', data: second },
+              { event: 'thread.message.completed', data: second },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawCreations: AssistantStreamEvent[] = [];
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => {
+      if (event.event === 'thread.message.created') {
+        rawCreations.push(event);
+      }
+    });
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+
+    expect(readData).toHaveBeenCalledTimes(1);
+    expect(rawCreations[0]?.data).toBe(first);
+    expect(rawCreations[0]).not.toBe(createdEvent);
+    expect(createdMessages).toEqual([first, second]);
+    expect(createdMessages[0]).toBe(first);
+    expect(await runner.finalMessages()).toEqual([first, second]);
+  });
+
+  test('preserves captured message routing when a raw listener replaces ordinary frame fields', async () => {
+    const message = { id: 'msg_captured', role: 'assistant', content: [] };
+    const replacement = { id: 'msg_replacement', role: 'assistant', content: [] };
+    const createdEvent = { event: 'thread.message.created', data: message };
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => {
+      if (Object.is(event, createdEvent)) {
+        (event as Event)['event'] = 'thread.run.completed';
+        (event as Event)['data'] = replacement;
+      }
+    });
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    const finalMessages = await runner.finalMessages();
+
+    expect(createdMessages[0]).toBe(message);
+    expect(finalMessages[0]).toBe(message);
+  });
+
+  test('captures an accessor-backed assistant event discriminator exactly once', async () => {
+    const message = { id: 'msg_discriminator', role: 'assistant', content: [] };
+    const createdEvent: Event = { data: message };
+    const readEvent = vi.fn(function readStableEvent(this: Event) {
+      expect(this).toBe(createdEvent);
+      return readEvent.mock.calls.length === 1 ? 'thread.message.created' : 'thread.run.completed';
+    });
+    Object.defineProperty(createdEvent, 'event', { enumerable: true, get: readEvent });
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const createdMessages: unknown[] = [];
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+
+    expect(readEvent).toHaveBeenCalledTimes(1);
+    expect(createdMessages[0]).toBe(message);
+  });
+
+  test('normalizes an inconsistent proxy-backed message frame before exposing it', async () => {
+    const message = { id: 'msg_proxy', role: 'assistant', content: [] };
+    const decoy = { id: 'msg_decoy', role: 'assistant', content: [] };
+    const source = { event: 'thread.message.created', data: decoy };
+    let dataReads = 0;
+    const createdEvent = new Proxy(source, {
+      get(target, key, receiver) {
+        if (key === 'data') {
+          dataReads += 1;
+          return message;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawEvents: AssistantStreamEvent[] = [];
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => rawEvents.push(event));
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+
+    expect(dataReads).toBe(1);
+    expect(rawEvents[0]).not.toBe(createdEvent);
+    expect(rawEvents[0]?.data).toBe(message);
+    expect(createdMessages[0]).toBe(message);
+  });
+
   test.each(['event', 'messageCreated'] as const)(
     'preserves the canonical active ID when a %s listener mutates its message',
     async (listener) => {
