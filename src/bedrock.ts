@@ -2,7 +2,11 @@ import * as Errors from './error';
 import { OpenAI } from './client';
 import type { ApiKeySetter, ClientOptions } from './client';
 import { assertNoDataResidency } from './internal/data-residency';
-import { assertBedrockRequestOrigin, brand_privateBedrockClient } from './internal/bedrock';
+import {
+  assertBedrockRequestOrigin,
+  assertValidBedrockBearerCredential,
+  brand_privateBedrockClient,
+} from './internal/bedrock';
 import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
@@ -222,9 +226,11 @@ export class BedrockOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    if ((security.bearerAuth || security.adminAPIKeyAuth) && this.apiKey !== null) {
+    const credential = this.apiKey;
+    if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
+      assertValidBedrockBearerCredential(credential);
       try {
-        return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+        return buildHeaders([{ Authorization: `Bearer ${credential}` }]);
       } catch (error) {
         if (error instanceof TypeError) {
           // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.

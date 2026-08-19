@@ -19,12 +19,29 @@ const SAFE_ERROR = 'Bedrock bearer credential contains an invalid HTTP header va
 
 const entrypoints: readonly Entrypoint[] = ['dependency-free', 'AWS', 'legacy'];
 const authenticationModes: readonly Authentication[] = ['static', 'rotating'];
+const forbiddenControlCredentials = [
+  ...Array.from({ length: 0x20 }, (_, value) => value).filter(
+    (value) => ![0x00, 0x09, 0x0a, 0x0d].includes(value),
+  ),
+  0x7f,
+].map((value) => ({
+  format: `HTTP control byte 0x${value.toString(16).padStart(2, '0')}`,
+  character: String.fromCodePoint(value),
+}));
+
 const malformedCredentials = [
   { format: 'line-feed', character: '\n' },
   { format: 'carriage-return', character: '\r' },
   { format: 'carriage-return line-feed', character: '\r\n' },
   { format: 'NUL byte', character: '\0' },
   { format: 'non-ByteString Unicode', character: '\u{1F680}' },
+  ...forbiddenControlCredentials,
+] as const;
+
+const supportedFieldBytes = [
+  { format: 'horizontal tab', character: '\t' },
+  { format: 'lowest obsolete-text byte', character: '\u0080' },
+  { format: 'highest obsolete-text byte', character: '\u00FF' },
 ] as const;
 
 const malformedCases = entrypoints.flatMap((entrypoint) =>
@@ -293,6 +310,43 @@ describe('Bedrock bearer credential diagnostic privacy', () => {
       expect(request.headers).toBe(headers);
       expect([...headers.entries()]).toEqual([['x-tenant', 'unrelated-caller-value']]);
       expect(request.redirect).toBe('follow');
+    },
+  );
+
+  test.each(
+    entrypoints.flatMap((entrypoint) =>
+      authenticationModes.flatMap((authentication) =>
+        supportedFieldBytes.map(({ format, character }) => ({
+          entrypoint,
+          authentication,
+          format,
+          character,
+        })),
+      ),
+    ),
+  )(
+    '$entrypoint $authentication preserves a valid $format bearer credential',
+    async ({ entrypoint, authentication, character }) => {
+      const credential = `valid-bedrock${character}credential`;
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const logger = createLogger();
+      const tokenProvider = vi.fn(async () => credential);
+      const client = createBedrockClient({
+        entrypoint,
+        authentication,
+        credential,
+        fetch,
+        logger,
+        tokenProvider,
+      });
+
+      await client.request({ method: 'get', path: '/models' });
+
+      const [, options] = fetch.mock.calls[0] ?? [];
+      expect(new Headers(options?.headers).get('authorization')).toBe(`Bearer ${credential}`);
+      expect(options?.redirect).toBe('manual');
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(tokenProvider).toHaveBeenCalledTimes(authentication === 'rotating' ? 1 : 0);
     },
   );
 
