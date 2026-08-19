@@ -46,6 +46,22 @@ const azureAuthenticationHeaderMutations = new WeakMap<
   Map<string, AzureAuthenticationHeaderMutation>
 >();
 
+const azureAuthenticationNullCarriers = new WeakMap<Set<string>, NullableHeaders>();
+
+const snapshotAzureAuthenticationHeaders = (
+  carrier: NullableHeaders,
+): ReadonlyArray<AzureAuthenticationLayer> | undefined => {
+  const headers = azureAuthenticationHeaders.get(carrier);
+  if (headers === undefined) return undefined;
+
+  let layers = azureAuthenticationHeaderSnapshots.get(carrier);
+  if (!layers) {
+    layers = Object.freeze(headers.map((layer) => Object.freeze([...iterateHeaders(layer)])));
+    azureAuthenticationHeaderSnapshots.set(carrier, layers);
+  }
+  return layers;
+};
+
 class DeferredAzureAuthenticationHeaders extends Headers {
   constructor() {
     super();
@@ -64,13 +80,15 @@ class DeferredAzureAuthenticationHeaders extends Headers {
     return this.current().has(normalized);
   };
 
-  override entries = () => this.current().entries();
+  override entries = (): ReturnType<Headers['entries']> =>
+    this.current().entries() as ReturnType<Headers['entries']>;
 
-  override keys = () => this.current().keys();
+  override keys = (): ReturnType<Headers['keys']> => this.current().keys() as ReturnType<Headers['keys']>;
 
-  override values = () => this.current().values();
+  override values = (): ReturnType<Headers['values']> =>
+    this.current().values() as ReturnType<Headers['values']>;
 
-  override [Symbol.iterator] = () => this.entries();
+  override [Symbol.iterator] = (): ReturnType<Headers[typeof Symbol.iterator]> => this.entries();
 
   override forEach = (
     callback: (value: string, key: string, parent: Headers) => void,
@@ -152,6 +170,92 @@ class DeferredAzureAuthenticationHeaders extends Headers {
   }
 }
 
+class DeferredAzureAuthenticationNulls extends Set<string> {
+  private initialized = false;
+  private readonly inherited = new Set<string>();
+
+  private initialize(): void {
+    if (this.initialized) return;
+    this.initialized = true;
+
+    const carrier = azureAuthenticationNullCarriers.get(this);
+    if (!carrier) return;
+
+    for (const layer of snapshotAzureAuthenticationHeaders(carrier) ?? []) {
+      for (const [name, value] of layer) {
+        const normalized = name.toLowerCase();
+        if (value === null) {
+          super.add(normalized);
+          this.inherited.add(normalized);
+        } else {
+          super.delete(normalized);
+          this.inherited.delete(normalized);
+        }
+      }
+    }
+  }
+
+  override get size(): number {
+    this.initialize();
+    return super.size;
+  }
+
+  override has(value: string): boolean {
+    this.initialize();
+    return super.has(value);
+  }
+
+  override entries(): SetIterator<[string, string]> {
+    this.initialize();
+    return super.entries();
+  }
+
+  override keys(): SetIterator<string> {
+    this.initialize();
+    return super.keys();
+  }
+
+  override values(): SetIterator<string> {
+    this.initialize();
+    return super.values();
+  }
+
+  override [Symbol.iterator](): SetIterator<string> {
+    this.initialize();
+    return super[Symbol.iterator]();
+  }
+
+  override forEach(
+    callback: (value: string, key: string, parent: Set<string>) => void,
+    thisArg?: unknown,
+  ): void {
+    this.initialize();
+    super.forEach(callback, thisArg);
+  }
+
+  override add(value: string): this {
+    this.initialize();
+    super.add(value);
+    return this;
+  }
+
+  override delete(value: string): boolean {
+    this.initialize();
+    const removed = super.delete(value);
+    if (removed && this.inherited.delete(value)) {
+      azureAuthenticationNullCarriers.get(this)?.values.delete(value);
+    }
+    return removed;
+  }
+
+  override clear(): void {
+    this.initialize();
+    for (const value of [...super.values()]) {
+      this.delete(value);
+    }
+  }
+}
+
 /**
  * Creates an authenticated Azure header carrier without first appending a raw
  * credential to native Headers, where rejected values appear in diagnostics.
@@ -160,10 +264,11 @@ export const buildAzureAuthenticationHeaders = (...headers: AzureAuthenticationV
   const carrier: NullableHeaders = {
     [brand_privateNullableHeaders]: true,
     values: new DeferredAzureAuthenticationHeaders(),
-    nulls: new Set<string>(),
+    nulls: new DeferredAzureAuthenticationNulls(),
   };
   azureAuthenticationHeaders.set(carrier, headers);
   azureAuthenticationHeaderCarriers.set(carrier.values, carrier);
+  azureAuthenticationNullCarriers.set(carrier.nulls, carrier);
   return carrier;
 };
 
@@ -177,13 +282,8 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
     const keys = deferredValues ? Headers.prototype.keys.call(values) : values.keys();
     const visibleNames = new Set([...keys, ...nullNames].map((name) => name.toLowerCase()));
     const mutations = azureAuthenticationHeaderMutations.get(values);
-    const azureHeaders = azureAuthenticationHeaders.get(headers);
-    if (azureHeaders !== undefined) {
-      let layers = azureAuthenticationHeaderSnapshots.get(headers);
-      if (!layers) {
-        layers = Object.freeze(azureHeaders.map((layer) => Object.freeze([...iterateHeaders(layer)])));
-        azureAuthenticationHeaderSnapshots.set(headers, layers);
-      }
+    const layers = snapshotAzureAuthenticationHeaders(headers);
+    if (layers !== undefined) {
       for (const layer of layers) {
         const seen = new Set<string>();
         for (const [name, value] of layer) {

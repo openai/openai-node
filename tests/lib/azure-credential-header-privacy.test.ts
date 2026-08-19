@@ -19,6 +19,7 @@ class ProtectedHookAzure extends AzureOpenAI {
   mutation: 'auth' | 'auth-null' | 'bearer' | 'admin' | undefined;
   mutationScheme: CarrierAuthenticationScheme = 'auth';
   mutateCarrier: ((headers: Headers) => void) | undefined;
+  inspectAuthenticationCarrier: ((carrier: NullableHeaders) => void) | undefined;
 
   protected override async prepareRequest(request: RequestInit): Promise<void> {
     if (this.injectedHeaders) {
@@ -70,6 +71,7 @@ class ProtectedHookAzure extends AzureOpenAI {
     }
     if (carrier && this.mutationScheme === 'auth') {
       this.mutateCarrier?.(carrier.values);
+      this.inspectAuthenticationCarrier?.(carrier);
     }
     return carrier;
   }
@@ -955,6 +957,102 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(client.fetchFailures).toBe(1);
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  test('exposes deferred Azure authentication tombstones through a genuine observable Set', async () => {
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-static-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.apiKey = null;
+    client.inspectAuthenticationCarrier = (carrier) => {
+      expect(carrier.nulls).toBeInstanceOf(Set);
+      expect(carrier.nulls.has('api-key')).toBe(true);
+      expect(carrier.nulls.size).toBe(1);
+      expect([...carrier.nulls]).toEqual(['api-key']);
+      expect([...carrier.nulls.keys()]).toEqual(['api-key']);
+      expect([...carrier.nulls.values()]).toEqual(['api-key']);
+      expect([...carrier.nulls.entries()]).toEqual([['api-key', 'api-key']]);
+      const observed: string[] = [];
+      const visitNulls = carrier.nulls.forEach.bind(carrier.nulls);
+      visitNulls((value, key, parent) => {
+        observed.push(value, key);
+        expect(parent).toBe(carrier.nulls);
+      });
+      expect(observed).toEqual(['api-key', 'api-key']);
+      expect(carrier.values.has('api-key')).toBe(false);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has('api-key')).toBe(false);
+  });
+
+  test.each(['delete', 'clear'] as const)(
+    'restores missing-authentication validation when an inherited Azure tombstone is removed with %s',
+    async (operation) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-static-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.apiKey = null;
+      client.inspectAuthenticationCarrier = (carrier) => {
+        expect(carrier.nulls.has('api-key')).toBe(true);
+        if (operation === 'delete') {
+          expect(carrier.nulls.delete('api-key')).toBe(true);
+        } else {
+          carrier.nulls.clear();
+        }
+        expect(carrier.nulls.size).toBe(0);
+        expect(carrier.values.has('api-key')).toBe(false);
+      };
+
+      await expect(client.request({ method: 'get', path: '/models' })).rejects.toThrow(
+        'Could not resolve authentication method.',
+      );
+
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['delete', 'clear'] as const)(
+    'restores a deferred static Azure credential when a caller-added tombstone is removed with %s',
+    async (operation) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-static-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.inspectAuthenticationCarrier = (carrier) => {
+        expect(carrier.nulls.has('api-key')).toBe(false);
+        expect(carrier.nulls.add('api-key')).toBe(carrier.nulls);
+        expect(carrier.nulls.has('api-key')).toBe(true);
+        if (operation === 'delete') {
+          expect(carrier.nulls.delete('api-key')).toBe(true);
+        } else {
+          carrier.nulls.clear();
+        }
+        expect(carrier.nulls.size).toBe(0);
+        expect(carrier.values.get('api-key')).toBe('configured-static-token');
+      };
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('configured-static-token');
+    },
+  );
 
   test.each(['auth', 'auth-null', 'bearer', 'admin'] as const)(
     'preserves a subclass mutation of the super %s authentication carrier',
