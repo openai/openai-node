@@ -412,6 +412,13 @@ function captureStructuredJSONSnapshot(
 ): string | null | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
   if (!descriptor) {
+    let prototype = Object.getPrototypeOf(snapshot) as object | null;
+    for (let depth = 0; prototype !== null; depth += 1) {
+      if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
+        throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+      }
+      prototype = Object.getPrototypeOf(prototype) as object | null;
+    }
     return undefined;
   }
   if (
@@ -422,6 +429,47 @@ function captureStructuredJSONSnapshot(
   }
 
   return descriptor.value as string | null | undefined;
+}
+
+function captureSnapshotArray<Item>(
+  snapshot: object,
+  property: 'choices' | 'tool_calls',
+  maximum: number,
+  kind: 'choice' | 'tool-call',
+): Item[] | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
+  if (!descriptor) {
+    let prototype = Object.getPrototypeOf(snapshot) as object | null;
+    for (let depth = 0; prototype !== null; depth += 1) {
+      if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
+        throw new OpenAIError(`Chat completion stream contains an unsafe snapshot ${kind} collection`);
+      }
+      prototype = Object.getPrototypeOf(prototype) as object | null;
+    }
+    return undefined;
+  }
+  if (!('value' in descriptor) || !Array.isArray(descriptor.value)) {
+    throw new OpenAIError(`Chat completion stream contains an unsafe snapshot ${kind} collection`);
+  }
+
+  const length = Object.getOwnPropertyDescriptor(descriptor.value, 'length');
+  if (!length || !('value' in length) || !Number.isSafeInteger(length.value) || length.value > maximum) {
+    throw new OpenAIError(`Chat completion stream exceeded its snapshot ${kind} limit`);
+  }
+
+  return descriptor.value as Item[];
+}
+
+function captureSnapshotArrayItem<Item>(array: Item[], index: number): Item | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(array, index);
+  if (!descriptor) {
+    return undefined;
+  }
+  if (!('value' in descriptor)) {
+    throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+  }
+
+  return descriptor.value as Item;
 }
 
 function validateStructuredJSONSnapshot(value: string, budget?: PartialJSONParseBudget): string {
@@ -763,6 +811,9 @@ export class ChatCompletionStream<ParsedT = null>
       const parseable = isAutoParsableTool(inputTool) || inputTool?.function.strict === true;
       let argumentsSnapshot: string;
       if (parseable) {
+        if (this.#currentChatCompletionSnapshot) {
+          this.#validateStructuredSnapshots(this.#currentChatCompletionSnapshot);
+        }
         const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
         if (typeof capturedArguments !== 'string') {
           throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
@@ -802,6 +853,9 @@ export class ChatCompletionStream<ParsedT = null>
         (!refusal && !choiceSnapshot.message.tool_calls?.length && !choiceSnapshot.message.function_call)) &&
       !state.content_done
     ) {
+      if (parseableContent && this.#currentChatCompletionSnapshot) {
+        this.#validateStructuredSnapshots(this.#currentChatCompletionSnapshot);
+      }
       state.content_done = true;
 
       this._emit('content.done', {
@@ -834,20 +888,29 @@ export class ChatCompletionStream<ParsedT = null>
     }
   }
 
-  #endRequest(): ParsedChatCompletion<ParsedT> {
-    if (this.ended) {
-      throw new OpenAIError(`stream has ended, this shouldn't happen`);
-    }
-    const snapshot = this.#currentChatCompletionSnapshot;
-    if (!snapshot) {
-      throw new OpenAIError(`request ended without sending any chunks`);
-    }
+  #validateStructuredSnapshots(snapshot: ChatCompletionSnapshot): void {
     const finalJSONBudget: PartialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
     const parseableContent = isParseableResponseFormat(this.#params?.response_format);
-    for (const choice of snapshot.choices) {
+    const choices = captureSnapshotArray<ChatCompletionSnapshot.Choice>(
+      snapshot,
+      'choices',
+      MAX_STREAM_CHOICES,
+      'choice',
+    );
+    if (!choices) {
+      throw new OpenAIError('Chat completion stream contains an unsafe snapshot choice collection');
+    }
+    for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex += 1) {
+      const choice = captureSnapshotArrayItem(choices, choiceIndex);
       if (!choice) {
         continue;
       }
+      const toolCalls = captureSnapshotArray<ChatCompletionSnapshot.Choice.Message.ToolCall>(
+        choice.message,
+        'tool_calls',
+        MAX_STREAM_TOOL_CALLS,
+        'tool-call',
+      );
       const state = this.#choiceEventStates[choice.index];
       if (parseableContent && !choice.message.refusal) {
         const content = captureStructuredJSONSnapshot(choice.message, 'content');
@@ -856,7 +919,7 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
       for (const [index, identity] of state?.tool_call_identities ?? []) {
-        const toolCall = choice.message.tool_calls?.[index];
+        const toolCall = toolCalls && captureSnapshotArrayItem(toolCalls, index);
         if (!toolCall) {
           throw new OpenAIError('Chat completion stream contains a changed tool call identity');
         }
@@ -865,7 +928,11 @@ export class ChatCompletionStream<ParsedT = null>
       if (!this.#hasAutoParseableTool) {
         continue;
       }
-      for (const toolCall of choice.message.tool_calls ?? []) {
+      for (let toolCallIndex = 0; toolCallIndex < (toolCalls?.length ?? 0); toolCallIndex += 1) {
+        const toolCall = captureSnapshotArrayItem(toolCalls!, toolCallIndex);
+        if (!toolCall) {
+          continue;
+        }
         const identity = ownFunctionToolIdentity(toolCall);
         if (!identity) {
           const type = Object.getOwnPropertyDescriptor(toolCall, 'type');
@@ -903,6 +970,17 @@ export class ChatCompletionStream<ParsedT = null>
         validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget);
       }
     }
+  }
+
+  #endRequest(): ParsedChatCompletion<ParsedT> {
+    if (this.ended) {
+      throw new OpenAIError(`stream has ended, this shouldn't happen`);
+    }
+    const snapshot = this.#currentChatCompletionSnapshot;
+    if (!snapshot) {
+      throw new OpenAIError(`request ended without sending any chunks`);
+    }
+    this.#validateStructuredSnapshots(snapshot);
     const audioDoneChoiceIndexes = this.#audioDoneChoiceIndexes;
     this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
@@ -1141,6 +1219,7 @@ export class ChatCompletionStream<ParsedT = null>
           if (!parseState.has_non_whitespace) {
             choice.message.parsed = null;
           } else if (shouldParse && reservePartialJSONParse(parseState, this.#partialJSONParseBudget)) {
+            this.#validateStructuredSnapshots(snapshot);
             choice.message.parsed = partialParse(validateStructuredJSONSnapshot(choice.message.content));
           } else if (content.length > 0) {
             choice.message.parsed = null;
@@ -1249,6 +1328,7 @@ export class ChatCompletionStream<ParsedT = null>
                   boundIdentity?.parseable === true &&
                   reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
                 ) {
+                  this.#validateStructuredSnapshots(snapshot);
                   functionSnapshot.parsed_arguments = partialParse(
                     validateStructuredJSONSnapshot(functionSnapshot.arguments),
                   );

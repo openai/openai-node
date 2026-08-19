@@ -1083,6 +1083,69 @@ it.each(['content', 'tool'] as const)(
   },
 );
 
+it.each(['data', 'accessor'] as const)(
+  'rejects inherited structured content from a %s descriptor without invoking getters',
+  async (kind) => {
+    const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    const stream = createStructuredStream('content', ['{}']);
+    const readContent = vi.fn(() => unsafe);
+
+    stream.on('chunk', (current, snapshot) => {
+      if (typeof current.choices[0]?.delta.content !== 'string') {
+        return;
+      }
+      const message = snapshot.choices[0]?.message;
+      if (!message) {
+        return;
+      }
+      const prototype = Object.create(Object.prototype) as object;
+      Object.defineProperty(prototype, 'content', kind === 'data' ? { value: unsafe } : { get: readContent });
+      Reflect.deleteProperty(message, 'content');
+      Object.setPrototypeOf(message, prototype);
+    });
+
+    const failure = await stream.finalChatCompletion().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+    expect(readContent).not.toHaveBeenCalled();
+  },
+);
+
+it.each(['choices', 'tool_calls'] as const)(
+  'rejects an oversized sparse %s snapshot before invoking its iterator',
+  async (collection) => {
+    const stream = createStructuredStream(collection === 'choices' ? 'content' : 'tool', ['{}']);
+    const iterate = vi.fn(() => {
+      throw new Error('oversized sparse snapshot must not be iterated');
+    });
+
+    stream.on('chunk', (current, snapshot) => {
+      if (!current.choices[0]?.delta.content && !current.choices[0]?.delta.tool_calls?.length) {
+        return;
+      }
+      const array = collection === 'choices' ? snapshot.choices : snapshot.choices[0]?.message.tool_calls;
+      if (!array) {
+        throw new Error('Expected a mutable public snapshot array');
+      }
+      array.length = 2 ** 32 - 1;
+      Object.defineProperty(array, Symbol.iterator, { configurable: true, value: iterate });
+    });
+
+    const failure = await stream.finalChatCompletion().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/snapshot.*(?:choice|tool).*limit/iu);
+    expect(iterate).not.toHaveBeenCalled();
+  },
+);
+
 it('enforces an aggregate final budget across independently bounded public parser snapshots', async () => {
   const edited = `{"value":"${'x'.repeat(9 * 1024 * 1024)}"}`;
 
@@ -1128,6 +1191,70 @@ it('enforces an aggregate final budget across independently bounded public parse
   expect(failure).toBeInstanceOf(Error);
   expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
 });
+
+it.each(['content', 'tool'] as const)(
+  'rejects a combined oversized %s snapshot before invoking any done-event parser',
+  async (kind) => {
+    const oversizedTogether = `{"value":"${'x'.repeat(9 * 1024 * 1024)}"}`;
+    const parse = vi.fn((value: string) => JSON.parse(value) as unknown);
+
+    async function* events(): AsyncGenerator<Chunk> {
+      if (kind === 'content') {
+        const first = chunk({ role: 'assistant', content: '{}' }, 'stop');
+        const [firstChoice] = first.choices;
+        if (!firstChoice) {
+          throw new Error('Expected the initial structured choice');
+        }
+        yield {
+          ...first,
+          choices: [firstChoice, { ...firstChoice, index: 1 }],
+        };
+        return;
+      }
+
+      yield chunk({
+        role: 'assistant',
+        tool_calls: [0, 1].map((index) => ({
+          index,
+          id: `call_${index}`,
+          type: 'function' as const,
+          function: { name: strictTool.function.name, arguments: '{}' },
+        })),
+      });
+      yield chunk({}, 'tool_calls');
+    }
+
+    const stream = ChatCompletionStream.createChatCompletion(createClient(events()), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Reject the whole aggregate before done parsing' }],
+      ...(kind === 'content'
+        ? { n: 2, response_format: makeParseableResponseFormat(structuredResponseFormat, parse) }
+        : { tools: [makeParseableTool(strictTool, { parser: parse, callback: undefined })] }),
+    });
+    stream.on('chunk', (current, snapshot) => {
+      if (kind === 'content' && typeof current.choices[0]?.delta.content === 'string') {
+        for (const choice of snapshot.choices) {
+          choice.message.content = oversizedTogether;
+        }
+      } else if (kind === 'tool' && current.choices[0]?.delta.tool_calls?.length) {
+        for (const toolCall of snapshot.choices[0]?.message.tool_calls ?? []) {
+          if (toolCall.type === 'function') {
+            toolCall.function.arguments = oversizedTogether;
+          }
+        }
+      }
+    });
+
+    const failure = await stream.finalChatCompletion().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+    expect(parse.mock.calls.length).toBe(0);
+  },
+);
 
 it('bounds a new strict tool appended to the public snapshot before its final parser', async () => {
   const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;

@@ -1173,8 +1173,12 @@ export function accumulateResponseWithContext(
   snapshot: Response | undefined,
   context: ResponseAccumulatorContext,
   rejectInvalidShellTargets = false,
+  onSanitizedEvent?: (event: ResponseStreamEvent) => void,
 ): Response {
   const dispatchEvent = sanitizeResponseEvent(event);
+  if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
+    onSanitizedEvent(dispatchEvent);
+  }
 
   if (!snapshot) {
     if (dispatchEvent.type !== 'response.created') {

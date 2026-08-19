@@ -421,6 +421,94 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     },
   );
 
+  test.each(['event', 'messageCreated'] as const)(
+    'reserves a %s-listener message-ID alias before a later duplicate creation',
+    async (listener) => {
+      const first = { id: 'msg_canonical', role: 'assistant', content: [] };
+      const alias = { id: 'msg_listener_alias', role: 'assistant', content: [] };
+      const firstEvent = { event: 'thread.message.created', data: first };
+      const runner = AssistantStream.createAssistantStream(
+        'thread_123',
+        {
+          create: vi.fn().mockResolvedValue(
+            iterableEvents([
+              firstEvent,
+              {
+                event: 'thread.message.completed',
+                data: { id: 'msg_canonical', role: 'assistant', content: [] },
+              },
+              { event: 'thread.message.created', data: alias },
+              { event: 'thread.message.completed', data: alias },
+              completedRun(),
+            ]),
+          ),
+        } as any,
+        { assistant_id: 'assistant_123' },
+      );
+      const exposed: AssistantStreamEvent[] = [];
+      const created: unknown[] = [];
+      runner.on('event', (event) => {
+        exposed.push(event);
+        if (listener === 'event' && Object.is(event.data, first)) {
+          first.id = alias.id;
+        }
+      });
+      runner.on('messageCreated', (message) => {
+        created.push(message);
+        if (listener === 'messageCreated' && Object.is(message, first)) {
+          first.id = alias.id;
+        }
+      });
+
+      await expect(runner.done()).rejects.toThrow(/already been created/u);
+      expect(exposed[0]).toBe(firstEvent);
+      expect(created[0]).toBe(first);
+      expect(first.id).toBe(alias.id);
+    },
+  );
+
+  test('normalizes an inconsistent proxy-backed message ID before exposing or retaining it', async () => {
+    const readID = vi.fn(() => 'msg_proxy_alias');
+    const source = { id: 'msg_proxy_canonical', role: 'assistant', content: [] };
+    const first = new Proxy(source, {
+      get(target, property, receiver) {
+        return property === 'id' ? readID() : Reflect.get(target, property, receiver);
+      },
+    });
+    const alias = { id: 'msg_proxy_alias', role: 'assistant', content: [] };
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi.fn().mockResolvedValue(
+          iterableEvents([
+            { event: 'thread.message.created', data: first },
+            {
+              event: 'thread.message.completed',
+              data: { id: 'msg_proxy_canonical', role: 'assistant', content: [] },
+            },
+            { event: 'thread.message.created', data: alias },
+            { event: 'thread.message.completed', data: alias },
+            completedRun(),
+          ]),
+        ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawIDs: string[] = [];
+    const createdIDs: string[] = [];
+    runner.on('event', (event) => {
+      if (event.event === 'thread.message.created') {
+        rawIDs.push(event.data.id);
+      }
+    });
+    runner.on('messageCreated', (message) => createdIDs.push(message.id));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    expect(rawIDs).toEqual(['msg_proxy_canonical', 'msg_proxy_alias']);
+    expect(createdIDs).toEqual(['msg_proxy_canonical', 'msg_proxy_alias']);
+    expect(readID).toHaveBeenCalledTimes(1);
+  });
+
   test.each(['inherited', 'accessor'] as const)(
     'rejects an %s message ID before exposing the event or invoking a getter',
     async (kind) => {

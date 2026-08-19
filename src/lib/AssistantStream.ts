@@ -107,18 +107,37 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
   const eventType = Reflect.get(event, 'event', event) as AssistantStreamEvent['event'];
   const data = Reflect.get(event, 'data', event) as AssistantStreamEvent['data'];
-  const stableEvent = Object.freeze({ event: eventType, data }) as AssistantStreamEvent;
+  let stableData = data;
+  if (
+    eventType === 'thread.message.created' ||
+    eventType === 'thread.message.in_progress' ||
+    eventType === 'thread.message.delta' ||
+    eventType === 'thread.message.completed' ||
+    eventType === 'thread.message.incomplete'
+  ) {
+    const messageID = Object.getOwnPropertyDescriptor(data, 'id');
+    if (messageID && 'value' in messageID && Reflect.get(data, 'id', data) !== messageID.value) {
+      const canonicalID = messageID.value as unknown;
+      stableData = new Proxy(data, {
+        get(target, property) {
+          return property === 'id' ? canonicalID : Reflect.get(target, property, target);
+        },
+      }) as AssistantStreamEvent['data'];
+    }
+  }
+  const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
   const ordinaryEvent =
     eventDescriptor !== undefined &&
     'value' in eventDescriptor &&
     eventDescriptor.value === eventType &&
     dataDescriptor !== undefined &&
     'value' in dataDescriptor &&
-    dataDescriptor.value === data;
+    dataDescriptor.value === data &&
+    stableData === data;
 
   return {
     event: stableEvent,
-    exposedEvent: ordinaryEvent ? event : ({ event: eventType, data } as AssistantStreamEvent),
+    exposedEvent: ordinaryEvent ? event : ({ event: eventType, data: stableData } as AssistantStreamEvent),
   };
 }
 
@@ -131,6 +150,7 @@ export class AssistantStream
   //We are accumulating many types so the value here is not strict
   #runStepSnapshots: Record<string, Runs.RunStep> = Object.create(null);
   #messageSnapshots: Record<string, Message> = Object.create(null);
+  #messageIDOwners = new Map<string, string>();
   #messageSnapshot: Message | undefined;
   #activeMessageID: string | undefined;
   #finalRun: Run | undefined;
@@ -362,13 +382,16 @@ export class AssistantStream
 
     const { event: stableEvent, exposedEvent } = stabilizeAssistantStreamEvent(event);
 
+    let messageID: string | undefined;
+    let messageData: MessageStreamEvent['data'] | undefined;
     switch (stableEvent.event) {
       case 'thread.message.created':
       case 'thread.message.in_progress':
       case 'thread.message.delta':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
-        this.#validateMessageEvent(stableEvent);
+        messageID = this.#validateMessageEvent(stableEvent);
+        messageData = stableEvent.data;
         break;
       }
     }
@@ -376,6 +399,9 @@ export class AssistantStream
     this.#currentEvent = exposedEvent;
 
     this.#handleEvent(exposedEvent);
+    if (messageID !== undefined && messageData !== undefined) {
+      this.#reserveMessageAlias(messageData, messageID);
+    }
 
     switch (stableEvent.event) {
       case 'thread.created': {
@@ -414,6 +440,9 @@ export class AssistantStream
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
         this.#handleMessage(stableEvent);
+        if (messageID !== undefined) {
+          this.#reserveMessageAlias(stableEvent.data, messageID);
+        }
         break;
       }
 
@@ -441,7 +470,7 @@ export class AssistantStream
     return this.#finalRun;
   }
 
-  #validateMessageEvent(event: MessageStreamEvent): void {
+  #validateMessageEvent(event: MessageStreamEvent): string {
     const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
     const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
 
@@ -456,14 +485,15 @@ export class AssistantStream
         );
       }
 
-      if (hasOwn(this.#messageSnapshots, messageID)) {
+      if (hasOwn(this.#messageSnapshots, messageID) || this.#messageIDOwners.has(messageID)) {
         throw new OpenAIError(
           `Received message creation for message "${messageID}", which has already been created`,
         );
       }
 
       this.#activeMessageID = messageID;
-      return;
+      this.#messageIDOwners.set(messageID, messageID);
+      return messageID;
     }
 
     if (!this.#messageSnapshot) {
@@ -481,6 +511,22 @@ export class AssistantStream
         `Received ${event.event} for message "${messageID}", which does not match the active message "${this.#activeMessageID}"`,
       );
     }
+    return messageID;
+  }
+
+  #reserveMessageAlias(data: MessageStreamEvent['data'], canonicalID: string): void {
+    const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
+    const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof messageID !== 'string' || messageID.length === 0) {
+      throw new OpenAIError('Received assistant message event with an invalid message ID');
+    }
+    const owner = this.#messageIDOwners.get(messageID);
+    if (owner !== undefined && owner !== canonicalID) {
+      throw new OpenAIError(
+        `Received message creation for message "${messageID}", which has already been created`,
+      );
+    }
+    this.#messageIDOwners.set(messageID, canonicalID);
   }
 
   #handleMessage(this: AssistantStream, event: MessageStreamEvent) {

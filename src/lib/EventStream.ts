@@ -1,4 +1,23 @@
-import { APIUserAbortError, OpenAIError } from '../error';
+import {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIError,
+  APIUserAbortError,
+  AuthenticationError,
+  BadRequestError,
+  ConflictError,
+  ContentFilterFinishReasonError,
+  InternalServerError,
+  InvalidWebhookSignatureError,
+  LengthFinishReasonError,
+  NotFoundError,
+  OAuthError,
+  OpenAIError,
+  PermissionDeniedError,
+  RateLimitError,
+  SubjectTokenProviderError,
+  UnprocessableEntityError,
+} from '../error';
 
 const MAX_BUFFERED_ITERATOR_EVENTS = 4096;
 const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
@@ -16,6 +35,7 @@ const typedArrayLengthGetter = Object.getOwnPropertyDescriptor(
   'length',
 )?.get;
 const dataViewBufferGetter = Object.getOwnPropertyDescriptor(DataView.prototype, 'buffer')?.get;
+const symbolDescriptionGetter = Object.getOwnPropertyDescriptor(Symbol.prototype, 'description')?.get;
 const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
 const sharedArrayBufferByteLengthGetter =
   typeof SharedArrayBuffer === 'function'
@@ -33,9 +53,24 @@ const nativeErrorBrand =
 const nativeErrorConstructorSource = functionToString.call(Error);
 const nativeFunctionConstructorSource = functionToString.call(Function);
 const trustedIntrinsicPrototypes = new Set<object>([
+  APIConnectionError.prototype,
+  APIConnectionTimeoutError.prototype,
+  APIError.prototype,
   OpenAIError.prototype,
   APIUserAbortError.prototype,
-  Object.getPrototypeOf(APIUserAbortError.prototype) as object,
+  AuthenticationError.prototype,
+  BadRequestError.prototype,
+  ConflictError.prototype,
+  ContentFilterFinishReasonError.prototype,
+  InternalServerError.prototype,
+  InvalidWebhookSignatureError.prototype,
+  LengthFinishReasonError.prototype,
+  NotFoundError.prototype,
+  OAuthError.prototype,
+  PermissionDeniedError.prototype,
+  RateLimitError.prototype,
+  SubjectTokenProviderError.prototype,
+  UnprocessableEntityError.prototype,
 ]);
 const trustedNativeConstructorSources = new Set<string>();
 const canonicalIntrinsicDescriptors = new Map<string, ReadonlyMap<PropertyKey, PropertyDescriptor>>();
@@ -569,8 +604,11 @@ function visitInspectableEventProperties(
   }
 
   for (const key of keys) {
-    if (!charge((typeof key === 'string' ? key.length : (key.description?.length ?? 0)) * 2 + 8)) {
+    if (!charge(typeof key === 'string' ? key.length * 2 + 8 : 8)) {
       return false;
+    }
+    if (typeof key === 'symbol') {
+      visit(key, depth + 1);
     }
 
     const descriptor = Object.getOwnPropertyDescriptor(current, key);
@@ -634,11 +672,11 @@ function visitRetainedEventPrototypes(
         ) {
           continue;
         }
-        if (
-          !charge((typeof key === 'string' ? key.length : (key.description?.length ?? 0)) * 2 + 8) ||
-          !('value' in descriptor)
-        ) {
+        if (!charge(typeof key === 'string' ? key.length * 2 + 8 : 8) || !('value' in descriptor)) {
           return false;
+        }
+        if (typeof key === 'symbol') {
+          visit(key, prototypeDepth + 1);
         }
         visit(descriptor.value, prototypeDepth + 1);
       }
@@ -655,6 +693,21 @@ function visitRetainedEventPrototypes(
 function estimateBufferedEventBytes(value: unknown, remainingBytes: number): number {
   let bytes = 0;
   const visited = new WeakSet<object>();
+  const visitedSymbols = new Set<symbol>();
+
+  const visitSymbol = (current: symbol): void => {
+    if (visitedSymbols.has(current)) {
+      bytes += 8;
+      return;
+    }
+    visitedSymbols.add(current);
+    if (!symbolDescriptionGetter) {
+      bytes = remainingBytes + 1;
+      return;
+    }
+    const description = Reflect.apply(symbolDescriptionGetter, current, []) as string | undefined;
+    bytes += 8 + (description?.length ?? 0) * 2;
+  };
 
   const visit = (current: unknown, depth: number, isBlobInternalHandle = false): void => {
     if (bytes > remainingBytes) {
@@ -663,6 +716,11 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
 
     if (typeof current === 'string') {
       bytes += current.length * 2;
+      return;
+    }
+
+    if (typeof current === 'symbol') {
+      visitSymbol(current);
       return;
     }
 

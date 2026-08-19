@@ -1,6 +1,14 @@
 import { runInNewContext } from 'node:vm';
 import { vi } from 'vitest';
-import { APIUserAbortError, OpenAIError } from 'openai/error';
+import {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  ContentFilterFinishReasonError,
+  LengthFinishReasonError,
+  OpenAIError,
+  SubjectTokenProviderError,
+} from 'openai/error';
 import { EventStream } from 'openai/lib/EventStream';
 import type { BaseEvents } from 'openai/lib/EventStream';
 
@@ -194,6 +202,58 @@ describe('EventStream.events', () => {
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 
+  test.each([
+    { name: 'length finish', create: () => new LengthFinishReasonError() },
+    { name: 'content filter', create: () => new ContentFilterFinishReasonError() },
+    { name: 'connection', create: () => new APIConnectionError({ message: 'connection failure' }) },
+    { name: 'connection timeout', create: () => new APIConnectionTimeoutError() },
+    {
+      name: 'subject token provider',
+      create: () => new SubjectTokenProviderError('token failure', 'trusted-provider'),
+    },
+  ])('preserves a queued genuine $name SDK error subclass', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('error');
+    const error = create();
+
+    stream.emitError(error);
+
+    await expect(iterator.next()).resolves.toEqual({ value: [error], done: false });
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  test('rejects a producer-owned SDK Error subclass prototype without invoking its callable', async () => {
+    const retained = 'x'.repeat(9 * 1024 * 1024);
+    const inspectRetained = vi.fn(() => retained);
+    const prototype = Object.create(OpenAIError.prototype) as object;
+    Object.defineProperty(prototype, 'inspectRetained', { value: inspectRetained });
+    const error = new OpenAIError('producer-controlled subclass');
+    Object.setPrototypeOf(error, prototype);
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(error);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(inspectRetained).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects a producer-owned accessor on a genuine SDK Error without invoking it', async () => {
+    const retained = 'x'.repeat(9 * 1024 * 1024);
+    const getter = vi.fn(() => retained);
+    const error = new LengthFinishReasonError();
+    Object.defineProperty(error, 'retained', { configurable: true, enumerable: false, get: getter });
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(error);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(getter).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
   test("yields the 'abort' event as a value instead of rejecting when iterating it", async () => {
     const stream = new TestStream();
     const iterator = stream.events('abort');
@@ -242,6 +302,50 @@ describe('EventStream.events', () => {
 });
 
 describe('EventStream iterator buffer limits', () => {
+  test.each([
+    { name: 'root symbol', create: (value: symbol) => value },
+    { name: 'nested symbol', create: (value: symbol) => ({ nested: [value] }) },
+    { name: 'Map-key symbol', create: (value: symbol) => new Map([[value, 'small']]) },
+    { name: 'Set-value symbol', create: (value: symbol) => new Set([value]) },
+    { name: 'symbol property key', create: (value: symbol) => ({ [value]: 'small' }) },
+  ])('charges retained description storage for a $name', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(create(Symbol('x'.repeat(5 * 1024 * 1024))));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('uses the captured intrinsic symbol-description getter without invoking a replacement', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const replacement = vi.spyOn(Symbol.prototype, 'description', 'get').mockReturnValue('small');
+
+    try {
+      stream.emitPayload(Symbol('x'.repeat(5 * 1024 * 1024)));
+      expect(replacement).not.toHaveBeenCalled();
+    } finally {
+      replacement.mockRestore();
+    }
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('charges a repeatedly retained symbol description only once', async () => {
+    const symbol = Symbol('x'.repeat(3 * 1024 * 1024));
+    const payload = { root: symbol, nested: [symbol], map: new Map([[symbol, symbol]]) };
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(false);
+    await expect(iterator.next()).resolves.toEqual({ value: [payload], done: false });
+  });
+
   test('aborts detached iterators after the queued-event high-water mark', async () => {
     const stream = new TestStream();
     const iterator = stream.events('foo');
