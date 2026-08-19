@@ -225,19 +225,17 @@ function createStreamingToolClient(content: string | readonly string[], tool: Ch
     ...chunk,
     choices: [{ index: 0, finish_reason: 'tool_calls', logprobs: null, delta: {} }],
   };
-  const continuationChunks = fragments.slice(1).map(
-    (fragment): OpenAI.Chat.ChatCompletionChunk => ({
-      ...chunk,
-      choices: [
-        {
-          index: 0,
-          finish_reason: null,
-          logprobs: null,
-          delta: { tool_calls: [{ index: 0, function: { arguments: fragment } }] },
-        },
-      ],
-    }),
-  );
+  const continuationChunks = fragments.slice(1).map((fragment): OpenAI.Chat.ChatCompletionChunk => ({
+    ...chunk,
+    choices: [
+      {
+        index: 0,
+        finish_reason: null,
+        logprobs: null,
+        delta: { tool_calls: [{ index: 0, function: { arguments: fragment } }] },
+      },
+    ],
+  }));
   const streamBody = [chunk, ...continuationChunks, completedChunk]
     .map((entry) => `data: ${JSON.stringify(entry)}\n\n`)
     .join('');
@@ -264,26 +262,24 @@ function createStreamingContentClient(
   format: typeof chatFormat | (typeof helperFamilies)[number]['chatFormat'],
   refusal?: string,
 ) {
-  const chunks = contents.map(
-    (content, index): OpenAI.Chat.ChatCompletionChunk => ({
-      id: 'chatcmpl_content_privacy',
-      object: 'chat.completion.chunk',
-      created: 0,
-      model: 'gpt-test',
-      choices: [
-        {
-          index: 0,
-          finish_reason: null,
-          logprobs: null,
-          delta: {
-            ...(index === 0 ? { role: 'assistant' as const } : {}),
-            ...(index === 0 && refusal ? { refusal } : {}),
-            content,
-          },
+  const chunks = contents.map((content, index): OpenAI.Chat.ChatCompletionChunk => ({
+    id: 'chatcmpl_content_privacy',
+    object: 'chat.completion.chunk',
+    created: 0,
+    model: 'gpt-test',
+    choices: [
+      {
+        index: 0,
+        finish_reason: null,
+        logprobs: null,
+        delta: {
+          ...(index === 0 ? { role: 'assistant' as const } : {}),
+          ...(index === 0 && refusal ? { refusal } : {}),
+          content,
         },
-      ],
-    }),
-  );
+      },
+    ],
+  }));
   const completedChunk: OpenAI.Chat.ChatCompletionChunk = {
     id: 'chatcmpl_content_privacy',
     object: 'chat.completion.chunk',
