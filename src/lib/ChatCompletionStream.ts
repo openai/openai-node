@@ -270,6 +270,7 @@ interface ValidatedChoiceSnapshot {
   message: ChatCompletionSnapshot.Choice.Message;
   content: string | null | undefined;
   refusal: string | null | undefined;
+  toolCallCollection: ChatCompletionSnapshot.Choice.Message.ToolCall[] | undefined;
   toolCalls: ReadonlyMap<number, ValidatedToolCallSnapshot>;
 }
 
@@ -1220,12 +1221,21 @@ export class ChatCompletionStream<ParsedT = null>
       const refusal = captureStructuredJSONSnapshot(message, 'refusal');
       const content = captureStructuredJSONSnapshot(message, 'content');
       const validatedTools = new Map<number, ValidatedToolCallSnapshot>();
-      validatedMessages.set(choice, Object.freeze({ message, content, refusal, toolCalls: validatedTools }));
       const toolCalls = captureSnapshotArray<ChatCompletionSnapshot.Choice.Message.ToolCall>(
         message,
         'tool_calls',
         MAX_STREAM_TOOL_CALLS,
         'tool-call',
+      );
+      validatedMessages.set(
+        choice,
+        Object.freeze({
+          message,
+          content,
+          refusal,
+          toolCallCollection: toolCalls,
+          toolCalls: validatedTools,
+        }),
       );
       const state = this.#choiceEventStates[choice.index];
       if (parseableContent && !refusal && typeof content === 'string') {
@@ -1744,6 +1754,9 @@ function finalizeChatCompletion<ParsedT>(
             if (property === 'refusal') {
               return validated.refusal;
             }
+            if (property === 'tool_calls') {
+              return validated.toolCallCollection;
+            }
             return Reflect.get(target, property, receiver);
           },
         });
@@ -1805,6 +1818,20 @@ function finalizeChatCompletion<ParsedT>(
                 'tool-call',
                 (tool_call, i): ChatCompletionMessageToolCall => {
                   const captured = validated.toolCalls.get(i);
+                  if (!captured) {
+                    const identity = ownFunctionToolIdentity(tool_call);
+                    if (
+                      identity &&
+                      shouldParseToolCall(params, {
+                        type: identity.type,
+                        function: { name: identity.name },
+                      })
+                    ) {
+                      throw new OpenAIError(
+                        'Chat completion stream contains an unsafe structured JSON snapshot',
+                      );
+                    }
+                  }
                   if (captured && captured.tool !== tool_call) {
                     throw new OpenAIError('Chat completion stream contains a changed tool call identity');
                   }

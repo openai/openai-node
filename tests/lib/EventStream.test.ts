@@ -1010,8 +1010,8 @@ describe('EventStream iterator buffer limits', () => {
     stream.end();
   });
 
-  test.each([4096, 4097])(
-    'bounds ordinary queued arrays at the %i-element inspection boundary',
+  test.each([4096, 4097, 8192])(
+    'buffers ordinary %i-element arrays within the retained-byte budget',
     async (length) => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
@@ -1019,14 +1019,9 @@ describe('EventStream iterator buffer limits', () => {
 
       stream.emitPayload(payload);
 
-      if (length === 4096) {
-        await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
-        stream.end();
-        return;
-      }
-
-      expect(stream.controller.signal.aborted).toBe(true);
-      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+      expect(stream.controller.signal.aborted).toBe(false);
+      stream.end();
     },
   );
 

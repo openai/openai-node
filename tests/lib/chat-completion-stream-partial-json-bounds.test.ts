@@ -1778,6 +1778,138 @@ it.each(['choice', 'message'] as const)(
   },
 );
 
+it.each(['strict', 'auto-parseable'] as const)(
+  'binds absent %s tool-call collections without invoking transparent proxy getters',
+  async (kind) => {
+    const unsafe =
+      kind === 'strict'
+        ? `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`
+        : `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    const parser = vi.fn((value: string) => JSON.parse(value) as unknown);
+    const tool =
+      kind === 'auto-parseable' ? makeParseableTool(strictTool, { parser, callback: vi.fn() }) : strictTool;
+    const stream = ChatCompletionStream.createChatCompletion(createClient(contentFragments(['ordinary'])), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Bind the absence of validated tool calls' }],
+      tools: [tool],
+    });
+    const injected = [
+      {
+        id: 'call_unvalidated',
+        type: 'function' as const,
+        function: { name: 'bounded_tool', arguments: unsafe },
+      },
+    ];
+    const read = vi.fn(() => injected);
+    let publicSnapshot: typeof stream.currentChatCompletionSnapshot;
+
+    stream.on('chunk', (_current, snapshot) => {
+      publicSnapshot = snapshot;
+    });
+    stream.on('content.done', () => {
+      const choice = publicSnapshot?.choices[0];
+      if (!choice || Object.getOwnPropertyDescriptor(choice.message, 'tool_calls')) {
+        throw new Error('Expected a message without an own tool-call collection');
+      }
+      choice.message = new Proxy(choice.message, {
+        get(target, property, receiver) {
+          return property === 'tool_calls' ? read() : Reflect.get(target, property, receiver);
+        },
+      });
+    });
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(read).not.toHaveBeenCalled();
+    expect(parser).not.toHaveBeenCalled();
+    expect(completion.choices[0]?.message.tool_calls).toBeUndefined();
+  },
+);
+
+it.each(['strict', 'auto-parseable'] as const)(
+  'rejects an uncaptured %s tool entry revealed after collection validation',
+  async (kind) => {
+    const parser = vi.fn((value: string) => JSON.parse(value) as unknown);
+    const tool =
+      kind === 'auto-parseable' ? makeParseableTool(strictTool, { parser, callback: vi.fn() }) : strictTool;
+    const stream = ChatCompletionStream.createChatCompletion(createClient(contentFragments(['ordinary'])), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Reject a parseable entry absent from its validated frame' }],
+      tools: [tool],
+    });
+    const injected = [
+      {
+        id: 'call_uncaptured',
+        type: 'function' as const,
+        function: { name: 'bounded_tool', arguments: '{"value":"unvalidated"}' },
+      },
+    ];
+    let inspections = 0;
+    const changingCollection = new Proxy(injected, {
+      getOwnPropertyDescriptor(target, property) {
+        if (property === '0' && inspections === 0) {
+          inspections += 1;
+          return Reflect.getOwnPropertyDescriptor(target, 'absent');
+        }
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+    });
+    let publicSnapshot: typeof stream.currentChatCompletionSnapshot;
+
+    stream.on('chunk', (_current, snapshot) => {
+      publicSnapshot = snapshot;
+    });
+    stream.on('content.done', () => {
+      const message = publicSnapshot?.choices[0]?.message;
+      if (!message) {
+        throw new Error('Expected a completed public message');
+      }
+      Object.defineProperty(message, 'tool_calls', {
+        configurable: true,
+        enumerable: true,
+        value: changingCollection,
+      });
+    });
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(/unsafe structured JSON snapshot/u);
+    expect(parser).not.toHaveBeenCalled();
+  },
+);
+
+it('buffers an actual detached logprobs event containing more than 4,096 tokens', async () => {
+  const tokens = Array.from({ length: 4097 }, () => ({
+    token: 'x',
+    logprob: 0,
+    bytes: [120],
+    top_logprobs: [],
+  }));
+
+  async function* logprobChunks(): AsyncGenerator<Chunk> {
+    yield chunk({ role: 'assistant' });
+    const event = chunk({ content: 'x' });
+    const [choice] = event.choices;
+    if (!choice) {
+      throw new Error('Expected a chat completion choice');
+    }
+    choice.logprobs = { content: tokens, refusal: null };
+    yield event;
+    yield chunk({}, 'stop');
+  }
+
+  const stream = ChatCompletionStream.createChatCompletion(createClient(logprobChunks()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Buffer every valid token logprob' }],
+    logprobs: true,
+  });
+  const iterator = stream.events('logprobs.content.done');
+
+  const completion = await stream.finalChatCompletion();
+  const event = await iterator.next();
+
+  expect(event.value?.[0].content).toHaveLength(4097);
+  expect(completion.choices[0]?.logprobs?.content).toHaveLength(4097);
+});
+
 it.each([
   { kind: 'strict', limit: 'byte' },
   { kind: 'strict', limit: 'depth' },

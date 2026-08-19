@@ -620,6 +620,7 @@ function visitHiddenEventValues(
 function getInspectableEventKeys(
   current: object,
   kind: RetainedStorage['kind'] | undefined,
+  availableBytes: number,
 ): (string | symbol)[] | undefined {
   if (Array.isArray(current)) {
     const descriptor = Object.getOwnPropertyDescriptor(current, 'length');
@@ -627,7 +628,8 @@ function getInspectableEventKeys(
     if (
       typeof length !== 'number' ||
       !Number.isSafeInteger(length) ||
-      length > MAX_INSPECTABLE_TYPED_ARRAY_ELEMENTS
+      length < 0 ||
+      length > Math.floor(availableBytes / 16)
     ) {
       return undefined;
     }
@@ -661,10 +663,11 @@ function visitInspectableEventProperties(
   current: object,
   kind: RetainedStorage['kind'] | undefined,
   depth: number,
+  availableBytes: () => number,
   charge: (bytes: number) => boolean,
   visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
 ): boolean {
-  const keys = getInspectableEventKeys(current, kind);
+  const keys = getInspectableEventKeys(current, kind, availableBytes());
   if (keys === undefined) {
     return false;
   }
@@ -698,6 +701,7 @@ function visitRetainedEventPrototypes(
   depth: number,
   isBlobInternalHandle: boolean,
   visited: WeakSet<object>,
+  availableBytes: () => number,
   charge: (bytes: number) => boolean,
   visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
 ): boolean {
@@ -746,7 +750,9 @@ function visitRetainedEventPrototypes(
         }
         visit(descriptor.value, prototypeDepth + 1);
       }
-    } else if (!visitInspectableEventProperties(prototype, undefined, prototypeDepth, charge, visit)) {
+    } else if (
+      !visitInspectableEventProperties(prototype, undefined, prototypeDepth, availableBytes, charge, visit)
+    ) {
       return false;
     }
 
@@ -760,6 +766,7 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
   let bytes = 0;
   const visited = new WeakSet<object>();
   const visitedSymbols = new Set<symbol>();
+  const availableBytes = (): number => remainingBytes - bytes;
 
   const visitSymbol = (current: symbol): void => {
     if (visitedSymbols.has(current)) {
@@ -824,6 +831,7 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
         depth,
         isBlobInternalHandle,
         visited,
+        availableBytes,
         (overhead) => {
           bytes += overhead;
           return bytes <= remainingBytes;
@@ -856,6 +864,7 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
         current,
         retainedStorage?.kind,
         depth,
+        availableBytes,
         (overhead) => {
           bytes += overhead;
           return bytes <= remainingBytes;
