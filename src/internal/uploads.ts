@@ -36,7 +36,10 @@ export interface StreamingFile {
   /** Source chunks read incrementally as the multipart request body is transmitted. */
   readonly data: StreamingFileInput;
 
-  /** Filename sent in the multipart part's `Content-Disposition` header. */
+  /**
+   * Logical source filename; ordinary uploads send its basename, while Skills can preserve
+   * a validated relative directory path.
+   */
   readonly name: string;
 
   /** Optional MIME type; defaults to `application/octet-stream` when omitted. */
@@ -51,7 +54,8 @@ export interface StreamingFile {
  * form data when the request is sent.
  *
  * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
- * @param name Non-empty filename sent in the multipart request.
+ * @param name Non-empty logical/source filename. Ordinary uploads send only its basename; Skills
+ * uploads may preserve a validated relative path with normalized forward slashes.
  * @param options Optional MIME type for the streaming file.
  * @throws {TypeError} If `name` is empty or the content type contains control characters.
  */
@@ -152,7 +156,7 @@ export function makeFile(
  *
  * Directory components separated by either `/` or `\\` are discarded unless an
  * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
- * paths use forward slashes. Paths inferred from URLs and filesystem streams always
+ * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
  * discard their directories.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
@@ -160,9 +164,9 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
     return undefined;
   }
 
+  const name = 'name' in value ? value.name : undefined;
   const explicitName =
-    ('name' in value && value.name && String(value.name)) ||
-    ('filename' in value && value.filename && String(value.filename));
+    (name && String(name)) || ('filename' in value && value.filename && String(value.filename));
   if (explicitName) {
     return options?.stripFilename === false ? normalizeFilenamePath(explicitName) : basename(explicitName);
   }
@@ -185,7 +189,11 @@ function basename(value: string): string | undefined {
 }
 
 function normalizeFilenamePath(value: string): string {
-  return value.replace(/\\/g, '/');
+  const normalized = value.replace(/\\/g, '/');
+  if (normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) || normalized.split('/').includes('..')) {
+    throw new TypeError('Upload file name must be a safe relative path without parent directory segments');
+  }
+  return normalized;
 }
 
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
@@ -369,12 +377,34 @@ const hasUploadableValue = (value: unknown): boolean => {
 
 type FormEntry = { key: string; value: unknown };
 
+const snapshotPreservedUploadEntries = (
+  entries: Iterable<FormEntry>,
+  filenames: WeakMap<object, string>,
+): FormEntry[] => {
+  const snapshot: FormEntry[] = [];
+  for (const entry of entries) {
+    if (isUploadable(entry.value) && !filenames.has(entry.value)) {
+      filenames.set(entry.value, getStreamingFileName(entry.value, { stripFilenames: false }));
+    }
+    snapshot.push(entry);
+  }
+  return snapshot;
+};
+
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
   options: CreateFormOptions = {},
 ): RequestOptions => {
+  const entries = iterateFormEntries(opts.body);
+  const preservedFilenames = options.stripFilenames === false ? new WeakMap<object, string>() : undefined;
+  const multipartEntries = preservedFilenames
+    ? snapshotPreservedUploadEntries(entries, preservedFilenames)
+    : entries;
+
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
-  const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options));
+  const body = ReadableStreamFrom(
+    iterateMultipartBody(multipartEntries, boundary, options, preservedFilenames),
+  );
 
   return {
     ...opts,
@@ -384,13 +414,14 @@ const createStreamingFormRequestOptions = (
 };
 
 async function* iterateMultipartBody(
-  body: unknown,
+  entries: Iterable<FormEntry>,
   boundary: string,
   options: CreateFormOptions,
+  preservedFilenames?: WeakMap<object, string>,
 ): AsyncGenerator<Uint8Array> {
-  for await (const { key, value } of iterateFormEntries(body)) {
+  for await (const { key, value } of entries) {
     if (isUploadable(value)) {
-      const filename = getStreamingFileName(value, options);
+      const filename = preservedFilenames?.get(value) ?? getStreamingFileName(value, options);
       const type = getStreamingFileType(value);
       yield encodeUTF8(`--${boundary}\r\n`);
       yield encodeUTF8(
@@ -410,7 +441,7 @@ async function* iterateMultipartBody(
   yield encodeUTF8(`--${boundary}--\r\n`);
 }
 
-async function* iterateFormEntries(body: unknown): AsyncGenerator<FormEntry> {
+function* iterateFormEntries(body: unknown): Generator<FormEntry> {
   if (!body || typeof body !== 'object') {
     return;
   }
@@ -420,7 +451,7 @@ async function* iterateFormEntries(body: unknown): AsyncGenerator<FormEntry> {
   }
 }
 
-async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<FormEntry> {
+function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
   if (value === undefined) {
     return;
   }
@@ -459,7 +490,9 @@ function getStreamingFileName(value: Uploadable, options: CreateFormOptions): st
       throw new TypeError('Streaming upload file name must be a non-empty string');
     }
 
-    return options.stripFilenames === false ? normalizeFilenamePath(name) : name;
+    return options.stripFilenames === false
+      ? normalizeFilenamePath(name)
+      : (basename(name) ?? 'unknown_file');
   }
 
   return getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
