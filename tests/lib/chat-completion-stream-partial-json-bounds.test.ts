@@ -1115,6 +1115,150 @@ it.each(['data', 'accessor'] as const)(
   },
 );
 
+it.each(['refusal', 'message'] as const)(
+  'rejects a stateful structured %s accessor before invoking it or an oversized parser',
+  async (property) => {
+    const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    const stream = createStructuredStream('content', ['{}']);
+    const parse = vi.spyOn(partialJSONParser, 'partialParse');
+    let read: (() => unknown) | undefined;
+
+    stream.on('chunk', (current, snapshot) => {
+      if (typeof current.choices[0]?.delta.content !== 'string') {
+        return;
+      }
+      const [choice] = snapshot.choices;
+      if (!choice) {
+        throw new Error('Expected a structured choice');
+      }
+      const original = choice.message;
+      original.content = unsafe;
+      if (property === 'refusal') {
+        const readRefusal = vi.fn(() => (readRefusal.mock.calls.length === 1 ? 'Request refused' : null));
+        read = readRefusal;
+        Object.defineProperty(original, property, { configurable: true, enumerable: true, get: readRefusal });
+      } else {
+        const safe = { ...original, content: '{}' };
+        const readMessage = vi.fn(() => (readMessage.mock.calls.length === 1 ? safe : original));
+        read = readMessage;
+        Object.defineProperty(choice, property, { configurable: true, enumerable: true, get: readMessage });
+      }
+    });
+
+    const failure = await stream.finalChatCompletion().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+    expect(read).not.toHaveBeenCalled();
+    expect(parse.mock.calls.every(([value]) => value.length < 16 * 1024 * 1024)).toBe(true);
+  },
+);
+
+it('rejects an inherited structured refusal accessor without invoking it', async () => {
+  const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+  const stream = createStructuredStream('content', ['{}']);
+  const read = vi.fn(() => 'Request refused');
+
+  stream.on('chunk', (current, snapshot) => {
+    if (typeof current.choices[0]?.delta.content !== 'string') {
+      return;
+    }
+    const message = snapshot.choices[0]?.message;
+    if (!message) {
+      throw new Error('Expected a structured message');
+    }
+    message.content = unsafe;
+    Reflect.deleteProperty(message, 'refusal');
+    Object.setPrototypeOf(message, Object.defineProperty({}, 'refusal', { get: read }));
+  });
+
+  const failure = await stream.finalChatCompletion().then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('rejects an inherited structured choice message without invoking its getter', async () => {
+  const stream = createStructuredStream('content', ['{}']);
+  const read = vi.fn(() => ({ content: '{}', role: 'assistant' }));
+
+  stream.on('chunk', (current, snapshot) => {
+    if (typeof current.choices[0]?.delta.content !== 'string') {
+      return;
+    }
+    const [choice] = snapshot.choices;
+    if (!choice) {
+      throw new Error('Expected a structured choice');
+    }
+    Reflect.deleteProperty(choice, 'message');
+    Object.setPrototypeOf(choice, Object.defineProperty({}, 'message', { get: read }));
+  });
+
+  const failure = await stream.finalChatCompletion().then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+  expect(read).not.toHaveBeenCalled();
+});
+
+it.each(['choice', 'message'] as const)(
+  'binds descriptor-validated structured values through final parsing without %s proxy reads',
+  async (kind) => {
+    const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    const stream = createStructuredStream('content', ['{}']);
+    const read = vi.fn();
+    let currentSnapshot: typeof stream.currentChatCompletionSnapshot;
+
+    stream.on('chunk', (_current, snapshot) => {
+      currentSnapshot = snapshot;
+    });
+    stream.on('content.done', () => {
+      const snapshot = currentSnapshot;
+      const choice = snapshot?.choices[0];
+      if (!snapshot || !choice) {
+        throw new Error('Expected a completed structured choice');
+      }
+      if (kind === 'choice') {
+        const unsafeMessage = { ...choice.message, content: unsafe };
+        snapshot.choices[0] = new Proxy(choice, {
+          get(target, property, receiver) {
+            if (property === 'message') {
+              read();
+              return unsafeMessage;
+            }
+            return Reflect.get(target, property, receiver);
+          },
+        });
+      } else {
+        choice.message = new Proxy(choice.message, {
+          get(target, property, receiver) {
+            if (property === 'content' || property === 'refusal') {
+              read();
+              return property === 'content' ? unsafe : 'Request refused';
+            }
+            return Reflect.get(target, property, receiver);
+          },
+        });
+      }
+    });
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(read).not.toHaveBeenCalled();
+    expect(completion.choices[0]?.message).toMatchObject({ content: '{}', parsed: {} });
+  },
+);
+
 it.each(['choices', 'tool_calls'] as const)(
   'rejects an oversized sparse %s snapshot before invoking its iterator',
   async (collection) => {

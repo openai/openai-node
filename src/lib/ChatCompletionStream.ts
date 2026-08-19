@@ -266,6 +266,12 @@ interface ChoiceEventState {
   tool_call_identities: Map<number, ToolCallIdentity>;
 }
 
+interface ValidatedChoiceSnapshot {
+  message: ChatCompletionSnapshot.Choice.Message;
+  content: string | null | undefined;
+  refusal: string | null | undefined;
+}
+
 interface ToolCallIdentity {
   type: 'function';
   name: string;
@@ -417,7 +423,7 @@ function reservePartialJSONParse(state: PartialJSONParseState, budget: PartialJS
 
 function captureStructuredJSONSnapshot(
   snapshot: object,
-  property: 'content' | 'arguments',
+  property: 'content' | 'arguments' | 'refusal',
 ): string | null | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
   if (!descriptor) {
@@ -438,6 +444,22 @@ function captureStructuredJSONSnapshot(
   }
 
   return descriptor.value as string | null | undefined;
+}
+
+function captureStructuredMessageSnapshot(
+  choice: ChatCompletionSnapshot.Choice,
+): ChatCompletionSnapshot.Choice.Message {
+  const descriptor = Object.getOwnPropertyDescriptor(choice, 'message');
+  if (
+    !descriptor ||
+    !('value' in descriptor) ||
+    typeof descriptor.value !== 'object' ||
+    descriptor.value === null
+  ) {
+    throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+  }
+
+  return descriptor.value as ChatCompletionSnapshot.Choice.Message;
 }
 
 function captureSnapshotArray<Item>(
@@ -700,40 +722,43 @@ export class ChatCompletionStream<ParsedT = null>
     for (const choice of chunk.choices) {
       const choiceSnapshot = completion.choices[choice.index]!;
       const { delta } = choice;
-      const parseableContent =
-        !choiceSnapshot.message.refusal && isParseableResponseFormat(this.#params?.response_format);
+      const structuredResponse = isParseableResponseFormat(this.#params?.response_format);
+      const boundedSnapshot = structuredResponse || this.#hasAutoParseableTool;
+      const messageSnapshot = boundedSnapshot
+        ? captureStructuredMessageSnapshot(choiceSnapshot)
+        : choiceSnapshot.message;
+      const refusal = boundedSnapshot
+        ? captureStructuredJSONSnapshot(messageSnapshot, 'refusal')
+        : messageSnapshot.refusal;
+      const parseableContent = !refusal && structuredResponse;
       const messageContent = parseableContent
-        ? captureStructuredJSONSnapshot(choiceSnapshot.message, 'content')
-        : choiceSnapshot.message.content;
+        ? captureStructuredJSONSnapshot(messageSnapshot, 'content')
+        : messageSnapshot.content;
 
-      if (delta?.content != null && choiceSnapshot.message?.role === 'assistant' && messageContent) {
+      if (delta?.content != null && messageSnapshot.role === 'assistant' && messageContent) {
         this._emit('content', delta.content, messageContent);
         this._emit('content.delta', {
           delta: delta.content,
           snapshot: messageContent,
-          parsed: choiceSnapshot.message.parsed,
+          parsed: messageSnapshot.parsed,
         });
       }
 
-      if (
-        delta?.refusal != null &&
-        choiceSnapshot.message?.role === 'assistant' &&
-        choiceSnapshot.message?.refusal
-      ) {
+      if (delta?.refusal != null && messageSnapshot.role === 'assistant' && refusal) {
         this._emit('refusal.delta', {
           delta: delta.refusal,
-          snapshot: choiceSnapshot.message.refusal,
+          snapshot: refusal,
         });
       }
 
-      if (choice.logprobs?.content != null && choiceSnapshot.message?.role === 'assistant') {
+      if (choice.logprobs?.content != null && messageSnapshot.role === 'assistant') {
         this._emit('logprobs.content.delta', {
           content: choice.logprobs?.content,
           snapshot: choiceSnapshot.logprobs?.content ?? [],
         });
       }
 
-      if (choice.logprobs?.refusal != null && choiceSnapshot.message?.role === 'assistant') {
+      if (choice.logprobs?.refusal != null && messageSnapshot.role === 'assistant') {
         this._emit('logprobs.refusal.delta', {
           refusal: choice.logprobs?.refusal,
           snapshot: choiceSnapshot.logprobs?.refusal ?? [],
@@ -764,7 +789,7 @@ export class ChatCompletionStream<ParsedT = null>
       }
 
       for (const toolCallDelta of delta?.tool_calls ?? []) {
-        const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallDelta.index];
+        const toolCallSnapshot = messageSnapshot.tool_calls?.[toolCallDelta.index];
         if (!toolCallSnapshot?.type) {
           continue;
         }
@@ -802,7 +827,10 @@ export class ChatCompletionStream<ParsedT = null>
       return;
     }
 
-    const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallIndex];
+    const messageSnapshot = this.#hasAutoParseableTool
+      ? captureStructuredMessageSnapshot(choiceSnapshot)
+      : choiceSnapshot.message;
+    const toolCallSnapshot = messageSnapshot.tool_calls?.[toolCallIndex];
     if (!toolCallSnapshot) {
       throw new Error('no tool call snapshot');
     }
@@ -854,16 +882,23 @@ export class ChatCompletionStream<ParsedT = null>
 
   #emitContentDoneEvents(choiceSnapshot: ChatCompletionSnapshot.Choice) {
     const state = this.#getChoiceEventState(choiceSnapshot);
-    const { refusal } = choiceSnapshot.message;
-    const parseableContent = !refusal && isParseableResponseFormat(this.#params?.response_format);
+    const structuredResponse = isParseableResponseFormat(this.#params?.response_format);
+    const boundedSnapshot = structuredResponse || this.#hasAutoParseableTool;
+    const messageSnapshot = boundedSnapshot
+      ? captureStructuredMessageSnapshot(choiceSnapshot)
+      : choiceSnapshot.message;
+    const refusal = boundedSnapshot
+      ? captureStructuredJSONSnapshot(messageSnapshot, 'refusal')
+      : messageSnapshot.refusal;
+    const parseableContent = !refusal && structuredResponse;
     const content = parseableContent
-      ? captureStructuredJSONSnapshot(choiceSnapshot.message, 'content')
-      : choiceSnapshot.message.content;
+      ? captureStructuredJSONSnapshot(messageSnapshot, 'content')
+      : messageSnapshot.content;
 
     if (
       content != null &&
       (content !== '' ||
-        (!refusal && !choiceSnapshot.message.tool_calls?.length && !choiceSnapshot.message.function_call)) &&
+        (!refusal && !messageSnapshot.tool_calls?.length && !messageSnapshot.function_call)) &&
       !state.content_done
     ) {
       if (parseableContent && this.#currentChatCompletionSnapshot) {
@@ -882,10 +917,10 @@ export class ChatCompletionStream<ParsedT = null>
       });
     }
 
-    if (choiceSnapshot.message.refusal && !state.refusal_done) {
+    if (refusal && !state.refusal_done) {
       state.refusal_done = true;
 
-      this._emit('refusal.done', { refusal: choiceSnapshot.message.refusal });
+      this._emit('refusal.done', { refusal });
     }
 
     if (choiceSnapshot.logprobs?.content && !state.logprobs_content_done) {
@@ -901,9 +936,12 @@ export class ChatCompletionStream<ParsedT = null>
     }
   }
 
-  #validateStructuredSnapshots(snapshot: ChatCompletionSnapshot): void {
+  #validateStructuredSnapshots(
+    snapshot: ChatCompletionSnapshot,
+  ): WeakMap<ChatCompletionSnapshot.Choice, ValidatedChoiceSnapshot> {
     const finalJSONBudget: PartialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
     const parseableContent = isParseableResponseFormat(this.#params?.response_format);
+    const validatedMessages = new WeakMap<ChatCompletionSnapshot.Choice, ValidatedChoiceSnapshot>();
     const choices = captureSnapshotArray<ChatCompletionSnapshot.Choice>(
       snapshot,
       'choices',
@@ -918,18 +956,19 @@ export class ChatCompletionStream<ParsedT = null>
       if (!choice) {
         continue;
       }
+      const message = captureStructuredMessageSnapshot(choice);
+      const refusal = captureStructuredJSONSnapshot(message, 'refusal');
+      const content = captureStructuredJSONSnapshot(message, 'content');
+      validatedMessages.set(choice, Object.freeze({ message, content, refusal }));
       const toolCalls = captureSnapshotArray<ChatCompletionSnapshot.Choice.Message.ToolCall>(
-        choice.message,
+        message,
         'tool_calls',
         MAX_STREAM_TOOL_CALLS,
         'tool-call',
       );
       const state = this.#choiceEventStates[choice.index];
-      if (parseableContent && !choice.message.refusal) {
-        const content = captureStructuredJSONSnapshot(choice.message, 'content');
-        if (typeof content === 'string') {
-          validateStructuredJSONSnapshot(content, finalJSONBudget, this.#partialJSONParseBudget);
-        }
+      if (parseableContent && !refusal && typeof content === 'string') {
+        validateStructuredJSONSnapshot(content, finalJSONBudget, this.#partialJSONParseBudget);
       }
       for (const [index, identity] of state?.tool_call_identities ?? []) {
         const toolCall = toolCalls && captureSnapshotArrayItem(toolCalls, index);
@@ -983,6 +1022,7 @@ export class ChatCompletionStream<ParsedT = null>
         validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget, this.#partialJSONParseBudget);
       }
     }
+    return validatedMessages;
   }
 
   #endRequest(): ParsedChatCompletion<ParsedT> {
@@ -993,12 +1033,12 @@ export class ChatCompletionStream<ParsedT = null>
     if (!snapshot) {
       throw new OpenAIError(`request ended without sending any chunks`);
     }
-    this.#validateStructuredSnapshots(snapshot);
+    const validatedMessages = this.#validateStructuredSnapshots(snapshot);
     const audioDoneChoiceIndexes = this.#audioDoneChoiceIndexes;
     this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
     this.#choiceEventStates = [];
-    return finalizeChatCompletion(snapshot, this.#params, audioDoneChoiceIndexes);
+    return finalizeChatCompletion(snapshot, this.#params, audioDoneChoiceIndexes, validatedMessages);
   }
 
   protected override async _createChatCompletion(
@@ -1122,6 +1162,9 @@ export class ChatCompletionStream<ParsedT = null>
         const newChoice = { finish_reason, index, message: {}, logprobs, ...other };
         snapshot.choices[index] = newChoice;
         choice = newChoice;
+      }
+      if (isParseableResponseFormat(this.#params?.response_format) || this.#hasAutoParseableTool) {
+        captureStructuredJSONSnapshot(captureStructuredMessageSnapshot(choice), 'refusal');
       }
 
       if (logprobs) {
@@ -1382,112 +1425,132 @@ function finalizeChatCompletion<ParsedT>(
   snapshot: ChatCompletionSnapshot,
   params: ChatCompletionCreateParams | null,
   audioDoneChoiceIndexes: ReadonlySet<number>,
+  validatedMessages: WeakMap<ChatCompletionSnapshot.Choice, ValidatedChoiceSnapshot>,
 ): ParsedChatCompletion<ParsedT> {
   const { id, choices, created, model, system_fingerprint, ...rest } = snapshot;
   const completion: ChatCompletion = {
     ...rest,
     id,
-    choices: choices.map(
-      ({ message, finish_reason, index, logprobs, ...choiceRest }): ChatCompletion.Choice => {
-        const { content = null, function_call, tool_calls, audio, ...messageRest } = message;
-        // Audio streams can end with an expires_at-only chunk after the
-        // generated audio, without a separate finish_reason.
-        const finishReason =
-          finish_reason ?? (audioDoneChoiceIndexes.has(index) && isCompleteAudio(audio) ? 'stop' : null);
-        if (!finishReason) {
-          throw new OpenAIError(`missing finish_reason for choice ${index}`);
-        }
-
-        const audioResponse = audio ? { audio: audio as ChatCompletionAudio } : {};
-        const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
-        if (!role) {
-          throw new OpenAIError(`missing role for choice ${index}`);
-        }
-
-        if (function_call) {
-          const { arguments: args, name } = function_call;
-          if (args == null) {
-            throw new OpenAIError(`missing function_call.arguments for choice ${index}`);
+    choices: choices.map((choice): ChatCompletion.Choice => {
+      const validated = validatedMessages.get(choice);
+      if (!validated) {
+        throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+      }
+      const stableChoice = new Proxy(choice, {
+        get(target, property, receiver) {
+          return property === 'message' ? validated.message : Reflect.get(target, property, receiver);
+        },
+      });
+      const { message: sourceMessage, finish_reason, index, logprobs, ...choiceRest } = stableChoice;
+      const message = new Proxy(sourceMessage, {
+        get(target, property, receiver) {
+          if (property === 'content') {
+            return validated.content;
           }
-
-          if (!name) {
-            throw new OpenAIError(`missing function_call.name for choice ${index}`);
+          if (property === 'refusal') {
+            return validated.refusal;
           }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+      const { content = null, function_call, tool_calls, audio, ...messageRest } = message;
+      // Audio streams can end with an expires_at-only chunk after the
+      // generated audio, without a separate finish_reason.
+      const finishReason =
+        finish_reason ?? (audioDoneChoiceIndexes.has(index) && isCompleteAudio(audio) ? 'stop' : null);
+      if (!finishReason) {
+        throw new OpenAIError(`missing finish_reason for choice ${index}`);
+      }
 
-          return {
-            ...choiceRest,
-            message: {
-              ...audioResponse,
-              content,
-              function_call: { arguments: args, name },
-              role,
-              refusal: message.refusal ?? null,
-            },
-            finish_reason: finishReason,
-            index,
-            logprobs,
-          };
+      const audioResponse = audio ? { audio: audio as ChatCompletionAudio } : {};
+      const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
+      if (!role) {
+        throw new OpenAIError(`missing role for choice ${index}`);
+      }
+
+      if (function_call) {
+        const { arguments: args, name } = function_call;
+        if (args == null) {
+          throw new OpenAIError(`missing function_call.arguments for choice ${index}`);
         }
 
-        if (tool_calls) {
-          return {
-            ...choiceRest,
-            index,
-            finish_reason: finishReason,
-            logprobs,
-            message: {
-              ...messageRest,
-              ...audioResponse,
-              role,
-              content,
-              refusal: message.refusal ?? null,
-              tool_calls: tool_calls.map((tool_call, i): ChatCompletionMessageToolCall => {
-                if (tool_call.type == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type`);
-                }
-
-                if (tool_call.type === 'custom') {
-                  const { custom, type, id, ...toolRest } = tool_call;
-                  const { input = '', name, ...customRest } = custom || {};
-                  if (name == null) {
-                    throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name`);
-                  }
-                  return {
-                    ...toolRest,
-                    id: id || `call_${uuid4()}`,
-                    type,
-                    custom: { ...customRest, name, input },
-                  };
-                }
-
-                const { function: fn, type, id, ...toolRest } = tool_call;
-                const { arguments: args, name, ...fnRest } = fn || {};
-                if (name == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name`);
-                }
-                if (args == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments`);
-                }
-
-                return {
-                  ...toolRest,
-                  id: id || `call_${uuid4()}`,
-                  type,
-                  function: { ...fnRest, name, arguments: args },
-                };
-              }),
-            },
-          };
+        if (!name) {
+          throw new OpenAIError(`missing function_call.name for choice ${index}`);
         }
+
         return {
           ...choiceRest,
-          message: { ...messageRest, ...audioResponse, content, role, refusal: message.refusal ?? null },
+          message: {
+            ...audioResponse,
+            content,
+            function_call: { arguments: args, name },
+            role,
+            refusal: message.refusal ?? null,
+          },
           finish_reason: finishReason,
           index,
           logprobs,
         };
-      },
-    ),
+      }
+
+      if (tool_calls) {
+        return {
+          ...choiceRest,
+          index,
+          finish_reason: finishReason,
+          logprobs,
+          message: {
+            ...messageRest,
+            ...audioResponse,
+            role,
+            content,
+            refusal: message.refusal ?? null,
+            tool_calls: tool_calls.map((tool_call, i): ChatCompletionMessageToolCall => {
+              if (tool_call.type == null) {
+                throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type`);
+              }
+
+              if (tool_call.type === 'custom') {
+                const { custom, type, id, ...toolRest } = tool_call;
+                const { input = '', name, ...customRest } = custom || {};
+                if (name == null) {
+                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name`);
+                }
+                return {
+                  ...toolRest,
+                  id: id || `call_${uuid4()}`,
+                  type,
+                  custom: { ...customRest, name, input },
+                };
+              }
+
+              const { function: fn, type, id, ...toolRest } = tool_call;
+              const { arguments: args, name, ...fnRest } = fn || {};
+              if (name == null) {
+                throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name`);
+              }
+              if (args == null) {
+                throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments`);
+              }
+
+              return {
+                ...toolRest,
+                id: id || `call_${uuid4()}`,
+                type,
+                function: { ...fnRest, name, arguments: args },
+              };
+            }),
+          },
+        };
+      }
+      return {
+        ...choiceRest,
+        message: { ...messageRest, ...audioResponse, content, role, refusal: message.refusal ?? null },
+        finish_reason: finishReason,
+        index,
+        logprobs,
+      };
+    }),
     created,
     model,
     object: 'chat.completion',
