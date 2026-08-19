@@ -239,7 +239,18 @@ export class Stream<Item> implements AsyncIterable<Item> {
             continue;
           }
           if (line) {
-            yield JSON.parse(line) as Item;
+            let data: Item;
+            try {
+              data = JSON.parse(line) as Item;
+            } catch (error) {
+              if (error instanceof SyntaxError) {
+                throw new SyntaxError('Error reading response: malformed newline-delimited JSON.');
+              }
+
+              throw error;
+            }
+
+            yield data;
           }
         }
         done = true;
