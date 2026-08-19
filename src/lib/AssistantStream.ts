@@ -442,6 +442,10 @@ export class AssistantStream
         this.#handleMessage(stableEvent);
         if (messageID !== undefined) {
           this.#reserveMessageAlias(stableEvent.data, messageID);
+          const retainedMessage = this.#messageSnapshots[messageID];
+          if (retainedMessage) {
+            this.#reserveMessageAlias(retainedMessage, messageID);
+          }
         }
         break;
       }

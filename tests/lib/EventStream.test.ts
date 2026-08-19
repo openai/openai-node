@@ -303,6 +303,42 @@ describe('EventStream.events', () => {
 
 describe('EventStream iterator buffer limits', () => {
   test.each([
+    { name: 'root proxy', wrap: (proxy: object) => proxy },
+    { name: 'nested proxy', wrap: (proxy: object) => ({ nested: proxy }) },
+    { name: 'Map-value proxy', wrap: (proxy: object) => new Map([['safe', proxy]]) },
+    { name: 'Set-value proxy', wrap: (proxy: object) => new Set([proxy]) },
+  ])('rejects a detached $name before invoking its hidden handler', async ({ wrap }) => {
+    const retained = 'x'.repeat(9 * 1024 * 1024);
+    const read = vi.fn((target: object, property: PropertyKey, receiver: unknown) => {
+      if (retained.length === 0) {
+        throw new Error('Expected retained handler state');
+      }
+      return Reflect.get(target, property, receiver);
+    });
+    const proxy = new Proxy({}, { get: read });
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(wrap(proxy));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(read).not.toHaveBeenCalled();
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('preserves a proxy identity when delivering directly to a waiting iterator', async () => {
+    const proxy = new Proxy({ value: 'direct' }, {});
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const next = iterator.next();
+
+    stream.emitPayload(proxy);
+
+    await expect(next).resolves.toEqual({ value: [proxy], done: false });
+    expect(stream.controller.signal.aborted).toBe(false);
+  });
+
+  test.each([
     { name: 'root symbol', create: (value: symbol) => value },
     { name: 'nested symbol', create: (value: symbol) => ({ nested: [value] }) },
     { name: 'Map-key symbol', create: (value: symbol) => new Map([[value, 'small']]) },

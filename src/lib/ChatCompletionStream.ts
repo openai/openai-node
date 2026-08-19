@@ -317,6 +317,7 @@ function recordPartialJSONFragment(
   state: PartialJSONParseState,
   budget: PartialJSONParseBudget,
   fragment: string,
+  validationWorkBudget?: PartialJSONParseBudget,
 ): boolean {
   if (budget.fragments >= MAX_PARTIAL_JSON_FRAGMENTS) {
     throw new OpenAIError('Chat completion stream exceeded its structured JSON fragment limit');
@@ -327,6 +328,7 @@ function recordPartialJSONFragment(
   let completed = false;
 
   for (const character of fragment) {
+    const previousBytes = bytes;
     const codePoint = character.codePointAt(0)!;
     if (codePoint <= 0x7f) {
       bytes += 1;
@@ -339,6 +341,10 @@ function recordPartialJSONFragment(
     }
     if (budget.bytes + bytes > MAX_PARTIAL_JSON_BYTES) {
       throw new OpenAIError('Chat completion stream exceeded its structured JSON byte limit');
+    }
+    if (validationWorkBudget && validationWorkBudget.work + bytes > MAX_PARTIAL_JSON_PARSE_WORK) {
+      validationWorkBudget.work += previousBytes;
+      throw new OpenAIError('Chat completion stream exceeded its structured JSON parse-work limit');
     }
 
     if (character !== ' ' && character !== '\n' && character !== '\r' && character !== '\t') {
@@ -378,6 +384,9 @@ function recordPartialJSONFragment(
   state.in_string = inString;
   budget.bytes += bytes;
   budget.fragments += 1;
+  if (validationWorkBudget) {
+    validationWorkBudget.work += bytes;
+  }
 
   if (!hasNonWhitespace || bytes === 0) {
     return false;
@@ -472,10 +481,14 @@ function captureSnapshotArrayItem<Item>(array: Item[], index: number): Item | un
   return descriptor.value as Item;
 }
 
-function validateStructuredJSONSnapshot(value: string, budget?: PartialJSONParseBudget): string {
+function validateStructuredJSONSnapshot(
+  value: string,
+  budget?: PartialJSONParseBudget,
+  validationWorkBudget?: PartialJSONParseBudget,
+): string {
   const state = createPartialJSONParseState();
   const parseBudget = budget ?? { bytes: 0, fragments: 0, work: 0 };
-  recordPartialJSONFragment(state, parseBudget, value);
+  recordPartialJSONFragment(state, parseBudget, value, validationWorkBudget);
   if (!reservePartialJSONParse(state, parseBudget)) {
     throw new OpenAIError('Chat completion stream exceeded its structured JSON parse-work limit');
   }
@@ -915,7 +928,7 @@ export class ChatCompletionStream<ParsedT = null>
       if (parseableContent && !choice.message.refusal) {
         const content = captureStructuredJSONSnapshot(choice.message, 'content');
         if (typeof content === 'string') {
-          validateStructuredJSONSnapshot(content, finalJSONBudget);
+          validateStructuredJSONSnapshot(content, finalJSONBudget, this.#partialJSONParseBudget);
         }
       }
       for (const [index, identity] of state?.tool_call_identities ?? []) {
@@ -967,7 +980,7 @@ export class ChatCompletionStream<ParsedT = null>
         if (typeof argumentsSnapshot !== 'string') {
           throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
         }
-        validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget);
+        validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget, this.#partialJSONParseBudget);
       }
     }
   }

@@ -78,6 +78,38 @@ const foreignErrorStackDescriptors = new WeakMap<object, PropertyDescriptor>();
 
 type NativeErrorConstructor = (...args: never[]) => unknown;
 
+function captureNativeProxyDetector(): ((value: object) => boolean) | undefined {
+  if (typeof process === 'undefined') {
+    return undefined;
+  }
+
+  try {
+    const loader = Object.getOwnPropertyDescriptor(process, 'getBuiltinModule');
+    if (!loader || !('value' in loader) || typeof loader.value !== 'function') {
+      return undefined;
+    }
+    const util: unknown = Reflect.apply(loader.value, process, ['node:util']);
+    if (typeof util !== 'object' || util === null) {
+      return undefined;
+    }
+    const types = Object.getOwnPropertyDescriptor(util, 'types');
+    if (!types || !('value' in types) || typeof types.value !== 'object' || types.value === null) {
+      return undefined;
+    }
+    const detector = Object.getOwnPropertyDescriptor(types.value, 'isProxy');
+    if (!detector || !('value' in detector) || typeof detector.value !== 'function') {
+      return undefined;
+    }
+    return detector.value as (value: object) => boolean;
+  } catch {
+    return undefined;
+  }
+}
+
+// Transparent proxies have no portable ECMAScript brand. Newer Node runtimes
+// expose one without adding a Node-only import to browser-compatible bundles.
+const nativeProxyDetector = captureNativeProxyDetector();
+
 function rememberTrustedIntrinsic(constructor: unknown): void {
   if (typeof constructor !== 'function') {
     return;
@@ -731,6 +763,11 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
 
     if (current === null || typeof current !== 'object') {
       bytes += 8;
+      return;
+    }
+
+    if (nativeProxyDetector?.(current)) {
+      bytes = remainingBytes + 1;
       return;
     }
 

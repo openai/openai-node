@@ -467,6 +467,56 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     },
   );
 
+  test.each(['messageDelta', 'textDone', 'messageDone'] as const)(
+    'reserves the retained message ID changed by a %s listener',
+    async (listener) => {
+      const first = { id: 'msg_canonical', role: 'assistant', content: [] };
+      const alias = { id: 'msg_specialized_alias', role: 'assistant', content: [] };
+      const text = { value: 'safe', annotations: [] };
+      const mutatedSnapshots: { id: string }[] = [];
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: first },
+        {
+          event: 'thread.message.delta',
+          data: { id: 'msg_canonical', delta: { content: [{ index: 0, type: 'text', text }] } },
+        },
+        {
+          event: 'thread.message.completed',
+          data: { id: 'msg_canonical', role: 'assistant', content: [{ type: 'text', text }] },
+        },
+        { event: 'thread.message.created', data: alias },
+        { event: 'thread.message.completed', data: alias },
+        completedRun(),
+      ]);
+
+      runner.on('messageDelta', (_delta, snapshot) => {
+        if (listener === 'messageDelta') {
+          snapshot.id = alias.id;
+          mutatedSnapshots.push(snapshot);
+        }
+      });
+      runner.on('textDone', (_text, snapshot) => {
+        if (listener === 'textDone') {
+          snapshot.id = alias.id;
+          mutatedSnapshots.push(snapshot);
+        }
+      });
+      runner.on('messageDone', () => {
+        if (listener === 'messageDone') {
+          const snapshot = runner.currentMessageSnapshot();
+          if (snapshot) {
+            snapshot.id = alias.id;
+            mutatedSnapshots.push(snapshot);
+          }
+        }
+      });
+
+      await expect(runner.done()).rejects.toThrow(/already been created/u);
+      expect(mutatedSnapshots).toHaveLength(1);
+      expect(mutatedSnapshots[0]?.id).toBe(alias.id);
+    },
+  );
+
   test('normalizes an inconsistent proxy-backed message ID before exposing or retaining it', async () => {
     const readID = vi.fn(() => 'msg_proxy_alias');
     const source = { id: 'msg_proxy_canonical', role: 'assistant', content: [] };

@@ -1398,6 +1398,44 @@ it('does not charge unmatched tool fragments against the actual structured JSON 
   expect(completion.choices[0]?.message.parsed).toEqual({ value: 'a'.repeat(32_768) });
 });
 
+it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-work limit', async () => {
+  const toolCount = 16;
+  const argumentsJSON = JSON.stringify({ value: 'x'.repeat(512 * 1024) });
+
+  async function* toolFragments(): AsyncGenerator<Chunk> {
+    for (let index = 0; index < toolCount; index += 1) {
+      yield chunk({
+        ...(index === 0 ? { role: 'assistant' as const } : {}),
+        tool_calls: [
+          {
+            index,
+            id: `call_work_${index}`,
+            type: 'function',
+            function: { name: strictTool.function.name, arguments: argumentsJSON },
+          },
+        ],
+      });
+    }
+    yield chunk({}, 'tool_calls');
+  }
+
+  const parse = vi.spyOn(partialJSONParser, 'partialParse');
+  const stream = ChatCompletionStream.createChatCompletion(createClient(toolFragments()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Bound aggregate strict-tool validation work' }],
+    tools: [strictTool],
+  });
+
+  const failure = await stream.finalChatCompletion().then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toMatch(/structured JSON parse-work limit/u);
+  expect(parse.mock.calls.length).toBeLessThan(toolCount);
+});
+
 it('refreshes the partial snapshot when a top-level structured JSON string closes', async () => {
   const stream = ChatCompletionStream.createChatCompletion(
     createClient(contentFragments(['"', 'a'.repeat(1100), 'b"'])),
