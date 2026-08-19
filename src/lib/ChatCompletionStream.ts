@@ -479,7 +479,10 @@ export class ChatCompletionStream<ParsedT = null>
       if (isAutoParsableTool(inputTool)) {
         parsedArguments = inputTool.$parseRaw(toolCallSnapshot.function.arguments);
       } else if (inputTool?.function.strict) {
-        parsedArguments = JSON.parse(toolCallSnapshot.function.arguments);
+        parsedArguments = parseResponseFormatContent(
+          { type: 'json_schema', $parseRaw: undefined },
+          toolCallSnapshot.function.arguments,
+        );
       }
 
       this._emit('tool_calls.function.arguments.done', {
