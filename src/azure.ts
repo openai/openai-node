@@ -1,6 +1,6 @@
 import type { RequestInit, RequestInfo, Response } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
-import { assertAzureAuthenticationHeaders, buildAzureAuthenticationHeaders } from './internal/headers';
+import { buildAzureAuthenticationHeaders, buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
@@ -177,15 +177,16 @@ export class AzureOpenAI extends OpenAI {
     return built;
   }
 
-  protected override fetchWithAuth(
+  protected override async fetchWithAuth(
     url: RequestInfo,
     init: RequestInit,
     timeout: number,
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<Response> {
-    assertAzureAuthenticationHeaders(init.headers);
-    if (new Headers(init.headers).has('api-key')) {
+    const headers = buildHeaders([buildAzureAuthenticationHeaders(), init.headers]).values;
+    init.headers = headers;
+    if (headers.has('api-key')) {
       init.redirect = 'manual';
     }
 

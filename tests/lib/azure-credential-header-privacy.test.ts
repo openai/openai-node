@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import { AzureOpenAI, OpenAIError } from 'openai';
+import { APIConnectionError, AzureOpenAI, OpenAIError } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { buildHeaders } from 'openai/internal/headers';
 import type { NullableHeaders } from 'openai/internal/headers';
@@ -14,6 +14,8 @@ class ProtectedHookAzure extends AzureOpenAI {
   injectedHeaders: Record<string, string> | undefined;
   bearerCalls = 0;
   adminCalls = 0;
+  fetchFailures = 0;
+  mutation: 'auth' | 'auth-null' | 'bearer' | 'admin' | undefined;
 
   protected override async prepareRequest(request: RequestInit): Promise<void> {
     if (this.injectedHeaders) {
@@ -21,13 +23,68 @@ class ProtectedHookAzure extends AzureOpenAI {
     }
   }
 
-  protected override async bearerAuth(_options: FinalRequestOptions): Promise<NullableHeaders> {
+  protected override fetchWithAuth(
+    url: RequestInfo,
+    init: RequestInit,
+    timeout: number,
+    controller: AbortController,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<Response> {
+    return super
+      .fetchWithAuth(url, init, timeout, controller, schemes)
+      .catch(this.recordFetchFailure.bind(this));
+  }
+
+  private recordFetchFailure(error: unknown): never {
+    this.fetchFailures += 1;
+    throw error;
+  }
+
+  invokeProtectedFetch(headers: Record<string, string>): Promise<Response> {
+    return this.fetchWithAuth(
+      'https://azure-resource.example.com/openai/models',
+      { headers },
+      1000,
+      new AbortController(),
+    );
+  }
+
+  protected override async authHeaders(
+    options: FinalRequestOptions,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<NullableHeaders | undefined> {
+    const carrier = await super.authHeaders(options, schemes);
+    if (this.mutation === 'auth') {
+      carrier?.values.set('API-KEY', 'mutated-static-token');
+    } else if (this.mutation === 'auth-null') {
+      carrier?.nulls.add('api-key');
+    }
+    return carrier;
+  }
+
+  protected override async bearerAuth(options: FinalRequestOptions): Promise<NullableHeaders> {
     this.bearerCalls += 1;
+    if (this.mutation === 'bearer') {
+      const carrier = await super.bearerAuth(options);
+      if (!carrier) {
+        throw new Error('Expected a deferred bearer authentication carrier.');
+      }
+      carrier.values.set('AUTHORIZATION', 'Bearer mutated-bearer-token');
+      return carrier;
+    }
     return buildHeaders([{ Authorization: 'Bearer custom-bearer-token' }]);
   }
 
-  protected override async adminAPIKeyAuth(_options: FinalRequestOptions): Promise<NullableHeaders> {
+  protected override async adminAPIKeyAuth(options: FinalRequestOptions): Promise<NullableHeaders> {
     this.adminCalls += 1;
+    if (this.mutation === 'admin') {
+      const carrier = await super.adminAPIKeyAuth(options);
+      if (!carrier) {
+        throw new Error('Expected a deferred admin authentication carrier.');
+      }
+      carrier.values.set('authorization', 'Bearer mutated-admin-token');
+      return carrier;
+    }
     return buildHeaders([{ Authorization: 'Bearer custom-admin-token' }]);
   }
 }
@@ -152,6 +209,34 @@ async function expectPrivateCredentialFailure(
     expect(diagnostic).not.toContain(PRIVATE_SUFFIX);
   }
   return failure;
+}
+
+async function expectPrivateTransportCredentialFailure(
+  operation: () => Promise<unknown>,
+  credential: string,
+): Promise<void> {
+  let failure: unknown;
+  try {
+    await operation();
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(APIConnectionError);
+  if (!(failure instanceof APIConnectionError)) {
+    throw new Error('Protected Azure transport failures must retain their connection wrapper.');
+  }
+  const { cause } = failure as APIConnectionError & { cause?: unknown };
+  expect(cause).toBeInstanceOf(TypeError);
+  if (!(cause instanceof TypeError)) {
+    throw new Error('Invalid Azure transport credentials require a sanitized TypeError cause.');
+  }
+  expect(cause.message).toBe(SAFE_ERROR);
+  expect((cause as TypeError & { cause?: unknown }).cause).toBeUndefined();
+  for (const diagnostic of [failure.message, failure.stack ?? '', cause.message, cause.stack ?? '']) {
+    expect(diagnostic).not.toContain(credential);
+    expect(diagnostic).not.toContain(PRIVATE_CREDENTIAL);
+    expect(diagnostic).not.toContain(PRIVATE_SUFFIX);
+  }
 }
 
 function expectPrivateLogs(logger: TestLogger, credential: string): void {
@@ -701,7 +786,7 @@ describe('Azure credential header diagnostic privacy', () => {
       maxRetries: 0,
     });
     client.injectedHeaders = { [header]: credential };
-    await expectPrivateCredentialFailure(
+    await expectPrivateTransportCredentialFailure(
       () => client.request({ method: 'get', path: '/models' }),
       credential,
     );
@@ -734,9 +819,9 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
-  test('validates every case-variant credential consumed by native post-hook headers', async () => {
+  test('keeps only the effective case-variant post-hook credential', async () => {
     const credential = `${PRIVATE_CREDENTIAL}\r${PRIVATE_SUFFIX}`;
-    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
     const client = new ProtectedHookAzure({
       baseURL: BASE_URL,
       apiVersion: API_VERSION,
@@ -745,11 +830,9 @@ describe('Azure credential header diagnostic privacy', () => {
       maxRetries: 0,
     });
     client.injectedHeaders = { AUTHORIZATION: credential, authorization: 'safe-final' };
-    await expectPrivateCredentialFailure(
-      () => client.request({ method: 'get', path: '/models' }),
-      credential,
-    );
-    expect(fetch).not.toHaveBeenCalled();
+    await client.request({ method: 'get', path: '/models' });
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe('safe-final');
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   test('preserves safe protected-hook header object identity and redirects', async () => {
@@ -764,7 +847,10 @@ describe('Azure credential header diagnostic privacy', () => {
     client.injectedHeaders = injected;
     await client.request({ method: 'get', path: '/models' });
     const request = fetch.mock.calls[0]?.[1];
-    expect(request?.headers).toBe(injected);
+    expect(request?.headers).toBeInstanceOf(Headers);
+    expect(request?.headers).not.toBe(injected);
+    expect(new Headers(request?.headers).get('api-key')).toBe('safe\tupdated-key');
+    expect(new Headers(request?.headers).get('x-custom')).toBe('preserved');
     expect(request?.redirect).toBe('manual');
   });
 
@@ -786,6 +872,100 @@ describe('Azure credential header diagnostic privacy', () => {
       const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
       expect(headers.get('x-ambient')).toBe('original');
       expect(headers.get('x-override')).toBe('default');
+    },
+  );
+
+  test.each(['getter', 'proxy'] as const)(
+    'snapshots a mutable %s credential once across validation, redirect, and dispatch',
+    async (kind) => {
+      const credential = `${PRIVATE_CREDENTIAL}\r${PRIVATE_SUFFIX}`;
+      let reads = 0;
+      const readValue = () => {
+        reads += 1;
+        return reads === 1 ? 'safe-first-token' : credential;
+      };
+      const getterHeaders: Record<string, string> = {};
+      Object.defineProperty(getterHeaders, 'api-key', {
+        enumerable: true,
+        get: readValue,
+      });
+      const headers =
+        kind === 'getter'
+          ? getterHeaders
+          : new Proxy(
+              { 'api-key': 'placeholder' },
+              {
+                get(target, property, receiver) {
+                  return property === 'api-key' ? readValue() : Reflect.get(target, property, receiver);
+                },
+              },
+            );
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-key',
+        fetch,
+        maxRetries: 0,
+      });
+      await client.invokeProtectedFetch(headers);
+      expect(reads).toBe(1);
+      const request = fetch.mock.calls[0]?.[1];
+      expect(request?.headers).toBeInstanceOf(Headers);
+      expect(new Headers(request?.headers).get('api-key')).toBe('safe-first-token');
+      expect(request?.redirect).toBe('manual');
+      expect(client.fetchFailures).toBe(0);
+    },
+  );
+
+  test('keeps protected Azure credential failures asynchronous and catchable', async () => {
+    const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'safe-key',
+      fetch,
+      maxRetries: 0,
+    });
+    const failure = client.invokeProtectedFetch({ authorization: credential });
+    expect(failure).toBeInstanceOf(Promise);
+    await expect(failure).rejects.toThrow(SAFE_ERROR);
+    await expect(failure.catch((error: unknown) => error)).resolves.not.toHaveProperty('cause');
+    expect(client.fetchFailures).toBe(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test.each(['auth', 'auth-null', 'bearer', 'admin'] as const)(
+    'preserves a subclass mutation of the super %s authentication carrier',
+    async (mutation) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const provider = vi.fn(async () => (mutation === 'bearer' ? malformed : 'safe-provider-token'));
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const isStatic = mutation === 'auth' || mutation === 'auth-null';
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(isStatic ? { apiKey: malformed } : { azureADTokenProvider: provider, adminAPIKey: malformed }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutation = mutation;
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: mutation === 'admin' },
+      });
+      const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      if (mutation === 'auth') {
+        expect(headers.get('api-key')).toBe('mutated-static-token');
+      } else if (mutation === 'auth-null') {
+        expect(headers.has('api-key')).toBe(false);
+      } else {
+        expect(headers.get('authorization')).toBe(`Bearer mutated-${mutation}-token`);
+      }
+      expect(provider).toHaveBeenCalledTimes(isStatic ? 0 : 1);
+      expect(fetch).toHaveBeenCalledTimes(1);
     },
   );
 });

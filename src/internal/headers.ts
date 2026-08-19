@@ -50,12 +50,15 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   if (!headers) return;
 
   if (brand_privateNullableHeaders in headers) {
+    const { values, nulls } = headers;
+    const visibleNames = new Set([...values.keys(), ...nulls].map((name) => name.toLowerCase()));
     const azureHeaders = azureAuthenticationHeaders.get(headers);
     if (azureHeaders !== undefined) {
       for (const layer of azureHeaders) {
         const seen = new Set<string>();
         for (const [name, value] of iterateHeaders(layer)) {
           const normalized = name.toLowerCase();
+          if (visibleNames.has(normalized)) continue;
           if (!seen.has(normalized)) {
             seen.add(normalized);
             yield [name, null];
@@ -64,7 +67,6 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
         }
       }
     }
-    const { values, nulls } = headers;
     yield* values.entries();
     for (const name of nulls) {
       yield [name, null];
