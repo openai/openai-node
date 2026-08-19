@@ -104,20 +104,6 @@ function visitHiddenEventValues(
     }
   }
 
-  if (current instanceof Error) {
-    for (const key of ['message', 'cause', 'errors', 'stack', 'name']) {
-      const descriptor = Object.getOwnPropertyDescriptor(current, key);
-      if (
-        descriptor &&
-        !descriptor.enumerable &&
-        'value' in descriptor &&
-        !visit(descriptor.value, key.length * 2 + 8)
-      ) {
-        return false;
-      }
-    }
-  }
-
   return true;
 }
 
@@ -155,7 +141,9 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     const bufferBytes = estimateRetainedBufferBytes(current, visit, depth);
     if (bufferBytes !== undefined) {
       bytes += bufferBytes;
-      return;
+      if (bytes > remainingBytes) {
+        return;
+      }
     }
 
     if (
@@ -168,8 +156,13 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
       return;
     }
 
-    for (const key of Object.keys(current)) {
-      bytes += key.length * 2 + 8;
+    const ownKeys =
+      bufferBytes !== undefined && ArrayBuffer.isView(current) && !(current instanceof DataView)
+        ? Object.getOwnPropertySymbols(current)
+        : Reflect.ownKeys(current);
+
+    for (const key of ownKeys) {
+      bytes += (typeof key === 'string' ? key.length : (key.description?.length ?? 0)) * 2 + 8;
       if (bytes > remainingBytes) {
         return;
       }

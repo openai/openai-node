@@ -205,6 +205,74 @@ describe('AssistantStream delta accumulation', () => {
 });
 
 describe('AssistantStream snapshots and message lifecycle', () => {
+  test.each(['event', 'messageCreated'] as const)(
+    'preserves the canonical active ID when a %s listener mutates its message',
+    async (listener) => {
+      const message = { id: 'msg_active', role: 'assistant', content: [] };
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: message },
+        { event: 'thread.message.delta', data: { id: 'msg_active', delta: { content: [] } } },
+        {
+          event: 'thread.message.completed',
+          data: { id: 'msg_active', role: 'assistant', content: [] },
+        },
+        completedRun(),
+      ]);
+
+      if (listener === 'event') {
+        runner.on('event', (event) => {
+          if (event.event === 'thread.message.created') {
+            event.data.id = 'msg_mutated_by_listener';
+          }
+        });
+      } else {
+        runner.on('messageCreated', (snapshot) => {
+          snapshot.id = 'msg_mutated_by_listener';
+        });
+      }
+
+      await expect(runner.done()).resolves.toBeUndefined();
+      await expect(runner.finalMessages()).resolves.toHaveLength(1);
+    },
+  );
+
+  test.each(['inherited', 'accessor'] as const)(
+    'rejects an %s message ID before exposing the event or invoking a getter',
+    async (kind) => {
+      const readID = vi.fn(() => 'msg_injected');
+      const message: Event =
+        kind === 'inherited'
+          ? Object.assign(Object.create(Object.defineProperty({}, 'id', { get: readID })) as Event, {
+              role: 'assistant',
+              content: [],
+            })
+          : { role: 'assistant', content: [] };
+      if (kind === 'accessor') {
+        Object.defineProperty(message, 'id', { enumerable: true, get: readID });
+      }
+
+      const runner = AssistantStream.createAssistantStream(
+        'thread_123',
+        {
+          create: vi
+            .fn()
+            .mockResolvedValue(
+              iterableEvents([{ event: 'thread.message.created', data: message }, completedRun()]),
+            ),
+        } as any,
+        { assistant_id: 'assistant_123' },
+      );
+      const exposedEvent = vi.fn();
+      runner.on('event', exposedEvent);
+
+      await expect(runner.done()).rejects.toThrow('invalid message ID');
+
+      expect(exposedEvent).not.toHaveBeenCalled();
+      expect(readID).not.toHaveBeenCalled();
+      expect(runner.currentMessageSnapshot()).toBeUndefined();
+    },
+  );
+
   test('rejects a delta for another message before mutating or emitting it', async () => {
     const message = {
       id: 'msg_active',

@@ -137,6 +137,41 @@ function createStructuredStream(kind: 'content' | 'tool', fragments: Iterable<st
 
 afterEach(() => vi.restoreAllMocks());
 
+it.each(['mutate', 'replace'] as const)(
+  'enforces structured JSON limits for strict tools %sd before deferred dispatch',
+  async (mutation) => {
+    const parse = vi.spyOn(partialJSONParser, 'partialParse');
+    const nestedJSON = `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+      model: 'gpt-test',
+      stream: true,
+      messages: [{ role: 'user', content: 'Call the strict tool' }],
+      tools: [{ ...strictTool, function: { ...strictTool.function, strict: false } }],
+    };
+    const client = createClient(argumentFragments([nestedJSON]));
+    const stream = ChatCompletionStream.createChatCompletion(client, params);
+
+    if (mutation === 'mutate') {
+      const tool = params.tools?.[0];
+      if (!tool || tool.type !== 'function') {
+        throw new Error('expected a function tool');
+      }
+      tool.function.strict = true;
+    } else {
+      params.tools = [strictTool];
+    }
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(/structured JSON nesting depth limit/u);
+    expect(parse).not.toHaveBeenCalled();
+    expect(client.chat.completions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: [expect.objectContaining({ function: expect.objectContaining({ strict: true }) })],
+      }),
+      expect.anything(),
+    );
+  },
+);
+
 it.each(['content', 'tool'] as const)(
   'coalesces fragmented %s JSON parsing while retaining every raw snapshot and the final output',
   async (kind) => {

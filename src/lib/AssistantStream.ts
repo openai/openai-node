@@ -109,6 +109,7 @@ export class AssistantStream
   #runStepSnapshots: Record<string, Runs.RunStep> = Object.create(null);
   #messageSnapshots: Record<string, Message> = Object.create(null);
   #messageSnapshot: Message | undefined;
+  #activeMessageID: string | undefined;
   #finalRun: Run | undefined;
   #currentContentIndex: number | undefined;
   #currentContent: MessageContent | undefined;
@@ -416,7 +417,8 @@ export class AssistantStream
   }
 
   #validateMessageEvent(event: MessageStreamEvent): void {
-    const messageID = event.data.id;
+    const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
+    const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
 
     if (typeof messageID !== 'string' || messageID.length === 0) {
       throw new OpenAIError('Received assistant message event with an invalid message ID');
@@ -425,7 +427,7 @@ export class AssistantStream
     if (event.event === 'thread.message.created') {
       if (this.#messageSnapshot) {
         throw new OpenAIError(
-          `Received message creation for "${messageID}" before the active message "${this.#messageSnapshot.id}" reached a terminal state`,
+          `Received message creation for "${messageID}" before the active message "${this.#activeMessageID}" reached a terminal state`,
         );
       }
 
@@ -435,6 +437,7 @@ export class AssistantStream
         );
       }
 
+      this.#activeMessageID = messageID;
       return;
     }
 
@@ -448,9 +451,9 @@ export class AssistantStream
       throw new OpenAIError('Received thread message event with no existing snapshot');
     }
 
-    if (messageID !== this.#messageSnapshot.id) {
+    if (messageID !== this.#activeMessageID) {
       throw new OpenAIError(
-        `Received ${event.event} for message "${messageID}", which does not match the active message "${this.#messageSnapshot.id}"`,
+        `Received ${event.event} for message "${messageID}", which does not match the active message "${this.#activeMessageID}"`,
       );
     }
   }
@@ -458,7 +461,10 @@ export class AssistantStream
   #handleMessage(this: AssistantStream, event: MessageStreamEvent) {
     const [accumulatedMessage, newContent] = this.#accumulateMessage(event, this.#messageSnapshot);
     this.#messageSnapshot = accumulatedMessage;
-    this.#messageSnapshots[accumulatedMessage.id] = accumulatedMessage;
+    if (!this.#activeMessageID) {
+      throw new OpenAIError('Received thread message event with no active message ID');
+    }
+    this.#messageSnapshots[this.#activeMessageID] = accumulatedMessage;
 
     for (const content of newContent) {
       const snapshotContent = accumulatedMessage.content[content.index];
@@ -550,6 +556,7 @@ export class AssistantStream
         this.#currentContentIndex = undefined;
         this.#currentContent = undefined;
         this.#messageSnapshot = undefined;
+        this.#activeMessageID = undefined;
       }
     }
   }

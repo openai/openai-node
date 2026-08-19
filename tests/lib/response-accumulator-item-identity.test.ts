@@ -330,6 +330,70 @@ describe('ResponseAccumulator output item identity', () => {
     expect(snapshot.output).toEqual([]);
   });
 
+  test.each(['created', 'lifecycle', 'added'] as const)(
+    'indexes the retained clone when a %s item identity changes while being read',
+    (kind) => {
+      const changing = makeOutput('reasoning', 'placeholder');
+      let reads = 0;
+      Object.defineProperty(changing, 'id', {
+        configurable: true,
+        enumerable: true,
+        get: () => {
+          reads += 1;
+          return reads <= 3 ? 'unique_item' : 'shared_item';
+        },
+      });
+
+      let snapshot: Response;
+      if (kind === 'created') {
+        snapshot = createSnapshot(makeOutput('message', 'shared_item'), changing);
+      } else if (kind === 'lifecycle') {
+        snapshot = applyEvent(createSnapshot(), {
+          type: 'response.completed',
+          response: makeResponse([makeOutput('message', 'shared_item'), changing]),
+        });
+      } else {
+        snapshot = applyEvent(createSnapshot(makeOutput('message', 'shared_item')), {
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: changing,
+        });
+      }
+
+      expect(snapshot.output.map((item) => item.id)).toEqual(['shared_item', 'unique_item']);
+      expect(reads).toBe(1);
+    },
+  );
+
+  test('leaves the previous canonical response context untouched when a lifecycle clone fails', () => {
+    const context = createResponseContext();
+    const snapshot = accumulateResponseWithContext(
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      undefined,
+      context,
+    );
+    const previousLengths = context.outputTextLengths;
+    const previousIndex = context.outputTextIndex;
+    const response = Object.assign(makeResponse([makeOutput('message', 'next_item')]), {
+      uncloneable() {
+        return null;
+      },
+    });
+
+    expect(() =>
+      accumulateResponseWithContext(
+        { type: 'response.completed', sequence_number: 1, response },
+        snapshot,
+        context,
+      ),
+    ).toThrow();
+
+    expect(context.canonicalSnapshot).toBe(snapshot);
+    expect(context.outputTextLengths).toBe(previousLengths);
+    expect(context.outputTextIndex).toBe(previousIndex);
+    expect(snapshot.output).toEqual([]);
+  });
+
   test('rejects duplicate output item IDs before appending another item', () => {
     const snapshot = createSnapshot(makeOutput('message', 'shared_item'));
     const original = structuredClone(snapshot);

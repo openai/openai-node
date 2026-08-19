@@ -302,6 +302,46 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Map keys', create: (value: string) => new Map([[value, 'small']]) },
     { name: 'Map values', create: (value: string) => new Map([['small', value]]) },
     { name: 'Set values', create: (value: string) => new Set([value]) },
+    {
+      name: 'non-enumerable own data properties',
+      create: (value: string) => Object.defineProperty({}, 'hidden', { value, enumerable: false }),
+    },
+    {
+      name: 'symbol-keyed own data properties',
+      create: (value: string) => ({ [Symbol('hidden payload')]: value }),
+    },
+    {
+      name: 'non-enumerable symbol-keyed own data properties',
+      create: (value: string) =>
+        Object.defineProperty({}, Symbol('hidden payload'), { value, enumerable: false }),
+    },
+    {
+      name: 'non-enumerable ArrayBuffer data properties',
+      create: (value: string) =>
+        Object.defineProperty(new ArrayBuffer(8), 'hidden', { value, enumerable: false }),
+    },
+    {
+      name: 'symbol-keyed ArrayBuffer data properties',
+      create: (value: string) => Object.defineProperty(new ArrayBuffer(8), Symbol('hidden'), { value }),
+    },
+    {
+      name: 'non-enumerable DataView data properties',
+      create: (value: string) =>
+        Object.defineProperty(new DataView(new ArrayBuffer(8)), 'hidden', { value, enumerable: false }),
+    },
+    {
+      name: 'symbol-keyed DataView data properties',
+      create: (value: string) =>
+        Object.defineProperty(new DataView(new ArrayBuffer(8)), Symbol('hidden'), { value }),
+    },
+    {
+      name: 'symbol-keyed typed-array data properties',
+      create: (value: string) => Object.defineProperty(new Uint8Array(8), Symbol('hidden'), { value }),
+    },
+    {
+      name: 'symbol-keyed Buffer data properties',
+      create: (value: string) => Object.defineProperty(Buffer.alloc(8), Symbol('hidden'), { value }),
+    },
     { name: 'non-enumerable Error messages', create: (value: string) => new Error(value) },
     {
       name: 'non-enumerable Error causes',
@@ -402,6 +442,7 @@ describe('EventStream iterator buffer limits', () => {
 
     payload.self = payload;
     Object.defineProperty(payload, 'accessor', { enumerable: true, get: readAccessor });
+    Object.defineProperty(payload, Symbol('hidden accessor'), { get: readAccessor });
     stream.emitPayload(payload);
 
     await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
@@ -431,6 +472,7 @@ describe('EventStream iterator buffer limits', () => {
     Object.defineProperty(error, 'hiddenAccessor', { enumerable: false, get: readAccessor });
     Object.defineProperty(backingBuffer, 'byteLength', { enumerable: true, get: readAccessor });
     Object.defineProperty(view, 'buffer', { enumerable: true, get: readAccessor });
+    Object.defineProperty(view, Symbol('hidden accessor'), { get: readAccessor });
     stream.emitPayload(payload);
 
     const result = await iterator.next();

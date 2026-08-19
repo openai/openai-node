@@ -260,15 +260,14 @@ function getResponseOutputIdentityIndex(
 }
 
 function cloneValidatedResponse(context: ResponseAccumulatorContext, response: Response): Response {
-  const { identities } = createResponseOutputIdentityIndex(response);
-  const snapshot = cloneResponse(context, response);
+  const nextContext = createCanonicalResponseContext();
+  const snapshot = cloneResponse(nextContext, response);
+  const identityIndex = createResponseOutputIdentityIndex(snapshot);
 
-  responseOutputIdentityIndexes.set(context, {
-    snapshot,
-    output: snapshot.output,
-    length: snapshot.output.length,
-    identities: new Set(identities),
-  });
+  context.canonicalSnapshot = nextContext.canonicalSnapshot;
+  context.outputTextLengths = nextContext.outputTextLengths;
+  context.outputTextIndex = nextContext.outputTextIndex;
+  responseOutputIdentityIndexes.set(context, identityIndex);
 
   return snapshot;
 }
@@ -527,9 +526,9 @@ function accumulateOutputItemEvent(
     case 'response.output_item.added': {
       validateArrayAppend(snapshot.output, event.output_index, 'output');
       const identityIndex = getResponseOutputIdentityIndex(context, snapshot);
-      const identities = getOutputItemIdentityKeys(event.item, event.type);
-      assertOutputItemIdentitiesAvailable(identityIndex.identities, identities);
       const output = structuredClone(event.item);
+      const identities = getOutputItemIdentityKeys(output, event.type);
+      assertOutputItemIdentitiesAvailable(identityIndex.identities, identities);
       if (output.type === 'message') {
         ensureCanonicalOutputText(context, snapshot);
       }

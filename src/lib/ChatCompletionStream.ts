@@ -692,12 +692,19 @@ export class ChatCompletionStream<ParsedT = null>
     options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     this._listenForAbort(options?.signal);
+    const requestParams = { ...params, stream: true as const };
+    this.#params = requestParams;
     this.#beginRequest();
 
-    const stream = await client.chat.completions.create(
-      { ...params, stream: true },
-      { ...options, signal: this.controller.signal },
-    );
+    const stream = await client.chat.completions.create(requestParams, {
+      ...options,
+      signal: this.controller.signal,
+    });
+    this.#hasAutoParseableTool =
+      requestParams.tools?.some(
+        (tool) =>
+          isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true),
+      ) ?? false;
     this._connected();
     for await (const chunk of stream) {
       this.#addChunk(chunk);
