@@ -64,6 +64,19 @@ if (!isLoopback) {
   });
 }
 
+if (isLoopback) {
+  const loopbackOrigin = `http://${bindHost === '::1' ? '[::1]' : bindHost}:3000`;
+
+  app.use((req: Request, res: Response, next: NextFunction): void => {
+    const origin = req.get('origin');
+    if ((origin !== undefined && origin !== loopbackOrigin) || req.get('sec-fetch-site') === 'cross-site') {
+      res.status(403).send('Forbidden');
+      return;
+    }
+    next();
+  });
+}
+
 app.use(express.text());
 
 // This endpoint can be called with:

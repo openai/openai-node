@@ -159,11 +159,12 @@ async function loadExample(filename, environment = {}) {
 	return runtime;
 }
 
-async function requestExample(runtime, authorization) {
+async function requestExample(runtime, authorization, headers = {}) {
 	const request = {
 		body: 'hello',
 		get(name) {
-			return name.toLowerCase() === 'authorization' ? authorization : undefined;
+			const normalizedName = name.toLowerCase();
+			return normalizedName === 'authorization' ? authorization : headers[normalizedName];
 		},
 	};
 	const response = {
@@ -227,6 +228,49 @@ describe.each(examples)('%s streaming proxy security', (filename) => {
 		const response = await requestExample(runtime);
 		expect(response.statusCode).toBe(200);
 		expect(response.body).toBe('mock completion');
+		expect(runtime.apiCalls).toBe(1);
+	});
+
+	it.each([
+		['a foreign browser origin', { origin: 'https://attacker.example' }],
+		['a different loopback port', { origin: 'http://127.0.0.1:4000' }],
+		['an opaque browser origin', { origin: 'null' }],
+		['cross-site Fetch Metadata without an Origin', { 'sec-fetch-site': 'cross-site' }],
+		[
+			'cross-site Fetch Metadata despite a matching Origin',
+			{ origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'cross-site' },
+		],
+	])('rejects %s before parsing a loopback request body', async (_description, headers) => {
+		const runtime = await loadExample(filename);
+		const response = await requestExample(runtime, undefined, headers);
+
+		expect(response.statusCode).toBe(403);
+		expect(runtime.bodyParserCalls).toBe(0);
+		expect(runtime.apiCalls).toBe(0);
+	});
+
+	it.each([
+		['a tokenless local CLI request', {}],
+		['a same-origin browser request', { origin: 'http://127.0.0.1:3000' }],
+		[
+			'a same-origin browser request with Fetch Metadata',
+			{ origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin' },
+		],
+	])('preserves %s', async (_description, headers) => {
+		const runtime = await loadExample(filename);
+		const response = await requestExample(runtime, undefined, headers);
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toBe('mock completion');
+		expect(runtime.bodyParserCalls).toBe(1);
+		expect(runtime.apiCalls).toBe(1);
+	});
+
+	it('accepts same-origin IPv6 loopback browser requests', async () => {
+		const runtime = await loadExample(filename, { OPENAI_EXAMPLE_HOST: '::1' });
+		const response = await requestExample(runtime, undefined, { origin: 'http://[::1]:3000' });
+
+		expect(response.statusCode).toBe(200);
 		expect(runtime.apiCalls).toBe(1);
 	});
 
