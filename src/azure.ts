@@ -195,8 +195,18 @@ export class AzureOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
+    const credential = this.apiKey;
+    if (security.bearerAuth && typeof credential === 'string') {
+      for (const character of credential) {
+        const code = character.codePointAt(0) ?? 0;
+        if ((code < 0x20 && code !== 0x09) || code === 0x7f || code > 0xff) {
+          throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+        }
+      }
+    }
+
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
-      return buildHeaders([{ 'api-key': this.apiKey }]);
+      return buildHeaders([{ 'api-key': credential }]);
     }
     return super.authHeaders(opts, security);
   }
