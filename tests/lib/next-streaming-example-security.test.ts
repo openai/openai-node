@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import handler from '../../examples/chat-completions/stream-to-client-next';
+import handler, * as nextEdgeExample from '../../examples/chat-completions/stream-to-client-next';
 
 const openai = vi.hoisted(() => {
   const toReadableStream = vi.fn(
@@ -94,6 +95,21 @@ afterEach(() => {
 });
 
 describe('Next Edge streaming example request boundaries', () => {
+  test('registers the default Pages Router handler with its Edge runtime configuration', () => {
+    expect(nextEdgeExample.config).toEqual({ runtime: 'edge' });
+    expect(nextEdgeExample).not.toHaveProperty('runtime');
+  });
+
+  test('keeps the dedicated bearer secret out of browser-facing documentation', () => {
+    const exampleSource = readFileSync('examples/chat-completions/stream-to-client-next.ts', 'utf-8');
+
+    expect(exampleSource).not.toContain('applicationAuthToken');
+    expect(exampleSource).not.toMatch(/fetch\([^]*Authorization:/u);
+    expect(exampleSource).toContain('session-authenticated server');
+    expect(exampleSource).toContain('server-side');
+    expect(exampleSource).toContain('$OPENAI_EXAMPLE_AUTH_TOKEN');
+  });
+
   test.each(['GET', 'HEAD', 'PUT', 'DELETE'])(
     'rejects %s before constructing a billed client',
     async (method) => {

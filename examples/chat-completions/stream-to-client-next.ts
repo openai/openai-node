@@ -3,37 +3,33 @@ import OpenAI from 'openai';
 // This file demonstrates how to stream from a Next.JS Edge handler as a
 // newline-separated JSON stream. It requires Next.JS scaffolding.
 //
-// Configure a dedicated application secret with at least 32 characters:
+// Configure a dedicated, server-only application secret with at least 32 characters:
 //
 //   OPENAI_EXAMPLE_AUTH_TOKEN=your-dedicated-long-application-secret
 //
-// Browser callers must also configure an explicit trusted origin:
+// Trusted server-side proxies that forward browser Origin headers must configure
+// an explicit trusted origin:
 //
 //   OPENAI_EXAMPLE_ALLOWED_ORIGIN=https://your-application.example
 //
-// This endpoint can be called with:
+// A trusted server-side process or command-line client can call this endpoint:
 //
 //   curl 127.0.0.1:3000 -N -X POST \
 //     -H "Authorization: Bearer $OPENAI_EXAMPLE_AUTH_TOKEN" \
 //     -H 'Content-Type: text/plain' \
 //     --data 'Can you explain why dogs are better than cats?'
 //
-// Or consumed with fetch:
-//
-//   fetch('https://your-application.example', {
-//     method: 'POST',
-//     headers: { Authorization: 'Bearer ' + applicationAuthToken },
-//     body: 'Tell me why dogs are better than cats',
-//   }).then(async res => {
-//     const runner = ChatCompletionStreamingRunner.fromReadableStream(res)
-//   })
-//
-// Never expose your OpenAI API key to a browser. The separate example token is
-// verified before creating an OpenAI client or reading an untrusted request.
+// Never expose your OpenAI API key or the dedicated bearer secret to a browser,
+// browser JavaScript, or browser developer tools. Browser clients must instead
+// use a separate session-authenticated server endpoint; only that trusted
+// server-side endpoint may attach the bearer secret. The secret is verified
+// before creating an OpenAI client or reading an untrusted request.
 //
 // See examples/chat-completions/stream-to-client-browser.ts for a more complete example.
 
-export const runtime = 'edge';
+export const config = {
+  runtime: 'edge',
+};
 
 const maximumPromptBytes = 64 * 1024;
 
