@@ -2,6 +2,8 @@ import { afterEach, vi } from 'vitest';
 
 import { OpenAIError } from 'openai/core/error';
 import { Stream, _iterSSEMessages } from 'openai/core/streaming';
+import { LineDecoder } from 'openai/internal/decoders/line';
+import { readEnv } from 'openai/internal/utils/env';
 
 const encoder = new TextEncoder();
 
@@ -36,6 +38,128 @@ function responseForChunks(chunks: Uint8Array[]) {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+});
+
+function withDenoEnvironment<T>(get: (name: string) => string | undefined, run: () => T): T {
+  const originalProcess = Object.getOwnPropertyDescriptor(globalThis, 'process');
+  const originalDeno = Object.getOwnPropertyDescriptor(globalThis, 'Deno');
+
+  try {
+    Object.defineProperty(globalThis, 'Deno', { configurable: true, value: { env: { get } } });
+    Object.defineProperty(globalThis, 'process', { configurable: true, value: undefined });
+    return run();
+  } finally {
+    if (originalProcess) {
+      Object.defineProperty(globalThis, 'process', originalProcess);
+    } else {
+      Reflect.deleteProperty(globalThis, 'process');
+    }
+    if (originalDeno) {
+      Object.defineProperty(globalThis, 'Deno', originalDeno);
+    } else {
+      Reflect.deleteProperty(globalThis, 'Deno');
+    }
+  }
+}
+
+function inaccessibleEnvironment(name: string): never {
+  const error = new Error('Environment access has been denied or revoked.');
+  error.name = name;
+  throw error;
+}
+
+describe('streaming without environment permissions', () => {
+  test.each(['PermissionDenied', 'NotCapable'])(
+    'treats a revoked Deno %s permission as an absent environment variable',
+    (errorName) => {
+      let permitted = true;
+      const values = withDenoEnvironment(
+        () => (permitted ? '  configured  ' : inaccessibleEnvironment(errorName)),
+        () => {
+          const configured = readEnv('OPENAI_MAX_SSE_EVENT_BYTES');
+          permitted = false;
+          return [configured, readEnv('OPENAI_MAX_SSE_EVENT_BYTES')];
+        },
+      );
+
+      expect(values).toEqual(['configured', undefined]);
+    },
+  );
+
+  test('treats an inaccessible process.env getter as absent', () => {
+    const originalProcess = Object.getOwnPropertyDescriptor(globalThis, 'process');
+    let configured: string | undefined;
+
+    try {
+      Object.defineProperty(globalThis, 'process', {
+        configurable: true,
+        value: {
+          get env() {
+            return inaccessibleEnvironment('PermissionDenied');
+          },
+        },
+      });
+      configured = readEnv('OPENAI_MAX_NDJSON_LINE_BYTES');
+    } finally {
+      if (originalProcess) {
+        Object.defineProperty(globalThis, 'process', originalProcess);
+      } else {
+        Reflect.deleteProperty(globalThis, 'process');
+      }
+    }
+
+    expect(configured).toBeUndefined();
+  });
+
+  test('decodes the public SSE stream after Deno environment permission is revoked', async () => {
+    const { response } = responseForChunks([encoder.encode('data: {"value":"safe"}\n\n')]);
+    const denied = vi.fn(() => inaccessibleEnvironment('PermissionDenied'));
+    const stream = Stream.fromSSEResponse<{ value: string }>(response, new AbortController());
+    const values = withDenoEnvironment(denied, () => collect(stream));
+
+    await expect(values).resolves.toEqual([{ value: 'safe' }]);
+    expect(denied).toHaveBeenCalledWith('OPENAI_MAX_SSE_EVENT_BYTES');
+  });
+
+  test('decodes the public NDJSON stream after Deno environment permission is revoked', async () => {
+    const { body } = responseForChunks([encoder.encode('{"value":"safe"}\n')]);
+    const denied = vi.fn(() => inaccessibleEnvironment('NotCapable'));
+    const stream = Stream.fromReadableStream<{ value: string }>(body, new AbortController());
+    const values = withDenoEnvironment(denied, () => collect(stream));
+
+    await expect(values).resolves.toEqual([{ value: 'safe' }]);
+    expect(denied).toHaveBeenCalledWith('OPENAI_MAX_NDJSON_LINE_BYTES');
+  });
+
+  test('retains the secure default SSE frame limit when Deno denies environment access', async () => {
+    const { response, cancel } = responseForChunks([new Uint8Array(8 * 1024 * 1024 + 1)]);
+    const denied = vi.fn(() => inaccessibleEnvironment('PermissionDenied'));
+    const stream = Stream.fromSSEResponse(response, new AbortController());
+    const values = withDenoEnvironment(denied, () => collect(stream));
+
+    await expect(values).rejects.toThrow(/8388608.*bytes/iu);
+    expect(denied).toHaveBeenCalledWith('OPENAI_MAX_SSE_EVENT_BYTES');
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  test('retains the secure default line limit when Deno denies environment access', () => {
+    const decoder = withDenoEnvironment(
+      () => inaccessibleEnvironment('PermissionDenied'),
+      () => new LineDecoder(),
+    );
+
+    expect(() => decoder.decode(new Uint8Array(8 * 1024 * 1024 + 1))).toThrow(/8388608.*bytes/iu);
+  });
+
+  test('preserves valid permitted Deno overrides and rejects oversized lines', () => {
+    const decoder = withDenoEnvironment(
+      () => '  4  ',
+      () => new LineDecoder(),
+    );
+
+    expect(decoder.decode(encoder.encode('four\n'))).toEqual(['four']);
+    expect(() => decoder.decode('large')).toThrow(/line.*4.*bytes/iu);
+  });
 });
 
 describe('server-sent event framing limits', () => {
