@@ -174,14 +174,15 @@ describe('prototype-pollution safety', () => {
     expect(Object.getPrototypeOf(destination)).toBe(Object.prototype);
   });
 
-  test('preserves safe adopted identities, array holes, and null prototypes', () => {
+  test('snapshots mutable adopted records while preserving array holes and null prototypes', () => {
     const safe = Object.assign(Object.create(null), { value: true });
     const sparse: unknown[] = [];
     sparse[2] = safe;
     const result = merge({}, { safe, sparse });
 
-    expect(result.safe).toBe(safe);
-    expect(result.sparse).toBe(sparse);
+    expect(result.safe).not.toBe(safe);
+    expect(result.sparse).not.toBe(sparse);
+    expect(result.sparse[2]).toBe(result.safe);
     expect(0 in result.sparse).toBe(false);
     expect(1 in result.sparse).toBe(false);
     expect(Object.getPrototypeOf(result.safe)).toBeNull();
@@ -286,7 +287,7 @@ describe('prototype-pollution safety', () => {
     },
   );
 
-  test('iteratively preserves safe adopted records deeper than the JavaScript call stack', () => {
+  test('iteratively snapshots adopted records deeper than the JavaScript call stack', () => {
     const root: Record<string, any> = {};
     let current = root;
     for (let index = 0; index < 6000; index += 1) {
@@ -294,7 +295,9 @@ describe('prototype-pollution safety', () => {
       current = current['next'];
     }
 
-    expect(merge({}, { nested: root }).nested).toBe(root);
+    const result = merge({}, { nested: root });
+    expect(result.nested === root).toBe(false);
+    expect(typeof result.nested.next).toBe('object');
   });
 
   test('fails closed when adopted records exceed the bounded traversal budget', () => {
@@ -306,6 +309,146 @@ describe('prototype-pollution safety', () => {
     }
 
     expect(() => merge({}, { nested: root })).toThrow(/adopted record|traversal|limit/iu);
+  });
+
+  test('detaches earlier aliases before later proxy descriptor traps can mutate source records', () => {
+    const shared: Record<string, unknown> = { safe: true };
+    let inspections = 0;
+    const later = new Proxy(
+      { value: true },
+      {
+        ownKeys(value) {
+          inspections += 1;
+          if (inspections === 2) {
+            Object.defineProperty(shared, '__proto__', {
+              configurable: true,
+              enumerable: true,
+              value: { polluted: true },
+            });
+          }
+          return Reflect.ownKeys(value);
+        },
+      },
+    );
+    const result = merge({}, { first: shared, second: later });
+
+    expect(has(result.first, '__proto__')).toBe(false);
+    const destination = {};
+    expect(Object.assign(destination, result.first)).toBe(destination);
+    expect(Object.getPrototypeOf(destination)).toBe(Object.prototype);
+    expect(inspections).toBe(1);
+  });
+
+  test('keeps unpublished snapshots safe when a later proxy mutates the original alias', () => {
+    const shared: Record<string, unknown> = { safe: true };
+    const later = new Proxy(
+      { value: true },
+      {
+        ownKeys(value) {
+          Object.defineProperty(shared, '__proto__', {
+            configurable: true,
+            enumerable: true,
+            value: { polluted: true },
+          });
+          return Reflect.ownKeys(value);
+        },
+      },
+    );
+    const result = merge({}, { first: shared, second: later });
+
+    expect(result.first).not.toBe(shared);
+    expect(has(result.first, '__proto__')).toBe(false);
+    expect(has(shared, '__proto__')).toBe(true);
+  });
+
+  test('snapshots two thousand aliases to a shared two-thousand-record graph only once', () => {
+    let inspections = 0;
+    const root: Record<string, any> = new Proxy(
+      {},
+      {
+        ownKeys(value) {
+          inspections += 1;
+          if (inspections > 4) {
+            throw new Error('Shared adopted graph was rescanned.');
+          }
+          return Reflect.ownKeys(value);
+        },
+      },
+    );
+    let current = root;
+    for (let index = 0; index < 1999; index += 1) {
+      current['next'] = {};
+      current = current['next'];
+    }
+    const source: Record<string, unknown> = {};
+    for (let index = 0; index < 2000; index += 1) {
+      source[`alias-${index}`] = root;
+    }
+    const result = merge({}, source);
+
+    expect(result['alias-0']).toBe(result['alias-1999']);
+    expect(result['alias-0']).not.toBe(root);
+    expect(inspections).toBeLessThanOrEqual(4);
+  });
+
+  test.each([
+    {
+      name: 'ordinary function',
+      create: () => {
+        const safe = true;
+        return function value() {
+          return safe;
+        };
+      },
+    },
+    { name: 'arrow function', create: () => () => true },
+    { name: 'bound function', create: () => Object.prototype.hasOwnProperty.bind({}) },
+  ])('preserves safe $name identity but rejects enumerable unsafe callable records', ({ create }) => {
+    const callable = create();
+
+    expect(merge({}, { safe: callable }).safe).toBe(callable);
+    Object.defineProperty(callable, '__proto__', {
+      configurable: true,
+      enumerable: true,
+      value: { polluted: true },
+    });
+    expect(() => merge({}, { unsafe: callable })).toThrow(/safely sanitize|unsupported|callable/iu);
+    expect(has(callable, '__proto__')).toBe(true);
+  });
+
+  test('assign_single_source safely snapshots nested records and shared aliases', () => {
+    const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}');
+    const inherited = { inherited: true };
+    const target = Object.create(inherited);
+    const result = assign_single_source(target, { first: unsafe, second: unsafe });
+
+    expect(result).toBe(target);
+    expect(Object.getPrototypeOf(result)).toBe(inherited);
+    expect(result.first).toBe(result.second);
+    expect(result.first).toEqual({ safe: true });
+    expect(has(unsafe, '__proto__')).toBe(true);
+  });
+
+  test('assign_single_source rejects unsafe callable records without invoking them', () => {
+    let calls = 0;
+    const unsafe = () => {
+      calls += 1;
+    };
+    Object.defineProperty(unsafe, '__proto__', {
+      configurable: true,
+      enumerable: true,
+      value: { polluted: true },
+    });
+
+    expect(() => assign_single_source({}, { unsafe })).toThrow(/safely sanitize|unsupported|callable/iu);
+    expect(calls).toBe(0);
+  });
+
+  test('preserves transitively frozen safe records without invoking their accessors', () => {
+    const child = Object.freeze({ value: true });
+    const frozen = Object.freeze({ child });
+
+    expect(merge({}, { nested: frozen }).nested).toBe(frozen);
   });
 
   test.each(['__proto__', 'constructor', 'prototype'])(
