@@ -4,7 +4,7 @@ import type { RequestInit, RequestInfo, Response } from 'openai/internal/builtin
 
 const apiVersion = '2024-02-15-preview';
 const testFetch = async (url: RequestInfo): Promise<Response> =>
-  Response.json({ url }, { headers: { 'content-type': 'application/json' } });
+  globalThis.Response.json({ url }, { headers: { 'content-type': 'application/json' } });
 
 describe('deployment path safety', () => {
   const endpoint = 'https://azure.example.com';
@@ -27,13 +27,13 @@ describe('deployment path safety', () => {
   const requestClient = new AzureOpenAI({ endpoint, apiKey, apiVersion, fetch: testFetch });
 
   test('keeps authenticated public chat requests inside the deployment route', async () => {
-    const authenticatedFetch = vi.fn(
-      async (url: RequestInfo, init?: RequestInit): Promise<Response> =>
-        Response.json(
-          { url, apiKey: new Headers(init?.headers).get('api-key') },
-          { headers: { 'content-type': 'application/json' } },
-        ),
-    );
+    const authenticatedFetch = vi.fn(async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+      const headers = { 'content-type': 'application/json' };
+      return globalThis.Response.json(
+        { url, apiKey: new Headers(init?.headers).get('api-key') },
+        { headers },
+      );
+    });
     const client = new AzureOpenAI({ endpoint, apiKey, apiVersion, fetch: authenticatedFetch });
 
     expect(

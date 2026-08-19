@@ -2,10 +2,35 @@ import { vi } from 'vitest';
 
 import { AzureOpenAI, OpenAIError } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import { buildHeaders } from 'openai/internal/headers';
+import type { NullableHeaders } from 'openai/internal/headers';
+import type { FinalRequestOptions } from 'openai/internal/request-options';
 
 type Authentication = 'static-api-key' | 'rotating-entra-token';
 type PublicRoute = 'generic-request' | 'models-list' | 'chat-completion';
 type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
+
+class ProtectedHookAzure extends AzureOpenAI {
+  injectedHeaders: Record<string, string> | undefined;
+  bearerCalls = 0;
+  adminCalls = 0;
+
+  protected override async prepareRequest(request: RequestInit): Promise<void> {
+    if (this.injectedHeaders) {
+      request.headers = this.injectedHeaders;
+    }
+  }
+
+  protected override async bearerAuth(_options: FinalRequestOptions): Promise<NullableHeaders> {
+    this.bearerCalls += 1;
+    return buildHeaders([{ Authorization: 'Bearer custom-bearer-token' }]);
+  }
+
+  protected override async adminAPIKeyAuth(_options: FinalRequestOptions): Promise<NullableHeaders> {
+    this.adminCalls += 1;
+    return buildHeaders([{ Authorization: 'Bearer custom-admin-token' }]);
+  }
+}
 
 const BASE_URL = 'https://azure-resource.example.com/openai';
 const API_VERSION = '2024-02-15-preview';
@@ -596,4 +621,171 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(new Headers(secondRequest?.headers).get('authorization')).toBe('Bearer valid-entra-token-two');
     expect(tokenProvider).toHaveBeenCalledTimes(2);
   });
+
+  test.each(
+    authenticationModes.flatMap((authentication) =>
+      (['api-key', 'Authorization'] as const).flatMap((header) =>
+        (['ambient', 'default'] as const).map((source) => ({ authentication, header, source })),
+      ),
+    ),
+  )(
+    '$authentication protects $source $header while preprocessing ambient headers',
+    async ({ authentication, header, source }) => {
+      const credential = `${PRIVATE_CREDENTIAL}\r${PRIVATE_SUFFIX}`;
+      vi.stubEnv(
+        'OPENAI_CUSTOM_HEADERS',
+        source === 'ambient' ? `${header}: ${credential}` : 'X-Ambient: safe',
+      );
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      await expectPrivateCredentialFailure(
+        async () =>
+          new AzureOpenAI({
+            baseURL: BASE_URL,
+            apiVersion: API_VERSION,
+            ...(authentication === 'static-api-key'
+              ? { apiKey: 'safe-key' }
+              : { azureADTokenProvider: async () => 'safe-token' }),
+            ...(source === 'default' ? { defaultHeaders: { [header]: credential } } : {}),
+            fetch,
+          }),
+        credential,
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['valid', 'null'] as const)(
+    'applies the %s default before an unsafe ambient credential',
+    async (override) => {
+      const credential = `${PRIVATE_CREDENTIAL}\r${PRIVATE_SUFFIX}`;
+      vi.stubEnv('OPENAI_CUSTOM_HEADERS', `API-KEY: ${credential}\nX-Ambient: preserved`);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const value = override === 'null' ? null : 'safe-default-key';
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-key',
+        defaultHeaders: { 'api-key': value },
+        fetch,
+      });
+      await client.request({ method: 'get', path: '/models' });
+      const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      expect(headers.get('api-key')).toBe(value);
+      expect(headers.get('x-ambient')).toBe('preserved');
+    },
+  );
+
+  test('preserves an explicitly null static Azure api-key', async () => {
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new AzureOpenAI({ baseURL: BASE_URL, apiVersion: API_VERSION, apiKey: 'safe-key', fetch });
+    client.apiKey = null;
+    await client.request({ method: 'get', path: '/models' });
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has('api-key')).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(
+    authenticationModes.flatMap((authentication) =>
+      (['api-key', 'Authorization'] as const).map((header) => ({ authentication, header })),
+    ),
+  )('$authentication sanitizes $header injected by prepareRequest', async ({ authentication, header }) => {
+    const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      ...(authentication === 'static-api-key'
+        ? { apiKey: 'safe-key' }
+        : { azureADTokenProvider: async () => 'safe-token' }),
+      fetch,
+      maxRetries: 0,
+    });
+    client.injectedHeaders = { [header]: credential };
+    await expectPrivateCredentialFailure(
+      () => client.request({ method: 'get', path: '/models' }),
+      credential,
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test.each(['bearer', 'admin'] as const)(
+    'preserves the protected %s authentication override',
+    async (scheme) => {
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        azureADTokenProvider: provider,
+        adminAPIKey: 'default-admin-token',
+        fetch,
+      });
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: scheme === 'admin' },
+      });
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+        scheme === 'admin' ? 'Bearer custom-admin-token' : 'Bearer custom-bearer-token',
+      );
+      expect(client.bearerCalls).toBe(1);
+      expect(client.adminCalls).toBe(scheme === 'admin' ? 1 : 0);
+      expect(provider).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('validates every case-variant credential consumed by native post-hook headers', async () => {
+    const credential = `${PRIVATE_CREDENTIAL}\r${PRIVATE_SUFFIX}`;
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'safe-key',
+      fetch,
+      maxRetries: 0,
+    });
+    client.injectedHeaders = { AUTHORIZATION: credential, authorization: 'safe-final' };
+    await expectPrivateCredentialFailure(
+      () => client.request({ method: 'get', path: '/models' }),
+      credential,
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('preserves safe protected-hook header object identity and redirects', async () => {
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'safe-key',
+      fetch,
+    });
+    const injected = { 'API-KEY': 'safe\tupdated-key', 'X-Custom': 'preserved' };
+    client.injectedHeaders = injected;
+    await client.request({ method: 'get', path: '/models' });
+    const request = fetch.mock.calls[0]?.[1];
+    expect(request?.headers).toBe(injected);
+    expect(request?.redirect).toBe('manual');
+  });
+
+  test.each(['Headers', 'tuple'] as const)(
+    'preserves safe ambient precedence with %s Azure default headers',
+    async (kind) => {
+      vi.stubEnv('OPENAI_CUSTOM_HEADERS', 'X-Ambient: original\nX-Override: ambient');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const defaults =
+        kind === 'Headers' ? new Headers({ 'x-override': 'default' }) : [['x-override', 'default']];
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'safe-key',
+        defaultHeaders: defaults,
+        fetch,
+      });
+      await client.request({ method: 'get', path: '/models' });
+      const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      expect(headers.get('x-ambient')).toBe('original');
+      expect(headers.get('x-override')).toBe('default');
+    },
+  );
 });

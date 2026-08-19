@@ -1,6 +1,6 @@
 import type { RequestInit, RequestInfo, Response } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
-import { buildAzureAuthenticationHeaders } from './internal/headers';
+import { assertAzureAuthenticationHeaders, buildAzureAuthenticationHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
@@ -126,6 +126,7 @@ export class AzureOpenAI extends OpenAI {
       throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
     }
 
+    protectAzureAmbientHeaders(opts);
     super({
       apiKey: azureADTokenProvider ?? apiKey,
       baseURL,
@@ -176,13 +177,14 @@ export class AzureOpenAI extends OpenAI {
     return built;
   }
 
-  protected override async fetchWithAuth(
+  protected override fetchWithAuth(
     url: RequestInfo,
     init: RequestInit,
     timeout: number,
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<Response> {
+    assertAzureAuthenticationHeaders(init.headers);
     if (new Headers(init.headers).has('api-key')) {
       init.redirect = 'manual';
     }
@@ -196,19 +198,33 @@ export class AzureOpenAI extends OpenAI {
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
-      return buildAzureAuthenticationHeaders(
-        typeof this.apiKey === 'string' ? [['api-key', this.apiKey]] : [],
-      );
+      return buildAzureAuthenticationHeaders([['api-key', this.apiKey]]);
     }
 
-    let authorization: string | null = null;
-    if (security.bearerAuth && typeof this.apiKey === 'string') {
-      authorization = `Bearer ${this.apiKey}`;
+    return buildAzureAuthenticationHeaders(
+      security.bearerAuth ? await this.bearerAuth(opts) : undefined,
+      security.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : undefined,
+    );
+  }
+
+  protected override async bearerAuth(_opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    if (this.apiKey === null) {
+      return undefined;
     }
-    if (security.adminAPIKeyAuth && typeof this.adminAPIKey === 'string') {
-      authorization = `Bearer ${this.adminAPIKey}`;
+    return buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.apiKey}`]]);
+  }
+
+  protected override async adminAPIKeyAuth(_opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    if (this.adminAPIKey === null || this.adminAPIKey === undefined) {
+      return undefined;
     }
-    return buildAzureAuthenticationHeaders(authorization === null ? [] : [['Authorization', authorization]]);
+    return buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.adminAPIKey}`]]);
+  }
+}
+
+function protectAzureAmbientHeaders(options: Pick<ClientOptions, 'defaultHeaders'>): void {
+  if (readEnv('OPENAI_CUSTOM_HEADERS')) {
+    options.defaultHeaders = buildAzureAuthenticationHeaders(options.defaultHeaders);
   }
 }
 

@@ -27,7 +27,7 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
-type AzureAuthenticationValues = ReadonlyArray<readonly [string, string]>;
+type AzureAuthenticationValues = ReadonlyArray<HeadersLike>;
 
 // Object-identity branding cannot be forged by caller-provided header records.
 const azureAuthenticationHeaders = new WeakMap<NullableHeaders, AzureAuthenticationValues>();
@@ -36,7 +36,7 @@ const azureAuthenticationHeaders = new WeakMap<NullableHeaders, AzureAuthenticat
  * Creates an authenticated Azure header carrier without first appending a raw
  * credential to native Headers, where rejected values appear in diagnostics.
  */
-export const buildAzureAuthenticationHeaders = (headers: AzureAuthenticationValues): NullableHeaders => {
+export const buildAzureAuthenticationHeaders = (...headers: AzureAuthenticationValues): NullableHeaders => {
   const carrier: NullableHeaders = {
     [brand_privateNullableHeaders]: true,
     values: new Headers(),
@@ -52,7 +52,17 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   if (brand_privateNullableHeaders in headers) {
     const azureHeaders = azureAuthenticationHeaders.get(headers);
     if (azureHeaders !== undefined) {
-      yield* azureHeaders;
+      for (const layer of azureHeaders) {
+        const seen = new Set<string>();
+        for (const [name, value] of iterateHeaders(layer)) {
+          const normalized = name.toLowerCase();
+          if (!seen.has(normalized)) {
+            seen.add(normalized);
+            yield [name, null];
+          }
+          yield [name, value];
+        }
+      }
     }
     const { values, nulls } = headers;
     yield* values.entries();
@@ -90,6 +100,15 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
     }
   }
 }
+
+/** Validates only the final authentication values without native construction. */
+export const assertAzureAuthenticationHeaders = (headers: HeadersLike): void => {
+  for (const [name, value] of iterateHeaders(headers)) {
+    if (value !== null && isAzureAuthenticationHeader(name)) {
+      assertAzureCredentialHeaderValue(value);
+    }
+  }
+};
 
 export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
   const targetHeaders = new Headers();
