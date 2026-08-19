@@ -530,6 +530,26 @@ describe('EventStream iterator buffer limits', () => {
         Object.defineProperty(new DataView(new ArrayBuffer(8)), Symbol('hidden'), { value }),
     },
     {
+      name: 'enumerable typed-array own string data properties',
+      create: (value: string) =>
+        Object.defineProperty(new Uint8Array(1), 'payload', { value, enumerable: true }),
+    },
+    {
+      name: 'non-enumerable typed-array own string data properties',
+      create: (value: string) =>
+        Object.defineProperty(new Uint8Array(1), 'payload', { value, enumerable: false }),
+    },
+    {
+      name: 'enumerable Buffer own string data properties',
+      create: (value: string) =>
+        Object.defineProperty(Buffer.alloc(1), 'payload', { value, enumerable: true }),
+    },
+    {
+      name: 'non-enumerable Buffer own string data properties',
+      create: (value: string) =>
+        Object.defineProperty(Buffer.alloc(1), 'payload', { value, enumerable: false }),
+    },
+    {
       name: 'symbol-keyed typed-array data properties',
       create: (value: string) => Object.defineProperty(new Uint8Array(8), Symbol('hidden'), { value }),
     },
@@ -574,6 +594,91 @@ describe('EventStream iterator buffer limits', () => {
 
     expect(stream.controller.signal.aborted).toBe(true);
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([
+    { name: 'Uint8Array', create: (length: number) => new Uint8Array(length) },
+    { name: 'Buffer', create: (length: number) => Buffer.alloc(length) },
+    {
+      name: 'cross-realm Uint8Array',
+      create: (length: number) => runInNewContext(`new Uint8Array(${length})`) as Uint8Array,
+    },
+  ])('buffers a $name at the own-key inspection boundary', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = create(4096);
+
+    stream.emitPayload(payload);
+
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test.each([
+    { name: 'Uint8Array', create: (length: number) => new Uint8Array(length) },
+    { name: 'Buffer', create: (length: number) => Buffer.alloc(length) },
+    {
+      name: 'cross-realm Uint8Array',
+      create: (length: number) => runInNewContext(`new Uint8Array(${length})`) as Uint8Array,
+    },
+  ])('rejects a detached $name above the bounded own-key inspection threshold', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(create(4097));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('rejects large dense typed arrays before materializing their index keys', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = new Uint8Array(1024 * 1024);
+    const ownKeys = vi.spyOn(Reflect, 'ownKeys');
+
+    try {
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(ownKeys.mock.calls.some(([value]) => value === payload)).toBe(false);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    } finally {
+      ownKeys.mockRestore();
+    }
+  });
+
+  test('inspects small typed-array properties without invoking overridden accessors', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = new Uint8Array(16);
+    const readAccessor = vi.fn(() => {
+      throw new Error('untrusted typed-array accessor');
+    });
+    Object.defineProperty(payload, 'length', { get: readAccessor });
+    Object.defineProperty(payload, 'buffer', { get: readAccessor });
+    Object.defineProperty(payload, 'hidden', { get: readAccessor });
+    Object.defineProperty(payload, Symbol('hidden accessor'), { get: readAccessor });
+
+    stream.emitPayload(payload);
+
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(readAccessor).not.toHaveBeenCalled();
+    stream.end();
+  });
+
+  test('delivers large typed arrays directly to waiting consumers without inspecting dense indices', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const next = iterator.next();
+    const payload = new Uint8Array(4097);
+
+    stream.emitPayload(payload);
+
+    await expect(next).resolves.toEqual({ done: false, value: [payload] });
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
   });
 
   test('delivers oversized events directly to waiting consumers without buffering', async () => {

@@ -406,6 +406,38 @@ function assignOwnProperties<T extends object>(target: T, source: object): T {
   return Object.assign(target, source);
 }
 
+function cloneParserConfigObject<Value extends object>(value: Value): Value {
+  return Object.create(Object.getPrototypeOf(value), Object.getOwnPropertyDescriptors(value)) as Value;
+}
+
+function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams): ChatCompletionCreateParams {
+  const snapshot = cloneParserConfigObject(params);
+
+  if (params.tools) {
+    snapshot.tools = params.tools.map((tool) => {
+      const descriptors = Object.getOwnPropertyDescriptors(tool);
+
+      if (isChatCompletionFunctionTool(tool)) {
+        const descriptor = descriptors.function;
+        descriptors.function = {
+          ...(descriptor && 'value' in descriptor
+            ? descriptor
+            : { configurable: true, enumerable: true, writable: true }),
+          value: cloneParserConfigObject(tool.function),
+        };
+      }
+
+      return Object.create(Object.getPrototypeOf(tool), descriptors) as typeof tool;
+    });
+  }
+
+  if (params.response_format) {
+    snapshot.response_format = cloneParserConfigObject(params.response_format);
+  }
+
+  return snapshot;
+}
+
 /** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 export class ChatCompletionStream<ParsedT = null>
   extends AbstractChatCompletionRunner<ChatCompletionStreamEvents<ParsedT>, ParsedT>
@@ -700,8 +732,9 @@ export class ChatCompletionStream<ParsedT = null>
       ...options,
       signal: this.controller.signal,
     });
+    this.#params = snapshotChatCompletionParserParams(requestParams);
     this.#hasAutoParseableTool =
-      requestParams.tools?.some(
+      this.#params.tools?.some(
         (tool) =>
           isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true),
       ) ?? false;

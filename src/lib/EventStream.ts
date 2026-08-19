@@ -2,12 +2,18 @@ import { APIUserAbortError, OpenAIError } from '../error';
 
 const MAX_BUFFERED_ITERATOR_EVENTS = 4096;
 const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
+// Typed-array own-key enumeration materializes every dense index before custom keys.
+const MAX_INSPECTABLE_TYPED_ARRAY_ELEMENTS = 4096;
 // Structured JSON may nest 128 levels before stream-event wrappers are added.
 const MAX_BUFFERED_EVENT_DEPTH = 256;
 
 const typedArrayBufferGetter = Object.getOwnPropertyDescriptor(
   Object.getPrototypeOf(Uint8Array.prototype) as object,
   'buffer',
+)?.get;
+const typedArrayLengthGetter = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype) as object,
+  'length',
 )?.get;
 const dataViewBufferGetter = Object.getOwnPropertyDescriptor(DataView.prototype, 'buffer')?.get;
 const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
@@ -181,6 +187,34 @@ function visitHiddenEventValues(
   return true;
 }
 
+function getInspectableEventKeys(
+  current: object,
+  kind: RetainedStorage['kind'] | undefined,
+): (string | symbol)[] | undefined {
+  if (kind !== 'typed-array') {
+    return Reflect.ownKeys(current);
+  }
+
+  const length: unknown = typedArrayLengthGetter?.call(current);
+  if (
+    typeof length !== 'number' ||
+    !Number.isSafeInteger(length) ||
+    length < 0 ||
+    length > MAX_INSPECTABLE_TYPED_ARRAY_ELEMENTS
+  ) {
+    return undefined;
+  }
+
+  return Reflect.ownKeys(current).filter((key) => {
+    if (typeof key !== 'string') {
+      return true;
+    }
+
+    const index = Number(key);
+    return !Number.isInteger(index) || index < 0 || index >= length || String(index) !== key;
+  });
+}
+
 function estimateBufferedEventBytes(value: unknown, remainingBytes: number): number {
   let bytes = 0;
   const visited = new WeakSet<object>();
@@ -230,10 +264,11 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
       return;
     }
 
-    const ownKeys =
-      retainedStorage?.kind === 'typed-array'
-        ? Object.getOwnPropertySymbols(current)
-        : Reflect.ownKeys(current);
+    const ownKeys = getInspectableEventKeys(current, retainedStorage?.kind);
+    if (ownKeys === undefined) {
+      bytes = remainingBytes + 1;
+      return;
+    }
 
     for (const key of ownKeys) {
       bytes += (typeof key === 'string' ? key.length : (key.description?.length ?? 0)) * 2 + 8;
