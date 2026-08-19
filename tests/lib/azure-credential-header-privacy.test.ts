@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 import { APIConnectionError, AzureOpenAI, OpenAIError } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
-import { buildHeaders } from 'openai/internal/headers';
+import { buildAzureAuthenticationHeaders, buildHeaders } from 'openai/internal/headers';
 import type { NullableHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 
@@ -50,6 +50,12 @@ class ProtectedHookAzure extends AzureOpenAI {
       1000,
       new AbortController(),
     );
+  }
+
+  inspectDeferredDefaultHeaders(defaults: Record<string, string>, inspect: (headers: Headers) => void): void {
+    const carrier = buildAzureAuthenticationHeaders(defaults);
+    this._options.defaultHeaders = carrier;
+    inspect(carrier.values);
   }
 
   protected override async authHeaders(
@@ -1147,4 +1153,170 @@ describe('Azure credential header diagnostic privacy', () => {
       expect(fetch).not.toHaveBeenCalled();
     },
   );
+
+  const deferredHeaderReadScenarios = (['auth', 'bearer', 'admin'] as const).flatMap((scheme) =>
+    (['get', 'has', 'entries', 'keys', 'values', 'iterator', 'forEach'] as const).map((method) => ({
+      scheme,
+      method,
+    })),
+  );
+
+  test.each(deferredHeaderReadScenarios)(
+    'preserves deferred $scheme authentication through Headers.$method',
+    async ({ scheme, method }) => {
+      const configured = 'configured-token';
+      const expectedName = scheme === 'auth' ? 'api-key' : 'authorization';
+      const expectedValue = scheme === 'auth' ? configured : `Bearer ${configured}`;
+      const provider = vi.fn(async () => configured);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(scheme === 'auth'
+          ? { apiKey: configured }
+          : { azureADTokenProvider: provider, adminAPIKey: configured }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutationScheme = scheme;
+      client.mutateCarrier = (headers) => {
+        expect(headers).toBeInstanceOf(Headers);
+        let observed: string | null = null;
+        switch (method) {
+          case 'get': {
+            observed = headers.get(expectedName.toUpperCase());
+            break;
+          }
+          case 'has': {
+            observed = headers.has(expectedName.toUpperCase()) ? expectedValue : null;
+            break;
+          }
+          case 'entries': {
+            observed = [...headers.entries()].find(([name]) => name === expectedName)?.[1] ?? null;
+            break;
+          }
+          case 'keys': {
+            observed = [...headers.keys()].includes(expectedName) ? expectedValue : null;
+            break;
+          }
+          case 'values': {
+            observed = [...headers.values()].find((value) => value === expectedValue) ?? null;
+            break;
+          }
+          case 'iterator': {
+            observed = [...headers].find(([name]) => name === expectedName)?.[1] ?? null;
+            break;
+          }
+          case 'forEach': {
+            const callbackContext = { trusted: true };
+            const iterate = headers.forEach;
+            iterate.call(
+              headers,
+              function collectHeader(
+                this: typeof callbackContext,
+                value: string,
+                name: string,
+                owner: Headers,
+              ) {
+                expect(this).toBe(callbackContext);
+                expect(owner).toBe(headers);
+                if (name === expectedName) {
+                  observed = value;
+                }
+              },
+              callbackContext,
+            );
+            break;
+          }
+          default: {
+            throw new Error('Unknown deferred header reader.');
+          }
+        }
+        expect(observed).toBe(expectedValue);
+      };
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: scheme === 'admin' },
+      });
+      expect(provider).toHaveBeenCalledTimes(scheme === 'auth' ? 0 : 1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('keeps deferred Headers reads coherent across malformed shadows and visible mutations', async () => {
+    const malformed = [PRIVATE_CREDENTIAL, PRIVATE_SUFFIX].join('\n');
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: malformed,
+      fetch,
+      maxRetries: 0,
+    });
+    client.mutateCarrier = (headers) => {
+      expect(headers.get('API-KEY')).toBe(malformed);
+      expect([...headers.entries()]).toEqual([['api-key', malformed]]);
+
+      headers.set('API-KEY', 'safe-shadow');
+      headers.append('api-key', 'safe-suffix');
+      expect(headers.get('api-key')).toBe('safe-shadow, safe-suffix');
+
+      headers.set('Z-Extra', 'last');
+      headers.set('A-Extra', 'first');
+      expect([...headers.keys()]).toEqual(['a-extra', 'api-key', 'z-extra']);
+
+      headers.delete('aPi-KeY');
+      expect(headers.has('API-KEY')).toBe(false);
+
+      headers.set('api-key', malformed);
+      expect(headers.get('API-KEY')).toBe(malformed);
+      headers.set('API-KEY', 'safe-final');
+      expect([...headers]).toEqual([
+        ['a-extra', 'first'],
+        ['api-key', 'safe-final'],
+        ['z-extra', 'last'],
+      ]);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+    const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('api-key')).toBe('safe-final');
+    expect(headers.get('a-extra')).toBe('first');
+    expect(headers.get('z-extra')).toBe('last');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('snapshots a deferred Azure default-header getter once across reads and final dispatch', async () => {
+    const malformed = [PRIVATE_CREDENTIAL, PRIVATE_SUFFIX].join('\n');
+    let reads = 0;
+    const defaults: Record<string, string> = {};
+    Object.defineProperty(defaults, 'API-KEY', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? 'safe-snapshot-token' : malformed;
+      },
+    });
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.inspectDeferredDefaultHeaders(defaults, (headers) => {
+      expect(headers.get('api-key')).toBe('safe-snapshot-token');
+      expect(headers.has('API-KEY')).toBe(true);
+      expect([...headers.entries()]).toEqual([['api-key', 'safe-snapshot-token']]);
+    });
+    expect(reads).toBe(1);
+
+    await client.request({ method: 'get', path: '/models' });
+    expect(reads).toBe(1);
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('safe-snapshot-token');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });

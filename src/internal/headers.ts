@@ -28,6 +28,7 @@ export type NullableHeaders = {
 };
 
 type AzureAuthenticationValues = ReadonlyArray<HeadersLike>;
+type AzureAuthenticationLayer = ReadonlyArray<readonly [string, string | null]>;
 type AzureAuthenticationHeaderMutation = {
   kind: 'append' | 'replace' | 'delete';
   values: string[];
@@ -35,6 +36,11 @@ type AzureAuthenticationHeaderMutation = {
 
 // Object-identity branding cannot be forged by caller-provided header records.
 const azureAuthenticationHeaders = new WeakMap<NullableHeaders, AzureAuthenticationValues>();
+const azureAuthenticationHeaderCarriers = new WeakMap<Headers, NullableHeaders>();
+const azureAuthenticationHeaderSnapshots = new WeakMap<
+  NullableHeaders,
+  ReadonlyArray<AzureAuthenticationLayer>
+>();
 const azureAuthenticationHeaderMutations = new WeakMap<
   Headers,
   Map<string, AzureAuthenticationHeaderMutation>
@@ -44,6 +50,51 @@ class DeferredAzureAuthenticationHeaders extends Headers {
   constructor() {
     super();
     azureAuthenticationHeaderMutations.set(this, new Map());
+  }
+
+  override get = (name: string): string | null => {
+    const normalized = String(name).toLowerCase();
+    Headers.prototype.has.call(this, normalized);
+    return this.current().get(normalized) ?? null;
+  };
+
+  override has = (name: string): boolean => {
+    const normalized = String(name).toLowerCase();
+    Headers.prototype.has.call(this, normalized);
+    return this.current().has(normalized);
+  };
+
+  override entries = () => this.current().entries();
+
+  override keys = () => this.current().keys();
+
+  override values = () => this.current().values();
+
+  override [Symbol.iterator] = () => this.entries();
+
+  override forEach = (
+    callback: (value: string, key: string, parent: Headers) => void,
+    thisArg?: unknown,
+  ): void => {
+    for (const [name, value] of this.entries()) {
+      callback.call(thisArg, value, name, this);
+    }
+  };
+
+  private current(): Map<string, string> {
+    const carrier = azureAuthenticationHeaderCarriers.get(this);
+    const source = carrier ? iterateHeaders(carrier) : Headers.prototype.entries.call(this);
+    const effective = new Map<string, string>();
+    for (const [name, value] of source) {
+      const normalized = name.toLowerCase();
+      if (value === null) {
+        effective.delete(normalized);
+        continue;
+      }
+      const previous = effective.get(normalized);
+      effective.set(normalized, previous === undefined ? value : `${previous}, ${value}`);
+    }
+    return new Map([...effective].sort(([left], [right]) => Number(left > right) - Number(left < right)));
   }
 
   override append = (name: string, value: string): void => {
@@ -112,6 +163,7 @@ export const buildAzureAuthenticationHeaders = (...headers: AzureAuthenticationV
     nulls: new Set<string>(),
   };
   azureAuthenticationHeaders.set(carrier, headers);
+  azureAuthenticationHeaderCarriers.set(carrier.values, carrier);
   return carrier;
 };
 
@@ -121,13 +173,20 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   if (brand_privateNullableHeaders in headers) {
     const { values, nulls } = headers;
     const nullNames = new Set([...nulls].map((name) => name.toLowerCase()));
-    const visibleNames = new Set([...values.keys(), ...nullNames].map((name) => name.toLowerCase()));
+    const deferredValues = azureAuthenticationHeaderCarriers.has(values);
+    const keys = deferredValues ? Headers.prototype.keys.call(values) : values.keys();
+    const visibleNames = new Set([...keys, ...nullNames].map((name) => name.toLowerCase()));
     const mutations = azureAuthenticationHeaderMutations.get(values);
     const azureHeaders = azureAuthenticationHeaders.get(headers);
     if (azureHeaders !== undefined) {
-      for (const layer of azureHeaders) {
+      let layers = azureAuthenticationHeaderSnapshots.get(headers);
+      if (!layers) {
+        layers = Object.freeze(azureHeaders.map((layer) => Object.freeze([...iterateHeaders(layer)])));
+        azureAuthenticationHeaderSnapshots.set(headers, layers);
+      }
+      for (const layer of layers) {
         const seen = new Set<string>();
-        for (const [name, value] of iterateHeaders(layer)) {
+        for (const [name, value] of layer) {
           const normalized = name.toLowerCase();
           const mutation = mutations?.get(normalized);
           if (
@@ -147,7 +206,8 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
       }
     }
     const emitted = new Set<string>();
-    for (const [name, value] of values.entries()) {
+    const entries = deferredValues ? Headers.prototype.entries.call(values) : values.entries();
+    for (const [name, value] of entries) {
       const normalized = name.toLowerCase();
       const mutation = mutations?.get(normalized);
       if (mutation && isAzureAuthenticationHeader(normalized)) {
