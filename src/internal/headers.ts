@@ -81,12 +81,13 @@ class DeferredAzureAuthenticationHeaders extends Headers {
   };
 
   override entries = (): ReturnType<Headers['entries']> =>
-    this.current().entries() as ReturnType<Headers['entries']>;
+    this.current().entries() as unknown as ReturnType<Headers['entries']>;
 
-  override keys = (): ReturnType<Headers['keys']> => this.current().keys() as ReturnType<Headers['keys']>;
+  override keys = (): ReturnType<Headers['keys']> =>
+    this.current().keys() as unknown as ReturnType<Headers['keys']>;
 
   override values = (): ReturnType<Headers['values']> =>
-    this.current().values() as ReturnType<Headers['values']>;
+    this.current().values() as unknown as ReturnType<Headers['values']>;
 
   override [Symbol.iterator] = (): ReturnType<Headers[typeof Symbol.iterator]> => this.entries();
 
