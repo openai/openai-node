@@ -581,6 +581,171 @@ it('preserves the branded parser identity while a tool.toJSON changes its dispat
   expect(serialize).toHaveBeenCalledTimes(1);
 });
 
+it.each(['format', 'request'] as const)(
+  'does not parse a response format serialized as text by the %s owner without tools',
+  async (owner) => {
+    const parser = vi.fn((content: string) => JSON.parse(content) as unknown);
+    const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+    const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+      model: 'gpt-test',
+      stream: true,
+      messages: [{ role: 'user', content: 'Use only the response format sent on the wire' }],
+      response_format: responseFormat,
+    };
+    const serialize = vi.fn(function serializeTextFormat(this: object) {
+      return owner === 'format' ? { type: 'text' } : { ...this, response_format: { type: 'text' } };
+    });
+    Object.defineProperty(owner === 'format' ? responseFormat : params, 'toJSON', {
+      configurable: true,
+      enumerable: owner === 'request',
+      value: serialize,
+    });
+    const client = createSerializedClient(contentFragments(['this is plain text']), (body) => {
+      expect(JSON.parse(body)).toMatchObject({ response_format: { type: 'text' } });
+    });
+
+    const completion = await ChatCompletionStream.createChatCompletion(client, params).finalChatCompletion();
+
+    expect(completion.choices[0]?.message).toMatchObject({ content: 'this is plain text', parsed: null });
+    expect(parser).not.toHaveBeenCalled();
+    expect(serialize).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('keeps the original response parser for its own serialized JSON schema', async () => {
+  const parser = vi.fn((content: string) => ({ owned: JSON.parse(content) as unknown }));
+  const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+  const serialize = vi.fn(function serializeOwnedSchema(this: typeof responseFormat) {
+    expect(this).toBe(responseFormat);
+    return { type: 'json_schema', json_schema: this.json_schema };
+  });
+  Object.defineProperty(responseFormat, 'toJSON', { configurable: true, value: serialize });
+  const client = createSerializedClient(contentFragments(['{"value":"owned"}']), (body) => {
+    expect(JSON.parse(body)).toMatchObject({ response_format: { type: 'json_schema' } });
+  });
+
+  const completion = await ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Preserve the actual response parser owner' }],
+    response_format: responseFormat,
+  }).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.parsed).toEqual({ owned: { value: 'owned' } });
+  expect(parser).toHaveBeenCalledWith('{"value":"owned"}');
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('drops a branded response parser for an unrelated synthesized JSON schema', async () => {
+  const parser = vi.fn((content: string) => ({ unsafe: JSON.parse(content) as unknown }));
+  const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+  const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+    model: 'gpt-test',
+    stream: true,
+    messages: [{ role: 'user', content: 'Do not attach a parser to an unrelated wire schema' }],
+    response_format: responseFormat,
+  };
+  const serialize = vi.fn(function synthesizeResponseFormat(this: object) {
+    return { ...this, response_format: { type: 'json_schema', json_schema: { name: 'synth', schema: {} } } };
+  });
+  Object.defineProperty(params, 'toJSON', { configurable: true, enumerable: true, value: serialize });
+  const client = createSerializedClient(contentFragments(['{"value":"wire"}']), (body) => {
+    expect(JSON.parse(body)).toMatchObject({ response_format: { json_schema: { name: 'synth' } } });
+  });
+
+  const completion = await ChatCompletionStream.createChatCompletion(client, params).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.parsed).toEqual({ value: 'wire' });
+  expect(parser).not.toHaveBeenCalled();
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it.each(['tools', 'request', 'tools-and-tool'] as const)(
+  'keeps branded parser ownership when the %s serializer reorders actual tools',
+  async (owner) => {
+    const parseFirst = vi.fn((content: string) => ({ wrong: JSON.parse(content) as unknown }));
+    const parseSecond = vi.fn((content: string) => ({ correct: JSON.parse(content) as unknown }));
+    const first = makeParseableTool(
+      { ...strictTool, function: { ...strictTool.function, name: 'first_tool' } },
+      { parser: parseFirst, callback: vi.fn() },
+    );
+    const second = makeParseableTool(
+      { ...strictTool, function: { ...strictTool.function, name: 'second_tool' } },
+      { parser: parseSecond, callback: vi.fn() },
+    );
+    const serializeTool = vi.fn(function serializeOwnedTool(this: typeof second) {
+      expect(this).toBe(second);
+      return { type: 'function', function: this.function };
+    });
+    if (owner === 'tools-and-tool') {
+      Object.defineProperty(second, 'toJSON', { configurable: true, value: serializeTool });
+    }
+    const tools = [first, second];
+    const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+      model: 'gpt-test',
+      stream: true,
+      messages: [{ role: 'user', content: 'Keep callbacks attached to their actual tool owner' }],
+      tools,
+    };
+    const serialize = vi.fn(function reorderActualTools(this: object) {
+      return owner === 'request' ? { ...this, tools: [second, first] } : [second, first];
+    });
+    Object.defineProperty(owner === 'request' ? params : tools, 'toJSON', {
+      configurable: true,
+      enumerable: owner === 'request',
+      value: serialize,
+    });
+    const argumentsJSON = '{"value":"correct owner"}';
+    const client = createSerializedClient(namedArgumentFragments('second_tool', [argumentsJSON]), (body) => {
+      const dispatched = JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams;
+      expect(dispatched.tools?.map((tool) => tool.type === 'function' && tool.function.name)).toEqual([
+        'second_tool',
+        'first_tool',
+      ]);
+    });
+
+    const completion = await ChatCompletionStream.createChatCompletion(client, params).finalChatCompletion();
+
+    expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+      function: { name: 'second_tool', parsed_arguments: { correct: { value: 'correct owner' } } },
+    });
+    expect(parseFirst).not.toHaveBeenCalled();
+    expect(parseSecond).toHaveBeenCalledWith(argumentsJSON);
+    expect(serialize).toHaveBeenCalledTimes(1);
+    expect(serializeTool).toHaveBeenCalledTimes(owner === 'tools-and-tool' ? 1 : 0);
+  },
+);
+
+it('never transfers a configured tool parser to an unrelated serialized tool', async () => {
+  const parser = vi.fn((content: string) => ({ unsafe: JSON.parse(content) as unknown }));
+  const original = makeParseableTool(strictTool, { parser, callback: vi.fn() });
+  const tools = [original];
+  const serialize = vi.fn(() => [
+    { type: 'function', function: { name: 'synthesized_tool', strict: true, parameters: {} } },
+  ]);
+  Object.defineProperty(tools, 'toJSON', { configurable: true, value: serialize });
+  const argumentsJSON = '{"value":"wire"}';
+  const client = createSerializedClient(
+    namedArgumentFragments('synthesized_tool', [argumentsJSON]),
+    (body) => {
+      expect(JSON.parse(body)).toMatchObject({
+        tools: [{ function: { name: 'synthesized_tool', strict: true } }],
+      });
+    },
+  );
+
+  const completion = await ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Never transfer unrelated parser callbacks' }],
+    tools,
+  }).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { name: 'synthesized_tool', parsed_arguments: { value: 'wire' } },
+  });
+  expect(parser).not.toHaveBeenCalled();
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
 it('preserves the exact error thrown by a serialized tool.toJSON hook', async () => {
   const failure = new Error('original custom serializer failure');
   const tool: OpenAI.Chat.ChatCompletionFunctionTool = { ...strictTool };

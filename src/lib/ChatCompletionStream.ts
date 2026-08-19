@@ -657,6 +657,7 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
 }
 
 type ChatCompletionInputTool = NonNullable<ChatCompletionCreateParams['tools']>[number];
+type ChatCompletionResponseFormat = NonNullable<ChatCompletionCreateParams['response_format']>;
 
 interface SerializedFunctionParserConfig {
   name?: string;
@@ -664,9 +665,14 @@ interface SerializedFunctionParserConfig {
 }
 
 interface SerializedToolParserConfig {
-  source: ChatCompletionInputTool;
+  source: ChatCompletionInputTool | undefined;
   type?: string;
   function?: SerializedFunctionParserConfig;
+}
+
+interface SerializedResponseParserConfig {
+  source: ChatCompletionResponseFormat | undefined;
+  type?: string;
 }
 
 function serializedParserDescriptor(
@@ -679,7 +685,13 @@ function serializedParserDescriptor(
 }
 
 function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): ChatCompletionInputTool {
-  const descriptors = Object.getOwnPropertyDescriptors(serialized.source);
+  const source =
+    serialized.source ??
+    ({
+      type: serialized.type,
+      ...(serialized.type === 'function' ? { function: {} } : {}),
+    } as ChatCompletionInputTool);
+  const descriptors = Object.getOwnPropertyDescriptors(source);
   descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
 
   if (serialized.type !== 'function' || !serialized.function) {
@@ -689,7 +701,7 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
     delete descriptors['$brand'];
     delete descriptors['$parseRaw'];
     delete descriptors['$callback'];
-    return Object.create(Object.getPrototypeOf(serialized.source), descriptors) as ChatCompletionInputTool;
+    return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
   }
 
   const descriptor = descriptors.function;
@@ -711,7 +723,29 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
     Object.create(Object.getPrototypeOf(original), functionDescriptors),
   );
 
-  return Object.create(Object.getPrototypeOf(serialized.source), descriptors) as ChatCompletionInputTool;
+  return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
+}
+
+function snapshotSerializedResponseFormat(
+  serialized: SerializedResponseParserConfig,
+): ChatCompletionResponseFormat {
+  const source = serialized.source ?? ({ type: serialized.type } as ChatCompletionResponseFormat);
+  const descriptors = Object.getOwnPropertyDescriptors(source);
+  descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
+  if (serialized.type !== 'json_schema' || !serialized.source) {
+    delete descriptors['$brand'];
+    delete descriptors['$parseRaw'];
+  }
+  return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionResponseFormat;
+}
+
+function ownSerializedParserObject(holder: object, key: string): object | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+  if (!descriptor || !('value' in descriptor)) {
+    return undefined;
+  }
+  const { value } = descriptor;
+  return typeof value === 'object' && value !== null ? value : undefined;
 }
 
 function observeSerializedChatCompletionParserParams(
@@ -719,8 +753,20 @@ function observeSerializedChatCompletionParserParams(
   initial: ChatCompletionCreateParams,
   update: (params: ChatCompletionCreateParams) => void,
 ): () => void {
+  const originalToolOwners = new WeakMap<object, ChatCompletionInputTool>();
+  if (body.tools) {
+    for (let index = 0; index < body.tools.length && index < MAX_STREAM_TOOL_CALLS; index += 1) {
+      const owner = ownSerializedParserObject(body.tools, String(index));
+      const source = initial.tools?.[index];
+      if (owner && source) {
+        originalToolOwners.set(owner, source);
+      }
+    }
+  }
   let root: object | undefined;
   let tools: object | undefined;
+  let responseFormat: object | undefined;
+  let responseFrame: SerializedResponseParserConfig | undefined;
   let frames: (SerializedToolParserConfig | undefined)[] = [];
   let toolFrames = new WeakMap<object, SerializedToolParserConfig>();
   let functionFrames = new WeakMap<object, SerializedFunctionParserConfig>();
@@ -730,9 +776,20 @@ function observeSerializedChatCompletionParserParams(
       if (!root && key === '' && typeof value === 'object' && value !== null) {
         root = value;
         tools = undefined;
+        responseFormat = undefined;
+        responseFrame = undefined;
         frames = [];
         toolFrames = new WeakMap();
         functionFrames = new WeakMap();
+        return;
+      }
+
+      if (holder === root && key === 'response_format') {
+        if (typeof value === 'object' && value !== null) {
+          responseFormat = value;
+          const owner = ownSerializedParserObject(holder, key);
+          responseFrame = { source: owner === body.response_format ? initial.response_format : undefined };
+        }
         return;
       }
 
@@ -745,12 +802,12 @@ function observeSerializedChatCompletionParserParams(
 
       if (holder === tools) {
         const index = Number(key);
-        const source = initial.tools?.[index];
+        const owner = ownSerializedParserObject(holder, key);
+        const source = owner ? originalToolOwners.get(owner) : undefined;
         if (
           !Number.isSafeInteger(index) ||
           index < 0 ||
           index >= MAX_STREAM_TOOL_CALLS ||
-          !source ||
           typeof value !== 'object' ||
           value === null
         ) {
@@ -771,6 +828,11 @@ function observeSerializedChatCompletionParserParams(
           tool.function = fn;
           functionFrames.set(value, fn);
         }
+        return;
+      }
+
+      if (holder === responseFormat && key === 'type' && typeof value === 'string' && responseFrame) {
+        responseFrame.type = value;
         return;
       }
 
@@ -800,9 +862,16 @@ function observeSerializedChatCompletionParserParams(
       } else {
         delete snapshot.tools;
       }
+      if (responseFrame) {
+        snapshot.response_format = snapshotSerializedResponseFormat(responseFrame);
+      } else {
+        delete snapshot.response_format;
+      }
       update(snapshot);
       root = undefined;
       tools = undefined;
+      responseFormat = undefined;
+      responseFrame = undefined;
       frames = [];
       toolFrames = new WeakMap();
       functionFrames = new WeakMap();
@@ -1264,17 +1333,18 @@ export class ChatCompletionStream<ParsedT = null>
         (tool) =>
           isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true),
       ) ?? false;
-    const stopObserving = requestParams.tools
-      ? observeSerializedChatCompletionParserParams(requestParams, parserParams, (serialized) => {
-          this.#params = serialized;
-          this.#hasAutoParseableTool =
-            serialized.tools?.some(
-              (tool) =>
-                isChatCompletionFunctionTool(tool) &&
-                (isAutoParsableTool(tool) || tool.function.strict === true),
-            ) ?? false;
-        })
-      : undefined;
+    const stopObserving =
+      requestParams.tools || requestParams.response_format
+        ? observeSerializedChatCompletionParserParams(requestParams, parserParams, (serialized) => {
+            this.#params = serialized;
+            this.#hasAutoParseableTool =
+              serialized.tools?.some(
+                (tool) =>
+                  isChatCompletionFunctionTool(tool) &&
+                  (isAutoParsableTool(tool) || tool.function.strict === true),
+              ) ?? false;
+          })
+        : undefined;
     const stream = await client.chat.completions
       .create(requestParams, {
         ...options,
