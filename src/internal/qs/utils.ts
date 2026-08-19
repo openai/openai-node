@@ -18,6 +18,7 @@ function isUnsafePropertyKey(key: unknown): boolean {
 interface AdoptedRecord {
   value: object;
   descriptors: PropertyDescriptorMap;
+  keys: PropertyKey[];
   prototype: object | null;
   parents: Set<AdoptedRecord>;
   ordinary: boolean;
@@ -32,9 +33,20 @@ interface MergeState {
   preparedTargets: WeakMap<object, Map<PropertyKey, any>>;
   preparedSources: WeakMap<object, WeakMap<object, object>>;
   inspectedSources: number;
+  inspectedSourceProperties: number;
 }
 
 const maxAdoptedRecords = 10_000;
+
+function isIntrinsicFunctionPrototype(
+  value: object,
+  key: PropertyKey,
+  descriptor: PropertyDescriptor,
+): boolean {
+  return (
+    typeof value === 'function' && key === 'prototype' && !descriptor.enumerable && !descriptor.configurable
+  );
+}
 
 function isObjectLike(value: unknown): value is object {
   return value !== null && (typeof value === 'object' || typeof value === 'function');
@@ -74,7 +86,18 @@ function sanitizeAdoptions(state: MergeState): void {
       throw new Error('Adopted record traversal exceeds the supported safety limit.');
     }
 
-    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(value);
+    if (keys.length > maxAdoptedRecords - inspectedProperties) {
+      throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    }
+    inspectedProperties += keys.length;
+    const descriptors: PropertyDescriptorMap = Object.create(null);
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor) {
+        Reflect.set(descriptors, key, descriptor);
+      }
+    }
     const prototype = Object.getPrototypeOf(value);
     const array = isArray(value);
     const extensible = Object.isExtensible(value);
@@ -84,6 +107,7 @@ function sanitizeAdoptions(state: MergeState): void {
     const record: AdoptedRecord = {
       value,
       descriptors,
+      keys,
       prototype,
       parents: new Set(),
       ordinary,
@@ -106,22 +130,16 @@ function sanitizeAdoptions(state: MergeState): void {
 
   const detached: AdoptedRecord[] = [];
   for (const record of visited) {
-    for (const key of Reflect.ownKeys(record.descriptors)) {
-      inspectedProperties += 1;
-      if (inspectedProperties > maxAdoptedRecords) {
-        throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    for (const key of record.keys) {
+      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      if (!descriptor) {
+        continue;
       }
-      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor;
       if (isUnsafePropertyKey(key)) {
         if (record.ordinary) {
           record.detached = true;
           record.unsafe = true;
-        } else if (
-          typeof record.value !== 'function' ||
-          key !== 'prototype' ||
-          descriptor.enumerable ||
-          descriptor.configurable
-        ) {
+        } else if (!isIntrinsicFunctionPrototype(record.value, key, descriptor)) {
           throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
         }
         continue;
@@ -135,6 +153,19 @@ function sanitizeAdoptions(state: MergeState): void {
     }
     if (record.detached) {
       detached.push(record);
+    }
+  }
+
+  for (let index = visited.length - 1; index >= 0; index -= 1) {
+    const record = visited[index]!;
+    if (record.ordinary) {
+      continue;
+    }
+    for (const key of ['__proto__', 'constructor', 'prototype'] as const) {
+      const descriptor = Object.getOwnPropertyDescriptor(record.value, key);
+      if (descriptor && !isIntrinsicFunctionPrototype(record.value, key, descriptor)) {
+        throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+      }
     }
   }
 
@@ -169,11 +200,14 @@ function sanitizeAdoptions(state: MergeState): void {
   }
   for (const record of detached) {
     const copy = copies.get(record.value);
-    for (const key of Reflect.ownKeys(record.descriptors)) {
+    for (const key of record.keys) {
       if (isUnsafePropertyKey(key)) {
         continue;
       }
-      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor;
+      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      if (!descriptor) {
+        continue;
+      }
       if ('value' in descriptor && isObjectLike(descriptor.value) && copies.has(descriptor.value)) {
         descriptor.value = copies.get(descriptor.value);
       }
@@ -240,6 +274,11 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
     throw new Error('Adopted record traversal exceeds the supported safety limit.');
   }
 
+  const sourceKeys = Reflect.ownKeys(source);
+  if (sourceKeys.length > maxAdoptedRecords - state.inspectedSourceProperties) {
+    throw new Error('Adopted record traversal exceeds the supported safety limit.');
+  }
+  state.inspectedSourceProperties += sourceKeys.length;
   const sourceIsArray = isArray(source);
   const prepared: Record<string, any> = sourceIsArray ? [] : Object.create(null);
   preparedTargets.set(target, prepared);
@@ -265,7 +304,13 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
     return prepared;
   }
 
-  for (const key of Object.keys(source)) {
+  const enumerableKeys: string[] = [];
+  for (const key of sourceKeys) {
+    if (typeof key === 'string' && Object.getOwnPropertyDescriptor(source, key)?.enumerable) {
+      enumerableKeys.push(key);
+    }
+  }
+  for (const key of enumerableKeys) {
     if (isUnsafePropertyKey(key)) {
       continue;
     }
@@ -343,11 +388,16 @@ function mergeWithState(
     if (isArray(target)) {
       target.push(source);
     } else if (target && typeof target === 'object') {
+      const propertyKey =
+        typeof source === 'string' || typeof source === 'symbol'
+          ? source
+          : Reflect.ownKeys({ [source]: true })[0]!;
       if (
-        !isUnsafePropertyKey(source) &&
-        ((options && (options.plainObjects || options.allowPrototypes)) || !has(Object.prototype, source))
+        !isUnsafePropertyKey(propertyKey) &&
+        ((options && (options.plainObjects || options.allowPrototypes)) ||
+          !has(Object.prototype, propertyKey))
       ) {
-        target[source] = true;
+        target[propertyKey] = true;
       }
     } else {
       return [target, source];
@@ -413,6 +463,7 @@ export function merge(
     preparedTargets: new WeakMap(),
     preparedSources: new WeakMap(),
     inspectedSources: 0,
+    inspectedSourceProperties: 0,
   };
   return mergeWithState(target, prepareSource(target, source, state), options, state);
 }
@@ -423,6 +474,7 @@ export function assign_single_source(target: any, source: any) {
     preparedTargets: new WeakMap(),
     preparedSources: new WeakMap(),
     inspectedSources: 0,
+    inspectedSourceProperties: 0,
   };
   const prepared = prepareSource(target, source, state, true);
   for (const key of Object.keys(prepared)) {

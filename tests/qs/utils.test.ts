@@ -646,6 +646,121 @@ describe('prototype-pollution safety', () => {
     expect(has(result.frozen.child, '__proto__')).toBe(false);
   });
 
+  test.each(graphOperations)(
+    '$name rejects retained inherited parents polluted by a later child Proxy trap',
+    ({ apply }) => {
+      const parent = Object.create({ inherited: true }) as Record<string, unknown>;
+      let inspections = 0;
+      parent['child'] = new Proxy(
+        { safe: true },
+        {
+          ownKeys(value) {
+            inspections += 1;
+            Object.defineProperty(parent, '__proto__', {
+              configurable: true,
+              enumerable: true,
+              value: { polluted: true },
+            });
+            return Reflect.ownKeys(value);
+          },
+        },
+      );
+      const target = { original: true };
+
+      expect(() => apply(target, { first: 'must not commit', parent })).toThrow(
+        /safely sanitize|unsupported|callable/iu,
+      );
+      expect(inspections).toBe(1);
+      expect(target).toEqual({ original: true });
+    },
+  );
+
+  test.each(graphOperations)(
+    '$name rejects an oversized root or adopted record before inspecting any descriptors',
+    ({ apply }) => {
+      for (const position of ['root', 'adopted']) {
+        const wide: Record<string, unknown> = {};
+        for (let index = 0; index <= 10_000; index += 1) {
+          wide[`value-${index}`] = index;
+        }
+        let descriptorCalls = 0;
+        let keyEnumerations = 0;
+        const hostile = new Proxy(wide, {
+          ownKeys(value) {
+            keyEnumerations += 1;
+            return Reflect.ownKeys(value);
+          },
+          getOwnPropertyDescriptor(value, key) {
+            descriptorCalls += 1;
+            return Object.getOwnPropertyDescriptor(value, key);
+          },
+        });
+        const target = { original: true };
+        const source = position === 'root' ? hostile : { first: 'must not commit', hostile };
+
+        expect(() => apply(target, source)).toThrow(/adopted record|traversal|limit/iu);
+        expect(keyEnumerations).toBe(1);
+        expect(descriptorCalls).toBe(0);
+        expect(target).toEqual({ original: true });
+      }
+    },
+  );
+
+  test('merge coerces a stateful callable scalar key exactly once before default lookup', () => {
+    let coercions = 0;
+    const callable = () => coercions >= 0;
+    Object.defineProperty(callable, Symbol.toPrimitive, {
+      value() {
+        coercions += 1;
+        return coercions === 1 ? 'safe' : 'constructor';
+      },
+    });
+    const target: Record<string, unknown> = {};
+
+    expect(merge(target, callable)).toBe(target);
+    expect(coercions).toBe(1);
+    expect(target).toEqual({ safe: true });
+    expect(has(target, 'constructor')).toBe(false);
+    expect(has(target, 'prototype')).toBe(false);
+  });
+
+  test.each(['__proto__', 'constructor', 'prototype'])(
+    'merge rejects coerced unsafe callable key %s when inherited names are allowed',
+    (unsafeKey) => {
+      let coercions = 0;
+      const callable = () => coercions >= 0;
+      Object.defineProperty(callable, Symbol.toPrimitive, {
+        value() {
+          coercions += 1;
+          return unsafeKey;
+        },
+      });
+      const target: Record<string, unknown> = {};
+
+      expect(merge(target, callable, { allowPrototypes: true })).toBe(target);
+      expect(coercions).toBe(1);
+      expect(Object.getPrototypeOf(target)).toBe(Object.prototype);
+      expect(has(target, unsafeKey)).toBe(false);
+    },
+  );
+
+  test('merge preserves a callable scalar key whose primitive value is a symbol', () => {
+    const safe = Symbol('safe');
+    let coercions = 0;
+    const callable = () => coercions >= 0;
+    Object.defineProperty(callable, Symbol.toPrimitive, {
+      value() {
+        coercions += 1;
+        return safe;
+      },
+    });
+    const target: Record<PropertyKey, unknown> = {};
+
+    expect(merge(target, callable, { allowPrototypes: true })).toBe(target);
+    expect(coercions).toBe(1);
+    expect(target[safe]).toBe(true);
+  });
+
   test('preserves transitively frozen safe records without invoking their accessors', () => {
     const child = Object.freeze({ value: true });
     const frozen = Object.freeze({ child });
