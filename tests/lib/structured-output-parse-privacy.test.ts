@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { OpenAIError } from 'openai/error';
+import type { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import {
   standardFunction,
   standardResponseFormat,
@@ -194,7 +195,8 @@ function createClient(body: OpenAI.Chat.ChatCompletion | OpenAI.Responses.Respon
   });
 }
 
-function createStreamingToolClient(content: string, tool: ChatCompletionFunctionTool) {
+function createStreamingToolClient(content: string | readonly string[], tool: ChatCompletionFunctionTool) {
+  const fragments = typeof content === 'string' ? [content] : content;
   const chunk: OpenAI.Chat.ChatCompletionChunk = {
     id: 'chatcmpl_stream_privacy',
     object: 'chat.completion.chunk',
@@ -212,7 +214,7 @@ function createStreamingToolClient(content: string, tool: ChatCompletionFunction
               index: 0,
               id: 'call_stream_privacy',
               type: 'function',
-              function: { name: 'lookup', arguments: content },
+              function: { name: 'lookup', arguments: fragments[0] ?? '' },
             },
           ],
         },
@@ -223,24 +225,90 @@ function createStreamingToolClient(content: string, tool: ChatCompletionFunction
     ...chunk,
     choices: [{ index: 0, finish_reason: 'tool_calls', logprobs: null, delta: {} }],
   };
+  const continuationChunks = fragments.slice(1).map(
+    (fragment): OpenAI.Chat.ChatCompletionChunk => ({
+      ...chunk,
+      choices: [
+        {
+          index: 0,
+          finish_reason: null,
+          logprobs: null,
+          delta: { tool_calls: [{ index: 0, function: { arguments: fragment } }] },
+        },
+      ],
+    }),
+  );
+  const streamBody = [chunk, ...continuationChunks, completedChunk]
+    .map((entry) => `data: ${JSON.stringify(entry)}\n\n`)
+    .join('');
   const client = new OpenAI({
     apiKey: 'sk-synthetic-client-key',
     logLevel: 'off',
     maxRetries: 0,
     fetch: async () =>
-      new Response(
-        `data: ${JSON.stringify(chunk)}\n\ndata: ${JSON.stringify(completedChunk)}\n\ndata: [DONE]\n\n`,
-        {
-          status: 200,
-          headers: { 'content-type': 'text/event-stream', 'x-request-id': 'req_stream_privacy' },
-        },
-      ),
+      new Response(`${streamBody}data: [DONE]\n\n`, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream', 'x-request-id': 'req_stream_privacy' },
+      }),
   });
 
   return client.chat.completions.stream({
     model: 'gpt-test',
     messages: [{ role: 'user', content: 'hello' }],
     tools: [tool],
+  });
+}
+
+function createStreamingContentClient(
+  contents: readonly string[],
+  format: typeof chatFormat | (typeof helperFamilies)[number]['chatFormat'],
+  refusal?: string,
+) {
+  const chunks = contents.map(
+    (content, index): OpenAI.Chat.ChatCompletionChunk => ({
+      id: 'chatcmpl_content_privacy',
+      object: 'chat.completion.chunk',
+      created: 0,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          finish_reason: null,
+          logprobs: null,
+          delta: {
+            ...(index === 0 ? { role: 'assistant' as const } : {}),
+            ...(index === 0 && refusal ? { refusal } : {}),
+            content,
+          },
+        },
+      ],
+    }),
+  );
+  const completedChunk: OpenAI.Chat.ChatCompletionChunk = {
+    id: 'chatcmpl_content_privacy',
+    object: 'chat.completion.chunk',
+    created: 0,
+    model: 'gpt-test',
+    choices: [{ index: 0, finish_reason: 'stop', logprobs: null, delta: {} }],
+  };
+  const streamBody = [...chunks, completedChunk]
+    .map((entry) => `data: ${JSON.stringify(entry)}\n\n`)
+    .join('');
+  const client = new OpenAI({
+    apiKey: 'sk-synthetic-client-key',
+    logLevel: 'off',
+    maxRetries: 0,
+    fetch: async () =>
+      new Response(`${streamBody}data: [DONE]\n\n`, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream', 'x-request-id': 'req_content_privacy' },
+      }),
+  });
+
+  return client.chat.completions.stream({
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'hello' }],
+    response_format: format,
   });
 }
 
@@ -365,6 +433,30 @@ function expectPrivateSyntaxError(error: unknown): asserts error is SyntaxError 
 
   expect(syntaxError.message).toBe(safeErrorMessage);
   expect(syntaxError.cause).toBeUndefined();
+}
+
+async function expectPrivateStreamingFailure<ParsedT>(stream: ChatCompletionStream<ParsedT>): Promise<void> {
+  const emittedErrors: unknown[] = [];
+  stream.on('error', (error) => emittedErrors.push(error));
+
+  const results = await Promise.allSettled([
+    stream.done(),
+    stream.finalChatCompletion(),
+    stream.finalMessage(),
+  ]);
+  const failures = results.map((result) => (result.status === 'rejected' ? result.reason : undefined));
+  const [failure] = failures;
+
+  expect(failure).toBeInstanceOf(OpenAIError);
+  const streamFailure = failure as OpenAIError & { cause?: unknown };
+  expect(streamFailure.message).toBe(safeErrorMessage);
+  for (const sensitive of [patient, credential, malformedContent]) {
+    expect(streamFailure.message).not.toContain(sensitive);
+    expect(streamFailure.stack).not.toContain(sensitive);
+  }
+  expectPrivateSyntaxError(streamFailure.cause);
+  expect(failures.every((result) => result === failure)).toBe(true);
+  expect(emittedErrors).toEqual([failure]);
 }
 
 describe('built-in structured JSON parse diagnostic privacy', () => {
@@ -654,6 +746,116 @@ describe('public chat streaming structured-tool diagnostic privacy', () => {
       tool: family.chatTool,
     })),
   ];
+  const streamingFormats = [
+    { title: 'raw JSON schema', format: chatFormat },
+    ...helperFamilies.map((family) => ({
+      title: `${family.title} SDK response-format helper`,
+      format: family.chatFormat,
+    })),
+    {
+      title: 'user-owned structured-response parser',
+      format: makeParseableResponseFormat(chatFormat, (content) => JSON.parse(content) as { ok: boolean }),
+    },
+  ];
+  const malformedFragments = [
+    { title: 'credential-shaped bare atom', content: credential },
+    { title: 'patient and credential bare atom', content: `${patient} ${credential}` },
+    { title: 'malformed escaped string', content: `"${patient} ${credential}\\x"` },
+  ];
+
+  test.each(
+    streamingFormats.flatMap((format) =>
+      malformedFragments.map((fragment) => ({
+        title: `${format.title}: ${fragment.title}`,
+        format: format.format,
+        content: fragment.content,
+      })),
+    ),
+  )(
+    '$title redacts incremental structured content before any terminal parser',
+    async ({ format, content }) => {
+      await expectPrivateStreamingFailure(createStreamingContentClient([content], format));
+    },
+  );
+
+  test.each(
+    streamingScenarios.flatMap((tool) =>
+      malformedFragments.map((fragment) => ({
+        title: `${tool.title}: ${fragment.title}`,
+        tool: tool.tool,
+        content: fragment.content,
+      })),
+    ),
+  )('$title redacts incremental tool arguments before the done-event parser', async ({ tool, content }) => {
+    await expectPrivateStreamingFailure(createStreamingToolClient(content, tool));
+  });
+
+  test.each(streamingFormats)(
+    '$title preserves partial structured-content snapshots across valid fragments',
+    async ({ format }) => {
+      const stream = createStreamingContentClient(['{"ok":', 'true}'], format);
+      const partialSnapshots: unknown[] = [];
+      stream.on('content.delta', (event) => partialSnapshots.push(event.parsed));
+
+      const completion = await stream.finalChatCompletion();
+
+      expect(partialSnapshots).toEqual([{}, { ok: true }]);
+      expect(completion.choices[0]?.message.parsed).toEqual({ ok: true });
+    },
+  );
+
+  test.each(streamingScenarios)(
+    '$title preserves partial structured-tool snapshots across valid fragments',
+    async ({ tool }) => {
+      const stream = createStreamingToolClient(['{"ok":', 'true}'], tool);
+      const partialSnapshots: unknown[] = [];
+      stream.on('tool_calls.function.arguments.delta', (event) =>
+        partialSnapshots.push(event.parsed_arguments),
+      );
+
+      const completion = await stream.finalChatCompletion();
+
+      expect(partialSnapshots).toEqual([{}, { ok: true }]);
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { parsed_arguments: { ok: true } },
+      });
+    },
+  );
+
+  test('does not parse sensitive refused structured-content fragments', async () => {
+    const stream = createStreamingContentClient([credential], chatFormat, 'request refused');
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices[0]?.message).toMatchObject({
+      content: credential,
+      refusal: 'request refused',
+      parsed: null,
+    });
+  });
+
+  test('preserves exact user-owned structured-response parser failures after valid partial parsing', async () => {
+    const customFailure = new SyntaxError('User-owned structured response diagnostic.');
+    const customCause = new Error('User-owned structured response cause.');
+    (customFailure as SyntaxError & { cause?: unknown }).cause = customCause;
+    const parser = vi.fn(() => {
+      throw customFailure;
+    });
+    const format = makeParseableResponseFormat(chatFormat, parser);
+    const stream = createStreamingContentClient([validContent], format);
+
+    let failure: unknown;
+    try {
+      await stream.done();
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError & { cause?: unknown }).cause).toBe(customFailure);
+    expect((customFailure as SyntaxError & { cause?: unknown }).cause).toBe(customCause);
+    expect(parser).toHaveBeenCalledTimes(1);
+  });
 
   test.each(streamingScenarios)(
     '$title redacts malformed arguments across every stream boundary',
