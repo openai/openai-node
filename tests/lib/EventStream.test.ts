@@ -3,11 +3,21 @@ import { vi } from 'vitest';
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
+  APIError,
   APIUserAbortError,
+  AuthenticationError,
+  BadRequestError,
+  ConflictError,
   ContentFilterFinishReasonError,
+  InternalServerError,
   LengthFinishReasonError,
+  NotFoundError,
+  OAuthError,
   OpenAIError,
+  PermissionDeniedError,
+  RateLimitError,
   SubjectTokenProviderError,
+  UnprocessableEntityError,
 } from 'openai/error';
 import { EventStream } from 'openai/lib/EventStream';
 import type { BaseEvents } from 'openai/lib/EventStream';
@@ -258,6 +268,102 @@ describe('EventStream.events', () => {
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 
+  test.each([
+    {
+      name: 'generic HTTP error',
+      status: 418,
+      create: (headers: Headers) => new APIError(418, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'bad request',
+      status: 400,
+      create: (headers: Headers) =>
+        new BadRequestError(400, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'authentication',
+      status: 401,
+      create: (headers: Headers) =>
+        new AuthenticationError(401, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'permission denied',
+      status: 403,
+      create: (headers: Headers) =>
+        new PermissionDeniedError(403, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'not found',
+      status: 404,
+      create: (headers: Headers) =>
+        new NotFoundError(404, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'conflict',
+      status: 409,
+      create: (headers: Headers) =>
+        new ConflictError(409, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'unprocessable entity',
+      status: 422,
+      create: (headers: Headers) =>
+        new UnprocessableEntityError(422, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'rate limit',
+      status: 429,
+      create: (headers: Headers) =>
+        new RateLimitError(429, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'internal server',
+      status: 503,
+      create: (headers: Headers) =>
+        new InternalServerError(503, { message: 'original failure' }, undefined, headers),
+    },
+    {
+      name: 'OAuth',
+      status: 400,
+      create: (headers: Headers) =>
+        new OAuthError(400, { error: 'invalid_request', error_description: 'original failure' }, headers),
+    },
+  ])('preserves a queued genuine $name SDK error with its response Headers', async ({ status, create }) => {
+    const headers = new Headers([
+      ['x-request-id', 'req-original-123'],
+      ['x-context', 'small retained header'],
+    ]);
+    const error = create(headers);
+    const stream = new TestStream();
+    const iterator = stream.events('error');
+
+    stream.emitError(error);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(error);
+    expect(error.headers).toBe(headers);
+    expect(error.status).toBe(status);
+    expect(error.requestID).toBe('req-original-123');
+    expect(stream.controller.signal.aborted).toBe(false);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  test('preserves the original API error and Headers identity for a directly waiting iterator', async () => {
+    const headers = new Headers([['x-request-id', 'req-direct']]);
+    const error = new BadRequestError(400, { message: 'direct failure' }, undefined, headers);
+    const stream = new TestStream();
+    const iterator = stream.events('error');
+    const next = iterator.next();
+
+    stream.emitError(error);
+
+    const result = await next;
+    expect(result.value?.[0]).toBe(error);
+    expect(error.headers).toBe(headers);
+    expect(error.requestID).toBe('req-direct');
+    expect(stream.controller.signal.aborted).toBe(false);
+  });
+
   test('rejects a producer-owned SDK Error subclass prototype without invoking its callable', async () => {
     const retained = 'x'.repeat(9 * 1024 * 1024);
     const inspectRetained = vi.fn(() => retained);
@@ -338,6 +444,76 @@ describe('EventStream.events', () => {
 });
 
 describe('EventStream iterator buffer limits', () => {
+  test.each([
+    { name: 'local Headers', create: () => new Headers([['x-safe', 'small']]) },
+    {
+      name: 'injected-realm Headers',
+      create: () => runInNewContext('new Headers([["x-safe", "small"]])', { Headers }) as Headers,
+    },
+  ])('preserves a queued genuine $name and its identity', async ({ create }) => {
+    const headers = create();
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(headers);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(headers);
+    expect(headers.get('x-safe')).toBe('small');
+    expect(stream.controller.signal.aborted).toBe(false);
+  });
+
+  test.each(['header name', 'header value'] as const)(
+    'charges oversized genuine Headers hidden %s storage',
+    async (location) => {
+      const retained = 'x'.repeat(4 * 1024 * 1024);
+      const headers =
+        location === 'header name'
+          ? new Headers([[retained, 'small']])
+          : new Headers([['x-hidden', retained]]);
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+
+      stream.emitPayload(headers);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test('rejects a Headers-prototype spoof without genuine hidden internal slots', async () => {
+    const spoof = Object.create(Headers.prototype) as Headers;
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(spoof);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each(['accessor', 'callable'] as const)(
+    'rejects a producer-owned Headers.entries %s without invoking it',
+    async (kind) => {
+      const retained = 'x'.repeat(9 * 1024 * 1024);
+      const inspectRetained = vi.fn(() => retained);
+      const headers = new Headers([['x-safe', 'small']]);
+      Object.defineProperty(
+        headers,
+        'entries',
+        kind === 'accessor' ? { get: inspectRetained } : { value: inspectRetained },
+      );
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+
+      stream.emitPayload(headers);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(inspectRetained).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
   test.each([
     { name: 'root proxy', wrap: (proxy: object) => proxy },
     { name: 'nested proxy', wrap: (proxy: object) => ({ nested: proxy }) },
@@ -592,6 +768,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Array', create: () => [1, 2, 3] },
     { name: 'Error', create: () => new Error('safe') },
     { name: 'Blob', create: () => new Blob(['safe']) },
+    { name: 'Headers', create: () => new Headers([['x-safe', 'small']]) },
   ])('charges oversized data retained by a custom $name prototype', async ({ create }) => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -610,6 +787,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Map', create: () => new Map() },
     { name: 'typed array', create: () => new Uint8Array(8) },
     { name: 'Error', create: () => new Error('safe') },
+    { name: 'Headers', create: () => new Headers([['x-safe', 'small']]) },
   ])('rejects a custom $name prototype accessor without invoking it', async ({ create }) => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -631,6 +809,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Map', create: () => new Map() },
     { name: 'typed array', create: () => new Uint8Array(8) },
     { name: 'Error', create: () => new Error('safe') },
+    { name: 'Headers', create: () => new Headers([['x-safe', 'small']]) },
   ])('preserves small safe custom $name prototype data and payload identity', async ({ create }) => {
     const stream = new TestStream();
     const iterator = stream.events('payload');

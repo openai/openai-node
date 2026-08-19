@@ -182,6 +182,7 @@ for (const name of [
   'BigUint64Array',
   'Blob',
   'File',
+  'Headers',
 ] as const) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
   if (descriptor && 'value' in descriptor) {
@@ -224,7 +225,23 @@ const blobInternalHandlePrototype = (() => {
 })();
 const mapEntries = Map.prototype.entries;
 const setValues = Set.prototype.values;
-const retainedStorageBrands = new Set(['ArrayBuffer', 'SharedArrayBuffer', 'Blob', 'File', 'Map', 'Set']);
+const headersEntriesDescriptor =
+  typeof Headers === 'function' ? Object.getOwnPropertyDescriptor(Headers.prototype, 'entries') : undefined;
+const headersEntries =
+  headersEntriesDescriptor &&
+  'value' in headersEntriesDescriptor &&
+  typeof headersEntriesDescriptor.value === 'function'
+    ? (headersEntriesDescriptor.value as typeof Headers.prototype.entries)
+    : undefined;
+const retainedStorageBrands = new Set([
+  'ArrayBuffer',
+  'SharedArrayBuffer',
+  'Blob',
+  'File',
+  'Map',
+  'Set',
+  'Headers',
+]);
 
 interface TrustedForeignIntrinsic {
   constructor: NativeErrorConstructor;
@@ -428,7 +445,7 @@ function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescript
 
 type RetainedStorage = {
   bytes: number;
-  kind: 'typed-array' | 'data-view' | 'buffer' | 'blob' | 'map' | 'set';
+  kind: 'typed-array' | 'data-view' | 'buffer' | 'blob' | 'map' | 'set' | 'headers';
 };
 
 type EventQueue<Value> = {
@@ -547,6 +564,9 @@ function estimateRetainedBufferBytes(
     case 'Set': {
       return { bytes: 0, kind: 'set' };
     }
+    case 'Headers': {
+      return { bytes: 0, kind: 'headers' };
+    }
     default: {
       return undefined;
     }
@@ -578,6 +598,17 @@ function visitHiddenEventValues(
   if (kind === 'set') {
     for (const entry of setValues.call(current)) {
       if (!visit(entry, 8)) {
+        return false;
+      }
+    }
+  }
+
+  if (kind === 'headers') {
+    if (!headersEntries) {
+      return false;
+    }
+    for (const [name, value] of headersEntries.call(current as Headers)) {
+      if (!visit(name, 8) || !visit(value, 8)) {
         return false;
       }
     }
