@@ -182,11 +182,7 @@ function getVerifiedForeignErrorConstructor(
   current: object,
   stackDescriptor: PropertyDescriptor,
 ): { constructor: NativeErrorConstructor; prototype: object } | undefined {
-  if (
-    !nativeErrorBrand ||
-    typeof stackDescriptor.get !== 'function' ||
-    typeof stackDescriptor.set !== 'function'
-  ) {
+  if (typeof stackDescriptor.get !== 'function' || typeof stackDescriptor.set !== 'function') {
     return undefined;
   }
 
@@ -242,7 +238,7 @@ function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescript
     if (
       typeof canonical !== 'object' ||
       canonical === null ||
-      !nativeErrorBrand?.call(Error, canonical) ||
+      !hasNativeErrorBrand(canonical) ||
       Object.getPrototypeOf(canonical) !== verified.prototype
     ) {
       return false;

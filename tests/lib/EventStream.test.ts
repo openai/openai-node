@@ -606,6 +606,40 @@ describe('EventStream iterator buffer limits', () => {
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
 
+  test.each([
+    { location: 'own', accessor: false },
+    { location: 'own', accessor: true },
+    { location: 'inherited', accessor: false },
+    { location: 'inherited', accessor: true },
+  ])(
+    'rejects an $location Symbol.toStringTag Error-brand spoof without invoking its accessor',
+    async ({ location, accessor }) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const genuine = runInNewContext("new Error('safe foreign error')") as Error;
+      const payload = Object.create(Object.getPrototypeOf(genuine) as object) as object;
+      const stack = Object.getOwnPropertyDescriptor(genuine, 'stack');
+      if (!stack) {
+        throw new Error('Expected a native Error stack descriptor');
+      }
+      Object.defineProperty(payload, 'stack', stack);
+
+      const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+      const target = location === 'own' ? payload : prototype;
+      const readTag = vi.fn(() => 'Error');
+      Object.defineProperty(target, Symbol.toStringTag, accessor ? { get: readTag } : { value: 'Error' });
+      if (location === 'inherited') {
+        Object.setPrototypeOf(payload, prototype);
+      }
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(readTag).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
   test('preserves safe custom prototype data on a genuine cross-realm Error', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -852,6 +886,33 @@ describe('EventStream iterator buffer limits', () => {
 
       expect(stream.controller.signal.aborted).toBe(true);
       expect(readAccessor).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test.each(['get', 'set'] as const)(
+    'rejects a same-realm proxied native Error stack %s without invoking its trap',
+    async (accessor) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const invokeAccessor = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      const payload = runInNewContext(
+        `const error = new Error('safe foreign error');
+         const descriptor = Object.getOwnPropertyDescriptor(error, 'stack');
+         Object.defineProperty(error, 'stack', {
+           ...descriptor,
+           [accessor]: new Proxy(descriptor[accessor], {
+             apply() { return invokeAccessor(); },
+           }),
+         });
+         error`,
+        { accessor, invokeAccessor },
+      ) as Error;
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(invokeAccessor).not.toHaveBeenCalled();
       await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
     },
   );
