@@ -843,6 +843,13 @@ export interface ChatCompletionChunk {
   moderation?: ChatCompletionChunk.Moderation | null;
 
   /**
+   * An obfuscation string added to normalize the size of streamed chunks as a
+   * mitigation to certain side-channel attacks. The field is included by default and
+   * omitted when `stream_options.include_obfuscation` is `false`.
+   */
+  obfuscation?: string;
+
+  /**
    * Specifies the processing type used for serving the request.
    *
    * - If set to 'auto', then the request will be processed with the service tier
