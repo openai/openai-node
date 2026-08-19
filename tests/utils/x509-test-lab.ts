@@ -1,18 +1,13 @@
-import { execFile } from 'node:child_process';
+import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
+import type { KeyObject } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer as createHTTPServer } from 'node:http';
 import type { IncomingMessage, Server as HTTPServer, ServerResponse } from 'node:http';
 import { createServer as createHTTPSServer } from 'node:https';
 import type { Server as HTTPSServer } from 'node:https';
 import { connect } from 'node:net';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import type { Duplex } from 'node:stream';
 import type { TLSSocket } from 'node:tls';
-import { promisify } from 'node:util';
-
-const runOpenSSL = promisify(execFile);
 
 export interface TestCertificate {
   certificate: Buffer;
@@ -21,10 +16,11 @@ export interface TestCertificate {
 
 export interface X509TestLab {
   certificateAuthority: Buffer;
+  proxyCertificateAuthority: Buffer;
   server: TestCertificate;
   firstClient: TestCertificate;
   secondClient: TestCertificate;
-  cleanup: () => Promise<void>;
+  proxyClient: TestCertificate;
 }
 
 export interface ObservedRequest {
@@ -42,108 +38,130 @@ export interface ObservedServer {
   connections: Set<Duplex>;
 }
 
-async function issueCertificate(
-  directory: string,
-  name: string,
-  extensions: string[],
-): Promise<TestCertificate> {
-  await runOpenSSL(
-    'openssl',
-    [
-      'req',
-      '-new',
-      '-newkey',
-      'ec',
-      '-pkeyopt',
-      'ec_paramgen_curve:P-256',
-      '-nodes',
-      '-keyout',
-      `${name}.key`,
-      '-out',
-      `${name}.csr`,
-      '-subj',
-      `/CN=${name}`,
-      ...extensions.flatMap((extension) => ['-addext', extension]),
-    ],
-    { cwd: directory, windowsHide: true },
-  );
-  await runOpenSSL(
-    'openssl',
-    [
-      'x509',
-      '-req',
-      '-in',
-      `${name}.csr`,
-      '-CA',
-      'ca.crt',
-      '-CAkey',
-      'ca.key',
-      '-CAcreateserial',
-      '-out',
-      `${name}.crt`,
-      '-days',
-      '1',
-      '-copy_extensions',
-      'copy',
-    ],
-    { cwd: directory, windowsHide: true },
-  );
-
-  const [certificate, privateKey] = await Promise.all([
-    readFile(path.join(directory, `${name}.crt`)),
-    readFile(path.join(directory, `${name}.key`)),
-  ]);
-  return { certificate, privateKey };
+interface SigningIdentity extends TestCertificate {
+  name: string;
+  signingKey: KeyObject;
 }
 
-export async function createX509TestLab(): Promise<X509TestLab> {
-  const directory = await mkdtemp(path.join(tmpdir(), 'openai-x509-conformance-'));
-
-  try {
-    await runOpenSSL(
-      'openssl',
-      [
-        'req',
-        '-x509',
-        '-newkey',
-        'ec',
-        '-pkeyopt',
-        'ec_paramgen_curve:P-256',
-        '-nodes',
-        '-keyout',
-        'ca.key',
-        '-out',
-        'ca.crt',
-        '-days',
-        '1',
-        '-subj',
-        '/CN=OpenAI SDK ephemeral test certificate authority',
-        '-addext',
-        'basicConstraints=critical,CA:TRUE',
-      ],
-      { cwd: directory, windowsHide: true },
-    );
-
-    const server = await issueCertificate(directory, 'localhost', [
-      'subjectAltName=DNS:localhost,IP:127.0.0.1',
-      'extendedKeyUsage=serverAuth',
-    ]);
-    const firstClient = await issueCertificate(directory, 'workload-a', ['extendedKeyUsage=clientAuth']);
-    const secondClient = await issueCertificate(directory, 'workload-b', ['extendedKeyUsage=clientAuth']);
-
-    return {
-      certificateAuthority: await readFile(path.join(directory, 'ca.crt')),
-      server,
-      firstClient,
-      secondClient,
-      cleanup: async () => {
-        await rm(directory, { recursive: true, force: true });
-      },
-    };
-  } catch (error) {
-    await rm(directory, { recursive: true, force: true });
-    throw error;
+function encodeDER(tag: number, value: Buffer): Buffer {
+  if (value.length < 128) {
+    return Buffer.concat([Buffer.from([tag, value.length]), value]);
   }
+
+  const bytes: number[] = [];
+  for (let remaining = value.length; remaining > 0; remaining = Math.floor(remaining / 256)) {
+    bytes.unshift(remaining % 256);
+  }
+  return Buffer.concat([Buffer.from([tag, 0x80 + bytes.length, ...bytes]), value]);
+}
+
+function sequence(...values: Buffer[]): Buffer {
+  return encodeDER(0x30, Buffer.concat(values));
+}
+
+function objectIdentifier(value: number[]): Buffer {
+  return encodeDER(0x06, Buffer.from(value));
+}
+
+function distinguishedName(name: string): Buffer {
+  const commonName = sequence(objectIdentifier([0x55, 0x04, 0x03]), encodeDER(0x0c, Buffer.from(name)));
+  return sequence(encodeDER(0x31, commonName));
+}
+
+function utcTime(date: Date): Buffer {
+  const timestamp = date.toISOString();
+  const value = `${timestamp.slice(2, 4)}${timestamp.slice(5, 7)}${timestamp.slice(8, 10)}${timestamp.slice(11, 13)}${timestamp.slice(14, 16)}${timestamp.slice(17, 19)}Z`;
+  return encodeDER(0x17, Buffer.from(value));
+}
+
+function extension(identifier: number[], value: Buffer, critical = false): Buffer {
+  return sequence(
+    objectIdentifier(identifier),
+    ...(critical ? [encodeDER(0x01, Buffer.from([0xff]))] : []),
+    encodeDER(0x04, value),
+  );
+}
+
+function issueCertificate(
+  name: string,
+  purpose: 'authority' | 'server' | 'client',
+  issuer?: SigningIdentity,
+): SigningIdentity {
+  const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const signatureAlgorithm = sequence(objectIdentifier([0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02]));
+  const isAuthority = purpose === 'authority';
+  const extensions = [
+    extension(
+      [0x55, 0x1d, 0x13],
+      sequence(...(isAuthority ? [encodeDER(0x01, Buffer.from([0xff]))] : [])),
+      true,
+    ),
+    extension(
+      [0x55, 0x1d, 0x0f],
+      encodeDER(0x03, Buffer.from(isAuthority ? [0x01, 0x06] : [0x07, 0x80])),
+      true,
+    ),
+  ];
+
+  if (!isAuthority) {
+    const keyPurpose = [0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, purpose === 'server' ? 0x01 : 0x02];
+    extensions.push(extension([0x55, 0x1d, 0x25], sequence(objectIdentifier(keyPurpose))));
+  }
+  if (purpose === 'server') {
+    extensions.push(
+      extension(
+        [0x55, 0x1d, 0x11],
+        sequence(encodeDER(0x82, Buffer.from('localhost')), encodeDER(0x87, Buffer.from([127, 0, 0, 1]))),
+      ),
+    );
+  }
+
+  const serial = randomBytes(16);
+  serial[0] = (serial[0] ?? 0) % 128 || 1;
+  const now = Date.now();
+  const certificateBody = sequence(
+    encodeDER(0xa0, encodeDER(0x02, Buffer.from([0x02]))),
+    encodeDER(0x02, serial),
+    signatureAlgorithm,
+    distinguishedName(issuer?.name ?? name),
+    sequence(utcTime(new Date(now - 60_000)), utcTime(new Date(now + 86_400_000))),
+    distinguishedName(name),
+    keys.publicKey.export({ format: 'der', type: 'spki' }),
+    encodeDER(0xa3, sequence(...extensions)),
+  );
+  const signature = sign('sha256', certificateBody, issuer?.signingKey ?? keys.privateKey);
+  const certificateDER = sequence(
+    certificateBody,
+    signatureAlgorithm,
+    encodeDER(0x03, Buffer.concat([Buffer.from([0]), signature])),
+  );
+  const certificateBase64 = certificateDER
+    .toString('base64')
+    .match(/.{1,64}/gu)
+    ?.join('\n');
+
+  return {
+    name,
+    certificate: Buffer.from(
+      `-----BEGIN CERTIFICATE-----\n${certificateBase64}\n-----END CERTIFICATE-----\n`,
+    ),
+    privateKey: Buffer.from(keys.privateKey.export({ format: 'pem', type: 'pkcs8' })),
+    signingKey: keys.privateKey,
+  };
+}
+
+export function createX509TestLab(): X509TestLab {
+  const workloadAuthority = issueCertificate('OpenAI SDK ephemeral workload test authority', 'authority');
+  const proxyAuthority = issueCertificate('OpenAI SDK ephemeral proxy test authority', 'authority');
+
+  return {
+    certificateAuthority: workloadAuthority.certificate,
+    proxyCertificateAuthority: proxyAuthority.certificate,
+    server: issueCertificate('localhost', 'server', workloadAuthority),
+    firstClient: issueCertificate('workload-a', 'client', workloadAuthority),
+    secondClient: issueCertificate('workload-b', 'client', workloadAuthority),
+    proxyClient: issueCertificate('proxy-only', 'client', proxyAuthority),
+  };
 }
 
 function observeRequest(request: IncomingMessage): ObservedRequest {
@@ -185,7 +203,7 @@ export function createConnectProxy(lab: X509TestLab, encrypted: boolean): Observ
   const connections = new Set<Duplex>();
   const server = encrypted
     ? createHTTPSServer({
-        ca: lab.certificateAuthority,
+        ca: lab.proxyCertificateAuthority,
         cert: lab.server.certificate,
         key: lab.server.privateKey,
         requestCert: true,

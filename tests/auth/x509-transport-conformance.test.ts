@@ -1,6 +1,7 @@
 import { X509Certificate } from 'node:crypto';
 import { Agent, ProxyAgent, fetch } from 'undici';
 import { expect } from 'vitest';
+import OpenAI from 'openai';
 
 import {
   closeObservedServers,
@@ -28,6 +29,42 @@ function createAgent(certificate: TestCertificate): Agent {
   });
 }
 
+function createSDKClient(
+  issuerURL: URL,
+  apiURL: URL,
+  dispatcher: Agent | ProxyAgent,
+  issuerDispatcher: Agent | ProxyAgent = dispatcher,
+): OpenAI {
+  return new OpenAI({
+    apiKey: null,
+    baseURL: new URL('/v1', apiURL).href,
+    maxRetries: 0,
+    workloadIdentity: {
+      identityProviderId: 'synthetic-identity-provider',
+      serviceAccountId: 'synthetic-service-account',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'synthetic-subject-token',
+      },
+    },
+    fetch: async (input, init) => {
+      const target = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (init?.redirect !== 'manual') {
+        throw new Error('The SDK did not preserve its manual redirect policy');
+      }
+      if (target.href === 'https://auth.openai.com/oauth/token') {
+        // Existing JWT exchange does not inherit client fetchOptions; bridge only its pinned test issuer.
+        return fetch(new URL('/oauth/token', issuerURL), { ...init, dispatcher: issuerDispatcher });
+      }
+      if (!Object.is(init.dispatcher, dispatcher)) {
+        throw new Error('The SDK did not propagate its configured fetchOptions dispatcher');
+      }
+      return fetch(target, { ...init, dispatcher });
+    },
+    fetchOptions: { dispatcher, redirect: 'manual' },
+  });
+}
+
 function createTokenServer(): ObservedServer {
   return createMutualTLSServer(lab, (_request, response) => {
     response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -48,12 +85,8 @@ function createAPIServer(): ObservedServer {
   });
 }
 
-beforeAll(async () => {
-  lab = await createX509TestLab();
-});
-
-afterAll(async () => {
-  await lab?.cleanup();
+beforeAll(() => {
+  lab = createX509TestLab();
 });
 
 describe('real-wire X.509 transport conformance', () => {
@@ -64,22 +97,10 @@ describe('real-wire X.509 transport conformance', () => {
 
     try {
       const [issuerURL, apiURL] = await Promise.all([listenLoopback(issuer), listenLoopback(api)]);
-      const tokenResponse = await fetch(new URL('/oauth/token', issuerURL), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-        redirect: 'manual',
-        dispatcher,
-      });
-      expect(await tokenResponse.json()).toEqual({ access_token: ACCESS_TOKEN });
+      const client = createSDKClient(issuerURL, apiURL, dispatcher);
 
-      const apiResponse = await fetch(new URL('/v1/models', apiURL), {
-        headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-        redirect: 'manual',
-        dispatcher,
-      });
-
-      expect(apiResponse.status).toBe(200);
+      const models = await client.models.list();
+      expect(models.data).toEqual([]);
       const fingerprint = new X509Certificate(lab.firstClient.certificate).fingerprint256;
       expect(issuer.requests).toEqual([
         expect.objectContaining({
@@ -112,8 +133,25 @@ describe('real-wire X.509 transport conformance', () => {
 
     try {
       const issuerURL = await listenLoopback(issuer);
+      const client = createSDKClient(issuerURL, issuerURL, dispatcher);
 
-      await expect(fetch(new URL('/oauth/token', issuerURL), { dispatcher })).rejects.toThrow();
+      await expect(client.models.list()).rejects.toThrow();
+      expect(issuer.requests).toEqual([]);
+    } finally {
+      await dispatcher.close();
+      await closeObservedServers(issuer);
+    }
+  });
+
+  test('rejects a proxy-only client certificate at the workload issuer trust boundary', async () => {
+    const issuer = createTokenServer();
+    const dispatcher = createAgent(lab.proxyClient);
+
+    try {
+      const issuerURL = await listenLoopback(issuer);
+      const client = createSDKClient(issuerURL, issuerURL, dispatcher);
+
+      await expect(client.models.list()).rejects.toThrow();
       expect(issuer.requests).toEqual([]);
     } finally {
       await dispatcher.close();
@@ -129,18 +167,10 @@ describe('real-wire X.509 transport conformance', () => {
 
     try {
       const [issuerURL, apiURL] = await Promise.all([listenLoopback(issuer), listenLoopback(api)]);
-      const exchange = await fetch(new URL('/oauth/token', issuerURL), {
-        method: 'POST',
-        dispatcher: firstIdentity,
-      });
-      expect(await exchange.json()).toEqual({ access_token: ACCESS_TOKEN });
+      const client = createSDKClient(issuerURL, apiURL, secondIdentity, firstIdentity);
 
-      const response = await fetch(new URL('/v1/models', apiURL), {
-        headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-        dispatcher: secondIdentity,
-      });
-
-      expect(response.status).toBe(200);
+      const models = await client.models.list();
+      expect(models.data).toEqual([]);
       expect(issuer.requests[0]?.certificateFingerprint).toBe(
         new X509Certificate(lab.firstClient.certificate).fingerprint256,
       );
@@ -155,6 +185,7 @@ describe('real-wire X.509 transport conformance', () => {
   });
 
   test('refuses an mTLS redirect before the destination receives a certificate or bearer', async () => {
+    const issuer = createTokenServer();
     const destination = createAPIServer();
     let destinationURL: URL;
     const source = createMutualTLSServer(lab, (_request, response) => {
@@ -164,21 +195,20 @@ describe('real-wire X.509 transport conformance', () => {
     const dispatcher = createAgent(lab.firstClient);
 
     try {
-      const endpoints = await Promise.all([listenLoopback(destination), listenLoopback(source)]);
-      [destinationURL] = endpoints;
+      const [issuerURL, redirectDestinationURL, sourceURL] = await Promise.all([
+        listenLoopback(issuer),
+        listenLoopback(destination),
+        listenLoopback(source),
+      ]);
+      destinationURL = redirectDestinationURL;
+      const client = createSDKClient(issuerURL, sourceURL, dispatcher);
 
-      const response = await fetch(new URL('/v1/models', endpoints[1]), {
-        headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-        redirect: 'manual',
-        dispatcher,
-      });
-
-      expect(response.status).toBe(307);
+      await expect(client.models.list()).rejects.toMatchObject({ status: 307 });
       expect(source.requests).toHaveLength(1);
       expect(destination.requests).toEqual([]);
     } finally {
       await dispatcher.close();
-      await closeObservedServers(source, destination);
+      await closeObservedServers(issuer, source, destination);
     }
   });
 
@@ -212,31 +242,23 @@ describe('real-wire X.509 transport conformance', () => {
             ? {
                 proxyTls: {
                   ca: lab.certificateAuthority,
-                  cert: lab.secondClient.certificate,
-                  key: lab.secondClient.privateKey,
+                  cert: lab.proxyClient.certificate,
+                  key: lab.proxyClient.privateKey,
                   servername: 'localhost',
                 },
               }
             : {}),
         });
 
-        const exchange = await fetch(new URL('/oauth/token', issuerURL), {
-          method: 'POST',
-          dispatcher,
-        });
-        expect(await exchange.json()).toEqual({ access_token: ACCESS_TOKEN });
+        const client = createSDKClient(issuerURL, apiURL, dispatcher);
 
-        const response = await fetch(new URL('/v1/models', apiURL), {
-          headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-          dispatcher,
-        });
-
-        expect(response.status).toBe(200);
+        const models = await client.models.list();
+        expect(models.data).toEqual([]);
         expect(proxy.requests).toEqual([
           expect.objectContaining({
             authorization: undefined,
             certificateFingerprint: encrypted
-              ? new X509Certificate(lab.secondClient.certificate).fingerprint256
+              ? new X509Certificate(lab.proxyClient.certificate).fingerprint256
               : undefined,
             cookie: undefined,
             path: issuerURL.host,
@@ -245,7 +267,7 @@ describe('real-wire X.509 transport conformance', () => {
           expect.objectContaining({
             authorization: undefined,
             certificateFingerprint: encrypted
-              ? new X509Certificate(lab.secondClient.certificate).fingerprint256
+              ? new X509Certificate(lab.proxyClient.certificate).fingerprint256
               : undefined,
             cookie: undefined,
             path: apiURL.host,
