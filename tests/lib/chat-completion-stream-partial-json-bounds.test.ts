@@ -377,6 +377,79 @@ it.each(['mutate', 'replace'] as const)(
   },
 );
 
+it.each([false, true] as const)(
+  'preserves the serialized strict=%s tool contract while its streaming response is pending',
+  async (dispatchedStrict) => {
+    const tool: OpenAI.Chat.ChatCompletionFunctionTool = {
+      ...strictTool,
+      function: { ...strictTool.function, strict: dispatchedStrict },
+    };
+    const argumentsJSON = `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    const chunks = argumentFragments([argumentsJSON]);
+    let serializedStrict: boolean | undefined;
+    const create = vi.fn(async (request: OpenAI.Chat.ChatCompletionCreateParams) => {
+      const serializedBody = JSON.stringify(request);
+      const serialized = JSON.parse(serializedBody) as OpenAI.Chat.ChatCompletionCreateParams;
+      const dispatched = serialized.tools?.[0];
+      if (dispatched?.type !== 'function') {
+        throw new Error('Expected the serialized function tool');
+      }
+      serializedStrict = dispatched.function.strict ?? false;
+      await Promise.resolve();
+      tool.function.strict = !dispatchedStrict;
+      return {
+        controller: new AbortController(),
+        [Symbol.asyncIterator]: () => chunks[Symbol.asyncIterator](),
+      };
+    });
+    const client = { chat: { completions: { create } } } as unknown as OpenAI;
+    const stream = ChatCompletionStream.createChatCompletion(client, {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Use the tool strictness actually dispatched' }],
+      tools: [tool],
+    });
+
+    if (dispatchedStrict) {
+      await expect(stream.finalChatCompletion()).rejects.toThrow(/structured JSON nesting depth limit/u);
+    } else {
+      const completion = await stream.finalChatCompletion();
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { arguments: argumentsJSON },
+      });
+    }
+    expect(serializedStrict).toBe(dispatchedStrict);
+    expect(create).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('preserves the serialized branded response parser while the streaming response is pending', async () => {
+  const parser = vi.fn((value: string) => JSON.parse(value) as { value: string });
+  const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+  const chunks = contentFragments(['{"value":"dispatched"}']);
+  let serializedType: string | undefined;
+  const create = vi.fn(async (request: OpenAI.Chat.ChatCompletionCreateParams) => {
+    const serializedBody = JSON.stringify(request);
+    const serialized = JSON.parse(serializedBody) as OpenAI.Chat.ChatCompletionCreateParams;
+    serializedType = serialized.response_format?.type;
+    await Promise.resolve();
+    request.response_format = { type: 'text' };
+    return {
+      controller: new AbortController(),
+      [Symbol.asyncIterator]: () => chunks[Symbol.asyncIterator](),
+    };
+  });
+  const client = { chat: { completions: { create } } } as unknown as OpenAI;
+
+  const completion = await ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Keep the serialized response parser' }],
+    response_format: responseFormat,
+  }).finalChatCompletion();
+
+  expect(serializedType).toBe('json_schema');
+  expect(completion.choices[0]?.message.parsed).toEqual({ value: 'dispatched' });
+  expect(parser).toHaveBeenCalledWith('{"value":"dispatched"}');
+});
 it.each(['byte', 'depth'] as const)(
   'does not activate strict argument parsing when caller tools mutate during %s streaming',
   async (limit) => {
@@ -1259,6 +1332,70 @@ it.each(['choice', 'message'] as const)(
   },
 );
 
+it.each(['choices', 'tool_calls'] as const)(
+  'finalizes validated %s without invoking caller-owned map or array species',
+  async (collection) => {
+    const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    const parser = vi.fn((value: string) => JSON.parse(value) as { value?: string });
+    const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+    const tool = makeParseableTool(strictTool, { parser, callback: vi.fn() });
+    const chunks = collection === 'choices' ? contentFragments(['{}']) : argumentFragments(['{}']);
+    const stream = ChatCompletionStream.createChatCompletion(createClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Finalize only the validated indexed snapshot entries' }],
+      ...(collection === 'choices' ? { response_format: responseFormat } : { tools: [tool] }),
+    });
+    const readConstructor = vi.fn(() => {
+      throw new Error('caller-owned array constructor must not be read');
+    });
+    const overriddenMap = vi.fn();
+    let snapshot: typeof stream.currentChatCompletionSnapshot;
+
+    stream.on('chunk', (_current, currentSnapshot) => {
+      snapshot = currentSnapshot;
+    });
+    const installOverride = () => {
+      const choice = snapshot?.choices[0];
+      if (!snapshot || !choice) {
+        throw new Error('Expected a completed public snapshot choice');
+      }
+      const array = collection === 'choices' ? snapshot.choices : choice.message.tool_calls;
+      if (!array) {
+        throw new Error('Expected a completed public snapshot array');
+      }
+      overriddenMap.mockImplementation(() => {
+        if (collection === 'choices') {
+          return [{ ...choice, message: { ...choice.message, content: unsafe } }];
+        }
+        const original = choice.message.tool_calls?.[0];
+        if (!original || original.type !== 'function') {
+          throw new Error('Expected a completed strict function tool');
+        }
+        return [{ ...original, function: { ...original.function, arguments: unsafe } }];
+      });
+      Object.defineProperty(array, 'map', { configurable: true, value: overriddenMap });
+      Object.defineProperty(array, 'constructor', { configurable: true, get: readConstructor });
+    };
+    if (collection === 'choices') {
+      stream.on('content.done', installOverride);
+    } else {
+      stream.on('tool_calls.function.arguments.done', installOverride);
+    }
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(overriddenMap).not.toHaveBeenCalled();
+    expect(readConstructor).not.toHaveBeenCalled();
+    expect(parser.mock.calls.every(([value]) => value === '{}')).toBe(true);
+    if (collection === 'choices') {
+      expect(completion.choices[0]?.message).toMatchObject({ content: '{}', parsed: {} });
+    } else {
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { arguments: '{}', parsed_arguments: {} },
+      });
+    }
+  },
+);
 it.each(['choices', 'tool_calls'] as const)(
   'rejects an oversized sparse %s snapshot before invoking its iterator',
   async (collection) => {

@@ -153,6 +153,42 @@ describe('EventStream.events', () => {
     expect(seen).toEqual(['start:first:1', 'end:first:1', 'start:second:2', 'end:second:2']);
   });
 
+  test.each([
+    { name: 'an isolated high surrogate', value: String.fromCodePoint(55_296) },
+    { name: 'an isolated low surrogate', value: String.fromCodePoint(56_320) },
+    { name: 'an astral code point', value: String.fromCodePoint(128_512) },
+    { name: 'escaped JSON control characters', value: '\n\u0000"\\' },
+  ])('preserves $name while detaching a queued string argument', async ({ value }) => {
+    const source = `prefix-${value}-${'x'.repeat(2048)}`;
+    const sliced = source.slice(7, 7 + value.length);
+    const stream = new TestStream();
+    const iterator = stream.events('foo');
+
+    stream.emitFoo(sliced, 3);
+
+    await expect(iterator.next()).resolves.toEqual({ value: [value, 3], done: false });
+    expect(stream.controller.signal.aborted).toBe(false);
+  });
+
+  test('preserves direct waiting string delivery and the caller-owned frozen payload identity', async () => {
+    const stream = new TestStream();
+    const immediate = stream.events('foo');
+    const pending = immediate.next();
+    const value = String.fromCodePoint(55_296);
+
+    stream.emitFoo(value, 4);
+
+    await expect(pending).resolves.toEqual({ value: [value, 4], done: false });
+
+    const frozen = Object.freeze({ value: 'frozen retained string' });
+    const buffered = stream.events('payload');
+    stream.emitPayload(frozen);
+    const next = await buffered.next();
+
+    expect(next.done).toBe(false);
+    expect(next.value?.[0]).toBe(frozen);
+    expect(Object.isFrozen(next.value?.[0])).toBe(true);
+  });
   test('rejects pending reads when the stream errors', async () => {
     const stream = new TestStream();
     const iterator = stream.events('foo');

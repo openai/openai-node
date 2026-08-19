@@ -25,6 +25,9 @@ const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
 const MAX_INSPECTABLE_TYPED_ARRAY_ELEMENTS = 4096;
 // Structured JSON may nest 128 levels before stream-event wrappers are added.
 const MAX_BUFFERED_EVENT_DEPTH = 256;
+const bufferedJSONStringify = JSON.stringify;
+const bufferedJSONParse = JSON.parse;
+const sdkOwnedBufferedEventArguments = new WeakSet<object>();
 
 const typedArrayBufferGetter = Object.getOwnPropertyDescriptor(
   Object.getPrototypeOf(Uint8Array.prototype) as object,
@@ -1136,7 +1139,14 @@ export class EventStream<EventTypes extends BaseEvents> {
     type Parameters = EventParameters<EventTypes, Event>;
     return this._createIterator<Parameters>(
       (push) => {
-        const onEvent = (...args: Parameters) => push(args);
+        const onEvent = (...args: Parameters) => {
+          sdkOwnedBufferedEventArguments.add(args);
+          try {
+            push(args);
+          } finally {
+            sdkOwnedBufferedEventArguments.delete(args);
+          }
+        };
         this.on(event, onEvent as EventListener<EventTypes, Event>);
         return () => this.off(event, onEvent as EventListener<EventTypes, Event>);
       },
@@ -1273,6 +1283,16 @@ export class EventStream<EventTypes extends BaseEvents> {
         if (pushQueue.length >= MAX_BUFFERED_ITERATOR_EVENTS || eventBytes > remainingBytes) {
           failBufferedEvents();
           return;
+        }
+
+        if (typeof value === 'object' && value !== null && sdkOwnedBufferedEventArguments.has(value)) {
+          const argumentsTuple = value as unknown[];
+          for (let index = 0; index < argumentsTuple.length; index += 1) {
+            const argument = argumentsTuple[index];
+            if (typeof argument === 'string') {
+              argumentsTuple[index] = bufferedJSONParse(bufferedJSONStringify(argument)) as string;
+            }
+          }
         }
 
         const entry: BufferedEvent = { bytes: eventBytes, active: true, check: undefined };
