@@ -6,7 +6,7 @@ import {
   OpenAIError,
 } from '../error';
 import type OpenAI from '../index';
-import type { RequestOptions } from '../internal/request-options';
+import { observeJSONRequestBody, type RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
 import { hasOwn } from '../internal/utils/values';
@@ -270,6 +270,15 @@ interface ValidatedChoiceSnapshot {
   message: ChatCompletionSnapshot.Choice.Message;
   content: string | null | undefined;
   refusal: string | null | undefined;
+  toolCalls: ReadonlyMap<number, ValidatedToolCallSnapshot>;
+}
+
+interface ValidatedToolCallSnapshot {
+  tool: ChatCompletionSnapshot.Choice.Message.ToolCall;
+  function: ChatCompletionSnapshot.Choice.Message.ToolCall.Function;
+  type: 'function';
+  name: string;
+  arguments: string;
 }
 
 interface ToolCallIdentity {
@@ -647,6 +656,160 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
   return snapshot;
 }
 
+type ChatCompletionInputTool = NonNullable<ChatCompletionCreateParams['tools']>[number];
+
+interface SerializedFunctionParserConfig {
+  name?: string;
+  strict?: boolean;
+}
+
+interface SerializedToolParserConfig {
+  source: ChatCompletionInputTool;
+  type?: string;
+  function?: SerializedFunctionParserConfig;
+}
+
+function serializedParserDescriptor(
+  descriptor: PropertyDescriptor | undefined,
+  value: unknown,
+): PropertyDescriptor {
+  return descriptor && 'value' in descriptor
+    ? { ...descriptor, value }
+    : { configurable: true, enumerable: true, writable: true, value };
+}
+
+function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): ChatCompletionInputTool {
+  const descriptors = Object.getOwnPropertyDescriptors(serialized.source);
+  descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
+
+  if (serialized.type !== 'function' || !serialized.function) {
+    if (descriptors.function) {
+      descriptors.function = serializedParserDescriptor(descriptors.function, undefined);
+    }
+    delete descriptors['$brand'];
+    delete descriptors['$parseRaw'];
+    delete descriptors['$callback'];
+    return Object.create(Object.getPrototypeOf(serialized.source), descriptors) as ChatCompletionInputTool;
+  }
+
+  const descriptor = descriptors.function;
+  const original =
+    descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value !== null
+      ? (descriptor.value as object)
+      : {};
+  const functionDescriptors = Object.getOwnPropertyDescriptors(original);
+  functionDescriptors['name'] = serializedParserDescriptor(
+    functionDescriptors['name'],
+    serialized.function.name,
+  );
+  functionDescriptors['strict'] = serializedParserDescriptor(
+    functionDescriptors['strict'],
+    serialized.function.strict,
+  );
+  descriptors.function = serializedParserDescriptor(
+    descriptor,
+    Object.create(Object.getPrototypeOf(original), functionDescriptors),
+  );
+
+  return Object.create(Object.getPrototypeOf(serialized.source), descriptors) as ChatCompletionInputTool;
+}
+
+function observeSerializedChatCompletionParserParams(
+  body: ChatCompletionCreateParams,
+  initial: ChatCompletionCreateParams,
+  update: (params: ChatCompletionCreateParams) => void,
+): () => void {
+  let root: object | undefined;
+  let tools: object | undefined;
+  let frames: (SerializedToolParserConfig | undefined)[] = [];
+  let toolFrames = new WeakMap<object, SerializedToolParserConfig>();
+  let functionFrames = new WeakMap<object, SerializedFunctionParserConfig>();
+
+  return observeJSONRequestBody(body, {
+    value(holder, key, value) {
+      if (!root && key === '' && typeof value === 'object' && value !== null) {
+        root = value;
+        tools = undefined;
+        frames = [];
+        toolFrames = new WeakMap();
+        functionFrames = new WeakMap();
+        return;
+      }
+
+      if (holder === root && key === 'tools') {
+        if (Array.isArray(value)) {
+          tools = value;
+        }
+        return;
+      }
+
+      if (holder === tools) {
+        const index = Number(key);
+        const source = initial.tools?.[index];
+        if (
+          !Number.isSafeInteger(index) ||
+          index < 0 ||
+          index >= MAX_STREAM_TOOL_CALLS ||
+          !source ||
+          typeof value !== 'object' ||
+          value === null
+        ) {
+          return;
+        }
+        const frame: SerializedToolParserConfig = { source };
+        frames[index] = frame;
+        toolFrames.set(value, frame);
+        return;
+      }
+
+      const tool = toolFrames.get(holder);
+      if (tool) {
+        if (key === 'type' && typeof value === 'string') {
+          tool.type = value;
+        } else if (key === 'function' && typeof value === 'object' && value !== null) {
+          const fn: SerializedFunctionParserConfig = {};
+          tool.function = fn;
+          functionFrames.set(value, fn);
+        }
+        return;
+      }
+
+      const fn = functionFrames.get(holder);
+      if (fn) {
+        if (key === 'name' && typeof value === 'string') {
+          fn.name = value;
+        } else if (key === 'strict' && typeof value === 'boolean') {
+          fn.strict = value;
+        }
+      }
+    },
+    complete() {
+      if (!root) {
+        return;
+      }
+      const snapshot = cloneParserConfigObject(initial);
+      if (tools) {
+        const serializedTools: ChatCompletionInputTool[] = [];
+        for (let index = 0; index < frames.length; index += 1) {
+          const frame = frames[index];
+          if (frame) {
+            serializedTools[index] = snapshotSerializedParserTool(frame);
+          }
+        }
+        snapshot.tools = serializedTools;
+      } else {
+        delete snapshot.tools;
+      }
+      update(snapshot);
+      root = undefined;
+      tools = undefined;
+      frames = [];
+      toolFrames = new WeakMap();
+      functionFrames = new WeakMap();
+    },
+  });
+}
+
 /** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 export class ChatCompletionStream<ParsedT = null>
   extends AbstractChatCompletionRunner<ChatCompletionStreamEvents<ParsedT>, ParsedT>
@@ -987,7 +1150,8 @@ export class ChatCompletionStream<ParsedT = null>
       const message = captureStructuredMessageSnapshot(choice);
       const refusal = captureStructuredJSONSnapshot(message, 'refusal');
       const content = captureStructuredJSONSnapshot(message, 'content');
-      validatedMessages.set(choice, Object.freeze({ message, content, refusal }));
+      const validatedTools = new Map<number, ValidatedToolCallSnapshot>();
+      validatedMessages.set(choice, Object.freeze({ message, content, refusal, toolCalls: validatedTools }));
       const toolCalls = captureSnapshotArray<ChatCompletionSnapshot.Choice.Message.ToolCall>(
         message,
         'tool_calls',
@@ -1035,7 +1199,6 @@ export class ChatCompletionStream<ParsedT = null>
           continue;
         }
         if (
-          toolCall.type !== 'function' ||
           !shouldParseToolCall(this.#params, {
             type: identity.type,
             function: { name: identity.name },
@@ -1043,11 +1206,26 @@ export class ChatCompletionStream<ParsedT = null>
         ) {
           continue;
         }
-        const argumentsSnapshot = captureStructuredJSONSnapshot(toolCall.function, 'arguments');
+        const descriptor = Object.getOwnPropertyDescriptor(toolCall, 'function');
+        if (!descriptor || !('value' in descriptor)) {
+          throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        const fn = descriptor.value as ChatCompletionSnapshot.Choice.Message.ToolCall.Function;
+        const argumentsSnapshot = captureStructuredJSONSnapshot(fn, 'arguments');
         if (typeof argumentsSnapshot !== 'string') {
           throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
         }
         validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget, this.#partialJSONParseBudget);
+        validatedTools.set(
+          toolCallIndex,
+          Object.freeze({
+            tool: toolCall,
+            function: fn,
+            type: identity.type,
+            name: identity.name,
+            arguments: argumentsSnapshot,
+          }),
+        );
       }
     }
     return validatedMessages;
@@ -1079,16 +1257,30 @@ export class ChatCompletionStream<ParsedT = null>
     this.#params = requestParams;
     this.#beginRequest();
 
-    this.#params = snapshotChatCompletionParserParams(requestParams);
+    const parserParams = snapshotChatCompletionParserParams(requestParams);
+    this.#params = parserParams;
     this.#hasAutoParseableTool =
-      this.#params.tools?.some(
+      parserParams.tools?.some(
         (tool) =>
           isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true),
       ) ?? false;
-    const stream = await client.chat.completions.create(requestParams, {
-      ...options,
-      signal: this.controller.signal,
-    });
+    const stopObserving = requestParams.tools
+      ? observeSerializedChatCompletionParserParams(requestParams, parserParams, (serialized) => {
+          this.#params = serialized;
+          this.#hasAutoParseableTool =
+            serialized.tools?.some(
+              (tool) =>
+                isChatCompletionFunctionTool(tool) &&
+                (isAutoParsableTool(tool) || tool.function.strict === true),
+            ) ?? false;
+        })
+      : undefined;
+    const stream = await client.chat.completions
+      .create(requestParams, {
+        ...options,
+        signal: this.controller.signal,
+      })
+      .finally(stopObserving);
     this._connected();
     for await (const chunk of stream) {
       this.#addChunk(chunk);
@@ -1542,12 +1734,43 @@ function finalizeChatCompletion<ParsedT>(
                 MAX_STREAM_TOOL_CALLS,
                 'tool-call',
                 (tool_call, i): ChatCompletionMessageToolCall => {
-                  if (tool_call.type == null) {
+                  const captured = validated.toolCalls.get(i);
+                  if (captured && captured.tool !== tool_call) {
+                    throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+                  }
+                  const stableFunction =
+                    captured &&
+                    new Proxy(captured.function, {
+                      get(target, property, receiver) {
+                        if (property === 'arguments') {
+                          return captured.arguments;
+                        }
+                        if (property === 'name') {
+                          return captured.name;
+                        }
+                        return Reflect.get(target, property, receiver);
+                      },
+                    });
+                  const stableTool =
+                    captured && stableFunction
+                      ? new Proxy(tool_call, {
+                          get(target, property, receiver) {
+                            if (property === 'type') {
+                              return captured.type;
+                            }
+                            if (property === 'function') {
+                              return stableFunction;
+                            }
+                            return Reflect.get(target, property, receiver);
+                          },
+                        })
+                      : tool_call;
+                  if (stableTool.type == null) {
                     throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type`);
                   }
 
-                  if (tool_call.type === 'custom') {
-                    const { custom, type, id, ...toolRest } = tool_call;
+                  if (stableTool.type === 'custom') {
+                    const { custom, type, id, ...toolRest } = stableTool;
                     const { input = '', name, ...customRest } = custom || {};
                     if (name == null) {
                       throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name`);
@@ -1560,7 +1783,7 @@ function finalizeChatCompletion<ParsedT>(
                     };
                   }
 
-                  const { function: fn, type, id, ...toolRest } = tool_call;
+                  const { function: fn, type, id, ...toolRest } = stableTool;
                   const { arguments: args, name, ...fnRest } = fn || {};
                   if (name == null) {
                     throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name`);

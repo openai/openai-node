@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type OpenAI from 'openai';
+import OpenAI from 'openai';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { makeParseableResponseFormat, makeParseableTool } from 'openai/lib/parser';
 import * as partialJSONParser from '../../src/_vendor/partial-json-parser/parser';
@@ -40,6 +40,28 @@ function createClient(chunks: AsyncIterable<Chunk>): OpenAI {
       },
     },
   } as unknown as OpenAI;
+}
+
+function createSerializedClient(chunks: AsyncIterable<Chunk>, observeBody: (body: string) => void): OpenAI {
+  return new OpenAI({
+    apiKey: 'sk-synthetic-serialized-tool',
+    maxRetries: 0,
+    fetch: async (_request, init) => {
+      if (typeof init?.body !== 'string') {
+        throw new TypeError('Expected a JSON-serialized chat request');
+      }
+      observeBody(init.body);
+      let events = '';
+      for await (const event of chunks) {
+        events += `data: ${JSON.stringify(event)}\n\n`;
+      }
+      events += 'data: [DONE]\n\n';
+      return new Response(events, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    },
+  });
 }
 
 function chunk(
@@ -421,6 +443,265 @@ it.each([false, true] as const)(
     expect(create).toHaveBeenCalledTimes(1);
   },
 );
+
+it.each([
+  { location: 'tool', dispatchedStrict: false },
+  { location: 'tool', dispatchedStrict: true },
+  { location: 'function', dispatchedStrict: false },
+  { location: 'function', dispatchedStrict: true },
+])(
+  'binds strict=$dispatchedStrict to the exact $location serializer result sent on the wire',
+  async ({ location, dispatchedStrict }) => {
+    const originalStrict = !dispatchedStrict;
+    const serializedFunction = { ...strictTool.function, strict: originalStrict };
+    const tool: OpenAI.Chat.ChatCompletionFunctionTool = {
+      ...strictTool,
+      function: serializedFunction,
+    };
+    const serialize = vi.fn(function serializeConfiguredTool(
+      this: OpenAI.Chat.ChatCompletionFunctionTool | typeof serializedFunction,
+      key: string,
+    ): unknown {
+      expect(this).toBe(location === 'tool' ? tool : serializedFunction);
+      expect(key).toBe(location === 'tool' ? '0' : 'function');
+      return location === 'tool'
+        ? { type: 'function', function: { ...serializedFunction, strict: dispatchedStrict } }
+        : { ...serializedFunction, strict: dispatchedStrict };
+    });
+    Object.defineProperty(location === 'tool' ? tool : serializedFunction, 'toJSON', {
+      configurable: true,
+      value: serialize,
+    });
+
+    const argumentsJSON = `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    let wireStrict: boolean | undefined;
+    const client = createSerializedClient(argumentFragments([argumentsJSON]), (body) => {
+      const wire = JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams;
+      const dispatched = wire.tools?.[0];
+      if (dispatched?.type !== 'function') {
+        throw new Error('Expected the serialized function tool');
+      }
+      wireStrict = dispatched.function.strict ?? false;
+      serializedFunction.strict = !dispatchedStrict;
+    });
+    const stream = ChatCompletionStream.createChatCompletion(client, {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Observe the real serialized tool contract' }],
+      tools: [tool],
+    });
+
+    if (dispatchedStrict) {
+      await expect(stream.finalChatCompletion()).rejects.toThrow(/structured JSON nesting depth limit/u);
+    } else {
+      const completion = await stream.finalChatCompletion();
+      const output = completion.choices[0]?.message.tool_calls?.[0];
+      expect(output).toMatchObject({ function: { arguments: argumentsJSON } });
+      if (output?.type === 'function') {
+        expect('parsed_arguments' in output.function).toBe(false);
+      }
+    }
+
+    expect(wireStrict).toBe(dispatchedStrict);
+    expect(serialize).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('keeps a genuinely serialized non-strict tool above the structured byte limit', async () => {
+  const tool: OpenAI.Chat.ChatCompletionFunctionTool = {
+    ...strictTool,
+    function: { ...strictTool.function, strict: true },
+  };
+  const serialize = vi.fn(function serializeUnboundedTool(this: typeof tool) {
+    expect(this).toBe(tool);
+    return { type: 'function', function: { ...this.function, strict: false } };
+  });
+  Object.defineProperty(tool, 'toJSON', { value: serialize });
+  const argumentsJSON = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+  const client = createSerializedClient(argumentFragments([argumentsJSON]), (body) => {
+    const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
+    expect(dispatched).toMatchObject({ function: { strict: false } });
+  });
+  const stream = ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Preserve the wire non-strict byte contract' }],
+    tools: [tool],
+  });
+
+  const completion = await stream.finalChatCompletion();
+
+  const output = completion.choices[0]?.message.tool_calls?.[0];
+  expect(output?.type).toBe('function');
+  if (output?.type === 'function') {
+    expect(output.function.arguments.length).toBe(argumentsJSON.length);
+    expect(output.function.arguments.startsWith('{"value":"')).toBe(true);
+    expect(output.function.arguments.endsWith('"}')).toBe(true);
+    expect('parsed_arguments' in output.function).toBe(false);
+  }
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('preserves the branded parser identity while a tool.toJSON changes its dispatched name', async () => {
+  const parser = vi.fn((value: string) => JSON.parse(value) as { value: string });
+  const callback = vi.fn();
+  const tool = makeParseableTool(strictTool, { parser, callback });
+  const serialize = vi.fn(function serializeRenamedTool(this: typeof tool, key: string) {
+    expect(this).toBe(tool);
+    expect(key).toBe('0');
+    return {
+      type: 'function',
+      function: { ...this.function, name: 'serialized_tool', strict: true },
+    };
+  });
+  Object.defineProperty(tool, 'toJSON', { configurable: true, value: serialize });
+  const argumentsJSON = '{"value":"serialized"}';
+  const client = createSerializedClient(
+    namedArgumentFragments('serialized_tool', [argumentsJSON]),
+    (body) => {
+      const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
+      expect(dispatched).toMatchObject({ function: { name: 'serialized_tool', strict: true } });
+    },
+  );
+  const stream = ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Keep the original branded tool parser' }],
+    tools: [tool],
+  });
+
+  const completion = await stream.finalChatCompletion();
+
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: {
+      name: 'serialized_tool',
+      arguments: argumentsJSON,
+      parsed_arguments: { value: 'serialized' },
+    },
+  });
+  expect(parser).toHaveBeenCalledWith(argumentsJSON);
+  expect(callback).not.toHaveBeenCalled();
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('preserves the exact error thrown by a serialized tool.toJSON hook', async () => {
+  const failure = new Error('original custom serializer failure');
+  const tool: OpenAI.Chat.ChatCompletionFunctionTool = { ...strictTool };
+  const serialize = vi.fn(() => {
+    throw failure;
+  });
+  Object.defineProperty(tool, 'toJSON', { value: serialize });
+  const client = createSerializedClient(argumentFragments(['{}']), () => {});
+  const stream = ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Preserve custom serialization errors' }],
+    tools: [tool],
+  });
+
+  await expect(stream.finalChatCompletion()).rejects.toThrow(failure.message);
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('tracks the actual serialized tool contract again when a request is retried', async () => {
+  const tool: OpenAI.Chat.ChatCompletionFunctionTool = {
+    ...strictTool,
+    function: { ...strictTool.function, strict: false },
+  };
+  let serializations = 0;
+  const serialize = vi.fn(function serializeRetriedTool(this: typeof tool) {
+    expect(this).toBe(tool);
+    serializations += 1;
+    return { type: 'function', function: { ...this.function, strict: serializations > 1 } };
+  });
+  Object.defineProperty(tool, 'toJSON', { value: serialize });
+  const dispatched: boolean[] = [];
+  const argumentsJSON = `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+  const client = new OpenAI({
+    apiKey: 'sk-synthetic-retried-serialized-tool',
+    maxRetries: 1,
+    fetch: async (_request, init) => {
+      if (typeof init?.body !== 'string') {
+        throw new TypeError('Expected a JSON-serialized retry request');
+      }
+      const parsed = JSON.parse(init.body) as OpenAI.Chat.ChatCompletionCreateParams;
+      const wireTool = parsed.tools?.[0];
+      if (wireTool?.type !== 'function') {
+        throw new Error('Expected the retried serialized function tool');
+      }
+      dispatched.push(wireTool.function.strict === true);
+      if (dispatched.length === 1) {
+        return new Response('{"error":{"message":"retry me"}}', {
+          status: 500,
+          headers: { 'content-type': 'application/json', 'retry-after-ms': '0' },
+        });
+      }
+      let events = '';
+      for await (const event of argumentFragments([argumentsJSON])) {
+        events += `data: ${JSON.stringify(event)}\n\n`;
+      }
+      return new Response(`${events}data: [DONE]\n\n`, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    },
+  });
+
+  const stream = ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Bind parsing to the successful retry serialization' }],
+    tools: [tool],
+  });
+
+  await expect(stream.finalChatCompletion()).rejects.toThrow(/structured JSON nesting depth limit/u);
+  expect(dispatched).toEqual([false, true]);
+  expect(serialize).toHaveBeenCalledTimes(2);
+});
+
+it('isolates concurrent serialized contracts that share the same caller-owned tool', async () => {
+  const tool: OpenAI.Chat.ChatCompletionFunctionTool = {
+    ...strictTool,
+    function: { ...strictTool.function, strict: false },
+  };
+  let serializations = 0;
+  const serialize = vi.fn(function serializeConcurrentTool(this: typeof tool) {
+    expect(this).toBe(tool);
+    serializations += 1;
+    return { type: 'function', function: { ...this.function, strict: serializations > 1 } };
+  });
+  Object.defineProperty(tool, 'toJSON', { value: serialize });
+  const argumentsJSON = `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+  const chunks: AsyncIterable<Chunk> = {
+    [Symbol.asyncIterator]: () => argumentFragments([argumentsJSON])[Symbol.asyncIterator](),
+  };
+  const dispatched: boolean[] = [];
+  const client = createSerializedClient(chunks, (body) => {
+    const parsed = JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams;
+    const wireTool = parsed.tools?.[0];
+    if (wireTool?.type !== 'function') {
+      throw new Error('Expected the concurrent serialized function tool');
+    }
+    dispatched.push(wireTool.function.strict === true);
+  });
+  const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+    model: 'gpt-test',
+    stream: true,
+    messages: [{ role: 'user', content: 'Isolate concurrent caller-owned tool serializers' }],
+    tools: [tool],
+  };
+  const first = ChatCompletionStream.createChatCompletion(client, params);
+  const second = ChatCompletionStream.createChatCompletion(client, params);
+
+  const [unbounded, bounded] = await Promise.allSettled([
+    first.finalChatCompletion(),
+    second.finalChatCompletion(),
+  ]);
+
+  expect(unbounded.status).toBe('fulfilled');
+  expect(bounded.status).toBe('rejected');
+  if (bounded.status === 'rejected') {
+    expect(bounded.reason).toBeInstanceOf(Error);
+    expect((bounded.reason as Error).message).toMatch(/structured JSON nesting depth limit/u);
+  }
+  expect(dispatched).toEqual([false, true]);
+  expect(serialize).toHaveBeenCalledTimes(2);
+});
 
 it('preserves the serialized branded response parser while the streaming response is pending', async () => {
   const parser = vi.fn((value: string) => JSON.parse(value) as { value: string });
@@ -1329,6 +1610,60 @@ it.each(['choice', 'message'] as const)(
 
     expect(read).not.toHaveBeenCalled();
     expect(completion.choices[0]?.message).toMatchObject({ content: '{}', parsed: {} });
+  },
+);
+
+it.each([
+  { kind: 'strict', limit: 'byte' },
+  { kind: 'strict', limit: 'depth' },
+  { kind: 'auto-parseable', limit: 'byte' },
+  { kind: 'auto-parseable', limit: 'depth' },
+])(
+  'binds validated $kind tool arguments through final parsing without $limit proxy reads',
+  async ({ kind, limit }) => {
+    const unsafe =
+      limit === 'byte'
+        ? `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`
+        : `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    const parser = vi.fn((value: string) => JSON.parse(value) as { value?: string });
+    const tool =
+      kind === 'auto-parseable' ? makeParseableTool(strictTool, { parser, callback: vi.fn() }) : strictTool;
+    const read = vi.fn();
+    const stream = ChatCompletionStream.createChatCompletion(createClient(argumentFragments(['{}'])), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Bind the validated strict tool frame' }],
+      tools: [tool],
+    });
+    let publicSnapshot: typeof stream.currentChatCompletionSnapshot;
+
+    stream.on('chunk', (_current, snapshot) => {
+      publicSnapshot = snapshot;
+    });
+    stream.on('tool_calls.function.arguments.done', () => {
+      const output = publicSnapshot?.choices[0]?.message.tool_calls?.[0];
+      if (!output || output.type !== 'function') {
+        throw new Error('Expected a completed function tool snapshot');
+      }
+      output.function = new Proxy(output.function, {
+        get(target, property, receiver) {
+          if (property === 'arguments' || property === 'name') {
+            read(property);
+            return property === 'arguments' ? unsafe : 'unvalidated_tool';
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+    });
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(read).not.toHaveBeenCalled();
+    expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+      function: { name: 'bounded_tool', arguments: '{}', parsed_arguments: {} },
+    });
+    if (kind === 'auto-parseable') {
+      expect(parser.mock.calls.every(([value]) => value === '{}')).toBe(true);
+    }
   },
 );
 
