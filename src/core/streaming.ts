@@ -104,7 +104,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let receivedCompletionSentinel = false;
       try {
         for await (const sse of _iterSSEMessages(response, controller)) {
-          if (sse.data.startsWith('[DONE]')) {
+          if (sse.data === '[DONE]') {
             receivedCompletionSentinel = true;
             break;
           }
