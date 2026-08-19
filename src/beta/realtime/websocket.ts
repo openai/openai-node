@@ -1,4 +1,5 @@
 import type { AzureOpenAI } from '../../index';
+import { assertAzureCredentialHeaderValue } from '../../internal/azure';
 import { assertBedrockWebSocketOrigin } from '../../internal/bedrock';
 import { OpenAI } from '../../index';
 import { OpenAIError } from '../../error';
@@ -119,6 +120,7 @@ function createAzureWebSocket(
     throw new Error('Azure OpenAI Realtime requires an API key');
   }
 
+  assertAzureCredentialHeaderValue(apiKey);
   redactAzureCredentials(url, isBearerToken);
   const socketURL = new URL(url);
   socketURL.searchParams.delete('api-key');

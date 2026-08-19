@@ -27,11 +27,12 @@ describe('deployment path safety', () => {
   const requestClient = new AzureOpenAI({ endpoint, apiKey, apiVersion, fetch: testFetch });
 
   test('keeps authenticated public chat requests inside the deployment route', async () => {
-    const authenticatedFetch = vi.fn(async (url: RequestInfo, init?: RequestInit): Promise<Response> =>
-      Response.json(
-        { url, apiKey: new Headers(init?.headers).get('api-key') },
-        { headers: { 'content-type': 'application/json' } },
-      ),
+    const authenticatedFetch = vi.fn(
+      async (url: RequestInfo, init?: RequestInit): Promise<Response> =>
+        Response.json(
+          { url, apiKey: new Headers(init?.headers).get('api-key') },
+          { headers: { 'content-type': 'application/json' } },
+        ),
     );
     const client = new AzureOpenAI({ endpoint, apiKey, apiVersion, fetch: authenticatedFetch });
 

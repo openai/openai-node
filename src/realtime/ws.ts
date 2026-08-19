@@ -1,4 +1,5 @@
 import * as WS from 'ws';
+import { safeAzureWebSocketHeaders } from '../internal/azure';
 import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { protectWebSocketOptionsFromCredentialRedirects } from '../internal/ws';
 import type { AzureOpenAI } from '../index';
@@ -70,7 +71,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       this.url,
       protectWebSocketOptionsFromCredentialRedirects({
         ...props.options,
-        headers,
+        headers: isAzure(client) ? safeAzureWebSocketHeaders(headers) : headers,
       }),
     );
 

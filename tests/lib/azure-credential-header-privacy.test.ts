@@ -362,6 +362,217 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  test.each(
+    authenticationModes.flatMap((authentication) =>
+      (['default', 'request'] as const).flatMap((source) =>
+        (['api-key', 'Authorization'] as const).map((header) => ({ authentication, source, header })),
+      ),
+    ),
+  )(
+    '$authentication rejects the effective $source $header override without exposing it',
+    async ({ authentication, source, header }) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const tokenProvider = vi.fn(async () => 'valid-entra-token');
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'valid-azure-key' }
+          : { azureADTokenProvider: tokenProvider }),
+        ...(source === 'default' ? { defaultHeaders: { [header]: credential } } : {}),
+        fetch,
+      });
+      await expectPrivateCredentialFailure(
+        () =>
+          client.request({
+            method: 'get',
+            path: '/models',
+            ...(source === 'request' ? { headers: { [header]: credential } } : {}),
+          }),
+        credential,
+      );
+      expect(fetch).not.toHaveBeenCalled();
+      expect(tokenProvider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test.each(
+    authenticationModes.flatMap((authentication) =>
+      (['valid', 'null'] as const).map((override) => ({ authentication, override })),
+    ),
+  )(
+    '$authentication accepts a malformed configured credential replaced by a $override override',
+    async ({ authentication, override }) => {
+      const configured = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const tokenProvider = vi.fn(async () => configured);
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: configured }
+          : { azureADTokenProvider: tokenProvider }),
+        fetch,
+      });
+      const name = authentication === 'static-api-key' ? 'API-KEY' : 'AUTHORIZATION';
+      const replacement = override === 'null' ? null : 'safe-replacement';
+      await client.request({ method: 'get', path: '/models', headers: { [name]: replacement } });
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(name)).toBe(replacement);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(tokenProvider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test.each(authenticationModes)(
+    '%s preserves case-insensitive last-write authentication header precedence',
+    async (authentication) => {
+      const configured = 'safe-configured-credential';
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: configured }
+          : { azureADTokenProvider: async () => configured }),
+        fetch,
+      });
+      const name = authentication === 'static-api-key' ? 'api-key' : 'authorization';
+      await client.request({
+        method: 'get',
+        path: '/models',
+        headers: {
+          [name.toUpperCase()]: `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`,
+          [name]: 'safe-final-credential',
+        },
+      });
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(name)).toBe('safe-final-credential');
+    },
+  );
+
+  test.each(['valid', 'null'] as const)(
+    'does not append an invalid default credential superseded by a %s request override',
+    async (override) => {
+      const unsafe = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'safe-configured-key',
+        defaultHeaders: { 'API-KEY': unsafe },
+        fetch,
+      });
+      const replacement = override === 'null' ? null : 'safe-final-key';
+      await client.request({
+        method: 'get',
+        path: '/models',
+        headers: { 'api-key': replacement },
+      });
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe(replacement);
+    },
+  );
+
+  test.each([
+    {
+      name: 'duplicate tuple values',
+      headers: [
+        ['Authorization', 'safe-first'],
+        ['authorization', `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`],
+      ],
+    },
+    {
+      name: 'multiple object values',
+      headers: {
+        Authorization: ['safe-first', `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`],
+      },
+    },
+  ])('rejects unsafe retained $name without invoking native header diagnostics', async ({ headers }) => {
+    const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = createClient({
+      authentication: 'static-api-key',
+      credential: 'safe-key',
+      fetch,
+    });
+    await expectPrivateCredentialFailure(
+      () => client.request({ method: 'get', path: '/models', headers }),
+      credential,
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('preserves a valid Headers default and a case-insensitive request replacement', async () => {
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'safe-configured-key',
+      defaultHeaders: new Headers({ 'API-KEY': 'safe-default-key' }),
+      fetch,
+    });
+    await client.request({
+      method: 'get',
+      path: '/models',
+      headers: { 'api-KEY': 'safe-final-key' },
+    });
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('safe-final-key');
+  });
+
+  test.each(authenticationModes)(
+    '%s preserves the existing explicitly enabled admin authentication precedence',
+    async (authentication) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'safe-static-key' }
+          : { azureADTokenProvider: provider }),
+        adminAPIKey: 'safe-admin-key',
+        fetch,
+      });
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: true },
+      });
+      const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      if (authentication === 'static-api-key') {
+        expect(headers.get('api-key')).toBe('safe-static-key');
+        expect(headers.has('authorization')).toBe(false);
+      } else {
+        expect(headers.get('authorization')).toBe('Bearer safe-admin-key');
+        expect(headers.has('api-key')).toBe(false);
+      }
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test('sanitizes explicit credential overrides without resolving a disabled provider', async () => {
+    const unsafe = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    const provider = vi.fn(async () => 'unused-provider-token');
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      azureADTokenProvider: provider,
+      fetch,
+    });
+    await expectPrivateCredentialFailure(
+      () =>
+        client.request({
+          method: 'get',
+          path: '/models',
+          __security: { bearerAuth: false, adminAPIKeyAuth: false },
+          headers: { AUTHORIZATION: unsafe },
+        }),
+      unsafe,
+    );
+    expect(provider).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   test('continues refreshing valid Entra credentials for each public request', async () => {
     const tokenProvider = vi
       .fn<() => Promise<string>>()

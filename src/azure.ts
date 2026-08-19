@@ -1,6 +1,6 @@
 import type { RequestInit, RequestInfo, Response } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
-import { buildHeaders } from './internal/headers';
+import { buildAzureAuthenticationHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
@@ -195,20 +195,20 @@ export class AzureOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    const credential = this.apiKey;
-    if (security.bearerAuth && typeof credential === 'string') {
-      for (const character of credential) {
-        const code = character.codePointAt(0) ?? 0;
-        if ((code < 0x20 && code !== 0x09) || code === 0x7f || code > 0xff) {
-          throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
-        }
-      }
+    if (security.bearerAuth && typeof this._options.apiKey === 'string') {
+      return buildAzureAuthenticationHeaders(
+        typeof this.apiKey === 'string' ? [['api-key', this.apiKey]] : [],
+      );
     }
 
-    if (security.bearerAuth && typeof this._options.apiKey === 'string') {
-      return buildHeaders([{ 'api-key': credential }]);
+    let authorization: string | null = null;
+    if (security.bearerAuth && typeof this.apiKey === 'string') {
+      authorization = `Bearer ${this.apiKey}`;
     }
-    return super.authHeaders(opts, security);
+    if (security.adminAPIKeyAuth && typeof this.adminAPIKey === 'string') {
+      authorization = `Bearer ${this.adminAPIKey}`;
+    }
+    return buildAzureAuthenticationHeaders(authorization === null ? [] : [['Authorization', authorization]]);
   }
 }
 

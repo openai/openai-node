@@ -134,6 +134,112 @@ afterEach(() => {
   });
 });
 
+describe('Azure realtime credential diagnostic privacy', () => {
+  const surfaces = [
+    { name: 'stable native', open: (client: AzureOpenAI) => StableBrowserRealtime.azure(client) },
+    { name: 'beta native', open: (client: AzureOpenAI) => BetaBrowserRealtime.azure(client) },
+    { name: 'stable Node ws', open: (client: AzureOpenAI) => StableNodeRealtime.azure(client) },
+    { name: 'beta Node ws', open: (client: AzureOpenAI) => BetaNodeRealtime.azure(client) },
+  ];
+  const invalidCharacters = [
+    ...Array.from({ length: 0x20 }, (_, code) => code)
+      .filter((code) => code !== 0x09)
+      .map((code) => ({
+        name: `U+${code.toString(16).padStart(4, '0')}`,
+        value: String.fromCodePoint(code),
+      })),
+    { name: 'DEL', value: String.fromCodePoint(0x7f) },
+    { name: 'Unicode', value: '\u{1F680}' },
+    { name: 'lone surrogate', value: String.fromCodePoint(0xd8_00) },
+  ];
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      ([false, true] as const).flatMap((rotating) =>
+        invalidCharacters.map((invalid) => ({ ...surface, rotating, invalid })),
+      ),
+    ),
+  )(
+    '$name rejects $invalid.name before constructing a socket (rotating: $rotating)',
+    async ({ open, rotating, invalid }) => {
+      const credential = `azure-private-credential-75da${invalid.value}private-patient-record-21f8`;
+      const provider = vi.fn(async () => credential);
+      const client = new AzureOpenAI({
+        baseURL: 'https://azure.example.com/openai/',
+        apiVersion: '2024-10-01-preview',
+        deployment: 'chat',
+        ...(rotating ? { azureADTokenProvider: provider } : { apiKey: credential }),
+      });
+      let failure: unknown;
+      try {
+        await open(client);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(TypeError);
+      expect((failure as TypeError).message).toBe(
+        'Azure OpenAI credential contains an invalid HTTP header value.',
+      );
+      expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
+      expect((failure as Error).stack).not.toContain('azure-private-credential-75da');
+      expect(FakeBrowserSocket.instances).toHaveLength(0);
+      expect(nodeSocketConstructor).not.toHaveBeenCalled();
+      expect(provider).toHaveBeenCalledTimes(rotating ? 1 : 0);
+    },
+  );
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      ([false, true] as const).flatMap((rotating) =>
+        (['safe key', 'safe\tkey', 'safe\u0080key', 'safe\u00FFkey'] as const).map((credential) => ({
+          ...surface,
+          rotating,
+          credential,
+        })),
+      ),
+    ),
+  )(
+    '$name preserves valid Azure HTTP field bytes (rotating: $rotating)',
+    async ({ open, rotating, credential }) => {
+      const provider = vi.fn(async () => credential);
+      const client = new AzureOpenAI({
+        baseURL: 'https://azure.example.com/openai/',
+        apiVersion: '2024-10-01-preview',
+        deployment: 'chat',
+        ...(rotating ? { azureADTokenProvider: provider } : { apiKey: credential }),
+      });
+      await open(client);
+      expect(provider).toHaveBeenCalledTimes(rotating ? 1 : 0);
+    },
+  );
+
+  test.each([
+    { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+    { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+  ])('$name Node ws rejects invalid custom authentication overrides', async ({ open }) => {
+    const client = createAzureClient({ deployment: 'chat' });
+    await expect(
+      open(client, {
+        options: { headers: { Authorization: 'azure-private-credential-75da\nprivate-patient-record-21f8' } },
+      }),
+    ).rejects.toThrow('Azure OpenAI credential contains an invalid HTTP header value.');
+    expect(nodeSocketConstructor).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+    { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+  ])('$name Node ws preserves safe case-insensitive final credential overrides', async ({ open }) => {
+    const client = createAzureClient({ deployment: 'chat' });
+    await open(client, {
+      options: {
+        headers: { 'API-KEY': 'azure-private-credential-75da\nprivate-patient-record-21f8' },
+      },
+    });
+    expect(lastNodeSocket().options.headers).toMatchObject({ 'api-key': 'azure-key' });
+  });
+});
+
 describe.each([
   { name: 'stable', Realtime: StableBrowserRealtime, beta: false },
   { name: 'beta', Realtime: BetaBrowserRealtime, beta: true },
