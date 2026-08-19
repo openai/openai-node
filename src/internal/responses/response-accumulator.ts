@@ -530,9 +530,8 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
   if (itemScoped) {
     try {
       for (const field of responseEventRoutingFields) {
-        if (Object.getOwnPropertyDescriptor(event, field)) {
-          stableValues.set(field, Reflect.get(event, field, event));
-        }
+        const routingDescriptor = Object.getOwnPropertyDescriptor(event, field);
+        stableValues.set(field, routingDescriptor ? Reflect.get(event, field, event) : undefined);
       }
 
       if (type === 'response.output_item.done') {

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { accumulateResponse } from 'openai/lib/responses/ResponseAccumulator';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import {
@@ -244,6 +245,55 @@ describe('ResponseAccumulator output item identity', () => {
 
     expect(snapshot).toEqual(original);
   });
+
+  test('rejects an inherited stateful output index before it can redirect an item event', () => {
+    const snapshot = createSnapshot(
+      makeOutput('message', 'first_item'),
+      makeOutput('message', 'second_item'),
+    );
+    const original = structuredClone(snapshot);
+    let reads = 0;
+    const prototype = Object.defineProperty({}, 'output_index', {
+      get: () => {
+        reads += 1;
+        return reads === 1 ? 0 : 1;
+      },
+    });
+    const event = Object.assign(Object.create(prototype) as EventFields, {
+      type: 'response.output_text.delta',
+      sequence_number: 1,
+      item_id: 'first_item',
+      content_index: 0,
+      delta: ' injected',
+    });
+
+    expect(() => accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toThrow(
+      'missing output at index undefined',
+    );
+    expect(reads).toBe(0);
+    expect(snapshot).toEqual(original);
+  });
+
+  test.each(['item_id', 'content_index'] as const)(
+    'rejects an inherited %s getter without executing it or mutating the snapshot',
+    (field) => {
+      const snapshot = createSnapshot(makeOutput('message', 'item_123'));
+      const original = structuredClone(snapshot);
+      const readInheritedValue = vi.fn(() => (field === 'item_id' ? 'item_123' : 0));
+      const prototype = Object.defineProperty({}, field, { get: readInheritedValue });
+      const event: EventFields = Object.assign(Object.create(prototype) as EventFields, {
+        type: 'response.output_text.delta',
+        sequence_number: 1,
+        output_index: 0,
+        delta: ' injected',
+        ...(field === 'item_id' ? { content_index: 0 } : { item_id: 'item_123' }),
+      });
+
+      expect(() => accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toThrow();
+      expect(readInheritedValue).not.toHaveBeenCalled();
+      expect(snapshot).toEqual(original);
+    },
+  );
 
   test('snapshots an item-scoped output index once before validating and applying its delta', () => {
     const snapshot = createSnapshot(

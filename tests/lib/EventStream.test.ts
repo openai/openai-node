@@ -267,6 +267,32 @@ describe('EventStream iterator buffer limits', () => {
     await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
   });
 
+  test.each(['iterator-first', 'observer-first'] as const)(
+    'delivers the overflow-triggering event to ordinary listeners when registered %s',
+    async (order) => {
+      const stream = new TestStream();
+      const observer = vi.fn();
+      let iterator: AsyncIterableIterator<[unknown]>;
+
+      if (order === 'iterator-first') {
+        iterator = stream.events('payload');
+        stream.on('payload', observer);
+      } else {
+        stream.on('payload', observer);
+        iterator = stream.events('payload');
+      }
+
+      const payload = { text: 'x'.repeat(5 * 1024 * 1024) };
+      stream.emitPayload(payload);
+
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith(payload);
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(stream.ended).toBe(true);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
   test('aborts detached iterators when nested event payloads exceed the byte high-water mark', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -396,6 +422,76 @@ describe('EventStream iterator buffer limits', () => {
     expect(stream.controller.signal.aborted).toBe(true);
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
+
+  test.each([
+    { name: 'Map keys', expression: "new Map([['x'.repeat(5 * 1024 * 1024), 'small']])" },
+    { name: 'Map values', expression: "new Map([['small', 'x'.repeat(5 * 1024 * 1024)]])" },
+    { name: 'Set values', expression: "new Set(['x'.repeat(5 * 1024 * 1024)])" },
+  ])('charges cross-realm $name hidden in internal collection slots', async ({ expression }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload: unknown = runInNewContext(expression);
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([
+    { name: 'Map', expression: "new Map([['small', 'value']])", method: 'entries' },
+    { name: 'Set', expression: "new Set(['small'])", method: 'values' },
+  ])(
+    'inspects small cross-realm $name entries without invoking hostile iterators',
+    async ({ expression, method }) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const payload = runInNewContext(expression) as object;
+      const invokeHostileIterator = vi.fn(() => {
+        throw new Error('hostile iterator');
+      });
+      Object.defineProperty(payload, method, { get: invokeHostileIterator });
+      Object.defineProperty(payload, Symbol.iterator, { get: invokeHostileIterator });
+
+      stream.emitPayload(payload);
+
+      const result = await iterator.next();
+
+      expect(result.done).toBe(false);
+      expect(result.value?.[0]).toBe(payload);
+      expect(invokeHostileIterator).not.toHaveBeenCalled();
+      stream.end();
+    },
+  );
+
+  test('handles cyclic cross-realm Maps and Sets without reentering untrusted iterators', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload: unknown = runInNewContext(
+      'const map = new Map(); const set = new Set(); map.set(map, set); set.add(map); map',
+    );
+
+    stream.emitPayload(payload);
+
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    stream.end();
+  });
+
+  test.each([
+    { name: 'Map', prototype: Map.prototype },
+    { name: 'Set', prototype: Set.prototype },
+  ])(
+    'fails closed when a $name prototype is forged without collection internal slots',
+    async ({ prototype }) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+
+      stream.emitPayload(Object.create(prototype));
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
 
   test.each([
     { name: 'Map keys', create: (value: string) => new Map([[value, 'small']]) },

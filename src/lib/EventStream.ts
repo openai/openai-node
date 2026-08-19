@@ -17,11 +17,13 @@ const sharedArrayBufferByteLengthGetter =
     : undefined;
 const blobSizeGetter =
   typeof Blob === 'function' ? Object.getOwnPropertyDescriptor(Blob.prototype, 'size')?.get : undefined;
-const retainedStorageBrands = new Set(['ArrayBuffer', 'SharedArrayBuffer', 'Blob', 'File']);
+const mapEntries = Map.prototype.entries;
+const setValues = Set.prototype.values;
+const retainedStorageBrands = new Set(['ArrayBuffer', 'SharedArrayBuffer', 'Blob', 'File', 'Map', 'Set']);
 
 type RetainedStorage = {
   bytes: number;
-  kind: 'typed-array' | 'data-view' | 'buffer' | 'blob';
+  kind: 'typed-array' | 'data-view' | 'buffer' | 'blob' | 'map' | 'set';
 };
 
 type EventQueue<Value> = {
@@ -134,6 +136,12 @@ function estimateRetainedBufferBytes(
       kind = 'blob';
       break;
     }
+    case 'Map': {
+      return { bytes: 0, kind: 'map' };
+    }
+    case 'Set': {
+      return { bytes: 0, kind: 'set' };
+    }
     default: {
       return undefined;
     }
@@ -151,18 +159,19 @@ function estimateRetainedBufferBytes(
 
 function visitHiddenEventValues(
   current: object,
+  kind: RetainedStorage['kind'] | undefined,
   visit: (value: unknown, overhead: number) => boolean,
 ): boolean {
-  if (current instanceof Map) {
-    for (const [key, entry] of Map.prototype.entries.call(current)) {
+  if (kind === 'map') {
+    for (const [key, entry] of mapEntries.call(current)) {
       if (!visit(key, 8) || !visit(entry, 8)) {
         return false;
       }
     }
   }
 
-  if (current instanceof Set) {
-    for (const entry of Set.prototype.values.call(current)) {
+  if (kind === 'set') {
+    for (const entry of setValues.call(current)) {
       if (!visit(entry, 8)) {
         return false;
       }
@@ -212,7 +221,7 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     }
 
     if (
-      !visitHiddenEventValues(current, (hiddenValue, overhead) => {
+      !visitHiddenEventValues(current, retainedStorage?.kind, (hiddenValue, overhead) => {
         bytes += overhead;
         visit(hiddenValue, depth + 1);
         return bytes <= remainingBytes;
