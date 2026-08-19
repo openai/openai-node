@@ -5,6 +5,25 @@ const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
 // Structured JSON may nest 128 levels before stream-event wrappers are added.
 const MAX_BUFFERED_EVENT_DEPTH = 256;
 
+const typedArrayBufferGetter = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype) as object,
+  'buffer',
+)?.get;
+const dataViewBufferGetter = Object.getOwnPropertyDescriptor(DataView.prototype, 'buffer')?.get;
+const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
+const sharedArrayBufferByteLengthGetter =
+  typeof SharedArrayBuffer === 'function'
+    ? Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get
+    : undefined;
+const blobSizeGetter =
+  typeof Blob === 'function' ? Object.getOwnPropertyDescriptor(Blob.prototype, 'size')?.get : undefined;
+const retainedStorageBrands = new Set(['ArrayBuffer', 'SharedArrayBuffer', 'Blob', 'File']);
+
+type RetainedStorage = {
+  bytes: number;
+  kind: 'typed-array' | 'data-view' | 'buffer' | 'blob';
+};
+
 type EventQueue<Value> = {
   readonly length: number;
   enqueue: (value: Value) => void;
@@ -49,39 +68,85 @@ function createEventQueue<Value>(): EventQueue<Value> {
   };
 }
 
+function getRetainedStorageBrand(current: object): string | undefined {
+  let prototype = Object.getPrototypeOf(current) as object | null;
+
+  for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag);
+    if (
+      descriptor &&
+      'value' in descriptor &&
+      typeof descriptor.value === 'string' &&
+      retainedStorageBrands.has(descriptor.value)
+    ) {
+      return descriptor.value;
+    }
+    prototype = Object.getPrototypeOf(prototype) as object | null;
+  }
+
+  return undefined;
+}
+
 function estimateRetainedBufferBytes(
   current: object,
   visit: (value: unknown, depth: number) => void,
   depth: number,
-): number | undefined {
+): RetainedStorage | undefined {
   if (ArrayBuffer.isView(current)) {
-    const prototype =
-      current instanceof DataView ? DataView.prototype : Object.getPrototypeOf(Uint8Array.prototype);
-    const buffer = Object.getOwnPropertyDescriptor(prototype, 'buffer')?.get?.call(current) as unknown;
-    if (typeof buffer !== 'object' || buffer === null) {
-      return Number.POSITIVE_INFINITY;
+    let buffer: unknown;
+    let kind: RetainedStorage['kind'] = 'typed-array';
+
+    try {
+      buffer = typedArrayBufferGetter?.call(current) as unknown;
+    } catch {
+      kind = 'data-view';
+      buffer = dataViewBufferGetter?.call(current) as unknown;
     }
 
-    // Even a one-byte view retains its complete backing allocation.
+    if (typeof buffer !== 'object' || buffer === null) {
+      return { bytes: Number.POSITIVE_INFINITY, kind };
+    }
+
+    // Even a one-byte cross-realm view retains its complete backing allocation.
     visit(buffer, depth + 1);
-    return 0;
+    return { bytes: 0, kind };
   }
 
-  if (current instanceof ArrayBuffer) {
-    const byteLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get?.call(
-      current,
-    ) as unknown;
-    return typeof byteLength === 'number' ? byteLength : Number.POSITIVE_INFINITY;
+  const brand = getRetainedStorageBrand(current);
+  if (!brand) {
+    return undefined;
   }
 
-  if (typeof SharedArrayBuffer === 'function' && current instanceof SharedArrayBuffer) {
-    const byteLength = Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get?.call(
-      current,
-    ) as unknown;
-    return typeof byteLength === 'number' ? byteLength : Number.POSITIVE_INFINITY;
+  let getter: (() => unknown) | undefined;
+  let kind: RetainedStorage['kind'] = 'buffer';
+  switch (brand) {
+    case 'ArrayBuffer': {
+      getter = arrayBufferByteLengthGetter;
+      break;
+    }
+    case 'SharedArrayBuffer': {
+      getter = sharedArrayBufferByteLengthGetter;
+      break;
+    }
+    case 'Blob':
+    case 'File': {
+      getter = blobSizeGetter;
+      kind = 'blob';
+      break;
+    }
+    default: {
+      return undefined;
+    }
   }
 
-  return undefined;
+  const bytes = getter?.call(current);
+  return {
+    bytes:
+      typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
+        ? bytes
+        : Number.POSITIVE_INFINITY,
+    kind,
+  };
 }
 
 function visitHiddenEventValues(
@@ -138,9 +203,9 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     visited.add(current);
     bytes += 16;
 
-    const bufferBytes = estimateRetainedBufferBytes(current, visit, depth);
-    if (bufferBytes !== undefined) {
-      bytes += bufferBytes;
+    const retainedStorage = estimateRetainedBufferBytes(current, visit, depth);
+    if (retainedStorage !== undefined) {
+      bytes += retainedStorage.bytes;
       if (bytes > remainingBytes) {
         return;
       }
@@ -157,7 +222,7 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     }
 
     const ownKeys =
-      bufferBytes !== undefined && ArrayBuffer.isView(current) && !(current instanceof DataView)
+      retainedStorage?.kind === 'typed-array'
         ? Object.getOwnPropertySymbols(current)
         : Reflect.ownKeys(current);
 

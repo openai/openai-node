@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import { vi } from 'vitest';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
 import { EventStream } from 'openai/lib/EventStream';
@@ -296,6 +297,104 @@ describe('EventStream iterator buffer limits', () => {
     expect(stream.controller.signal.aborted).toBe(true);
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
     await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
+  });
+
+  test.each([
+    { name: 'Blob', create: () => new Blob([new Uint8Array(9 * 1024 * 1024)]) },
+    { name: 'File', create: () => new File([new Uint8Array(9 * 1024 * 1024)], 'large.bin') },
+  ])(
+    'rejects oversized $name backing storage without invoking an overridden size getter',
+    async ({ create }) => {
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      const payload = create();
+      const readSize = vi.fn(() => 1);
+      Object.defineProperty(payload, 'size', { get: readSize });
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+      expect(readSize).not.toHaveBeenCalled();
+    },
+  );
+
+  test('delivers a small Blob without invoking an own size accessor', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = new Blob(['small']);
+    const readSize = vi.fn(() => {
+      throw new Error('untrusted size accessor');
+    });
+    Object.defineProperty(payload, 'size', { get: readSize });
+
+    stream.emitPayload(payload);
+
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(readSize).not.toHaveBeenCalled();
+    stream.end();
+  });
+
+  test('fails closed on a spoofed Blob receiver without invoking its size accessor', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const readSize = vi.fn(() => 1);
+    const payload = Object.create(Blob.prototype);
+    Object.defineProperty(payload, 'size', { get: readSize });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    expect(readSize).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { name: 'DataView', expression: 'new DataView(new ArrayBuffer(16))' },
+    { name: 'ArrayBuffer', expression: 'new ArrayBuffer(16)' },
+    { name: 'SharedArrayBuffer-backed DataView', expression: 'new DataView(new SharedArrayBuffer(16))' },
+  ])('accepts a small cross-realm $name without reading spoofable accessors', async ({ expression }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload: unknown = runInNewContext(expression);
+
+    stream.emitPayload(payload);
+
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: [payload] });
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test.each([
+    { name: 'ArrayBuffer', expression: 'new ArrayBuffer(9 * 1024 * 1024)' },
+    {
+      name: 'ArrayBuffer-backed DataView',
+      expression: 'new DataView(new ArrayBuffer(9 * 1024 * 1024), 0, 1)',
+    },
+    {
+      name: 'SharedArrayBuffer-backed DataView',
+      expression: 'new DataView(new SharedArrayBuffer(9 * 1024 * 1024), 0, 1)',
+    },
+  ])('charges the complete cross-realm $name backing store', async ({ expression }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(runInNewContext(expression));
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('charges non-enumerable data retained by a cross-realm DataView', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const payload = runInNewContext('new DataView(new ArrayBuffer(16))') as DataView;
+    Object.defineProperty(payload, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
 
   test.each([

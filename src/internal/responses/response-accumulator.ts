@@ -494,6 +494,15 @@ function assertNever(_value: never): never {
   throw new OpenAIError('Unhandled response stream event: unknown');
 }
 
+const responseEventRoutingFields = [
+  'item_id',
+  'output_index',
+  'content_index',
+  'annotation_index',
+  'command_index',
+  'summary_index',
+] as const;
+
 function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumulatorEvent {
   let descriptor: PropertyDescriptor | undefined;
   try {
@@ -510,9 +519,35 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
     return assertNever(event as never);
   }
 
+  const stableValues = new Map<PropertyKey, unknown>([['type', type]]);
+  const itemScoped =
+    type === 'response.output_item.added' ||
+    type === 'response.output_item.done' ||
+    type === 'response.content_part.added' ||
+    type === 'response.content_part.done' ||
+    hasOwn(expectedOutputItemTypes, type);
+
+  if (itemScoped) {
+    try {
+      for (const field of responseEventRoutingFields) {
+        if (Object.getOwnPropertyDescriptor(event, field)) {
+          stableValues.set(field, Reflect.get(event, field, event));
+        }
+      }
+
+      if (type === 'response.output_item.done') {
+        stableValues.set('item', structuredClone(Reflect.get(event, 'item', event)));
+      } else if (type === 'response.content_part.added' || type === 'response.content_part.done') {
+        stableValues.set('part', structuredClone(Reflect.get(event, 'part', event)));
+      }
+    } catch {
+      return assertNever(event as never);
+    }
+  }
+
   return new Proxy(event, {
     get(target, property) {
-      return property === 'type' ? type : Reflect.get(target, property, target);
+      return stableValues.has(property) ? stableValues.get(property) : Reflect.get(target, property, target);
     },
   });
 }
@@ -547,7 +582,7 @@ function accumulateOutputItemEvent(
     case 'response.output_item.done': {
       const output = getOutput(snapshot, event.output_index);
       const previousText = getOutputText(context, output);
-      const replacement = structuredClone(event.item);
+      const replacement = event.item;
       if (output.type === 'message' || replacement.type === 'message') {
         ensureCanonicalOutputText(context, snapshot);
       }
@@ -577,7 +612,7 @@ function accumulateContentPartAddedEvent(
       const { part } = event;
       if (type === 'message' && part.type !== 'reasoning_text') {
         validateArrayAppend(output.content, event.content_index, 'content');
-        const content = structuredClone(part);
+        const content = part;
         if (content.type === 'output_text') {
           ensureCanonicalOutputText(context, snapshot);
         }
@@ -592,7 +627,7 @@ function accumulateContentPartAddedEvent(
         if (!output.content) {
           output.content = content;
         }
-        content.push(structuredClone(part));
+        content.push(part);
       }
       return true;
     }
@@ -614,7 +649,7 @@ function accumulateContentPartDoneEvent(
       if (output.type === 'message' && part.type !== 'reasoning_text') {
         const content = getContent(output.content, event.content_index);
         const previousText = content.type === 'output_text' ? content.text : '';
-        const replacement = structuredClone(part);
+        const replacement = part;
         if (content.type === 'output_text' || replacement.type === 'output_text') {
           ensureCanonicalOutputText(context, snapshot);
         }
@@ -628,7 +663,7 @@ function accumulateContentPartDoneEvent(
           throw new OpenAIError(`missing content at index ${event.content_index}`);
         }
         getContent(content, event.content_index);
-        content[event.content_index] = structuredClone(part);
+        content[event.content_index] = part;
       }
       return true;
     }

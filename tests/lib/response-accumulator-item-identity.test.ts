@@ -245,6 +245,130 @@ describe('ResponseAccumulator output item identity', () => {
     expect(snapshot).toEqual(original);
   });
 
+  test('snapshots an item-scoped output index once before validating and applying its delta', () => {
+    const snapshot = createSnapshot(
+      makeOutput('message', 'first_item'),
+      makeOutput('message', 'second_item'),
+    );
+    const event: EventFields = {
+      type: 'response.output_text.delta',
+      sequence_number: 1,
+      item_id: 'first_item',
+      content_index: 0,
+      delta: ' injected',
+    };
+    let reads = 0;
+    Object.defineProperty(event, 'output_index', {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return reads === 1 ? 0 : 1;
+      },
+    });
+
+    expect(accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toBe(snapshot);
+
+    const [first, second] = snapshot.output;
+    if (first?.type !== 'message' || second?.type !== 'message') {
+      throw new Error('expected message output items');
+    }
+    expect(first.content[0]).toMatchObject({ text: 'safe text injected' });
+    expect(second.content[0]).toMatchObject({ text: 'safe text' });
+    expect(reads).toBe(1);
+  });
+
+  test('snapshots item-scoped identity and content-index accessors once', () => {
+    const snapshot = createSnapshot(makeOutput('message', 'item_123'));
+    const event: EventFields = {
+      type: 'response.output_text.delta',
+      sequence_number: 1,
+      output_index: 0,
+      delta: ' injected',
+    };
+    let identityReads = 0;
+    let indexReads = 0;
+    Object.defineProperty(event, 'item_id', {
+      enumerable: true,
+      get: () => {
+        identityReads += 1;
+        return identityReads === 1 ? 'item_123' : 'foreign_item';
+      },
+    });
+    Object.defineProperty(event, 'content_index', {
+      enumerable: true,
+      get: () => {
+        indexReads += 1;
+        return indexReads === 1 ? 0 : 1;
+      },
+    });
+
+    expect(accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toBe(snapshot);
+    expect(identityReads).toBe(1);
+    expect(indexReads).toBe(1);
+  });
+
+  test('validates the exact cloned output-item completion retained by the snapshot', () => {
+    const snapshot = createSnapshot(makeOutput('message', 'item_123'));
+    const replacement = makeOutput('message', 'placeholder');
+    let reads = 0;
+    Object.defineProperty(replacement, 'id', {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return reads <= 4 ? 'item_123' : 'foreign_item';
+      },
+    });
+
+    expect(
+      accumulateResponse(
+        {
+          type: 'response.output_item.done',
+          sequence_number: 1,
+          output_index: 0,
+          item: replacement,
+        } as ResponseStreamEvent,
+        snapshot,
+      ),
+    ).toBe(snapshot);
+
+    expect(snapshot.output[0]?.id).toBe('item_123');
+    expect(reads).toBe(1);
+  });
+
+  test('validates the same cloned content-part discriminator that is accumulated', () => {
+    const snapshot = createSnapshot(makeOutput('message', 'item_123'));
+    const part = { type: 'output_text', text: 'more', annotations: [] };
+    let reads = 0;
+    Object.defineProperty(part, 'type', {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return reads === 1 ? 'output_text' : 'reasoning_text';
+      },
+    });
+
+    expect(
+      accumulateResponse(
+        {
+          type: 'response.content_part.added',
+          sequence_number: 1,
+          output_index: 0,
+          item_id: 'item_123',
+          content_index: 2,
+          part,
+        } as ResponseStreamEvent,
+        snapshot,
+      ),
+    ).toBe(snapshot);
+
+    const [output] = snapshot.output;
+    if (output?.type !== 'message') {
+      throw new Error('expected a message output item');
+    }
+    expect(output.content[2]).toMatchObject({ type: 'output_text', text: 'more' });
+    expect(reads).toBe(1);
+  });
+
   test('rejects an item ID belonging to another existing output item', () => {
     const snapshot = createSnapshot(
       makeOutput('message', 'first_item'),
@@ -457,6 +581,35 @@ describe('ResponseAccumulator output item identity', () => {
     ).toThrow("duplicate output item identity 'id:mutated_item'");
 
     expect(snapshot).toEqual(original);
+  });
+
+  test('detects an in-place call identity change across public accumulation calls', () => {
+    const snapshot = createSnapshot(makeOutput('function_call', 'first_item'));
+    const [existing] = snapshot.output;
+    if (existing?.type !== 'function_call') {
+      throw new Error('expected a function-call output item');
+    }
+    existing.call_id = 'call_mutated';
+
+    const duplicate = makeOutput('function_call', 'second_item');
+    if (duplicate.type !== 'function_call') {
+      throw new Error('expected a function-call output item');
+    }
+    duplicate.call_id = 'call_mutated';
+
+    expect(() =>
+      accumulateResponse(
+        {
+          type: 'response.output_item.added',
+          sequence_number: 1,
+          output_index: 1,
+          item: duplicate,
+        } as ResponseStreamEvent,
+        snapshot,
+      ),
+    ).toThrow("duplicate output item identity 'call:function_call:call_mutated'");
+
+    expect(snapshot.output).toHaveLength(1);
   });
 
   test('does not reserve an output item identity when cloning its event fails', () => {
