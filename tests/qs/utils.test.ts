@@ -86,6 +86,18 @@ test('assign()', () => {
 });
 
 describe('prototype-pollution safety', () => {
+  const graphOperations = [
+    {
+      name: 'merge',
+      apply: (target: Record<string, any>, source: Record<string, any>) => merge(target, source),
+    },
+    {
+      name: 'assign_single_source',
+      apply: (target: Record<string, any>, source: Record<string, any>) =>
+        assign_single_source(target, source),
+    },
+  ];
+
   test.each([
     {
       name: 'merge',
@@ -266,6 +278,8 @@ describe('prototype-pollution safety', () => {
       create: () =>
         new (class {
           #value = true;
+          child = { safe: true };
+
           getValue() {
             return this.#value;
           }
@@ -442,6 +456,194 @@ describe('prototype-pollution safety', () => {
 
     expect(() => assign_single_source({}, { unsafe })).toThrow(/safely sanitize|unsupported|callable/iu);
     expect(calls).toBe(0);
+  });
+
+  test.each(graphOperations)(
+    '$name rejects unsupported unsafe keys even when a proxy changes their enumerability',
+    ({ apply }) => {
+      const unsupported = Object.create({ inherited: true }) as Record<string, unknown>;
+      Object.defineProperty(unsupported, '__proto__', {
+        configurable: true,
+        enumerable: false,
+        value: { polluted: true },
+      });
+      const unstable = new Proxy(unsupported, {
+        getPrototypeOf(value) {
+          Object.defineProperty(value, '__proto__', {
+            configurable: true,
+            enumerable: true,
+            value: { polluted: true },
+          });
+          return Reflect.getPrototypeOf(value);
+        },
+      });
+      const target = { original: true };
+
+      expect(() => apply(target, { value: unstable })).toThrow(/safely sanitize|unsupported|callable/iu);
+      expect(target).toEqual({ original: true });
+    },
+  );
+
+  test.each(graphOperations)(
+    '$name leaves the caller target untouched when sanitation rejects',
+    ({ apply }) => {
+      const unsafe = new Date('2026-08-18T00:00:00.000Z');
+      Object.defineProperty(unsafe, '__proto__', {
+        configurable: true,
+        enumerable: true,
+        value: { polluted: true },
+      });
+      const target = { original: true };
+
+      expect(() => apply(target, { first: 'must not commit', unsafe })).toThrow(
+        /safely sanitize|unsupported|callable/iu,
+      );
+      expect(target).toEqual({ original: true });
+    },
+  );
+
+  test.each(graphOperations)(
+    '$name snapshots source getters exactly once before committing any target property',
+    ({ apply }) => {
+      const unsafe = new Date('2026-08-18T00:00:00.000Z');
+      Object.defineProperty(unsafe, '__proto__', {
+        configurable: true,
+        enumerable: true,
+        value: { polluted: true },
+      });
+      let getterCalls = 0;
+      const source = {
+        first: 'must not commit',
+        get unsafe() {
+          getterCalls += 1;
+          return unsafe;
+        },
+      };
+      const target = { original: true };
+
+      expect(() => apply(target, source)).toThrow(/safely sanitize|unsupported|callable/iu);
+      expect(getterCalls).toBe(1);
+      expect(target).toEqual({ original: true });
+    },
+  );
+
+  test('merge snapshots recursive collision getters before mutating the caller target', () => {
+    const unsafe = new Date('2026-08-18T00:00:00.000Z');
+    Object.defineProperty(unsafe, '__proto__', {
+      configurable: true,
+      enumerable: true,
+      value: { polluted: true },
+    });
+    let getterCalls = 0;
+    const child = { existing: true };
+    const target = { child };
+    const source = {
+      first: 'must not commit',
+      child: {
+        get unsafe() {
+          getterCalls += 1;
+          return unsafe;
+        },
+      },
+    };
+
+    expect(() => merge(target, source)).toThrow(/safely sanitize|unsupported|callable/iu);
+    expect(getterCalls).toBe(1);
+    expect(Object.keys(target)).toEqual(['child']);
+    expect(target.child).toBe(child);
+    expect(child).toEqual({ existing: true });
+  });
+
+  test.each(graphOperations)(
+    '$name leaves the caller target untouched when a descriptor trap fails',
+    ({ apply }) => {
+      const unsafe = new Proxy(
+        {},
+        {
+          ownKeys() {
+            throw new Error('descriptor inspection failed');
+          },
+        },
+      );
+      const target = { original: true };
+
+      expect(() => apply(target, { first: 'must not commit', unsafe })).toThrow(
+        'descriptor inspection failed',
+      );
+      expect(target).toEqual({ original: true });
+    },
+  );
+
+  test.each(graphOperations)(
+    '$name leaves the caller target untouched when the traversal budget is exceeded',
+    ({ apply }) => {
+      const oversized: Record<string, unknown> = {};
+      for (let index = 0; index <= 10_000; index += 1) {
+        oversized[`value-${index}`] = index;
+      }
+      const target = { original: true };
+
+      expect(() => apply(target, { first: 'must not commit', oversized })).toThrow(
+        /adopted record|traversal|limit/iu,
+      );
+      expect(target).toEqual({ original: true });
+    },
+  );
+
+  test.each(graphOperations)('$name preserves safe inherited instances with mutable fields', ({ apply }) => {
+    const instance = Object.assign(
+      Object.create({
+        getValue() {
+          return true;
+        },
+      }),
+      { child: { safe: true } },
+    );
+    const date = Object.assign(new Date('2026-08-18T00:00:00.000Z'), { child: { safe: true } });
+    const callable = Object.assign(() => true, { child: { safe: true } });
+    const result = apply({}, { instance, date, callable });
+
+    expect(result.instance).toBe(instance);
+    expect(result.instance.getValue()).toBe(true);
+    expect(result.date).toBe(date);
+    expect(result.date.toISOString()).toBe('2026-08-18T00:00:00.000Z');
+    expect(result.callable).toBe(callable);
+    expect(result.callable()).toBe(true);
+    expect(result.instance.child).toBe(instance.child);
+    expect(result.date.child).toBe(date.child);
+    expect(result.callable.child).toBe(callable.child);
+  });
+
+  test('merge preserves caller-owned nested target records and arrays', () => {
+    const nested = { existing: true };
+    const arrayEntry = { existing: true };
+    const array = [arrayEntry];
+    const target = { nested, array };
+
+    expect(merge(target, { nested: { added: true }, array: [{ added: true }] })).toBe(target);
+    expect(target.nested).toBe(nested);
+    expect(target.nested).toEqual({ existing: true, added: true });
+    expect(target.array).toBe(array);
+    expect(target.array[0]).toBe(arrayEntry);
+    expect(target.array[0]).toEqual({ existing: true, added: true });
+  });
+
+  test.each(graphOperations)('$name preserves sealed, non-extensible, and frozen integrity', ({ apply }) => {
+    const sealed = Object.seal({ value: true });
+    const nonExtensible = Object.preventExtensions({ value: true });
+    const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}') as Record<string, unknown>;
+    const frozen = Object.freeze({ child: unsafe });
+    const result = apply({}, { sealed, nonExtensible, frozen });
+
+    expect(result.sealed).not.toBe(sealed);
+    expect(Object.isSealed(result.sealed)).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(result.sealed, 'value')?.writable).toBe(true);
+    expect(result.nonExtensible).not.toBe(nonExtensible);
+    expect(Object.isExtensible(result.nonExtensible)).toBe(false);
+    expect(Object.isSealed(result.nonExtensible)).toBe(false);
+    expect(result.frozen).not.toBe(frozen);
+    expect(Object.isFrozen(result.frozen)).toBe(true);
+    expect(has(result.frozen.child, '__proto__')).toBe(false);
   });
 
   test('preserves transitively frozen safe records without invoking their accessors', () => {

@@ -23,10 +23,15 @@ interface AdoptedRecord {
   ordinary: boolean;
   array: boolean;
   detached: boolean;
+  unsafe: boolean;
+  extensible: boolean;
 }
 
 interface MergeState {
   adopted: { target: object; key: PropertyKey }[];
+  preparedTargets: WeakMap<object, Map<PropertyKey, any>>;
+  preparedSources: WeakMap<object, WeakMap<object, object>>;
+  inspectedSources: number;
 }
 
 const maxAdoptedRecords = 10_000;
@@ -72,6 +77,7 @@ function sanitizeAdoptions(state: MergeState): void {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const prototype = Object.getPrototypeOf(value);
     const array = isArray(value);
+    const extensible = Object.isExtensible(value);
     const ordinary =
       typeof value !== 'function' &&
       (array ? prototype === Array.prototype : prototype === Object.prototype || prototype === null);
@@ -82,7 +88,9 @@ function sanitizeAdoptions(state: MergeState): void {
       parents: new Set(),
       ordinary,
       array,
-      detached: ordinary && !Object.isFrozen(value),
+      detached: ordinary && (extensible || !Object.isFrozen(value)),
+      unsafe: false,
+      extensible,
     };
     records.set(value, record);
     visited.push(record);
@@ -107,7 +115,13 @@ function sanitizeAdoptions(state: MergeState): void {
       if (isUnsafePropertyKey(key)) {
         if (record.ordinary) {
           record.detached = true;
-        } else if (descriptor.enumerable) {
+          record.unsafe = true;
+        } else if (
+          typeof record.value !== 'function' ||
+          key !== 'prototype' ||
+          descriptor.enumerable ||
+          descriptor.configurable
+        ) {
           throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
         }
         continue;
@@ -124,10 +138,23 @@ function sanitizeAdoptions(state: MergeState): void {
     }
   }
 
-  for (const record of detached) {
+  const unsafe = visited.filter((record) => record.unsafe);
+  for (const record of unsafe) {
     for (const parent of record.parents) {
       if (!parent.ordinary) {
         throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+      }
+      if (!parent.unsafe) {
+        parent.unsafe = true;
+        unsafe.push(parent);
+      }
+    }
+  }
+
+  for (const record of detached) {
+    for (const parent of record.parents) {
+      if (!parent.ordinary) {
+        continue;
       }
       if (!parent.detached) {
         parent.detached = true;
@@ -160,6 +187,102 @@ function sanitizeAdoptions(state: MergeState): void {
       Object.defineProperty(copies.get(target) ?? target, key, { ...descriptor, value });
     }
   }
+
+  for (const record of detached) {
+    if (!record.extensible) {
+      Object.preventExtensions(copies.get(record.value));
+    }
+  }
+}
+
+function readPreparedTarget(state: MergeState, target: any, key: PropertyKey): any {
+  const prepared = state.preparedTargets.get(target);
+  if (prepared?.has(key)) {
+    const value = prepared.get(key);
+    prepared.delete(key);
+    return value;
+  }
+  return target[key];
+}
+
+function previewTarget(state: MergeState, target: object, key: PropertyKey): any {
+  const descriptor = Object.getOwnPropertyDescriptor(target, key);
+  if (descriptor && 'value' in descriptor) {
+    return descriptor.value;
+  }
+
+  const value = Reflect.get(target, key, target);
+  let prepared = state.preparedTargets.get(target);
+  if (!prepared) {
+    prepared = new Map();
+    state.preparedTargets.set(target, prepared);
+  }
+  prepared.set(key, value);
+  return value;
+}
+
+function prepareMergeSource(target: any, source: any, state: MergeState, assign = false): any {
+  if (!source || typeof source !== 'object' || !target || typeof target !== 'object') {
+    return source;
+  }
+
+  let preparedTargets = state.preparedSources.get(source);
+  if (!preparedTargets) {
+    preparedTargets = new WeakMap();
+    state.preparedSources.set(source, preparedTargets);
+  }
+  const existing = preparedTargets.get(target);
+  if (existing) {
+    return existing;
+  }
+  state.inspectedSources += 1;
+  if (state.inspectedSources > maxAdoptedRecords) {
+    throw new Error('Adopted record traversal exceeds the supported safety limit.');
+  }
+
+  const sourceIsArray = isArray(source);
+  const prepared: Record<string, any> = sourceIsArray ? [] : Object.create(null);
+  preparedTargets.set(target, prepared);
+
+  if (isArray(target) && sourceIsArray && !assign) {
+    const sourceLength = source.length;
+    (prepared as any[]).length = sourceLength;
+    for (let index = 0; index < sourceLength; index += 1) {
+      if (!(index in source)) {
+        continue;
+      }
+      const value = source[index];
+      if (has(target, index)) {
+        const targetValue = previewTarget(state, target, index);
+        prepared[index] =
+          targetValue && typeof targetValue === 'object' && value && typeof value === 'object'
+            ? prepareMergeSource(targetValue, value, state)
+            : value;
+      } else {
+        prepared[index] = value;
+      }
+    }
+    return prepared;
+  }
+
+  for (const key of Object.keys(source)) {
+    if (isUnsafePropertyKey(key)) {
+      continue;
+    }
+    const value = source[key];
+    prepared[key] =
+      !assign && has(target, key) && value && typeof value === 'object'
+        ? prepareMergeSource(previewTarget(state, target, key), value, state)
+        : value;
+  }
+  return prepared;
+}
+
+function prepareSource(target: any, source: any, state: MergeState, assign = false): any {
+  const holder = { value: prepareMergeSource(target, source, state, assign) };
+  rememberAdoption(state, holder, 'value', holder.value);
+  sanitizeAdoptions(state);
+  return holder.value;
 }
 
 const hex_table = /* @__PURE__ */ (() => {
@@ -235,11 +358,7 @@ function mergeWithState(
 
   if (!target || typeof target !== 'object') {
     // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
-    const combined = [target].concat(source);
-    for (const [index, item] of combined.entries()) {
-      rememberAdoption(state, combined, index, item);
-    }
-    return combined;
+    return [target].concat(source);
   }
 
   let mergeTarget = target;
@@ -254,20 +373,17 @@ function mergeWithState(
       if (i in source) {
         const item = source[i];
         if (has(target, i)) {
-          const targetItem = target[i];
+          const targetItem = readPreparedTarget(state, target, i);
           if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
             const merged = mergeWithState(targetItem, item, options, state);
             target[i] = merged;
-            rememberAdoption(state, target, i, merged);
           } else {
             const adopted = item;
             target.push(adopted);
-            rememberAdoption(state, target, target.length - 1, adopted);
           }
         } else {
           const adopted = item;
           target[i] = adopted;
-          rememberAdoption(state, target, i, adopted);
         }
       }
     }
@@ -279,9 +395,10 @@ function mergeWithState(
       continue;
     }
     const value = source[key];
-    const adopted = has(mergeTarget, key) ? mergeWithState(mergeTarget[key], value, options, state) : value;
+    const adopted = has(mergeTarget, key)
+      ? mergeWithState(readPreparedTarget(state, mergeTarget, key), value, options, state)
+      : value;
     mergeTarget[key] = adopted;
-    rememberAdoption(state, mergeTarget, key, adopted);
   }
   return mergeTarget;
 }
@@ -291,23 +408,29 @@ export function merge(
   source: any,
   options: { plainObjects?: boolean; allowPrototypes?: boolean } = {},
 ) {
-  const state: MergeState = { adopted: [] };
-  const result = mergeWithState(target, source, options, state);
-  sanitizeAdoptions(state);
-  return result;
+  const state: MergeState = {
+    adopted: [],
+    preparedTargets: new WeakMap(),
+    preparedSources: new WeakMap(),
+    inspectedSources: 0,
+  };
+  return mergeWithState(target, prepareSource(target, source, state), options, state);
 }
 
 export function assign_single_source(target: any, source: any) {
-  const state: MergeState = { adopted: [] };
-  for (const key of Object.keys(source)) {
+  const state: MergeState = {
+    adopted: [],
+    preparedTargets: new WeakMap(),
+    preparedSources: new WeakMap(),
+    inspectedSources: 0,
+  };
+  const prepared = prepareSource(target, source, state, true);
+  for (const key of Object.keys(prepared)) {
     if (isUnsafePropertyKey(key)) {
       continue;
     }
-    const value = source[key];
-    target[key] = value;
-    rememberAdoption(state, target, key, value);
+    target[key] = prepared[key];
   }
-  sanitizeAdoptions(state);
   return target;
 }
 
