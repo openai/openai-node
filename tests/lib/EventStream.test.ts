@@ -445,6 +445,91 @@ describe('EventStream.events', () => {
 
 describe('EventStream iterator buffer limits', () => {
   test.each([
+    { name: 'local Date', create: () => new Date(1_725_000_000_000) },
+    { name: 'cross-realm Date', create: () => runInNewContext('new Date(1725000000000)') as Date },
+  ])('preserves a buffered genuine $name and its exact identity', async ({ create }) => {
+    const payload = create();
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(payload);
+    expect(Date.prototype.getTime.call(payload)).toBe(1_725_000_000_000);
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test.each([
+    { name: 'local', create: () => Object.create(Date.prototype) as Date },
+    { name: 'cross-realm', create: () => runInNewContext('Object.create(Date.prototype)') as Date },
+  ])('rejects a $name Date-prototype spoof without genuine timestamp storage', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(create());
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each(['accessor', 'callable'] as const)(
+    'rejects a custom genuine Date prototype %s without invoking it',
+    async (kind) => {
+      const payload = runInNewContext('new Date(123)') as Date;
+      const inspectRetained = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+      Object.defineProperty(
+        prototype,
+        'retained',
+        kind === 'accessor' ? { get: inspectRetained } : { value: inspectRetained },
+      );
+      Object.setPrototypeOf(payload, prototype);
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(inspectRetained).not.toHaveBeenCalled();
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test.each([
+    { name: 'local', create: () => new Date(123) },
+    { name: 'cross-realm', create: () => runInNewContext('new Date(123)') as Date },
+  ])('charges oversized custom prototype data on a genuine $name Date', async ({ create }) => {
+    const payload = create();
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
+    Object.setPrototypeOf(payload, prototype);
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(payload);
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('preserves safe custom Date prototype data and buffered identity', async () => {
+    const payload = runInNewContext('new Date(123)') as Date;
+    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    Object.defineProperty(prototype, 'safe', { value: 'small retained data' });
+    Object.setPrototypeOf(payload, prototype);
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(payload);
+
+    const result = await iterator.next();
+    expect(result.value?.[0]).toBe(payload);
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+  test.each([
     { name: 'local Headers', create: () => new Headers([['x-safe', 'small']]) },
     {
       name: 'injected-realm Headers',

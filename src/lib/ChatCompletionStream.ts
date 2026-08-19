@@ -661,6 +661,8 @@ type ChatCompletionInputTool = NonNullable<ChatCompletionCreateParams['tools']>[
 type ChatCompletionResponseFormat = NonNullable<ChatCompletionCreateParams['response_format']>;
 
 interface SerializedFunctionParserConfig {
+  source: ChatCompletionInputTool | undefined;
+  schemaMatches: boolean;
   name?: string;
   strict?: boolean;
 }
@@ -673,7 +675,243 @@ interface SerializedToolParserConfig {
 
 interface SerializedResponseParserConfig {
   source: ChatCompletionResponseFormat | undefined;
+  schemaMatches: boolean;
   type?: string;
+}
+
+interface SerializedParserSchemaBudget {
+  nodes: number;
+  bytes: number;
+}
+
+const MAX_SERIALIZED_PARSER_SCHEMA_NODES = 4096;
+const MAX_SERIALIZED_PARSER_SCHEMA_BYTES = 1024 * 1024;
+const MAX_SERIALIZED_PARSER_SCHEMA_DEPTH = 64;
+const OMITTED_SERIALIZED_PARSER_VALUE = Symbol('omitted serialized parser value');
+const UNSAFE_SERIALIZED_PARSER_VALUE = Symbol('unsafe serialized parser value');
+
+type CanonicalSerializedParserValue =
+  | string
+  | typeof OMITTED_SERIALIZED_PARSER_VALUE
+  | typeof UNSAFE_SERIALIZED_PARSER_VALUE;
+
+function canonicalSerializedParserSchema(
+  value: unknown,
+  budget: SerializedParserSchemaBudget,
+): string | undefined {
+  const ancestors = new WeakSet<object>();
+
+  const charge = (bytes: number): boolean => {
+    if (
+      !Number.isSafeInteger(bytes) ||
+      bytes < 0 ||
+      budget.bytes + bytes > MAX_SERIALIZED_PARSER_SCHEMA_BYTES
+    ) {
+      return false;
+    }
+    budget.bytes += bytes;
+    return true;
+  };
+
+  const visit = (current: unknown, depth: number): CanonicalSerializedParserValue => {
+    if (depth > MAX_SERIALIZED_PARSER_SCHEMA_DEPTH || budget.nodes >= MAX_SERIALIZED_PARSER_SCHEMA_NODES) {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+    budget.nodes += 1;
+
+    if (current === undefined || typeof current === 'function' || typeof current === 'symbol') {
+      return OMITTED_SERIALIZED_PARSER_VALUE;
+    }
+    if (typeof current === 'bigint') {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+    if (current === null || typeof current === 'boolean' || typeof current === 'number') {
+      const serialized = JSON.stringify(current);
+      return typeof serialized === 'string' && charge(serialized.length)
+        ? serialized
+        : UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+    if (typeof current === 'string') {
+      if (!charge(current.length * 6 + 2)) {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+      return JSON.stringify(current);
+    }
+    if (typeof current !== 'object' || ancestors.has(current)) {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+
+    const array = Array.isArray(current);
+    const prototype = Object.getPrototypeOf(current) as object | null;
+    if (
+      (array && prototype !== Array.prototype) ||
+      (!array && prototype !== null && prototype !== Object.prototype)
+    ) {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+
+    for (
+      let owner: object | null = current;
+      owner !== null;
+      owner = Object.getPrototypeOf(owner) as object | null
+    ) {
+      const serializer = Object.getOwnPropertyDescriptor(owner, 'toJSON');
+      if (!serializer) {
+        continue;
+      }
+      if (!('value' in serializer) || typeof serializer.value === 'function') {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+      break;
+    }
+
+    ancestors.add(current);
+    try {
+      if (!charge(2)) {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+
+      if (array) {
+        const lengthDescriptor = Object.getOwnPropertyDescriptor(current, 'length');
+        const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+        if (
+          typeof length !== 'number' ||
+          !Number.isSafeInteger(length) ||
+          length < 0 ||
+          length > MAX_SERIALIZED_PARSER_SCHEMA_NODES - budget.nodes
+        ) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+
+        const items: string[] = [];
+        for (let index = 0; index < length; index += 1) {
+          const key = String(index);
+          const descriptor = Object.getOwnPropertyDescriptor(current, key);
+          if (!descriptor) {
+            if (
+              Object.getOwnPropertyDescriptor(Array.prototype, key) ||
+              Object.getOwnPropertyDescriptor(Object.prototype, key)
+            ) {
+              return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            budget.nodes += 1;
+            if (!charge(4)) {
+              return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            items.push('null');
+            continue;
+          }
+          if (!('value' in descriptor)) {
+            return UNSAFE_SERIALIZED_PARSER_VALUE;
+          }
+
+          const item = visit(descriptor.value, depth + 1);
+          if (item === UNSAFE_SERIALIZED_PARSER_VALUE) {
+            return item;
+          }
+          items.push(item === OMITTED_SERIALIZED_PARSER_VALUE ? 'null' : item);
+        }
+        return `[${items.join(',')}]`;
+      }
+
+      const keys = Reflect.ownKeys(current);
+      if (keys.length > MAX_SERIALIZED_PARSER_SCHEMA_NODES - budget.nodes) {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+
+      const entries: [string, unknown][] = [];
+      for (const key of keys) {
+        if (typeof key !== 'string') {
+          continue;
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(current, key);
+        if (!descriptor) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        if (!descriptor.enumerable) {
+          continue;
+        }
+        if (!('value' in descriptor)) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        entries.push([key, descriptor.value]);
+      }
+      entries.sort(([left], [right]) => {
+        if (left === right) {
+          return 0;
+        }
+        return left < right ? -1 : 1;
+      });
+
+      const fields: string[] = [];
+      for (const [key, entry] of entries) {
+        const normalized = visit(entry, depth + 1);
+        if (normalized === UNSAFE_SERIALIZED_PARSER_VALUE) {
+          return normalized;
+        }
+        if (normalized === OMITTED_SERIALIZED_PARSER_VALUE) {
+          continue;
+        }
+        if (!charge(key.length * 6 + 3)) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        fields.push(`${JSON.stringify(key)}:${normalized}`);
+      }
+      return `{${fields.join(',')}}`;
+    } finally {
+      ancestors.delete(current);
+    }
+  };
+
+  try {
+    const normalized = visit(value, 0);
+    return typeof normalized === 'string' ? normalized : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function rememberSerializedParserSchema(
+  signatures: WeakMap<object, string>,
+  source: object,
+  holder: object,
+  key: string,
+  budget: SerializedParserSchemaBudget,
+): void {
+  const parser = Object.getOwnPropertyDescriptor(source, '$parseRaw');
+  const schema = Object.getOwnPropertyDescriptor(holder, key);
+  if (
+    !parser ||
+    !('value' in parser) ||
+    typeof parser.value !== 'function' ||
+    !schema ||
+    !('value' in schema)
+  ) {
+    return;
+  }
+
+  const normalized = canonicalSerializedParserSchema(schema.value, budget);
+  if (normalized !== undefined) {
+    signatures.set(source, normalized);
+  }
+}
+
+function hasMatchingSerializedParserSchema(
+  signatures: WeakMap<object, string>,
+  source: object | undefined,
+  holder: object,
+  key: string,
+  value: unknown,
+  budget: SerializedParserSchemaBudget,
+): boolean {
+  const expected = source && signatures.get(source);
+  const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+  return (
+    expected !== undefined &&
+    descriptor !== undefined &&
+    'value' in descriptor &&
+    canonicalSerializedParserSchema(value, budget) === expected
+  );
 }
 
 function serializedParserDescriptor(
@@ -723,6 +961,11 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
     descriptor,
     Object.create(Object.getPrototypeOf(original), functionDescriptors),
   );
+  if (!serialized.function.schemaMatches) {
+    delete descriptors['$brand'];
+    delete descriptors['$parseRaw'];
+    delete descriptors['$callback'];
+  }
 
   return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
 }
@@ -733,7 +976,7 @@ function snapshotSerializedResponseFormat(
   const source = serialized.source ?? ({ type: serialized.type } as ChatCompletionResponseFormat);
   const descriptors = Object.getOwnPropertyDescriptors(source);
   descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
-  if (serialized.type !== 'json_schema' || !serialized.source) {
+  if (serialized.type !== 'json_schema' || !serialized.source || !serialized.schemaMatches) {
     delete descriptors['$brand'];
     delete descriptors['$parseRaw'];
   }
@@ -755,15 +998,37 @@ function observeSerializedChatCompletionParserParams(
   update: (params: ChatCompletionCreateParams) => void,
 ): () => void {
   const originalToolOwners = new WeakMap<object, ChatCompletionInputTool>();
+  const originalSchemaSignatures = new WeakMap<object, string>();
+  const originalSchemaBudget: SerializedParserSchemaBudget = { nodes: 0, bytes: 0 };
   if (body.tools) {
     for (let index = 0; index < body.tools.length && index < MAX_STREAM_TOOL_CALLS; index += 1) {
       const owner = ownSerializedParserObject(body.tools, String(index));
       const source = initial.tools?.[index];
       if (owner && source) {
         originalToolOwners.set(owner, source);
+        const originalFunction = ownSerializedParserObject(source, 'function');
+        if (originalFunction) {
+          rememberSerializedParserSchema(
+            originalSchemaSignatures,
+            source,
+            originalFunction,
+            'parameters',
+            originalSchemaBudget,
+          );
+        }
       }
     }
   }
+  if (initial.response_format) {
+    rememberSerializedParserSchema(
+      originalSchemaSignatures,
+      initial.response_format,
+      initial.response_format,
+      'json_schema',
+      originalSchemaBudget,
+    );
+  }
+  let serializedSchemaBudget: SerializedParserSchemaBudget = { nodes: 0, bytes: 0 };
   let root: object | undefined;
   let tools: object | undefined;
   let responseFormat: object | undefined;
@@ -776,6 +1041,7 @@ function observeSerializedChatCompletionParserParams(
     value(holder, key, value) {
       if (!root && key === '' && typeof value === 'object' && value !== null) {
         root = value;
+        serializedSchemaBudget = { nodes: 0, bytes: 0 };
         tools = undefined;
         responseFormat = undefined;
         responseFrame = undefined;
@@ -789,7 +1055,10 @@ function observeSerializedChatCompletionParserParams(
         if (typeof value === 'object' && value !== null) {
           responseFormat = value;
           const owner = ownSerializedParserObject(holder, key);
-          responseFrame = { source: owner === body.response_format ? initial.response_format : undefined };
+          responseFrame = {
+            source: owner === body.response_format ? initial.response_format : undefined,
+            schemaMatches: false,
+          };
         }
         return;
       }
@@ -825,15 +1094,26 @@ function observeSerializedChatCompletionParserParams(
         if (key === 'type' && typeof value === 'string') {
           tool.type = value;
         } else if (key === 'function' && typeof value === 'object' && value !== null) {
-          const fn: SerializedFunctionParserConfig = {};
+          const fn: SerializedFunctionParserConfig = { source: tool.source, schemaMatches: false };
           tool.function = fn;
           functionFrames.set(value, fn);
         }
         return;
       }
 
-      if (holder === responseFormat && key === 'type' && typeof value === 'string' && responseFrame) {
-        responseFrame.type = value;
+      if (holder === responseFormat && responseFrame) {
+        if (key === 'type' && typeof value === 'string') {
+          responseFrame.type = value;
+        } else if (key === 'json_schema') {
+          responseFrame.schemaMatches = hasMatchingSerializedParserSchema(
+            originalSchemaSignatures,
+            responseFrame.source,
+            holder,
+            key,
+            value,
+            serializedSchemaBudget,
+          );
+        }
         return;
       }
 
@@ -843,6 +1123,15 @@ function observeSerializedChatCompletionParserParams(
           fn.name = value;
         } else if (key === 'strict' && typeof value === 'boolean') {
           fn.strict = value;
+        } else if (key === 'parameters') {
+          fn.schemaMatches = hasMatchingSerializedParserSchema(
+            originalSchemaSignatures,
+            fn.source,
+            holder,
+            key,
+            value,
+            serializedSchemaBudget,
+          );
         }
       }
     },
@@ -1639,13 +1928,15 @@ export class ChatCompletionStream<ParsedT = null>
                 this.#params?.tools?.find(
                   (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === identity.name,
                 );
-              if (identity && configuredTool) {
+              if (identity) {
                 boundIdentity = {
                   ...identity,
-                  parseable: shouldParseToolCall(this.#params, {
-                    type: identity.type,
-                    function: { name: identity.name },
-                  }),
+                  parseable:
+                    configuredTool !== undefined &&
+                    shouldParseToolCall(this.#params, {
+                      type: identity.type,
+                      function: { name: identity.name },
+                    }),
                 };
                 eventState.tool_call_identities.set(index, boundIdentity);
                 if (!boundIdentity.parseable) {

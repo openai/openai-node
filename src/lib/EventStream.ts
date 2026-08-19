@@ -39,6 +39,7 @@ const typedArrayLengthGetter = Object.getOwnPropertyDescriptor(
 )?.get;
 const dataViewBufferGetter = Object.getOwnPropertyDescriptor(DataView.prototype, 'buffer')?.get;
 const symbolDescriptionGetter = Object.getOwnPropertyDescriptor(Symbol.prototype, 'description')?.get;
+const dateTimestampGetter = Date.prototype.getTime;
 const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
 const sharedArrayBufferByteLengthGetter =
   typeof SharedArrayBuffer === 'function'
@@ -54,6 +55,7 @@ const nativeErrorBrand =
     ? (errorBrandDescriptor.value as (value: unknown) => boolean)
     : undefined;
 const nativeErrorConstructorSource = functionToString.call(Error);
+const nativeDateConstructorSource = functionToString.call(Date);
 const nativeFunctionConstructorSource = functionToString.call(Function);
 const trustedIntrinsicPrototypes = new Set<object>([
   APIConnectionError.prototype,
@@ -150,6 +152,7 @@ for (const constructor of [
   Object,
   Function,
   Array,
+  Date,
   Map,
   Set,
   ArrayBuffer,
@@ -239,6 +242,7 @@ const retainedStorageBrands = new Set([
   'Blob',
   'File',
   'Map',
+  'Date',
   'Set',
   'Headers',
 ]);
@@ -445,7 +449,7 @@ function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescript
 
 type RetainedStorage = {
   bytes: number;
-  kind: 'typed-array' | 'data-view' | 'buffer' | 'blob' | 'map' | 'set' | 'headers';
+  kind: 'typed-array' | 'data-view' | 'buffer' | 'blob' | 'map' | 'date' | 'set' | 'headers';
 };
 
 type EventQueue<Value> = {
@@ -496,6 +500,22 @@ function getRetainedStorageBrand(current: object): string | undefined {
   let prototype = Object.getPrototypeOf(current) as object | null;
 
   for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
+    if (prototype === Date.prototype) {
+      return 'Date';
+    }
+    if (!trustedIntrinsicPrototypes.has(prototype)) {
+      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+      if (
+        constructor &&
+        'value' in constructor &&
+        typeof constructor.value === 'function' &&
+        functionToString.call(constructor.value) === nativeDateConstructorSource &&
+        getTrustedForeignIntrinsic(prototype)
+      ) {
+        return 'Date';
+      }
+    }
+
     const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag);
     if (
       descriptor &&
@@ -560,6 +580,10 @@ function estimateRetainedBufferBytes(
     }
     case 'Map': {
       return { bytes: 0, kind: 'map' };
+    }
+    case 'Date': {
+      Reflect.apply(dateTimestampGetter, current, []);
+      return { bytes: 8, kind: 'date' };
     }
     case 'Set': {
       return { bytes: 0, kind: 'set' };

@@ -540,6 +540,264 @@ it('keeps a genuinely serialized non-strict tool above the structured byte limit
   expect(serialize).toHaveBeenCalledTimes(1);
 });
 
+it.each(['tool', 'function'] as const)(
+  'drops a branded parser when the owning %s serializer changes its parameter schema',
+  async (location) => {
+    const parser = vi.fn(() => {
+      throw new Error('stale tool parser must not run');
+    });
+    const callback = vi.fn();
+    const tool = makeParseableTool(strictTool, { parser, callback });
+    const wireParameters = { type: 'object', properties: { wire: { type: 'number' } } };
+    const serialize = vi.fn(() =>
+      location === 'tool'
+        ? { type: 'function', function: { ...tool.function, parameters: wireParameters } }
+        : { ...tool.function, parameters: wireParameters },
+    );
+    Object.defineProperty(location === 'tool' ? tool : tool.function, 'toJSON', {
+      configurable: true,
+      value: serialize,
+    });
+    const argumentsJSON = '{"wire":42}';
+    const client = createSerializedClient(argumentFragments([argumentsJSON]), (body) => {
+      expect(JSON.parse(body)).toMatchObject({
+        tools: [{ function: { name: strictTool.function.name, parameters: wireParameters } }],
+      });
+    });
+
+    const completion = await ChatCompletionStream.createChatCompletion(client, {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Do not retain a parser for the changed tool schema' }],
+      tools: [tool],
+    }).finalChatCompletion();
+
+    expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+      function: { parsed_arguments: { wire: 42 } },
+    });
+    expect(parser).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+    expect(serialize).toHaveBeenCalledTimes(1);
+  },
+);
+
+it.each(['removed', 'accessor', 'serializer', 'oversized', 'cyclic source'] as const)(
+  'drops branded ownership for an unsafe %s tool parameter schema without repeating hooks',
+  async (kind) => {
+    const parser = vi.fn(() => {
+      throw new Error('unsafe tool parser must not run');
+    });
+    const callback = vi.fn();
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+    const source =
+      kind === 'cyclic source'
+        ? { ...strictTool, function: { ...strictTool.function, parameters: circular } }
+        : strictTool;
+    const tool = makeParseableTool(source, { parser, callback });
+    const inspectSchema = vi.fn(() => ({ type: 'string' }));
+    const nested: Record<string, unknown> = {};
+    if (kind === 'accessor') {
+      Object.defineProperty(nested, 'value', { enumerable: true, get: inspectSchema });
+    } else if (kind === 'serializer') {
+      Object.defineProperty(nested, 'toJSON', { configurable: true, value: inspectSchema });
+    }
+    const parameters =
+      kind === 'oversized'
+        ? Object.fromEntries(Array.from({ length: 4097 }, (_, index) => [`field${index}`, index]))
+        : { type: 'object', properties: kind === 'accessor' || kind === 'serializer' ? nested : {} };
+    const serialize = vi.fn(() => ({
+      type: 'function',
+      function: {
+        name: strictTool.function.name,
+        strict: true,
+        ...(kind === 'removed' ? {} : { parameters }),
+      },
+    }));
+    Object.defineProperty(tool, 'toJSON', { configurable: true, value: serialize });
+
+    const completion = await ChatCompletionStream.createChatCompletion(
+      createSerializedClient(argumentFragments(['{"wire":42}']), () => {}),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Reject unprovable parser schema ownership' }],
+        tools: [tool],
+      },
+    ).finalChatCompletion();
+
+    expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+      function: { parsed_arguments: { wire: 42 } },
+    });
+    expect(parser).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+    expect(inspectSchema).toHaveBeenCalledTimes(kind === 'accessor' || kind === 'serializer' ? 1 : 0);
+    expect(serialize).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('preserves a branded tool parser for an equivalent reordered canonical wire schema', async () => {
+  const parser = vi.fn((value: string) => ({ owned: JSON.parse(value) as unknown }));
+  const callback = vi.fn();
+  const required = ['ignored', 'value'];
+  Reflect.deleteProperty(required, '0');
+  const tool = makeParseableTool(
+    {
+      ...strictTool,
+      function: {
+        ...strictTool.function,
+        parameters: {
+          type: 'object',
+          ignored: undefined,
+          required,
+          properties: { value: { type: 'string' } },
+        },
+      },
+    },
+    { parser, callback },
+  );
+  const serialize = vi.fn(() => ({
+    type: 'function',
+    function: {
+      ...tool.function,
+      parameters: {
+        properties: { value: { type: 'string' } },
+        required: [null, 'value'],
+        type: 'object',
+      },
+    },
+  }));
+  Object.defineProperty(tool, 'toJSON', { configurable: true, value: serialize });
+  const argumentsJSON = '{"value":"equivalent"}';
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createSerializedClient(argumentFragments([argumentsJSON]), () => {}),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Preserve equivalent canonical schema ownership' }],
+      tools: [tool],
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { parsed_arguments: { owned: { value: 'equivalent' } } },
+  });
+  expect(parser).toHaveBeenCalledWith(argumentsJSON);
+  expect(callback).not.toHaveBeenCalled();
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+it('drops a branded response parser when its owner serializes a different nested schema', async () => {
+  const parser = vi.fn(() => {
+    throw new Error('stale response parser must not run');
+  });
+  const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+  const wireSchema = {
+    name: structuredResponseFormat.json_schema.name,
+    schema: { type: 'object', properties: { wire: { type: 'number' } } },
+  };
+  const serialize = vi.fn(() => ({ type: 'json_schema', json_schema: wireSchema }));
+  Object.defineProperty(responseFormat, 'toJSON', { configurable: true, value: serialize });
+  const client = createSerializedClient(contentFragments(['{"wire":42}']), (body) => {
+    expect(JSON.parse(body)).toMatchObject({ response_format: { json_schema: wireSchema } });
+  });
+
+  const completion = await ChatCompletionStream.createChatCompletion(client, {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Drop a response parser for the changed wire schema' }],
+    response_format: responseFormat,
+  }).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.parsed).toEqual({ wire: 42 });
+  expect(parser).not.toHaveBeenCalled();
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('preserves a branded response parser for equivalent reordered serialized schema data', async () => {
+  const parser = vi.fn((value: string) => ({ owned: JSON.parse(value) as unknown }));
+  const responseFormat = makeParseableResponseFormat(
+    {
+      type: 'json_schema',
+      json_schema: {
+        name: 'equivalent_output',
+        schema: { type: 'object', properties: { value: { type: 'string' } } },
+      },
+    },
+    parser,
+  );
+  const serialize = vi.fn(() => ({
+    type: 'json_schema',
+    json_schema: {
+      schema: { properties: { value: { type: 'string' } }, type: 'object' },
+      name: 'equivalent_output',
+    },
+  }));
+  Object.defineProperty(responseFormat, 'toJSON', { configurable: true, value: serialize });
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createSerializedClient(contentFragments(['{"value":"equivalent"}']), () => {}),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Retain the equivalent response parser' }],
+      response_format: responseFormat,
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.parsed).toEqual({ owned: { value: 'equivalent' } });
+  expect(parser).toHaveBeenCalledWith('{"value":"equivalent"}');
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('drops an ambiguous accessor-backed response schema without reading it twice', async () => {
+  const parser = vi.fn((value: string) => ({ unsafe: JSON.parse(value) as unknown }));
+  const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+  const readSchema = vi.fn(() => ({ name: 'accessor_output', schema: { type: 'object' } }));
+  const serialized = { type: 'json_schema' };
+  Object.defineProperty(serialized, 'json_schema', { enumerable: true, get: readSchema });
+  const serialize = vi.fn(() => serialized);
+  Object.defineProperty(responseFormat, 'toJSON', { configurable: true, value: serialize });
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createSerializedClient(contentFragments(['{"value":"wire"}']), () => {}),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Never read an ambiguous schema accessor twice' }],
+      response_format: responseFormat,
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.parsed).toEqual({ value: 'wire' });
+  expect(parser).not.toHaveBeenCalled();
+  expect(readSchema).toHaveBeenCalledTimes(1);
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('drops a nested accessor-backed response schema without invoking its getter twice', async () => {
+  const parser = vi.fn(() => {
+    throw new Error('ambiguous response parser must not run');
+  });
+  const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
+  const readNestedSchema = vi.fn(() => ({ type: 'number' }));
+  const properties = {};
+  Object.defineProperty(properties, 'wire', { enumerable: true, get: readNestedSchema });
+  const serialize = vi.fn(() => ({
+    type: 'json_schema',
+    json_schema: { name: structuredResponseFormat.json_schema.name, schema: { type: 'object', properties } },
+  }));
+  Object.defineProperty(responseFormat, 'toJSON', { configurable: true, value: serialize });
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createSerializedClient(contentFragments(['{"wire":42}']), () => {}),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Do not repeat nested schema getters' }],
+      response_format: responseFormat,
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.parsed).toEqual({ wire: 42 });
+  expect(parser).not.toHaveBeenCalled();
+  expect(readNestedSchema).toHaveBeenCalledTimes(1);
+  expect(serialize).toHaveBeenCalledTimes(1);
+});
+
 it('preserves the branded parser identity while a tool.toJSON changes its dispatched name', async () => {
   const parser = vi.fn((value: string) => JSON.parse(value) as { value: string });
   const callback = vi.fn();
@@ -1079,6 +1337,156 @@ it.each(['content', 'tool'] as const)(
     }
   },
 );
+it.each(['byte', 'depth', 'fragment'] as const)(
+  'does not budget an identified unconfigured tool beyond the structured %s limit',
+  async (limit) => {
+    const parse = vi.spyOn(partialJSONParser, 'partialParse');
+    const unmatchedName = 'provider_unconfigured_tool';
+    const completion = await ChatCompletionStream.createChatCompletion(
+      createClient(namedArgumentFragments(unmatchedName, overStructuredLimit(limit))),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Leave identified provider-only tools unparsed' }],
+        tools: [strictTool],
+      },
+    ).finalChatCompletion();
+
+    const call = completion.choices[0]?.message.tool_calls?.[0];
+    expect(call?.type).toBe('function');
+    if (call?.type === 'function') {
+      expect(call.function.name).toBe(unmatchedName);
+      expect(call.function.arguments.length).toBeGreaterThan(0);
+      expect(call.function.parsed_arguments).toBeNull();
+    }
+    expect(parse).not.toHaveBeenCalled();
+  },
+);
+
+it('rejects a configured-name change after binding an unconfigured tool identity', async () => {
+  async function* changedUnconfiguredIdentity(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_unconfigured',
+          type: 'function',
+          function: { name: 'provider_unconfigured_tool', arguments: '{"safe":' },
+        },
+      ],
+    });
+    yield chunk({
+      tool_calls: [{ index: 0, function: { name: strictTool.function.name, arguments: 'true}' } }],
+    });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const stream = ChatCompletionStream.createChatCompletion(createClient(changedUnconfiguredIdentity()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Keep a bound unconfigured tool identity immutable' }],
+    tools: [strictTool],
+  });
+
+  await expect(stream.finalChatCompletion()).rejects.toThrow(/tool call identity/u);
+});
+
+it('refunds provisional unmatched argument bytes before parsing another strict tool', async () => {
+  const provisional = 'a'.repeat(8 * 1024 * 1024);
+  const structured = 'b'.repeat(9 * 1024 * 1024);
+  const unmatchedName = 'provider_unconfigured_tool';
+
+  async function* mixedDelayedIdentities(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      tool_calls: [{ index: 0, function: { arguments: `{"value":"${provisional}` } }],
+    });
+    yield chunk({
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_unconfigured',
+          type: 'function',
+          function: { name: unmatchedName, arguments: '"}' },
+        },
+      ],
+    });
+    yield chunk({
+      tool_calls: [
+        {
+          index: 1,
+          id: 'call_strict',
+          type: 'function',
+          function: {
+            name: strictTool.function.name,
+            arguments: `{"value":"${structured}"}`,
+          },
+        },
+      ],
+    });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const completion = await ChatCompletionStream.createChatCompletion(createClient(mixedDelayedIdentities()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Refund the provisional unmatched-tool budget' }],
+    tools: [strictTool],
+  }).finalChatCompletion();
+
+  const unmatchedCall = completion.choices[0]?.message.tool_calls?.[0];
+  const boundedCall = completion.choices[0]?.message.tool_calls?.[1];
+  expect(unmatchedCall?.type === 'function' ? unmatchedCall.function.parsed_arguments : undefined).toBeNull();
+  expect(boundedCall?.type === 'function' ? boundedCall.function.parsed_arguments : undefined).toEqual({
+    value: structured,
+  });
+});
+
+it('refunds provisional unmatched fragments before parsing another strict tool', async () => {
+  async function* mixedDelayedFragments(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      tool_calls: [{ index: 0, function: { arguments: '{"value":"' } }],
+    });
+    for (let index = 0; index < 40_000; index += 1) {
+      yield chunk({ tool_calls: [{ index: 0, function: { arguments: '' } }] });
+    }
+    yield chunk({
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_unconfigured',
+          type: 'function',
+          function: { name: 'provider_unconfigured_tool', arguments: '"}' },
+        },
+      ],
+    });
+    yield chunk({
+      tool_calls: [
+        {
+          index: 1,
+          id: 'call_strict',
+          type: 'function',
+          function: { name: strictTool.function.name, arguments: '{"value":"' },
+        },
+      ],
+    });
+    for (let index = 0; index < 30_000; index += 1) {
+      yield chunk({ tool_calls: [{ index: 1, function: { arguments: '' } }] });
+    }
+    yield chunk({ tool_calls: [{ index: 1, function: { arguments: '"}' } }] });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const completion = await ChatCompletionStream.createChatCompletion(createClient(mixedDelayedFragments()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Refund the unmatched provisional fragment budget exactly once' }],
+    tools: [strictTool],
+  }).finalChatCompletion();
+
+  const strictCall = completion.choices[0]?.message.tool_calls?.[1];
+  expect(strictCall?.type === 'function' ? strictCall.function.parsed_arguments : undefined).toEqual({
+    value: '',
+  });
+});
 
 it('preserves non-enumerable tool parsing brands and executable callbacks in private snapshots', async () => {
   const parser = vi.fn((content: string) => JSON.parse(content) as { value: string });
