@@ -263,11 +263,20 @@ interface ChoiceEventState {
   current_tool_call_index: number | null;
   done_tool_calls: Set<number>;
   tool_call_parse_states: Map<number, PartialJSONParseState>;
+  tool_call_identities: Map<number, ToolCallIdentity>;
+}
+
+interface ToolCallIdentity {
+  type: 'function';
+  name: string;
+  parseable: boolean;
 }
 
 interface PartialJSONParseState {
   bytes: number;
   depth: number;
+  fragments: number;
+  work: number;
   escaped: boolean;
   has_non_whitespace: boolean;
   in_string: boolean;
@@ -295,6 +304,8 @@ function createPartialJSONParseState(): PartialJSONParseState {
   return {
     bytes: 0,
     depth: 0,
+    fragments: 0,
+    work: 0,
     escaped: false,
     has_non_whitespace: false,
     in_string: false,
@@ -360,6 +371,7 @@ function recordPartialJSONFragment(
   }
 
   state.bytes += bytes;
+  state.fragments += 1;
   state.depth = depth;
   state.escaped = escaped;
   state.has_non_whitespace = hasNonWhitespace;
@@ -389,8 +401,36 @@ function reservePartialJSONParse(state: PartialJSONParseState, budget: PartialJS
   }
 
   budget.work += state.bytes;
+  state.work += state.bytes;
   state.last_parsed_bytes = state.bytes;
   return true;
+}
+
+function ownFunctionToolIdentity(
+  toolCall: PartialToolCallSnapshot,
+): Pick<ToolCallIdentity, 'type' | 'name'> | undefined {
+  const type = Object.getOwnPropertyDescriptor(toolCall, 'type');
+  const fn = Object.getOwnPropertyDescriptor(toolCall, 'function');
+  if (!type || !('value' in type) || type.value !== 'function' || !fn || !('value' in fn)) {
+    return undefined;
+  }
+  if (typeof fn.value !== 'object' || fn.value === null) {
+    return undefined;
+  }
+
+  const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
+  if (!name || !('value' in name) || typeof name.value !== 'string' || name.value.length === 0) {
+    return undefined;
+  }
+
+  return { type: 'function', name: name.value };
+}
+
+function assertBoundToolCallIdentity(toolCall: PartialToolCallSnapshot, identity: ToolCallIdentity): void {
+  const current = ownFunctionToolIdentity(toolCall);
+  if (!current || current.name !== identity.name || current.type !== identity.type) {
+    throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+  }
 }
 
 function assignOwnProperties<T extends object>(target: T, source: object): T {
@@ -552,6 +592,7 @@ export class ChatCompletionStream<ParsedT = null>
       done_tool_calls: new Set(),
       current_tool_call_index: null,
       tool_call_parse_states: new Map(),
+      tool_call_identities: new Map(),
     };
     this.#choiceEventStates[choice.index] = state;
     return state;
@@ -662,6 +703,11 @@ export class ChatCompletionStream<ParsedT = null>
     if (!toolCallSnapshot) {
       throw new Error('no tool call snapshot');
     }
+    const boundIdentity = state.tool_call_identities.get(toolCallIndex);
+    if (boundIdentity) {
+      assertBoundToolCallIdentity(toolCallSnapshot, boundIdentity);
+    }
+
     if (!toolCallSnapshot.type) {
       throw new Error('tool call snapshot missing `type`');
     }
@@ -739,6 +785,19 @@ export class ChatCompletionStream<ParsedT = null>
     const snapshot = this.#currentChatCompletionSnapshot;
     if (!snapshot) {
       throw new OpenAIError(`request ended without sending any chunks`);
+    }
+    for (const choice of snapshot.choices) {
+      if (!choice) {
+        continue;
+      }
+      const state = this.#choiceEventStates[choice.index];
+      for (const [index, identity] of state?.tool_call_identities ?? []) {
+        const toolCall = choice.message.tool_calls?.[index];
+        if (!toolCall) {
+          throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+        }
+        assertBoundToolCallIdentity(toolCall, identity);
+      }
     }
     const audioDoneChoiceIndexes = this.#audioDoneChoiceIndexes;
     this.#audioDoneChoiceIndexes = new Set();
@@ -996,6 +1055,19 @@ export class ChatCompletionStream<ParsedT = null>
           }
 
           const tool_call = (toolCallSnapshots[index] ??= {});
+          const functionName = fn?.name;
+          const eventState = this.#hasAutoParseableTool ? this.#getChoiceEventState(choice) : undefined;
+          let boundIdentity = eventState?.tool_call_identities.get(index);
+          if (boundIdentity) {
+            assertBoundToolCallIdentity(tool_call, boundIdentity);
+            if (
+              (type !== undefined && type !== boundIdentity.type) ||
+              (functionName !== undefined && functionName !== boundIdentity.name)
+            ) {
+              throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+            }
+          }
+
           assignOwnProperties(tool_call, rest);
           if (id) {
             tool_call.id = id;
@@ -1013,13 +1085,39 @@ export class ChatCompletionStream<ParsedT = null>
             }
           }
           if (fn) {
-            const functionSnapshot = (tool_call.function ??= { name: fn.name ?? '', arguments: '' });
-            if (fn.name) {
-              functionSnapshot.name = fn.name;
+            const functionSnapshot = (tool_call.function ??= { name: functionName ?? '', arguments: '' });
+            if (functionName) {
+              functionSnapshot.name = functionName;
+            }
+            if (eventState && !boundIdentity) {
+              const identity = ownFunctionToolIdentity(tool_call);
+              const configuredTool =
+                identity &&
+                this.#params?.tools?.find(
+                  (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === identity.name,
+                );
+              if (identity && configuredTool) {
+                boundIdentity = {
+                  ...identity,
+                  parseable: shouldParseToolCall(this.#params, {
+                    type: identity.type,
+                    function: { name: identity.name },
+                  }),
+                };
+                eventState.tool_call_identities.set(index, boundIdentity);
+                if (!boundIdentity.parseable) {
+                  const provisionalState = eventState.tool_call_parse_states.get(index);
+                  if (provisionalState) {
+                    this.#partialJSONParseBudget.bytes -= provisionalState.bytes;
+                    this.#partialJSONParseBudget.fragments -= provisionalState.fragments;
+                    this.#partialJSONParseBudget.work -= provisionalState.work;
+                    eventState.tool_call_parse_states.delete(index);
+                  }
+                }
+              }
             }
             if (fn.arguments != null) {
-              if (this.#hasAutoParseableTool) {
-                const eventState = this.#getChoiceEventState(choice);
+              if (eventState && boundIdentity?.parseable !== false) {
                 let parseState = eventState.tool_call_parse_states.get(index);
                 if (!parseState) {
                   parseState = createPartialJSONParseState();
@@ -1034,7 +1132,7 @@ export class ChatCompletionStream<ParsedT = null>
                 functionSnapshot.arguments += fn.arguments;
                 if (
                   shouldParse &&
-                  shouldParseToolCall(this.#params, tool_call) &&
+                  boundIdentity?.parseable === true &&
                   reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
                 ) {
                   functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);

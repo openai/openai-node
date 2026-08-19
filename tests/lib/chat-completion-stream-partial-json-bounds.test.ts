@@ -20,6 +20,15 @@ const strictTool: OpenAI.Chat.ChatCompletionFunctionTool = {
   },
 };
 
+const nonStrictTool: OpenAI.Chat.ChatCompletionFunctionTool = {
+  type: 'function',
+  function: {
+    name: 'unbounded_tool',
+    strict: false,
+    parameters: { type: 'object', properties: { value: { type: 'string' } } },
+  },
+};
+
 function createClient(chunks: AsyncIterable<Chunk>): OpenAI {
   return {
     chat: {
@@ -73,7 +82,45 @@ async function* argumentFragments(fragments: Iterable<string>): AsyncGenerator<C
   yield chunk({}, 'tool_calls');
 }
 
-async function* delayedToolIdentityFragments(fragment: string): AsyncGenerator<Chunk> {
+async function* namedArgumentFragments(name: string, fragments: Iterable<string>): AsyncGenerator<Chunk> {
+  let first = true;
+  for (const fragment of fragments) {
+    yield chunk({
+      ...(first ? { role: 'assistant' as const } : {}),
+      tool_calls: [
+        {
+          index: 0,
+          ...(first ? { id: 'call_named', type: 'function' as const } : {}),
+          function: { ...(first ? { name } : {}), arguments: fragment },
+        },
+      ],
+    });
+    first = false;
+  }
+  yield chunk({}, 'tool_calls');
+}
+
+function* overStructuredLimit(limit: 'byte' | 'depth' | 'fragment'): Generator<string> {
+  if (limit === 'byte') {
+    yield `{"value":"${'a'.repeat(17 * 1024 * 1024)}"}`;
+    return;
+  }
+  if (limit === 'depth') {
+    yield `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    return;
+  }
+
+  yield '{"value":"';
+  for (let index = 0; index < 65_536; index += 1) {
+    yield '';
+  }
+  yield '"}';
+}
+
+async function* delayedToolIdentityFragments(
+  fragment: string,
+  name = strictTool.function.name,
+): AsyncGenerator<Chunk> {
   yield chunk({
     role: 'assistant',
     tool_calls: [{ index: 0, function: { arguments: fragment } }],
@@ -84,7 +131,7 @@ async function* delayedToolIdentityFragments(fragment: string): AsyncGenerator<C
         index: 0,
         id: 'call_bounded',
         type: 'function',
-        function: { name: 'bounded_tool', arguments: '"}' },
+        function: { name, arguments: '"}' },
       },
     ],
   });
@@ -482,6 +529,253 @@ it.each(['byte', 'depth'] as const)(
       limit === 'byte' ? /structured JSON byte limit/u : /structured JSON nesting depth limit/u,
     );
     expect(parse).not.toHaveBeenCalled();
+  },
+);
+
+it.each(['byte', 'depth'] as const)(
+  'retains the %s budget until a delayed non-strict identity is actually known',
+  async (limit) => {
+    const prefix =
+      limit === 'byte' ? `{"value":"${'a'.repeat(17 * 1024 * 1024)}` : `{"value":${'['.repeat(128)}`;
+    const stream = ChatCompletionStream.createChatCompletion(
+      createClient(delayedToolIdentityFragments(prefix, nonStrictTool.function.name)),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Protect incomplete mixed-tool identities' }],
+        tools: [strictTool, nonStrictTool],
+      },
+    );
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(
+      limit === 'byte' ? /structured JSON byte limit/u : /structured JSON nesting depth limit/u,
+    );
+  },
+);
+
+it.each(['byte', 'depth', 'fragment'] as const)(
+  'does not apply the structured JSON %s budget to a known non-strict tool in a mixed request',
+  async (limit) => {
+    const parse = vi.spyOn(partialJSONParser, 'partialParse');
+    const completion = await ChatCompletionStream.createChatCompletion(
+      createClient(namedArgumentFragments(nonStrictTool.function.name, overStructuredLimit(limit))),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Keep the non-strict tool unparsed' }],
+        tools: [strictTool, nonStrictTool],
+      },
+    ).finalChatCompletion();
+
+    const call = completion.choices[0]?.message.tool_calls?.[0];
+    expect(call?.type).toBe('function');
+    if (call?.type === 'function') {
+      expect(call.function.name).toBe(nonStrictTool.function.name);
+      expect(call.function.arguments.length).toBeGreaterThan(0);
+      expect(call.function.parsed_arguments).toBeNull();
+    }
+    expect(parse).not.toHaveBeenCalled();
+  },
+);
+
+it.each(['byte', 'depth', 'fragment'] as const)(
+  'retains the structured JSON %s budget for a strict tool in a mixed request',
+  async (limit) => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      createClient(namedArgumentFragments(strictTool.function.name, overStructuredLimit(limit))),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Keep the strict tool protected' }],
+        tools: [strictTool, nonStrictTool],
+      },
+    );
+
+    const failure = await stream.finalChatCompletion().then(
+      () => 'unexpected success',
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    );
+
+    const expectedFailures = {
+      byte: /structured JSON byte limit/u,
+      depth: /structured JSON nesting depth limit/u,
+      fragment: /structured JSON fragment limit/u,
+    };
+
+    expect(failure).toMatch(expectedFailures[limit]);
+  },
+);
+
+it('retains the structured JSON budget for a branded auto-parseable non-strict tool', async () => {
+  const autoTool = makeParseableTool(
+    { ...strictTool, function: { ...strictTool.function, strict: false } },
+    { parser: (value: string) => JSON.parse(value) as unknown, callback: vi.fn() },
+  );
+  const stream = ChatCompletionStream.createChatCompletion(
+    createClient(namedArgumentFragments(autoTool.function.name, overStructuredLimit('depth'))),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Protect the branded auto-parseable tool' }],
+      tools: [autoTool, nonStrictTool],
+    },
+  );
+
+  await expect(stream.finalChatCompletion()).rejects.toThrow(/structured JSON nesting depth limit/u);
+});
+
+it('refunds provisional non-strict argument bytes before parsing another strict tool', async () => {
+  const provisional = 'a'.repeat(8 * 1024 * 1024);
+  const structured = 'b'.repeat(9 * 1024 * 1024);
+
+  async function* mixedDelayedIdentities(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      tool_calls: [{ index: 0, function: { arguments: `{"value":"${provisional}` } }],
+    });
+    yield chunk({
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_nonstrict',
+          type: 'function',
+          function: { name: nonStrictTool.function.name, arguments: '"}' },
+        },
+      ],
+    });
+    yield chunk({
+      tool_calls: [
+        {
+          index: 1,
+          id: 'call_strict',
+          type: 'function',
+          function: { name: strictTool.function.name, arguments: `{"value":"${structured}"}` },
+        },
+      ],
+    });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const completion = await ChatCompletionStream.createChatCompletion(createClient(mixedDelayedIdentities()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Refund the provisional non-strict budget' }],
+    tools: [strictTool, nonStrictTool],
+  }).finalChatCompletion();
+
+  const looseCall = completion.choices[0]?.message.tool_calls?.[0];
+  const boundedCall = completion.choices[0]?.message.tool_calls?.[1];
+  expect(looseCall?.type === 'function' ? looseCall.function.parsed_arguments : undefined).toBeNull();
+  expect(boundedCall?.type === 'function' ? boundedCall.function.parsed_arguments : undefined).toEqual({
+    value: structured,
+  });
+});
+
+it('refunds provisional non-strict fragments before parsing another strict tool', async () => {
+  async function* mixedDelayedFragments(): AsyncGenerator<Chunk> {
+    yield chunk({
+      role: 'assistant',
+      tool_calls: [{ index: 0, function: { arguments: '{"value":"' } }],
+    });
+    for (let index = 0; index < 40_000; index += 1) {
+      yield chunk({ tool_calls: [{ index: 0, function: { arguments: '' } }] });
+    }
+    yield chunk({
+      tool_calls: [
+        {
+          index: 0,
+          id: 'call_nonstrict',
+          type: 'function',
+          function: { name: nonStrictTool.function.name, arguments: '"}' },
+        },
+      ],
+    });
+    yield chunk({
+      tool_calls: [
+        {
+          index: 1,
+          id: 'call_strict',
+          type: 'function',
+          function: { name: strictTool.function.name, arguments: '{"value":"' },
+        },
+      ],
+    });
+    for (let index = 0; index < 30_000; index += 1) {
+      yield chunk({ tool_calls: [{ index: 1, function: { arguments: '' } }] });
+    }
+    yield chunk({ tool_calls: [{ index: 1, function: { arguments: '"}' } }] });
+    yield chunk({}, 'tool_calls');
+  }
+
+  const completion = await ChatCompletionStream.createChatCompletion(createClient(mixedDelayedFragments()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Refund provisional non-strict fragments' }],
+    tools: [strictTool, nonStrictTool],
+  }).finalChatCompletion();
+
+  const strictCall = completion.choices[0]?.message.tool_calls?.[1];
+  expect(strictCall?.type === 'function' ? strictCall.function.parsed_arguments : undefined).toEqual({
+    value: '',
+  });
+});
+
+it.each(['name', 'type'] as const)(
+  'rejects a %s change after binding a non-strict function-tool identity',
+  async (field) => {
+    async function* changedToolIdentity(): AsyncGenerator<Chunk> {
+      yield chunk({
+        role: 'assistant',
+        tool_calls: [
+          {
+            index: 0,
+            id: 'call_nonstrict',
+            type: 'function',
+            function: {
+              name: nonStrictTool.function.name,
+              arguments: `{"value":"${'a'.repeat(17 * 1024 * 1024)}"}`,
+            },
+          },
+        ],
+      });
+      yield chunk({
+        tool_calls: [
+          field === 'name'
+            ? { index: 0, function: { name: strictTool.function.name, arguments: '' } }
+            : { index: 0, type: 'custom', custom: { name: 'changed', input: '' } },
+        ],
+      });
+      yield chunk({}, 'tool_calls');
+    }
+
+    const stream = ChatCompletionStream.createChatCompletion(createClient(changedToolIdentity()), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Reject an identity-changing tool delta' }],
+      tools: [strictTool, nonStrictTool],
+    });
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(/tool call identity/u);
+  },
+);
+
+it.each(['name', 'type'] as const)(
+  'rejects a public snapshot %s mutation before final tool parsing',
+  async (field) => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      createClient(namedArgumentFragments(nonStrictTool.function.name, ['{}'])),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Reject public identity mutation' }],
+        tools: [strictTool, nonStrictTool],
+      },
+    );
+    stream.on('chunk', (_current, snapshot) => {
+      const toolCall = snapshot.choices[0]?.message.tool_calls?.[0];
+      if (toolCall?.type !== 'function') {
+        return;
+      }
+      if (field === 'name') {
+        toolCall.function.name = strictTool.function.name;
+      } else {
+        Object.defineProperty(toolCall, 'type', { value: 'custom' });
+      }
+    });
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow(/tool call identity/u);
   },
 );
 
