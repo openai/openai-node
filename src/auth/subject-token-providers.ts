@@ -175,7 +175,15 @@ export function azureManagedIdentityTokenProvider(
           );
         }
 
-        const data = (await response.json()) as { access_token?: string };
+        let data: { access_token?: string };
+        try {
+          data = (await response.json()) as { access_token?: string };
+        } catch (error) {
+          if (error instanceof SyntaxError) {
+            throw new SyntaxError('IMDS response contains invalid JSON');
+          }
+          throw error;
+        }
 
         if (!data.access_token) {
           throw new SubjectTokenProviderError("IMDS response missing 'access_token' field", 'azure-imds');
