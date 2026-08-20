@@ -42,10 +42,12 @@ class FakeBrowserSocket {
   readonly close = vi.fn();
   readonly url: string;
   readonly protocols: string[];
+  readonly headers: Record<string, string>;
 
-  constructor(url: string, protocols: string[]) {
+  constructor(url: string, options: string[] | { protocols: string[]; headers: Record<string, string> }) {
     this.url = url;
-    this.protocols = protocols;
+    this.protocols = Array.isArray(options) ? options : options.protocols;
+    this.headers = Array.isArray(options) ? {} : options.headers;
     FakeBrowserSocket.instances.push(this);
   }
 
@@ -263,11 +265,12 @@ describe.each([
     expect(errors).toHaveBeenCalledTimes(2);
   });
 
-  test('places Azure API keys in the URL and redacts them after opening', async () => {
+  test('sends Azure API keys in request headers and redacts the exposed URL', async () => {
     const realtime = await Realtime.azure(createAzureClient({ deployment: 'chat' }));
     const connectionURL = new URL(lastBrowserSocket().url);
 
-    expect(lastBrowserSocket().url).toContain('api-key=azure-key');
+    expect(lastBrowserSocket().headers).toEqual({ 'api-key': 'azure-key' });
+    expect(connectionURL.searchParams.has('api-key')).toBe(false);
     expect(lastBrowserSocket().protocols).not.toContain('openai-insecure-api-key.azure-key');
     expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
     expect(connectionURL.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
@@ -275,11 +278,12 @@ describe.each([
     expect(connectionURL.searchParams.has('api-version')).toBe(beta);
   });
 
-  test('places rotating Azure credentials in Authorization and redacts them', async () => {
+  test('sends rotating Azure credentials in Authorization headers and redacts the exposed URL', async () => {
     const realtime = await Realtime.azure(createAzureClient({ deployment: 'chat', tokenProvider: true }));
     const connectionURL = new URL(lastBrowserSocket().url);
 
-    expect(connectionURL.searchParams.get('Authorization')).toBe('Bearer azure-token');
+    expect(lastBrowserSocket().headers).toEqual({ Authorization: 'Bearer azure-token' });
+    expect(connectionURL.searchParams.has('Authorization')).toBe(false);
     expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
     expect(connectionURL.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
     expect(connectionURL.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
@@ -287,7 +291,7 @@ describe.each([
   });
 
   test.each(azureCredentialCases)(
-    'redacts both Azure query credentials when the URL already contains another credential with $authentication',
+    'strips and redacts existing Azure query credentials when authenticating with $authentication',
     async ({ tokenProvider, queryParameter, credential }) => {
       const existingParameter = queryParameter === 'api-key' ? 'Authorization' : 'api-key';
       const existingCredential = tokenProvider ? 'existing-gateway-key' : 'existing-gateway-token';
@@ -305,8 +309,9 @@ describe.each([
           });
       const connectionURL = new URL(lastBrowserSocket().url);
 
-      expect(connectionURL.searchParams.get(existingParameter)).toBe(existingCredential);
-      expect(connectionURL.searchParams.get(queryParameter)).toBe(credential);
+      expect(connectionURL.searchParams.has(existingParameter)).toBe(false);
+      expect(connectionURL.searchParams.has(queryParameter)).toBe(false);
+      expect(lastBrowserSocket().headers).toEqual({ [queryParameter]: credential });
       expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
       expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
       expect(realtime.url.toString()).not.toContain(existingCredential);
@@ -326,7 +331,8 @@ describe.each([
       const realtime = await Realtime.azure(client, { dangerouslyAllowBrowser: false });
 
       expect(realtime.socket).toBe(lastBrowserSocket());
-      expect(new URL(lastBrowserSocket().url).searchParams.get(queryParameter)).toBe(credential);
+      expect(lastBrowserSocket().headers).toEqual({ [queryParameter]: credential });
+      expect(new URL(lastBrowserSocket().url).searchParams.has(queryParameter)).toBe(false);
     },
   );
 
@@ -340,42 +346,37 @@ describe.each([
       vi.unstubAllGlobals();
     });
 
-    describe.each(azureCredentialCases)(
-      'with $authentication',
-      ({ tokenProvider, queryParameter, credential }) => {
-        test('rejects an explicit browser denial before opening a WebSocket', async () => {
+    describe.each(azureCredentialCases)('with $authentication', ({ tokenProvider }) => {
+      test('rejects an explicit browser denial before opening a WebSocket', async () => {
+        const client = createAzureClient({
+          deployment: 'chat',
+          tokenProvider,
+          dangerouslyAllowBrowser: true,
+        });
+
+        await expect(Realtime.azure(client, { dangerouslyAllowBrowser: false })).rejects.toThrow(OpenAIError);
+        expect(FakeBrowserSocket.instances).toHaveLength(0);
+      });
+
+      test.each([
+        { setting: 'explicitly enabled', dangerouslyAllowBrowser: true },
+        { setting: 'inherited from the client', dangerouslyAllowBrowser: undefined },
+      ])(
+        'rejects a browser WebSocket when browser access is $setting',
+        async ({ dangerouslyAllowBrowser }) => {
           const client = createAzureClient({
             deployment: 'chat',
             tokenProvider,
             dangerouslyAllowBrowser: true,
           });
 
-          await expect(Realtime.azure(client, { dangerouslyAllowBrowser: false })).rejects.toThrow(
-            OpenAIError,
-          );
+          await expect(
+            Realtime.azure(client, dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
+          ).rejects.toThrow(/request headers|authentication proxy/iu);
           expect(FakeBrowserSocket.instances).toHaveLength(0);
-        });
-
-        test.each([
-          { setting: 'explicitly enabled', dangerouslyAllowBrowser: true },
-          { setting: 'inherited from the client', dangerouslyAllowBrowser: undefined },
-        ])('opens a WebSocket when browser access is $setting', async ({ dangerouslyAllowBrowser }) => {
-          const client = createAzureClient({
-            deployment: 'chat',
-            tokenProvider,
-            dangerouslyAllowBrowser: true,
-          });
-
-          const realtime = await Realtime.azure(
-            client,
-            dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser },
-          );
-
-          expect(realtime.socket).toBe(lastBrowserSocket());
-          expect(new URL(lastBrowserSocket().url).searchParams.get(queryParameter)).toBe(credential);
-        });
-      },
-    );
+        },
+      );
+    });
   });
 
   test('rejects Azure connections without a deployment', async () => {
@@ -423,7 +424,8 @@ describe('stable browser realtime transcription', () => {
       expect(connectionURL.searchParams.get('intent')).toBe('transcription');
       expect(connectionURL.searchParams.has('api-version')).toBe(false);
       expect(connectionURL.searchParams.has('deployment')).toBe(false);
-      expect(connectionURL.searchParams.get('api-key')).toBe('azure-key');
+      expect(connectionURL.searchParams.has('api-key')).toBe(false);
+      expect(lastBrowserSocket().headers).toEqual({ 'api-key': 'azure-key' });
       expect(lastBrowserSocket().protocols).toEqual(['realtime']);
       expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');
     },
@@ -439,7 +441,8 @@ describe('stable browser realtime transcription', () => {
     expect(connectionURL.searchParams.get('intent')).toBe('transcription');
     expect(connectionURL.searchParams.has('api-version')).toBe(false);
     expect(connectionURL.searchParams.has('deployment')).toBe(false);
-    expect(connectionURL.searchParams.get('Authorization')).toBe('Bearer azure-token');
+    expect(connectionURL.searchParams.has('Authorization')).toBe(false);
+    expect(lastBrowserSocket().headers).toEqual({ Authorization: 'Bearer azure-token' });
     expect(lastBrowserSocket().protocols).toEqual(['realtime']);
     expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
   });
@@ -748,7 +751,8 @@ describe('stable browser realtime custom URL builder', () => {
     );
     expect(connectionURL.pathname).toBe('/azure/custom');
     expect(connectionURL.searchParams.get('existing')).toBe('value');
-    expect(connectionURL.searchParams.get('api-key')).toBe('azure-key');
+    expect(connectionURL.searchParams.has('api-key')).toBe(false);
+    expect(lastBrowserSocket().headers).toEqual({ 'api-key': 'azure-key' });
     expect(connectionURL.searchParams.has('model')).toBe(false);
     expect(connectionURL.searchParams.has('deployment')).toBe(false);
     expect(lastBrowserSocket().protocols).toEqual(['realtime']);
@@ -767,7 +771,8 @@ describe('stable browser realtime custom URL builder', () => {
     const connectionURL = new URL(lastBrowserSocket().url);
 
     expect(connectionURL.searchParams.get('existing')).toBe('value');
-    expect(connectionURL.searchParams.get('Authorization')).toBe('Bearer azure-token');
+    expect(connectionURL.searchParams.has('Authorization')).toBe(false);
+    expect(lastBrowserSocket().headers).toEqual({ Authorization: 'Bearer azure-token' });
     expect(connectionURL.searchParams.has('model')).toBe(false);
     expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
     expect(customURL.toString()).toBe('wss://sap.example.com/azure/custom?existing=value');
@@ -801,8 +806,9 @@ describe('stable browser realtime custom URL builder', () => {
 
       expect(connectionURL.pathname).toBe('/azure/custom');
       expect(connectionURL.searchParams.get('routing')).toBe('value');
-      expect(connectionURL.searchParams.get(existingParameter)).toBe('existing');
-      expect(connectionURL.searchParams.get(authenticationParameter)).toBe(authenticationValue);
+      expect(connectionURL.searchParams.has(existingParameter)).toBe(false);
+      expect(connectionURL.searchParams.has(authenticationParameter)).toBe(false);
+      expect(lastBrowserSocket().headers).toEqual({ [authenticationParameter]: authenticationValue });
       expect(realtime.url.searchParams.get('routing')).toBe('value');
       expect(realtime.url.searchParams.get('Authorization')).toBe('<REDACTED>');
       expect(realtime.url.searchParams.get('api-key')).toBe('<REDACTED>');

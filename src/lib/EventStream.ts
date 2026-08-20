@@ -205,8 +205,6 @@ if (typeof Buffer === 'function') {
   rememberTrustedIntrinsic(Buffer);
 }
 
-const blobSizeGetter =
-  typeof Blob === 'function' ? Object.getOwnPropertyDescriptor(Blob.prototype, 'size')?.get : undefined;
 const blobInternalHandlePrototype = (() => {
   if (typeof Blob !== 'function') {
     return undefined;
@@ -562,7 +560,7 @@ function estimateRetainedBufferBytes(
   }
 
   let getter: (() => unknown) | undefined;
-  let kind: RetainedStorage['kind'] = 'buffer';
+  const kind: RetainedStorage['kind'] = 'buffer';
   switch (brand) {
     case 'ArrayBuffer': {
       getter = arrayBufferByteLengthGetter;
@@ -574,9 +572,10 @@ function estimateRetainedBufferBytes(
     }
     case 'Blob':
     case 'File': {
-      getter = blobSizeGetter;
-      kind = 'blob';
-      break;
+      // Blob slices can retain an arbitrarily larger native backing allocation,
+      // and neither browser nor Node exposes its extent or ownership. Detached
+      // queues must fail closed; waiting readers bypass retained-size inspection.
+      return { bytes: Number.POSITIVE_INFINITY, kind: 'blob' };
     }
     case 'Map': {
       return { bytes: 0, kind: 'map' };

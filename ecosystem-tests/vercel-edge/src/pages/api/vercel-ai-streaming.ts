@@ -11,15 +11,71 @@ export const config = {
   ],
 };
 
-export default async function handler(request: NextRequest) {
-  const openai = new OpenAI();
+const maximumMessages = 32;
+const maximumMessageCharacters = 16_384;
+const maximumRequestBodyBytes = 64 * 1024;
 
-  const { messages }: { messages: UIMessage[] } = await request.json();
+async function cancelOversizedRequest(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  try {
+    await reader.cancel();
+  } catch {
+    // Cleanup failures must not mask the original payload-size rejection.
+  }
+}
+
+async function readRequestBody(request: NextRequest): Promise<string | null> {
+  const reader = request.body?.getReader();
+  if (!reader) {
+    return '';
+  }
+
+  const body = new Uint8Array(maximumRequestBodyBytes);
+  let length = 0;
+
+  try {
+    while (true) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- A bounded stream must consume chunks sequentially.
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (value.byteLength > maximumRequestBodyBytes - length) {
+        void cancelOversizedRequest(reader);
+        return null;
+      }
+
+      body.set(value, length);
+      length += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return new TextDecoder().decode(body.subarray(0, length));
+}
+
+export default async function handler(request: NextRequest) {
+  const body = await readRequestBody(request);
+  if (body === null) {
+    return new Response('Payload Too Large', { status: 413 });
+  }
+
+  const { messages }: { messages: UIMessage[] } = JSON.parse(body);
+
+  if (!Array.isArray(messages)) {
+    return new Response('Invalid messages', { status: 400 });
+  }
+  if (messages.length > maximumMessages) {
+    return new Response('Too many messages', { status: 413 });
+  }
+
+  let totalCharacters = 0;
   const openAIMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = messages.map((message) => {
     const content = message.parts
       .filter((part) => part.type === 'text')
       .map((part) => part.text)
       .join('');
+    totalCharacters += content.length;
 
     switch (message.role) {
       case 'system': {
@@ -37,8 +93,14 @@ export default async function handler(request: NextRequest) {
     }
   });
 
+  if (totalCharacters > maximumMessageCharacters) {
+    return new Response('Messages are too large', { status: 413 });
+  }
+
+  const openai = new OpenAI();
   const completion = await openai.chat.completions.create({
     model: 'gpt-3.5-turbo',
+    max_tokens: 128,
     stream: true,
     messages: openAIMessages,
   });

@@ -1342,6 +1342,59 @@ describe('EventStream iterator buffer limits', () => {
   });
 
   test.each([
+    { name: 'Blob', create: () => new Blob([new Uint8Array(10 * 1024 * 1024)]) },
+    { name: 'File', create: () => new File([new Uint8Array(10 * 1024 * 1024)], 'private.bin') },
+  ])(
+    'rejects a queued one-byte $name slice whose opaque backing exceeds the byte limit',
+    async ({ create }) => {
+      const payload = create().slice(0, 1);
+      // Node 26 incidentally adds a removable callable constructor; older and
+      // browser Blob implementations expose the same opaque handle without it.
+      Reflect.deleteProperty(payload, 'constructor');
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+
+      stream.emitPayload(payload);
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+    },
+  );
+
+  test.each([
+    { name: 'Blob', create: () => new Blob(['small']) },
+    { name: 'File', create: () => new File(['small'], 'small.bin') },
+  ])('rejects a detached $name because its complete backing extent is opaque', async ({ create }) => {
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload(create());
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test.each([
+    { name: 'Blob', create: () => new Blob([new Uint8Array(10 * 1024 * 1024)]).slice(0, 1) },
+    {
+      name: 'File',
+      create: () => new File([new Uint8Array(10 * 1024 * 1024)], 'private.bin').slice(0, 1),
+    },
+  ])('preserves a sliced $name identity for an already waiting consumer', async ({ create }) => {
+    const payload = create();
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    const waiting = iterator.next();
+
+    stream.emitPayload(payload);
+
+    const delivered = await waiting;
+    expect(delivered.value?.[0]).toBe(payload);
+    expect(stream.controller.signal.aborted).toBe(false);
+    stream.end();
+  });
+
+  test.each([
     { name: 'Blob', create: () => new Blob([new Uint8Array(9 * 1024 * 1024)]) },
     { name: 'File', create: () => new File([new Uint8Array(9 * 1024 * 1024)], 'large.bin') },
   ])(

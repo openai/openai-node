@@ -42,6 +42,47 @@ Most of the SDK is generated code. Modifications to code will be persisted betwe
 result in merge conflicts between manual patches and changes from the generator. The generator will never
 modify the contents of the `src/lib/` and `examples/` directories.
 
+## Security requirements
+
+### Credentials, examples, and diagnostics
+
+- Never commit API keys, npm tokens, private keys, `.env` files, customer content, or other live credentials.
+  Read `OPENAI_API_KEY` from the environment and use synthetic values in examples, fixtures, mocks,
+  recordings, and snapshots.
+- Never include secret API keys in browser bundles. Enabling `dangerouslyAllowBrowser` requires explicit
+  security review; examples must not suggest exposing server-side credentials to browsers.
+- Always redact authentication headers, cookies, and webhook secrets. Keep real customer-sensitive request or
+  response data out of default or uncontrolled logs, test output, snapshots, and CI artifacts. Preserve
+  documented opt-in `OPENAI_LOG=debug` or `logLevel: 'debug'` logging, `APIError.error` diagnostics,
+  and clearly fake or sanitized fixtures; warn that diagnostics may contain sensitive data and redact them
+  before forwarding to untrusted sinks.
+
+### Dependencies and release automation
+
+- Review direct and transitive dependency updates, `pnpm-lock.yaml`, package provenance, and install or
+  build lifecycle scripts, including dependencies used by examples and ecosystem fixtures.
+- Use `pnpm install --frozen-lockfile` in CI and when verifying an unchanged lockfile. For intentional
+  dependency updates, regenerate and review `pnpm-lock.yaml` with the corresponding dependency changes.
+  Do not weaken `pnpm-workspace.yaml`
+  safeguards such as `minimumReleaseAge`, `minimumReleaseAgeStrict`, `trustPolicy`, `blockExoticSubdeps`,
+  `strictDepBuilds`, `trustLockfile`, or the `allowBuilds` allowlist without explicit security review.
+- Pin third-party GitHub Actions to full, immutable commit SHAs and review action updates. Keep workflow
+  permissions minimal; grant `id-token: write`, GitHub App access, and npm publishing privileges only to
+  trusted jobs that require them.
+- Publish npm packages only through protected GitHub Actions OIDC trusted publishing. Never expose GitHub
+  App private keys, OIDC credentials, long-lived registry tokens, or other release secrets to untrusted code,
+  unreviewed lifecycle scripts, logs, artifacts, or public package contents.
+
+### Security-sensitive changes
+
+Require focused review and relevant regression or security tests for changes affecting authentication,
+API-key forwarding, custom `fetch`, `baseURL`, redirects, headers, browser credential handling, uploads or
+filesystem paths, webhook signature verification, parsing or serialization, and release or publishing flows.
+Exercise malformed or hostile input where relevant, including prototype-pollution and credential-leak cases.
+
+Report suspected vulnerabilities privately through [`SECURITY.md`](SECURITY.md). Do not disclose
+vulnerability details in public GitHub issues or pull requests.
+
 ## Adding and running examples
 
 All files in the `examples/` directory are not modified by the generator and can be freely edited or added to.

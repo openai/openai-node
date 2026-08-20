@@ -122,7 +122,7 @@ const rt = await OpenAIRealtimeWS.create(client, {
 });
 ```
 
-The callback receives the client and validated connection target and returns the final `wss:` URL. Exactly one of `model`, `callID`, or transcription `intent` is still required, but the SDK does not add routing parameters such as `model` to the returned URL. Use only a trusted endpoint because connection credentials are sent to it. For native Azure WebSocket connections, the required authentication query parameter is still added before connecting and redacted from the exposed URL afterward.
+The callback receives the client and validated connection target and returns the final `wss:` URL. Exactly one of `model`, `callID`, or transcription `intent` is still required, but the SDK does not add routing parameters such as `model` to the returned URL. Use only a trusted endpoint because connection credentials are sent to it. Native Azure WebSocket connections send API keys and bearer tokens as handshake request headers, never in the socket URL. Browsers cannot set WebSocket handshake headers, so browser-based Azure clients must use a server-side authentication proxy; server applications can use either `OpenAIRealtimeWebSocket.azure()` on a header-capable runtime or `OpenAIRealtimeWS.azure()`.
 
 A full example can be found in [`examples/realtime/websocket.ts`](../examples/realtime/websocket.ts).
 

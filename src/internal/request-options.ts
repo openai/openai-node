@@ -85,7 +85,7 @@ export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };
 export type RequestEncoder = (request: { headers: NullableHeaders; body: unknown }) => EncodedContent;
 
 interface JSONRequestBodyObserver {
-  value(holder: object, key: string, value: unknown): void;
+  value(holder: object, key: string, value: unknown): unknown;
   complete(): void;
 }
 
@@ -122,10 +122,14 @@ export const FallbackEncoder: RequestEncoder = ({ headers, body }) => {
   } else {
     const active = [...observers];
     encoded = JSON.stringify(body, function (this: object, key: string, value: unknown): unknown {
+      let observed = value;
       for (const observer of active) {
-        observer.value(this, key, value);
+        const replacement = observer.value(this, key, observed);
+        if (replacement !== undefined) {
+          observed = replacement;
+        }
       }
-      return value;
+      return observed;
     });
     for (const observer of active) {
       observer.complete();

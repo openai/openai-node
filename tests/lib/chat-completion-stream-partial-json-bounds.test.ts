@@ -292,6 +292,82 @@ it('captures known non-strict mixed-tool argument accessors exactly once', async
   });
 });
 
+it('dispatches captured tool deltas after a public chunk listener replaces their collection', async () => {
+  const argumentsJSON = '{"value":"original"}';
+  const stream = ChatCompletionStream.createChatCompletion(createClient(argumentFragments([argumentsJSON])), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Dispatch the original validated tool frame' }],
+    tools: [strictTool],
+  });
+  stream.on('chunk', (current) => {
+    const delta = current.choices[0]?.delta;
+    const original = delta?.tool_calls?.[0];
+    if (delta && original) {
+      delta.tool_calls = [
+        {
+          ...original,
+          index: 1,
+          function: { ...original.function, name: 'listener_replacement', arguments: 'tampered' },
+        },
+      ];
+    }
+  });
+  const emitted: { index: number; arguments: string; arguments_delta: string }[] = [];
+  stream.on('tool_calls.function.arguments.delta', (event) =>
+    emitted.push({
+      index: event.index,
+      arguments: event.arguments,
+      arguments_delta: event.arguments_delta,
+    }),
+  );
+
+  const completion = await stream.finalChatCompletion();
+
+  expect(emitted).toEqual([{ index: 0, arguments: argumentsJSON, arguments_delta: argumentsJSON }]);
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { name: strictTool.function.name, arguments: argumentsJSON },
+  });
+});
+
+it('reads a stateful delta.tool_calls accessor once and dispatches its original frame', async () => {
+  const argumentsJSON = '{"value":"captured"}';
+  const original = {
+    index: 0,
+    id: 'call_captured',
+    type: 'function' as const,
+    function: { name: strictTool.function.name, arguments: argumentsJSON },
+  };
+  const replacement = {
+    ...original,
+    index: 1,
+    function: { name: 'changed_by_second_getter', arguments: '{"value":"changed"}' },
+  };
+  const readToolCalls = vi.fn(() => (readToolCalls.mock.calls.length === 1 ? [original] : [replacement]));
+  const delta: Chunk['choices'][number]['delta'] = { role: 'assistant' };
+  Object.defineProperty(delta, 'tool_calls', { configurable: true, enumerable: true, get: readToolCalls });
+
+  async function* statefulChunks(): AsyncGenerator<Chunk> {
+    yield chunk(delta);
+    yield chunk({}, 'tool_calls');
+  }
+
+  const stream = ChatCompletionStream.createChatCompletion(createClient(statefulChunks()), {
+    model: 'gpt-test',
+    messages: [{ role: 'user', content: 'Do not reread the tool delta collection after accumulation' }],
+    tools: [strictTool],
+  });
+  const fragments: string[] = [];
+  stream.on('tool_calls.function.arguments.delta', (event) => fragments.push(event.arguments_delta));
+
+  const completion = await stream.finalChatCompletion();
+
+  expect(readToolCalls).toHaveBeenCalledTimes(1);
+  expect(fragments).toEqual([argumentsJSON]);
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { name: strictTool.function.name, arguments: argumentsJSON },
+  });
+});
+
 it('captures an argument accessor once while its strict tool identity is incomplete', async () => {
   const oversizedPrefix = `{"value":"${'x'.repeat(17 * 1024 * 1024)}`;
   let reads = 0;
@@ -517,7 +593,12 @@ it('keeps a genuinely serialized non-strict tool above the structured byte limit
   });
   Object.defineProperty(tool, 'toJSON', { value: serialize });
   const argumentsJSON = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
-  const client = createSerializedClient(argumentFragments([argumentsJSON]), (body) => {
+  const fragments: string[] = [];
+  const maximumFrameBytes = 4 * 1024 * 1024;
+  for (let offset = 0; offset < argumentsJSON.length; offset += maximumFrameBytes) {
+    fragments.push(argumentsJSON.slice(offset, offset + maximumFrameBytes));
+  }
+  const client = createSerializedClient(argumentFragments(fragments), (body) => {
     const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
     expect(dispatched).toMatchObject({ function: { strict: false } });
   });
@@ -796,6 +877,91 @@ it('drops a nested accessor-backed response schema without invoking its getter t
   expect(parser).not.toHaveBeenCalled();
   expect(readNestedSchema).toHaveBeenCalledTimes(1);
   expect(serialize).toHaveBeenCalledTimes(1);
+});
+
+it('never binds a descriptor tool parser to a different value actually read through an array Proxy', async () => {
+  const parseDescriptorTool = vi.fn((value: string) => ({ stale: JSON.parse(value) as unknown }));
+  const parseActualTool = vi.fn((value: string) => ({ actual: JSON.parse(value) as unknown }));
+  const descriptorTool = makeParseableTool(
+    { ...strictTool, function: { ...strictTool.function, name: 'descriptor_tool' } },
+    { parser: parseDescriptorTool, callback: vi.fn() },
+  );
+  const actualTool = makeParseableTool(
+    { ...strictTool, function: { ...strictTool.function, name: 'actual_wire_tool' } },
+    { parser: parseActualTool, callback: vi.fn() },
+  );
+  const readActualTool = vi.fn(() => actualTool);
+  const tools = new Proxy([descriptorTool], {
+    get(target, property, receiver) {
+      return property === '0' ? readActualTool() : Reflect.get(target, property, receiver);
+    },
+  });
+  const argumentsJSON = '{"value":"wire"}';
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createSerializedClient(namedArgumentFragments('actual_wire_tool', [argumentsJSON]), (body) => {
+      const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
+      expect(dispatched).toMatchObject({ function: { name: 'actual_wire_tool' } });
+    }),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Bind only the tool actually read by JSON serialization' }],
+      tools,
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { parsed_arguments: { value: 'wire' } },
+  });
+  expect(readActualTool).toHaveBeenCalledTimes(1);
+  expect(parseDescriptorTool).not.toHaveBeenCalled();
+  expect(parseActualTool).not.toHaveBeenCalled();
+});
+
+it('ignores global stringify replacement inside a tool serializer when comparing wire schemas', async () => {
+  const parseStaleSchema = vi.fn((value: string) => ({ stale: JSON.parse(value) as unknown }));
+  const tool = makeParseableTool(strictTool, { parser: parseStaleSchema, callback: vi.fn() });
+  const originalStringify = JSON.stringify;
+  const forgePrimitive = vi.fn((value: unknown) => originalStringify(value === 'wire' ? 'value' : value));
+  const serialize = vi.fn(() => {
+    JSON.stringify = forgePrimitive as typeof JSON.stringify;
+    return {
+      type: 'function',
+      function: {
+        ...tool.function,
+        parameters: { type: 'object', properties: { wire: { type: 'string' } } },
+      },
+    };
+  });
+  Object.defineProperty(tool, 'toJSON', { configurable: true, value: serialize });
+  const argumentsJSON = '{"wire":"safe"}';
+
+  try {
+    const completion = await ChatCompletionStream.createChatCompletion(
+      createSerializedClient(argumentFragments([argumentsJSON]), (body) => {
+        JSON.stringify = originalStringify;
+        const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
+        expect(dispatched).toMatchObject({
+          function: { parameters: { properties: { wire: { type: 'string' } } } },
+        });
+      }),
+      {
+        model: 'gpt-test',
+        messages: [
+          { role: 'user', content: 'Compare the actual schema with a captured stringify intrinsic' },
+        ],
+        tools: [tool],
+      },
+    ).finalChatCompletion();
+
+    expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+      function: { parsed_arguments: { wire: 'safe' } },
+    });
+    expect(parseStaleSchema).not.toHaveBeenCalled();
+    expect(serialize).toHaveBeenCalledTimes(1);
+  } finally {
+    JSON.stringify = originalStringify;
+  }
 });
 
 it.each(['own override', 'array subclass'] as const)(
@@ -1801,6 +1967,42 @@ it.each(['content', 'tool'] as const)(
         function: { arguments: expectedJSON, parsed_arguments: { value: 'a'.repeat(4096) } },
       });
     }
+  },
+);
+
+it.each(['content', 'tool'] as const)(
+  'accepts %s JSON at the UTF-8 limit when a surrogate pair crosses fragments',
+  async (kind) => {
+    const prefix = '{"value":"';
+    const suffix = '"}';
+    const maximumBytes = 16 * 1024 * 1024;
+    const padding = 'x'.repeat(maximumBytes - prefix.length - suffix.length - 8);
+    const first = `${prefix}${padding}\uD83D`;
+    const second = '\uDE00\uD83D';
+    const third = '\uDE00';
+    const acceptedPrefix = `${first}${second}${third}`;
+    const complete = `${acceptedPrefix}${suffix}`;
+    expect(new TextEncoder().encode(complete)).toHaveLength(maximumBytes);
+
+    const stream = createStructuredStream(kind, [first, second, third, suffix]);
+    let acceptedSnapshot: string | undefined;
+    const capture = (snapshot: string): void => {
+      if (snapshot.endsWith('😀😀')) {
+        acceptedSnapshot = snapshot;
+        // The independent whole-snapshot parse-work ceiling may reject repeated
+        // 16 MiB final scans; isolate the valid streaming UTF-8 byte boundary
+        // before the separately budgeted final parse.
+        stream.abort();
+      }
+    };
+    if (kind === 'content') {
+      stream.on('content.delta', (event) => capture(event.snapshot));
+    } else {
+      stream.on('tool_calls.function.arguments.delta', (event) => capture(event.arguments));
+    }
+
+    await expect(stream.done()).rejects.toThrow(/abort|parse-work/iu);
+    expect(acceptedSnapshot?.length).toBe(acceptedPrefix.length);
   },
 );
 

@@ -1,4 +1,4 @@
-import { partialParse } from '../_vendor/partial-json-parser/parser';
+import { MalformedJSON, partialParse } from '../_vendor/partial-json-parser/parser';
 import {
   APIUserAbortError,
   ContentFilterFinishReasonError,
@@ -35,6 +35,18 @@ import type {
 import { Stream } from '../streaming';
 import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
 import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
+
+function parseStructuredStreamingJSON(content: string): unknown {
+  try {
+    return partialParse(content);
+  } catch (error) {
+    if (error instanceof MalformedJSON || error instanceof SyntaxError) {
+      return parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
+    }
+
+    throw error;
+  }
+}
 
 /** An incremental assistant-text event and its accumulated state. */
 export interface ContentDeltaEvent {
@@ -266,6 +278,16 @@ interface ChoiceEventState {
   tool_call_identities: Map<number, ToolCallIdentity>;
 }
 
+interface CapturedToolCallDeltaFrame {
+  readonly index: number;
+  readonly arguments_delta: string;
+}
+
+interface CapturedChoiceToolCallFrames {
+  readonly index: number;
+  readonly tool_calls: readonly CapturedToolCallDeltaFrame[];
+}
+
 interface ValidatedChoiceSnapshot {
   message: ChatCompletionSnapshot.Choice.Message;
   content: string | null | undefined;
@@ -297,6 +319,7 @@ interface PartialJSONParseState {
   has_non_whitespace: boolean;
   in_string: boolean;
   last_parsed_bytes: number;
+  pending_high_surrogate: boolean;
 }
 
 interface PartialJSONParseBudget {
@@ -326,6 +349,7 @@ function createPartialJSONParseState(): PartialJSONParseState {
     has_non_whitespace: false,
     in_string: false,
     last_parsed_bytes: 0,
+    pending_high_surrogate: false,
   };
 }
 
@@ -342,11 +366,14 @@ function recordPartialJSONFragment(
   let bytes = 0;
   let { depth, escaped, has_non_whitespace: hasNonWhitespace, in_string: inString } = state;
   let completed = false;
+  let firstCharacter = true;
 
   for (const character of fragment) {
     const previousBytes = bytes;
     const codePoint = character.codePointAt(0)!;
-    if (codePoint <= 0x7f) {
+    if (firstCharacter && state.pending_high_surrogate && codePoint >= 0xdc_00 && codePoint <= 0xdf_ff) {
+      bytes += 1;
+    } else if (codePoint <= 0x7f) {
       bytes += 1;
     } else if (codePoint <= 0x7_ff) {
       bytes += 2;
@@ -355,6 +382,7 @@ function recordPartialJSONFragment(
     } else {
       bytes += 4;
     }
+    firstCharacter = false;
     if (budget.bytes + bytes > MAX_PARTIAL_JSON_BYTES) {
       throw new OpenAIError('Chat completion stream exceeded its structured JSON byte limit');
     }
@@ -398,6 +426,10 @@ function recordPartialJSONFragment(
   state.escaped = escaped;
   state.has_non_whitespace = hasNonWhitespace;
   state.in_string = inString;
+  if (fragment.length > 0) {
+    const finalCodeUnit = fragment.codePointAt(fragment.length - 1) ?? 0;
+    state.pending_high_surrogate = finalCodeUnit >= 0xd8_00 && finalCodeUnit <= 0xdb_ff;
+  }
   budget.bytes += bytes;
   budget.fragments += 1;
   if (validationWorkBudget) {
@@ -701,6 +733,7 @@ interface SerializedParserSchemaBudget {
 }
 
 const MAX_SERIALIZED_PARSER_SCHEMA_NODES = 4096;
+const stringifyParserSchemaValue = JSON.stringify;
 const MAX_SERIALIZED_PARSER_SCHEMA_BYTES = 1024 * 1024;
 const MAX_SERIALIZED_PARSER_SCHEMA_DEPTH = 64;
 const OMITTED_SERIALIZED_PARSER_VALUE = Symbol('omitted serialized parser value');
@@ -742,7 +775,7 @@ function canonicalSerializedParserSchema(
       return UNSAFE_SERIALIZED_PARSER_VALUE;
     }
     if (current === null || typeof current === 'boolean' || typeof current === 'number') {
-      const serialized = JSON.stringify(current);
+      const serialized = stringifyParserSchemaValue(current);
       return typeof serialized === 'string' && charge(serialized.length)
         ? serialized
         : UNSAFE_SERIALIZED_PARSER_VALUE;
@@ -751,7 +784,7 @@ function canonicalSerializedParserSchema(
       if (!charge(current.length * 6 + 2)) {
         return UNSAFE_SERIALIZED_PARSER_VALUE;
       }
-      return JSON.stringify(current);
+      return stringifyParserSchemaValue(current);
     }
     if (typeof current !== 'object' || ancestors.has(current)) {
       return UNSAFE_SERIALIZED_PARSER_VALUE;
@@ -871,7 +904,7 @@ function canonicalSerializedParserSchema(
         if (!charge(key.length * 6 + 3)) {
           return UNSAFE_SERIALIZED_PARSER_VALUE;
         }
-        fields.push(`${JSON.stringify(key)}:${normalized}`);
+        fields.push(`${stringifyParserSchemaValue(key)}:${normalized}`);
       }
       return `{${fields.join(',')}}`;
     } finally {
@@ -1059,6 +1092,7 @@ function observeSerializedChatCompletionParserParams(
   let responseFrame: SerializedResponseParserConfig | undefined;
   let frames: (SerializedToolParserConfig | undefined)[] = [];
   let toolFrames = new WeakMap<object, SerializedToolParserConfig>();
+  let actualToolOwners = new Map<number, object | undefined>();
   let functionFrames = new WeakMap<object, SerializedFunctionParserConfig>();
 
   return observeJSONRequestBody(body, {
@@ -1070,6 +1104,7 @@ function observeSerializedChatCompletionParserParams(
         responseFrame = undefined;
         frames = [];
         toolFrames = new WeakMap();
+        actualToolOwners = new Map();
         functionFrames = new WeakMap();
         return;
       }
@@ -1088,15 +1123,33 @@ function observeSerializedChatCompletionParserParams(
 
       if (holder === root && key === 'tools') {
         if (Array.isArray(value)) {
-          tools = value;
+          tools = new Proxy(value, {
+            get(target, property) {
+              const actual = Reflect.get(target, property, target) as unknown;
+              if (typeof property === 'string') {
+                const index = Number(property);
+                if (
+                  Number.isSafeInteger(index) &&
+                  index >= 0 &&
+                  index < MAX_STREAM_TOOL_CALLS &&
+                  String(index) === property
+                ) {
+                  actualToolOwners.set(
+                    index,
+                    typeof actual === 'object' && actual !== null ? actual : undefined,
+                  );
+                }
+              }
+              return actual;
+            },
+          });
+          return tools;
         }
         return;
       }
 
       if (holder === tools) {
         const index = Number(key);
-        const owner = ownSerializedParserObject(holder, key);
-        const source = owner ? originalToolOwners.get(owner) : undefined;
         if (
           !Number.isSafeInteger(index) ||
           index < 0 ||
@@ -1106,6 +1159,8 @@ function observeSerializedChatCompletionParserParams(
         ) {
           return;
         }
+        const owner = actualToolOwners.get(index);
+        const source = owner ? originalToolOwners.get(owner) : undefined;
         const frame: SerializedToolParserConfig = { source };
         frames[index] = frame;
         toolFrames.set(value, frame);
@@ -1155,6 +1210,7 @@ function observeSerializedChatCompletionParserParams(
           );
         }
       }
+      return undefined;
     },
     complete() {
       if (!root) {
@@ -1185,6 +1241,7 @@ function observeSerializedChatCompletionParserParams(
       responseFrame = undefined;
       frames = [];
       toolFrames = new WeakMap();
+      actualToolOwners = new Map();
       functionFrames = new WeakMap();
     },
   });
@@ -1301,12 +1358,14 @@ export class ChatCompletionStream<ParsedT = null>
       return;
     }
 
-    const toolCallArgumentFragments = new WeakMap<object, string>();
-    const completion = this.#accumulateChatCompletion(chunk, toolCallArgumentFragments);
+    const capturedChoiceFrames = new WeakMap<object, CapturedChoiceToolCallFrames>();
+    const completion = this.#accumulateChatCompletion(chunk, capturedChoiceFrames);
     this._emit('chunk', chunk, completion);
 
     for (const choice of chunk.choices) {
-      const choiceSnapshot = completion.choices[choice.index]!;
+      const capturedChoice = capturedChoiceFrames.get(choice);
+      const choiceSnapshot = completion.choices[capturedChoice?.index ?? choice.index]!;
+      const capturedToolCalls = capturedChoice?.tool_calls ?? [];
       const { delta } = choice;
       const structuredResponse = isParseableResponseFormat(this.#params?.response_format);
       const boundedSnapshot = structuredResponse || this.#hasAutoParseableTool;
@@ -1361,7 +1420,7 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
 
-      for (const toolCall of delta?.tool_calls ?? []) {
+      for (const toolCall of capturedToolCalls) {
         if (state.current_tool_call_index !== toolCall.index) {
           this.#emitContentDoneEvents(choiceSnapshot);
 
@@ -1374,7 +1433,7 @@ export class ChatCompletionStream<ParsedT = null>
         state.current_tool_call_index = toolCall.index;
       }
 
-      for (const toolCallDelta of delta?.tool_calls ?? []) {
+      for (const toolCallDelta of capturedToolCalls) {
         const toolCallSnapshot = messageSnapshot.tool_calls?.[toolCallDelta.index];
         if (!toolCallSnapshot?.type) {
           continue;
@@ -1397,7 +1456,7 @@ export class ChatCompletionStream<ParsedT = null>
             index: toolCallDelta.index,
             arguments: argumentsSnapshot,
             parsed_arguments: toolCallSnapshot.function.parsed_arguments,
-            arguments_delta: toolCallArgumentFragments.get(toolCallDelta) ?? '',
+            arguments_delta: toolCallDelta.arguments_delta,
           });
         } else if (toolCallSnapshot.type !== 'custom') {
           assertNever(toolCallSnapshot);
@@ -1452,7 +1511,10 @@ export class ChatCompletionStream<ParsedT = null>
       if (isAutoParsableTool(inputTool)) {
         parsedArguments = inputTool.$parseRaw(validateStructuredJSONSnapshot(argumentsSnapshot));
       } else if (inputTool?.function.strict) {
-        parsedArguments = JSON.parse(validateStructuredJSONSnapshot(argumentsSnapshot));
+        parsedArguments = parseResponseFormatContent(
+          { type: 'json_schema', $parseRaw: undefined },
+          validateStructuredJSONSnapshot(argumentsSnapshot),
+        );
       }
 
       this._emit('tool_calls.function.arguments.done', {
@@ -1754,10 +1816,10 @@ export class ChatCompletionStream<ParsedT = null>
 
   #accumulateChatCompletion(
     chunk: ChatCompletionChunk,
-    toolCallArgumentFragments: WeakMap<object, string>,
+    capturedChoiceFrames: WeakMap<object, CapturedChoiceToolCallFrames>,
   ): ChatCompletionSnapshot {
     let snapshot = this.#currentChatCompletionSnapshot;
-    const { choices, ...rest } = chunk;
+    const { choices, obfuscation: _obfuscation, ...rest } = chunk;
     if (!snapshot) {
       const newSnapshot: ChatCompletionSnapshot = {
         ...rest,
@@ -1777,7 +1839,10 @@ export class ChatCompletionStream<ParsedT = null>
         ? Math.min(requestedChoiceCount, MAX_STREAM_CHOICES)
         : MAX_STREAM_CHOICES;
 
-    for (const { delta, finish_reason, index, logprobs = null, ...other } of chunk.choices) {
+    for (const chunkChoice of chunk.choices) {
+      const { delta, finish_reason, index, logprobs = null, ...other } = chunkChoice;
+      const capturedToolCalls: CapturedToolCallDeltaFrame[] = [];
+      capturedChoiceFrames.set(chunkChoice, Object.freeze({ index, tool_calls: capturedToolCalls }));
       if (!Number.isSafeInteger(index) || index < 0 || index >= maxChoices) {
         throw new OpenAIError(`Chat completion stream contains an invalid choice index: ${index}`);
       }
@@ -1829,6 +1894,7 @@ export class ChatCompletionStream<ParsedT = null>
       assignOwnProperties(choice, other);
 
       if (!delta) {
+        Object.freeze(capturedToolCalls);
         continue;
       } // Shouldn't happen; just in case.
 
@@ -1901,7 +1967,9 @@ export class ChatCompletionStream<ParsedT = null>
             choice.message.parsed = null;
           } else if (shouldParse && reservePartialJSONParse(parseState, this.#partialJSONParseBudget)) {
             this.#validateStructuredSnapshots(snapshot);
-            choice.message.parsed = partialParse(validateStructuredJSONSnapshot(choice.message.content));
+            choice.message.parsed = parseStructuredStreamingJSON(
+              validateStructuredJSONSnapshot(choice.message.content),
+            );
           } else if (content.length > 0) {
             choice.message.parsed = null;
           }
@@ -1921,6 +1989,7 @@ export class ChatCompletionStream<ParsedT = null>
           if (!Number.isSafeInteger(index) || index < 0 || index >= MAX_STREAM_TOOL_CALLS) {
             throw new OpenAIError(`Chat completion stream contains an invalid tool call index: ${index}`);
           }
+          let argumentsDelta = '';
 
           const tool_call = (toolCallSnapshots[index] ??= {});
           const functionName = fn?.name;
@@ -1988,7 +2057,7 @@ export class ChatCompletionStream<ParsedT = null>
             }
             const argumentFragment = fn.arguments;
             if (argumentFragment != null) {
-              toolCallArgumentFragments.set(toolCallDelta, argumentFragment);
+              argumentsDelta = argumentFragment;
               if (eventState && boundIdentity?.parseable !== false) {
                 let parseState = eventState.tool_call_parse_states.get(index);
                 if (!parseState) {
@@ -2012,7 +2081,7 @@ export class ChatCompletionStream<ParsedT = null>
                   reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
                 ) {
                   this.#validateStructuredSnapshots(snapshot);
-                  functionSnapshot.parsed_arguments = partialParse(
+                  functionSnapshot.parsed_arguments = parseStructuredStreamingJSON(
                     validateStructuredJSONSnapshot(functionSnapshot.arguments),
                   );
                 } else if (argumentFragment.length > 0 && hasOwn(functionSnapshot, 'parsed_arguments')) {
@@ -2023,8 +2092,10 @@ export class ChatCompletionStream<ParsedT = null>
               }
             }
           }
+          capturedToolCalls.push(Object.freeze({ index, arguments_delta: argumentsDelta }));
         }
       }
+      Object.freeze(capturedToolCalls);
     }
     return snapshot;
   }

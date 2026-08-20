@@ -1,6 +1,11 @@
 import { OpenAIError } from '../error';
 import type { AutoParseableResponseFormat, AutoParseableTextFormat, AutoParseableTool } from '../lib/parser';
-import { makeParseableResponseFormat, makeParseableTextFormat, makeParseableTool } from '../lib/parser';
+import {
+  makeParseableResponseFormat,
+  makeParseableTextFormat,
+  makeParseableTool,
+  parseResponseFormatContent,
+} from '../lib/parser';
 import type { AutoParseableResponseTool } from '../lib/ResponsesParser';
 import { makeParseableResponseTool } from '../lib/ResponsesParser';
 import type { JSONSchema } from '../lib/jsonschema';
@@ -504,7 +509,8 @@ function parseStandardSchema<Schema extends StandardSchemaLike>(
   standardSchema: Schema,
   content: string,
 ): InferStandardOutput<Schema> {
-  const result = standardSchema['~standard'].validate(JSON.parse(content));
+  const parsed = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
+  const result = standardSchema['~standard'].validate(parsed);
 
   if (isPromiseLike(result)) {
     void Promise.resolve(result).catch(() => undefined);

@@ -143,32 +143,40 @@ export function uploadWebApiTestCases({
 
   const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;
 
+  async function expectAndDeleteUploadedFile(file: { filename: string; id: string }) {
+    try {
+      expectEqual(file.filename, 'finetune.jsonl');
+    } finally {
+      await client.files.delete(file.id);
+    }
+  }
+
   it('toFile handles string', async () => {
     // @ts-ignore this only doesn't error in vercel build...
     const file = await toFile(fineTune, 'finetune.jsonl');
     const result = await client.files.create({ file, purpose: 'fine-tune' });
-    expectEqual(result.filename, 'finetune.jsonl');
+    await expectAndDeleteUploadedFile(result);
   });
   it('toFile handles Blob', async () => {
     const result = await client.files.create({
       file: await toFile(new Blob([fineTune]), 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expectEqual(result.filename, 'finetune.jsonl');
+    await expectAndDeleteUploadedFile(result);
   });
   it('toFile handles Uint8Array', async () => {
     const result = await client.files.create({
       file: await toFile(new TextEncoder().encode(fineTune), 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expectEqual(result.filename, 'finetune.jsonl');
+    await expectAndDeleteUploadedFile(result);
   });
   it('toFile handles ArrayBuffer', async () => {
     const result = await client.files.create({
       file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expectEqual(result.filename, 'finetune.jsonl');
+    await expectAndDeleteUploadedFile(result);
   });
   if (runtime !== 'edge') {
     // this fails in edge for some reason
@@ -177,7 +185,7 @@ export function uploadWebApiTestCases({
         file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.jsonl'),
         purpose: 'fine-tune',
       });
-      expectEqual(result.filename, 'finetune.jsonl');
+      await expectAndDeleteUploadedFile(result);
     });
   }
 }
