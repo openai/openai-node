@@ -9366,7 +9366,9 @@ export namespace Tool {
     input_image_mask?: ImageGeneration.InputImageMask;
 
     /**
-     * The image generation model to use. Default: `gpt-image-1`.
+     * The image generation model to use. One of `gpt-image-1`, `gpt-image-1-mini`,
+     * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`, or
+     * `chatgpt-image-latest`. Default: `gpt-image-1`.
      */
     model?:
       | (string & {})
