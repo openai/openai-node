@@ -20,6 +20,7 @@ class ProtectedHookAzure extends AzureOpenAI {
   mutationScheme: CarrierAuthenticationScheme = 'auth';
   mutateCarrier: ((headers: Headers) => void) | undefined;
   inspectAuthenticationCarrier: ((carrier: NullableHeaders) => void) | undefined;
+  cloneAuthenticationCarrier: 'spread' | 'assign' | undefined;
 
   protected override async prepareRequest(request: RequestInit): Promise<void> {
     if (this.injectedHeaders) {
@@ -73,7 +74,14 @@ class ProtectedHookAzure extends AzureOpenAI {
       this.mutateCarrier?.(carrier.values);
       this.inspectAuthenticationCarrier?.(carrier);
     }
-    return carrier;
+    if (!carrier || !this.cloneAuthenticationCarrier) {
+      return carrier;
+    }
+    if (this.cloneAuthenticationCarrier === 'spread') {
+      return { ...carrier };
+    }
+    const copied = {};
+    return Object.assign(copied, carrier);
   }
 
   protected override async bearerAuth(options: FinalRequestOptions): Promise<NullableHeaders> {
@@ -1498,4 +1506,224 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('safe-snapshot-token');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  test.each(['auth', 'bearer', 'admin'] as const)(
+    'keeps deferred $scheme Headers operations on their native prototype',
+    async (scheme) => {
+      const configured = 'prototype-credential';
+      const expectedName = scheme === 'auth' ? 'api-key' : 'authorization';
+      const expected = scheme === 'auth' ? configured : `Bearer ${configured}`;
+      const provider = vi.fn(async () => configured);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(scheme === 'auth'
+          ? { apiKey: configured }
+          : { azureADTokenProvider: provider, adminAPIKey: configured }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutationScheme = scheme;
+      client.mutateCarrier = (headers) => {
+        expect(Object.keys(headers)).toEqual(Object.keys(new Headers()));
+        expect({ ...headers }).toEqual({ ...new Headers() });
+        const copied = {};
+        const native = {};
+        expect(Object.assign(copied, headers)).toEqual(Object.assign(native, new Headers()));
+        for (const method of [
+          'get',
+          'has',
+          'entries',
+          'keys',
+          'values',
+          'forEach',
+          'append',
+          'set',
+          'delete',
+        ]) {
+          expect(Object.getOwnPropertyDescriptor(headers, method)).toBeUndefined();
+          expect(typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(headers), method)?.value).toBe(
+            'function',
+          );
+        }
+        expect(Object.getOwnPropertyDescriptor(headers, Symbol.iterator)).toBeUndefined();
+        expect(new Headers(headers).get(expectedName)).toBe(expected);
+        const detached = headers.get;
+        expect(() => detached(expectedName)).toThrow(TypeError);
+      };
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: scheme === 'admin' },
+      });
+
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(expectedName)).toBe(expected);
+      expect(provider).toHaveBeenCalledTimes(scheme === 'auth' ? 0 : 1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  const coercedCredentialCases = authenticationModes.flatMap((authentication) =>
+    (['api-key', 'Authorization'] as const).flatMap((header) =>
+      (['object', 'proxy'] as const).flatMap((representation) =>
+        (['unsafe serialization', 'safe serialization'] as const).map((direction) => ({
+          authentication,
+          header,
+          representation,
+          direction,
+        })),
+      ),
+    ),
+  );
+
+  test.each(coercedCredentialCases)(
+    '$authentication snapshots $representation $header $direction exactly once',
+    async ({ authentication, header, representation, direction }) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const serialized = direction === 'unsafe serialization' ? malformed : 'safe-coerced-token';
+      const iterated = direction === 'unsafe serialization' ? 'safe-iterator-value' : malformed;
+      let coercions = 0;
+      let iteratorReads = 0;
+      const source = {
+        *[Symbol.iterator](): IterableIterator<string> {
+          iteratorReads += 1;
+          yield* iterated;
+        },
+        toString(): string {
+          coercions += 1;
+          return serialized;
+        },
+      };
+      const credential =
+        representation === 'proxy'
+          ? new Proxy(source, {
+              get(target, property, receiver) {
+                return Reflect.get(target, property, receiver);
+              },
+            })
+          : source;
+      const headers: Record<string, string> = {};
+      Object.defineProperty(headers, header, { enumerable: true, value: credential });
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'safe-configured-token' }
+          : { azureADTokenProvider: provider }),
+        fetch,
+        maxRetries: 0,
+      });
+      const operation = () => client.request({ method: 'get', path: '/models', headers });
+
+      if (direction === 'unsafe serialization') {
+        await expectPrivateCredentialFailure(operation, malformed);
+        expect(fetch).not.toHaveBeenCalled();
+      } else {
+        await operation();
+        expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(header)).toBe(serialized);
+        expect(fetch).toHaveBeenCalledTimes(1);
+      }
+
+      expect(coercions).toBe(1);
+      expect(iteratorReads).toBe(0);
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test.each(['api-key', 'Authorization'] as const)(
+    'does not coerce a shadowed $header credential before final overrides',
+    async (header) => {
+      let coercions = 0;
+      const shadowed = {
+        *[Symbol.iterator](): IterableIterator<string> {
+          yield* 'safe-iterator-value';
+        },
+        toString(): string {
+          coercions += 1;
+          return `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+        },
+      };
+      const defaults: Record<string, string> = {};
+      Object.defineProperty(defaults, header, { enumerable: true, value: shadowed });
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'safe-configured-token',
+        defaultHeaders: defaults,
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client.request({ method: 'get', path: '/models', headers: { [header]: 'safe-final-token' } });
+
+      expect(coercions).toBe(0);
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(header)).toBe('safe-final-token');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  const carrierCloneCases = (['spread', 'assign'] as const).flatMap((clone) =>
+    (['auth', 'bearer', 'admin'] as const).map((scheme) => ({ clone, scheme })),
+  );
+
+  test.each(carrierCloneCases)(
+    'preserves deferred $scheme authentication through a $clone carrier clone',
+    async ({ clone, scheme }) => {
+      const configured = 'cloned-credential';
+      const expectedName = scheme === 'auth' ? 'api-key' : 'authorization';
+      const expected = scheme === 'auth' ? configured : `Bearer ${configured}`;
+      const provider = vi.fn(async () => configured);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(scheme === 'auth'
+          ? { apiKey: configured }
+          : { azureADTokenProvider: provider, adminAPIKey: configured }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.cloneAuthenticationCarrier = clone;
+      client.mutationScheme = scheme;
+      client.mutateCarrier = (headers) => {
+        expect(headers).toBeInstanceOf(Headers);
+      };
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: scheme === 'admin' },
+      });
+
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(expectedName)).toBe(expected);
+      expect(provider).toHaveBeenCalledTimes(scheme === 'auth' ? 0 : 1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['spread', 'assign'] as const)(
+    'preserves an explicit null tombstone through a $clone carrier clone',
+    async (clone) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'suppressed-credential',
+        fetch,
+        maxRetries: 0,
+      });
+      client.cloneAuthenticationCarrier = clone;
+      client.mutation = 'auth-null';
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has('api-key')).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
 });

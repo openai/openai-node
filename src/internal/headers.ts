@@ -68,37 +68,92 @@ class DeferredAzureAuthenticationHeaders extends Headers {
     azureAuthenticationHeaderMutations.set(this, new Map());
   }
 
-  override get = (name: string): string | null => {
-    const normalized = String(name).toLowerCase();
-    Headers.prototype.has.call(this, normalized);
-    return this.current().get(normalized) ?? null;
-  };
-
-  override has = (name: string): boolean => {
-    const normalized = String(name).toLowerCase();
-    Headers.prototype.has.call(this, normalized);
-    return this.current().has(normalized);
-  };
-
-  override entries = (): ReturnType<Headers['entries']> =>
-    this.current().entries() as unknown as ReturnType<Headers['entries']>;
-
-  override keys = (): ReturnType<Headers['keys']> =>
-    this.current().keys() as unknown as ReturnType<Headers['keys']>;
-
-  override values = (): ReturnType<Headers['values']> =>
-    this.current().values() as unknown as ReturnType<Headers['values']>;
-
-  override [Symbol.iterator] = (): ReturnType<Headers[typeof Symbol.iterator]> => this.entries();
-
-  override forEach = (
-    callback: (value: string, key: string, parent: Headers) => void,
-    thisArg?: unknown,
-  ): void => {
-    for (const [name, value] of this.entries()) {
-      callback.call(thisArg, value, name, this);
-    }
-  };
+  static {
+    Object.defineProperties(this.prototype, {
+      get: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders, name: string): string | null {
+          const normalized = String(name).toLowerCase();
+          Headers.prototype.has.call(this, normalized);
+          return this.current().get(normalized) ?? null;
+        },
+      },
+      has: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders, name: string): boolean {
+          const normalized = String(name).toLowerCase();
+          Headers.prototype.has.call(this, normalized);
+          return this.current().has(normalized);
+        },
+      },
+      entries: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders): ReturnType<Headers['entries']> {
+          return this.current().entries() as unknown as ReturnType<Headers['entries']>;
+        },
+      },
+      keys: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders): ReturnType<Headers['keys']> {
+          return this.current().keys() as unknown as ReturnType<Headers['keys']>;
+        },
+      },
+      values: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders): ReturnType<Headers['values']> {
+          return this.current().values() as unknown as ReturnType<Headers['values']>;
+        },
+      },
+      [Symbol.iterator]: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders): ReturnType<Headers[typeof Symbol.iterator]> {
+          return this.entries();
+        },
+      },
+      forEach: {
+        configurable: true,
+        writable: true,
+        value(
+          this: DeferredAzureAuthenticationHeaders,
+          callback: (value: string, key: string, parent: Headers) => void,
+          thisArg?: unknown,
+        ): void {
+          for (const [name, value] of this.entries()) {
+            callback.call(thisArg, value, name, this);
+          }
+        },
+      },
+      append: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders, name: string, value: string): void {
+          this.update(name, value, 'append');
+        },
+      },
+      set: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders, name: string, value: string): void {
+          this.update(name, value, 'replace');
+        },
+      },
+      delete: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders, name: string): void {
+          const normalized = String(name).toLowerCase();
+          Headers.prototype.delete.call(this, normalized);
+          azureAuthenticationHeaderMutations.get(this)?.set(normalized, { kind: 'delete', values: [] });
+        },
+      },
+    });
+  }
 
   private current(): Map<string, string> {
     const carrier = azureAuthenticationHeaderCarriers.get(this);
@@ -118,20 +173,6 @@ class DeferredAzureAuthenticationHeaders extends Headers {
     }
     return new Map([...effective].sort(([left], [right]) => Number(left > right) - Number(left < right)));
   }
-
-  override append = (name: string, value: string): void => {
-    this.update(name, value, 'append');
-  };
-
-  override set = (name: string, value: string): void => {
-    this.update(name, value, 'replace');
-  };
-
-  override delete = (name: string): void => {
-    const normalized = String(name).toLowerCase();
-    Headers.prototype.delete.call(this, normalized);
-    azureAuthenticationHeaderMutations.get(this)?.set(normalized, { kind: 'delete', values: [] });
-  };
 
   private update(name: string, value: string, operation: 'append' | 'replace'): void {
     const normalized = String(name).toLowerCase();
@@ -286,7 +327,9 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
     const keys = deferredValues ? Headers.prototype.keys.call(values) : values.keys();
     const visibleNames = new Set([...keys, ...nullNames].map((name) => name.toLowerCase()));
     const mutations = azureAuthenticationHeaderMutations.get(values);
-    const layers = snapshotAzureAuthenticationHeaders(headers);
+    const layers = snapshotAzureAuthenticationHeaders(
+      azureAuthenticationHeaderCarriers.get(values) ?? headers,
+    );
     if (layers !== undefined) {
       for (const layer of layers) {
         const seen = new Set<string>();
@@ -382,7 +425,9 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
     (headers) =>
       typeof headers === 'object' &&
       headers !== null &&
-      azureAuthenticationHeaders.has(headers as NullableHeaders),
+      (azureAuthenticationHeaders.has(headers as NullableHeaders) ||
+        (brand_privateNullableHeaders in headers &&
+          azureAuthenticationHeaderCarriers.has((headers as NullableHeaders).values))),
   );
   const pendingAuthenticationHeaders = new Map<string, string[]>();
 
@@ -422,10 +467,13 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
       }
     }
   }
-  for (const values of pendingAuthenticationHeaders.values()) {
-    for (const value of values) {
-      assertAzureCredentialHeaderValue(value);
-    }
+  for (const [name, values] of pendingAuthenticationHeaders) {
+    const snapshots = values.map((value) => {
+      const snapshot = String(value);
+      assertAzureCredentialHeaderValue(snapshot);
+      return snapshot;
+    });
+    pendingAuthenticationHeaders.set(name, snapshots);
   }
   for (const [name, values] of pendingAuthenticationHeaders) {
     for (const value of values) {
