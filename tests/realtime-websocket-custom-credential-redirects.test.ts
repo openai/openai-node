@@ -11,6 +11,12 @@ import { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/
 const sensitiveTokenHeaders = [
   'X-Auth-Token',
   'x-aUtH-tOkEn',
+  'X-Authentication-Token',
+  'x-aUtHeNtIcAtIoN-tOkEn',
+  'X_AUTHENTICATION_TOKEN',
+  'X-AuthenticationToken',
+  'Authentication-Token',
+  'X-Authentication-Token-Primary',
   'X-Access-Token',
   'x_aCcEsS_tOkEn',
   'X-Session-Token',
@@ -25,10 +31,12 @@ const benignHeaders = [
   'X-Trace-Id',
   'X-Token-Budget',
   'X-Auth-Metadata',
+  'X-Authentication-Metadata',
   'X-Access-Level',
   'X-Session-Id',
   'X-Security-Policy',
   'X-Auth-Tokenization',
+  'X-Authentication-Tokenization',
 ] as const;
 
 interface RedirectScenario {
