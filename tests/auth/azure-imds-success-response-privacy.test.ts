@@ -21,6 +21,16 @@ function withParserCause<Failure extends Error>(error: Failure, cause: unknown):
   });
 }
 
+function createCauseFreeJSONFailure(privateValue: string): Error {
+  const failure = new Error(`invalid json response body reason: ${privateValue} malformed response`);
+  return Object.defineProperty(failure, 'type', {
+    configurable: true,
+    enumerable: true,
+    value: 'invalid-json',
+    writable: true,
+  });
+}
+
 function createCrossRealmJSONFailure(privateValue: string, wrapped = false): unknown {
   return runInNewContext(
     [
@@ -218,6 +228,35 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   it.each(
     PRIVATE_VALUES.flatMap((privateValue) =>
       (['provider', 'workload'] as const).flatMap((boundary) =>
+        (['direct', 'nested'] as const).map((shape) => ({ privateValue, boundary, shape })),
+      ),
+    ),
+  )(
+    'sanitizes a $shape cause-free invalid-json fetch error containing $privateValue through $boundary',
+    async ({ privateValue, boundary, shape }) => {
+      const parserFailure = createCauseFreeJSONFailure(privateValue);
+      expect(Object.getOwnPropertyDescriptor(parserFailure, 'cause')).toBeUndefined();
+      const original =
+        shape === 'direct'
+          ? parserFailure
+          : withParserCause(new Error(`${privateValue} outer metadata parser wrapper`), parserFailure);
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      const readJSON = vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+
+      await expectPrivateParseFailure(operation, privateValue);
+
+      expect(readJSON).toHaveBeenCalledTimes(1);
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    PRIVATE_VALUES.flatMap((privateValue) =>
+      (['provider', 'workload'] as const).flatMap((boundary) =>
         (['direct', 'local wrapper', 'foreign wrapper', 'nested wrapper'] as const).map((shape) => ({
           privateValue,
           boundary,
@@ -252,6 +291,45 @@ describe('Azure IMDS successful-response JSON privacy', () => {
 
       await expectPrivateParseFailure(operation, privateValue);
 
+      expect(readJSON).toHaveBeenCalledTimes(1);
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    PRIVATE_VALUES.flatMap((privateValue) =>
+      (['provider', 'workload'] as const).flatMap((boundary) =>
+        (['own data', 'own accessor', 'inherited data', 'inherited accessor'] as const).flatMap((tag) =>
+          (['direct', 'wrapped'] as const).map((shape) => ({ privateValue, boundary, tag, shape })),
+        ),
+      ),
+    ),
+  )(
+    'sanitizes a $shape foreign syntax error with $tag containing $privateValue through $boundary',
+    async ({ privateValue, boundary, tag, shape }) => {
+      const parserFailure = createCrossRealmJSONFailure(privateValue) as object;
+      const tagged = tag.startsWith('own') ? parserFailure : (Object.getPrototypeOf(parserFailure) as object);
+      const readTag = vi.fn(() => {
+        throw new Error(`${privateValue} escaped through an untrusted parser tag`);
+      });
+      Object.defineProperty(tagged, Symbol.toStringTag, {
+        configurable: true,
+        ...(tag.endsWith('accessor') ? { get: readTag } : { value: 'DecoratedSyntaxError' }),
+      });
+      const original =
+        shape === 'direct'
+          ? parserFailure
+          : withParserCause(new Error(`${privateValue} outer metadata parser wrapper`), parserFailure);
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      const readJSON = vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+
+      await expectPrivateParseFailure(operation, privateValue);
+
+      expect(readTag).not.toHaveBeenCalled();
       expect(readJSON).toHaveBeenCalledTimes(1);
       expect(apiFetch).not.toHaveBeenCalled();
     },
@@ -444,6 +522,40 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       }
       expect(failure.cause).toBe(original);
       expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['non-parser marker', 'inherited marker', 'accessor marker'] as const)(
+    'preserves the exact safe custom parser error with an untrusted $0',
+    async (shape) => {
+      const original = new Error('the custom metadata parser could not read its body');
+      const readType = vi.fn(() => 'invalid-json');
+      if (shape === 'non-parser marker') {
+        Object.defineProperty(original, 'type', { configurable: true, value: 'system' });
+      } else if (shape === 'inherited marker') {
+        const prototype = Object.create(Error.prototype) as object;
+        Object.defineProperty(prototype, 'type', { configurable: true, value: 'invalid-json' });
+        Object.setPrototypeOf(original, prototype);
+      } else {
+        Object.defineProperty(original, 'type', { configurable: true, get: readType });
+      }
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      let failure: unknown;
+
+      try {
+        await provider.getToken();
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+      if (!(failure instanceof SubjectTokenProviderError)) {
+        throw new Error('The public provider did not preserve its custom parser failure.');
+      }
+      expect(failure.cause).toBe(original);
+      expect(readType).not.toHaveBeenCalled();
     },
   );
 
