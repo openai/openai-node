@@ -127,6 +127,7 @@ export class AbstractChatCompletionRunner<
   ParsedT,
 > extends EventStream<EventTypes> {
   protected _chatCompletions: ParsedChatCompletion<ParsedT>[] = [];
+  #completionArrivedBeforeAbort = false;
   /** Mutable conversation history, including initial input, assistant replies, and tool results. */
   messages: ChatCompletionMessageParam[] = [];
 
@@ -134,6 +135,7 @@ export class AbstractChatCompletionRunner<
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
     chatCompletion: ParsedChatCompletion<ParsedT>,
   ): ParsedChatCompletion<ParsedT> {
+    this.#completionArrivedBeforeAbort = !this.controller.signal.aborted;
     normalizeToolCallIds(chatCompletion);
     this._chatCompletions.push(chatCompletion);
     this._emit('chatCompletion', chatCompletion);
@@ -476,6 +478,9 @@ export class AbstractChatCompletionRunner<
         try {
           parsed = await fn.parse(args);
         } catch (error) {
+          if (this.controller.signal.aborted) {
+            throw new APIUserAbortError();
+          }
           const content = error instanceof Error ? error.message : String(error);
           return { message: { role, tool_call_id, content }, functionCalled: false };
         }
@@ -507,7 +512,7 @@ export class AbstractChatCompletionRunner<
       );
       // A completed buffered turn retains its first immediate callback for
       // compatibility; delayed parsed callbacks never inherit this exception.
-      allowBufferedToolCall = this.controller.signal.aborted;
+      allowBufferedToolCall = this.controller.signal.aborted && this.#completionArrivedBeforeAbort;
 
       const message = chatCompletion.choices[0]?.message;
       if (!message) {
@@ -524,6 +529,9 @@ export class AbstractChatCompletionRunner<
           if (result.message) {
             this._addMessage(result.message);
           }
+          if (this.controller.signal.aborted) {
+            throw new APIUserAbortError();
+          }
 
           if (singleFunctionToCall && result.functionCalled) {
             await afterCompletion?.(chatCompletion, runner);
@@ -533,11 +541,13 @@ export class AbstractChatCompletionRunner<
       } else {
         const results = await Promise.allSettled(message.tool_calls.map(runToolCall));
 
-        // Wait for every concurrently running tool to settle before surfacing an
-        // error so tool side effects cannot continue after the runner has ended.
-        for (const result of results) {
-          if (result.status === 'rejected') {
-            throw result.reason;
+        // Wait for all side effects. Ordinary failures retain their existing
+        // behavior; cancellation preserves every callback that already finished.
+        if (!this.controller.signal.aborted) {
+          for (const result of results) {
+            if (result.status === 'rejected') {
+              throw result.reason;
+            }
           }
         }
 
@@ -547,6 +557,9 @@ export class AbstractChatCompletionRunner<
           if (result.status === 'fulfilled' && result.value.message) {
             this._addMessage(result.value.message);
           }
+        }
+        if (this.controller.signal.aborted) {
+          throw new APIUserAbortError();
         }
       }
 
