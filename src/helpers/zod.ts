@@ -3,7 +3,12 @@ import type * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
 import type * as z4Mini from 'zod/v4-mini';
 import type { AutoParseableResponseFormat, AutoParseableTextFormat, AutoParseableTool } from '../lib/parser';
-import { makeParseableResponseFormat, makeParseableTextFormat, makeParseableTool } from '../lib/parser';
+import {
+  makeParseableResponseFormat,
+  makeParseableTextFormat,
+  makeParseableTool,
+  parseResponseFormatContent,
+} from '../lib/parser';
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 import type { AutoParseableResponseTool } from '../lib/ResponsesParser';
 import { makeParseableResponseTool } from '../lib/ResponsesParser';
@@ -202,7 +207,7 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
   zodObject: ZodInput,
   content: string,
 ): InferZodType<ZodInput> {
-  const parsed = JSON.parse(content);
+  const parsed = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
   const parser = (zodObject as { parse?: (data: unknown) => unknown }).parse;
 
   if (typeof parser === 'function') {

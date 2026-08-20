@@ -264,7 +264,10 @@ function parseToolCall<Params extends ResponseCreateParamsBase>(
   if (isAutoParsableTool(inputTool)) {
     parsedArguments = inputTool.$parseRaw(toolCall.arguments);
   } else if (inputTool?.strict) {
-    parsedArguments = JSON.parse(toolCall.arguments);
+    parsedArguments = parseResponseFormatContent(
+      { type: 'json_schema', $parseRaw: undefined },
+      toolCall.arguments,
+    );
   }
 
   return {

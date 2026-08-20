@@ -1,4 +1,4 @@
-import { partialParse } from '../_vendor/partial-json-parser/parser';
+import { MalformedJSON, partialParse } from '../_vendor/partial-json-parser/parser';
 import {
   APIUserAbortError,
   ContentFilterFinishReasonError,
@@ -35,6 +35,18 @@ import type {
 import { Stream } from '../streaming';
 import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
 import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
+
+function parseStructuredStreamingJSON(content: string): unknown {
+  try {
+    return partialParse(content);
+  } catch (error) {
+    if (error instanceof MalformedJSON || error instanceof SyntaxError) {
+      return parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
+    }
+
+    throw error;
+  }
+}
 
 /** An incremental assistant-text event and its accumulated state. */
 export interface ContentDeltaEvent {
@@ -479,7 +491,10 @@ export class ChatCompletionStream<ParsedT = null>
       if (isAutoParsableTool(inputTool)) {
         parsedArguments = inputTool.$parseRaw(toolCallSnapshot.function.arguments);
       } else if (inputTool?.function.strict) {
-        parsedArguments = JSON.parse(toolCallSnapshot.function.arguments);
+        parsedArguments = parseResponseFormatContent(
+          { type: 'json_schema', $parseRaw: undefined },
+          toolCallSnapshot.function.arguments,
+        );
       }
 
       this._emit('tool_calls.function.arguments.done', {
@@ -764,7 +779,9 @@ export class ChatCompletionStream<ParsedT = null>
 
         if (!choice.message.refusal && isParseableResponseFormat(this.#params?.response_format)) {
           // The partial parser does not accept whitespace-only input.
-          choice.message.parsed = choice.message.content.trim() ? partialParse(choice.message.content) : null;
+          choice.message.parsed = choice.message.content.trim()
+            ? parseStructuredStreamingJSON(choice.message.content)
+            : null;
         }
       }
 
@@ -805,7 +822,7 @@ export class ChatCompletionStream<ParsedT = null>
               functionSnapshot.arguments += fn.arguments;
 
               if (shouldParseToolCall(this.#params, tool_call)) {
-                functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+                functionSnapshot.parsed_arguments = parseStructuredStreamingJSON(functionSnapshot.arguments);
               }
             }
           }
