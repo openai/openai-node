@@ -12,6 +12,14 @@ const SAFE_PARSE_FAILURE = 'IMDS response contains invalid JSON';
 
 type AzureProvider = ReturnType<typeof azureManagedIdentityTokenProvider>;
 
+function withParserCause<Failure extends Error>(error: Failure, cause: unknown): Failure {
+  return Object.defineProperty(error, 'cause', {
+    configurable: true,
+    value: cause,
+    writable: true,
+  });
+}
+
 function createWorkloadClient(provider: AzureProvider, apiFetch: typeof fetch): OpenAI {
   return new OpenAI({
     apiKey: null,
@@ -156,6 +164,115 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
 
     await expectPrivateParseFailure(() => provider.getToken(), privateValue);
+  });
+
+  it.each(
+    PRIVATE_VALUES.flatMap((privateValue) =>
+      (['provider', 'workload'] as const).flatMap((boundary) =>
+        (['wrapper', 'nested wrapper'] as const).map((wrapper) => ({ privateValue, boundary, wrapper })),
+      ),
+    ),
+  )(
+    'sanitizes $wrapper parser errors containing $privateValue through the $boundary boundary',
+    async ({ privateValue, boundary, wrapper }) => {
+      const parserError = new SyntaxError(`${privateValue} appeared in the malformed metadata preview`);
+      const wrapped =
+        wrapper === 'wrapper'
+          ? withParserCause(new Error(`${privateValue} custom fetch JSON parser failed`), parserError)
+          : withParserCause(
+              new TypeError(`${privateValue} outer metadata parser wrapper`),
+              withParserCause(new Error(`${privateValue} nested metadata parser wrapper`), parserError),
+            );
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      const readJSON = vi.spyOn(response, 'json').mockRejectedValue(wrapped);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+
+      await expectPrivateParseFailure(operation, privateValue);
+
+      expect(readJSON).toHaveBeenCalledTimes(1);
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['cyclic', 'over-budget'] as const)(
+    'fails closed for a $0 ambiguous wrapped parser failure without disclosing its diagnostic',
+    async (shape) => {
+      const [privateValue] = PRIVATE_VALUES;
+      let original: Error = new SyntaxError(`${privateValue} appeared in the malformed metadata preview`);
+      if (shape === 'cyclic') {
+        original = new Error(`${privateValue} appeared in a cyclic metadata parser wrapper`);
+        Object.defineProperty(original, 'cause', { value: original });
+      } else {
+        for (let depth = 0; depth < 40; depth += 1) {
+          original = withParserCause(
+            new Error(`${privateValue} appeared in a deeply nested metadata parser wrapper`),
+            original,
+          );
+        }
+      }
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+
+      await expectPrivateParseFailure(() => provider.getToken(), privateValue);
+    },
+  );
+
+  it.each(['provider', 'workload'] as const)(
+    'preserves a genuinely non-syntax wrapped parser error through the %s boundary',
+    async (boundary) => {
+      const customCause = new TypeError('the metadata response body became unavailable');
+      const original = withParserCause(
+        new Error('the custom metadata parser could not read its body'),
+        withParserCause(new Error('safe custom parser diagnostics'), customCause),
+      );
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+      let failure: unknown;
+
+      try {
+        await operation();
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+      if (!(failure instanceof SubjectTokenProviderError)) {
+        throw new Error('The public provider did not preserve its custom parser failure.');
+      }
+      expect(failure.cause).toBe(original);
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves custom parser diagnostics without invoking an untrusted cause getter', async () => {
+    const original = new Error('the custom metadata parser could not read its body');
+    const readCause = vi.fn(() => new SyntaxError('an untrusted cause getter must not be invoked'));
+    Object.defineProperty(original, 'cause', { configurable: true, get: readCause });
+    const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+    vi.spyOn(response, 'json').mockRejectedValue(original);
+    const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+    let failure: unknown;
+
+    try {
+      await provider.getToken();
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+    if (!(failure instanceof SubjectTokenProviderError)) {
+      throw new Error('The public provider did not preserve its custom parser failure.');
+    }
+    expect(failure.cause).toBe(original);
+    expect(readCause).not.toHaveBeenCalled();
   });
 
   it.each([new Error('metadata body failed'), new TypeError('metadata body became unusable')])(

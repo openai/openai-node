@@ -7,6 +7,38 @@ import { SubjectTokenProviderError } from '../core/error';
 const DEFAULT_RESOURCE = 'https://management.azure.com/';
 const DEFAULT_AZURE_API_VERSION = '2018-02-01';
 const AZURE_IMDS_BASE_URL = 'http://169.254.169.254/metadata/identity/oauth2/token';
+const MAX_AZURE_IMDS_JSON_ERROR_CAUSES = 32;
+
+function isMalformedAzureJSONError(error: unknown): boolean {
+  const visited = new Set<Error>();
+  let current = error;
+
+  for (let depth = 0; depth < MAX_AZURE_IMDS_JSON_ERROR_CAUSES; depth += 1) {
+    if (current instanceof SyntaxError) {
+      return true;
+    }
+    if (!(current instanceof Error)) {
+      return false;
+    }
+    if (visited.has(current)) {
+      return true;
+    }
+    visited.add(current);
+
+    let cause: PropertyDescriptor | undefined;
+    try {
+      cause = Object.getOwnPropertyDescriptor(current, 'cause');
+    } catch {
+      return true;
+    }
+    if (!cause || !('value' in cause)) {
+      return false;
+    }
+    current = cause.value;
+  }
+
+  return true;
+}
 
 /** Reads the UTF-8 contents of a Kubernetes service-account token file. */
 type ReadFile = (path: string) => Promise<string>;
@@ -179,7 +211,7 @@ export function azureManagedIdentityTokenProvider(
         try {
           data = (await response.json()) as { access_token?: string };
         } catch (error) {
-          if (error instanceof SyntaxError) {
+          if (isMalformedAzureJSONError(error)) {
             throw new SyntaxError('IMDS response contains invalid JSON');
           }
           throw error;
