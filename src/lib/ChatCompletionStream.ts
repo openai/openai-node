@@ -1899,9 +1899,12 @@ export class ChatCompletionStream<ParsedT = null>
       } // Shouldn't happen; just in case.
 
       this.#audioDoneChoiceIndexes.delete(index);
-      const { audio, content, refusal, function_call, role, tool_calls, ...rest } = delta as typeof delta & {
-        audio?: Partial<ChatCompletionAudio> | null;
-      };
+      const { audio, content, refusal, function_call, role, ...capturedDeltaFields } =
+        delta as typeof delta & {
+          audio?: Partial<ChatCompletionAudio> | null;
+        };
+      const { tool_calls: capturedToolCallDelta, ...rest } = capturedDeltaFields;
+      const tool_calls = hasOwn(capturedDeltaFields, 'tool_calls') ? capturedToolCallDelta : delta.tool_calls;
       assertIsEmpty(rest);
       assignOwnProperties(choice.message, rest);
       if (
