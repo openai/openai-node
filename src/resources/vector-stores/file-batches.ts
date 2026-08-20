@@ -8,9 +8,9 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
-import { sleep } from '../../internal/utils/sleep';
 import { type Uploadable } from '../../uploads';
 import { allSettledWithThrow } from '../../lib/Util';
+import { pollVectorStoreFileBatch } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
 
 export class FileBatches extends APIResource {
@@ -107,47 +107,7 @@ export class FileBatches extends APIResource {
     batchID: string,
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
-    const headers = buildHeaders([
-      options?.headers,
-      {
-        'X-Stainless-Poll-Helper': 'true',
-        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-      },
-    ]);
-
-    while (true) {
-      const { data: batch, response } = await this.retrieve(
-        batchID,
-        { vector_store_id: vectorStoreID },
-        {
-          ...options,
-          headers,
-        },
-      ).withResponse();
-
-      switch (batch.status) {
-        case 'in_progress':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        case 'failed':
-        case 'cancelled':
-        case 'completed':
-          return batch;
-      }
-    }
+    return await pollVectorStoreFileBatch(this, vectorStoreID, batchID, options);
   }
 
   /**
