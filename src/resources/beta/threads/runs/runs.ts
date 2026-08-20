@@ -37,7 +37,7 @@ import { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
-import { sleep } from '../../../../internal/utils/sleep';
+import { pollAssistantRun } from '../../../../lib/assistant-run-polling';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
 import { path } from '../../../../internal/utils/path';
 
@@ -180,50 +180,7 @@ export class Runs extends APIResource {
     params: RunRetrieveParams,
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Run> {
-    const headers = buildHeaders([
-      options?.headers,
-      {
-        'X-Stainless-Poll-Helper': 'true',
-        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-      },
-    ]);
-
-    while (true) {
-      const { data: run, response } = await this.retrieve(runId, params, {
-        ...options,
-        headers: { ...options?.headers, ...headers },
-      }).withResponse();
-
-      switch (run.status) {
-        //If we are in any sort of intermediate state we poll
-        case 'queued':
-        case 'in_progress':
-        case 'cancelling':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        //We return the run in any terminal state.
-        case 'requires_action':
-        case 'incomplete':
-        case 'cancelled':
-        case 'completed':
-        case 'failed':
-        case 'expired':
-          return run;
-      }
-    }
+    return await pollAssistantRun(this, runId, params, options);
   }
 
   /**
