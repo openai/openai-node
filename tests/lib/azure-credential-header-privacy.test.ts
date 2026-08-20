@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
 import { vi } from 'vitest';
 
 import { APIConnectionError, AzureOpenAI, OpenAIError } from 'openai';
@@ -21,6 +23,7 @@ class ProtectedHookAzure extends AzureOpenAI {
   mutateCarrier: ((headers: Headers) => void) | undefined;
   inspectAuthenticationCarrier: ((carrier: NullableHeaders) => void) | undefined;
   cloneAuthenticationCarrier: 'spread' | 'assign' | undefined;
+  observeAuthenticationOptions: ((options: FinalRequestOptions) => Promise<void>) | undefined;
 
   protected override async prepareRequest(request: RequestInit): Promise<void> {
     if (this.injectedHeaders) {
@@ -64,6 +67,9 @@ class ProtectedHookAzure extends AzureOpenAI {
     options: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
+    if (this.observeAuthenticationOptions) {
+      await this.observeAuthenticationOptions(options);
+    }
     const carrier = await super.authHeaders(options, schemes);
     if (this.mutation === 'auth') {
       carrier?.values.set('API-KEY', 'mutated-static-token');
@@ -121,6 +127,11 @@ class ProtectedHookAzure extends AzureOpenAI {
   }
 }
 
+const testRequire = createRequire(`${process.cwd()}/package.json`);
+const foreignRequire = createRequire(testRequire.resolve('vitest/package.json'));
+const { Headers: ForeignHeaders } = foreignRequire('undici') as { Headers: typeof Headers };
+const createForeignHeaders = (values: [string, string][]): Headers =>
+  runInNewContext('new ForeignHeaders(values)', { ForeignHeaders, values }) as Headers;
 const BASE_URL = 'https://azure-resource.example.com/openai';
 const API_VERSION = '2024-02-15-preview';
 const PRIVATE_CREDENTIAL = 'azure-private-credential-75da';
@@ -624,6 +635,65 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
+  test('keeps shared request options unchanged across overlapping private authentication waits', async () => {
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+    });
+    const rawHeaders = { 'api-key': 'first-token', 'x-custom': 'preserved' };
+    const body = { safe: 'payload' };
+    const metadata = { source: 'shared request options' };
+    const { signal } = new AbortController();
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/models',
+      body,
+      headers: rawHeaders,
+      __metadata: metadata,
+      signal,
+    };
+    const observed: FinalRequestOptions[] = [];
+    const releases = new Set<number>();
+    client.observeAuthenticationOptions = async (received) => {
+      const index = observed.length;
+      observed.push(received);
+      await vi.waitFor(() => expect(releases.has(index)).toBe(true), { interval: 1 });
+    };
+
+    const first = client.buildRequest(options);
+    const duringFirst = options.headers;
+    const second = client.buildRequest(options);
+    const duringSecond = options.headers;
+    expect(observed).toHaveLength(2);
+    releases.add(0);
+    const firstBuilt = await first;
+    const whileSecondWaits = options.headers;
+    releases.add(1);
+    const secondBuilt = await second;
+
+    expect(duringFirst).toBe(rawHeaders);
+    expect(duringSecond).toBe(rawHeaders);
+    expect(whileSecondWaits).toBe(rawHeaders);
+    expect(options.headers).toBe(rawHeaders);
+    expect(observed).toHaveLength(2);
+    expect(observed[0]).not.toBe(options);
+    expect(observed[1]).not.toBe(options);
+    expect(observed[0]).not.toBe(observed[1]);
+    expect(observed.every((received) => received.__metadata === metadata)).toBe(true);
+    expect(observed.every((received) => received.body === body && received.signal === signal)).toBe(true);
+    expect(firstBuilt.req.headers.get('api-key')).toBe('first-token');
+    expect(secondBuilt.req.headers.get('api-key')).toBe('first-token');
+
+    client.observeAuthenticationOptions = undefined;
+    rawHeaders['api-key'] = 'updated-token';
+    const reused = await client.buildRequest(options);
+    expect(reused.req.headers.get('api-key')).toBe('updated-token');
+    expect(options.headers).toBe(rawHeaders);
+  });
+
   test.each(
     authenticationModes.flatMap((authentication) =>
       (['valid', 'null'] as const).map((override) => ({ authentication, override })),
@@ -1019,6 +1089,162 @@ describe('Azure credential header diagnostic privacy', () => {
       expect(fetch).toHaveBeenCalledTimes(1);
     },
   );
+
+  test.each([
+    ['static API key', 'static-api-key', 'api-key', false] as const,
+    ['rotating bearer token', 'rotating-entra-token', 'authorization', false] as const,
+    ['rotating admin token', 'rotating-entra-token', 'authorization', true] as const,
+  ])(
+    'safely snapshots actual cross-realm undici Headers for %s',
+    async (_description, authentication, name, admin) => {
+      const credential = name === 'api-key' ? 'realm-static-token' : 'Bearer realm-rotating-token';
+      const firstCookie = 'session=first; Expires=Wed, 21 Oct 2015 07:28:00 GMT';
+      const secondCookie = 'preference=second; Path=/';
+      const injected = createForeignHeaders([
+        [name, credential],
+        ['x-custom', 'preserved'],
+        ['set-cookie', firstCookie],
+        ['set-cookie', secondCookie],
+      ]);
+      expect(injected).not.toBeInstanceOf(Headers);
+      const provider = vi.fn(async () => 'configured-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'configured-static-token' }
+          : { azureADTokenProvider: provider, adminAPIKey: 'configured-admin-token' }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: admin },
+      });
+
+      const request = fetch.mock.calls[0]?.[1];
+      expect(request?.headers).toBeInstanceOf(Headers);
+      expect(request?.headers).not.toBe(injected);
+      const sent = request?.headers as Headers;
+      expect(sent.get(name)).toBe(credential);
+      expect(sent.get('x-custom')).toBe('preserved');
+      expect(sent.getSetCookie()).toEqual([firstCookie, secondCookie]);
+      expect(request?.redirect).toBe(name === 'api-key' ? 'manual' : undefined);
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test.each([false, true] as const)(
+    'snapshots cross-realm credential iteration once (malformed first: %s)',
+    async (malformedFirst) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const safe = 'safe-realm credential\tvalue\u00FF';
+      const injected = createForeignHeaders([['api-key', 'placeholder']]);
+      const originalPrototype = Object.getPrototypeOf(injected) as object;
+      const prototype = Object.create(null) as object;
+      for (const name of Reflect.ownKeys(originalPrototype)) {
+        const descriptor = Object.getOwnPropertyDescriptor(originalPrototype, name);
+        if (descriptor) {
+          Object.defineProperty(prototype, name, descriptor);
+        }
+      }
+      let reads = 0;
+      Object.defineProperty(prototype, Symbol.iterator, {
+        configurable: true,
+        value() {
+          reads += 1;
+          const credential = malformedFirst || reads !== 1 ? malformed : safe;
+          return [
+            ['api-key', credential],
+            ['x-custom', 'preserved'],
+          ][Symbol.iterator]();
+        },
+      });
+      Object.setPrototypeOf(injected, prototype);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      if (malformedFirst) {
+        await expectPrivateCredentialFailure(() => client.invokeProtectedFetch(injected), malformed);
+        expect(fetch).not.toHaveBeenCalled();
+      } else {
+        await client.invokeProtectedFetch(injected);
+        const request = fetch.mock.calls[0]?.[1];
+        expect(request?.headers).not.toBe(injected);
+        expect(new Headers(request?.headers).get('api-key')).toBe(safe);
+        expect(new Headers(request?.headers).get('x-custom')).toBe('preserved');
+      }
+      expect(reads).toBe(1);
+    },
+  );
+
+  test('rejects a spoofed cross-realm Headers iterator accessor without invoking it', async () => {
+    let getterReads = 0;
+    const prototype = Object.create(null) as object;
+    Object.defineProperties(prototype, {
+      [Symbol.toStringTag]: { value: 'Headers' },
+      [Symbol.iterator]: {
+        get() {
+          getterReads += 1;
+          throw new Error(`${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`);
+        },
+      },
+      entries: { value: () => [][Symbol.iterator]() },
+      get: { value: () => null },
+      has: { value: () => false },
+    });
+    const injected = Object.create(prototype) as Headers;
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+
+    await expectPrivateCredentialFailure(
+      () => client.invokeProtectedFetch(injected),
+      `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`,
+    );
+    expect(getterReads).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('bounds a cross-realm Headers iterator before materializing untrusted entries', async () => {
+    const injected = createForeignHeaders([['api-key', 'safe-token']]);
+    const prototype = Object.create(Object.getPrototypeOf(injected)) as object;
+    Object.defineProperties(prototype, {
+      [Symbol.toStringTag]: { value: 'Headers' },
+      [Symbol.iterator]: {
+        value: () =>
+          Array.from({ length: 1025 }, (_, index) => [`x-header-${index}`, 'safe'])[Symbol.iterator](),
+      },
+      entries: { value: Object.getPrototypeOf(injected).entries },
+      get: { value: Object.getPrototypeOf(injected).get },
+      has: { value: Object.getPrototypeOf(injected).has },
+    });
+    Object.setPrototypeOf(injected, prototype);
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'safe-key',
+      fetch,
+    });
+    await expect(client.invokeProtectedFetch(injected)).rejects.toThrow(SAFE_ERROR);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
   test.each(['subclass override', 'own override'] as const)(
     'materializes a mutable post-hook Headers %s exactly once before dispatch',

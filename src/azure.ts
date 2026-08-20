@@ -171,21 +171,15 @@ export class AzureOpenAI extends OpenAI {
       }
     }
     const rawHeaders = options.headers;
-    if (rawHeaders !== undefined && rawHeaders !== null) {
-      options.headers = buildAzureAuthenticationHeaders(rawHeaders);
+    const requestOptions =
+      rawHeaders === undefined || rawHeaders === null
+        ? options
+        : { ...options, headers: buildAzureAuthenticationHeaders(rawHeaders) };
+    const built = await super.buildRequest(requestOptions, props);
+    if (built.req.headers.has('api-key')) {
+      built.req.redirect = 'manual';
     }
-
-    try {
-      const built = await super.buildRequest(options, props);
-      if (built.req.headers.has('api-key')) {
-        built.req.redirect = 'manual';
-      }
-      return built;
-    } finally {
-      if (rawHeaders !== undefined && rawHeaders !== null) {
-        options.headers = rawHeaders;
-      }
-    }
+    return built;
   }
 
   protected override async fetchWithAuth(
@@ -196,7 +190,8 @@ export class AzureOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<Response> {
     const suppliedHeaders = init.headers;
-    const headers = buildHeaders([buildAzureAuthenticationHeaders(), suppliedHeaders]).values;
+    const safeHeaders = snapshotCrossRealmHeaders(suppliedHeaders);
+    const headers = buildHeaders([buildAzureAuthenticationHeaders(), safeHeaders]).values;
     if (!hasIntrinsicHeadersIdentity(suppliedHeaders)) {
       init.headers = headers;
     }
@@ -276,6 +271,50 @@ function hasIntrinsicHeadersIdentity(headers: RequestInit['headers']): headers i
       Object.getOwnPropertyDescriptor(intrinsicHeadersPrototype, operation)?.value ===
         intrinsicHeadersDescriptors.get(operation),
   );
+}
+
+function snapshotCrossRealmHeaders(headers: RequestInit['headers']): RequestInit['headers'] {
+  if (headers === undefined || headers === null || typeof headers !== 'object') {
+    return headers;
+  }
+  if (headers instanceof Headers || Array.isArray(headers)) {
+    return headers;
+  }
+
+  const prototype = Object.getPrototypeOf(headers) as object | null;
+  if (
+    prototype === null ||
+    Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value !== 'Headers'
+  ) {
+    return headers;
+  }
+
+  const operations = [Symbol.iterator, 'entries', 'get', 'has'] as const;
+  const valid = operations.every((operation) => {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, operation);
+    return (
+      typeof descriptor?.value === 'function' &&
+      Object.getOwnPropertyDescriptor(headers, operation) === undefined
+    );
+  });
+  if (!valid) {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+
+  const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator) as PropertyDescriptor;
+  const snapshots: [string, string][] = [];
+  for (const row of iterator.value.call(headers) as Iterable<unknown>) {
+    if (snapshots.length >= 1024 || !Array.isArray(row)) {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+    const name: unknown = Reflect.get(row, 0);
+    const value: unknown = Reflect.get(row, 1);
+    if (typeof name !== 'string' || typeof value !== 'string') {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+    snapshots.push([name, value]);
+  }
+  return snapshots;
 }
 
 function protectAzureAmbientHeaders(options: Pick<ClientOptions, 'defaultHeaders'>): void {
