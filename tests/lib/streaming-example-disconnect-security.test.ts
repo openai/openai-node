@@ -26,8 +26,10 @@ interface ExampleRuntime {
   signal?: AbortSignal;
   onProvider?: () => void;
   pendingCreate: boolean;
+  pendingNext: boolean;
   abortError?: Error;
   rejectCreate?: (error: Error) => void;
+  rejectNext?: (error: Error) => void;
 }
 
 function createNodeHTTPEmitter(): EventEmitter {
@@ -83,6 +85,26 @@ function completionChunks(runtime: ExampleRuntime, encoded: boolean): AsyncItera
 
       return {
         async next() {
+          if (encoded && runtime.pendingNext) {
+            runtime.pendingNext = false;
+            const deferred = new AbortController();
+            let failure: Error | undefined;
+            const pending = once(deferred.signal, 'abort').then(() => {
+              throw failure ?? new APIUserAbortError();
+            });
+
+            runtime.rejectNext = (error) => {
+              failure = error;
+              deferred.abort();
+            };
+            runtime.signal?.addEventListener(
+              'abort',
+              () => runtime.rejectNext?.(runtime.abortError ?? new APIUserAbortError()),
+              { once: true },
+            );
+            return pending;
+          }
+
           if (index >= 3) {
             return { done: true as const, value: undefined };
           }
@@ -112,6 +134,7 @@ function loadExample(filename: Example, options: { withoutAbortController?: bool
     cancellations: 0,
     consoleError: vi.fn(),
     pendingCreate: false,
+    pendingNext: false,
   };
 
   const app = {
@@ -361,6 +384,75 @@ describe.each(examples)('%s upstream disconnect lifecycle', (filename) => {
     expect(response.write).toHaveBeenCalledTimes(3);
     expect(response.end).toHaveBeenCalledOnce();
   });
+});
+
+test.each(['response close', 'request abort'] as const)(
+  'the Express example silently handles an SDK iterator abort after %s',
+  async (disconnectEvent) => {
+    const runtime = loadExample('stream-to-client-express.ts');
+    runtime.pendingNext = true;
+    const request = createRequest();
+    const response = createResponse();
+
+    const pending = invoke(runtime, request, response);
+    expect(runtime.rejectNext).toBeDefined();
+
+    if (disconnectEvent === 'response close') {
+      response.destroyed = true;
+      response.emit('close');
+    } else {
+      request.emit('aborted');
+    }
+
+    await pending;
+
+    expect(runtime.signal?.aborted).toBe(true);
+    expect(runtime.aborts).toBe(1);
+    expect(runtime.generated).toBe(0);
+    expect(runtime.consoleError).not.toHaveBeenCalled();
+    expect(response.write).not.toHaveBeenCalled();
+    expect(response.end).not.toHaveBeenCalled();
+    expect(request.listenerCount('aborted')).toBe(0);
+    expect(response.listenerCount('close')).toBe(0);
+  },
+);
+
+test('the Express example still reports a genuine iterator error after a client disconnect', async () => {
+  const providerError = new Error('upstream stream failed during cancellation');
+  const runtime = loadExample('stream-to-client-express.ts');
+  runtime.pendingNext = true;
+  runtime.abortError = providerError;
+  const request = createRequest();
+  const response = createResponse();
+
+  const pending = invoke(runtime, request, response);
+  response.destroyed = true;
+  response.emit('close');
+  await pending;
+
+  expect(runtime.signal?.aborted).toBe(true);
+  expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(request.listenerCount('aborted')).toBe(0);
+  expect(response.listenerCount('close')).toBe(0);
+});
+
+test.each([
+  ['a genuine upstream stream failure', new Error('upstream stream failed')],
+  ['an SDK abort without a client disconnect', new APIUserAbortError()],
+])('the Express example still reports %s', async (_description, providerError) => {
+  const runtime = loadExample('stream-to-client-express.ts');
+  runtime.pendingNext = true;
+  const request = createRequest();
+  const response = createResponse();
+
+  const pending = invoke(runtime, request, response);
+  runtime.rejectNext?.(providerError);
+  await pending;
+
+  expect(runtime.signal?.aborted).toBe(false);
+  expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(request.listenerCount('aborted')).toBe(0);
+  expect(response.listenerCount('close')).toBe(0);
 });
 
 test.each(['response close', 'request abort'] as const)(

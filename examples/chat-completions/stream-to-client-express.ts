@@ -125,6 +125,17 @@ function watchClientDisconnect(req: Request, res: Response) {
   };
 }
 
+function rethrowUnlessClientAbort(
+  error: unknown,
+  disconnect: ReturnType<typeof watchClientDisconnect>,
+): void {
+  const clientConstructor = openai.constructor as typeof OpenAI;
+
+  if (!disconnect?.signal.aborted || !(error instanceof clientConstructor.APIUserAbortError)) {
+    throw error;
+  }
+}
+
 const handleRequest = async (req: Request, res: Response) => {
   console.log('Received request:', req.body);
 
@@ -164,6 +175,8 @@ const handleRequest = async (req: Request, res: Response) => {
     if (!disconnect?.signal.aborted && !res.destroyed) {
       res.end();
     }
+  } catch (error) {
+    rethrowUnlessClientAbort(error, disconnect);
   } finally {
     disconnect?.cleanup();
   }
