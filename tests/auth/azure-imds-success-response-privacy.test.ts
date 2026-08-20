@@ -257,6 +257,72 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     },
   );
 
+  it.each(
+    PRIVATE_VALUES.flatMap((privateValue) =>
+      (['provider', 'workload'] as const).flatMap((boundary) =>
+        (['throwing prototype', 'nested throwing prototype', 'revoked', 'nested revoked'] as const).map(
+          (shape) => ({ privateValue, boundary, shape }),
+        ),
+      ),
+    ),
+  )(
+    'fails closed for a $shape parser rejection containing $privateValue through $boundary',
+    async ({ privateValue, boundary, shape }) => {
+      const target = new Error(`${privateValue} appeared in the malformed metadata preview`);
+      let rejected: object;
+      if (shape === 'revoked' || shape === 'nested revoked') {
+        const temporary = Proxy.revocable(target, {});
+        temporary.revoke();
+        rejected = temporary.proxy;
+      } else {
+        rejected = new Proxy(target, {
+          getPrototypeOf() {
+            throw new Error(`${privateValue} appeared in an unsafe parser brand diagnostic`);
+          },
+        });
+      }
+      if (shape === 'nested throwing prototype' || shape === 'nested revoked') {
+        rejected = withParserCause(
+          new Error(`${privateValue} appeared in the outer metadata parser wrapper`),
+          rejected,
+        );
+      }
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      const readJSON = vi.spyOn(response, 'json').mockRejectedValue(rejected);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+
+      await expectPrivateParseFailure(operation, privateValue);
+
+      expect(readJSON).toHaveBeenCalledTimes(1);
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['provider', 'workload'] as const)(
+    'continues failing closed for a secret-bearing parser descriptor trap through %s',
+    async (boundary) => {
+      const [privateValue] = PRIVATE_VALUES;
+      const rejected = new Proxy(new Error('safe custom metadata parser wrapper'), {
+        getOwnPropertyDescriptor() {
+          throw new Error(`${privateValue} appeared in an unsafe parser descriptor diagnostic`);
+        },
+      });
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      vi.spyOn(response, 'json').mockRejectedValue(rejected);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+
+      await expectPrivateParseFailure(operation, privateValue);
+
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['own name', 'prototype name', 'native prototype', 'foreign type'] as const)(
     'preserves a spoofed or non-syntax cross-realm parser cause: %s',
     async (shape) => {

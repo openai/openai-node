@@ -82,7 +82,7 @@ function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
   }
 }
 
-function isMalformedAzureJSONError(error: unknown): boolean {
+function inspectAzureJSONErrorCause(error: unknown): boolean {
   const visited = new Set<object>();
   let current = error;
 
@@ -118,6 +118,14 @@ function isMalformedAzureJSONError(error: unknown): boolean {
   }
 
   return true;
+}
+
+function isMalformedAzureJSONError(error: unknown): boolean {
+  try {
+    return inspectAzureJSONErrorCause(error);
+  } catch {
+    return true;
+  }
 }
 
 /** Reads the UTF-8 contents of a Kubernetes service-account token file. */
