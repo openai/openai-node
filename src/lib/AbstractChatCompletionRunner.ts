@@ -1,4 +1,4 @@
-import { OpenAIError } from '../error';
+import { APIUserAbortError, OpenAIError } from '../error';
 import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import { uuid4 } from '../internal/utils/uuid';
@@ -439,7 +439,11 @@ export class AbstractChatCompletionRunner<
       functionCalled: boolean;
     };
 
+    let allowBufferedToolCall = false;
+
     const runToolCall = async (toolCall: ChatCompletionMessageToolCall): Promise<ToolCallResult> => {
+      const bufferedToolCall = allowBufferedToolCall;
+      allowBufferedToolCall = false;
       if (toolCall.type !== 'function') {
         return { message: undefined, functionCalled: false };
       }
@@ -475,8 +479,14 @@ export class AbstractChatCompletionRunner<
           const content = error instanceof Error ? error.message : String(error);
           return { message: { role, tool_call_id, content }, functionCalled: false };
         }
+        if (this.controller.signal.aborted) {
+          throw new APIUserAbortError();
+        }
         rawContent = await fn.function(parsed, runner, toolContext);
       } else {
+        if (this.controller.signal.aborted && !bufferedToolCall) {
+          throw new APIUserAbortError();
+        }
         rawContent = await fn.function(args, runner, toolContext);
       }
 
@@ -495,6 +505,10 @@ export class AbstractChatCompletionRunner<
         },
         options,
       );
+      // A completed buffered turn retains its first immediate callback for
+      // compatibility; delayed parsed callbacks never inherit this exception.
+      allowBufferedToolCall = this.controller.signal.aborted;
+
       const message = chatCompletion.choices[0]?.message;
       if (!message) {
         throw new OpenAIError(`missing message in ChatCompletion response`);
