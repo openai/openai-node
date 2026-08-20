@@ -6,6 +6,8 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { describe, expect, test, vi } from 'vitest';
 
+import { APIUserAbortError } from '../../src/core/error';
+
 const examples = ['stream-to-client-express.ts', 'stream-to-client-raw.ts'] as const;
 
 type Example = (typeof examples)[number];
@@ -19,11 +21,13 @@ interface ExampleRuntime {
   aborts: number;
   generated: number;
   cancellations: number;
+  consoleError: ReturnType<typeof vi.fn>;
   handler?: RouteHandler;
   signal?: AbortSignal;
   onProvider?: () => void;
   pendingCreate: boolean;
-  resolveCreate?: (stream: AsyncIterable<Completion>) => void;
+  abortError?: Error;
+  rejectCreate?: (error: Error) => void;
 }
 
 function createNodeHTTPEmitter(): EventEmitter {
@@ -106,6 +110,7 @@ function loadExample(filename: Example, options: { withoutAbortController?: bool
     aborts: 0,
     generated: 0,
     cancellations: 0,
+    consoleError: vi.fn(),
     pendingCreate: false,
   };
 
@@ -144,6 +149,8 @@ function loadExample(filename: Example, options: { withoutAbortController?: bool
   }
 
   class MockOpenAI {
+    static APIUserAbortError = APIUserAbortError;
+
     readonly chat = {
       completions: {
         stream: (_body: unknown, providerOptions?: { signal?: AbortSignal }) => {
@@ -160,9 +167,20 @@ function loadExample(filename: Example, options: { withoutAbortController?: bool
 
           if (runtime.pendingCreate) {
             const deferred = new AbortController();
-            const pending = once(deferred.signal, 'abort').then(() => chunks);
-            runtime.resolveCreate = () => deferred.abort();
-            runtime.signal?.addEventListener('abort', () => deferred.abort(), { once: true });
+            let failure: Error | undefined;
+            const pending = once(deferred.signal, 'abort').then(() => {
+              throw failure ?? new APIUserAbortError();
+            });
+
+            runtime.rejectCreate = (error) => {
+              failure = error;
+              deferred.abort();
+            };
+            runtime.signal?.addEventListener(
+              'abort',
+              () => runtime.rejectCreate?.(runtime.abortError ?? new APIUserAbortError()),
+              { once: true },
+            );
             runtime.onProvider?.();
             return pending;
           }
@@ -207,7 +225,7 @@ function loadExample(filename: Example, options: { withoutAbortController?: bool
   const commonJS = { exports: {} };
   const globals: Record<string, unknown> = {
     Buffer,
-    console: { error: vi.fn(), log: vi.fn() },
+    console: { error: runtime.consoleError, log: vi.fn() },
     exports: commonJS.exports,
     module: commonJS,
     process: { env: {} },
@@ -345,26 +363,72 @@ describe.each(examples)('%s upstream disconnect lifecycle', (filename) => {
   });
 });
 
-test('the raw example aborts a provider request while create is still pending', async () => {
+test.each(['response close', 'request abort'] as const)(
+  'the raw example silently handles an SDK abort while create is pending after %s',
+  async (disconnectEvent) => {
+    const runtime = loadExample('stream-to-client-raw.ts');
+    runtime.pendingCreate = true;
+    const request = createRequest();
+    const response = createResponse();
+
+    const pending = invoke(runtime, request, response);
+    expect(runtime.rejectCreate).toBeDefined();
+
+    if (disconnectEvent === 'response close') {
+      response.destroyed = true;
+      response.emit('close');
+    } else {
+      request.emit('aborted');
+    }
+
+    await pending;
+
+    expect(runtime.signal?.aborted).toBe(true);
+    expect(runtime.aborts).toBe(1);
+    expect(runtime.generated).toBe(0);
+    expect(runtime.consoleError).not.toHaveBeenCalled();
+    expect(response.header).not.toHaveBeenCalled();
+    expect(response.write).not.toHaveBeenCalled();
+    expect(response.end).not.toHaveBeenCalled();
+    expect(request.listenerCount('aborted')).toBe(0);
+    expect(response.listenerCount('close')).toBe(0);
+  },
+);
+
+test('the raw example still reports a genuine provider error after a client disconnect', async () => {
+  const providerError = new Error('upstream connection failed during cancellation');
+  const runtime = loadExample('stream-to-client-raw.ts');
+  runtime.pendingCreate = true;
+  runtime.abortError = providerError;
+  const request = createRequest();
+  const response = createResponse();
+
+  const pending = invoke(runtime, request, response);
+  response.destroyed = true;
+  response.emit('close');
+  await pending;
+
+  expect(runtime.signal?.aborted).toBe(true);
+  expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(request.listenerCount('aborted')).toBe(0);
+  expect(response.listenerCount('close')).toBe(0);
+});
+
+test.each([
+  ['a genuine provider failure', new Error('upstream connection failed')],
+  ['an SDK abort without a client disconnect', new APIUserAbortError()],
+])('the raw example still reports %s', async (_description, providerError) => {
   const runtime = loadExample('stream-to-client-raw.ts');
   runtime.pendingCreate = true;
   const request = createRequest();
   const response = createResponse();
 
   const pending = invoke(runtime, request, response);
-  expect(runtime.resolveCreate).toBeDefined();
-
-  response.destroyed = true;
-  response.emit('close');
-  runtime.resolveCreate?.(completionChunks(runtime, false) as AsyncIterable<Completion>);
+  runtime.rejectCreate?.(providerError);
   await pending;
 
-  expect(runtime.signal?.aborted).toBe(true);
-  expect(runtime.aborts).toBe(1);
-  expect(runtime.generated).toBe(0);
-  expect(response.header).not.toHaveBeenCalled();
-  expect(response.write).not.toHaveBeenCalled();
-  expect(response.end).not.toHaveBeenCalled();
+  expect(runtime.signal?.aborted).toBe(false);
+  expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
   expect(request.listenerCount('aborted')).toBe(0);
   expect(response.listenerCount('close')).toBe(0);
 });
