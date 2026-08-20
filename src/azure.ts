@@ -184,8 +184,11 @@ export class AzureOpenAI extends OpenAI {
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<Response> {
-    const headers = buildHeaders([buildAzureAuthenticationHeaders(), init.headers]).values;
-    init.headers = headers;
+    const suppliedHeaders = init.headers;
+    const headers = buildHeaders([buildAzureAuthenticationHeaders(), suppliedHeaders]).values;
+    if (!hasIntrinsicHeadersIdentity(suppliedHeaders)) {
+      init.headers = headers;
+    }
     if (headers.has('api-key')) {
       init.redirect = 'manual';
     }
@@ -221,6 +224,47 @@ export class AzureOpenAI extends OpenAI {
     }
     return buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.adminAPIKey}`]]);
   }
+}
+
+const intrinsicHeadersPrototype = Headers.prototype;
+const intrinsicHeadersHas = intrinsicHeadersPrototype.has;
+const intrinsicHeadersOperations = [
+  'append',
+  'delete',
+  'entries',
+  'forEach',
+  'get',
+  'getSetCookie',
+  'has',
+  'keys',
+  'set',
+  'values',
+  Symbol.iterator,
+] as const;
+const intrinsicHeadersDescriptors = new Map(
+  intrinsicHeadersOperations.map((operation) => [
+    operation,
+    Object.getOwnPropertyDescriptor(intrinsicHeadersPrototype, operation)?.value,
+  ]),
+);
+
+function hasIntrinsicHeadersIdentity(headers: RequestInit['headers']): headers is Headers {
+  if (!(headers instanceof Headers) || Object.getPrototypeOf(headers) !== intrinsicHeadersPrototype) {
+    return false;
+  }
+
+  try {
+    intrinsicHeadersHas.call(headers, 'api-key');
+  } catch {
+    return false;
+  }
+
+  return intrinsicHeadersOperations.every(
+    (operation) =>
+      Object.getOwnPropertyDescriptor(headers, operation) === undefined &&
+      Object.getOwnPropertyDescriptor(intrinsicHeadersPrototype, operation)?.value ===
+        intrinsicHeadersDescriptors.get(operation),
+  );
 }
 
 function protectAzureAmbientHeaders(options: Pick<ClientOptions, 'defaultHeaders'>): void {

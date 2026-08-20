@@ -12,7 +12,7 @@ type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
 type CarrierAuthenticationScheme = 'auth' | 'bearer' | 'admin';
 
 class ProtectedHookAzure extends AzureOpenAI {
-  injectedHeaders: Record<string, string> | undefined;
+  injectedHeaders: Record<string, string> | Headers | undefined;
   bearerCalls = 0;
   adminCalls = 0;
   fetchFailures = 0;
@@ -45,7 +45,7 @@ class ProtectedHookAzure extends AzureOpenAI {
     throw error;
   }
 
-  invokeProtectedFetch(headers: Record<string, string>): Promise<Response> {
+  invokeProtectedFetch(headers: Record<string, string> | Headers): Promise<Response> {
     return this.fetchWithAuth(
       'https://azure-resource.example.com/openai/models',
       { headers },
@@ -883,6 +883,105 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(new Headers(request?.headers).get('x-custom')).toBe('preserved');
     expect(request?.redirect).toBe('manual');
   });
+
+  test.each([
+    ['static API key', 'static-api-key', 'api-key', false] as const,
+    ['rotating bearer token', 'rotating-entra-token', 'authorization', false] as const,
+    ['rotating admin token', 'rotating-entra-token', 'authorization', true] as const,
+  ])(
+    'preserves an intrinsic post-hook Headers identity and transport metadata for %s',
+    async (_description, authentication, name, admin) => {
+      const credential = name === 'api-key' ? 'hook-static-token' : 'Bearer hook-rotating-token';
+      const injected = new Headers({ [name]: credential, 'x-custom': 'preserved' });
+      const metadata = new WeakMap<Headers, { source: string }>();
+      const marker = { source: 'protected request hook' };
+      metadata.set(injected, marker);
+
+      let transportMetadata: { source: string } | undefined;
+      const fetch = vi.fn(async (_url: RequestInfo, init?: RequestInit) => {
+        if (init?.headers instanceof Headers) {
+          transportMetadata = metadata.get(init.headers);
+        }
+        return Response.json({ ok: true });
+      });
+      const provider = vi.fn(async () => 'configured-provider-token');
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'configured-static-token' }
+          : { azureADTokenProvider: provider, adminAPIKey: 'configured-admin-token' }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: admin },
+      });
+
+      const request = fetch.mock.calls[0]?.[1];
+      expect(request?.headers).toBe(injected);
+      expect(transportMetadata).toBe(marker);
+      expect(injected.get(name)).toBe(credential);
+      expect(injected.get('x-custom')).toBe('preserved');
+      expect(request?.redirect).toBe(name === 'api-key' ? 'manual' : undefined);
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['subclass override', 'own override'] as const)(
+    'materializes a mutable post-hook Headers %s exactly once before dispatch',
+    async (override) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\r${PRIVATE_SUFFIX}`;
+      let reads = 0;
+      const nextEntries = () => {
+        reads += 1;
+        return new Map([
+          ['api-key', reads === 1 ? 'safe-first-token' : malformed],
+          ['x-custom', 'preserved'],
+        ]).entries();
+      };
+
+      const injected = new Headers({ 'api-key': 'placeholder' });
+      const operationOwner =
+        override === 'subclass override'
+          ? Object.getPrototypeOf(Object.setPrototypeOf(injected, Object.create(Headers.prototype)))
+          : injected;
+      Object.defineProperty(operationOwner, 'entries', {
+        configurable: true,
+        value: nextEntries,
+      });
+      Object.defineProperty(operationOwner, Symbol.iterator, {
+        configurable: true,
+        value: nextEntries,
+      });
+
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-static-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client.invokeProtectedFetch(injected);
+
+      const validationReads = reads;
+      const request = fetch.mock.calls[0]?.[1];
+      expect(request?.headers).toBeInstanceOf(Headers);
+      expect(request?.headers).not.toBe(injected);
+      expect(new Headers(request?.headers).get('api-key')).toBe('safe-first-token');
+      expect(new Headers(request?.headers).get('x-custom')).toBe('preserved');
+      expect(request?.redirect).toBe('manual');
+      expect(validationReads).toBe(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
 
   test.each(['Headers', 'tuple'] as const)(
     'preserves safe ambient precedence with %s Azure default headers',
