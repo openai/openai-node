@@ -1,6 +1,7 @@
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { inspect } from 'node:util';
+import { runInNewContext } from 'node:vm';
 import { vi } from 'vitest';
 
 import OpenAI, { SubjectTokenProviderError } from 'openai';
@@ -18,6 +19,23 @@ function withParserCause<Failure extends Error>(error: Failure, cause: unknown):
     value: cause,
     writable: true,
   });
+}
+
+function createCrossRealmJSONFailure(privateValue: string, wrapped = false): unknown {
+  return runInNewContext(
+    [
+      '(() => {',
+      "  try { JSON.parse(privateValue + ' malformed metadata response'); }",
+      '  catch (error) {',
+      '    if (!wrapped) return error;',
+      "    const wrapper = new Error(privateValue + ' foreign metadata parser wrapper');",
+      "    Object.defineProperty(wrapper, 'cause', { configurable: true, value: error });",
+      '    return wrapper;',
+      '  }',
+      '})()',
+    ].join('\n'),
+    { privateValue, wrapped },
+  );
 }
 
 function createWorkloadClient(provider: AzureProvider, apiFetch: typeof fetch): OpenAI {
@@ -196,6 +214,117 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       expect(apiFetch).not.toHaveBeenCalled();
     },
   );
+
+  it.each(
+    PRIVATE_VALUES.flatMap((privateValue) =>
+      (['provider', 'workload'] as const).flatMap((boundary) =>
+        (['direct', 'local wrapper', 'foreign wrapper', 'nested wrapper'] as const).map((shape) => ({
+          privateValue,
+          boundary,
+          shape,
+        })),
+      ),
+    ),
+  )(
+    'sanitizes genuine $shape cross-realm parser errors containing $privateValue through $boundary',
+    async ({ privateValue, boundary, shape }) => {
+      const foreignParserError = createCrossRealmJSONFailure(privateValue);
+      const foreignWrapper = createCrossRealmJSONFailure(privateValue, true);
+      expect(foreignParserError).not.toBeInstanceOf(SyntaxError);
+      expect(foreignParserError).not.toBeInstanceOf(Error);
+      expect(foreignWrapper).not.toBeInstanceOf(Error);
+      let original: unknown;
+      if (shape === 'direct') {
+        original = foreignParserError;
+      } else if (shape === 'local wrapper') {
+        original = withParserCause(new Error('local metadata parser wrapper'), foreignParserError);
+      } else if (shape === 'foreign wrapper') {
+        original = foreignWrapper;
+      } else {
+        original = withParserCause(new TypeError('outer local metadata parser wrapper'), foreignWrapper);
+      }
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      const readJSON = vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+
+      await expectPrivateParseFailure(operation, privateValue);
+
+      expect(readJSON).toHaveBeenCalledTimes(1);
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['own name', 'prototype name', 'native prototype', 'foreign type'] as const)(
+    'preserves a spoofed or non-syntax cross-realm parser cause: %s',
+    async (shape) => {
+      let foreign: unknown;
+      if (shape === 'own name') {
+        foreign = runInNewContext(
+          "Object.defineProperty(new Error('safe custom failure'), 'name', { value: 'SyntaxError' })",
+        );
+      } else if (shape === 'prototype name') {
+        foreign = runInNewContext(
+          [
+            'class CustomParserFailure extends Error {}',
+            "Object.defineProperty(CustomParserFailure.prototype, 'name', { value: 'SyntaxError' });",
+            "new CustomParserFailure('safe custom failure')",
+          ].join('\n'),
+        );
+      } else if (shape === 'native prototype') {
+        foreign = runInNewContext('Object.create(SyntaxError.prototype)');
+      } else {
+        foreign = runInNewContext("new TypeError('safe custom parser type failure')");
+      }
+      const original = withParserCause(new Error('safe custom metadata parser wrapper'), foreign);
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      let failure: unknown;
+
+      try {
+        await provider.getToken();
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+      if (!(failure instanceof SubjectTokenProviderError)) {
+        throw new Error('The public provider did not preserve its custom parser failure.');
+      }
+      expect(failure.cause).toBe(original);
+    },
+  );
+
+  it('never invokes cross-realm name, message, tag, toString, or cause getters', async () => {
+    const foreign = runInNewContext("new Error('safe foreign parser failure')") as object;
+    const reads = vi.fn(() => {
+      throw new Error('an untrusted cross-realm diagnostic getter was invoked');
+    });
+    for (const property of ['name', 'message', 'toString', 'cause', Symbol.toStringTag]) {
+      Object.defineProperty(foreign, property, { configurable: true, get: reads });
+    }
+    const original = withParserCause(new Error('safe custom metadata parser wrapper'), foreign);
+    const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+    vi.spyOn(response, 'json').mockRejectedValue(original);
+    const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+    let failure: unknown;
+
+    try {
+      await provider.getToken();
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+    if (!(failure instanceof SubjectTokenProviderError)) {
+      throw new Error('The public provider did not preserve its custom parser failure.');
+    }
+    expect(failure.cause).toBe(original);
+    expect(reads).not.toHaveBeenCalled();
+  });
 
   it.each(['cyclic', 'over-budget'] as const)(
     'fails closed for a $0 ambiguous wrapped parser failure without disclosing its diagnostic',
