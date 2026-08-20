@@ -185,6 +185,7 @@ async function closeServer(server: Server): Promise<void> {
 describe('workload identity OAuth access-token confidentiality and integrity', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
@@ -298,6 +299,87 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
     expect(harness.exchange).toHaveBeenCalledTimes(1);
     await expect(auth.getToken()).resolves.toBe('safe-concurrent-recovery');
     expect(harness.exchange).toHaveBeenCalledTimes(2);
+  });
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      tokenTypes.flatMap((tokenType) =>
+        [0x80, 0xa0, 0xc3, 0xff].map((byte) => ({ surface, tokenType, byte })),
+      ),
+    ),
+  )(
+    '$surface rejects $tokenType obs-text byte $byte before Bun can UTF-8 rewrite the credential',
+    async ({ surface, tokenType, byte }) => {
+      vi.stubGlobal('Bun', { version: '1.2.14' });
+      const token = [ACCESS_SECRET, String.fromCodePoint(byte), PRIVATE_PATIENT].join('');
+      const harness = createHarness(token, tokenType);
+
+      await expectPrivateFailure(operationFor(surface, harness), token, surface);
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+      expect(harness.subjectToken).toHaveBeenCalledTimes(1);
+      expect(harness.api).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(surfaces)('%s retries with ASCII after rejecting an obs-text Bun exchange', async (surface) => {
+    vi.stubGlobal('Bun', { version: '1.2.14' });
+    const token = [ACCESS_SECRET, String.fromCodePoint(0x80), PRIVATE_PATIENT].join('');
+    const harness = createHarness(token);
+    harness.exchange
+      .mockResolvedValueOnce(oauthResponse(token))
+      .mockResolvedValueOnce(oauthResponse('safe-bun-replacement'));
+    const operation = operationFor(surface, harness);
+
+    await expectPrivateFailure(operation, token, surface);
+    await expect(operation()).resolves.toBeDefined();
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+    expect(harness.api).toHaveBeenCalledTimes(surface === 'public-client' ? 1 : 0);
+  });
+
+  test.each(surfaces)(
+    '%s validates the same single Bun accessor snapshot before caching',
+    async (surface) => {
+      vi.stubGlobal('Bun', { version: '1.2.14' });
+      const token = [ACCESS_SECRET, String.fromCodePoint(0xff), PRIVATE_PATIENT].join('');
+      const read = vi.fn().mockReturnValueOnce(token).mockReturnValue('safe-later-bun-value');
+      const harness = createHarness('unused-safe-token');
+      harness.exchange.mockResolvedValueOnce(accessorResponse(read, true));
+
+      await expectPrivateFailure(operationFor(surface, harness), token, surface);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(harness.api).not.toHaveBeenCalled();
+    },
+  );
+
+  test('shares one rejected Bun obs-text refresh and recovers without poisoning its cache', async () => {
+    vi.stubGlobal('Bun', { version: '1.2.14' });
+    const token = [ACCESS_SECRET, String.fromCodePoint(0x80), PRIVATE_PATIENT].join('');
+    const harness = createHarness(token);
+    harness.exchange
+      .mockResolvedValueOnce(oauthResponse(token))
+      .mockResolvedValueOnce(oauthResponse('safe-bun-concurrent-recovery'));
+    const auth = new WorkloadIdentityAuth(harness.config, harness.fetch);
+
+    const attempts = await Promise.allSettled(Array.from({ length: 24 }, async () => auth.getToken()));
+
+    expect(attempts.every((attempt) => attempt.status === 'rejected')).toBe(true);
+    expect(harness.exchange).toHaveBeenCalledTimes(1);
+    await expect(auth.getToken()).resolves.toBe('safe-bun-concurrent-recovery');
+    expect(harness.exchange).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    { name: 'ascii', token: 'safe-bun-ascii-token' },
+    { name: 'internal HTTP space', token: 'safe bun ascii token' },
+    { name: 'internal HTTP tab', token: ['safe', String.fromCodePoint(0x09), 'bun'].join('') },
+  ])('preserves valid $name workload credentials on Bun', async ({ token }) => {
+    vi.stubGlobal('Bun', { version: '1.2.14' });
+    const harness = createHarness(token);
+    const auth = new WorkloadIdentityAuth(harness.config, harness.fetch);
+
+    await expect(auth.getToken()).resolves.toBe(token);
+    await expect(auth.getToken()).resolves.toBe(token);
+    expect(harness.exchange).toHaveBeenCalledTimes(1);
   });
 
   test.each(leadingWhitespaceCases)(
@@ -673,4 +755,75 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
       await closeServer(server);
     }
   });
+
+  test.each(
+    ['node', 'bun'].flatMap((runtime) =>
+      [0x80, 0xff].map((byte) => ({
+        runtime,
+        byte,
+        token: ['safe', String.fromCodePoint(byte), 'token'].join(''),
+      })),
+    ),
+  )(
+    '$runtime preserves or rejects obs-text byte $byte at the actual public loopback HTTP boundary',
+    async ({ runtime, byte, token }) => {
+      if (runtime === 'bun') {
+        vi.stubGlobal('Bun', { version: '1.2.14' });
+      }
+      let exchangeRequests = 0;
+      let apiRequests = 0;
+      let authorizationBytes: string | undefined;
+      const server = createServer((request, response) => {
+        if (request.url === '/oauth/token') {
+          exchangeRequests += 1;
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ access_token: token, expires_in: 3600 }));
+        } else {
+          apiRequests += 1;
+          authorizationBytes = Buffer.from(request.headers.authorization ?? '', 'latin1').toString('hex');
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ object: 'list', data: [] }));
+        }
+      });
+      const listening = once(server, 'listening');
+      server.listen(0, '127.0.0.1');
+      await listening;
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected an authenticated loopback TCP address.');
+      }
+      const baseURL = ['http://127.0.0.1:', String(address.port)].join('');
+      const nativeFetch = globalThis.fetch;
+      const transport = vi.fn((url: RequestInfo, init?: RequestInit) => {
+        const target = String(url) === OAUTH_URL ? [baseURL, '/oauth/token'].join('') : url;
+        return nativeFetch(target, init);
+      });
+      const client = new OpenAI({
+        apiKey: null,
+        baseURL: [baseURL, '/v1'].join(''),
+        maxRetries: 0,
+        fetch: transport,
+        workloadIdentity: {
+          identityProviderId: 'safe-identity-provider',
+          serviceAccountId: 'safe-service-account',
+          provider: { tokenType: 'jwt', getToken: async () => 'subject-token' },
+        },
+      });
+
+      try {
+        if (runtime === 'bun') {
+          await expectPrivateFailure(() => client.models.list(), token, 'public-client');
+          expect([exchangeRequests, apiRequests]).toEqual([1, 0]);
+          expect(authorizationBytes).toBeUndefined();
+        } else {
+          await expect(client.models.list()).resolves.toBeDefined();
+          expect([exchangeRequests, apiRequests]).toEqual([1, 1]);
+          expect(authorizationBytes).toBe(Buffer.from(['Bearer ', token].join(''), 'latin1').toString('hex'));
+          expect(authorizationBytes).toContain(byte.toString(16));
+        }
+      } finally {
+        await closeServer(server);
+      }
+    },
+  );
 });

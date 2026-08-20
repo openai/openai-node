@@ -15,6 +15,14 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 
+function isUnsafeAccessToken(accessToken: string): boolean {
+  const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
+  if (typeof scope.Bun?.version === 'string') {
+    return /[^\t\u0020-\u007E]|^[\t ]|[\t ]$/u.test(accessToken);
+  }
+  return /[^\t\u0020-\u007E\u0080-\u00FF]|^[\t ]|[\t ]$/u.test(accessToken);
+}
+
 /**
  * Exchanges external workload-identity tokens for cached OpenAI access tokens.
  *
@@ -134,7 +142,7 @@ export class WorkloadIdentityAuth {
     if (
       typeof accessToken !== 'string' ||
       accessToken.trim().length === 0 ||
-      /[^\t\u0020-\u007E\u0080-\u00FF]|^[\t ]|[\t ]$/u.test(accessToken)
+      isUnsafeAccessToken(accessToken)
     ) {
       throw new OpenAIError("Token exchange response missing 'access_token' field");
     }
