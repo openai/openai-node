@@ -93,6 +93,7 @@
     "@aws-sdk/credential-provider-node": ">=3.972.0 <4",
     "@smithy/hash-node": ">=4.3.0 <5",
     "@smithy/signature-v4": ">=5.4.0 <6",
+    "undici": ">=7 <9",
     "ws": "^8.18.0",
     "zod": "^3.25 || ^4.0"
   },
@@ -104,6 +105,9 @@
       "optional": true
     },
     "@smithy/signature-v4": {
+      "optional": true
+    },
+    "undici": {
       "optional": true
     },
     "ws": {

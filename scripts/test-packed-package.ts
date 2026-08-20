@@ -16,6 +16,8 @@ const packedPackagePath = require('node:path');
     engines?: {
       node?: string;
     };
+    peerDependencies?: Record<string, string>;
+    peerDependenciesMeta?: Record<string, { optional?: boolean }>;
   }
 
   interface RunOptions {
@@ -73,6 +75,8 @@ const packedPackagePath = require('node:path');
     source === 'helpers/zod.ts' ||
     source === 'helpers/audio.ts' ||
     source === 'providers/bedrock/aws.ts' ||
+    source === 'auth/x509-transport.ts' ||
+    source === 'internal/auth/x509-transport-capability.ts' ||
     source === 'auth/index.ts' ||
     source === 'auth/subject-token-providers.ts';
 
@@ -328,6 +332,28 @@ const packedPackagePath = require('node:path');
       sourcePackage.engines,
       'Packed package engine metadata differs from package.json',
     );
+    assert.equal(installedPackage.peerDependencies?.['undici'], '>=7 <9');
+    assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
+    const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
+    assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
+    fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
+
+    for (const [inputType, consumer] of [
+      [
+        'commonjs',
+        "const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+      ],
+      [
+        'module',
+        "import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+      ],
+    ]) {
+      run(process.execPath, [
+        `--input-type=${inputType}`,
+        '-e',
+        `${consumer} const dispatcher = new Agent(); const transport = createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); if (!Object.isFrozen(transport)) throw new Error('X.509 transport capability is not frozen'); dispatcher.close();`,
+      ]);
+    }
 
     console.log(
       `Packed npm artifact passed CommonJS, ESM, and ${browserSafeSources.length}/${mappedSources.size} source checks across ${sourceMaps.length} source maps on ${process.version}.`,
