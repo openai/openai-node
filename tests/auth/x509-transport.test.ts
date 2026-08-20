@@ -1,4 +1,6 @@
 import { X509Certificate } from 'node:crypto';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
 import { Agent, ProxyAgent } from 'undici';
 import { vi } from 'vitest';
 
@@ -182,6 +184,40 @@ describe('explicit X.509 transport capability', () => {
     }
   });
 
+  test('rejects a URL that misreports HTTPS without leaking credentials to a plaintext server', async () => {
+    const dispatcher = new Agent();
+    let leakedAuthorization: string | undefined;
+    const attacker = createServer((request, response) => {
+      leakedAuthorization = request.headers.authorization;
+      response.writeHead(200);
+      response.end();
+    });
+    const listening = once(attacker, 'listening');
+    attacker.listen(0, '127.0.0.1');
+    await listening;
+
+    try {
+      const address = attacker.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected a loopback TCP server address');
+      }
+
+      const target = new URL(`http://127.0.0.1:${address.port}`);
+      Object.defineProperty(target, 'protocol', { get: () => 'https:' });
+      const capability = createX509Transport(directOptions(dispatcher));
+
+      await expect(
+        sendX509Request(capability, target, { headers: { authorization: 'Bearer synthetic-secret' } }),
+      ).rejects.toThrow(/HTTPS/iu);
+      expect(leakedAuthorization).toBeUndefined();
+    } finally {
+      attacker.closeAllConnections();
+      const closed = once(attacker, 'close');
+      attacker.close();
+      await Promise.all([dispatcher.close(), closed]);
+    }
+  });
+
   test('rejects per-request dispatcher overrides before dispatch', async () => {
     const dispatcher = new Agent();
     const override = new Agent();
@@ -237,6 +273,52 @@ describe('explicit X.509 transport capability', () => {
       );
     } finally {
       await Promise.all([dispatcher.close(), replacement.close(), closeObservedServers(server)]);
+    }
+  });
+
+  test('preserves inherited request method, headers, and body at native dispatch', async () => {
+    const lab = createX509TestLab();
+    let observedMethod: string | undefined;
+    let observedAuthorization: string | undefined;
+    let observedBody = '';
+    const server = createMutualTLSServer(lab, (request, response) => {
+      observedMethod = request.method;
+      observedAuthorization = request.headers.authorization;
+      request.setEncoding('utf-8');
+      request.on('data', (chunk: string) => {
+        observedBody += chunk;
+      });
+      request.once('end', () => {
+        response.writeHead(200);
+        response.end();
+      });
+    });
+    const dispatcher = new Agent({
+      connect: {
+        ca: lab.certificateAuthority,
+        cert: lab.firstClient.certificate,
+        key: lab.firstClient.privateKey,
+        servername: 'localhost',
+      },
+      maxCachedSessions: 0,
+    });
+
+    try {
+      const inherited = {
+        method: 'POST',
+        headers: { authorization: 'Bearer synthetic-secret' },
+        body: 'inherited-request-body',
+      };
+      const options: RequestInit = Object.create(inherited);
+      const capability = createX509Transport(directOptions(dispatcher));
+      const response = await sendX509Request(capability, await listenLoopback(server), options);
+      await response.body?.cancel();
+
+      expect(observedMethod).toBe('POST');
+      expect(observedAuthorization).toBe('Bearer synthetic-secret');
+      expect(observedBody).toBe('inherited-request-body');
+    } finally {
+      await Promise.all([dispatcher.close(), closeObservedServers(server)]);
     }
   });
 

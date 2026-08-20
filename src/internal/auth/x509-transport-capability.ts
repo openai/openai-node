@@ -142,7 +142,8 @@ export async function sendX509Request(
     throw new Error('Invalid X.509 transport capability.');
   }
 
-  if (target.protocol !== 'https:') {
+  const normalizedTarget = new URL(target.href);
+  if (normalizedTarget.protocol !== 'https:') {
     throw new Error('X.509 transport requires an HTTPS destination.');
   }
 
@@ -150,6 +151,11 @@ export async function sendX509Request(
     throw new Error('X.509 transport does not allow a per-request dispatcher override.');
   }
 
-  const response = await fetch(target, { ...options, dispatcher, redirect: 'manual' });
+  const requestOptions: NonNullable<Parameters<typeof fetch>[1]> = Object.create(options);
+  Object.defineProperties(requestOptions, {
+    dispatcher: { value: dispatcher, enumerable: true },
+    redirect: { value: 'manual', enumerable: true },
+  });
+  const response = await fetch(normalizedTarget, requestOptions);
   return response;
 }

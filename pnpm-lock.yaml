@@ -137,7 +137,7 @@ importers:
         version: 16.3.0(@babel/core@7.29.7)(@types/node@26.2.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       openai:
         specifier: file:..
-        version: file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(ws@8.21.1)(zod@4.4.3)
+        version: file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(undici@8.9.0)(ws@8.21.1)(zod@4.4.3)
       undici:
         specifier: ^8.9.0
         version: 8.9.0
@@ -2978,6 +2978,7 @@ packages:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
       '@smithy/hash-node': '>=4.3.0 <5'
       '@smithy/signature-v4': '>=5.4.0 <6'
+      undici: '>=7 <9'
       ws: ^8.18.0
       zod: ^3.25 || ^4.0
     peerDependenciesMeta:
@@ -2986,6 +2987,8 @@ packages:
       '@smithy/hash-node':
         optional: true
       '@smithy/signature-v4':
+        optional: true
+      undici:
         optional: true
       ws:
         optional: true
@@ -6734,11 +6737,12 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
-  openai@file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(ws@8.21.1)(zod@4.4.3):
+  openai@file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(undici@8.9.0)(ws@8.21.1)(zod@4.4.3):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.78
       '@smithy/hash-node': 4.4.16
       '@smithy/signature-v4': 5.6.12
+      undici: 8.9.0
       ws: 8.21.1
       zod: 4.4.3
 
