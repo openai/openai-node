@@ -1,12 +1,13 @@
 import { timingSafeEqual } from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { runInNewContext } from 'node:vm';
 
 import ts from 'typescript';
 import { describe, expect, test, vi } from 'vitest';
 
-import { APIUserAbortError } from '../../src/core/error';
+import OpenAI, { APIUserAbortError } from '../../src/index';
 
 const examples = ['stream-to-client-express.ts', 'stream-to-client-raw.ts'] as const;
 
@@ -126,7 +127,10 @@ function completionChunks(runtime: ExampleRuntime, encoded: boolean): AsyncItera
   };
 }
 
-function loadExample(filename: Example, options: { withoutAbortController?: boolean } = {}): ExampleRuntime {
+function loadExample(
+  filename: Example,
+  options: { withoutAbortController?: boolean; client?: new () => OpenAI } = {},
+): ExampleRuntime {
   const runtime: ExampleRuntime = {
     apiCalls: 0,
     aborts: 0,
@@ -227,7 +231,7 @@ function loadExample(filename: Example, options: { withoutAbortController?: bool
 
   function requireExampleModule(specifier: string): unknown {
     if (specifier === 'openai') {
-      return { __esModule: true, default: MockOpenAI };
+      return { __esModule: true, default: options.client ?? MockOpenAI };
     }
     if (specifier === 'express') {
       return { __esModule: true, default: express };
@@ -269,6 +273,94 @@ function invoke(runtime: ExampleRuntime, request: unknown, response: unknown): P
   }
 
   return runtime.handler(request, response);
+}
+
+async function loadPublicExample(filename: Example, mode: 'pending' | 'complete' | 'failure' = 'pending') {
+  const upstreamClosed: Promise<unknown[]>[] = [];
+  const upstream = createServer((_request, response) => {
+    upstreamClosed.push(once(response, 'close'));
+
+    if (mode === 'failure') {
+      response.writeHead(500, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ error: { message: 'intentional public upstream failure' } }));
+      return;
+    }
+
+    if (mode === 'pending' && filename === 'stream-to-client-raw.ts') {
+      return;
+    }
+
+    response.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    response.flushHeaders();
+
+    if (mode === 'complete') {
+      const base = {
+        id: 'chatcmpl-public-loopback',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+      };
+      const content = {
+        ...base,
+        choices: [
+          { index: 0, delta: { role: 'assistant', content: 'safe public chunk' }, finish_reason: null },
+        ],
+      };
+      const finished = {
+        ...base,
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+      };
+      response.end(
+        `data: ${JSON.stringify(content)}\n\ndata: ${JSON.stringify(finished)}\n\ndata: [DONE]\n\n`,
+      );
+    }
+  });
+
+  const listening = once(upstream, 'listening');
+  upstream.listen(0, '127.0.0.1');
+  await listening;
+
+  const address = upstream.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('The public SDK loopback server has no local port');
+  }
+  const baseURL = `http://127.0.0.1:${address.port}/v1`;
+
+  let signal: AbortSignal | undefined;
+  let body: ReadableStream<Uint8Array> | null | undefined;
+  const transport = vi.fn<typeof fetch>(async (request, options) => {
+    signal = options?.signal ?? undefined;
+    const response = await fetch(request, options);
+    ({ body } = response);
+    return response;
+  });
+
+  const PublicOpenAI = OpenAI.bind(undefined, {
+    apiKey: 'public-sdk-loopback-test-key',
+    baseURL,
+    fetch: transport,
+    maxRetries: 0,
+  });
+
+  return {
+    runtime: loadExample(filename, { client: PublicOpenAI }),
+    transport,
+    upstream,
+    upstreamClosed,
+    get signal() {
+      return signal;
+    },
+    get body() {
+      return body;
+    },
+  };
+}
+
+async function closePublicExample(upstream: ReturnType<typeof createServer>): Promise<void> {
+  const closed = once(upstream, 'close');
+  upstream.closeAllConnections();
+  upstream.close();
+  await closed;
 }
 
 describe.each(examples)('%s upstream disconnect lifecycle', (filename) => {
@@ -384,6 +476,95 @@ describe.each(examples)('%s upstream disconnect lifecycle', (filename) => {
     expect(response.write).toHaveBeenCalledTimes(3);
     expect(response.end).toHaveBeenCalledOnce();
   });
+});
+
+test.each([
+  ['stream-to-client-express.ts', 'response close'],
+  ['stream-to-client-express.ts', 'request abort'],
+  ['stream-to-client-raw.ts', 'response close'],
+  ['stream-to-client-raw.ts', 'request abort'],
+] as const)(
+  'the public SDK aborts %s through the real loopback transport after %s',
+  async (filename, event) => {
+    const client = await loadPublicExample(filename);
+    const request = createRequest();
+    const response = createResponse();
+
+    try {
+      const pending = invoke(client.runtime, request, response);
+      await vi.waitFor(() => expect(client.transport).toHaveBeenCalledOnce(), { timeout: 250 });
+      await vi.waitFor(() => expect(client.upstreamClosed).toHaveLength(1));
+
+      if (filename === 'stream-to-client-express.ts') {
+        await vi.waitFor(() => expect(client.body?.locked).toBe(true));
+      }
+
+      expect(client.signal).toBeInstanceOf(AbortSignal);
+      expect(client.signal?.aborted).toBe(false);
+
+      if (event === 'response close') {
+        response.destroyed = true;
+        response.emit('close');
+      } else {
+        request.emit('aborted');
+      }
+
+      await pending;
+      await client.upstreamClosed[0];
+
+      expect(client.signal?.aborted).toBe(true);
+      expect(client.runtime.consoleError).not.toHaveBeenCalled();
+      expect(response.write).not.toHaveBeenCalled();
+      expect(response.end).not.toHaveBeenCalled();
+      expect(request.listenerCount('aborted')).toBe(0);
+      expect(response.listenerCount('close')).toBe(0);
+    } finally {
+      await closePublicExample(client.upstream);
+    }
+  },
+);
+
+test.each(examples)(
+  'the public SDK completes %s through the real SSE loopback transport',
+  async (filename) => {
+    const client = await loadPublicExample(filename, 'complete');
+    const request = createRequest();
+    const response = createResponse();
+
+    try {
+      await invoke(client.runtime, request, response);
+
+      expect(client.transport).toHaveBeenCalledOnce();
+      expect(client.runtime.consoleError).not.toHaveBeenCalled();
+      expect(response.write).toHaveBeenCalled();
+      expect(response.end).toHaveBeenCalledOnce();
+      expect(request.listenerCount('aborted')).toBe(0);
+      expect(response.listenerCount('close')).toBe(0);
+    } finally {
+      await closePublicExample(client.upstream);
+    }
+  },
+);
+
+test.each(examples)('the public SDK still reports genuine upstream failures from %s', async (filename) => {
+  const client = await loadPublicExample(filename, 'failure');
+  const request = createRequest();
+  const response = createResponse();
+
+  try {
+    await invoke(client.runtime, request, response);
+
+    expect(client.transport).toHaveBeenCalledOnce();
+    expect(client.runtime.consoleError).toHaveBeenCalledOnce();
+    expect(String(client.runtime.consoleError.mock.calls[0]?.[0])).toContain(
+      'intentional public upstream failure',
+    );
+    expect(response.end).not.toHaveBeenCalled();
+    expect(request.listenerCount('aborted')).toBe(0);
+    expect(response.listenerCount('close')).toBe(0);
+  } finally {
+    await closePublicExample(client.upstream);
+  }
 });
 
 test.each(['response close', 'request abort'] as const)(
