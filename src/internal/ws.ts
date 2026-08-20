@@ -44,13 +44,34 @@ interface CredentialedWebSocketOptions {
   headers?: object | null | undefined;
 }
 
+const REDIRECT_SAFE_WEBSOCKET_HEADERS = new Set([
+  'connection',
+  'host',
+  'openai-beta',
+  'origin',
+  'sec-websocket-extensions',
+  'sec-websocket-key',
+  'sec-websocket-version',
+  'upgrade',
+  'user-agent',
+  'x-access-level',
+  'x-auth-metadata',
+  'x-auth-tokenization',
+  'x-authentication-metadata',
+  'x-authentication-tokenization',
+  'x-security-policy',
+  'x-token-budget',
+  'x-trace-id',
+]);
+
 /** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */
 export function protectWebSocketOptionsFromCredentialRedirects<Options extends CredentialedWebSocketOptions>(
   options: Options,
 ): Options {
-  const hasSensitiveHeader = Object.keys(options.headers ?? {}).some(
-    (name) => /^(?:authorization|proxy-authorization|cookie)$/iu.test(name) || /api[-_]?key/iu.test(name),
-  );
+  const hasSensitiveHeader = Object.keys(options.headers ?? {}).some((name) => {
+    const normalized = name.toLowerCase().split('_').join('-');
+    return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(normalized);
+  });
 
   if (!options.auth && !hasSensitiveHeader) {
     return options;
