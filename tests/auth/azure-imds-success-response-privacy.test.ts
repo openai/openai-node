@@ -338,6 +338,59 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   it.each(
     PRIVATE_VALUES.flatMap((privateValue) =>
       (['provider', 'workload'] as const).flatMap((boundary) =>
+        (['own data', 'own accessor', 'inherited data', 'inherited accessor'] as const).flatMap((tag) =>
+          (['foreign syntax', 'marked fetch'] as const).flatMap((parser) =>
+            (['direct', 'wrapped'] as const).map((shape) => ({
+              privateValue,
+              boundary,
+              tag,
+              parser,
+              shape,
+            })),
+          ),
+        ),
+      ),
+    ),
+  )(
+    'follows a $shape $tag foreign wrapper to its $parser containing $privateValue through $boundary',
+    async ({ privateValue, boundary, tag, parser, shape }) => {
+      const foreign = createCrossRealmJSONFailure(privateValue, true) as object;
+      if (parser === 'marked fetch') {
+        Object.defineProperty(foreign, 'cause', {
+          configurable: true,
+          value: createCauseFreeJSONFailure(privateValue),
+        });
+      }
+      const tagged = tag.startsWith('own') ? foreign : (Object.getPrototypeOf(foreign) as object);
+      const readTag = vi.fn(() => {
+        throw new Error(`${privateValue} escaped through an untrusted foreign wrapper tag`);
+      });
+      Object.defineProperty(tagged, Symbol.toStringTag, {
+        configurable: true,
+        ...(tag.endsWith('accessor') ? { get: readTag } : { value: 'DecoratedParserWrapper' }),
+      });
+      const original =
+        shape === 'direct'
+          ? foreign
+          : withParserCause(new Error(`${privateValue} outer metadata parser wrapper`), foreign);
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      const readJSON = vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(provider, apiFetch);
+      const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+
+      await expectPrivateParseFailure(operation, privateValue);
+
+      expect(readTag).not.toHaveBeenCalled();
+      expect(readJSON).toHaveBeenCalledTimes(1);
+      expect(apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    PRIVATE_VALUES.flatMap((privateValue) =>
+      (['provider', 'workload'] as const).flatMap((boundary) =>
         (['throwing prototype', 'nested throwing prototype', 'revoked', 'nested revoked'] as const).map(
           (shape) => ({ privateValue, boundary, shape }),
         ),
@@ -439,6 +492,51 @@ describe('Azure IMDS successful-response JSON privacy', () => {
         throw new Error('The public provider did not preserve its custom parser failure.');
       }
       expect(failure.cause).toBe(original);
+    },
+  );
+
+  it.each(['safe foreign cause', 'fake native marker', 'cause accessor'] as const)(
+    'preserves a tagged foreign parser wrapper with a $0 without invoking untrusted getters',
+    async (shape) => {
+      const foreign =
+        shape === 'fake native marker'
+          ? (runInNewContext('Object.create(Error.prototype)') as object)
+          : (runInNewContext("new Error('safe foreign metadata parser wrapper')") as object);
+      const readTag = vi.fn(() => {
+        throw new Error('an untrusted foreign wrapper tag getter was invoked');
+      });
+      const readCause = vi.fn(() => new SyntaxError('an untrusted foreign wrapper cause was invoked'));
+      Object.defineProperty(foreign, Symbol.toStringTag, { configurable: true, get: readTag });
+      if (shape === 'cause accessor') {
+        Object.defineProperty(foreign, 'cause', { configurable: true, get: readCause });
+      } else {
+        Object.defineProperty(foreign, 'cause', {
+          configurable: true,
+          value: new TypeError('the metadata response body became unavailable'),
+        });
+      }
+      if (shape === 'fake native marker') {
+        Object.defineProperty(foreign, 'type', { configurable: true, value: 'invalid-json' });
+      }
+      const original = withParserCause(new Error('safe custom metadata parser wrapper'), foreign);
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      let failure: unknown;
+
+      try {
+        await provider.getToken();
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+      if (!(failure instanceof SubjectTokenProviderError)) {
+        throw new Error('The public provider did not preserve its custom parser failure.');
+      }
+      expect(failure.cause).toBe(original);
+      expect(readTag).not.toHaveBeenCalled();
+      expect(readCause).not.toHaveBeenCalled();
     },
   );
 

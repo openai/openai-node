@@ -12,6 +12,7 @@ const getOwnErrorDescriptor = Object.getOwnPropertyDescriptor;
 const getErrorPrototype = Object.getPrototypeOf;
 const errorObjectToString = Object.prototype.toString;
 const errorFunctionToString = Function.prototype.toString;
+const nativeErrorSource = errorFunctionToString.call(Error);
 const nativeSyntaxErrorSource = errorFunctionToString.call(SyntaxError);
 const nativeErrorBrandDescriptor = getOwnErrorDescriptor(Error, 'isError');
 const nativeErrorBrand =
@@ -21,15 +22,15 @@ const nativeErrorBrand =
     ? (nativeErrorBrandDescriptor.value as (error: object) => boolean)
     : undefined;
 
-type AzureJSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
+type AzureJSONErrorKind = 'error' | 'syntax' | 'tagged-wrapper' | 'unknown' | 'unsafe';
 
-function hasNativeSyntaxErrorPrototype(prototype: object): boolean {
+function hasNativeErrorPrototype(prototype: object, kind: 'Error' | 'SyntaxError'): boolean {
   const name = getOwnErrorDescriptor(prototype, 'name');
   const constructor = getOwnErrorDescriptor(prototype, 'constructor');
   if (
     !name ||
     !('value' in name) ||
-    name.value !== 'SyntaxError' ||
+    name.value !== kind ||
     !constructor ||
     !('value' in constructor) ||
     typeof constructor.value !== 'function'
@@ -38,11 +39,12 @@ function hasNativeSyntaxErrorPrototype(prototype: object): boolean {
   }
 
   const originalPrototype = getOwnErrorDescriptor(constructor.value, 'prototype');
+  const nativeSource = kind === 'Error' ? nativeErrorSource : nativeSyntaxErrorSource;
   return Boolean(
     originalPrototype &&
     'value' in originalPrototype &&
     originalPrototype.value === prototype &&
-    errorFunctionToString.call(constructor.value) === nativeSyntaxErrorSource,
+    errorFunctionToString.call(constructor.value) === nativeSource,
   );
 }
 
@@ -72,17 +74,24 @@ function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
       return 'unknown';
     }
 
+    let genericErrorPrototype = false;
     for (let index = 1; index < prototypes.length; index += 1) {
       const prototype = prototypes[index];
       if (!prototype) {
         return 'unsafe';
       }
-      if (hasNativeSyntaxErrorPrototype(prototype)) {
+      if (hasNativeErrorPrototype(prototype, 'SyntaxError')) {
         return tagged ? 'unsafe' : 'syntax';
+      }
+      if (tagged && hasNativeErrorPrototype(prototype, 'Error')) {
+        genericErrorPrototype = true;
       }
     }
 
-    return tagged ? 'unknown' : 'error';
+    if (!tagged) {
+      return 'error';
+    }
+    return genericErrorPrototype ? 'tagged-wrapper' : 'unknown';
   } catch {
     return 'unsafe';
   }
@@ -103,12 +112,14 @@ function inspectAzureJSONErrorCause(error: unknown): boolean {
     if (kind === 'syntax' || kind === 'unsafe') {
       return true;
     }
-    if (kind !== 'error') {
+    if (kind !== 'error' && kind !== 'tagged-wrapper') {
       return false;
     }
-    const parserType = getOwnErrorDescriptor(current, 'type');
-    if (parserType && 'value' in parserType && parserType.value === 'invalid-json') {
-      return true;
+    if (kind === 'error') {
+      const parserType = getOwnErrorDescriptor(current, 'type');
+      if (parserType && 'value' in parserType && parserType.value === 'invalid-json') {
+        return true;
+      }
     }
     if (visited.has(current)) {
       return true;
