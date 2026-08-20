@@ -49,7 +49,9 @@ export function protectWebSocketOptionsFromCredentialRedirects<Options extends C
   options: Options,
 ): Options {
   const hasSensitiveHeader = Object.keys(options.headers ?? {}).some(
-    (name) => /^(?:authorization|proxy-authorization|cookie)$/iu.test(name) || /api[-_]?key/iu.test(name),
+    (name) =>
+      /^(?:authorization|proxy-authorization|cookie)$/iu.test(name) ||
+      /api[-_]?key|(?:^|[-_])(?:auth|access|session|security)[-_]?token(?:$|[-_])/iu.test(name),
   );
 
   if (!options.auth && !hasSensitiveHeader) {
