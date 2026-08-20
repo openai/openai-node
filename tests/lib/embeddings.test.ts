@@ -1,5 +1,7 @@
 import OpenAI from 'openai';
 
+import base64EmbeddingFixture from '../api-resources/embeddings-base64-response.json';
+import floatEmbeddingFixture from '../api-resources/embeddings-float-response.json';
 import { compareType, expectType } from '../utils/typing';
 
 const vector = [1.25, -2.5];
@@ -27,6 +29,55 @@ function createClient(): OpenAI {
     },
   });
 }
+
+function makeFixtureClient(): OpenAI {
+  return new OpenAI({
+    apiKey: 'My API Key',
+    baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+    fetch: async (_, init) => {
+      const format = (JSON.parse(String(init?.body)) as OpenAI.EmbeddingCreateParams).encoding_format;
+      // These existing responses were taken from the live API with:
+      // model: 'text-embedding-3-large', input: 'h', dimensions: 256.
+      return Response.json(format === 'base64' ? base64EmbeddingFixture : floatEmbeddingFixture);
+    },
+  });
+}
+
+describe('resource embeddings', () => {
+  test('create: encoding_format=default should create float32 embeddings', async () => {
+    const client = makeFixtureClient();
+    const response = await client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+    });
+
+    expect(Array.isArray(response.data?.[0]?.embedding)).toBe(true);
+    expect(response.data?.[0]?.embedding[0]).toBe(-0.09928705543279648);
+  });
+
+  test('create: encoding_format=float should create float32 embeddings', async () => {
+    const client = makeFixtureClient();
+    const response = await client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+      encoding_format: 'float',
+    });
+
+    expect(Array.isArray(response.data?.[0]?.embedding)).toBe(true);
+    expect(response.data?.[0]?.embedding[0]).toBe(-0.099287055);
+  });
+
+  test('create: encoding_format=base64 should return base64 embeddings', async () => {
+    const client = makeFixtureClient();
+    const response = await client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+      encoding_format: 'base64',
+    });
+
+    expect(typeof response.data?.[0]?.embedding).toBe('string');
+  });
+});
 
 describe('embedding response types', () => {
   test('preserves numeric embedding types for default and float requests', async () => {
