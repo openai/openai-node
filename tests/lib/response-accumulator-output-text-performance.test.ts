@@ -273,6 +273,41 @@ describe('canonical streamed response output text', () => {
     expect(work.count).toBeLessThanOrEqual(count * 8);
   });
 
+  test('recounts long public snapshots without comparing the previous aggregate', () => {
+    const count = 16_000;
+    const delta = 'x'.repeat(64);
+    const snapshot = accumulateResponse(created([message(0, [text('')])]));
+    let aggregate = snapshot.output_text;
+    let recounted = false;
+    let readsBeforeRecount = 0;
+    Object.defineProperty(snapshot, 'output_text', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (!recounted) {
+          readsBeforeRecount += 1;
+        }
+        return aggregate;
+      },
+      set(value: string) {
+        aggregate = value;
+        recounted = true;
+      },
+    });
+
+    const event = textFrame('delta', 0, 0, delta);
+    for (let index = 0; index < count; index += 1) {
+      recounted = false;
+      accumulateResponse(event, snapshot);
+    }
+
+    // Comparing two equal, independently accumulated strings can walk the
+    // entire prefix per delta. Count the reads instead of timing the test.
+    expect(readsBeforeRecount).toBe(0);
+    expect(snapshot.output_text).toBe(delta.repeat(count));
+    expect(firstText(snapshot).text).toBe(snapshot.output_text);
+  });
+
   test.each([false, true])('releases the accumulator context when parsing fails: %s', async (fails) => {
     const createContext = vi.spyOn(responseAccumulator, 'createResponseContext');
     const failure = new OpenAIError('response parsing failed');
