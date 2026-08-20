@@ -296,6 +296,106 @@ describe('Azure realtime credential diagnostic privacy', () => {
     { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
     { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
   ])(
+    '$name Node ws snapshots credential arrays by bounded index without invoking their iterator',
+    async ({ open }) => {
+      let iteratorReads = 0;
+      let indexedReads = 0;
+      const credential = ['safe-first', 'safe-second'];
+      Object.defineProperty(credential, '0', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          indexedReads += 1;
+          return 'safe-first';
+        },
+      });
+      Object.defineProperty(credential, Symbol.iterator, {
+        configurable: true,
+        get() {
+          iteratorReads += 1;
+          throw new Error('An untrusted credential iterator must never run.');
+        },
+      });
+      const headers: Record<string, string> = {};
+      Object.defineProperty(headers, 'Authorization', { enumerable: true, value: credential });
+
+      await open(createAzureClient({ deployment: 'chat' }), { options: { headers } });
+
+      expect(Reflect.get(lastNodeSocket().options.headers ?? {}, 'Authorization')).toEqual([
+        'safe-first',
+        'safe-second',
+      ]);
+      expect(indexedReads).toBe(1);
+      expect(iteratorReads).toBe(0);
+      expect(nodeSocketConstructor).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(
+    [
+      { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+      { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+    ].flatMap((surface) =>
+      ([1025, Number.POSITIVE_INFINITY, -1] as const).map((length) => ({ ...surface, length })),
+    ),
+  )(
+    '$name Node ws rejects an unsafe credential array length $length before iteration',
+    async ({ open, length }) => {
+      let lengthReads = 0;
+      let iteratorReads = 0;
+      let indexReads = 0;
+      const credential = new Proxy(['safe-token'], {
+        get(target, property, receiver) {
+          if (property === 'length') {
+            lengthReads += 1;
+            return length;
+          }
+          if (property === Symbol.iterator) {
+            iteratorReads += 1;
+            throw new Error('An untrusted credential iterator must never run.');
+          }
+          if (property === '0') {
+            indexReads += 1;
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+      const headers: Record<string, string> = {};
+      Object.defineProperty(headers, 'Authorization', { enumerable: true, value: credential });
+
+      await expect(open(createAzureClient({ deployment: 'chat' }), { options: { headers } })).rejects.toThrow(
+        'Azure OpenAI credential contains an invalid HTTP header value.',
+      );
+
+      expect(lengthReads).toBe(1);
+      expect(iteratorReads).toBe(0);
+      expect(indexReads).toBe(0);
+      expect(nodeSocketConstructor).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([
+    { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+    { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+  ])('$name Node ws preserves finite sparse authentication arrays', async ({ open }) => {
+    const credential = ['safe-first'];
+    credential.length = 3;
+    const headers: Record<string, string> = {};
+    Object.defineProperty(headers, 'Authorization', { enumerable: true, value: credential });
+
+    await open(createAzureClient({ deployment: 'chat' }), { options: { headers } });
+
+    expect(Reflect.get(lastNodeSocket().options.headers ?? {}, 'Authorization')).toEqual([
+      'safe-first',
+      undefined,
+      undefined,
+    ]);
+  });
+
+  test.each([
+    { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+    { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+  ])(
     '$name Node ws rejects malformed array credentials before constructing a transport',
     async ({ open }) => {
       const malformed = 'azure-private-credential-75da\nprivate-patient-record-21f8';

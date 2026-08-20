@@ -170,11 +170,22 @@ export class AzureOpenAI extends OpenAI {
         options.path = path`/deployments/${model}` + options.path;
       }
     }
-    const built = await super.buildRequest(options, props);
-    if (built.req.headers.has('api-key')) {
-      built.req.redirect = 'manual';
+    const rawHeaders = options.headers;
+    if (rawHeaders !== undefined && rawHeaders !== null) {
+      options.headers = buildAzureAuthenticationHeaders(rawHeaders);
     }
-    return built;
+
+    try {
+      const built = await super.buildRequest(options, props);
+      if (built.req.headers.has('api-key')) {
+        built.req.redirect = 'manual';
+      }
+      return built;
+    } finally {
+      if (rawHeaders !== undefined && rawHeaders !== null) {
+        options.headers = rawHeaders;
+      }
+    }
   }
 
   protected override async fetchWithAuth(

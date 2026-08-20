@@ -79,6 +79,32 @@ class DeferredAzureAuthenticationHeaders extends Headers {
           return this.current().get(normalized) ?? null;
         },
       },
+      getSetCookie: {
+        configurable: true,
+        writable: true,
+        value(this: DeferredAzureAuthenticationHeaders): string[] {
+          Headers.prototype.has.call(this, 'set-cookie');
+          const carrier = azureAuthenticationHeaderCarriers.get(this);
+          const source = carrier ? iterateHeaders(carrier) : Headers.prototype.entries.call(this);
+          const cookies: string[] = [];
+
+          for (const [name, value] of source) {
+            if (name.toLowerCase() !== 'set-cookie') {
+              continue;
+            }
+            if (value === null) {
+              cookies.length = 0;
+              continue;
+            }
+            const normalized = new Headers([['set-cookie', value]]).get('set-cookie');
+            if (normalized !== null) {
+              cookies.push(normalized);
+            }
+          }
+
+          return cookies;
+        },
+      },
       has: {
         configurable: true,
         writable: true,

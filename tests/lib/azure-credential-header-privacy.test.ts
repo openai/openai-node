@@ -72,6 +72,8 @@ class ProtectedHookAzure extends AzureOpenAI {
     }
     if (carrier && this.mutationScheme === 'auth') {
       this.mutateCarrier?.(carrier.values);
+    }
+    if (carrier) {
       this.inspectAuthenticationCarrier?.(carrier);
     }
     if (!carrier || !this.cloneAuthenticationCarrier) {
@@ -534,6 +536,91 @@ describe('Azure credential header diagnostic privacy', () => {
       );
       expect(fetch).not.toHaveBeenCalled();
       expect(tokenProvider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  const bodyCredentialCases = authenticationModes.flatMap((authentication) =>
+    (['api-key', 'Authorization'] as const).flatMap((header) =>
+      (['chat completion', 'form body', 'undefined body'] as const).map((body) => ({
+        authentication,
+        header,
+        body,
+      })),
+    ),
+  );
+
+  test.each(bodyCredentialCases)(
+    '$authentication protects request-level $header during $body preprocessing',
+    async ({ authentication, header, body }) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        deployment: 'test-deployment',
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'safe-configured-token' }
+          : { azureADTokenProvider: provider }),
+        fetch,
+        maxRetries: 0,
+      });
+      const headers = { [header]: credential };
+      const operation = () => {
+        if (body === 'chat completion') {
+          return client.chat.completions.create(
+            { model: 'test-deployment', messages: [{ role: 'user', content: 'hello' }] },
+            { headers },
+          );
+        }
+        if (body === 'form body') {
+          const form = new FormData();
+          form.append('safe', 'payload');
+          return client.request({ method: 'post', path: '/models', body: form, headers });
+        }
+        return client.request({ method: 'post', path: '/models', body: undefined, headers });
+      };
+
+      await expectPrivateCredentialFailure(operation, credential);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test.each(['api-key', 'Authorization'] as const)(
+    'snapshots the effective %s override once across body preprocessing and final authentication',
+    async (name) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\r${PRIVATE_SUFFIX}`;
+      let reads = 0;
+      const headers: Record<string, string> = {};
+      Object.defineProperty(headers, name, {
+        enumerable: true,
+        get() {
+          reads += 1;
+          return reads === 1 ? 'safe-final-token' : malformed;
+        },
+      });
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'safe-configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { safe: 'payload' },
+        headers,
+      };
+
+      await client.request(options);
+
+      expect(reads).toBe(1);
+      expect(options.headers).toBe(headers);
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(name)).toBe('safe-final-token');
+      expect(fetch).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -1606,6 +1693,74 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  test.each(
+    (['bearer', 'admin'] as const).flatMap((scheme) =>
+      (['read', 'append', 'set', 'delete', 'null'] as const).map((operation) => ({ scheme, operation })),
+    ),
+  )(
+    'preserves individual protected $scheme Set-Cookie values through deferred $operation',
+    async ({ scheme, operation }) => {
+      const first = 'session=first; Expires=Wed, 21 Oct 2015 07:28:00 GMT';
+      const second = 'preference=second; Path=/';
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        azureADTokenProvider: provider,
+        adminAPIKey: 'safe-admin-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutationScheme = scheme;
+      client.mutateCarrier = (headers) => {
+        headers.append('Set-Cookie', ` ${first} `);
+        headers.append('set-cookie', second);
+      };
+      let expected = [first, second];
+      client.inspectAuthenticationCarrier = (carrier) => {
+        expect(carrier.values.getSetCookie()).toEqual(expected);
+        expect(Object.getOwnPropertyDescriptor(carrier.values, 'getSetCookie')).toBeUndefined();
+        expect(
+          typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(carrier.values), 'getSetCookie')
+            ?.value,
+        ).toBe('function');
+
+        if (operation === 'append') {
+          carrier.values.append('Set-Cookie', 'third=value');
+          expected = [...expected, 'third=value'];
+        } else if (operation === 'set') {
+          carrier.values.set('set-cookie', 'replacement=value');
+          expected = ['replacement=value'];
+        } else if (operation === 'delete') {
+          carrier.values.delete('SET-COOKIE');
+          expected = [];
+        } else if (operation === 'null') {
+          carrier.nulls.add('set-cookie');
+          expected = [];
+        }
+
+        expect(carrier.values.getSetCookie()).toEqual(expected);
+        const detached = carrier.values.getSetCookie;
+        expect(() => detached()).toThrow(TypeError);
+      };
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: scheme === 'admin' },
+      });
+
+      const dispatched = fetch.mock.calls[0]?.[1]?.headers;
+      expect(dispatched).toBeInstanceOf(Headers);
+      if (dispatched instanceof Headers) {
+        expect(dispatched.getSetCookie()).toEqual(expected);
+      }
+      expect(provider).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test.each(['auth', 'bearer', 'admin'] as const)(
     'keeps deferred $scheme Headers operations on their native prototype',
     async (scheme) => {
@@ -1632,6 +1787,7 @@ describe('Azure credential header diagnostic privacy', () => {
         expect(Object.assign(copied, headers)).toEqual(Object.assign(native, new Headers()));
         for (const method of [
           'get',
+          'getSetCookie',
           'has',
           'entries',
           'keys',

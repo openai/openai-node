@@ -46,8 +46,13 @@ export function safeAzureWebSocketHeaders<Headers extends Record<string, unknown
   for (const name of authenticationNames.values()) {
     const value = safeHeaders.get(name);
     if (Array.isArray(value)) {
+      const { length } = value;
+      if (!Number.isSafeInteger(length) || length < 0 || length > 1024) {
+        throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+      }
       const snapshot: unknown[] = [];
-      for (const entry of value) {
+      for (let index = 0; index < length; index += 1) {
+        const entry = value[index];
         if (typeof entry === 'string') {
           assertAzureCredentialHeaderValue(entry);
         }
