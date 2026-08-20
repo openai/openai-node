@@ -48,12 +48,16 @@ export function createEmbedding(
 
   return response._thenUnwrap((data) => {
     if (data && data.data) {
-      // Preserve skipped holes when a custom response parser returns a sparse array.
-      // oxlint-disable-next-line unicorn/no-array-for-each
-      data.data.forEach((embeddingBase64Obj) => {
-        const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
-        embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
-      });
+      const embeddings = data.data;
+      const { length } = embeddings;
+      // Preserve the original iteration length and skip sparse-array holes.
+      for (let index = 0; index < length; index += 1) {
+        if (index in embeddings) {
+          const embeddingBase64Obj = embeddings[index] as Embedding;
+          const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
+          embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
+        }
+      }
     }
 
     return data;

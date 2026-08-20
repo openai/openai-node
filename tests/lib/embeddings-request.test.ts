@@ -35,6 +35,22 @@ function embeddingResponse(embedding: number[] | string): Response {
   );
 }
 
+function mockEmbeddingParser(client: OpenAI, data: OpenAI.CreateEmbeddingResponse): void {
+  const rawPromise = new APIPromise(
+    client,
+    Promise.resolve({
+      response: new Response(null),
+      options: { method: 'post', path: '/embeddings' },
+      controller: new AbortController(),
+      requestLogID: 'synthetic',
+      retryOfRequestLogID: undefined,
+      startTime: 0,
+    }),
+    () => data,
+  );
+  vi.spyOn(client, 'post').mockReturnValue(rawPromise);
+}
+
 describe('embedding request compatibility', () => {
   test.each([
     { name: 'omitted', present: false, format: undefined, explicit: false },
@@ -143,19 +159,7 @@ describe('embedding request compatibility', () => {
       model: request.model,
       usage: { prompt_tokens: 1, total_tokens: 1 },
     };
-    const rawPromise = new APIPromise(
-      client,
-      Promise.resolve({
-        response: new Response(null),
-        options: { method: 'post', path: '/embeddings' },
-        controller: new AbortController(),
-        requestLogID: 'synthetic',
-        retryOfRequestLogID: undefined,
-        startTime: 0,
-      }),
-      () => data,
-    );
-    vi.spyOn(client, 'post').mockReturnValue(rawPromise);
+    mockEmbeddingParser(client, data);
 
     const result = await client.embeddings.create(request);
     expect(result).toBe(data);
@@ -163,6 +167,41 @@ describe('embedding request compatibility', () => {
     expect(result.data[1]).toBe(entry);
     expect(0 in result.data).toBe(false);
     expect(entry.embedding).toEqual(vector);
+  });
+
+  test('keeps the original iteration length when a custom parser mutates the array', async () => {
+    const client = new OpenAI({ apiKey: 'test-key' });
+    const entries: OpenAI.Embedding[] = [];
+    const appended: OpenAI.Embedding = {
+      object: 'embedding',
+      index: 1,
+      embedding: encodedVector as unknown as number[],
+    };
+    let value = encodedVector as unknown as number[];
+    entries.push({
+      object: 'embedding',
+      index: 0,
+      get embedding() {
+        entries.push(appended);
+        return value;
+      },
+      set embedding(decoded: number[]) {
+        value = decoded;
+      },
+    });
+    const data: OpenAI.CreateEmbeddingResponse = {
+      object: 'list',
+      data: entries,
+      model: request.model,
+      usage: { prompt_tokens: 1, total_tokens: 1 },
+    };
+    mockEmbeddingParser(client, data);
+
+    await expect(client.embeddings.create(request)).resolves.toBe(data);
+    expect(value).toEqual(vector);
+    expect(entries).toHaveLength(2);
+    expect(entries[1]).toBe(appended);
+    expect(appended.embedding).toBe(encodedVector);
   });
 
   test('preserves the API error object through the decoding wrapper', async () => {
