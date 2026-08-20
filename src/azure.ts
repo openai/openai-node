@@ -1,6 +1,10 @@
 import type { RequestInit, RequestInfo, Response } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
-import { buildAzureAuthenticationHeaders, buildHeaders } from './internal/headers';
+import {
+  buildAzureAuthenticationHeaders,
+  buildHeaders,
+  protectAzureRequestHeaders,
+} from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
@@ -170,16 +174,26 @@ export class AzureOpenAI extends OpenAI {
         options.path = path`/deployments/${model}` + options.path;
       }
     }
-    const rawHeaders = options.headers;
-    const requestOptions =
-      rawHeaders === undefined || rawHeaders === null
-        ? options
-        : { ...options, headers: buildAzureAuthenticationHeaders(rawHeaders) };
-    const built = await super.buildRequest(requestOptions, props);
-    if (built.req.headers.has('api-key')) {
-      built.req.redirect = 'manual';
+    const { body, headers } = options;
+    const preprocessesHeaders = body === undefined ? 'body' in options : Boolean(body);
+    const protection = preprocessesHeaders ? protectAzureRequestHeaders(headers) : undefined;
+
+    try {
+      let pending: ReturnType<OpenAI['buildRequest']>;
+      try {
+        pending = super.buildRequest(options, props);
+      } finally {
+        protection?.deactivate();
+      }
+
+      const built = await pending;
+      if (built.req.headers.has('api-key')) {
+        built.req.redirect = 'manual';
+      }
+      return built;
+    } finally {
+      protection?.release();
     }
-    return built;
   }
 
   protected override async fetchWithAuth(

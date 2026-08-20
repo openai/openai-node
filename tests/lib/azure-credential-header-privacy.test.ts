@@ -24,8 +24,23 @@ class ProtectedHookAzure extends AzureOpenAI {
   inspectAuthenticationCarrier: ((carrier: NullableHeaders) => void) | undefined;
   cloneAuthenticationCarrier: 'spread' | 'assign' | undefined;
   observeAuthenticationOptions: ((options: FinalRequestOptions) => Promise<void>) | undefined;
+  observePreparedOptions: ((options: FinalRequestOptions) => void) | undefined;
+  observeProtectedHookOptions:
+    | ((hook: 'auth' | 'bearer' | 'admin' | 'request', options: FinalRequestOptions) => void)
+    | undefined;
 
-  protected override async prepareRequest(request: RequestInit): Promise<void> {
+  protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    await super.prepareOptions(options);
+    this.observePreparedOptions?.(options);
+  }
+
+  protected override async prepareRequest(
+    request: RequestInit,
+    context?: { url: string; options: FinalRequestOptions },
+  ): Promise<void> {
+    if (context) {
+      this.observeProtectedHookOptions?.('request', context.options);
+    }
     if (this.injectedHeaders) {
       request.headers = this.injectedHeaders;
     }
@@ -67,6 +82,7 @@ class ProtectedHookAzure extends AzureOpenAI {
     options: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
+    this.observeProtectedHookOptions?.('auth', options);
     if (this.observeAuthenticationOptions) {
       await this.observeAuthenticationOptions(options);
     }
@@ -93,6 +109,7 @@ class ProtectedHookAzure extends AzureOpenAI {
   }
 
   protected override async bearerAuth(options: FinalRequestOptions): Promise<NullableHeaders> {
+    this.observeProtectedHookOptions?.('bearer', options);
     this.bearerCalls += 1;
     if (this.mutation === 'bearer' || (this.mutationScheme === 'bearer' && this.mutateCarrier)) {
       const carrier = await super.bearerAuth(options);
@@ -110,6 +127,7 @@ class ProtectedHookAzure extends AzureOpenAI {
   }
 
   protected override async adminAPIKeyAuth(options: FinalRequestOptions): Promise<NullableHeaders> {
+    this.observeProtectedHookOptions?.('admin', options);
     this.adminCalls += 1;
     if (this.mutation === 'admin' || (this.mutationScheme === 'admin' && this.mutateCarrier)) {
       const carrier = await super.adminAPIKeyAuth(options);
@@ -643,7 +661,19 @@ describe('Azure credential header diagnostic privacy', () => {
       apiKey: 'configured-token',
       fetch,
     });
+    let credential = 'first-token';
+    let reads = 0;
     const rawHeaders = { 'api-key': 'first-token', 'x-custom': 'preserved' };
+    Object.defineProperty(rawHeaders, 'api-key', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return credential;
+      },
+      set(value: string) {
+        credential = value;
+      },
+    });
     const body = { safe: 'payload' };
     const metadata = { source: 'shared request options' };
     const { signal } = new AbortController();
@@ -679,9 +709,9 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(whileSecondWaits).toBe(rawHeaders);
     expect(options.headers).toBe(rawHeaders);
     expect(observed).toHaveLength(2);
-    expect(observed[0]).not.toBe(options);
-    expect(observed[1]).not.toBe(options);
-    expect(observed[0]).not.toBe(observed[1]);
+    expect(reads).toBe(1);
+    expect(observed[0]).toBe(options);
+    expect(observed[1]).toBe(options);
     expect(observed.every((received) => received.__metadata === metadata)).toBe(true);
     expect(observed.every((received) => received.body === body && received.signal === signal)).toBe(true);
     expect(firstBuilt.req.headers.get('api-key')).toBe('first-token');
@@ -691,7 +721,167 @@ describe('Azure credential header diagnostic privacy', () => {
     rawHeaders['api-key'] = 'updated-token';
     const reused = await client.buildRequest(options);
     expect(reused.req.headers.get('api-key')).toBe('updated-token');
+    expect(reads).toBe(2);
     expect(options.headers).toBe(rawHeaders);
+  });
+
+  test.each([
+    ['static authentication', 'static-api-key', false] as const,
+    ['rotating bearer authentication', 'rotating-entra-token', false] as const,
+    ['rotating administrator authentication', 'rotating-entra-token', true] as const,
+  ])(
+    'preserves prepareOptions WeakMap identity through every protected %s hook',
+    async (_description, authentication, admin) => {
+      const provider = vi.fn(async () => 'configured-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'configured-static-token' }
+          : { azureADTokenProvider: provider, adminAPIKey: 'configured-admin-token' }),
+        fetch,
+        maxRetries: 0,
+      });
+      const state = new WeakMap<FinalRequestOptions, { secret: string }>();
+      const marker = { secret: 'protected per-request state' };
+      const observed: string[] = [];
+      let prepared: FinalRequestOptions | undefined;
+      client.observePreparedOptions = (options) => {
+        prepared = options;
+        state.set(options, marker);
+      };
+      client.observeProtectedHookOptions = (hook, options) => {
+        observed.push(hook);
+        expect(options).toBe(prepared);
+        expect(state.get(options)).toBe(marker);
+      };
+      const headers = { 'x-custom': 'preserved' };
+
+      await client.request({
+        method: 'post',
+        path: '/models',
+        body: { safe: 'payload' },
+        headers,
+        __security: { bearerAuth: true, adminAPIKeyAuth: admin },
+      });
+
+      const expectedHooks = ['auth'];
+      if (authentication === 'rotating-entra-token') {
+        expectedHooks.push('bearer');
+      }
+      if (admin) {
+        expectedHooks.push('admin');
+      }
+      expect(observed).toEqual([...expectedHooks, 'request']);
+      expect(prepared?.headers).toBe(headers);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test('never leaks an Azure body marker into reentrant non-Azure processing of the same raw object', async () => {
+    const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    let reads = 0;
+    let nestedFailure: unknown;
+    const headers: Record<string, string> = {};
+    Object.defineProperty(headers, 'api-key', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        if (reads === 1) {
+          try {
+            buildHeaders([headers]);
+          } catch (error) {
+            nestedFailure = error;
+          }
+          return 'safe-outer-token';
+        }
+        return malformed;
+      },
+    });
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+
+    await client.request({ method: 'post', path: '/models', body: { safe: true }, headers });
+
+    expect(nestedFailure).toBeInstanceOf(TypeError);
+    expect((nestedFailure as Error).message).not.toBe(SAFE_ERROR);
+    expect((nestedFailure as Error).message).toContain(PRIVATE_CREDENTIAL);
+    expect(reads).toBe(2);
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('safe-outer-token');
+  });
+
+  test('isolates concurrent body snapshots for distinct mutable raw header objects', async () => {
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+    });
+    const firstHeaders = { 'api-key': 'first-token' };
+    const secondHeaders = { 'api-key': 'second-token' };
+    const firstOptions: FinalRequestOptions = {
+      method: 'post',
+      path: '/models',
+      body: { first: true },
+      headers: firstHeaders,
+    };
+    const secondOptions: FinalRequestOptions = {
+      method: 'post',
+      path: '/models',
+      body: { second: true },
+      headers: secondHeaders,
+    };
+    const observed: FinalRequestOptions[] = [];
+    let released = false;
+    client.observeAuthenticationOptions = async (received) => {
+      observed.push(received);
+      await vi.waitFor(() => expect(released).toBe(true), { interval: 1 });
+    };
+
+    const first = client.buildRequest(firstOptions);
+    const second = client.buildRequest(secondOptions);
+    expect(observed).toHaveLength(2);
+    expect(firstOptions.headers).toBe(firstHeaders);
+    expect(secondOptions.headers).toBe(secondHeaders);
+    released = true;
+    const [firstBuilt, secondBuilt] = await Promise.all([first, second]);
+
+    expect(firstBuilt.req.headers.get('api-key')).toBe('first-token');
+    expect(secondBuilt.req.headers.get('api-key')).toBe('second-token');
+    expect(firstOptions.headers).toBe(firstHeaders);
+    expect(secondOptions.headers).toBe(secondHeaders);
+  });
+
+  test('releases failed private body snapshots before the same caller headers are reused', async () => {
+    const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    const headers = { 'api-key': malformed };
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+    });
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/models',
+      body: { safe: true },
+      headers,
+    };
+
+    await expectPrivateCredentialFailure(() => client.buildRequest(options), malformed);
+    expect(options.headers).toBe(headers);
+    headers['api-key'] = 'safe-reused-token';
+    const reused = await client.buildRequest(options);
+    expect(reused.req.headers.get('api-key')).toBe('safe-reused-token');
+    expect(options.headers).toBe(headers);
   });
 
   test.each(
