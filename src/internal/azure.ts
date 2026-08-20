@@ -45,11 +45,17 @@ export function safeAzureWebSocketHeaders<Headers extends Record<string, unknown
 
   for (const name of authenticationNames.values()) {
     const value = safeHeaders.get(name);
-    const values = Array.isArray(value) ? value : [value];
-    for (const entry of values) {
-      if (typeof entry === 'string') {
-        assertAzureCredentialHeaderValue(entry);
+    if (Array.isArray(value)) {
+      const snapshot: unknown[] = [];
+      for (const entry of value) {
+        if (typeof entry === 'string') {
+          assertAzureCredentialHeaderValue(entry);
+        }
+        snapshot.push(entry);
       }
+      safeHeaders.set(name, snapshot);
+    } else if (typeof value === 'string') {
+      assertAzureCredentialHeaderValue(value);
     }
   }
   return Object.fromEntries(safeHeaders) as Headers;

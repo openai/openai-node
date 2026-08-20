@@ -226,6 +226,101 @@ describe('Azure realtime credential diagnostic privacy', () => {
     expect(nodeSocketConstructor).not.toHaveBeenCalled();
   });
 
+  const arrayHeaderSurfaces = [
+    { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+    { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+  ].flatMap((surface) =>
+    (['getter', 'proxy'] as const).flatMap((kind) =>
+      ([false, true] as const).map((rotating) => ({ ...surface, kind, rotating })),
+    ),
+  );
+
+  test.each(arrayHeaderSurfaces)(
+    '$name Node ws snapshots $kind credential arrays before dispatch (rotating: $rotating)',
+    async ({ open, kind, rotating }) => {
+      const malformed = 'azure-private-credential-75da\nprivate-patient-record-21f8';
+      const safe = 'safe-array credential\tvalue\u00FF';
+      let reads = 0;
+      const original = [safe];
+      if (kind === 'getter') {
+        Object.defineProperty(original, '0', {
+          configurable: true,
+          enumerable: true,
+          get() {
+            reads += 1;
+            return reads === 1 ? safe : malformed;
+          },
+        });
+      }
+      const credential =
+        kind === 'proxy'
+          ? new Proxy(original, {
+              get(target, property, receiver) {
+                if (property === '0') {
+                  reads += 1;
+                  return reads === 1 ? safe : malformed;
+                }
+                return Reflect.get(target, property, receiver);
+              },
+            })
+          : original;
+      const unrelated = ['keep caller array'];
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const client = new AzureOpenAI({
+        baseURL: 'https://azure.example.com/openai/',
+        apiVersion: '2024-10-01-preview',
+        deployment: 'chat',
+        ...(rotating ? { azureADTokenProvider: provider } : { apiKey: 'azure-key' }),
+      });
+      const headerName = rotating ? 'api-key' : 'Authorization';
+      const headers: Record<string, string> = {};
+      Object.defineProperties(headers, {
+        [headerName]: { enumerable: true, value: credential },
+        'X-Unrelated': { enumerable: true, value: unrelated },
+      });
+
+      await open(client, { options: { headers } });
+
+      const outgoing = lastNodeSocket().options.headers ?? {};
+      const dispatched: unknown = Reflect.get(outgoing, headerName);
+      expect(reads).toBe(1);
+      expect(dispatched === credential).toBe(false);
+      expect(dispatched).toEqual([safe]);
+      expect(Reflect.get(outgoing, 'X-Unrelated')).toBe(unrelated);
+      expect(reads).toBe(1);
+      expect(provider).toHaveBeenCalledTimes(rotating ? 1 : 0);
+    },
+  );
+
+  test.each([
+    { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+    { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+  ])(
+    '$name Node ws rejects malformed array credentials before constructing a transport',
+    async ({ open }) => {
+      const malformed = 'azure-private-credential-75da\nprivate-patient-record-21f8';
+      let reads = 0;
+      const credential = ['ignored'];
+      Object.defineProperty(credential, '0', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          reads += 1;
+          return malformed;
+        },
+      });
+
+      const headers: Record<string, string> = {};
+      Object.defineProperty(headers, 'Authorization', { enumerable: true, value: credential });
+
+      await expect(open(createAzureClient({ deployment: 'chat' }), { options: { headers } })).rejects.toThrow(
+        'Azure OpenAI credential contains an invalid HTTP header value.',
+      );
+      expect(reads).toBe(1);
+      expect(nodeSocketConstructor).not.toHaveBeenCalled();
+    },
+  );
+
   test.each([
     { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
     { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },

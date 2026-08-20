@@ -110,8 +110,11 @@ class DeferredAzureAuthenticationHeaders extends Headers {
         effective.delete(normalized);
         continue;
       }
+      const normalizedValue = isAzureAuthenticationHeader(normalized)
+        ? value.replace(/^[\t ]+|[\t ]+$/g, '')
+        : value;
       const previous = effective.get(normalized);
-      effective.set(normalized, previous === undefined ? value : `${previous}, ${value}`);
+      effective.set(normalized, previous === undefined ? normalizedValue : `${previous}, ${normalizedValue}`);
     }
     return new Map([...effective].sort(([left], [right]) => Number(left > right) - Number(left < right)));
   }

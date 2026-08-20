@@ -1343,6 +1343,87 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
+  const deferredBoundaryScenarios = (['auth', 'bearer', 'admin'] as const).flatMap((scheme) =>
+    [
+      { boundary: 'ASCII edge whitespace', credential: ' \tvisible \t ' },
+      { boundary: 'internal SP and HTAB', credential: 'in ter\tnal' },
+      { boundary: 'valid obs-text', credential: '\u00A0visible\u00A0' },
+    ].map(({ boundary, credential }) => ({ scheme, boundary, credential })),
+  );
+
+  test.each(deferredBoundaryScenarios)(
+    'normalizes deferred $scheme $boundary exactly like native Headers',
+    async ({ scheme, credential }) => {
+      const expectedName = scheme === 'auth' ? 'api-key' : 'authorization';
+      const raw = scheme === 'auth' ? credential : `Bearer ${credential}`;
+      const expected = new Headers([[expectedName, raw]]).get(expectedName);
+      const provider = vi.fn(async () => credential);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(scheme === 'auth'
+          ? { apiKey: credential }
+          : { azureADTokenProvider: provider, adminAPIKey: credential }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutationScheme = scheme;
+      client.mutateCarrier = (headers) => {
+        expect(headers.get(expectedName.toUpperCase())).toBe(expected);
+        expect(headers.has(expectedName.toUpperCase())).toBe(true);
+        expect([...headers.entries()].find(([name]) => name === expectedName)?.[1]).toBe(expected);
+        expect([...headers.keys()]).toContain(expectedName);
+        expect([...headers.values()]).toContain(expected);
+        expect([...headers].find(([name]) => name === expectedName)?.[1]).toBe(expected);
+        const observed: string[] = [];
+        const iterate = headers.forEach;
+        iterate.call(headers, (value, name) => {
+          if (name === expectedName) {
+            observed.push(value);
+          }
+        });
+        expect(observed).toEqual([expected]);
+      };
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: scheme === 'admin' },
+      });
+
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(expectedName)).toBe(expected);
+      expect(provider).toHaveBeenCalledTimes(scheme === 'auth' ? 0 : 1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('normalizes every deferred authentication value before combining duplicates', async () => {
+    const first = ' \tfirst \t ';
+    const second = '\t second \t';
+    const native = new Headers([['api-key', first]]);
+    native.append('api-key', second);
+    const expected = native.get('api-key');
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: first,
+      fetch,
+      maxRetries: 0,
+    });
+    client.mutateCarrier = (headers) => {
+      headers.append('API-KEY', second);
+      expect(headers.get('api-key')).toBe(expected);
+      expect([...headers.entries()]).toContainEqual(['api-key', expected]);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe(expected);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   test('keeps deferred Headers reads coherent across malformed shadows and visible mutations', async () => {
     const malformed = [PRIVATE_CREDENTIAL, PRIVATE_SUFFIX].join('\n');
     const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
