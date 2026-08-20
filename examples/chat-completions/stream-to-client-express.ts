@@ -94,21 +94,79 @@ app.use(express.text());
 //   })
 //
 // See examples/chat-completions/stream-to-client-browser.ts for a more complete example.
+function watchClientDisconnect(req: Request, res: Response) {
+  if (
+    typeof AbortController !== 'function' ||
+    typeof req.on !== 'function' ||
+    typeof req.off !== 'function' ||
+    typeof res.on !== 'function' ||
+    typeof res.off !== 'function'
+  ) {
+    return;
+  }
+
+  const controller = new AbortController();
+  const onRequestAborted = () => controller.abort();
+  const onResponseClosed = () => {
+    if (!res.writableEnded) {
+      controller.abort();
+    }
+  };
+
+  req.on('aborted', onRequestAborted);
+  res.on('close', onResponseClosed);
+
+  return {
+    signal: controller.signal,
+    cleanup() {
+      req.off('aborted', onRequestAborted);
+      res.off('close', onResponseClosed);
+    },
+  };
+}
+
 const handleRequest = async (req: Request, res: Response) => {
   console.log('Received request:', req.body);
 
-  const stream = openai.chat.completions.stream({
-    model: 'gpt-3.5-turbo',
-    stream: true,
-    messages: [{ role: 'user', content: req.body }],
-  });
+  const disconnect = watchClientDisconnect(req, res);
 
-  res.header('Content-Type', 'text/plain');
-  for await (const chunk of stream.toReadableStream()) {
-    res.write(chunk);
+  try {
+    if (res.destroyed) {
+      return;
+    }
+
+    const completionRequest = {
+      model: 'gpt-3.5-turbo',
+      stream: true as const,
+      messages: [{ role: 'user' as const, content: req.body }],
+    };
+    const stream = disconnect
+      ? openai.chat.completions.stream(completionRequest, { signal: disconnect.signal })
+      : openai.chat.completions.stream(completionRequest);
+
+    if (disconnect?.signal.aborted || res.destroyed) {
+      return;
+    }
+
+    res.header('Content-Type', 'text/plain');
+    for await (const chunk of stream.toReadableStream()) {
+      if (disconnect?.signal.aborted || res.destroyed) {
+        break;
+      }
+
+      res.write(chunk);
+
+      if (disconnect?.signal.aborted || res.destroyed) {
+        break;
+      }
+    }
+
+    if (!disconnect?.signal.aborted && !res.destroyed) {
+      res.end();
+    }
+  } finally {
+    disconnect?.cleanup();
   }
-
-  res.end();
 };
 
 app.post('/', (req: Request, res: Response) => handleRequest(req, res).catch(console.error));
