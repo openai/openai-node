@@ -39,6 +39,7 @@ const malformedCredentials = [
 ] as const;
 
 const supportedFieldBytes = [
+  { format: 'internal space', character: ' ' },
   { format: 'horizontal tab', character: '\t' },
   { format: 'lowest obsolete-text byte', character: '\u0080' },
   { format: 'highest obsolete-text byte', character: '\u00FF' },
@@ -47,6 +48,20 @@ const supportedFieldBytes = [
 const malformedCases = entrypoints.flatMap((entrypoint) =>
   authenticationModes.flatMap((authentication) =>
     malformedCredentials.map(({ format, character }) => ({ entrypoint, authentication, format, character })),
+  ),
+);
+
+const boundaryWhitespaceCases = entrypoints.flatMap((entrypoint) =>
+  authenticationModes.flatMap((authentication) =>
+    ([' ', '\t'] as const).flatMap((character) =>
+      (['leading', 'trailing'] as const).map((position) => ({
+        entrypoint,
+        authentication,
+        character,
+        position,
+        format: `${position} ${character === ' ' ? 'space' : 'horizontal tab'}`,
+      })),
+    ),
   ),
 );
 
@@ -159,6 +174,34 @@ describe('Bedrock bearer credential diagnostic privacy', () => {
     '$entrypoint $authentication rejects a $format credential without exposing its value',
     async ({ entrypoint, authentication, character }) => {
       const credential = SENSITIVE_CREDENTIAL + character + SENSITIVE_SUFFIX;
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const logger = createLogger();
+      const tokenProvider = vi.fn(async () => credential);
+      const client = createBedrockClient({
+        entrypoint,
+        authentication,
+        credential,
+        fetch,
+        logger,
+        tokenProvider,
+      });
+
+      await expectPrivateCredentialFailure(
+        () => client.request({ method: 'get', path: '/models' }),
+        credential,
+      );
+
+      expect(fetch).not.toHaveBeenCalled();
+      expect(tokenProvider).toHaveBeenCalledTimes(authentication === 'rotating' ? 1 : 0);
+      expectPrivateLogs(logger, credential);
+    },
+  );
+
+  test.each(boundaryWhitespaceCases)(
+    '$entrypoint $authentication rejects a $format credential before it can change on the wire',
+    async ({ entrypoint, authentication, character, position }) => {
+      const secret = `${SENSITIVE_CREDENTIAL}-${SENSITIVE_SUFFIX}`;
+      const credential = position === 'leading' ? `${character}${secret}` : `${secret}${character}`;
       const fetch = vi.fn(async () => Response.json({ ok: true }));
       const logger = createLogger();
       const tokenProvider = vi.fn(async () => credential);

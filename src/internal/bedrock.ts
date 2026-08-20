@@ -278,6 +278,10 @@ export function assertProviderOwnsAuthorization(headers: Headers): void {
 
 /** Rejects non-HTTP field bytes without retaining or exposing a bearer credential. */
 export function assertValidBedrockBearerCredential(credential: string): void {
+  if (/^[\t ]|[\t ]$/.test(credential)) {
+    throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+  }
+
   for (const character of credential) {
     const value = character.codePointAt(0) ?? 0;
     if ((value < 0x20 && value !== 0x09) || value === 0x7f || value > 0xff) {
