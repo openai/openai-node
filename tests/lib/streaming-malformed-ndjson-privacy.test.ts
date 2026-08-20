@@ -286,24 +286,13 @@ describe('newline-delimited stream diagnostic privacy', () => {
     expect(body.locked).toBe(false);
   });
 
-  test('preserves configured newline size errors without replacing them', async () => {
+  test('ignores the unreleased newline size setting', async () => {
     vi.stubEnv('OPENAI_MAX_NDJSON_LINE_BYTES', '12');
-    const { body, cancel } = readable(['{"sensitive":"too long"}\n'], { close: false });
-    const controller = new AbortController();
-
+    const { body } = readable(['{"value":"long enough"}\n']);
     try {
-      let failure: unknown;
-      try {
-        await collect(Stream.fromReadableStream(body, controller));
-      } catch (error) {
-        failure = error;
-      }
-
-      expect(failure).toBeInstanceOf(OpenAIError);
-      expect((failure as Error).message).toBe('Line exceeds the maximum size of 12 bytes.');
-      expect(controller.signal.aborted).toBe(true);
-      expect(cancel).toHaveBeenCalledTimes(1);
-      expect(body.locked).toBe(false);
+      await expect(collect(Stream.fromReadableStream(body, new AbortController()))).resolves.toEqual([
+        { value: 'long enough' },
+      ]);
     } finally {
       vi.unstubAllEnvs();
     }

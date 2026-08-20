@@ -465,8 +465,9 @@ describe('_iterSSEMessages', () => {
     ]);
   });
 
-  test('only rescans delimiter overlap when receiving one byte at a time', async () => {
+  test('feeds each incoming byte to the line decoder without rescanning whole events', async () => {
     const findDelimiter = vi.spyOn(lineDecoders, 'findDoubleNewlineIndex');
+    const decodeLines = vi.spyOn(lineDecoders.LineDecoder.prototype, 'decode');
     const payload = 'x'.repeat(256);
     const event = encoder.encode(`data: ${payload}\n\n`);
     const response = new Response(ReadableStreamFrom(Array.from(event, (byte) => Uint8Array.of(byte))));
@@ -476,10 +477,13 @@ describe('_iterSSEMessages', () => {
         { event: null, data: payload },
       ]);
 
-      expect(findDelimiter).toHaveBeenCalled();
-      const scannedBytes = findDelimiter.mock.calls.reduce((total, [buffer]) => total + buffer.byteLength, 0);
-      expect(scannedBytes).toBeLessThan(event.byteLength * 5);
+      expect(findDelimiter).not.toHaveBeenCalled();
+      expect(decodeLines).toHaveBeenCalledTimes(event.byteLength);
+      expect(
+        decodeLines.mock.calls.every(([chunk]) => chunk instanceof Uint8Array && chunk.length === 1),
+      ).toBe(true);
     } finally {
+      decodeLines.mockRestore();
       findDelimiter.mockRestore();
     }
   });
@@ -502,16 +506,13 @@ describe('_iterSSEMessages', () => {
     }
   });
 
-  test('compacts consumed prefixes without overwriting retained SSE frames', async () => {
-    const firstFrame = encoder.encode('data: first\r\n\r\n');
-    const response = new Response(
-      ReadableStreamFrom([
-        encoder.encode('data: first\r\n\r\ndata: second\r\n\r'),
-        encoder.encode('\n'),
-        encoder.encode('data: third\r\n\r\n'),
-      ]),
-    );
-    const compactBytes = vi.spyOn(Uint8Array.prototype, 'copyWithin');
+  test('decodes transport chunks directly without overwriting previously yielded events', async () => {
+    const chunks = [
+      encoder.encode('data: first\r\n\r\ndata: second\r\n\r'),
+      encoder.encode('\n'),
+      encoder.encode('data: third\r\n\r\n'),
+    ];
+    const response = new Response(ReadableStreamFrom(chunks));
     const decodeLines = vi.spyOn(lineDecoders.LineDecoder.prototype, 'decode');
 
     try {
@@ -521,11 +522,9 @@ describe('_iterSSEMessages', () => {
         { event: null, data: 'third' },
       ]);
 
-      expect(compactBytes).toHaveBeenCalled();
-      expect(decodeLines.mock.calls[0]?.[0]).toEqual(firstFrame);
+      expect(decodeLines.mock.calls.map(([chunk]) => chunk)).toEqual(chunks);
     } finally {
       decodeLines.mockRestore();
-      compactBytes.mockRestore();
     }
   });
 

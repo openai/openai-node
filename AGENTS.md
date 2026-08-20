@@ -111,6 +111,16 @@ explicitly requires it.
   bodies, raw responses, async iterators, redirect handling, abort reasons, retry
   budgets, concurrent refresh, cleanup, and reader/listener/lock ownership as
   applicable. Avoid new retained state and accidental quadratic hot paths.
+- Treat large payloads as a normal API contract, not evidence of malformed or
+  hostile input. Responses, Chat Completions, and other APIs can legitimately
+  return large `application/json` bodies, streaming events, and WebSocket
+  messages. Do not introduce arbitrary fixed limits on bodies, frames, events,
+  or lines as a security or efficiency fix. Prefer incremental processing,
+  amortized-linear buffering, timely cleanup, and caller cancellation. Any new
+  rejection limit needs an explicit, owner-approved API contract and a review
+  of existing supported payloads and transports. Protect this behavior with
+  deterministic public-entrypoint tests that construct large synthetic payloads
+  in memory; do not commit large captures or require slow live image generation.
 - Give every cache an explicit owner, complete identity key, lifetime, and
   invalidation policy. Do not trust caller-mutable snapshots, conflate changed
   transport/certificate identities, or leak request/client-specific state or
