@@ -798,6 +798,245 @@ it('drops a nested accessor-backed response schema without invoking its getter t
   expect(serialize).toHaveBeenCalledTimes(1);
 });
 
+it.each(['own override', 'array subclass'] as const)(
+  'binds parser owners to numeric tool slots without invoking a caller %s map',
+  async (kind) => {
+    const parseFirst = vi.fn((value: string) => ({ first: JSON.parse(value) as unknown }));
+    const parseSecond = vi.fn((value: string) => ({ second: JSON.parse(value) as unknown }));
+    const first = makeParseableTool(
+      { ...strictTool, function: { ...strictTool.function, name: 'first_indexed_tool' } },
+      { parser: parseFirst, callback: vi.fn() },
+    );
+    const second = makeParseableTool(
+      { ...strictTool, function: { ...strictTool.function, name: 'second_indexed_tool' } },
+      { parser: parseSecond, callback: vi.fn() },
+    );
+    class ReorderedTools extends Array<OpenAI.Chat.ChatCompletionFunctionTool> {}
+    const tools = kind === 'array subclass' ? new ReorderedTools(first, second) : [first, second];
+    const overriddenMap = vi.fn(() => [second, first]);
+    const readSpecies = vi.fn(() => Array);
+    Object.defineProperty(kind === 'array subclass' ? ReorderedTools.prototype : tools, 'map', {
+      configurable: true,
+      value: overriddenMap,
+    });
+    Object.defineProperty(ReorderedTools, Symbol.species, { configurable: true, get: readSpecies });
+    const argumentsJSON = '{"value":"correct"}';
+
+    const completion = await ChatCompletionStream.createChatCompletion(
+      createSerializedClient(namedArgumentFragments('first_indexed_tool', [argumentsJSON]), () => {}),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Bind parsers to genuine indexed array ownership' }],
+        tools,
+      },
+    ).finalChatCompletion();
+
+    expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+      function: { parsed_arguments: { first: { value: 'correct' } } },
+    });
+    expect(parseFirst).toHaveBeenCalledWith(argumentsJSON);
+    expect(parseSecond).not.toHaveBeenCalled();
+    expect(overriddenMap).not.toHaveBeenCalled();
+    expect(readSpecies).not.toHaveBeenCalled();
+  },
+);
+
+it('leaves accessor-backed tool slots unbound without reading the request getter twice', async () => {
+  const parser = vi.fn((value: string) => ({ unsafe: JSON.parse(value) as unknown }));
+  const tool = makeParseableTool(strictTool, { parser, callback: vi.fn() });
+  const tools: OpenAI.Chat.ChatCompletionFunctionTool[] = [tool];
+  const readTool = vi.fn(() => tool);
+  Object.defineProperty(tools, '0', { configurable: true, enumerable: true, get: readTool });
+
+  const completion = await ChatCompletionStream.createChatCompletion(
+    createSerializedClient(argumentFragments(['{"value":"wire"}']), () => {}),
+    {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Never pre-read caller indexed accessors' }],
+      tools,
+    },
+  ).finalChatCompletion();
+
+  expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+    function: { parsed_arguments: { value: 'wire' } },
+  });
+  expect(parser).not.toHaveBeenCalled();
+  expect(readTool).toHaveBeenCalledTimes(1);
+});
+
+it.each(['late tool', 'response format'] as const)(
+  'keeps an independent bounded schema budget for the %s parser contract',
+  async (target) => {
+    const parsers = Array.from({ length: 6 }, (_, index) =>
+      vi.fn((value: string) => ({ owner: index, value: JSON.parse(value) as unknown })),
+    );
+    const largeSchema = {
+      type: 'object',
+      properties: Object.fromEntries(
+        Array.from({ length: 1023 }, (_, index) => [`field_${index}`, { type: 'string' }]),
+      ),
+    };
+    const tools = parsers.map((parser, index) =>
+      makeParseableTool(
+        {
+          ...strictTool,
+          function: { ...strictTool.function, name: `large_schema_tool_${index}`, parameters: largeSchema },
+        },
+        { parser, callback: vi.fn() },
+      ),
+    );
+    const parseResponse = vi.fn((value: string) => ({ response: JSON.parse(value) as unknown }));
+    const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parseResponse);
+    const value = '{"value":"independent"}';
+    const chunks =
+      target === 'late tool'
+        ? namedArgumentFragments('large_schema_tool_5', [value])
+        : contentFragments([value]);
+
+    const completion = await ChatCompletionStream.createChatCompletion(
+      createSerializedClient(chunks, () => {}),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Isolate every configured schema contract budget' }],
+        tools,
+        response_format: responseFormat,
+      },
+    ).finalChatCompletion();
+
+    if (target === 'late tool') {
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { parsed_arguments: { owner: 5, value: { value: 'independent' } } },
+      });
+      expect(parsers[5]).toHaveBeenCalledWith(value);
+    } else {
+      expect(completion.choices[0]?.message.parsed).toEqual({
+        response: { value: 'independent' },
+      });
+      expect(parseResponse).toHaveBeenCalledWith(value);
+    }
+  },
+);
+
+it.each(['tool', 'response format'] as const)(
+  'shadows an inherited %s parser when its own serialized schema diverges',
+  async (target) => {
+    const staleParser = vi.fn(() => {
+      throw new Error('inherited stale parser must never run');
+    });
+    const value = '{"wire":42}';
+
+    if (target === 'tool') {
+      const inherited = makeParseableTool(strictTool, { parser: staleParser, callback: vi.fn() });
+      const tool = Object.create(inherited) as typeof inherited;
+      Object.defineProperties(tool, {
+        type: { configurable: true, enumerable: true, value: 'function' },
+        function: { configurable: true, enumerable: true, value: { ...strictTool.function } },
+      });
+      const serialize = vi.fn(() => ({
+        type: 'function',
+        function: {
+          ...strictTool.function,
+          parameters: { type: 'object', properties: { wire: { type: 'number' } } },
+        },
+      }));
+      Object.defineProperty(tool, 'toJSON', { configurable: true, value: serialize });
+
+      const completion = await ChatCompletionStream.createChatCompletion(
+        createSerializedClient(argumentFragments([value]), () => {}),
+        {
+          model: 'gpt-test',
+          messages: [{ role: 'user', content: 'Mask the inherited stale function parser' }],
+          tools: [tool],
+        },
+      ).finalChatCompletion();
+
+      expect(serialize).toHaveBeenCalledTimes(1);
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { parsed_arguments: { wire: 42 } },
+      });
+    } else {
+      const inherited = makeParseableResponseFormat(structuredResponseFormat, staleParser);
+      const responseFormat = Object.create(inherited) as typeof inherited;
+      Object.defineProperties(responseFormat, {
+        type: { configurable: true, enumerable: true, value: 'json_schema' },
+        json_schema: { configurable: true, enumerable: true, value: structuredResponseFormat.json_schema },
+      });
+      const serialize = vi.fn(() => ({
+        type: 'json_schema',
+        json_schema: {
+          name: structuredResponseFormat.json_schema.name,
+          schema: { type: 'object', properties: { wire: { type: 'number' } } },
+        },
+      }));
+      Object.defineProperty(responseFormat, 'toJSON', { configurable: true, value: serialize });
+
+      const completion = await ChatCompletionStream.createChatCompletion(
+        createSerializedClient(contentFragments([value]), () => {}),
+        {
+          model: 'gpt-test',
+          messages: [{ role: 'user', content: 'Mask the inherited stale response parser' }],
+          response_format: responseFormat,
+        },
+      ).finalChatCompletion();
+
+      expect(serialize).toHaveBeenCalledTimes(1);
+      expect(completion.choices[0]?.message.parsed).toEqual({ wire: 42 });
+    }
+
+    expect(staleParser).not.toHaveBeenCalled();
+  },
+);
+
+it.each(['tool', 'response format'] as const)(
+  'preserves an inherited %s parser when its serialized schema remains equivalent',
+  async (target) => {
+    const parser = vi.fn((value: string) => ({ inherited: JSON.parse(value) as unknown }));
+    const value = '{"value":"safe"}';
+
+    if (target === 'tool') {
+      const inherited = makeParseableTool(strictTool, { parser, callback: vi.fn() });
+      const tool = Object.create(inherited) as typeof inherited;
+      Object.defineProperties(tool, {
+        type: { configurable: true, enumerable: true, value: 'function' },
+        function: { configurable: true, enumerable: true, value: { ...strictTool.function } },
+      });
+
+      const completion = await ChatCompletionStream.createChatCompletion(
+        createSerializedClient(argumentFragments([value]), () => {}),
+        {
+          model: 'gpt-test',
+          messages: [{ role: 'user', content: 'Preserve equivalent inherited tool ownership' }],
+          tools: [tool],
+        },
+      ).finalChatCompletion();
+
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        function: { parsed_arguments: { inherited: { value: 'safe' } } },
+      });
+    } else {
+      const inherited = makeParseableResponseFormat(structuredResponseFormat, parser);
+      const responseFormat = Object.create(inherited) as typeof inherited;
+      Object.defineProperties(responseFormat, {
+        type: { configurable: true, enumerable: true, value: 'json_schema' },
+        json_schema: { configurable: true, enumerable: true, value: structuredResponseFormat.json_schema },
+      });
+
+      const completion = await ChatCompletionStream.createChatCompletion(
+        createSerializedClient(contentFragments([value]), () => {}),
+        {
+          model: 'gpt-test',
+          messages: [{ role: 'user', content: 'Preserve equivalent inherited response ownership' }],
+          response_format: responseFormat,
+        },
+      ).finalChatCompletion();
+
+      expect(completion.choices[0]?.message.parsed).toEqual({ inherited: { value: 'safe' } });
+    }
+
+    expect(parser).toHaveBeenCalledWith(value);
+  },
+);
+
 it('preserves the branded parser identity while a tool.toJSON changes its dispatched name', async () => {
   const parser = vi.fn((value: string) => JSON.parse(value) as { value: string });
   const callback = vi.fn();

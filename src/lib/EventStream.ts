@@ -728,6 +728,7 @@ function visitRetainedEventPrototypes(
   availableBytes: () => number,
   charge: (bytes: number) => boolean,
   visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
+  retainPrototype: (prototype: object, inspect: () => boolean) => boolean,
 ): boolean {
   let prototype = Object.getPrototypeOf(current) as object | null;
 
@@ -742,18 +743,31 @@ function visitRetainedEventPrototypes(
       return true;
     }
     if (visited.has(prototype)) {
-      return charge(8);
+      visit(prototype, prototypeDepth);
+      return availableBytes() >= 0;
     }
 
     visited.add(prototype);
-    if (!charge(16)) {
-      return false;
-    }
+    const retainedPrototype = prototype;
+    const retained = retainPrototype(retainedPrototype, () => {
+      if (!charge(16)) {
+        return false;
+      }
 
-    const intrinsic = getTrustedForeignIntrinsic(prototype);
-    if (intrinsic) {
-      for (const key of Reflect.ownKeys(prototype)) {
-        const descriptor = Object.getOwnPropertyDescriptor(prototype, key);
+      const intrinsic = getTrustedForeignIntrinsic(retainedPrototype);
+      if (!intrinsic) {
+        return visitInspectableEventProperties(
+          retainedPrototype,
+          undefined,
+          prototypeDepth,
+          availableBytes,
+          charge,
+          visit,
+        );
+      }
+
+      for (const key of Reflect.ownKeys(retainedPrototype)) {
+        const descriptor = Object.getOwnPropertyDescriptor(retainedPrototype, key);
         if (!descriptor) {
           return false;
         }
@@ -774,36 +788,118 @@ function visitRetainedEventPrototypes(
         }
         visit(descriptor.value, prototypeDepth + 1);
       }
-    } else if (
-      !visitInspectableEventProperties(prototype, undefined, prototypeDepth, availableBytes, charge, visit)
-    ) {
+
+      return availableBytes() >= 0;
+    });
+    if (!retained) {
       return false;
     }
 
-    prototype = Object.getPrototypeOf(prototype) as object | null;
+    prototype = Object.getPrototypeOf(retainedPrototype) as object | null;
   }
 
   return true;
 }
 
-function estimateBufferedEventBytes(value: unknown, remainingBytes: number): number {
+type BufferedRetainedIdentity = object | symbol;
+
+type BufferedInspectedNode = {
+  bytes: number;
+  edges: Set<BufferedRetainedIdentity>;
+};
+
+type BufferedInspectedGraph = {
+  scalarBytes: number;
+  roots: Set<BufferedRetainedIdentity>;
+  nodes: Map<BufferedRetainedIdentity, BufferedInspectedNode>;
+};
+
+type BufferedLedgerEntry = {
+  scalarBytes: number;
+  roots: Set<BufferedRetainedIdentity>;
+  identities: Set<BufferedRetainedIdentity>;
+};
+
+type BufferedLedgerRecord = BufferedInspectedNode & {
+  owners: Set<BufferedLedgerEntry>;
+};
+
+type BufferedLedgerChange = {
+  node: BufferedInspectedNode;
+  ownerDelta: number;
+};
+
+const BUFFERED_LEDGER_ENTRY_BYTES = 32;
+const BUFFERED_LEDGER_NODE_BYTES = 32;
+const BUFFERED_LEDGER_EDGE_BYTES = 8;
+const BUFFERED_LEDGER_OWNER_BYTES = 16;
+const MAX_BUFFERED_LEDGER_RECONCILIATION_WORK = 128 * 1024;
+
+function inspectBufferedEventGraph(
+  value: unknown,
+  remainingBytes: number,
+): BufferedInspectedGraph | undefined {
   let bytes = 0;
+  let scalarBytes = 0;
   const visited = new WeakSet<object>();
   const visitedSymbols = new Set<symbol>();
+  const roots = new Set<BufferedRetainedIdentity>();
+  const nodes = new Map<BufferedRetainedIdentity, BufferedInspectedNode>();
+  let activeNode: BufferedInspectedNode | undefined;
   const availableBytes = (): number => remainingBytes - bytes;
+  const charge = (amount: number): boolean => {
+    if (!Number.isSafeInteger(amount) || amount < 0) {
+      bytes = remainingBytes + 1;
+      return false;
+    }
+
+    bytes += amount;
+    if (activeNode) {
+      activeNode.bytes += amount;
+    } else {
+      scalarBytes += amount;
+    }
+    return bytes <= remainingBytes;
+  };
+  const addIdentity = (identity: BufferedRetainedIdentity): void => {
+    if (activeNode) {
+      activeNode.edges.add(identity);
+    } else {
+      roots.add(identity);
+    }
+  };
+  const retainIdentity = (identity: BufferedRetainedIdentity, inspect: () => boolean): boolean => {
+    addIdentity(identity);
+    const node: BufferedInspectedNode = { bytes: 0, edges: new Set() };
+    nodes.set(identity, node);
+    const previous = activeNode;
+    activeNode = node;
+    try {
+      return inspect();
+    } finally {
+      activeNode = previous;
+    }
+  };
 
   const visitSymbol = (current: symbol): void => {
     if (visitedSymbols.has(current)) {
-      bytes += 8;
+      addIdentity(current);
+      charge(8);
       return;
     }
     visitedSymbols.add(current);
-    if (!symbolDescriptionGetter) {
+
+    if (
+      !retainIdentity(current, () => {
+        if (!symbolDescriptionGetter) {
+          return false;
+        }
+        const description = Reflect.apply(symbolDescriptionGetter, current, []) as string | undefined;
+        return charge(8 + (description?.length ?? 0) * 2);
+      })
+    ) {
       bytes = remainingBytes + 1;
-      return;
     }
-    const description = Reflect.apply(symbolDescriptionGetter, current, []) as string | undefined;
-    bytes += 8 + (description?.length ?? 0) * 2;
   };
 
   const visit = (current: unknown, depth: number, isBlobInternalHandle = false): void => {
@@ -812,7 +908,7 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     }
 
     if (typeof current === 'string') {
-      bytes += current.length * 2;
+      charge(current.length * 2);
       return;
     }
 
@@ -827,7 +923,7 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     }
 
     if (current === null || typeof current !== 'object') {
-      bytes += 8;
+      charge(8);
       return;
     }
 
@@ -842,59 +938,58 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
     }
 
     if (visited.has(current)) {
-      bytes += 8;
+      addIdentity(current);
+      charge(8);
       return;
     }
     visited.add(current);
-    bytes += 16;
-
-    const retainedStorage = estimateRetainedBufferBytes(current, visit, depth);
-    if (
-      !visitRetainedEventPrototypes(
-        current,
-        depth,
-        isBlobInternalHandle,
-        visited,
-        availableBytes,
-        (overhead) => {
-          bytes += overhead;
-          return bytes <= remainingBytes;
-        },
-        visit,
-      )
-    ) {
-      bytes = remainingBytes + 1;
-      return;
-    }
-    if (retainedStorage !== undefined) {
-      bytes += retainedStorage.bytes;
-      if (bytes > remainingBytes) {
-        return;
-      }
-    }
 
     if (
-      !visitHiddenEventValues(current, retainedStorage?.kind, (hiddenValue, overhead) => {
-        bytes += overhead;
-        visit(hiddenValue, depth + 1);
-        return bytes <= remainingBytes;
+      !retainIdentity(current, () => {
+        if (!charge(16)) {
+          return false;
+        }
+
+        const retainedStorage = estimateRetainedBufferBytes(current, visit, depth);
+        if (
+          !visitRetainedEventPrototypes(
+            current,
+            depth,
+            isBlobInternalHandle,
+            visited,
+            availableBytes,
+            charge,
+            visit,
+            retainIdentity,
+          )
+        ) {
+          return false;
+        }
+        if (retainedStorage !== undefined && !charge(retainedStorage.bytes)) {
+          return false;
+        }
+
+        if (
+          !visitHiddenEventValues(current, retainedStorage?.kind, (hiddenValue, overhead) => {
+            if (!charge(overhead)) {
+              return false;
+            }
+            visit(hiddenValue, depth + 1);
+            return bytes <= remainingBytes;
+          })
+        ) {
+          return false;
+        }
+
+        return visitInspectableEventProperties(
+          current,
+          retainedStorage?.kind,
+          depth,
+          availableBytes,
+          charge,
+          visit,
+        );
       })
-    ) {
-      return;
-    }
-
-    if (
-      !visitInspectableEventProperties(
-        current,
-        retainedStorage?.kind,
-        depth,
-        availableBytes,
-        (overhead) => {
-          bytes += overhead;
-          return bytes <= remainingBytes;
-        },
-        visit,
-      )
     ) {
       bytes = remainingBytes + 1;
     }
@@ -903,10 +998,335 @@ function estimateBufferedEventBytes(value: unknown, remainingBytes: number): num
   try {
     visit(value, 0);
   } catch {
-    return remainingBytes + 1;
+    return undefined;
   }
 
-  return bytes;
+  return bytes <= remainingBytes ? { scalarBytes, roots, nodes } : undefined;
+}
+
+function areBufferedRetainedEdgesEqual(
+  first: Set<BufferedRetainedIdentity>,
+  second: Set<BufferedRetainedIdentity>,
+): boolean {
+  if (first.size !== second.size) {
+    return false;
+  }
+  for (const identity of first) {
+    if (!second.has(identity)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getBufferedLedgerNodeBytes(node: BufferedInspectedNode, owners: number): number {
+  return (
+    node.bytes +
+    BUFFERED_LEDGER_NODE_BYTES +
+    node.edges.size * BUFFERED_LEDGER_EDGE_BYTES +
+    owners * BUFFERED_LEDGER_OWNER_BYTES
+  );
+}
+
+function getBufferedLedgerEntryBytes(entry: Pick<BufferedLedgerEntry, 'scalarBytes' | 'roots'>): number {
+  return BUFFERED_LEDGER_ENTRY_BYTES + entry.scalarBytes + entry.roots.size * BUFFERED_LEDGER_EDGE_BYTES;
+}
+
+function collectBufferedLedgerIdentities(
+  roots: Set<BufferedRetainedIdentity>,
+  candidate: Map<BufferedRetainedIdentity, BufferedInspectedNode>,
+  records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
+  work: { remaining: number },
+): Set<BufferedRetainedIdentity> | undefined {
+  const identities = new Set<BufferedRetainedIdentity>();
+  const pending = [...roots];
+
+  while (pending.length) {
+    work.remaining -= 1;
+    if (work.remaining < 0) {
+      return undefined;
+    }
+
+    const identity = pending.pop()!;
+    if (identities.has(identity)) {
+      continue;
+    }
+    const node = candidate.get(identity) ?? records.get(identity);
+    if (!node) {
+      return undefined;
+    }
+    identities.add(identity);
+    for (const edge of node.edges) {
+      pending.push(edge);
+    }
+  }
+
+  return identities;
+}
+
+function getBufferedLedgerChange(
+  identity: BufferedRetainedIdentity,
+  graph: BufferedInspectedGraph,
+  records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
+  changes: Map<BufferedRetainedIdentity, BufferedLedgerChange>,
+  node?: BufferedInspectedNode,
+): BufferedLedgerChange | undefined {
+  const existing = changes.get(identity);
+  if (existing) {
+    if (node) {
+      existing.node = node;
+    }
+    return existing;
+  }
+
+  const current = node ?? graph.nodes.get(identity) ?? records.get(identity);
+  if (!current) {
+    return undefined;
+  }
+  const update = { node: current, ownerDelta: 0 };
+  changes.set(identity, update);
+  return update;
+}
+
+function findBufferedLedgerAffectedOwners(
+  entry: BufferedLedgerEntry,
+  graph: BufferedInspectedGraph,
+  records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
+  changes: Map<BufferedRetainedIdentity, BufferedLedgerChange>,
+  work: { remaining: number },
+): Set<BufferedLedgerEntry> | undefined {
+  const affected = new Set<BufferedLedgerEntry>([entry]);
+
+  for (const [identity, node] of graph.nodes) {
+    work.remaining -= 1;
+    if (work.remaining < 0) {
+      return undefined;
+    }
+
+    const previous = records.get(identity);
+    if (!previous) {
+      continue;
+    }
+    const changedEdges = !areBufferedRetainedEdgesEqual(previous.edges, node.edges);
+    if (previous.bytes !== node.bytes || changedEdges) {
+      getBufferedLedgerChange(identity, graph, records, changes, node);
+    }
+    if (!changedEdges) {
+      continue;
+    }
+    for (const owner of previous.owners) {
+      work.remaining -= 1;
+      if (work.remaining < 0) {
+        return undefined;
+      }
+      affected.add(owner);
+    }
+  }
+
+  return affected;
+}
+
+function updateBufferedLedgerMembershipChanges(
+  owner: BufferedLedgerEntry,
+  next: Set<BufferedRetainedIdentity>,
+  graph: BufferedInspectedGraph,
+  records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
+  changes: Map<BufferedRetainedIdentity, BufferedLedgerChange>,
+  work: { remaining: number },
+): boolean {
+  for (const identity of owner.identities) {
+    work.remaining -= 1;
+    if (work.remaining < 0) {
+      return false;
+    }
+    if (!next.has(identity)) {
+      const update = getBufferedLedgerChange(identity, graph, records, changes);
+      if (!update) {
+        return false;
+      }
+      update.ownerDelta -= 1;
+    }
+  }
+
+  for (const identity of next) {
+    work.remaining -= 1;
+    if (work.remaining < 0) {
+      return false;
+    }
+    if (!owner.identities.has(identity)) {
+      const update = getBufferedLedgerChange(identity, graph, records, changes);
+      if (!update) {
+        return false;
+      }
+      update.ownerDelta += 1;
+    }
+  }
+
+  return true;
+}
+
+function collectBufferedLedgerMemberships(
+  entry: BufferedLedgerEntry,
+  graph: BufferedInspectedGraph,
+  affected: Set<BufferedLedgerEntry>,
+  records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
+  changes: Map<BufferedRetainedIdentity, BufferedLedgerChange>,
+  work: { remaining: number },
+): Map<BufferedLedgerEntry, Set<BufferedRetainedIdentity>> | undefined {
+  const memberships = new Map<BufferedLedgerEntry, Set<BufferedRetainedIdentity>>();
+
+  for (const owner of affected) {
+    const roots = owner === entry ? graph.roots : owner.roots;
+    const next = collectBufferedLedgerIdentities(roots, graph.nodes, records, work);
+    if (!next || !updateBufferedLedgerMembershipChanges(owner, next, graph, records, changes, work)) {
+      return undefined;
+    }
+    memberships.set(owner, next);
+  }
+
+  return memberships;
+}
+
+function projectBufferedLedgerBytes(
+  currentBytes: number,
+  entry: BufferedLedgerEntry,
+  graph: BufferedInspectedGraph,
+  isNew: boolean,
+  changes: Map<BufferedRetainedIdentity, BufferedLedgerChange>,
+  records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
+): number | undefined {
+  let projected =
+    currentBytes - (isNew ? 0 : getBufferedLedgerEntryBytes(entry)) + getBufferedLedgerEntryBytes(graph);
+
+  for (const [identity, update] of changes) {
+    const previous = records.get(identity);
+    const owners = (previous?.owners.size ?? 0) + update.ownerDelta;
+    if (owners < 0) {
+      return undefined;
+    }
+    if (previous) {
+      projected -= getBufferedLedgerNodeBytes(previous, previous.owners.size);
+    }
+    if (owners) {
+      projected += getBufferedLedgerNodeBytes(update.node, owners);
+    }
+  }
+
+  return Number.isSafeInteger(projected) && projected >= 0 && projected <= MAX_BUFFERED_ITERATOR_BYTES
+    ? projected
+    : undefined;
+}
+
+function applyBufferedLedgerChanges(
+  records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
+  changes: Map<BufferedRetainedIdentity, BufferedLedgerChange>,
+  memberships: Map<BufferedLedgerEntry, Set<BufferedRetainedIdentity>>,
+): void {
+  for (const [identity, update] of changes) {
+    const previous = records.get(identity);
+    const owners = (previous?.owners.size ?? 0) + update.ownerDelta;
+    if (!owners) {
+      continue;
+    }
+    if (previous) {
+      previous.bytes = update.node.bytes;
+      previous.edges = update.node.edges;
+    } else {
+      records.set(identity, {
+        bytes: update.node.bytes,
+        edges: update.node.edges,
+        owners: new Set(),
+      });
+    }
+  }
+
+  for (const [owner, next] of memberships) {
+    for (const identity of owner.identities) {
+      if (!next.has(identity)) {
+        records.get(identity)?.owners.delete(owner);
+      }
+    }
+    for (const identity of next) {
+      if (!owner.identities.has(identity)) {
+        records.get(identity)!.owners.add(owner);
+      }
+    }
+    owner.identities = next;
+  }
+
+  for (const identity of changes.keys()) {
+    if (records.get(identity)?.owners.size === 0) {
+      records.delete(identity);
+    }
+  }
+}
+
+/**
+ * Account for queue-owned identities once while charging bounded ownership and
+ * edge metadata. Shared topology changes are reconciled for every queued owner.
+ */
+function createBufferedEventLedger(): {
+  retain: (graph: BufferedInspectedGraph) => BufferedLedgerEntry | undefined;
+  refresh: (entry: BufferedLedgerEntry, graph: BufferedInspectedGraph) => boolean;
+  release: (entry: BufferedLedgerEntry) => void;
+  clear: () => void;
+} {
+  const records = new Map<BufferedRetainedIdentity, BufferedLedgerRecord>();
+  let bytes = 0;
+
+  const reconcile = (entry: BufferedLedgerEntry, graph: BufferedInspectedGraph, isNew: boolean): boolean => {
+    const work = { remaining: MAX_BUFFERED_LEDGER_RECONCILIATION_WORK };
+    const changes = new Map<BufferedRetainedIdentity, BufferedLedgerChange>();
+    const affected = findBufferedLedgerAffectedOwners(entry, graph, records, changes, work);
+    if (!affected) {
+      return false;
+    }
+    const memberships = collectBufferedLedgerMemberships(entry, graph, affected, records, changes, work);
+    if (!memberships) {
+      return false;
+    }
+    const projectedBytes = projectBufferedLedgerBytes(bytes, entry, graph, isNew, changes, records);
+    if (projectedBytes === undefined) {
+      return false;
+    }
+
+    applyBufferedLedgerChanges(records, changes, memberships);
+    entry.scalarBytes = graph.scalarBytes;
+    entry.roots = graph.roots;
+    bytes = projectedBytes;
+    return true;
+  };
+
+  const release = (entry: BufferedLedgerEntry): void => {
+    bytes -= getBufferedLedgerEntryBytes(entry);
+    for (const identity of entry.identities) {
+      const record = records.get(identity);
+      if (!record?.owners.delete(entry)) {
+        continue;
+      }
+      bytes -= BUFFERED_LEDGER_OWNER_BYTES;
+      if (record.owners.size === 0) {
+        bytes -= getBufferedLedgerNodeBytes(record, 0);
+        records.delete(identity);
+      }
+    }
+    entry.identities.clear();
+  };
+
+  return {
+    retain(graph) {
+      const entry: BufferedLedgerEntry = { scalarBytes: 0, roots: new Set(), identities: new Set() };
+      return reconcile(entry, graph, true) ? entry : undefined;
+    },
+    refresh(entry, graph) {
+      return reconcile(entry, graph, false);
+    },
+    release,
+    clear() {
+      records.clear();
+      bytes = 0;
+    },
+  };
 }
 
 /** An abortable event stream with typed listeners, asynchronous iteration, and lifecycle state. */
@@ -1250,7 +1670,7 @@ export class EventStream<EventTypes extends BaseEvents> {
       reject: (error: OpenAIError) => void;
     };
     type BufferedEvent = {
-      bytes: number;
+      retention: BufferedLedgerEntry;
       active: boolean;
       check: (() => void) | undefined;
     };
@@ -1258,7 +1678,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     const pushQueue = createEventQueue<T>();
     const bufferedEventSizes = createEventQueue<BufferedEvent>();
     const readQueue = createEventQueue<Reader>();
-    let bufferedBytes = 0;
+    const bufferedLedger = createBufferedEventLedger();
     let ended = this.ended;
     let failure: OpenAIError | undefined;
     let failureDelivered = false;
@@ -1300,7 +1720,7 @@ export class EventStream<EventTypes extends BaseEvents> {
           deactivateBufferedEvent(bufferedEventSizes.dequeue()!);
         }
         pushQueue.clear();
-        bufferedBytes = 0;
+        bufferedLedger.clear();
       }
 
       const error = new OpenAIError(
@@ -1319,15 +1739,10 @@ export class EventStream<EventTypes extends BaseEvents> {
         return;
       }
 
-      const remainingBytes = MAX_BUFFERED_ITERATOR_BYTES - bufferedBytes + entry.bytes;
-      const eventBytes = estimateBufferedEventBytes(value, remainingBytes);
-      if (eventBytes > remainingBytes) {
+      const graph = inspectBufferedEventGraph(value, MAX_BUFFERED_ITERATOR_BYTES);
+      if (!graph || !bufferedLedger.refresh(entry.retention, graph)) {
         failBufferedEvents(true);
-        return;
       }
-
-      bufferedBytes += eventBytes - entry.bytes;
-      entry.bytes = eventBytes;
     };
 
     const push = (value: T) => {
@@ -1338,13 +1753,13 @@ export class EventStream<EventTypes extends BaseEvents> {
       if (reader) {
         reader.resolve({ value, done: false });
       } else {
-        const remainingBytes = MAX_BUFFERED_ITERATOR_BYTES - bufferedBytes;
-        const eventBytes =
-          pushQueue.length < MAX_BUFFERED_ITERATOR_EVENTS
-            ? estimateBufferedEventBytes(value, remainingBytes)
-            : remainingBytes + 1;
-
-        if (pushQueue.length >= MAX_BUFFERED_ITERATOR_EVENTS || eventBytes > remainingBytes) {
+        if (pushQueue.length >= MAX_BUFFERED_ITERATOR_EVENTS) {
+          failBufferedEvents();
+          return;
+        }
+        const graph = inspectBufferedEventGraph(value, MAX_BUFFERED_ITERATOR_BYTES);
+        const retention = graph && bufferedLedger.retain(graph);
+        if (!retention) {
           failBufferedEvents();
           return;
         }
@@ -1359,10 +1774,9 @@ export class EventStream<EventTypes extends BaseEvents> {
           }
         }
 
-        const entry: BufferedEvent = { bytes: eventBytes, active: true, check: undefined };
+        const entry: BufferedEvent = { retention, active: true, check: undefined };
         pushQueue.enqueue(value);
         bufferedEventSizes.enqueue(entry);
-        bufferedBytes += eventBytes;
         const check = () => {
           entry.check = undefined;
           revalidateBufferedEvent(value, entry);
@@ -1403,13 +1817,13 @@ export class EventStream<EventTypes extends BaseEvents> {
           const value = pushQueue.dequeue()!;
           const entry = bufferedEventSizes.dequeue()!;
           deactivateBufferedEvent(entry);
-          bufferedBytes -= entry.bytes;
-          const remainingBytes = MAX_BUFFERED_ITERATOR_BYTES - bufferedBytes;
-          if (estimateBufferedEventBytes(value, remainingBytes) > remainingBytes) {
+          const graph = inspectBufferedEventGraph(value, MAX_BUFFERED_ITERATOR_BYTES);
+          if (!graph || !bufferedLedger.refresh(entry.retention, graph)) {
             const error = failBufferedEvents(true);
             failureDelivered = true;
             return Promise.reject(error);
           }
+          bufferedLedger.release(entry.retention);
           return Promise.resolve({ value, done: false });
         }
 
@@ -1432,7 +1846,7 @@ export class EventStream<EventTypes extends BaseEvents> {
           deactivateBufferedEvent(bufferedEventSizes.dequeue()!);
         }
         pushQueue.clear();
-        bufferedBytes = 0;
+        bufferedLedger.clear();
         cleanup();
         finishReaders();
         if (onReturn) {

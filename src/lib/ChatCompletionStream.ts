@@ -622,7 +622,22 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
   const snapshot = cloneParserConfigObject(params);
 
   if (params.tools) {
-    snapshot.tools = params.tools.map((tool) => {
+    const stableTools: NonNullable<ChatCompletionCreateParams['tools']> = [];
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(params.tools, 'length');
+    const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+    const toolCount =
+      typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
+        ? Math.min(length, MAX_STREAM_TOOL_CALLS)
+        : 0;
+
+    for (let index = 0; index < toolCount; index += 1) {
+      const item = Object.getOwnPropertyDescriptor(params.tools, String(index));
+      if (!item || !('value' in item)) {
+        stableTools.length = index + 1;
+        continue;
+      }
+
+      const tool = item.value as NonNullable<ChatCompletionCreateParams['tools']>[number];
       const stableTool = cloneParserConfigObject(tool, [
         'type',
         '$brand',
@@ -642,8 +657,9 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
         };
       }
 
-      return Object.create(Object.getPrototypeOf(tool), descriptors) as typeof tool;
-    });
+      stableTools[index] = Object.create(Object.getPrototypeOf(tool), descriptors) as typeof tool;
+    }
+    snapshot.tools = stableTools;
   }
 
   if (params.response_format) {
@@ -876,7 +892,6 @@ function rememberSerializedParserSchema(
   source: object,
   holder: object,
   key: string,
-  budget: SerializedParserSchemaBudget,
 ): void {
   const parser = Object.getOwnPropertyDescriptor(source, '$parseRaw');
   const schema = Object.getOwnPropertyDescriptor(holder, key);
@@ -890,7 +905,7 @@ function rememberSerializedParserSchema(
     return;
   }
 
-  const normalized = canonicalSerializedParserSchema(schema.value, budget);
+  const normalized = canonicalSerializedParserSchema(schema.value, { nodes: 0, bytes: 0 });
   if (normalized !== undefined) {
     signatures.set(source, normalized);
   }
@@ -902,7 +917,6 @@ function hasMatchingSerializedParserSchema(
   holder: object,
   key: string,
   value: unknown,
-  budget: SerializedParserSchemaBudget,
 ): boolean {
   const expected = source && signatures.get(source);
   const descriptor = Object.getOwnPropertyDescriptor(holder, key);
@@ -910,7 +924,7 @@ function hasMatchingSerializedParserSchema(
     expected !== undefined &&
     descriptor !== undefined &&
     'value' in descriptor &&
-    canonicalSerializedParserSchema(value, budget) === expected
+    canonicalSerializedParserSchema(value, { nodes: 0, bytes: 0 }) === expected
   );
 }
 
@@ -921,6 +935,28 @@ function serializedParserDescriptor(
   return descriptor && 'value' in descriptor
     ? { ...descriptor, value }
     : { configurable: true, enumerable: true, writable: true, value };
+}
+
+function shadowSerializedParserMetadata(
+  descriptors: PropertyDescriptorMap,
+  source: object,
+  fields: readonly string[],
+): void {
+  for (const field of fields) {
+    const descriptor = descriptors[field];
+    if (!descriptor && !(field in source)) {
+      continue;
+    }
+    descriptors[field] =
+      descriptor && 'value' in descriptor
+        ? { ...descriptor, value: undefined }
+        : {
+            configurable: descriptor?.configurable ?? true,
+            enumerable: descriptor?.enumerable ?? false,
+            writable: false,
+            value: undefined,
+          };
+  }
 }
 
 function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): ChatCompletionInputTool {
@@ -937,9 +973,7 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
     if (descriptors.function) {
       descriptors.function = serializedParserDescriptor(descriptors.function, undefined);
     }
-    delete descriptors['$brand'];
-    delete descriptors['$parseRaw'];
-    delete descriptors['$callback'];
+    shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
     return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
   }
 
@@ -962,9 +996,7 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
     Object.create(Object.getPrototypeOf(original), functionDescriptors),
   );
   if (!serialized.function.schemaMatches) {
-    delete descriptors['$brand'];
-    delete descriptors['$parseRaw'];
-    delete descriptors['$callback'];
+    shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
   }
 
   return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
@@ -977,8 +1009,7 @@ function snapshotSerializedResponseFormat(
   const descriptors = Object.getOwnPropertyDescriptors(source);
   descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
   if (serialized.type !== 'json_schema' || !serialized.source || !serialized.schemaMatches) {
-    delete descriptors['$brand'];
-    delete descriptors['$parseRaw'];
+    shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw']);
   }
   return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionResponseFormat;
 }
@@ -999,7 +1030,8 @@ function observeSerializedChatCompletionParserParams(
 ): () => void {
   const originalToolOwners = new WeakMap<object, ChatCompletionInputTool>();
   const originalSchemaSignatures = new WeakMap<object, string>();
-  const originalSchemaBudget: SerializedParserSchemaBudget = { nodes: 0, bytes: 0 };
+  // At most 128 tools plus one response format each receive an independent
+  // 4,096-node/1 MiB source and wire allowance (129 MiB maximum per pass).
   if (body.tools) {
     for (let index = 0; index < body.tools.length && index < MAX_STREAM_TOOL_CALLS; index += 1) {
       const owner = ownSerializedParserObject(body.tools, String(index));
@@ -1008,13 +1040,7 @@ function observeSerializedChatCompletionParserParams(
         originalToolOwners.set(owner, source);
         const originalFunction = ownSerializedParserObject(source, 'function');
         if (originalFunction) {
-          rememberSerializedParserSchema(
-            originalSchemaSignatures,
-            source,
-            originalFunction,
-            'parameters',
-            originalSchemaBudget,
-          );
+          rememberSerializedParserSchema(originalSchemaSignatures, source, originalFunction, 'parameters');
         }
       }
     }
@@ -1025,10 +1051,8 @@ function observeSerializedChatCompletionParserParams(
       initial.response_format,
       initial.response_format,
       'json_schema',
-      originalSchemaBudget,
     );
   }
-  let serializedSchemaBudget: SerializedParserSchemaBudget = { nodes: 0, bytes: 0 };
   let root: object | undefined;
   let tools: object | undefined;
   let responseFormat: object | undefined;
@@ -1041,7 +1065,6 @@ function observeSerializedChatCompletionParserParams(
     value(holder, key, value) {
       if (!root && key === '' && typeof value === 'object' && value !== null) {
         root = value;
-        serializedSchemaBudget = { nodes: 0, bytes: 0 };
         tools = undefined;
         responseFormat = undefined;
         responseFrame = undefined;
@@ -1111,7 +1134,6 @@ function observeSerializedChatCompletionParserParams(
             holder,
             key,
             value,
-            serializedSchemaBudget,
           );
         }
         return;
@@ -1130,7 +1152,6 @@ function observeSerializedChatCompletionParserParams(
             holder,
             key,
             value,
-            serializedSchemaBudget,
           );
         }
       }
@@ -1187,11 +1208,26 @@ export class ChatCompletionStream<ParsedT = null>
     this.#params = params;
     this.#audioDoneChoiceIndexes = new Set();
     this.#choiceEventStates = [];
-    this.#hasAutoParseableTool =
-      params?.tools?.some(
-        (tool) =>
-          isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true),
-      ) ?? false;
+    this.#hasAutoParseableTool = false;
+    const tools = params?.tools;
+    const lengthDescriptor = tools && Object.getOwnPropertyDescriptor(tools, 'length');
+    const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+    if (tools && typeof length === 'number' && Number.isSafeInteger(length) && length >= 0) {
+      for (let index = 0; index < Math.min(length, MAX_STREAM_TOOL_CALLS); index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(tools, String(index));
+        if (!descriptor || !('value' in descriptor)) {
+          continue;
+        }
+        const tool = descriptor.value as ChatCompletionInputTool;
+        if (
+          isChatCompletionFunctionTool(tool) &&
+          (isAutoParsableTool(tool) || tool.function.strict === true)
+        ) {
+          this.#hasAutoParseableTool = true;
+          break;
+        }
+      }
+    }
     this.#partialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
   }
 

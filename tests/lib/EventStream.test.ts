@@ -444,6 +444,123 @@ describe('EventStream.events', () => {
 });
 
 describe('EventStream iterator buffer limits', () => {
+  test('deduplicates one nested graph across hundreds of independently buffered events', async () => {
+    const shared = { text: 'x'.repeat(16 * 1024), nested: { state: 'shared' } };
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    for (let index = 0; index < 768; index += 1) {
+      stream.emitPayload({ delta: { index }, shared });
+    }
+
+    expect(stream.controller.signal.aborted).toBe(false);
+    const first = await iterator.next();
+    const last = await Promise.all(Array.from({ length: 767 }, () => iterator.next()));
+    expect((first.value[0] as { shared: object }).shared).toBe(shared);
+    expect((last.pop()?.value[0] as { shared: object } | undefined)?.shared).toBe(shared);
+    stream.end();
+  });
+
+  test('charges a growing shared snapshot only once across queued owner identities', async () => {
+    const shared = { text: '' };
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    for (let index = 0; index < 640; index += 1) {
+      shared.text += 'x'.repeat(32);
+      stream.emitPayload({ index, shared });
+    }
+
+    expect(stream.controller.signal.aborted).toBe(false);
+    const first = await iterator.next();
+    expect((first.value[0] as { shared: typeof shared }).shared).toBe(shared);
+    expect(shared.text).toHaveLength(640 * 32);
+    await iterator.return?.();
+  });
+
+  test('deduplicates the backing store retained by distinct cross-event typed-array views', async () => {
+    const backing = new ArrayBuffer(3 * 1024 * 1024);
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    for (let index = 0; index < 4; index += 1) {
+      stream.emitPayload({ view: new Uint8Array(backing, index, 1) });
+    }
+
+    expect(stream.controller.signal.aborted).toBe(false);
+    const values = await Promise.all(Array.from({ length: 4 }, () => iterator.next()));
+    for (const value of values) {
+      expect((value.value[0] as { view: Uint8Array }).view.buffer).toBe(backing);
+    }
+    stream.end();
+  });
+
+  test('deduplicates a symbol description retained by multiple queued event graphs', async () => {
+    const symbol = Symbol('x'.repeat(3 * 1024 * 1024));
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+
+    stream.emitPayload({ first: symbol });
+    stream.emitPayload({ second: symbol });
+
+    expect(stream.controller.signal.aborted).toBe(false);
+    await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    stream.end();
+  });
+
+  test('propagates a newly shared descendant to every buffered owner before one dequeues', async () => {
+    const shared: { child: { text: string } } = { child: { text: 'small' } };
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    stream.emitPayload({ first: true, shared });
+    stream.emitPayload({ second: true, shared });
+
+    shared.child = { text: 'x'.repeat(3 * 1024 * 1024) };
+    const first = await iterator.next();
+
+    expect((first.value[0] as { shared: typeof shared }).shared).toBe(shared);
+    expect(stream.controller.signal.aborted).toBe(false);
+
+    stream.emitPayload({ independent: 'y'.repeat(2 * 1024 * 1024) });
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    await expect(stream.done()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
+  test('retains a shared graph until its final queued owner is consumed', async () => {
+    const shared = { text: 'x'.repeat(2 * 1024 * 1024) };
+    const stream = new TestStream();
+    const iterator = stream.events('payload');
+    stream.emitPayload({ first: true, shared });
+    stream.emitPayload({ second: true, shared });
+
+    await iterator.next();
+    stream.emitPayload({ separate: 'y'.repeat(1024 * 1024) });
+    await iterator.next();
+    stream.emitPayload({ replacement: 'z'.repeat(2 * 1024 * 1024) });
+
+    expect(stream.controller.signal.aborted).toBe(false);
+    await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    stream.end();
+  });
+
+  test('rejects a late accessor added to a shared retained graph without invoking it', async () => {
+    const shared: Record<string, unknown> = { safe: true };
+    const stream = new TestStream();
+    stream.events('payload');
+    stream.emitPayload({ shared });
+    const readHidden = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+    Object.defineProperty(shared, 'hidden', { enumerable: true, get: readHidden });
+
+    stream.emitPayload({ shared });
+
+    expect(stream.controller.signal.aborted).toBe(true);
+    expect(readHidden).not.toHaveBeenCalled();
+    await expect(stream.done()).rejects.toThrow(/iterator buffer limit/iu);
+  });
+
   test.each([
     { name: 'local Date', create: () => new Date(1_725_000_000_000) },
     { name: 'cross-realm Date', create: () => runInNewContext('new Date(1725000000000)') as Date },

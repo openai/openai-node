@@ -205,6 +205,37 @@ describe('AssistantStream delta accumulation', () => {
 });
 
 describe('AssistantStream snapshots and message lifecycle', () => {
+  test('buffers repeated message deltas without charging their shared growing snapshot repeatedly', async () => {
+    const message = {
+      id: 'msg_shared_snapshot',
+      role: 'assistant',
+      content: [{ type: 'text', text: { value: 'x'.repeat(16 * 1024), annotations: [] } }],
+    };
+    const events: Event[] = [{ event: 'thread.message.created', data: message }];
+    for (let index = 0; index < 640; index += 1) {
+      events.push({
+        event: 'thread.message.delta',
+        data: {
+          id: message.id,
+          delta: { content: [{ index: 0, type: 'text', text: { value: 'a' } }] },
+        },
+      });
+    }
+    events.push({ event: 'thread.message.completed', data: message }, completedRun());
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      { create: vi.fn().mockResolvedValue(iterableEvents(events)) } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const iterator = runner.events('messageDelta');
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    const first = await iterator.next();
+    expect(first.value?.[1]).toBe(message);
+    expect(message.content[0]?.text.value).toHaveLength(16 * 1024 + 640);
+    await iterator.return?.();
+  });
+
   test('preserves ordinary raw-event and message snapshot identities', async () => {
     const message = { id: 'msg_identity', role: 'assistant', content: [] };
     const createdEvent = { event: 'thread.message.created', data: message };
