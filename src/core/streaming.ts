@@ -1,7 +1,7 @@
 import { OpenAIError, APIError } from './error';
 import type { ReadableStream } from '../internal/shim-types';
 import { makeReadableStream, ReadableStreamToAsyncIterable } from '../internal/shims';
-import { LineDecoder } from '../internal/decoders/line';
+import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
 import { isAbortError } from '../internal/errors';
 import { encodeUTF8 } from '../internal/utils/bytes';
 import { loggerFor } from '../internal/utils/log';
@@ -336,7 +336,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
 /**
  * Decodes complete SSE records from a response and aborts when its body is absent.
- * Lines are decoded incrementally without imposing a line or event size limit.
+ * Complete events are decoded on demand without imposing a line or event size limit.
  *
  * @yields {ServerSentEvent} Each decoded server-sent event in wire order.
  */
@@ -361,7 +361,7 @@ export async function* _iterSSEMessages(
   const lineDecoder = new LineDecoder();
 
   const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
-  for await (const sseChunk of iter) {
+  for await (const sseChunk of iterSSEChunks(iter)) {
     for (const line of lineDecoder.decode(sseChunk)) {
       const sse = sseDecoder.decode(line);
       if (sse) {
@@ -375,6 +375,71 @@ export async function* _iterSSEMessages(
     if (sse) {
       yield sse;
     }
+  }
+}
+
+// A `\r\n\r\n` separator may retain up to three bytes from the previous chunk.
+const DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES = 3;
+
+/**
+ * Given an async iterable iterator, iterates over it and yields full
+ * SSE chunks, i.e. yields when a double new-line is encountered.
+ *
+ * @yields {Uint8Array} A complete SSE chunk.
+ */
+async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGenerator<Uint8Array> {
+  let data = new Uint8Array();
+  let dataStart = 0;
+  let dataEnd = 0;
+  let searchStartIndex = 0;
+
+  for await (const chunk of iterator) {
+    if (chunk == null) {
+      continue;
+    }
+
+    let binaryChunk: Uint8Array;
+    if (chunk instanceof ArrayBuffer) {
+      binaryChunk = new Uint8Array(chunk);
+    } else if (typeof chunk === 'string') {
+      binaryChunk = encodeUTF8(chunk);
+    } else {
+      binaryChunk = chunk;
+    }
+
+    if (dataEnd + binaryChunk.length > data.length) {
+      const bufferedLength = dataEnd - dataStart;
+
+      // Compact only when it reclaims substantial space without moving a large live tail repeatedly.
+      if (dataStart >= data.length / 2 && bufferedLength + binaryChunk.length <= data.length) {
+        data.copyWithin(0, dataStart, dataEnd);
+      } else {
+        const newData = new Uint8Array(Math.max(data.length * 2, bufferedLength + binaryChunk.length));
+        newData.set(data.subarray(dataStart, dataEnd));
+        data = newData;
+      }
+
+      searchStartIndex -= dataStart;
+      dataStart = 0;
+      dataEnd = bufferedLength;
+    }
+
+    data.set(binaryChunk, dataEnd);
+    dataEnd += binaryChunk.length;
+
+    let patternIndex;
+    while ((patternIndex = findDoubleNewlineIndex(data.subarray(searchStartIndex, dataEnd))) !== -1) {
+      patternIndex += searchStartIndex;
+      yield data.slice(dataStart, patternIndex);
+      dataStart = patternIndex;
+      searchStartIndex = dataStart;
+    }
+
+    searchStartIndex = Math.max(dataStart, dataEnd - DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES);
+  }
+
+  if (dataEnd > dataStart) {
+    yield data.slice(dataStart, dataEnd);
   }
 }
 
