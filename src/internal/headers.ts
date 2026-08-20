@@ -206,22 +206,22 @@ class DeferredAzureAuthenticationNulls extends Set<string> {
     return super.has(value);
   }
 
-  override entries(): SetIterator<[string, string]> {
+  override entries(): ReturnType<Set<string>['entries']> {
     this.initialize();
     return super.entries();
   }
 
-  override keys(): SetIterator<string> {
+  override keys(): ReturnType<Set<string>['keys']> {
     this.initialize();
     return super.keys();
   }
 
-  override values(): SetIterator<string> {
+  override values(): ReturnType<Set<string>['values']> {
     this.initialize();
     return super.values();
   }
 
-  override [Symbol.iterator](): SetIterator<string> {
+  override [Symbol.iterator](): ReturnType<Set<string>[typeof Symbol.iterator]> {
     this.initialize();
     return super[Symbol.iterator]();
   }
