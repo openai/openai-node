@@ -120,12 +120,13 @@ function createAzureWebSocket(
     throw new Error('Azure OpenAI Realtime requires an API key');
   }
 
-  assertAzureCredentialHeaderValue(apiKey);
+  const credential = String(apiKey);
+  assertAzureCredentialHeaderValue(credential);
   redactAzureCredentials(url, isBearerToken);
   const socketURL = new URL(url);
   socketURL.searchParams.delete('api-key');
   socketURL.searchParams.delete('Authorization');
-  const headers = isBearerToken ? { Authorization: `Bearer ${apiKey}` } : { 'api-key': apiKey };
+  const headers = isBearerToken ? { Authorization: `Bearer ${credential}` } : { 'api-key': credential };
 
   // @ts-ignore
   return new WebSocket(socketURL.toString(), { protocols, headers });

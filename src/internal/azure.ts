@@ -53,14 +53,19 @@ export function safeAzureWebSocketHeaders<Headers extends Record<string, unknown
       const snapshot: unknown[] = [];
       for (let index = 0; index < length; index += 1) {
         const entry = value[index];
-        if (typeof entry === 'string') {
-          assertAzureCredentialHeaderValue(entry);
+        if (entry === null || entry === undefined) {
+          snapshot.push(entry);
+          continue;
         }
-        snapshot.push(entry);
+        const credential = String(entry);
+        assertAzureCredentialHeaderValue(credential);
+        snapshot.push(credential);
       }
       safeHeaders.set(name, snapshot);
-    } else if (typeof value === 'string') {
-      assertAzureCredentialHeaderValue(value);
+    } else {
+      const credential = String(value);
+      assertAzureCredentialHeaderValue(credential);
+      safeHeaders.set(name, credential);
     }
   }
   return Object.fromEntries(safeHeaders) as Headers;

@@ -115,6 +115,34 @@ function createAzureClient(
   });
 }
 
+function statefulCredential(first: string, second: string) {
+  let coercions = 0;
+  let hookReads = 0;
+  let iteratorReads = 0;
+  const value = {
+    startsWith() {
+      return false;
+    },
+    [Symbol.iterator]() {
+      iteratorReads += 1;
+      return 'safe iterable credential'[Symbol.iterator]();
+    },
+  };
+  Object.defineProperty(value, Symbol.toPrimitive, {
+    get() {
+      hookReads += 1;
+      return () => {
+        coercions += 1;
+        return coercions === 1 ? first : second;
+      };
+    },
+  });
+  return {
+    value,
+    counts: () => ({ coercions, hookReads, iteratorReads }),
+  };
+}
+
 beforeEach(() => {
   FakeBrowserSocket.instances = [];
   nodeSocketConstructor.mockClear();
@@ -209,6 +237,128 @@ describe('Azure realtime credential diagnostic privacy', () => {
         ...(rotating ? { azureADTokenProvider: provider } : { apiKey: credential }),
       });
       await open(client);
+      expect(provider).toHaveBeenCalledTimes(rotating ? 1 : 0);
+    },
+  );
+
+  test.each(
+    surfaces.flatMap((surface) =>
+      ([false, true] as const).flatMap((rotating) =>
+        ([false, true] as const).map((malformedFirst) => ({ ...surface, rotating, malformedFirst })),
+      ),
+    ),
+  )(
+    '$name snapshots mutable credential coercion once (rotating: $rotating, malformed first: $malformedFirst)',
+    async ({ name, open, rotating, malformedFirst }) => {
+      const safe = 'safe credential\tvalue\u00FF';
+      const malformed = 'azure-private-credential-75da\nprivate-patient-record-21f8';
+      const observed = statefulCredential(
+        malformedFirst ? malformed : safe,
+        malformedFirst ? safe : malformed,
+      );
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const client = new AzureOpenAI({
+        baseURL: 'https://azure.example.com/openai/',
+        apiVersion: '2024-10-01-preview',
+        deployment: 'chat',
+        ...(rotating ? { azureADTokenProvider: provider } : { apiKey: 'azure-key' }),
+      });
+      Object.defineProperty(client, 'apiKey', {
+        configurable: true,
+        get: () => observed.value,
+        set() {},
+      });
+
+      if (malformedFirst) {
+        let failure: unknown;
+        try {
+          await open(client);
+        } catch (error) {
+          failure = error;
+        }
+        expect(failure).toBeInstanceOf(TypeError);
+        expect((failure as TypeError).message).toBe(
+          'Azure OpenAI credential contains an invalid HTTP header value.',
+        );
+        expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
+        expect((failure as Error).stack).not.toContain('azure-private-credential-75da');
+        expect(FakeBrowserSocket.instances).toHaveLength(0);
+        expect(nodeSocketConstructor).not.toHaveBeenCalled();
+      } else {
+        await open(client);
+        const headers = name.includes('native')
+          ? lastBrowserSocket().headers
+          : lastNodeSocket().options.headers;
+        const field = rotating ? 'Authorization' : 'api-key';
+        expect(Reflect.get(headers ?? {}, field)).toBe(rotating ? `Bearer ${safe}` : safe);
+      }
+
+      expect(observed.counts()).toEqual({ coercions: 1, hookReads: 1, iteratorReads: 0 });
+      expect(provider).toHaveBeenCalledTimes(rotating ? 1 : 0);
+    },
+  );
+
+  test.each(
+    [
+      { name: 'stable', open: StableNodeRealtime.azure.bind(StableNodeRealtime) },
+      { name: 'beta', open: BetaNodeRealtime.azure.bind(BetaNodeRealtime) },
+    ].flatMap((surface) =>
+      ([false, true] as const).flatMap((rotating) =>
+        (['scalar', 'array'] as const).flatMap((shape) =>
+          ([false, true] as const).map((malformedFirst) => ({
+            ...surface,
+            rotating,
+            shape,
+            malformedFirst,
+          })),
+        ),
+      ),
+    ),
+  )(
+    '$name Node ws snapshots $shape header coercion once (rotating: $rotating, malformed first: $malformedFirst)',
+    async ({ open, rotating, shape, malformedFirst }) => {
+      const safe = 'safe header\tvalue\u0080';
+      const malformed = 'azure-private-credential-75da\nprivate-patient-record-21f8';
+      const observed = statefulCredential(
+        malformedFirst ? malformed : safe,
+        malformedFirst ? safe : malformed,
+      );
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const client = new AzureOpenAI({
+        baseURL: 'https://azure.example.com/openai/',
+        apiVersion: '2024-10-01-preview',
+        deployment: 'chat',
+        ...(rotating ? { azureADTokenProvider: provider } : { apiKey: 'azure-key' }),
+      });
+      const field = rotating ? 'api-key' : 'Authorization';
+      const headers: Record<string, string> = {};
+      Object.defineProperty(headers, field, {
+        enumerable: true,
+        value: shape === 'array' ? [observed.value] : observed.value,
+      });
+
+      if (malformedFirst) {
+        let failure: unknown;
+        try {
+          await open(client, { options: { headers } });
+        } catch (error) {
+          failure = error;
+        }
+        expect(failure).toBeInstanceOf(TypeError);
+        expect((failure as TypeError).message).toBe(
+          'Azure OpenAI credential contains an invalid HTTP header value.',
+        );
+        expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
+        expect((failure as Error).stack).not.toContain('azure-private-credential-75da');
+        expect(nodeSocketConstructor).not.toHaveBeenCalled();
+      } else {
+        await open(client, { options: { headers } });
+        expect(Reflect.get(lastNodeSocket().options.headers ?? {}, field)).toEqual(
+          shape === 'array' ? [safe] : safe,
+        );
+      }
+
+      expect(observed.counts()).toEqual({ coercions: 1, hookReads: 1, iteratorReads: 0 });
       expect(provider).toHaveBeenCalledTimes(rotating ? 1 : 0);
     },
   );
