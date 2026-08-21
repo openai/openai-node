@@ -1,10 +1,8 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
-import { InvalidWebhookSignatureError } from '../../error';
 import { APIResource } from '../../core/resource';
 import { buildHeaders, HeadersLike } from '../../internal/headers';
-import { fromBase64 } from '../../internal/utils/base64';
-import { encodeUTF8 } from '../../internal/utils/bytes';
+import { verifyWebhookSignature } from '../../lib/webhook-signature';
 
 export class Webhooks extends APIResource {
   /**
@@ -52,65 +50,7 @@ export class Webhooks extends APIResource {
     const timestamp = this.#getRequiredHeader(headersObj, 'webhook-timestamp');
     const webhookId = this.#getRequiredHeader(headersObj, 'webhook-id');
 
-    // Validate timestamp to prevent replay attacks
-    const timestampSeconds = parseInt(timestamp, 10);
-    if (isNaN(timestampSeconds)) {
-      throw new InvalidWebhookSignatureError('Invalid webhook timestamp format');
-    }
-
-    const nowSeconds = Math.floor(Date.now() / 1000);
-
-    if (nowSeconds - timestampSeconds > tolerance) {
-      throw new InvalidWebhookSignatureError('Webhook timestamp is too old');
-    }
-
-    if (timestampSeconds > nowSeconds + tolerance) {
-      throw new InvalidWebhookSignatureError('Webhook timestamp is too new');
-    }
-
-    // Extract signatures from v1,<base64> format
-    // The signature header can have multiple values, separated by spaces.
-    // Each value is in the format v1,<base64>. We should accept if any match.
-    const signatures = signatureHeader
-      .split(' ')
-      .map((part) => (part.startsWith('v1,') ? part.substring(3) : part));
-
-    // Decode the secret if it starts with whsec_
-    const decodedSecret = Uint8Array.from(
-      secret.startsWith('whsec_') ? fromBase64(secret.slice('whsec_'.length)) : encodeUTF8(secret),
-    );
-
-    // Create the signed payload: {webhook_id}.{timestamp}.{payload}
-    const signedPayload = webhookId ? `${webhookId}.${timestamp}.${payload}` : `${timestamp}.${payload}`;
-    const signedPayloadBytes = Uint8Array.from(encodeUTF8(signedPayload));
-
-    // Import the secret as a cryptographic key for HMAC
-    const key = await crypto.subtle.importKey(
-      'raw',
-      decodedSecret,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify'],
-    );
-
-    // Check if any signature matches using timing-safe WebCrypto verify
-    for (const signature of signatures) {
-      try {
-        const signatureBytes = Uint8Array.from(fromBase64(signature));
-        const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, signedPayloadBytes);
-
-        if (isValid) {
-          return; // Valid signature found
-        }
-      } catch {
-        // Invalid base64 or signature format, continue to next signature
-        continue;
-      }
-    }
-
-    throw new InvalidWebhookSignatureError(
-      'The given webhook signature does not match the expected signature',
-    );
+    return await verifyWebhookSignature(payload, signatureHeader, timestamp, webhookId, secret, tolerance);
   }
 
   #validateSecret(secret: string | null | undefined): asserts secret is string {
