@@ -1,5 +1,5 @@
 import { types } from 'node:util';
-import { Agent, ProxyAgent, fetch } from 'undici';
+import undici, { Agent, ProxyAgent, fetch } from 'undici';
 
 declare const x509TransportBrand: unique symbol;
 
@@ -105,6 +105,11 @@ function attestedDispatcher(options: X509TransportOptions): Agent | ProxyAgent {
  */
 export function createX509Transport(options: X509TransportOptions): X509Transport {
   assertNodeRuntime();
+
+  // Undici introduced this public export in v7; v5 and v6 do not provide it.
+  if (!Object.getOwnPropertyDescriptor(undici, 'cacheStores')) {
+    throw new Error('X.509 transport requires Undici 7 or 8.');
+  }
 
   if (!options || typeof options !== 'object' || types.isProxy(options)) {
     throw new Error('X.509 transport configuration must be a non-proxy object.');
