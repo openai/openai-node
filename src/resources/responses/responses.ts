@@ -4,7 +4,7 @@ import {
   type ExtractParsedContentFromParams,
   parseResponse,
   type ResponseCreateParamsWithTools,
-  addOutputText,
+  addOutputTextIfResponse,
 } from '../../lib/ResponsesParser';
 import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
 import { APIResource } from '../../core/resource';
@@ -115,13 +115,7 @@ export class Responses extends APIResource {
         stream: body.stream ?? false,
         __security: { bearerAuth: true },
       }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
-    )._thenUnwrap((rsp) => {
-      if ('object' in rsp && rsp.object === 'response') {
-        addOutputText(rsp as Response);
-      }
-
-      return rsp;
-    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
+    )._thenUnwrap(addOutputTextIfResponse) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -161,13 +155,7 @@ export class Responses extends APIResource {
         stream: query?.stream ?? false,
         __security: { bearerAuth: true },
       }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
-    )._thenUnwrap((rsp) => {
-      if ('object' in rsp && rsp.object === 'response') {
-        addOutputText(rsp as Response);
-      }
-
-      return rsp;
-    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
+    )._thenUnwrap(addOutputTextIfResponse) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**

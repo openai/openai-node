@@ -1,4 +1,5 @@
 import { OpenAIError } from '../error';
+import type { Stream } from '../core/streaming';
 import type { ChatCompletionTool } from '../resources/chat/completions';
 import type {
   FunctionTool,
@@ -11,6 +12,7 @@ import type {
   ResponseCreateParamsNonStreaming,
   ResponseFormatTextJSONSchemaConfig,
   ResponseFunctionToolCall,
+  ResponseStreamEvent,
   ResponseTextConfig,
   Tool,
 } from '../resources/responses/responses';
@@ -315,6 +317,17 @@ function needsOutputText(
   target: { output_text?: Response['output_text'] | null },
 ): boolean {
   return !Object.getOwnPropertyDescriptor(response, 'output_text') || target.output_text == null;
+}
+
+/** Adds output text to response data while preserving response and stream identity. */
+export function addOutputTextIfResponse(
+  rsp: Response | Stream<ResponseStreamEvent>,
+): Response | Stream<ResponseStreamEvent> {
+  if ('object' in rsp && rsp.object === 'response') {
+    addOutputText(rsp as Response);
+  }
+
+  return rsp;
 }
 
 /** Replaces `output_text` with the concatenated text from every response output message. */
