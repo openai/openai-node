@@ -108,20 +108,20 @@ describe('vector-store batch upload orchestration', () => {
     expect(fileIds).toEqual(['existing']);
   });
 
-  test.each([-1, Number.NaN, 1.5])(
+  test.each([-1, Number.NaN, 1.5, Number.NEGATIVE_INFINITY])(
     'preserves the invalid array-length error for concurrency %s',
     async (limit) => {
       const client = createClient();
       const upload = vi.spyOn(client.files, 'create');
       const createAndPoll = vi.spyOn(client.vectorStores.fileBatches, 'createAndPoll');
 
-      await expect(
-        client.vectorStores.fileBatches.uploadAndPoll(
-          'vs_123',
-          { files: createFiles(3) },
-          { maxConcurrency: limit },
-        ),
-      ).rejects.toBeInstanceOf(RangeError);
+      const result = client.vectorStores.fileBatches.uploadAndPoll(
+        'vs_123',
+        { files: createFiles(3) },
+        { maxConcurrency: limit },
+      );
+      await expect(result).rejects.toBeInstanceOf(RangeError);
+      await expect(result).rejects.toThrow('Invalid array length');
       expect(upload).not.toHaveBeenCalled();
       expect(createAndPoll).not.toHaveBeenCalled();
     },

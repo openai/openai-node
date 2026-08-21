@@ -41,8 +41,9 @@ export async function uploadAndPollVectorStoreFileBatch(
     }
   }
 
-  // oxlint-disable-next-line unicorn/no-new-array -- Preserve native RangeError for negative, NaN, or fractional limits.
-  const workers = new Array<Promise<void>>(concurrencyLimit);
+  // Assigning length preserves native validation of invalid concurrency values.
+  const workers: Promise<void>[] = [];
+  workers.length = concurrencyLimit;
   for (let index = 0; index < workers.length; index += 1) {
     workers[index] = processFiles(fileIterator);
   }
