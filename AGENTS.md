@@ -73,6 +73,16 @@ explicitly requires it.
   when the public contract changes. Preserve existing documentation URLs and import
   paths, and make examples runnable with the documented environment and dependencies.
 
+## Custom-code budget
+
+Follow [the custom-code guidance](scripts/castiron/CUSTOM_CODE.md). Budget changes
+belong in a separate PR containing only `.castiron-ratchet.json`, with an explicit justification
+in the PR description. Increases require a **human approving review** before merging.
+Agents may investigate and draft proposals, but must not approve budget increases
+(including through a human's credentials) or bypass the gate. Do not weaken
+counting, broaden exclusions, or alter generation metadata to make a change pass.
+The checker and effective budget come from main, not the PR. Keep default CODEOWNERS.
+
 ## Security and lifecycle correctness
 
 - Never commit API keys, tokens, private keys, `.env` files, customer data, or other
