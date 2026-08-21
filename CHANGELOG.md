@@ -1,5 +1,79 @@
 # Changelog
 
+## [7.6.0](https://github.com/openai/openai-node/compare/v7.5.0...v7.6.0) (2026-08-21)
+
+
+### Features
+
+* **api:** Add obfuscation field to ChatCompletionChunk ([#2423](https://github.com/openai/openai-node/issues/2423)) ([39afa3a](https://github.com/openai/openai-node/commit/39afa3ade23436802ab4373d0324b6312740f048))
+* support named data-residency endpoints ([#2393](https://github.com/openai/openai-node/issues/2393)) ([62d98dd](https://github.com/openai/openai-node/commit/62d98ddc55bbeed45456130561953dd2dfcf0b8c))
+
+
+### Bug Fixes
+
+* [responses] Avoid quadratic comparisons when accumulating long text ([#2434](https://github.com/openai/openai-node/issues/2434)) ([95628ce](https://github.com/openai/openai-node/commit/95628cee9b4d6869f1b0b54e323248eed5bd59c5))
+* **auth:** sanitize malformed Azure IMDS token responses ([#2427](https://github.com/openai/openai-node/issues/2427)) ([bbfb792](https://github.com/openai/openai-node/commit/bbfb7926b16428c350ba278ac1444b12470dc57a))
+* drain tee stream queues in linear time ([#2379](https://github.com/openai/openai-node/issues/2379)) ([1f3ce07](https://github.com/openai/openai-node/commit/1f3ce0760abbd3b40606225ef1fd40be2e87e467))
+* preserve large streaming responses ([#2433](https://github.com/openai/openai-node/issues/2433)) ([4e588c2](https://github.com/openai/openai-node/commit/4e588c2fed7f5987381495f9cca245e245ac9cbd))
+* preserve multipart upload array order ([#2380](https://github.com/openai/openai-node/issues/2380)) ([f1a2b61](https://github.com/openai/openai-node/commit/f1a2b6156f305c9e92821afe184d3164d67a9be1))
+* **security:** abort streaming examples when clients disconnect ([#2426](https://github.com/openai/openai-node/issues/2426)) ([b32a25b](https://github.com/openai/openai-node/commit/b32a25bd643b4970cc1a99c57bc9710a00f7f539))
+* **security:** authenticate Cloudflare tests and restrict streaming proxies ([#2413](https://github.com/openai/openai-node/issues/2413)) ([9286fdb](https://github.com/openai/openai-node/commit/9286fdb0cd694b301c06b31441e797ce55f6aa25))
+* **security:** authenticate Vercel ecosystem APIs and clean up uploaded files ([#2412](https://github.com/openai/openai-node/issues/2412)) ([d58608a](https://github.com/openai/openai-node/commit/d58608a08323b9a58f951cabd93bf734e264e76a))
+* **security:** bound SDK event streams and validate streamed item identities ([#2415](https://github.com/openai/openai-node/issues/2415)) ([7df29a9](https://github.com/openai/openai-node/commit/7df29a98c69f1dd14300737e42cc6f22965b6b73))
+* **security:** bound SSE frames and NDJSON lines before buffering ([#2411](https://github.com/openai/openai-node/issues/2411)) ([0e250a4](https://github.com/openai/openai-node/commit/0e250a4c90b7742ee70d1ff510eda5ac95469cc2))
+* **security:** close rejected Azure managed-identity response streams ([#2416](https://github.com/openai/openai-node/issues/2416)) ([387bbc8](https://github.com/openai/openai-node/commit/387bbc8d267a85245c36fe8e640e9b1c6baf76a3))
+* **security:** harden Bedrock regions, query merges, and upload errors ([#2410](https://github.com/openai/openai-node/issues/2410)) ([ce45d0d](https://github.com/openai/openai-node/commit/ce45d0dd53bc992697952217f1e463aaac9a6924))
+* **security:** harden Realtime WebSocket origins, worker guards, and Azure credentials ([#2414](https://github.com/openai/openai-node/issues/2414)) ([5533f73](https://github.com/openai/openai-node/commit/5533f73792081f56a515f49373bf80fa94669fbb))
+* **security:** preserve chat structured response-format integrity ([#2402](https://github.com/openai/openai-node/issues/2402)) ([e69df93](https://github.com/openai/openai-node/commit/e69df93db7577631a3608da13acf7bc20f0f1ff2))
+* **security:** prevent AssistantStream deltas leaking sensitive data ([#2392](https://github.com/openai/openai-node/issues/2392)) ([17cf54c](https://github.com/openai/openai-node/commit/17cf54c5fdcec9ed3f02e49134602b5aea2116e1))
+* **security:** prevent streaming upload filename path disclosure ([#2386](https://github.com/openai/openai-node/issues/2386)) ([c88a024](https://github.com/openai/openai-node/commit/c88a0248b84e68664b12a5ad697665417e71e33d))
+* **security:** prevent structured-output format downgrade ([#2394](https://github.com/openai/openai-node/issues/2394)) ([dd945e6](https://github.com/openai/openai-node/commit/dd945e63d9c31adff7d3feef1078b7b3f99b4e1f))
+* **security:** redact built-in structured JSON parse errors ([#2418](https://github.com/openai/openai-node/issues/2418)) ([a0d68cc](https://github.com/openai/openai-node/commit/a0d68cc53125c2cb82eab31271b8984b8d65d4b2))
+* **security:** redact chat completion finalization snapshots ([#2400](https://github.com/openai/openai-node/issues/2400)) ([fb5d8e7](https://github.com/openai/openai-node/commit/fb5d8e7c7a07da216b4ea2c922a680e911fff8f6))
+* **security:** redact GCP metadata authentication error bodies ([#2399](https://github.com/openai/openai-node/issues/2399)) ([322840c](https://github.com/openai/openai-node/commit/322840c342cf234df8a450e9886ce76588137361))
+* **security:** redact invalid workload identity access tokens ([#2425](https://github.com/openai/openai-node/issues/2425)) ([0d28da3](https://github.com/openai/openai-node/commit/0d28da38e8f4f72e3d3f294cd393b88a7ad1fd2c))
+* **security:** redact malformed NDJSON stream diagnostics ([#2420](https://github.com/openai/openai-node/issues/2420)) ([dcc705c](https://github.com/openai/openai-node/commit/dcc705c118fe43fa6daf494f6b11bb9b1879544d))
+* **security:** redact malformed Realtime WebSocket error causes ([#2408](https://github.com/openai/openai-node/issues/2408)) ([e7a1a44](https://github.com/openai/openai-node/commit/e7a1a440450caa4db760bfa402c60ed39e3390d5))
+* **security:** redact malformed SSE diagnostic payloads ([#2403](https://github.com/openai/openai-node/issues/2403)) ([272a2cc](https://github.com/openai/openai-node/commit/272a2cc3d896ff84702d6cd72a2638e0d987834c))
+* **security:** redact sensitive assistant delta diagnostics ([#2406](https://github.com/openai/openai-node/issues/2406)) ([b130b83](https://github.com/openai/openai-node/commit/b130b83c22a174104908e160d178fde8bd53da93))
+* **security:** redact unsupported Responses stream event payloads ([#2395](https://github.com/openai/openai-node/issues/2395)) ([32b2953](https://github.com/openai/openai-node/commit/32b295310498c3dd0a39367b57b0ed5bdaffc06a))
+* **security:** reject malformed Realtime WebSocket event frames ([#2391](https://github.com/openai/openai-node/issues/2391)) ([e6e11b0](https://github.com/openai/openai-node/commit/e6e11b00de8400f7c3ac0f6ebbb2db25029da42a))
+* **security:** require an exact SSE completion sentinel ([#2422](https://github.com/openai/openai-node/issues/2422)) ([a905bfb](https://github.com/openai/openai-node/commit/a905bfbac5b535e015e90326a744cc193e5addf8))
+* **security:** require OIDC for npm publishing ([#2404](https://github.com/openai/openai-node/issues/2404)) ([342764b](https://github.com/openai/openai-node/commit/342764b5346bd108b935f724cf959a6fc272c07e))
+* **security:** respect configured logger for Assistants stream errors ([#2390](https://github.com/openai/openai-node/issues/2390)) ([8ba3009](https://github.com/openai/openai-node/commit/8ba30099e7cbf49d7a333315f91421ee3a7b294c))
+* **security:** restrict live CI credentials to protected main ([#2405](https://github.com/openai/openai-node/issues/2405)) ([3554cdc](https://github.com/openai/openai-node/commit/3554cdc5226b8176df037556fb965459c060c519))
+* **security:** scope Cloudflare ecosystem API key files ([#2398](https://github.com/openai/openai-node/issues/2398)) ([4f4b45d](https://github.com/openai/openai-node/commit/4f4b45d59f3d7b5f03dba1674db0d3faa1e0b8ce))
+* **security:** secure Next.js Edge streaming example requests ([#2424](https://github.com/openai/openai-node/issues/2424)) ([861caed](https://github.com/openai/openai-node/commit/861caede8c17c6b32f54b4e9dec86854d786f9e8))
+* **security:** stop retaining sensitive assistant stream events ([#2407](https://github.com/openai/openai-node/issues/2407)) ([dfec129](https://github.com/openai/openai-node/commit/dfec1297b4b2c055fc7cacbad676561e4a64f22d))
+* settle concurrent stream event waiters in linear time ([#2387](https://github.com/openai/openai-node/issues/2387)) ([a88c2ca](https://github.com/openai/openai-node/commit/a88c2caa8a2e28c69d6a57edd1669bb4081d05b2))
+* settle WebSocket event waiters in linear time ([#2389](https://github.com/openai/openai-node/issues/2389)) ([489dc72](https://github.com/openai/openai-node/commit/489dc7250e9507f0b519fc6069e8d0f83ed1b144))
+* **streaming:** reject named SSE provider error events ([#2409](https://github.com/openai/openai-node/issues/2409)) ([b7a0bd6](https://github.com/openai/openai-node/commit/b7a0bd6144ed88c7a541fa8420d5ddada1177466))
+* **ws:** block custom credential headers on redirects ([#2429](https://github.com/openai/openai-node/issues/2429)) ([d2ab6e7](https://github.com/openai/openai-node/commit/d2ab6e7ff5d4aef2e72a3ab3bfe5b6ce4281b599))
+
+
+### Chores
+
+* **api:** clarify image transparency and audio delta docs ([#2439](https://github.com/openai/openai-node/issues/2439)) ([f14e885](https://github.com/openai/openai-node/commit/f14e885bab219c1e1314a1d13c249faca96373f6))
+* **api:** document supported image generation models ([#2432](https://github.com/openai/openai-node/issues/2432)) ([0e00909](https://github.com/openai/openai-node/commit/0e00909bcb8105fb75a604238e61eea896222af3))
+* **api:** update SDK generation metadata ([#2448](https://github.com/openai/openai-node/issues/2448)) ([d1410d1](https://github.com/openai/openai-node/commit/d1410d190d047be6aa3969a86d043648fdf378fe))
+* set a 3,000-line custom-code budget ([#2446](https://github.com/openai/openai-node/issues/2446)) ([2035847](https://github.com/openai/openai-node/commit/2035847e92c2b875a545c41991804cfffe246429))
+
+
+### Documentation
+
+* encode recurring SDK review feedback in agent guidance ([#2378](https://github.com/openai/openai-node/issues/2378)) ([e552523](https://github.com/openai/openai-node/commit/e5525235e57f35deeab4a4697b7830081cf96b7c))
+* **security:** add secure contributor and agent guidance ([#2382](https://github.com/openai/openai-node/issues/2382)) ([459d009](https://github.com/openai/openai-node/commit/459d00993ca1bfcb2d1cb02ff3d590fc90f6ac97))
+
+
+### Refactors
+
+* move embedding encoding into an SDK-owned helper ([#2436](https://github.com/openai/openai-node/issues/2436)) ([db9e930](https://github.com/openai/openai-node/commit/db9e9308851f3bfe556c91cbe2335f7336a78c99))
+* move file processing wait into an SDK-owned helper ([#2438](https://github.com/openai/openai-node/issues/2438)) ([3d39e64](https://github.com/openai/openai-node/commit/3d39e64de2358ca57e5305a2051f15af7687f9b7))
+* move vector store batch uploads into an SDK-owned helper ([#2441](https://github.com/openai/openai-node/issues/2441)) ([0257e51](https://github.com/openai/openai-node/commit/0257e513021012a052c6c06e10ae535f060663ea))
+* move vector store polling into an SDK-owned helper ([#2437](https://github.com/openai/openai-node/issues/2437)) ([4317319](https://github.com/openai/openai-node/commit/43173195e09bc916d58b4caffc6bf2e73002109f))
+* move webhook signature checks into an SDK-owned helper ([#2442](https://github.com/openai/openai-node/issues/2442)) ([283e12b](https://github.com/openai/openai-node/commit/283e12be45fbcd3a230b5c3e4651b87073d7116f))
+* share SDK-owned assistant run polling ([#2440](https://github.com/openai/openai-node/issues/2440)) ([4de295b](https://github.com/openai/openai-node/commit/4de295be076965deb83fe4ea931d4311f9dcbb07))
+
 ## [7.5.0](https://github.com/openai/openai-node/compare/v7.4.0...v7.5.0) (2026-08-17)
 
 
