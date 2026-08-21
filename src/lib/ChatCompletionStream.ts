@@ -1849,7 +1849,7 @@ export class ChatCompletionStream<ParsedT = null>
 
       let choice = snapshot.choices[index];
       if (!choice) {
-        const newChoice = { finish_reason, index, message: {}, logprobs, ...other };
+        const newChoice = { finish_reason, index, message: {}, logprobs: null, ...other };
         snapshot.choices[index] = newChoice;
         choice = newChoice;
       }
@@ -1874,6 +1874,14 @@ export class ChatCompletionStream<ParsedT = null>
           }
         } else {
           choice.logprobs = { ...logprobs };
+
+          if (logprobs.content) {
+            choice.logprobs.content = [...logprobs.content];
+          }
+
+          if (logprobs.refusal) {
+            choice.logprobs.refusal = [...logprobs.refusal];
+          }
         }
       }
 
