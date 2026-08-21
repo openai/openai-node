@@ -153,6 +153,30 @@ describe('explicit X.509 transport capability', () => {
     },
   );
 
+  test.each(['factory', 'tls', 'privateKey'])('rejects non-enumerable unsupported %s input', async (key) => {
+    const dispatcher = new Agent();
+    const options = directOptions(dispatcher);
+    Object.defineProperty(options, key, { value: 'hidden transport option' });
+
+    try {
+      expect(() => createX509Transport(options)).toThrow(/unsupported.*option/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects unsupported symbol-keyed transport options', async () => {
+    const dispatcher = new Agent();
+    const options = directOptions(dispatcher);
+    Object.defineProperty(options, Symbol('privateKey'), { value: 'hidden transport option' });
+
+    try {
+      expect(() => createX509Transport(options)).toThrow(/unsupported.*option/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
   test('rejects an Agent attested as a CONNECT proxy', async () => {
     const dispatcher = new Agent();
 
@@ -317,6 +341,65 @@ describe('explicit X.509 transport capability', () => {
       expect(observedMethod).toBe('POST');
       expect(observedAuthorization).toBe('Bearer synthetic-secret');
       expect(observedBody).toBe('inherited-request-body');
+    } finally {
+      await Promise.all([dispatcher.close(), closeObservedServers(server)]);
+    }
+  });
+
+  test('preserves the original receiver for inherited private-field RequestInit accessors', async () => {
+    const lab = createX509TestLab();
+    let observedMethod: string | undefined;
+    let observedAuthorization: string | undefined;
+    let observedBody = '';
+    const server = createMutualTLSServer(lab, (request, response) => {
+      observedMethod = request.method;
+      observedAuthorization = request.headers.authorization;
+      request.setEncoding('utf-8');
+      request.on('data', (chunk: string) => {
+        observedBody += chunk;
+      });
+      request.once('end', () => {
+        response.writeHead(200);
+        response.end();
+      });
+    });
+    const dispatcher = new Agent({
+      connect: {
+        ca: lab.certificateAuthority,
+        cert: lab.firstClient.certificate,
+        key: lab.firstClient.privateKey,
+        servername: 'localhost',
+      },
+      maxCachedSessions: 0,
+    });
+
+    class PrivateRequestOptions {
+      readonly #method = 'POST';
+      readonly #headers = { authorization: 'Bearer synthetic-secret' };
+      readonly #body = 'private-request-body';
+
+      get method(): string {
+        return this.#method;
+      }
+
+      get headers(): Record<string, string> {
+        return this.#headers;
+      }
+
+      get body(): string {
+        return this.#body;
+      }
+    }
+
+    try {
+      const options: RequestInit = new PrivateRequestOptions();
+      const capability = createX509Transport(directOptions(dispatcher));
+      const response = await sendX509Request(capability, await listenLoopback(server), options);
+      await response.body?.cancel();
+
+      expect(observedMethod).toBe('POST');
+      expect(observedAuthorization).toBe('Bearer synthetic-secret');
+      expect(observedBody).toBe('private-request-body');
     } finally {
       await Promise.all([dispatcher.close(), closeObservedServers(server)]);
     }

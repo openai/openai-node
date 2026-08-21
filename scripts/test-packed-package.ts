@@ -216,14 +216,15 @@ const packedPackagePath = require('node:path');
       tarball,
     ]);
 
-    for (const undiciMajor of [5, 6]) {
+    for (const undiciMajor of [5, 6, 7]) {
       const undiciFixture = path.join(temporaryDirectory, `undici-${undiciMajor}`);
       const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciMajor}`);
+      const undiciVersion = undiciMajor === 7 ? '7.0.0' : `${undiciMajor}.29.0`;
       fs.mkdirSync(undiciFixture);
       fs.mkdirSync(consumer);
       fs.writeFileSync(
         path.join(undiciFixture, 'package.json'),
-        JSON.stringify({ name: 'undici', version: `${undiciMajor}.29.0`, main: 'index.js' }),
+        JSON.stringify({ name: 'undici', version: undiciVersion, main: 'index.js' }),
       );
       fs.writeFileSync(
         path.join(undiciFixture, 'index.js'),
@@ -231,6 +232,7 @@ const packedPackagePath = require('node:path');
           `const undici = require(${JSON.stringify(path.join(root, 'node_modules/undici'))});`,
           'exports.Agent = undici.Agent;',
           'exports.ProxyAgent = undici.ProxyAgent;',
+          'exports.Request = undici.Request;',
           'exports.fetch = undici.fetch;',
         ].join('\n'),
       );
@@ -288,7 +290,7 @@ const packedPackagePath = require('node:path');
           [
             `--input-type=${inputType}`,
             '-e',
-            `${imports} const dispatcher = new Agent(); assert.throws(() => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }), /Undici 7 or 8/u); dispatcher.close();`,
+            `${imports} const dispatcher = new Agent(); assert.doesNotThrow(() => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' })); dispatcher.close();`,
           ],
           { cwd: consumer },
         );

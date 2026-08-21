@@ -1,5 +1,5 @@
 import { types } from 'node:util';
-import undici, { Agent, ProxyAgent, fetch } from 'undici';
+import { Agent, ProxyAgent, Request, fetch } from 'undici';
 
 declare const x509TransportBrand: unique symbol;
 
@@ -106,18 +106,13 @@ function attestedDispatcher(options: X509TransportOptions): Agent | ProxyAgent {
 export function createX509Transport(options: X509TransportOptions): X509Transport {
   assertNodeRuntime();
 
-  // Undici introduced this public export in v7; v5 and v6 do not provide it.
-  if (!Object.getOwnPropertyDescriptor(undici, 'cacheStores')) {
-    throw new Error('X.509 transport requires Undici 7 or 8.');
-  }
-
   if (!options || typeof options !== 'object' || types.isProxy(options)) {
     throw new Error('X.509 transport configuration must be a non-proxy object.');
   }
 
-  for (const name of Object.keys(options)) {
-    if (!allowedOptionNames.has(name)) {
-      throw new Error(`Unsupported X.509 transport option: \`${name}\`.`);
+  for (const name of Reflect.ownKeys(options)) {
+    if (typeof name !== 'string' || !allowedOptionNames.has(name)) {
+      throw new Error(`Unsupported X.509 transport option: \`${String(name)}\`.`);
     }
   }
 
@@ -156,11 +151,8 @@ export async function sendX509Request(
     throw new Error('X.509 transport does not allow a per-request dispatcher override.');
   }
 
-  const requestOptions: NonNullable<Parameters<typeof fetch>[1]> = Object.create(options);
-  Object.defineProperties(requestOptions, {
-    dispatcher: { value: dispatcher, enumerable: true },
-    redirect: { value: 'manual', enumerable: true },
-  });
-  const response = await fetch(normalizedTarget, requestOptions);
+  const requestOptions: Omit<RequestInit, 'dispatcher'> = options;
+  const request = new Request(normalizedTarget, requestOptions);
+  const response = await fetch(request, { dispatcher, redirect: 'manual' });
   return response;
 }
