@@ -216,10 +216,9 @@ const packedPackagePath = require('node:path');
       tarball,
     ]);
 
-    for (const undiciMajor of [5, 6, 7]) {
-      const undiciFixture = path.join(temporaryDirectory, `undici-${undiciMajor}`);
-      const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciMajor}`);
-      const undiciVersion = undiciMajor === 7 ? '7.0.0' : `${undiciMajor}.29.0`;
+    for (const undiciVersion of ['5.1.1', '5.2.0', '6.29.0', '7.0.0']) {
+      const undiciFixture = path.join(temporaryDirectory, `undici-${undiciVersion}`);
+      const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
       fs.mkdirSync(undiciFixture);
       fs.mkdirSync(consumer);
       fs.writeFileSync(
@@ -233,7 +232,15 @@ const packedPackagePath = require('node:path');
           'exports.Agent = undici.Agent;',
           'exports.ProxyAgent = undici.ProxyAgent;',
           'exports.Request = undici.Request;',
-          'exports.fetch = undici.fetch;',
+          undiciVersion === '5.1.1'
+            ? [
+                'exports.fetch = async function fetch(resource) {',
+                '  const options = Object.create(arguments[1] ?? null);',
+                "  Object.defineProperty(options, 'dispatcher', { value: undici.getGlobalDispatcher() });",
+                '  return undici.fetch(resource, options);',
+                '};',
+              ].join('\n')
+            : 'exports.fetch = undici.fetch;',
         ].join('\n'),
       );
       const packedUndici = run(
@@ -244,10 +251,10 @@ const packedPackagePath = require('node:path');
         .trim()
         .split(/\r?\n/)
         .pop();
-      assert(packedUndici, `npm pack did not report the Undici ${undiciMajor} fixture`);
+      assert(packedUndici, `npm pack did not report the Undici ${undiciVersion} fixture`);
       fs.writeFileSync(
         path.join(consumer, 'package.json'),
-        JSON.stringify({ name: `legacy-undici-${undiciMajor}-consumer`, private: true }),
+        JSON.stringify({ name: `legacy-undici-${undiciVersion}-consumer`, private: true }),
       );
       const installation = childProcess.spawnSync(
         'npm',
@@ -267,12 +274,12 @@ const packedPackagePath = require('node:path');
       assert.equal(
         installation.status,
         0,
-        `An existing Undici ${undiciMajor} consumer could not install the SDK: ${installation.stderr}`,
+        `An existing Undici ${undiciVersion} consumer could not install the SDK: ${installation.stderr}`,
       );
       assert.doesNotMatch(
         installation.stderr,
         /ERESOLVE/u,
-        `An existing Undici ${undiciMajor} consumer encountered an optional-peer conflict`,
+        `An existing Undici ${undiciVersion} consumer encountered an optional-peer conflict`,
       );
       run(process.execPath, ['-e', "require('openai')"], { cwd: consumer });
       for (const [inputType, imports] of [
@@ -290,7 +297,7 @@ const packedPackagePath = require('node:path');
           [
             `--input-type=${inputType}`,
             '-e',
-            `${imports} const dispatcher = new Agent(); assert.doesNotThrow(() => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' })); dispatcher.close();`,
+            `${imports} const dispatcher = new Agent(); const create = () => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); ${undiciVersion === '5.1.1' ? 'assert.throws(create, /Undici 5\\.2\\.0 or later/u)' : 'assert.doesNotThrow(create)'}; dispatcher.close();`,
           ],
           { cwd: consumer },
         );

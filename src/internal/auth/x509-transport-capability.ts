@@ -90,6 +90,24 @@ function attestedDispatcher(options: X509TransportOptions): Agent | ProxyAgent {
   return dispatcher;
 }
 
+function assertRequestDispatcherSupport(dispatcher: Agent | ProxyAgent): void {
+  let observesRequestDispatcher = false;
+
+  // about:blank never reaches the network; the getter checks the actual fetch contract.
+  void Promise.allSettled([
+    fetch('about:blank', {
+      get dispatcher() {
+        observesRequestDispatcher = true;
+        return dispatcher;
+      },
+    }),
+  ]);
+
+  if (!observesRequestDispatcher) {
+    throw new Error('X.509 transport requires Undici 5.2.0 or later with per-request dispatcher support.');
+  }
+}
+
 /**
  * Creates a frozen, opaque capability for one caller-owned Undici transport.
  *
@@ -101,7 +119,8 @@ function attestedDispatcher(options: X509TransportOptions): Agent | ProxyAgent {
  * never reach the proxy. Rotation requires creating a fresh dispatcher and
  * capability; the application remains responsible for draining the old one.
  *
- * This Node-only preview entrypoint requires the optional `undici` peer.
+ * This Node-only preview entrypoint requires the optional `undici` peer at
+ * version 5.2.0 or later; ordinary SDK clients retain broader compatibility.
  */
 export function createX509Transport(options: X509TransportOptions): X509Transport {
   assertNodeRuntime();
@@ -124,7 +143,9 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
     throw new Error('X.509 transport requires an explicitly attested static client certificate.');
   }
 
-  return new NodeX509Transport(attestedDispatcher(options));
+  const dispatcher = attestedDispatcher(options);
+  assertRequestDispatcherSupport(dispatcher);
+  return new NodeX509Transport(dispatcher);
 }
 
 /** Dispatches through the opaque attested transport without accepting replacement dispatchers. */

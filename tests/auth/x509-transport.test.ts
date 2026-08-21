@@ -1,7 +1,7 @@
 import { X509Certificate } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { Agent, ProxyAgent } from 'undici';
+import { Agent, ProxyAgent, fetch } from 'undici';
 import { vi } from 'vitest';
 
 import { createX509Transport } from 'openai/auth/x509-transport';
@@ -26,6 +26,32 @@ function directOptions(dispatcher: Agent): X509TransportOptions {
 }
 
 describe('explicit X.509 transport capability', () => {
+  test('rejects Undici without per-request dispatcher support before creating a capability', async () => {
+    const dispatcher = new Agent();
+    const dispatch = vi.spyOn(dispatcher, 'dispatch');
+    let observesRequestDispatcher = false;
+
+    try {
+      await Promise.allSettled([
+        fetch('about:blank', {
+          get dispatcher() {
+            observesRequestDispatcher = true;
+            return dispatcher;
+          },
+        }),
+      ]);
+
+      if (observesRequestDispatcher) {
+        expect(() => createX509Transport(directOptions(dispatcher))).not.toThrow();
+      } else {
+        expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/Undici 5\.2\.0 or later/u);
+      }
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
   test('creates an opaque, frozen capability with a distinct rotation generation', async () => {
     const dispatcher = new Agent();
     const rotatedDispatcher = new Agent();
