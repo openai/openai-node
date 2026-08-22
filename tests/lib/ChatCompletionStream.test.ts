@@ -91,6 +91,27 @@ function customToolChunks(): OpenAI.Chat.ChatCompletionChunk[] {
 }
 
 describe('.stream()', () => {
+  it('refreshes the partial snapshot when a top-level structured JSON string closes', async () => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('"', 'a'.repeat(1100), 'b"')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Return a structured string' }],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'structured_string', schema: { type: 'string' } },
+        },
+      },
+    );
+    const parsedSnapshots: unknown[] = [];
+    stream.on('content.delta', (event) => parsedSnapshots.push(event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(parsedSnapshots.pop()).toBe(`${'a'.repeat(1100)}b`);
+    expect(completion.choices[0]?.message.parsed).toBe(`${'a'.repeat(1100)}b`);
+  });
+
   it.each([
     ['first-padding', 'last-padding'],
     [undefined, 'last-padding'],

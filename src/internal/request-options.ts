@@ -84,62 +84,11 @@ export type RequestOptions = {
 export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };
 export type RequestEncoder = (request: { headers: NullableHeaders; body: unknown }) => EncodedContent;
 
-interface JSONRequestBodyObserver {
-  value(holder: object, key: string, value: unknown): unknown;
-  complete(): void;
-}
-
-const jsonRequestBodyObservers = new WeakMap<object, Set<JSONRequestBodyObserver>>();
-
-/** Observes values produced by the actual JSON request serializer without changing them. */
-export function observeJSONRequestBody(body: object, observer: JSONRequestBodyObserver): () => void {
-  let observers = jsonRequestBodyObservers.get(body);
-  if (!observers) {
-    observers = new Set();
-    jsonRequestBodyObservers.set(body, observers);
-  }
-  observers.add(observer);
-
-  return () => {
-    const active = jsonRequestBodyObservers.get(body);
-    if (!active) {
-      return;
-    }
-    active.delete(observer);
-    if (active.size === 0) {
-      jsonRequestBodyObservers.delete(body);
-    }
-  };
-}
-
 export const FallbackEncoder: RequestEncoder = ({ headers, body }) => {
-  const observers =
-    typeof body === 'object' && body !== null ? jsonRequestBodyObservers.get(body) : undefined;
-  let encoded: string;
-
-  if (!observers || observers.size === 0) {
-    encoded = JSON.stringify(body);
-  } else {
-    const active = [...observers];
-    encoded = JSON.stringify(body, function (this: object, key: string, value: unknown): unknown {
-      let observed = value;
-      for (const observer of active) {
-        const replacement = observer.value(this, key, observed);
-        if (replacement !== undefined) {
-          observed = replacement;
-        }
-      }
-      return observed;
-    });
-    for (const observer of active) {
-      observer.complete();
-    }
-  }
-
   return {
     bodyHeaders: {
       'content-type': 'application/json',
     },
-    body: encoded,
+    body: JSON.stringify(body),
   };
 };
