@@ -108,6 +108,26 @@ function assertRequestDispatcherSupport(dispatcher: Agent | ProxyAgent): void {
   }
 }
 
+function assertConnectProxySupport(): void {
+  const targetOrigin = 'https://127.0.0.1:65535';
+  let routedOrigin: string | undefined;
+  const probe = new ProxyAgent({
+    uri: 'http://127.0.0.1:1',
+    factory(origin) {
+      routedOrigin = String(origin);
+      throw new Error('X.509 CONNECT capability probe');
+    },
+  });
+
+  // The throwing factory reveals the actual routing decision before any socket opens.
+  const request = fetch(targetOrigin, { dispatcher: probe });
+  void Promise.allSettled([request, probe.close()]);
+
+  if (routedOrigin !== targetOrigin) {
+    throw new Error('X.509 CONNECT proxy requires Undici 5.5.1 or later with target TLS tunneling.');
+  }
+}
+
 /**
  * Creates a frozen, opaque capability for one caller-owned Undici transport.
  *
@@ -120,7 +140,8 @@ function assertRequestDispatcherSupport(dispatcher: Agent | ProxyAgent): void {
  * capability; the application remains responsible for draining the old one.
  *
  * This Node-only preview entrypoint requires the optional `undici` peer at
- * version 5.2.0 or later; ordinary SDK clients retain broader compatibility.
+ * version 5.2.0 or later. CONNECT proxy modes require version 5.5.1 or
+ * later; ordinary SDK clients retain broader compatibility.
  */
 export function createX509Transport(options: X509TransportOptions): X509Transport {
   assertNodeRuntime();
@@ -145,6 +166,9 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
 
   const dispatcher = attestedDispatcher(options);
   assertRequestDispatcherSupport(dispatcher);
+  if (dispatcher instanceof ProxyAgent) {
+    assertConnectProxySupport();
+  }
   return new NodeX509Transport(dispatcher);
 }
 

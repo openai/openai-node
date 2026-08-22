@@ -431,6 +431,78 @@ describe('explicit X.509 transport capability', () => {
     }
   });
 
+  test('rejects non-tunneling CONNECT proxies before they receive workload credentials', async () => {
+    const lab = createX509TestLab();
+    let leakedAuthorization: string | undefined;
+    let leakedBody = '';
+    const target = createMutualTLSServer(lab, (_request, response) => {
+      response.writeHead(200);
+      response.end();
+    });
+    const proxy = createConnectProxy(lab, false);
+    proxy.server.on('request', (request, response) => {
+      leakedAuthorization = request.headers.authorization;
+      request.setEncoding('utf-8');
+      request.on('data', (chunk: string) => {
+        leakedBody += chunk;
+      });
+      request.once('end', () => {
+        response.writeHead(200);
+        response.end();
+      });
+    });
+    let dispatcher: ProxyAgent | undefined;
+
+    try {
+      const [targetURL, proxyURL] = await Promise.all([listenLoopback(target), listenLoopback(proxy, false)]);
+      dispatcher = new ProxyAgent({
+        uri: proxyURL.href,
+        auth: 'cHJveHktY3JlZGVudGlhbA==',
+        requestTls: {
+          ca: lab.certificateAuthority,
+          cert: lab.firstClient.certificate,
+          key: lab.firstClient.privateKey,
+          servername: 'localhost',
+        },
+      });
+
+      let capability: X509Transport;
+      try {
+        capability = createX509Transport({
+          runtime: 'node',
+          dispatcher,
+          certificateIdentity: 'static',
+          proxy: 'http-connect',
+        });
+      } catch (error) {
+        expect(error).toEqual(
+          expect.objectContaining({ message: expect.stringMatching(/CONNECT.*Undici 5\.5\.1 or later/u) }),
+        );
+        expect(proxy.requests).toEqual([]);
+        expect(leakedAuthorization).toBeUndefined();
+        expect(leakedBody).toBe('');
+        return;
+      }
+
+      const response = await sendX509Request(capability, targetURL, {
+        method: 'POST',
+        headers: { authorization: 'Bearer synthetic-workload-secret' },
+        body: 'synthetic-workload-body',
+      });
+      await response.body?.cancel();
+
+      expect(response.status).toBe(200);
+      expect(leakedAuthorization).toBeUndefined();
+      expect(leakedBody).toBe('');
+      expect(proxy.requests).toHaveLength(1);
+      expect(proxy.requests[0]?.authorization).toBeUndefined();
+      expect(proxy.requests[0]?.proxyAuthorization).toBe('Basic cHJveHktY3JlZGVudGlhbA==');
+      expect(target.requests[0]?.authorization).toBe('Bearer synthetic-workload-secret');
+    } finally {
+      await Promise.all([dispatcher?.close(), closeObservedServers(target, proxy)]);
+    }
+  });
+
   test('keeps HTTPS CONNECT proxy and workload identities separate on the wire', async () => {
     const lab = createX509TestLab();
     const target = createMutualTLSServer(lab, (_request, response) => {
@@ -444,7 +516,7 @@ describe('explicit X.509 transport capability', () => {
       const [targetURL, proxyURL] = await Promise.all([listenLoopback(target), listenLoopback(proxy)]);
       dispatcher = new ProxyAgent({
         uri: proxyURL.href,
-        token: 'Basic cHJveHktY3JlZGVudGlhbA==',
+        auth: 'cHJveHktY3JlZGVudGlhbA==',
         requestTls: {
           ca: lab.certificateAuthority,
           cert: lab.firstClient.certificate,

@@ -216,7 +216,21 @@ const packedPackagePath = require('node:path');
       tarball,
     ]);
 
-    for (const undiciVersion of ['5.1.1', '5.2.0', '6.29.0', '7.0.0']) {
+    const unsupportedDispatcher =
+      'assert.throws(direct, /Undici 5\\.2\\.0 or later/u); assert.throws(httpConnect, /Undici 5\\.2\\.0 or later/u); assert.throws(httpsConnect, /Undici 5\\.2\\.0 or later/u);';
+    const unsupportedProxy =
+      'assert.doesNotThrow(direct); assert.throws(httpConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u); assert.throws(httpsConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u);';
+    const supportedTransports =
+      'assert.doesNotThrow(direct); assert.doesNotThrow(httpConnect); assert.doesNotThrow(httpsConnect);';
+
+    for (const [undiciVersion, forwardsProxyRequests, transportAssertions] of [
+      ['5.1.1', false, unsupportedDispatcher],
+      ['5.2.0', true, unsupportedProxy],
+      ['5.5.0', true, unsupportedProxy],
+      ['5.5.1', false, supportedTransports],
+      ['6.29.0', false, supportedTransports],
+      ['7.0.0', false, supportedTransports],
+    ] as const) {
       const undiciFixture = path.join(temporaryDirectory, `undici-${undiciVersion}`);
       const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
       fs.mkdirSync(undiciFixture);
@@ -230,7 +244,24 @@ const packedPackagePath = require('node:path');
         [
           `const undici = require(${JSON.stringify(path.join(root, 'node_modules/undici'))});`,
           'exports.Agent = undici.Agent;',
-          'exports.ProxyAgent = undici.ProxyAgent;',
+          forwardsProxyRequests
+            ? [
+                'exports.ProxyAgent = class ForwardingProxyAgent extends undici.ProxyAgent {',
+                '  #proxyOrigin;',
+                '  constructor(options) {',
+                '    super(options);',
+                '    this.#proxyOrigin = new URL(options.uri).origin;',
+                '  }',
+                '  dispatch(options, handler) {',
+                '    return super.dispatch({',
+                '      ...options,',
+                '      origin: this.#proxyOrigin,',
+                '      path: options.origin + options.path,',
+                '    }, handler);',
+                '  }',
+                '};',
+              ].join('\n')
+            : 'exports.ProxyAgent = undici.ProxyAgent;',
           'exports.Request = undici.Request;',
           undiciVersion === '5.1.1'
             ? [
@@ -285,11 +316,11 @@ const packedPackagePath = require('node:path');
       for (const [inputType, imports] of [
         [
           'commonjs',
-          "const assert = require('node:assert/strict'); const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+          "const assert = require('node:assert/strict'); const { Agent, ProxyAgent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
         ],
         [
           'module',
-          "import assert from 'node:assert/strict'; import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+          "import assert from 'node:assert/strict'; import { Agent, ProxyAgent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
         ],
       ]) {
         run(
@@ -297,7 +328,17 @@ const packedPackagePath = require('node:path');
           [
             `--input-type=${inputType}`,
             '-e',
-            `${imports} const dispatcher = new Agent(); const create = () => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); ${undiciVersion === '5.1.1' ? 'assert.throws(create, /Undici 5\\.2\\.0 or later/u)' : 'assert.doesNotThrow(create)'}; dispatcher.close();`,
+            [
+              imports,
+              'const dispatcher = new Agent();',
+              "const proxyDispatcher = new ProxyAgent({ uri: 'http://127.0.0.1:1' });",
+              "const secureProxyDispatcher = new ProxyAgent({ uri: 'https://127.0.0.1:1' });",
+              "const direct = () => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' });",
+              "const httpConnect = () => createX509Transport({ runtime: 'node', dispatcher: proxyDispatcher, certificateIdentity: 'static', proxy: 'http-connect' });",
+              "const httpsConnect = () => createX509Transport({ runtime: 'node', dispatcher: secureProxyDispatcher, certificateIdentity: 'static', proxy: 'https-connect' });",
+              transportAssertions,
+              'dispatcher.close(); proxyDispatcher.close(); secureProxyDispatcher.close();',
+            ].join(' '),
           ],
           { cwd: consumer },
         );
