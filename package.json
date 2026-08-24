@@ -64,6 +64,7 @@
     "typescript": "6.0.3",
     "typescript-4-9": "npm:typescript@4.9.5",
     "ultracite": "7.10.0",
+    "undici": "8.9.0",
     "vitest": "4.1.10",
     "ws": "^8.18.0",
     "yargs": "^18.1.0",
@@ -92,6 +93,7 @@
     "@aws-sdk/credential-provider-node": ">=3.972.0 <4",
     "@smithy/hash-node": ">=4.3.0 <5",
     "@smithy/signature-v4": ">=5.4.0 <6",
+    "undici": ">=5 <9",
     "ws": "^8.18.0",
     "zod": "^3.25 || ^4.0"
   },
@@ -103,6 +105,9 @@
       "optional": true
     },
     "@smithy/signature-v4": {
+      "optional": true
+    },
+    "undici": {
       "optional": true
     },
     "ws": {

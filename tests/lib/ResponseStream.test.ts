@@ -154,6 +154,188 @@ describe('.stream()', () => {
     });
   });
 
+  it.each([
+    { field: 'output_index', mutation: 'changes' },
+    { field: 'content_index', mutation: 'changes' },
+    { field: 'output_index', mutation: 'deletes' },
+    { field: 'content_index', mutation: 'deletes' },
+    { field: 'output_index', mutation: 'hides' },
+    { field: 'content_index', mutation: 'hides' },
+  ] as const)(
+    'dispatches the originally validated text route when a raw listener $mutation $field',
+    async ({ field, mutation }) => {
+      const output: Response['output'] = [
+        {
+          id: 'msg_first',
+          type: 'message',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [
+            { type: 'output_text', annotations: [], text: 'first' },
+            { type: 'output_text', annotations: [], text: 'second' },
+          ],
+        },
+        {
+          id: 'msg_other',
+          type: 'message',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [{ type: 'output_text', annotations: [], text: 'foreign' }],
+        },
+      ];
+      const events: ResponseStreamEvent[] = [
+        {
+          type: 'response.created',
+          sequence_number: 0,
+          response: makeResponse({ output, output_text: 'firstsecondforeign' }),
+        },
+        {
+          type: 'response.output_text.delta',
+          sequence_number: 1,
+          item_id: 'msg_first',
+          output_index: 0,
+          content_index: 0,
+          delta: '!',
+          logprobs: [],
+        },
+      ];
+      const emitted = vi.fn();
+      const raw: ResponseStreamEvent[] = [];
+      const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      stream.on('event', (event) => {
+        raw.push(event);
+        if (event.type === 'response.output_text.delta') {
+          if (mutation === 'deletes') {
+            Reflect.deleteProperty(event, field);
+          } else if (mutation === 'hides') {
+            Object.defineProperty(event, field, { configurable: true, enumerable: false, value: 1 });
+          } else {
+            event[field] = 1;
+          }
+        }
+      });
+      stream.on('response.output_text.delta', emitted);
+
+      await expect(stream.finalResponse()).resolves.toBeDefined();
+
+      expect(raw[1]).toBeDefined();
+      expect(emitted).toHaveBeenCalledTimes(1);
+      expect(emitted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          output_index: 0,
+          content_index: 0,
+          snapshot: 'first!',
+        }),
+      );
+    },
+  );
+
+  it('dispatches validated function-call routes even when raw listeners alter their identities', async () => {
+    const output: Response['output'] = [
+      {
+        id: 'function_first',
+        type: 'function_call',
+        call_id: 'call_first',
+        name: 'first',
+        arguments: '{"first":',
+        status: 'in_progress',
+      },
+      {
+        id: 'function_other',
+        type: 'function_call',
+        call_id: 'call_other',
+        name: 'other',
+        arguments: '{"other":',
+        status: 'in_progress',
+      },
+    ];
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse({ output }) },
+      {
+        type: 'response.function_call_arguments.delta',
+        sequence_number: 1,
+        item_id: 'function_first',
+        output_index: 0,
+        delta: 'true}',
+      },
+    ];
+    const emitted = vi.fn();
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    stream.on('event', (event) => {
+      if (event.type === 'response.function_call_arguments.delta') {
+        event.output_index = 1;
+        event.item_id = 'function_other';
+      }
+    });
+    stream.on('response.function_call_arguments.delta', emitted);
+
+    await expect(stream.finalResponse()).resolves.toBeDefined();
+
+    expect(emitted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'response.function_call_arguments.delta',
+        item_id: 'function_first',
+        output_index: 0,
+        snapshot: '{"first":true}',
+      }),
+    );
+  });
+
+  it('captures a custom-transport routing accessor exactly once for accumulation and dispatch', async () => {
+    const output: Response['output'] = [
+      {
+        id: 'msg_first',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [{ type: 'output_text', annotations: [], text: 'first' }],
+      },
+      {
+        id: 'msg_other',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [{ type: 'output_text', annotations: [], text: 'foreign' }],
+      },
+    ];
+    const delta = {
+      type: 'response.output_text.delta' as const,
+      sequence_number: 1,
+      item_id: 'msg_first',
+      output_index: 0,
+      content_index: 0,
+      delta: '!',
+      logprobs: [],
+    };
+    const readIndex = vi.fn(() => (readIndex.mock.calls.length === 1 ? 0 : 1));
+    Object.defineProperty(delta, 'output_index', { configurable: true, enumerable: true, get: readIndex });
+    const events: ResponseStreamEvent[] = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse({ output, output_text: 'firstforeign' }),
+      },
+      delta,
+    ];
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield* events;
+      },
+    };
+    const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+    const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'route safely' });
+    const emitted = vi.fn();
+    stream.on('response.output_text.delta', emitted);
+
+    await expect(stream.finalResponse()).resolves.toBeDefined();
+
+    expect(readIndex).toHaveBeenCalledTimes(1);
+    expect(emitted).toHaveBeenCalledWith(
+      expect.objectContaining({ output_index: 0, content_index: 0, snapshot: 'first!' }),
+    );
+  });
+
   it('replays hosted shell events, dispatches typed listeners, and preserves each command output', async () => {
     const events: ResponseStreamEvent[] = [
       {
@@ -293,6 +475,56 @@ describe('.stream()', () => {
         ],
       },
     ]);
+  });
+
+  it.each(
+    (
+      [
+        'response.shell_call_command.added',
+        'response.shell_call_command.delta',
+        'response.shell_call_command.done',
+      ] as const
+    ).flatMap((type) =>
+      (['message', 'reasoning', 'shell_call_output'] as const).map((itemType) => ({ type, itemType })),
+    ),
+  )('rejects public $type targeting $itemType before any emission', async ({ type, itemType }) => {
+    const outputByType: Record<typeof itemType, Response['output'][number]> = {
+      message: {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [],
+      },
+      reasoning: { id: 'reasoning_123', type: 'reasoning', summary: [] },
+      shell_call_output: {
+        id: 'shell_output_123',
+        type: 'shell_call_output',
+        call_id: 'call_123',
+        max_output_length: null,
+        output: [],
+        status: 'in_progress',
+      },
+    };
+    const output = outputByType[itemType];
+    const shellEvent: ResponseStreamEvent =
+      type === 'response.shell_call_command.delta'
+        ? { type, sequence_number: 1, output_index: 0, command_index: 0, delta: 'injected' }
+        : { type, sequence_number: 1, output_index: 0, command_index: 0, command: 'injected' };
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse({ output: [output] }) },
+      shellEvent,
+    ];
+    const emitted = vi.fn();
+    const rawEvents: string[] = [];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    stream.on(type, emitted).on('event', (event) => rawEvents.push(event.type));
+
+    await expect(stream.finalResponse()).rejects.toThrow(
+      `expected output item type 'shell_call', got '${itemType}'`,
+    );
+    expect(emitted).not.toHaveBeenCalled();
+    expect(rawEvents).toEqual(['response.created']);
   });
 
   it('converts an error event into an APIError', async () => {

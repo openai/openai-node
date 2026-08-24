@@ -73,6 +73,16 @@ explicitly requires it.
   when the public contract changes. Preserve existing documentation URLs and import
   paths, and make examples runnable with the documented environment and dependencies.
 
+## Custom-code budget
+
+Follow [the custom-code guidance](scripts/castiron/CUSTOM_CODE.md). Budget changes
+belong in a separate PR containing only `.castiron-ratchet.json`, with an explicit justification
+in the PR description. Increases require a **human approving review** before merging.
+Agents may investigate and draft proposals, but must not approve budget increases
+(including through a human's credentials) or bypass the gate. Do not weaken
+counting, broaden exclusions, or alter generation metadata to make a change pass.
+The checker and effective budget come from main, not the PR. Keep default CODEOWNERS.
+
 ## Security and lifecycle correctness
 
 - Never commit API keys, tokens, private keys, `.env` files, customer data, or other
@@ -111,6 +121,16 @@ explicitly requires it.
   bodies, raw responses, async iterators, redirect handling, abort reasons, retry
   budgets, concurrent refresh, cleanup, and reader/listener/lock ownership as
   applicable. Avoid new retained state and accidental quadratic hot paths.
+- Treat large payloads as a normal API contract, not evidence of malformed or
+  hostile input. Responses, Chat Completions, and other APIs can legitimately
+  return large `application/json` bodies, streaming events, and WebSocket
+  messages. Do not introduce arbitrary fixed limits on bodies, frames, events,
+  or lines as a security or efficiency fix. Prefer incremental processing,
+  amortized-linear buffering, timely cleanup, and caller cancellation. Any new
+  rejection limit needs an explicit, owner-approved API contract and a review
+  of existing supported payloads and transports. Protect this behavior with
+  deterministic public-entrypoint tests that construct large synthetic payloads
+  in memory; do not commit large captures or require slow live image generation.
 - Give every cache an explicit owner, complete identity key, lifetime, and
   invalidation policy. Do not trust caller-mutable snapshots, conflate changed
   transport/certificate identities, or leak request/client-specific state or
