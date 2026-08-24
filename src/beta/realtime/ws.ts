@@ -3,8 +3,8 @@ import { assertBedrockWebSocketOrigin } from '../../internal/bedrock';
 import { protectWebSocketOptionsFromCredentialRedirects } from '../../internal/ws';
 import type { AzureOpenAI } from '../../index';
 import { OpenAI } from '../../index';
-import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
-import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
+import type { RealtimeClientEvent } from '../../resources/beta/realtime/realtime';
+import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure, parseRealtimeEvent } from './internal-base';
 import type { RealtimeConnectionConfig } from './internal-base';
 
 /**
@@ -14,11 +14,16 @@ import type { RealtimeConnectionConfig } from './internal-base';
  * Register an SDK `error` listener and wait for `socket`'s `open` event before
  * sending client events. Use the stable Realtime helper for Azure sideband calls.
  */
-function resolveRealtimeURL(
-  client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
-  props: RealtimeConnectionConfig & { __url?: URL | undefined },
-): URL {
-  return props.__url ?? buildRealtimeURL(client, props);
+function assertTrustedRealtimeURL(client: Pick<OpenAI, 'apiKey' | 'baseURL'>, url: URL): void {
+  if (url.protocol !== 'wss:') {
+    throw new Error('Realtime WebSocket URLs must use the wss: protocol.');
+  }
+
+  const configuredURL = new URL(client.baseURL);
+  configuredURL.protocol = 'wss:';
+  if (url.origin !== configuredURL.origin) {
+    throw new Error('Realtime WebSocket URL origin must match the configured client origin.');
+  }
 }
 
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
@@ -45,9 +50,6 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
       /** Indicates that a function-based credential was resolved by an async factory. @internal */
       __resolvedApiKey?: boolean;
-
-      /** Final URL validated before an asynchronous credential provider ran. @internal */
-      __url?: URL;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
@@ -62,7 +64,8 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         ].join('\n'),
       );
     }
-    this.url = resolveRealtimeURL(client, props);
+    this.url = buildRealtimeURL(client, props);
+    assertTrustedRealtimeURL(client, this.url);
     assertBedrockWebSocketOrigin(client, this.url);
     const headers = {
       ...props.options?.headers,
@@ -81,7 +84,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     this.socket.on('message', (wsEvent) => {
       const event = (() => {
         try {
-          const parsedEvent = JSON.parse(wsEvent.toString()) as RealtimeServerEvent;
+          const parsedEvent = parseRealtimeEvent(wsEvent.toString());
 
           if (
             typeof parsedEvent !== 'object' ||
@@ -133,9 +136,12 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     },
   ): Promise<OpenAIRealtimeWS> {
     const url = buildRealtimeURL(client, props);
+    assertTrustedRealtimeURL(client, url);
     assertBedrockWebSocketOrigin(client, url);
     const resolvedApiKey = await client._callApiKey();
-    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: resolvedApiKey, __url: url }, client);
+    assertTrustedRealtimeURL(client, url);
+    assertBedrockWebSocketOrigin(client, url);
+    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: resolvedApiKey }, client);
   }
 
   /**

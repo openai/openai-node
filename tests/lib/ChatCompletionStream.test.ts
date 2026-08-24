@@ -91,6 +91,37 @@ function customToolChunks(): OpenAI.Chat.ChatCompletionChunk[] {
 }
 
 describe('.stream()', () => {
+  it.each([
+    ['first-padding', 'last-padding'],
+    [undefined, 'last-padding'],
+    ['', ''],
+  ])('keeps chunk obfuscation out of accumulated completions (%s, %s)', async (first, last) => {
+    const padding = [first, last];
+    const chunks = contentChunks('Hello', ' world').map((chunk, index) => ({
+      ...chunk,
+      ...(padding[index] === undefined ? {} : { obfuscation: padding[index] }),
+    }));
+    const original = JSON.stringify(chunks);
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+    });
+    const received: OpenAI.Chat.ChatCompletionChunk[] = [];
+    stream.on('chunk', (chunk, snapshot) => {
+      received.push(chunk);
+      expect(snapshot).not.toHaveProperty('obfuscation');
+      expect(stream.currentChatCompletionSnapshot).not.toHaveProperty('obfuscation');
+    });
+
+    const completion = await stream.finalChatCompletion();
+    expect(received).toEqual(chunks);
+    expect(received.map((chunk) => chunk.obfuscation)).toEqual(padding);
+    expect(JSON.stringify(chunks)).toBe(original);
+    expect(completion.choices[0]?.message.content).toBe('Hello world');
+    expect(completion).not.toHaveProperty('obfuscation');
+    expect(JSON.stringify(completion)).not.toContain('obfuscation');
+  });
+
   it('emits finalization failures as errors', async () => {
     const chunk: OpenAI.Chat.ChatCompletionChunk = {
       id: 'chatcmpl-test',

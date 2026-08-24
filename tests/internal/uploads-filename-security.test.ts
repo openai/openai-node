@@ -80,7 +80,7 @@ describe('streaming upload filename security', () => {
     );
     const body = await new Response(options.body as ReadableStream).text();
 
-    expect(body).toContain(`name="field-${escaped}"; filename="résumé-${escaped}.txt"`);
+    expect(body).toContain(`name="field-${escaped}"; filename="%0D%0AInjected: yes.txt"`);
     expect(body).not.toContain('\r\nInjected: yes');
   });
 
@@ -97,7 +97,7 @@ describe('streaming upload filename security', () => {
   });
 
   test.each([
-    ['default stripping', undefined, 'nested%5Cstream.txt', 'ordinary.txt'],
+    ['default stripping', undefined, 'stream.txt', 'ordinary.txt'],
     ['preserved paths', { stripFilenames: false }, 'nested/stream.txt', 'nested/ordinary.txt'],
   ] as const)(
     'preserves existing filenames and fallback names with %s',

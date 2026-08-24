@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+import { lstatSync, renameSync, unlinkSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import execa from 'execa';
 import yargs from 'yargs';
@@ -10,12 +12,392 @@ const TAR_NAME = 'openai.tgz';
 const PACK_FOLDER = '.pack';
 const PACK_FILE = `${PACK_FOLDER}/${TAR_NAME}`;
 const IS_CI = Boolean(process.env['CI'] && process.env['CI'] !== 'false');
+const MAX_CLOUDFLARE_CREDENTIAL_BYTES = 64 * 1024;
+
+let activeCloudflareCredentialCleanup: (() => Promise<void>) | undefined;
+let ecosystemInterruptionRequested = false;
 
 async function defaultNodeRunner() {
   await installPackage();
   await run('npm', ['run', 'tsc']);
   if (state.live) {
     await run('npm', ['test']);
+  }
+}
+
+async function writeCloudflareCredentialFile(
+  file: Awaited<ReturnType<typeof fs.open>>,
+  contents: Buffer,
+): Promise<void> {
+  await file.truncate(0);
+
+  let offset = 0;
+  while (offset < contents.length) {
+    const { bytesWritten } = await file.write(contents, offset, contents.length - offset, offset);
+    if (bytesWritten === 0) {
+      throw new Error('Unable to update the Cloudflare credential file.');
+    }
+    offset += bytesWritten;
+  }
+}
+
+async function readCloudflareCredentialSnapshot(
+  file: Awaited<ReturnType<typeof fs.open>>,
+  size: bigint,
+): Promise<Buffer> {
+  if (size < 0n || size > BigInt(MAX_CLOUDFLARE_CREDENTIAL_BYTES)) {
+    throw new Error('The Cloudflare credential file exceeds the maximum size of 64 KiB.');
+  }
+
+  const contents = Buffer.alloc(MAX_CLOUDFLARE_CREDENTIAL_BYTES + 1);
+  let offset = 0;
+
+  while (offset < contents.length) {
+    const { bytesRead } = await file.read(contents, offset, contents.length - offset, offset);
+    if (bytesRead === 0) {
+      return contents.subarray(0, offset);
+    }
+    offset += bytesRead;
+  }
+
+  throw new Error('The Cloudflare credential file exceeds the maximum size of 64 KiB.');
+}
+
+class CloudflareCredentialIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CloudflareCredentialIntegrityError';
+  }
+}
+
+type CloudflareCredentialIdentity = { dev: bigint; ino: bigint };
+
+function cloudflareCredentialMatchesIdentity(
+  candidate: string,
+  identity: CloudflareCredentialIdentity,
+): boolean {
+  try {
+    const metadata = lstatSync(candidate, { bigint: true });
+    return metadata.isFile() && metadata.dev === identity.dev && metadata.ino === identity.ino;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function unlinkCloudflareCredentialArtifact(candidate: string, identity: CloudflareCredentialIdentity): void {
+  if (!cloudflareCredentialMatchesIdentity(candidate, identity)) {
+    throw new CloudflareCredentialIntegrityError('A Cloudflare credential artifact was replaced.');
+  }
+  unlinkSync(candidate);
+}
+
+async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Promise<void>): Promise<void> {
+  if (ecosystemInterruptionRequested) {
+    throw new CloudflareCredentialIntegrityError('Cannot stage Cloudflare credentials after interruption.');
+  }
+
+  const credentialPath = '.dev.vars';
+  const flags = fs.constants.O_RDWR + fs.constants.O_NOFOLLOW + fs.constants.O_NONBLOCK;
+  const expectedContents = Buffer.from(`OPENAI_API_KEY='${apiKey}'`);
+  let file: Awaited<ReturnType<typeof fs.open>> | undefined;
+  let originalFile: Awaited<ReturnType<typeof fs.open>> | undefined;
+  let originalIdentity: CloudflareCredentialIdentity | undefined;
+  let stagingIdentity: CloudflareCredentialIdentity | undefined;
+  let backupIdentity: CloudflareCredentialIdentity | undefined;
+  let backupPath: string | undefined;
+  let temporaryPath: string | undefined;
+  let created = false;
+  let published = false;
+  let staged = false;
+  let stagedSecretPresent = false;
+  let pendingIntegrityError: CloudflareCredentialIntegrityError | undefined;
+  let cleanup: Promise<void> | undefined;
+  let staging: Promise<void> | undefined;
+
+  const removeSecret = (contents: Buffer): Buffer => {
+    let sanitized = contents;
+    let complete = sanitized.indexOf(expectedContents);
+    while (complete !== -1) {
+      sanitized = Buffer.concat([
+        sanitized.subarray(0, complete),
+        sanitized.subarray(complete + expectedContents.length),
+      ]);
+      complete = sanitized.indexOf(expectedContents);
+    }
+
+    const secret = Buffer.from(apiKey);
+    const chunks: Buffer[] = [];
+    let offset = 0;
+    let position = sanitized.indexOf(secret, offset);
+    while (position !== -1) {
+      chunks.push(sanitized.subarray(offset, position), Buffer.from('[REDACTED]'));
+      offset = position + secret.length;
+      position = sanitized.indexOf(secret, offset);
+    }
+    if (chunks.length === 0) {
+      return sanitized;
+    }
+    chunks.push(sanitized.subarray(offset));
+    return Buffer.concat(chunks);
+  };
+
+  const scrubCredentialFile = async (handle: Awaited<ReturnType<typeof fs.open>>): Promise<void> => {
+    await handle.truncate(0);
+    stagedSecretPresent = false;
+  };
+
+  const preserveChangedContents = async (
+    handle: Awaited<ReturnType<typeof fs.open>>,
+    contents: Buffer,
+    mode: number,
+    identity: CloudflareCredentialIdentity,
+  ): Promise<never> => {
+    const sanitized = removeSecret(contents);
+    if (!sanitized.equals(contents)) {
+      if (mode !== 0o600) {
+        await handle.chmod(0o600);
+      }
+      await writeCloudflareCredentialFile(handle, sanitized);
+      if (mode !== 0o600) {
+        await handle.chmod(mode);
+      }
+    }
+
+    stagedSecretPresent = false;
+    if (!cloudflareCredentialMatchesIdentity(credentialPath, identity)) {
+      await scrubCredentialFile(handle);
+      throw new CloudflareCredentialIntegrityError(
+        'The Cloudflare credential path was replaced while credentials were staged.',
+      );
+    }
+
+    throw new CloudflareCredentialIntegrityError(
+      'The Cloudflare credential contents changed while credentials were staged.',
+    );
+  };
+
+  const validateStagedContents = async (
+    handle: Awaited<ReturnType<typeof fs.open>>,
+    identity: CloudflareCredentialIdentity,
+  ): Promise<boolean> => {
+    if (!staged) {
+      return false;
+    }
+
+    const metadata = await handle.stat({ bigint: true });
+    const mode = Number(metadata.mode % 4096n);
+    let contents: Buffer;
+    try {
+      contents = await readCloudflareCredentialSnapshot(handle, metadata.size);
+    } catch {
+      await scrubCredentialFile(handle);
+      pendingIntegrityError = new CloudflareCredentialIntegrityError(
+        'The Cloudflare credential contents changed beyond the safe size limit.',
+      );
+      return false;
+    }
+
+    if (!contents.equals(expectedContents)) {
+      await preserveChangedContents(handle, contents, mode, identity);
+    }
+
+    const changedMode = mode !== 0o600;
+    if (changedMode && originalFile) {
+      await originalFile.chmod(mode);
+    }
+    return changedMode;
+  };
+
+  const restoreOriginalCredentialPath = (identity: CloudflareCredentialIdentity): void => {
+    if (!cloudflareCredentialMatchesIdentity(credentialPath, identity)) {
+      throw new CloudflareCredentialIntegrityError(
+        'The Cloudflare credential path was replaced while credentials were staged.',
+      );
+    }
+
+    if (created) {
+      unlinkSync(credentialPath);
+      return;
+    }
+
+    if (backupPath && backupIdentity) {
+      if (!cloudflareCredentialMatchesIdentity(backupPath, backupIdentity)) {
+        throw new CloudflareCredentialIntegrityError(
+          'The original Cloudflare credential backup was replaced.',
+        );
+      }
+      renameSync(backupPath, credentialPath);
+      backupPath = undefined;
+    }
+  };
+
+  const cleanupArtifacts = async (): Promise<void> => {
+    try {
+      if (stagedSecretPresent && file && (created || file !== originalFile)) {
+        await scrubCredentialFile(file);
+      }
+      if (temporaryPath && stagingIdentity && file && file !== originalFile) {
+        await file.truncate(0);
+        unlinkCloudflareCredentialArtifact(temporaryPath, stagingIdentity);
+        temporaryPath = undefined;
+      }
+      if (backupPath && backupIdentity) {
+        unlinkCloudflareCredentialArtifact(backupPath, backupIdentity);
+        backupPath = undefined;
+      }
+    } finally {
+      await file?.close();
+      if (originalFile && originalFile !== file) {
+        await originalFile.close();
+      }
+    }
+  };
+
+  const restoreOnce = (): Promise<void> => {
+    cleanup ??= (async () => {
+      try {
+        if (staging) {
+          try {
+            await staging;
+          } catch {
+            // The owning operation reports the original staging failure.
+          }
+        }
+
+        if (!file || !stagingIdentity || !published) {
+          return;
+        }
+
+        try {
+          if (!cloudflareCredentialMatchesIdentity(credentialPath, stagingIdentity)) {
+            throw new CloudflareCredentialIntegrityError(
+              'The Cloudflare credential path was replaced while credentials were staged.',
+            );
+          }
+        } catch (error) {
+          await scrubCredentialFile(file);
+          try {
+            restoreOriginalCredentialPath(stagingIdentity);
+          } catch {
+            // An inaccessible or replaced pathname must never block descriptor scrubbing.
+          }
+          if (error instanceof CloudflareCredentialIntegrityError) {
+            throw error;
+          }
+          throw new CloudflareCredentialIntegrityError(
+            'The Cloudflare credential path could not be validated safely.',
+          );
+        }
+
+        const changedMode = await validateStagedContents(file, stagingIdentity);
+        await scrubCredentialFile(file);
+        restoreOriginalCredentialPath(stagingIdentity);
+
+        if (pendingIntegrityError) {
+          throw pendingIntegrityError;
+        }
+
+        if (changedMode) {
+          throw new CloudflareCredentialIntegrityError(
+            'The Cloudflare credential permissions changed while credentials were staged.',
+          );
+        }
+      } finally {
+        await cleanupArtifacts();
+      }
+    })();
+    return cleanup;
+  };
+
+  activeCloudflareCredentialCleanup = restoreOnce;
+
+  try {
+    staging = (async () => {
+      try {
+        file = await fs.open(credentialPath, flags);
+      } catch (error) {
+        if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+          throw error;
+        }
+
+        file = await fs.open(credentialPath, flags + fs.constants.O_CREAT + fs.constants.O_EXCL, 0o600);
+        created = true;
+      }
+
+      const metadata = await file.stat({ bigint: true });
+      if (!metadata.isFile() || metadata.nlink !== 1n) {
+        throw new Error('The Cloudflare credential path must be an unshared regular file.');
+      }
+      originalIdentity = { dev: metadata.dev, ino: metadata.ino };
+      stagingIdentity = originalIdentity;
+      published = created;
+
+      if (!created) {
+        await readCloudflareCredentialSnapshot(file, metadata.size);
+      }
+
+      const current = await fs.lstat(credentialPath, { bigint: true });
+      if (!current.isFile() || current.dev !== originalIdentity.dev || current.ino !== originalIdentity.ino) {
+        throw new CloudflareCredentialIntegrityError(
+          'The Cloudflare credential path changed before credentials could be staged.',
+        );
+      }
+
+      if (!created) {
+        originalFile = file;
+        const suffix = randomBytes(16).toString('hex');
+        backupPath = `${credentialPath}.openai-original-${suffix}`;
+        await fs.link(credentialPath, backupPath);
+        const backup = lstatSync(backupPath, { bigint: true });
+        backupIdentity = { dev: backup.dev, ino: backup.ino };
+        if (!cloudflareCredentialMatchesIdentity(backupPath, originalIdentity)) {
+          throw new CloudflareCredentialIntegrityError(
+            'The Cloudflare credential path changed while its backup was being created.',
+          );
+        }
+
+        temporaryPath = `${credentialPath}.openai-staging-${suffix}`;
+        file = await fs.open(temporaryPath, flags + fs.constants.O_CREAT + fs.constants.O_EXCL, 0o600);
+        const privateMetadata = await file.stat({ bigint: true });
+        if (!privateMetadata.isFile() || privateMetadata.nlink !== 1n) {
+          throw new CloudflareCredentialIntegrityError(
+            'The private Cloudflare credential inode is not exclusive.',
+          );
+        }
+        stagingIdentity = { dev: privateMetadata.dev, ino: privateMetadata.ino };
+      }
+
+      await file.chmod(0o600);
+      stagedSecretPresent = true;
+      await writeCloudflareCredentialFile(file, expectedContents);
+      staged = true;
+
+      if (temporaryPath && originalIdentity) {
+        if (!cloudflareCredentialMatchesIdentity(credentialPath, originalIdentity)) {
+          throw new CloudflareCredentialIntegrityError(
+            'The Cloudflare credential path changed before private credentials could be published.',
+          );
+        }
+        renameSync(temporaryPath, credentialPath);
+        temporaryPath = undefined;
+        published = true;
+      }
+    })();
+    await staging;
+    if (!cleanup) {
+      await runLiveTest();
+    }
+  } finally {
+    try {
+      await restoreOnce();
+    } finally {
+      if (activeCloudflareCredentialCleanup === restoreOnce) {
+        activeCloudflareCredentialCleanup = undefined;
+      }
+    }
   }
 }
 
@@ -70,15 +452,14 @@ const projectRunners = {
   },
   'cloudflare-worker': async () => {
     await installPackage();
-
-    const apiKey = process.env['OPENAI_API_KEY'];
-    if (apiKey) {
-      await fs.writeFile('.dev.vars', `OPENAI_API_KEY='${apiKey}'`);
-    }
     await run('npm', ['run', 'tsc']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      const apiKey = process.env['OPENAI_API_KEY'];
+      assert.ok(apiKey);
+      await withCloudflareCredentials(apiKey, async () => {
+        await run('npm', ['run', 'test:ci']);
+      });
     }
     if (state.deploy) {
       await run('npm', ['run', 'deploy']);
@@ -96,9 +477,7 @@ const projectRunners = {
 
     await run('npm', ['run', 'tsc']);
 
-    if (state.live) {
-      await run('bun', ['test']);
-    }
+    await run('bun', state.live ? ['test'] : ['test', 'workload-identity-access-token.test.ts']);
   },
   deno: async () => {
     const packageJson = {
@@ -338,10 +717,41 @@ async function main() {
     await fs.rm(path.join(tmpFolderPath, 'puppeteer-cache'), { recursive: true, force: true });
   }
 
-  async function runCleanupAndExit() {
-    await runCleanup();
+  let interruptionCleanup: Promise<void> | undefined;
 
-    process.exit(1);
+  function runCleanupAndExit(signal: NodeJS.Signals): void {
+    ecosystemInterruptionRequested = true;
+    interruptionCleanup ??= (async () => {
+      try {
+        await activeCloudflareCredentialCleanup?.();
+      } catch {
+        console.error('Unable to finish Cloudflare credential cleanup after interruption.');
+        process.exit(1);
+        return;
+      }
+
+      if (!args.noCleanup) {
+        try {
+          await runCleanup();
+        } catch {
+          console.error('Unable to finish Cloudflare credential cleanup after interruption.');
+          if (signal !== 'SIGHUP') {
+            process.exit(1);
+            return;
+          }
+        }
+      }
+
+      if (args.noCleanup || signal === 'SIGHUP') {
+        process.removeListener('SIGHUP', runCleanupAndExit);
+        process.removeListener('SIGINT', runCleanupAndExit);
+        process.removeListener('SIGTERM', runCleanupAndExit);
+        process.kill(process.pid, signal);
+        return;
+      }
+
+      process.exit(1);
+    })();
   }
 
   if (!(await fileExists(tmpFolderPath))) {
@@ -353,11 +763,13 @@ async function main() {
     jobs = projectsToRun.length;
   }
 
+  process.on('SIGHUP', runCleanupAndExit);
+  process.on('SIGINT', runCleanupAndExit);
+  process.on('SIGTERM', runCleanupAndExit);
+
   if (!args.noCleanup) {
     // The cleanup code is only executed from the parent script that runs
     // multiple projects.
-    process.on('SIGINT', runCleanupAndExit);
-    process.on('SIGTERM', runCleanupAndExit);
     process.on('exit', runCleanup);
 
     await fileCache.cacheFiles(tmpFolderPath);
@@ -472,7 +884,13 @@ async function main() {
         console.error('\n');
 
         try {
-          await withRetry(fn, project, state.retry, state.retryDelay);
+          await withRetry(
+            fn,
+            project,
+            state.retry,
+            state.retryDelay,
+            (error) => !(error instanceof CloudflareCredentialIntegrityError),
+          );
           console.error('\n');
           console.error(`✅ ${project}`);
         } catch (err) {
@@ -500,6 +918,10 @@ async function main() {
     await runCleanup();
   }
 
+  if (interruptionCleanup) {
+    await interruptionCleanup;
+  }
+
   if (failed.length) {
     console.error(`${failed.length} project(s) failed - ${failed.join(', ')}`);
     process.exit(1);
@@ -517,6 +939,10 @@ async function withRetry(
 ): Promise<void> {
   let retriesLeft = retryAmount;
   while (true) {
+    if (ecosystemInterruptionRequested) {
+      throw new CloudflareCredentialIntegrityError('Cannot retry ecosystem tests after interruption.');
+    }
+
     try {
       return await fn();
     } catch (err) {

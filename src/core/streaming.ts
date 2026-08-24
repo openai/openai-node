@@ -103,7 +103,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let receivedCompletionSentinel = false;
       try {
         for await (const sse of _iterSSEMessages(response, controller)) {
-          if (sse.data.startsWith('[DONE]')) {
+          if (sse.data === '[DONE]') {
             receivedCompletionSentinel = true;
             break;
           }
@@ -113,10 +113,14 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
             try {
               data = JSON.parse(sse.data) as any;
-            } catch (e) {
-              logger.error(`Could not parse message into JSON:`, sse.data);
-              logger.error(`From chunk:`, sse.raw);
-              throw e;
+            } catch {
+              logger.error(`Could not parse message into JSON:`);
+              logger.error(`From chunk:`);
+              throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
+            }
+
+            if (sse.event === 'error') {
+              throw new APIError(undefined, data?.error ?? data, undefined, response.headers);
             }
 
             if (data && data.error) {
@@ -128,14 +132,10 @@ export class Stream<Item> implements AsyncIterable<Item> {
             let data;
             try {
               data = JSON.parse(sse.data);
-            } catch (e) {
-              logger.error(`Could not parse message into JSON:`, sse.data);
-              logger.error(`From chunk:`, sse.raw);
-              throw e;
-            }
-            // SSE error events surface as APIError instances.
-            if (sse.event === 'error') {
-              throw new APIError(undefined, data.error, data.message, undefined);
+            } catch {
+              logger.error(`Could not parse message into JSON:`);
+              logger.error(`From chunk:`);
+              throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
             }
             yield { event: sse.event, data } as any;
           }
@@ -238,7 +238,18 @@ export class Stream<Item> implements AsyncIterable<Item> {
             continue;
           }
           if (line) {
-            yield JSON.parse(line) as Item;
+            let data: Item;
+            try {
+              data = JSON.parse(line) as Item;
+            } catch (error) {
+              if (error instanceof SyntaxError) {
+                throw new SyntaxError('Error reading response: malformed newline-delimited JSON.');
+              }
+
+              throw error;
+            }
+
+            yield data;
           }
         }
         done = true;
@@ -325,6 +336,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
 /**
  * Decodes complete SSE records from a response and aborts when its body is absent.
+ * Complete events are decoded on demand without imposing a line or event size limit.
  *
  * @yields {ServerSentEvent} Each decoded server-sent event in wire order.
  */

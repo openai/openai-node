@@ -73,8 +73,28 @@ explicitly requires it.
   when the public contract changes. Preserve existing documentation URLs and import
   paths, and make examples runnable with the documented environment and dependencies.
 
+## Custom-code budget
+
+Follow [the custom-code guidance](scripts/castiron/CUSTOM_CODE.md). Budget changes
+belong in a separate PR containing only `.castiron-ratchet.json`, with an explicit justification
+in the PR description. Increases require a **human approving review** before merging.
+Agents may investigate and draft proposals, but must not approve budget increases
+(including through a human's credentials) or bypass the gate. Do not weaken
+counting, broaden exclusions, or alter generation metadata to make a change pass.
+The checker and effective budget come from main, not the PR. Keep default CODEOWNERS.
+
 ## Security and lifecycle correctness
 
+- Never commit API keys, tokens, private keys, `.env` files, customer data, or other
+  secrets. Read `OPENAI_API_KEY` from the environment and keep examples, fixtures,
+  recordings, and snapshots synthetic.
+- Never place secret API keys in browser bundles or enable `dangerouslyAllowBrowser`
+  without explicit security review. Always redact credentials, authorization
+  headers, cookies, and webhook secrets. Keep real customer-sensitive request or
+  response data out of default or uncontrolled logs, errors, test output,
+  snapshots, and CI artifacts. Preserve documented opt-in `OPENAI_LOG=debug`
+  or `logLevel: 'debug'` logging and `APIError.error` diagnostics with clear
+  sensitive-data warnings; redact them before forwarding to untrusted sinks.
 - Treat provider endpoints, headers, filenames, schemas, and object properties as
   untrusted. At JSON object-record boundaries, validate the own properties and
   values actually emitted, accounting for serialization hooks and omitted values;
@@ -92,15 +112,34 @@ explicitly requires it.
   Bind privileged checkout, release, and publication operations to the validated,
   immutable commit; do not trust floating refs, mutable tags, optional checks, or
   assumptions about repository settings and app permissions.
+- Pin third-party GitHub Actions to full, immutable commit SHAs. Publish npm packages
+  only through protected GitHub Actions OIDC trusted publishing; never add token-based
+  release paths. Expose GitHub App private keys, OIDC credentials, and permissions only to
+  trusted release jobs; never expose them to unreviewed scripts or untrusted code.
 - For streaming, uploads, authentication, retries, timeouts, and cancellation,
   exercise the complete request/response lifetime: headers, JSON/error/binary/SSE
   bodies, raw responses, async iterators, redirect handling, abort reasons, retry
   budgets, concurrent refresh, cleanup, and reader/listener/lock ownership as
   applicable. Avoid new retained state and accidental quadratic hot paths.
+- Treat large payloads as a normal API contract, not evidence of malformed or
+  hostile input. Responses, Chat Completions, and other APIs can legitimately
+  return large `application/json` bodies, streaming events, and WebSocket
+  messages. Do not introduce arbitrary fixed limits on bodies, frames, events,
+  or lines as a security or efficiency fix. Prefer incremental processing,
+  amortized-linear buffering, timely cleanup, and caller cancellation. Any new
+  rejection limit needs an explicit, owner-approved API contract and a review
+  of existing supported payloads and transports. Protect this behavior with
+  deterministic public-entrypoint tests that construct large synthetic payloads
+  in memory; do not commit large captures or require slow live image generation.
 - Give every cache an explicit owner, complete identity key, lifetime, and
   invalidation policy. Do not trust caller-mutable snapshots, conflate changed
   transport/certificate identities, or leak request/client-specific state or
   credentials across clients, transports, retries, or authentication contexts.
+- Require focused security review and relevant regression tests for authentication,
+  network destinations or headers, browser credentials, files and uploads, webhook
+  signatures, parsing, serialization, dependencies, and release automation. Report
+  suspected vulnerabilities privately via `.github/SECURITY.md`; never disclose
+  them in public issues or pull requests.
 
 ## Tooling, dependencies, and verification
 

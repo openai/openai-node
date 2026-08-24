@@ -205,6 +205,628 @@ describe('AssistantStream delta accumulation', () => {
 });
 
 describe('AssistantStream snapshots and message lifecycle', () => {
+  test('buffers repeated message deltas without charging their shared growing snapshot repeatedly', async () => {
+    const message = {
+      id: 'msg_shared_snapshot',
+      role: 'assistant',
+      content: [{ type: 'text', text: { value: 'x'.repeat(16 * 1024), annotations: [] } }],
+    };
+    const events: Event[] = [{ event: 'thread.message.created', data: message }];
+    for (let index = 0; index < 640; index += 1) {
+      events.push({
+        event: 'thread.message.delta',
+        data: {
+          id: message.id,
+          delta: { content: [{ index: 0, type: 'text', text: { value: 'a' } }] },
+        },
+      });
+    }
+    events.push({ event: 'thread.message.completed', data: message }, completedRun());
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      { create: vi.fn().mockResolvedValue(iterableEvents(events)) } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const iterator = runner.events('messageDelta');
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    const first = await iterator.next();
+    expect(first.value?.[1]).toBe(message);
+    expect(message.content[0]?.text.value).toHaveLength(16 * 1024 + 640);
+    await iterator.return?.();
+  });
+
+  test('preserves ordinary raw-event and message snapshot identities', async () => {
+    const message = { id: 'msg_identity', role: 'assistant', content: [] };
+    const createdEvent = { event: 'thread.message.created', data: message };
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawEvents: AssistantStreamEvent[] = [];
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => rawEvents.push(event));
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    const finalMessages = await runner.finalMessages();
+
+    expect(rawEvents[0]).toBe(createdEvent);
+    expect(createdMessages[0]).toBe(message);
+    expect(finalMessages[0]).toBe(message);
+  });
+
+  test('captures accessor-backed event data once before exposing or routing its message', async () => {
+    const first = { id: 'msg_first', role: 'assistant', content: [] };
+    const second = { id: 'msg_second', role: 'assistant', content: [] };
+    const createdEvent: Event = { event: 'thread.message.created' };
+    const readData = vi.fn(function readStableData(this: Event) {
+      expect(this).toBe(createdEvent);
+      return readData.mock.calls.length === 1 ? first : second;
+    });
+    Object.defineProperty(createdEvent, 'data', { enumerable: true, get: readData });
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: first },
+              { event: 'thread.message.created', data: second },
+              { event: 'thread.message.completed', data: second },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawCreations: AssistantStreamEvent[] = [];
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => {
+      if (event.event === 'thread.message.created') {
+        rawCreations.push(event);
+      }
+    });
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+
+    expect(readData).toHaveBeenCalledTimes(1);
+    expect(rawCreations[0]?.data).toBe(first);
+    expect(rawCreations[0]).not.toBe(createdEvent);
+    expect(createdMessages).toEqual([first, second]);
+    expect(createdMessages[0]).toBe(first);
+    expect(await runner.finalMessages()).toEqual([first, second]);
+  });
+
+  test('preserves captured message routing when a raw listener replaces ordinary frame fields', async () => {
+    const message = { id: 'msg_captured', role: 'assistant', content: [] };
+    const replacement = { id: 'msg_replacement', role: 'assistant', content: [] };
+    const createdEvent = { event: 'thread.message.created', data: message };
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => {
+      if (Object.is(event, createdEvent)) {
+        (event as Event)['event'] = 'thread.run.completed';
+        (event as Event)['data'] = replacement;
+      }
+    });
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    const finalMessages = await runner.finalMessages();
+
+    expect(createdMessages[0]).toBe(message);
+    expect(finalMessages[0]).toBe(message);
+  });
+
+  test('captures an accessor-backed assistant event discriminator exactly once', async () => {
+    const message = { id: 'msg_discriminator', role: 'assistant', content: [] };
+    const createdEvent: Event = { data: message };
+    const readEvent = vi.fn(function readStableEvent(this: Event) {
+      expect(this).toBe(createdEvent);
+      return readEvent.mock.calls.length === 1 ? 'thread.message.created' : 'thread.run.completed';
+    });
+    Object.defineProperty(createdEvent, 'event', { enumerable: true, get: readEvent });
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const createdMessages: unknown[] = [];
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+
+    expect(readEvent).toHaveBeenCalledTimes(1);
+    expect(createdMessages[0]).toBe(message);
+  });
+
+  test('normalizes an inconsistent proxy-backed message frame before exposing it', async () => {
+    const message = { id: 'msg_proxy', role: 'assistant', content: [] };
+    const decoy = { id: 'msg_decoy', role: 'assistant', content: [] };
+    const source = { event: 'thread.message.created', data: decoy };
+    let dataReads = 0;
+    const createdEvent = new Proxy(source, {
+      get(target, key, receiver) {
+        if (key === 'data') {
+          dataReads += 1;
+          return message;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            iterableEvents([
+              createdEvent,
+              { event: 'thread.message.completed', data: message },
+              completedRun(),
+            ]),
+          ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawEvents: AssistantStreamEvent[] = [];
+    const createdMessages: unknown[] = [];
+    runner.on('event', (event) => rawEvents.push(event));
+    runner.on('messageCreated', (snapshot) => createdMessages.push(snapshot));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+
+    expect(dataReads).toBe(1);
+    expect(rawEvents[0]).not.toBe(createdEvent);
+    expect(rawEvents[0]?.data).toBe(message);
+    expect(createdMessages[0]).toBe(message);
+  });
+
+  test.each(['event', 'messageCreated'] as const)(
+    'preserves the canonical active ID when a %s listener mutates its message',
+    async (listener) => {
+      const message = { id: 'msg_active', role: 'assistant', content: [] };
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: message },
+        { event: 'thread.message.delta', data: { id: 'msg_active', delta: { content: [] } } },
+        {
+          event: 'thread.message.completed',
+          data: { id: 'msg_active', role: 'assistant', content: [] },
+        },
+        completedRun(),
+      ]);
+
+      if (listener === 'event') {
+        runner.on('event', (event) => {
+          if (event.event === 'thread.message.created') {
+            event.data.id = 'msg_mutated_by_listener';
+          }
+        });
+      } else {
+        runner.on('messageCreated', (snapshot) => {
+          snapshot.id = 'msg_mutated_by_listener';
+        });
+      }
+
+      await expect(runner.done()).resolves.toBeUndefined();
+      await expect(runner.finalMessages()).resolves.toHaveLength(1);
+    },
+  );
+
+  test.each(['event', 'messageCreated'] as const)(
+    'reserves a %s-listener message-ID alias before a later duplicate creation',
+    async (listener) => {
+      const first = { id: 'msg_canonical', role: 'assistant', content: [] };
+      const alias = { id: 'msg_listener_alias', role: 'assistant', content: [] };
+      const firstEvent = { event: 'thread.message.created', data: first };
+      const runner = AssistantStream.createAssistantStream(
+        'thread_123',
+        {
+          create: vi.fn().mockResolvedValue(
+            iterableEvents([
+              firstEvent,
+              {
+                event: 'thread.message.completed',
+                data: { id: 'msg_canonical', role: 'assistant', content: [] },
+              },
+              { event: 'thread.message.created', data: alias },
+              { event: 'thread.message.completed', data: alias },
+              completedRun(),
+            ]),
+          ),
+        } as any,
+        { assistant_id: 'assistant_123' },
+      );
+      const exposed: AssistantStreamEvent[] = [];
+      const created: unknown[] = [];
+      runner.on('event', (event) => {
+        exposed.push(event);
+        if (listener === 'event' && Object.is(event.data, first)) {
+          first.id = alias.id;
+        }
+      });
+      runner.on('messageCreated', (message) => {
+        created.push(message);
+        if (listener === 'messageCreated' && Object.is(message, first)) {
+          first.id = alias.id;
+        }
+      });
+
+      await expect(runner.done()).rejects.toThrow(/already been created/u);
+      expect(exposed[0]).toBe(firstEvent);
+      expect(created[0]).toBe(first);
+      expect(first.id).toBe(alias.id);
+    },
+  );
+
+  test.each(['messageDelta', 'textDone', 'messageDone'] as const)(
+    'reserves the retained message ID changed by a %s listener',
+    async (listener) => {
+      const first = { id: 'msg_canonical', role: 'assistant', content: [] };
+      const alias = { id: 'msg_specialized_alias', role: 'assistant', content: [] };
+      const text = { value: 'safe', annotations: [] };
+      const mutatedSnapshots: { id: string }[] = [];
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: first },
+        {
+          event: 'thread.message.delta',
+          data: { id: 'msg_canonical', delta: { content: [{ index: 0, type: 'text', text }] } },
+        },
+        {
+          event: 'thread.message.completed',
+          data: { id: 'msg_canonical', role: 'assistant', content: [{ type: 'text', text }] },
+        },
+        { event: 'thread.message.created', data: alias },
+        { event: 'thread.message.completed', data: alias },
+        completedRun(),
+      ]);
+
+      runner.on('messageDelta', (_delta, snapshot) => {
+        if (listener === 'messageDelta') {
+          snapshot.id = alias.id;
+          mutatedSnapshots.push(snapshot);
+        }
+      });
+      runner.on('textDone', (_text, snapshot) => {
+        if (listener === 'textDone') {
+          snapshot.id = alias.id;
+          mutatedSnapshots.push(snapshot);
+        }
+      });
+      runner.on('messageDone', () => {
+        if (listener === 'messageDone') {
+          const snapshot = runner.currentMessageSnapshot();
+          if (snapshot) {
+            snapshot.id = alias.id;
+            mutatedSnapshots.push(snapshot);
+          }
+        }
+      });
+
+      await expect(runner.done()).rejects.toThrow(/already been created/u);
+      expect(mutatedSnapshots).toHaveLength(1);
+      expect(mutatedSnapshots[0]?.id).toBe(alias.id);
+    },
+  );
+
+  test('normalizes an inconsistent proxy-backed message ID before exposing or retaining it', async () => {
+    const readID = vi.fn(() => 'msg_proxy_alias');
+    const source = { id: 'msg_proxy_canonical', role: 'assistant', content: [] };
+    const first = new Proxy(source, {
+      get(target, property, receiver) {
+        return property === 'id' ? readID() : Reflect.get(target, property, receiver);
+      },
+    });
+    const alias = { id: 'msg_proxy_alias', role: 'assistant', content: [] };
+    const runner = AssistantStream.createAssistantStream(
+      'thread_123',
+      {
+        create: vi.fn().mockResolvedValue(
+          iterableEvents([
+            { event: 'thread.message.created', data: first },
+            {
+              event: 'thread.message.completed',
+              data: { id: 'msg_proxy_canonical', role: 'assistant', content: [] },
+            },
+            { event: 'thread.message.created', data: alias },
+            { event: 'thread.message.completed', data: alias },
+            completedRun(),
+          ]),
+        ),
+      } as any,
+      { assistant_id: 'assistant_123' },
+    );
+    const rawIDs: string[] = [];
+    const createdIDs: string[] = [];
+    runner.on('event', (event) => {
+      if (event.event === 'thread.message.created') {
+        rawIDs.push(event.data.id);
+      }
+    });
+    runner.on('messageCreated', (message) => createdIDs.push(message.id));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+    expect(rawIDs).toEqual(['msg_proxy_canonical', 'msg_proxy_alias']);
+    expect(createdIDs).toEqual(['msg_proxy_canonical', 'msg_proxy_alias']);
+    expect(readID).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['inherited', 'accessor'] as const)(
+    'rejects an %s message ID before exposing the event or invoking a getter',
+    async (kind) => {
+      const readID = vi.fn(() => 'msg_injected');
+      const message: Event =
+        kind === 'inherited'
+          ? Object.assign(Object.create(Object.defineProperty({}, 'id', { get: readID })) as Event, {
+              role: 'assistant',
+              content: [],
+            })
+          : { role: 'assistant', content: [] };
+      if (kind === 'accessor') {
+        Object.defineProperty(message, 'id', { enumerable: true, get: readID });
+      }
+
+      const runner = AssistantStream.createAssistantStream(
+        'thread_123',
+        {
+          create: vi
+            .fn()
+            .mockResolvedValue(
+              iterableEvents([{ event: 'thread.message.created', data: message }, completedRun()]),
+            ),
+        } as any,
+        { assistant_id: 'assistant_123' },
+      );
+      const exposedEvent = vi.fn();
+      runner.on('event', exposedEvent);
+
+      await expect(runner.done()).rejects.toThrow('invalid message ID');
+
+      expect(exposedEvent).not.toHaveBeenCalled();
+      expect(readID).not.toHaveBeenCalled();
+      expect(runner.currentMessageSnapshot()).toBeUndefined();
+    },
+  );
+
+  test('rejects a delta for another message before mutating or emitting it', async () => {
+    const message = {
+      id: 'msg_active',
+      role: 'assistant',
+      content: [{ type: 'text', text: { value: 'original', annotations: [] } }],
+    };
+    const createdEvent = { event: 'thread.message.created', data: message };
+    const runner = assistantStream([
+      createdEvent,
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_foreign',
+          delta: { content: [{ index: 0, type: 'text', text: { value: ' injected' } }] },
+        },
+      },
+      completedRun(),
+    ]);
+    const rawEvent = vi.fn();
+    const messageDelta = vi.fn();
+    const textDelta = vi.fn();
+
+    runner.on('event', rawEvent);
+    runner.on('messageDelta', messageDelta);
+    runner.on('textDelta', textDelta);
+
+    await expect(runner.done()).rejects.toThrow('does not match the active message');
+
+    expect(rawEvent).toHaveBeenCalledTimes(1);
+    expect(rawEvent).toHaveBeenCalledWith(createdEvent);
+    expect(messageDelta).not.toHaveBeenCalled();
+    expect(textDelta).not.toHaveBeenCalled();
+    expect(runner.currentEvent()).toEqual(createdEvent);
+    expect(runner.currentMessageSnapshot()).toEqual(message);
+  });
+
+  test.each(['thread.message.in_progress', 'thread.message.completed', 'thread.message.incomplete'])(
+    'rejects a mismatched %s event before finalizing or emitting the active message',
+    async (event) => {
+      const message = { id: 'msg_active', role: 'assistant', content: [] };
+      const text = { value: 'original', annotations: [] };
+      const acceptedDelta = {
+        event: 'thread.message.delta',
+        data: { id: message.id, delta: { content: [{ index: 0, type: 'text', text }] } },
+      };
+      const runner = assistantStream([
+        { event: 'thread.message.created', data: message },
+        acceptedDelta,
+        {
+          event,
+          data: {
+            id: 'msg_foreign',
+            role: 'assistant',
+            content: [{ type: 'text', text: { value: 'injected', annotations: [] } }],
+          },
+        },
+        completedRun(),
+      ]);
+      const rawEvent = vi.fn();
+      const messageDone = vi.fn();
+      const textDone = vi.fn();
+
+      runner.on('event', rawEvent);
+      runner.on('messageDone', messageDone);
+      runner.on('textDone', textDone);
+
+      await expect(runner.done()).rejects.toThrow('does not match the active message');
+
+      expect(rawEvent).toHaveBeenCalledTimes(2);
+      expect(messageDone).not.toHaveBeenCalled();
+      expect(textDone).not.toHaveBeenCalled();
+      expect(runner.currentEvent()).toEqual(acceptedDelta);
+      expect(runner.currentMessageSnapshot()).toEqual({
+        ...message,
+        content: [{ index: 0, type: 'text', text }],
+      });
+    },
+  );
+
+  test.each(['msg_active', 'msg_second'])(
+    'rejects creation of %s before the active message has reached a terminal state',
+    async (id) => {
+      const message = { id: 'msg_active', role: 'assistant', content: [] };
+      const createdEvent = { event: 'thread.message.created', data: message };
+      const runner = assistantStream([
+        createdEvent,
+        { event: 'thread.message.created', data: { id, role: 'assistant', content: [] } },
+        completedRun(),
+      ]);
+      const rawEvent = vi.fn();
+      const messageCreated = vi.fn();
+
+      runner.on('event', rawEvent);
+      runner.on('messageCreated', messageCreated);
+
+      await expect(runner.done()).rejects.toThrow('before the active message');
+
+      expect(rawEvent).toHaveBeenCalledTimes(1);
+      expect(messageCreated).toHaveBeenCalledTimes(1);
+      expect(runner.currentEvent()).toEqual(createdEvent);
+      expect(runner.currentMessageSnapshot()).toEqual(message);
+    },
+  );
+
+  test('rejects reuse of a completed message ID before emitting a new creation', async () => {
+    const message = { id: 'msg_reused', role: 'assistant', content: [] };
+    const terminalEvent = { event: 'thread.message.completed', data: message };
+    const runner = assistantStream([
+      { event: 'thread.message.created', data: message },
+      terminalEvent,
+      { event: 'thread.message.created', data: message },
+      completedRun(),
+    ]);
+    const rawEvent = vi.fn();
+    const messageCreated = vi.fn();
+    const messageDone = vi.fn();
+
+    runner.on('event', rawEvent);
+    runner.on('messageCreated', messageCreated);
+    runner.on('messageDone', messageDone);
+
+    await expect(runner.done()).rejects.toThrow('already been created');
+
+    expect(rawEvent).toHaveBeenCalledTimes(2);
+    expect(messageCreated).toHaveBeenCalledTimes(1);
+    expect(messageDone).toHaveBeenCalledTimes(1);
+    expect(runner.currentEvent()).toEqual(terminalEvent);
+    expect(runner.currentMessageSnapshot()).toBeUndefined();
+  });
+
+  test.each(['', null, 123])('rejects the invalid message ID %j before emitting its creation', async (id) => {
+    const runner = assistantStream([
+      { event: 'thread.message.created', data: { id, role: 'assistant', content: [] } },
+      completedRun(),
+    ]);
+    const rawEvent = vi.fn();
+    const messageCreated = vi.fn();
+
+    runner.on('event', rawEvent);
+    runner.on('messageCreated', messageCreated);
+
+    await expect(runner.done()).rejects.toThrow('invalid message ID');
+
+    expect(rawEvent).not.toHaveBeenCalled();
+    expect(messageCreated).not.toHaveBeenCalled();
+    expect(runner.currentEvent()).toBeUndefined();
+    expect(runner.currentMessageSnapshot()).toBeUndefined();
+  });
+
+  test.each([
+    'thread.message.delta',
+    'thread.message.in_progress',
+    'thread.message.completed',
+    'thread.message.incomplete',
+  ])('rejects %s before message creation without exposing the raw event', async (event) => {
+    const data =
+      event === 'thread.message.delta'
+        ? { id: 'msg_missing', delta: { content: [] } }
+        : { id: 'msg_missing', content: [] };
+    const runner = assistantStream([{ event, data }, completedRun()]);
+    const rawEvent = vi.fn();
+
+    runner.on('event', rawEvent);
+
+    await expect(runner.done()).rejects.toThrow('no existing snapshot');
+
+    expect(rawEvent).not.toHaveBeenCalled();
+    expect(runner.currentEvent()).toBeUndefined();
+    expect(runner.currentMessageSnapshot()).toBeUndefined();
+  });
+
+  test.each([
+    'thread.message.delta',
+    'thread.message.in_progress',
+    'thread.message.completed',
+    'thread.message.incomplete',
+  ])('rejects %s after message completion without exposing the raw event', async (event) => {
+    const message = { id: 'msg_completed', role: 'assistant', content: [] };
+    const terminalEvent = { event: 'thread.message.completed', data: message };
+    const data = event === 'thread.message.delta' ? { id: message.id, delta: { content: [] } } : message;
+    const runner = assistantStream([
+      { event: 'thread.message.created', data: message },
+      terminalEvent,
+      { event, data },
+      completedRun(),
+    ]);
+    const rawEvent = vi.fn();
+    const messageDone = vi.fn();
+
+    runner.on('event', rawEvent);
+    runner.on('messageDone', messageDone);
+
+    await expect(runner.done()).rejects.toThrow('no existing snapshot');
+
+    expect(rawEvent).toHaveBeenCalledTimes(2);
+    expect(messageDone).toHaveBeenCalledTimes(1);
+    expect(runner.currentEvent()).toEqual(terminalEvent);
+    expect(runner.currentMessageSnapshot()).toBeUndefined();
+  });
+
   test.each(['__proto__', 'constructor', 'prototype'])(
     'rejects the reserved %s property in newly inserted message content',
     async (key) => {

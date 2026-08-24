@@ -1223,6 +1223,11 @@ describe('resource completions', () => {
       );
       const listener = new RunnerListener(runner);
 
+      runner.on('message', (message) => {
+        if (message.role === 'assistant') {
+          controller.abort();
+        }
+      });
       await handleRequest(async (request) => {
         expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
         return {
@@ -1255,8 +1260,6 @@ describe('resource completions', () => {
           object: 'chat.completion',
         };
       });
-
-      controller.abort();
 
       await runner.done().catch(() => {});
 

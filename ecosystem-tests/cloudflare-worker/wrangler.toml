@@ -1,6 +1,9 @@
 name = "cfw"
 main = "src/worker.ts"
 compatibility_date = "2023-06-18"
+# This billed ecosystem-test worker must never receive a public default URL.
+workers_dev = false
+preview_urls = false
 #node_compat = true
 
 # # KV Namespace binding - For more information: https://developers.cloudflare.com/workers/runtime-apis/kv

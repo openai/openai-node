@@ -104,6 +104,52 @@ describe('instantiate bedrock client', () => {
     expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
   });
 
+  test.each([
+    ['path injection', 'attacker.example/'],
+    ['userinfo injection', 'us-east-1@attacker.example/'],
+    ['backslash injection', 'attacker.example\\'],
+    ['query injection', 'us-east-1?target=attacker.example'],
+    ['fragment injection', 'us-east-1#attacker.example'],
+    ['a malformed region', 'not-a-region'],
+  ])('rejects %s in an explicit AWS region before resolving credentials', (_scenario, awsRegion) => {
+    const bedrockTokenProvider = vi.fn(async () => 'synthetic-bedrock-secret');
+    const fetch = vi.fn(async () => jsonResponse());
+
+    expect(() => new BedrockOpenAI({ awsRegion, bedrockTokenProvider, fetch })).toThrow(/region.*invalid/iu);
+    expect(bedrockTokenProvider).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test.each(['AWS_REGION', 'AWS_DEFAULT_REGION'] as const)(
+    'rejects an injected AWS region from %s before resolving credentials',
+    (environmentVariable) => {
+      process.env[environmentVariable] = 'us-east-1@attacker.example/';
+      const bedrockTokenProvider = vi.fn(async () => 'synthetic-bedrock-secret');
+      const fetch = vi.fn(async () => jsonResponse());
+
+      expect(() => new BedrockOpenAI({ bedrockTokenProvider, fetch })).toThrow(/region.*invalid/iu);
+      expect(bedrockTokenProvider).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['us-east-1', 'us-gov-west-1', 'cn-north-1'])(
+    'preserves the derived Bedrock endpoint for the valid AWS region %s',
+    (awsRegion) => {
+      const client = new BedrockOpenAI({ awsRegion, apiKey: 'token' });
+
+      expect(client.baseURL).toBe(`https://bedrock-mantle.${awsRegion}.api.aws/openai/v1`);
+    },
+  );
+
+  test('preserves an explicitly configured endpoint when the ambient AWS region is invalid', () => {
+    process.env['AWS_REGION'] = 'attacker.example/';
+
+    const client = new BedrockOpenAI({ baseURL: 'https://trusted.example/openai/v1', apiKey: 'token' });
+
+    expect(client.baseURL).toBe('https://trusted.example/openai/v1');
+  });
+
   test('uses Bedrock config precedence', () => {
     process.env['AWS_BEDROCK_BASE_URL'] = 'https://env.example.com/openai/v1';
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'env token';

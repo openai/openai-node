@@ -9,7 +9,7 @@
  */
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 
-fetch('http://localhost:3000', {
+fetch('http://127.0.0.1:3000', {
   method: 'POST',
   body: 'Tell me why dogs are better than cats',
   headers: { 'Content-Type': 'text/plain' },

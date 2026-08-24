@@ -8,9 +8,9 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
-import { sleep } from '../../internal/utils/sleep';
 import { type Uploadable } from '../../uploads';
-import { allSettledWithThrow } from '../../lib/Util';
+import { pollVectorStoreFileBatch } from '../../lib/vector-store-polling';
+import { uploadAndPollVectorStoreFileBatch } from '../../lib/vector-store-upload';
 import { path } from '../../internal/utils/path';
 
 export class FileBatches extends APIResource {
@@ -107,47 +107,7 @@ export class FileBatches extends APIResource {
     batchID: string,
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
-    const headers = buildHeaders([
-      options?.headers,
-      {
-        'X-Stainless-Poll-Helper': 'true',
-        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-      },
-    ]);
-
-    while (true) {
-      const { data: batch, response } = await this.retrieve(
-        batchID,
-        { vector_store_id: vectorStoreID },
-        {
-          ...options,
-          headers,
-        },
-      ).withResponse();
-
-      switch (batch.status) {
-        case 'in_progress':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        case 'failed':
-        case 'cancelled':
-        case 'completed':
-          return batch;
-      }
-    }
+    return await pollVectorStoreFileBatch(this, vectorStoreID, batchID, options);
   }
 
   /**
@@ -160,41 +120,12 @@ export class FileBatches extends APIResource {
     { files, fileIds = [] }: { files: Uploadable[]; fileIds?: string[] },
     options?: RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
   ): Promise<VectorStoreFileBatch> {
-    if (files == null || files.length == 0) {
-      throw new Error(
-        `No \`files\` provided to process. If you've already uploaded files you should use \`.createAndPoll()\` instead`,
-      );
-    }
-
-    const configuredConcurrency = options?.maxConcurrency ?? 5;
-
-    // We cap the number of workers at the number of files (so we don't start any unnecessary workers)
-    const concurrencyLimit = Math.min(configuredConcurrency, files.length);
-
-    const client = this._client;
-    const fileIterator = files.values();
-    const allFileIds: string[] = [...fileIds];
-
-    // This code is based on this design. The libraries don't accommodate our environment limits.
-    // https://stackoverflow.com/questions/40639432/what-is-the-best-way-to-limit-concurrency-when-using-es6s-promise-all
-    async function processFiles(iterator: IterableIterator<Uploadable>) {
-      for (let item of iterator) {
-        const fileObj = await client.files.create({ file: item, purpose: 'assistants' }, options);
-        allFileIds.push(fileObj.id);
-      }
-    }
-
-    // Start workers to process results
-    const workers = Array(concurrencyLimit).fill(fileIterator).map(processFiles);
-
-    // Wait for all processing to complete.
-    await allSettledWithThrow(workers);
-
-    return await this.createAndPoll(
+    return await uploadAndPollVectorStoreFileBatch(
+      this,
+      this._client,
       vectorStoreId,
-      {
-        file_ids: allFileIds,
-      },
+      files,
+      fileIds,
       options,
     );
   }

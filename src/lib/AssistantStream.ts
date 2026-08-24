@@ -99,19 +99,60 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
+function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
+  event: AssistantStreamEvent;
+  exposedEvent: AssistantStreamEvent;
+} {
+  const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
+  const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
+  const eventType = Reflect.get(event, 'event', event) as AssistantStreamEvent['event'];
+  const data = Reflect.get(event, 'data', event) as AssistantStreamEvent['data'];
+  let stableData = data;
+  if (
+    eventType === 'thread.message.created' ||
+    eventType === 'thread.message.in_progress' ||
+    eventType === 'thread.message.delta' ||
+    eventType === 'thread.message.completed' ||
+    eventType === 'thread.message.incomplete'
+  ) {
+    const messageID = Object.getOwnPropertyDescriptor(data, 'id');
+    if (messageID && 'value' in messageID && Reflect.get(data, 'id', data) !== messageID.value) {
+      const canonicalID = messageID.value as unknown;
+      stableData = new Proxy(data, {
+        get(target, property) {
+          return property === 'id' ? canonicalID : Reflect.get(target, property, target);
+        },
+      }) as AssistantStreamEvent['data'];
+    }
+  }
+  const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
+  const ordinaryEvent =
+    eventDescriptor !== undefined &&
+    'value' in eventDescriptor &&
+    eventDescriptor.value === eventType &&
+    dataDescriptor !== undefined &&
+    'value' in dataDescriptor &&
+    dataDescriptor.value === data &&
+    stableData === data;
+
+  return {
+    event: stableEvent,
+    exposedEvent: ordinaryEvent ? event : ({ event: eventType, data: stableData } as AssistantStreamEvent),
+  };
+}
+
 /** Streams assistant-run events while accumulating messages, run steps, and tool-call snapshots. */
 export class AssistantStream
   extends EventStream<AssistantStreamEvents>
   implements AsyncIterable<AssistantStreamEvent>
 {
-  //Track all events in a single list for reference
-  #events: AssistantStreamEvent[] = [];
-
   //Used to accumulate deltas
   //We are accumulating many types so the value here is not strict
   #runStepSnapshots: Record<string, Runs.RunStep> = Object.create(null);
   #messageSnapshots: Record<string, Message> = Object.create(null);
+  #messageIDOwners = new Map<string, string>();
   #messageSnapshot: Message | undefined;
+  #activeMessageID: string | undefined;
   #finalRun: Run | undefined;
   #currentContentIndex: number | undefined;
   #currentContent: MessageContent | undefined;
@@ -339,11 +380,30 @@ export class AssistantStream
       return;
     }
 
-    this.#currentEvent = event;
+    const { event: stableEvent, exposedEvent } = stabilizeAssistantStreamEvent(event);
 
-    this.#handleEvent(event);
+    let messageID: string | undefined;
+    let messageData: MessageStreamEvent['data'] | undefined;
+    switch (stableEvent.event) {
+      case 'thread.message.created':
+      case 'thread.message.in_progress':
+      case 'thread.message.delta':
+      case 'thread.message.completed':
+      case 'thread.message.incomplete': {
+        messageID = this.#validateMessageEvent(stableEvent);
+        messageData = stableEvent.data;
+        break;
+      }
+    }
 
-    switch (event.event) {
+    this.#currentEvent = exposedEvent;
+
+    this.#handleEvent(exposedEvent);
+    if (messageID !== undefined && messageData !== undefined) {
+      this.#reserveMessageAlias(messageData, messageID);
+    }
+
+    switch (stableEvent.event) {
       case 'thread.created': {
         //No action on this event.
         break;
@@ -359,7 +419,7 @@ export class AssistantStream
       case 'thread.run.cancelling':
       case 'thread.run.cancelled':
       case 'thread.run.expired': {
-        this.#handleRun(event);
+        this.#handleRun(stableEvent);
         break;
       }
 
@@ -370,7 +430,7 @@ export class AssistantStream
       case 'thread.run.step.failed':
       case 'thread.run.step.cancelled':
       case 'thread.run.step.expired': {
-        this.#handleRunStep(event);
+        this.#handleRunStep(stableEvent);
         break;
       }
 
@@ -379,7 +439,14 @@ export class AssistantStream
       case 'thread.message.delta':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
-        this.#handleMessage(event);
+        this.#handleMessage(stableEvent);
+        if (messageID !== undefined) {
+          this.#reserveMessageAlias(stableEvent.data, messageID);
+          const retainedMessage = this.#messageSnapshots[messageID];
+          if (retainedMessage) {
+            this.#reserveMessageAlias(retainedMessage, messageID);
+          }
+        }
         break;
       }
 
@@ -390,7 +457,7 @@ export class AssistantStream
         );
       }
       default: {
-        assertNever(event);
+        assertNever(stableEvent);
       }
     }
   }
@@ -407,10 +474,72 @@ export class AssistantStream
     return this.#finalRun;
   }
 
+  #validateMessageEvent(event: MessageStreamEvent): string {
+    const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
+    const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+
+    if (typeof messageID !== 'string' || messageID.length === 0) {
+      throw new OpenAIError('Received assistant message event with an invalid message ID');
+    }
+
+    if (event.event === 'thread.message.created') {
+      if (this.#messageSnapshot) {
+        throw new OpenAIError(
+          `Received message creation for "${messageID}" before the active message "${this.#activeMessageID}" reached a terminal state`,
+        );
+      }
+
+      if (hasOwn(this.#messageSnapshots, messageID) || this.#messageIDOwners.has(messageID)) {
+        throw new OpenAIError(
+          `Received message creation for message "${messageID}", which has already been created`,
+        );
+      }
+
+      this.#activeMessageID = messageID;
+      this.#messageIDOwners.set(messageID, messageID);
+      return messageID;
+    }
+
+    if (!this.#messageSnapshot) {
+      if (event.event === 'thread.message.delta') {
+        throw new OpenAIError(
+          'Received a delta with no existing snapshot (there should be one from message creation)',
+        );
+      }
+
+      throw new OpenAIError('Received thread message event with no existing snapshot');
+    }
+
+    if (messageID !== this.#activeMessageID) {
+      throw new OpenAIError(
+        `Received ${event.event} for message "${messageID}", which does not match the active message "${this.#activeMessageID}"`,
+      );
+    }
+    return messageID;
+  }
+
+  #reserveMessageAlias(data: MessageStreamEvent['data'], canonicalID: string): void {
+    const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
+    const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof messageID !== 'string' || messageID.length === 0) {
+      throw new OpenAIError('Received assistant message event with an invalid message ID');
+    }
+    const owner = this.#messageIDOwners.get(messageID);
+    if (owner !== undefined && owner !== canonicalID) {
+      throw new OpenAIError(
+        `Received message creation for message "${messageID}", which has already been created`,
+      );
+    }
+    this.#messageIDOwners.set(messageID, canonicalID);
+  }
+
   #handleMessage(this: AssistantStream, event: MessageStreamEvent) {
     const [accumulatedMessage, newContent] = this.#accumulateMessage(event, this.#messageSnapshot);
     this.#messageSnapshot = accumulatedMessage;
-    this.#messageSnapshots[accumulatedMessage.id] = accumulatedMessage;
+    if (!this.#activeMessageID) {
+      throw new OpenAIError('Received thread message event with no active message ID');
+    }
+    this.#messageSnapshots[this.#activeMessageID] = accumulatedMessage;
 
     for (const content of newContent) {
       const snapshotContent = accumulatedMessage.content[content.index];
@@ -502,6 +631,7 @@ export class AssistantStream
         this.#currentContentIndex = undefined;
         this.#currentContent = undefined;
         this.#messageSnapshot = undefined;
+        this.#activeMessageID = undefined;
       }
     }
   }
@@ -582,7 +712,6 @@ export class AssistantStream
   }
 
   #handleEvent(this: AssistantStream, event: AssistantStreamEvent) {
-    this.#events.push(event);
     this.#emitExposed('event', event);
   }
 

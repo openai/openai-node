@@ -295,8 +295,21 @@ describe('unsupported Responses event diagnostic privacy', () => {
   test.each(['response.mcp_list_tools.failed', 'response.audio.transcript.done'] as const)(
     'continues dispatching the generated %s discriminator',
     (type) => {
-      const snapshot = createSnapshot();
-      const event = { type, sequence_number: 1 } as ResponseStreamEvent;
+      const itemScoped = type === 'response.mcp_list_tools.failed';
+      const snapshot = itemScoped
+        ? accumulateResponse({
+            ...createdEvent(),
+            response: {
+              ...makeResponse(),
+              output: [{ id: 'mcp_123', type: 'mcp_list_tools', server_label: 'server', tools: [] }],
+            },
+          } as ResponseStreamEvent)
+        : createSnapshot();
+      const event = {
+        type,
+        sequence_number: 1,
+        ...(itemScoped ? { output_index: 0, item_id: 'mcp_123' } : {}),
+      } as ResponseStreamEvent;
 
       expect(accumulateResponse(event, snapshot)).toBe(snapshot);
     },
