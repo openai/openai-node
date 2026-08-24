@@ -185,12 +185,31 @@ Standard Schema validators:
 - The root schema must describe an object. Root-level unions are not supported.
 - Object properties must be required. Represent a value that may be absent as a required nullable field, for
   example `z.string().nullable()`, instead of a plain `z.string().optional()`.
-- Nested unions, enums, arrays, literals, nullable values, and discriminated unions work when they can be
-  represented in the supported strict JSON Schema subset.
+- Nested unions with disjoint JSON types or literal values, enums, arrays, JSON-native literals, nullable
+  values, and discriminated unions work when they can be represented in the supported strict JSON Schema subset.
 - Model-visible descriptions must come from the schema, for example `z.string().describe('...')`. TypeScript
   comments are not available at runtime.
-- Refinements and transforms still run during local validation, but unsupported conversions can fail before
-  the request is sent.
+- Zod v3 strict schemas reject native `Date`, `BigInt`, `Map`, `Set`, and `Promise` values, custom
+  refinements, transforms, pipelines, intersections, and ambiguous unions. These behaviors cannot be represented
+  faithfully in the JSON Schema sent to the model. Non-strict Realtime tools keep their existing behavior.
+
+### Represent large integers as strings
+
+JSON numbers lose integer precision before Zod validation. Keep large integers as decimal strings in the
+model-facing schema, then convert them after parsing:
+
+```ts
+import { z } from 'zod/v3';
+
+const Invoice = z.object({
+  amount: z.string().regex(/^-?(?:0|[1-9][0-9]*)$/u),
+});
+
+const invoice = Invoice.parse(JSON.parse('{"amount":"90071992547409931234567890"}'));
+const exactAmount = BigInt(invoice.amount);
+```
+
+The same JSON-native pattern works with Zod v4 and avoids relying on lossy numeric coercion.
 
 For details, see the [Structured Outputs API guide](https://platform.openai.com/docs/guides/structured-outputs)
 and the existing [helper compatibility notes](helpers.md#supported-zod-features).
