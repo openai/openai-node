@@ -181,6 +181,21 @@ export class BedrockOpenAI extends OpenAI {
       ...opts,
     });
 
+    let currentApiKey = this.apiKey;
+    Object.defineProperty(this, 'apiKey', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        if (currentApiKey !== null) {
+          assertValidBedrockBearerCredential(currentApiKey);
+        }
+        return currentApiKey;
+      },
+      set(nextApiKey: string | null) {
+        currentApiKey = nextApiKey;
+      },
+    });
+
     const trustedBaseURL = this.baseURL;
     let currentBaseURL = trustedBaseURL;
     Object.defineProperty(this, 'baseURL', {
