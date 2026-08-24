@@ -6,7 +6,7 @@ import {
   OpenAIError,
 } from '../error';
 import type OpenAI from '../index';
-import type { RequestOptions } from '../internal/request-options';
+import { observeJSONRequestBody, type RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
 import { hasOwn } from '../internal/utils/values';
@@ -268,11 +268,64 @@ type PartialToolCallSnapshot = {
 
 interface ChoiceEventState {
   content_done: boolean;
+  content_parse_state: PartialJSONParseState | undefined;
   refusal_done: boolean;
   logprobs_content_done: boolean;
   logprobs_refusal_done: boolean;
   current_tool_call_index: number | null;
   done_tool_calls: Set<number>;
+  tool_call_parse_states: Map<number, PartialJSONParseState>;
+  tool_call_identities: Map<number, ToolCallIdentity>;
+}
+
+interface CapturedToolCallDeltaFrame {
+  readonly index: number;
+  readonly arguments_delta: string;
+}
+
+interface CapturedChoiceToolCallFrames {
+  readonly index: number;
+  readonly tool_calls: readonly CapturedToolCallDeltaFrame[];
+}
+
+interface ValidatedChoiceSnapshot {
+  message: ChatCompletionSnapshot.Choice.Message;
+  content: string | null | undefined;
+  refusal: string | null | undefined;
+  toolCallCollection: ChatCompletionSnapshot.Choice.Message.ToolCall[] | undefined;
+  toolCalls: ReadonlyMap<number, ValidatedToolCallSnapshot>;
+}
+
+interface ValidatedToolCallSnapshot {
+  tool: ChatCompletionSnapshot.Choice.Message.ToolCall;
+  function: ChatCompletionSnapshot.Choice.Message.ToolCall.Function;
+  type: 'function';
+  name: string;
+  arguments: string;
+}
+
+interface ToolCallIdentity {
+  type: 'function';
+  name: string;
+  parseable: boolean;
+}
+
+interface PartialJSONParseState {
+  bytes: number;
+  depth: number;
+  fragments: number;
+  work: number;
+  escaped: boolean;
+  has_non_whitespace: boolean;
+  in_string: boolean;
+  last_parsed_bytes: number;
+  pending_high_surrogate: boolean;
+}
+
+interface PartialJSONParseBudget {
+  bytes: number;
+  fragments: number;
+  work: number;
 }
 
 // The Chat Completions schema limits n to 128. Replayed streams do not retain
@@ -280,6 +333,287 @@ interface ChoiceEventState {
 // conservative ceiling to prevent sparse tool-call arrays from growing unbounded.
 const MAX_STREAM_CHOICES = 128;
 const MAX_STREAM_TOOL_CALLS = 128;
+const MAX_PARTIAL_JSON_BYTES = 16 * 1024 * 1024;
+const MAX_PARTIAL_JSON_FRAGMENTS = 65_536;
+const MAX_PARTIAL_JSON_DEPTH = 128;
+const MAX_PARTIAL_JSON_PARSE_WORK = 64 * 1024 * 1024;
+const EAGER_PARTIAL_JSON_BYTES = 1024;
+
+function createPartialJSONParseState(): PartialJSONParseState {
+  return {
+    bytes: 0,
+    depth: 0,
+    fragments: 0,
+    work: 0,
+    escaped: false,
+    has_non_whitespace: false,
+    in_string: false,
+    last_parsed_bytes: 0,
+    pending_high_surrogate: false,
+  };
+}
+
+function recordPartialJSONFragment(
+  state: PartialJSONParseState,
+  budget: PartialJSONParseBudget,
+  fragment: string,
+  validationWorkBudget?: PartialJSONParseBudget,
+): boolean {
+  if (budget.fragments >= MAX_PARTIAL_JSON_FRAGMENTS) {
+    throw new OpenAIError('Chat completion stream exceeded its structured JSON fragment limit');
+  }
+
+  let bytes = 0;
+  let { depth, escaped, has_non_whitespace: hasNonWhitespace, in_string: inString } = state;
+  let completed = false;
+  let firstCharacter = true;
+
+  for (const character of fragment) {
+    const previousBytes = bytes;
+    const codePoint = character.codePointAt(0)!;
+    if (firstCharacter && state.pending_high_surrogate && codePoint >= 0xdc_00 && codePoint <= 0xdf_ff) {
+      bytes += 1;
+    } else if (codePoint <= 0x7f) {
+      bytes += 1;
+    } else if (codePoint <= 0x7_ff) {
+      bytes += 2;
+    } else if (codePoint <= 0xff_ff) {
+      bytes += 3;
+    } else {
+      bytes += 4;
+    }
+    firstCharacter = false;
+    if (budget.bytes + bytes > MAX_PARTIAL_JSON_BYTES) {
+      throw new OpenAIError('Chat completion stream exceeded its structured JSON byte limit');
+    }
+    if (validationWorkBudget && validationWorkBudget.work + bytes > MAX_PARTIAL_JSON_PARSE_WORK) {
+      validationWorkBudget.work += previousBytes;
+      throw new OpenAIError('Chat completion stream exceeded its structured JSON parse-work limit');
+    }
+
+    if (character !== ' ' && character !== '\n' && character !== '\r' && character !== '\t') {
+      hasNonWhitespace = true;
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+        completed ||= depth === 0;
+      }
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+    } else if (character === '{' || character === '[') {
+      depth += 1;
+      if (depth > MAX_PARTIAL_JSON_DEPTH) {
+        throw new OpenAIError('Chat completion stream exceeded its structured JSON nesting depth limit');
+      }
+    } else if ((character === '}' || character === ']') && depth > 0) {
+      depth -= 1;
+      completed ||= depth === 0;
+    }
+  }
+
+  state.bytes += bytes;
+  state.fragments += 1;
+  state.depth = depth;
+  state.escaped = escaped;
+  state.has_non_whitespace = hasNonWhitespace;
+  state.in_string = inString;
+  if (fragment.length > 0) {
+    const finalCodeUnit = fragment.codePointAt(fragment.length - 1) ?? 0;
+    state.pending_high_surrogate = finalCodeUnit >= 0xd8_00 && finalCodeUnit <= 0xdb_ff;
+  }
+  budget.bytes += bytes;
+  budget.fragments += 1;
+  if (validationWorkBudget) {
+    validationWorkBudget.work += bytes;
+  }
+
+  if (!hasNonWhitespace || bytes === 0) {
+    return false;
+  }
+
+  const minimumGrowth = Math.max(EAGER_PARTIAL_JSON_BYTES, Math.floor(state.last_parsed_bytes / 2));
+  if (
+    state.bytes > EAGER_PARTIAL_JSON_BYTES &&
+    !completed &&
+    state.bytes - state.last_parsed_bytes < minimumGrowth
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function reservePartialJSONParse(state: PartialJSONParseState, budget: PartialJSONParseBudget): boolean {
+  if (budget.work + state.bytes > MAX_PARTIAL_JSON_PARSE_WORK) {
+    return false;
+  }
+
+  budget.work += state.bytes;
+  state.work += state.bytes;
+  state.last_parsed_bytes = state.bytes;
+  return true;
+}
+
+function captureStructuredJSONSnapshot(
+  snapshot: object,
+  property: 'content' | 'arguments' | 'refusal',
+): string | null | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
+  if (!descriptor) {
+    let prototype = Object.getPrototypeOf(snapshot) as object | null;
+    for (let depth = 0; prototype !== null; depth += 1) {
+      if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
+        throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+      }
+      prototype = Object.getPrototypeOf(prototype) as object | null;
+    }
+    return undefined;
+  }
+  if (
+    !('value' in descriptor) ||
+    (typeof descriptor.value !== 'string' && descriptor.value !== null && descriptor.value !== undefined)
+  ) {
+    throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+  }
+
+  return descriptor.value as string | null | undefined;
+}
+
+function captureStructuredMessageSnapshot(
+  choice: ChatCompletionSnapshot.Choice,
+): ChatCompletionSnapshot.Choice.Message {
+  const descriptor = Object.getOwnPropertyDescriptor(choice, 'message');
+  if (
+    !descriptor ||
+    !('value' in descriptor) ||
+    typeof descriptor.value !== 'object' ||
+    descriptor.value === null
+  ) {
+    throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+  }
+
+  return descriptor.value as ChatCompletionSnapshot.Choice.Message;
+}
+
+function captureSnapshotArray<Item>(
+  snapshot: object,
+  property: 'choices' | 'tool_calls',
+  maximum: number,
+  kind: 'choice' | 'tool-call',
+): Item[] | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
+  if (!descriptor) {
+    let prototype = Object.getPrototypeOf(snapshot) as object | null;
+    for (let depth = 0; prototype !== null; depth += 1) {
+      if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
+        throw new OpenAIError(`Chat completion stream contains an unsafe snapshot ${kind} collection`);
+      }
+      prototype = Object.getPrototypeOf(prototype) as object | null;
+    }
+    return undefined;
+  }
+  if (!('value' in descriptor) || !Array.isArray(descriptor.value)) {
+    throw new OpenAIError(`Chat completion stream contains an unsafe snapshot ${kind} collection`);
+  }
+
+  const length = Object.getOwnPropertyDescriptor(descriptor.value, 'length');
+  if (!length || !('value' in length) || !Number.isSafeInteger(length.value) || length.value > maximum) {
+    throw new OpenAIError(`Chat completion stream exceeded its snapshot ${kind} limit`);
+  }
+
+  return descriptor.value as Item[];
+}
+
+function captureSnapshotArrayItem<Item>(array: Item[], index: number): Item | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(array, index);
+  if (!descriptor) {
+    return undefined;
+  }
+  if (!('value' in descriptor)) {
+    throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+  }
+
+  return descriptor.value as Item;
+}
+
+function mapCapturedSnapshotArray<Item, Mapped>(
+  array: Item[],
+  maximum: number,
+  kind: 'choice' | 'tool-call',
+  map: (item: Item, index: number) => Mapped,
+): Mapped[] {
+  const descriptor = Object.getOwnPropertyDescriptor(array, 'length');
+  const length: unknown = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+  if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0 || length > maximum) {
+    throw new OpenAIError(`Chat completion stream exceeded its snapshot ${kind} limit`);
+  }
+
+  const mapped: Mapped[] = [];
+  mapped.length = length;
+  for (let index = 0; index < length; index += 1) {
+    const item = Object.getOwnPropertyDescriptor(array, index);
+    if (!item) {
+      continue;
+    }
+    if (!('value' in item)) {
+      throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+    }
+    mapped[index] = map(item.value as Item, index);
+  }
+
+  return mapped;
+}
+
+function validateStructuredJSONSnapshot(
+  value: string,
+  budget?: PartialJSONParseBudget,
+  validationWorkBudget?: PartialJSONParseBudget,
+): string {
+  const state = createPartialJSONParseState();
+  const parseBudget = budget ?? { bytes: 0, fragments: 0, work: 0 };
+  recordPartialJSONFragment(state, parseBudget, value, validationWorkBudget);
+  if (!reservePartialJSONParse(state, parseBudget)) {
+    throw new OpenAIError('Chat completion stream exceeded its structured JSON parse-work limit');
+  }
+
+  return value;
+}
+
+function ownFunctionToolIdentity(
+  toolCall: PartialToolCallSnapshot,
+): Pick<ToolCallIdentity, 'type' | 'name'> | undefined {
+  const type = Object.getOwnPropertyDescriptor(toolCall, 'type');
+  const fn = Object.getOwnPropertyDescriptor(toolCall, 'function');
+  if (!type || !('value' in type) || type.value !== 'function' || !fn || !('value' in fn)) {
+    return undefined;
+  }
+  if (typeof fn.value !== 'object' || fn.value === null) {
+    return undefined;
+  }
+
+  const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
+  if (!name || !('value' in name) || typeof name.value !== 'string' || name.value.length === 0) {
+    return undefined;
+  }
+
+  return { type: 'function', name: name.value };
+}
+
+function assertBoundToolCallIdentity(toolCall: PartialToolCallSnapshot, identity: ToolCallIdentity): void {
+  const current = ownFunctionToolIdentity(toolCall);
+  if (!current || current.name !== identity.name || current.type !== identity.type) {
+    throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+  }
+}
 
 function assignOwnProperties<T extends object>(target: T, source: object): T {
   if (Object.prototype.propertyIsEnumerable.call(source, '__proto__') && !hasOwn(target, '__proto__')) {
@@ -294,6 +628,625 @@ function assignOwnProperties<T extends object>(target: T, source: object): T {
   return Object.assign(target, source);
 }
 
+function cloneParserConfigObject<Value extends object>(
+  value: Value,
+  stableFields: readonly PropertyKey[] = [],
+): Value {
+  const descriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(value);
+  for (const field of stableFields) {
+    const descriptor = descriptors[field];
+    if (!descriptor && !(field in value)) {
+      continue;
+    }
+
+    descriptors[field] = {
+      value: descriptor && 'value' in descriptor ? descriptor.value : Reflect.get(value, field, value),
+      enumerable: descriptor?.enumerable ?? false,
+      configurable: descriptor?.configurable ?? true,
+      writable: descriptor && 'writable' in descriptor ? descriptor.writable : false,
+    };
+  }
+
+  return Object.create(Object.getPrototypeOf(value), descriptors) as Value;
+}
+
+function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams): ChatCompletionCreateParams {
+  const snapshot = cloneParserConfigObject(params);
+
+  if (params.tools) {
+    const stableTools: NonNullable<ChatCompletionCreateParams['tools']> = [];
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(params.tools, 'length');
+    const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+    const toolCount =
+      typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
+        ? Math.min(length, MAX_STREAM_TOOL_CALLS)
+        : 0;
+
+    for (let index = 0; index < toolCount; index += 1) {
+      const item = Object.getOwnPropertyDescriptor(params.tools, String(index));
+      if (!item || !('value' in item)) {
+        stableTools.length = index + 1;
+        continue;
+      }
+
+      const tool = item.value as NonNullable<ChatCompletionCreateParams['tools']>[number];
+      const stableTool = cloneParserConfigObject(tool, [
+        'type',
+        '$brand',
+        '$parseRaw',
+        '$callback',
+        'function',
+      ]);
+      const descriptors = Object.getOwnPropertyDescriptors(stableTool);
+
+      if (isChatCompletionFunctionTool(stableTool)) {
+        const descriptor = descriptors.function;
+        descriptors.function = {
+          ...(descriptor && 'value' in descriptor
+            ? descriptor
+            : { configurable: true, enumerable: true, writable: true }),
+          value: cloneParserConfigObject(stableTool.function, ['name', 'strict']),
+        };
+      }
+
+      stableTools[index] = Object.create(Object.getPrototypeOf(tool), descriptors) as typeof tool;
+    }
+    snapshot.tools = stableTools;
+  }
+
+  if (params.response_format) {
+    snapshot.response_format = cloneParserConfigObject(params.response_format, [
+      'type',
+      '$brand',
+      '$parseRaw',
+    ]);
+  }
+
+  return snapshot;
+}
+
+type ChatCompletionInputTool = NonNullable<ChatCompletionCreateParams['tools']>[number];
+type ChatCompletionResponseFormat = NonNullable<ChatCompletionCreateParams['response_format']>;
+
+interface SerializedFunctionParserConfig {
+  source: ChatCompletionInputTool | undefined;
+  schemaMatches: boolean;
+  name?: string;
+  strict?: boolean;
+}
+
+interface SerializedToolParserConfig {
+  source: ChatCompletionInputTool | undefined;
+  type?: string;
+  function?: SerializedFunctionParserConfig;
+}
+
+interface SerializedResponseParserConfig {
+  source: ChatCompletionResponseFormat | undefined;
+  schemaMatches: boolean;
+  type?: string;
+}
+
+interface SerializedParserSchemaBudget {
+  nodes: number;
+  bytes: number;
+}
+
+const MAX_SERIALIZED_PARSER_SCHEMA_NODES = 4096;
+const stringifyParserSchemaValue = JSON.stringify;
+const MAX_SERIALIZED_PARSER_SCHEMA_BYTES = 1024 * 1024;
+const MAX_SERIALIZED_PARSER_SCHEMA_DEPTH = 64;
+const OMITTED_SERIALIZED_PARSER_VALUE = Symbol('omitted serialized parser value');
+const UNSAFE_SERIALIZED_PARSER_VALUE = Symbol('unsafe serialized parser value');
+
+type CanonicalSerializedParserValue =
+  | string
+  | typeof OMITTED_SERIALIZED_PARSER_VALUE
+  | typeof UNSAFE_SERIALIZED_PARSER_VALUE;
+
+function canonicalSerializedParserSchema(
+  value: unknown,
+  budget: SerializedParserSchemaBudget,
+): string | undefined {
+  const ancestors = new WeakSet<object>();
+
+  const charge = (bytes: number): boolean => {
+    if (
+      !Number.isSafeInteger(bytes) ||
+      bytes < 0 ||
+      budget.bytes + bytes > MAX_SERIALIZED_PARSER_SCHEMA_BYTES
+    ) {
+      return false;
+    }
+    budget.bytes += bytes;
+    return true;
+  };
+
+  const visit = (current: unknown, depth: number): CanonicalSerializedParserValue => {
+    if (depth > MAX_SERIALIZED_PARSER_SCHEMA_DEPTH || budget.nodes >= MAX_SERIALIZED_PARSER_SCHEMA_NODES) {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+    budget.nodes += 1;
+
+    if (current === undefined || typeof current === 'function' || typeof current === 'symbol') {
+      return OMITTED_SERIALIZED_PARSER_VALUE;
+    }
+    if (typeof current === 'bigint') {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+    if (current === null || typeof current === 'boolean' || typeof current === 'number') {
+      const serialized = stringifyParserSchemaValue(current);
+      return typeof serialized === 'string' && charge(serialized.length)
+        ? serialized
+        : UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+    if (typeof current === 'string') {
+      if (!charge(current.length * 6 + 2)) {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+      return stringifyParserSchemaValue(current);
+    }
+    if (typeof current !== 'object' || ancestors.has(current)) {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+
+    const array = Array.isArray(current);
+    const prototype = Object.getPrototypeOf(current) as object | null;
+    if (
+      (array && prototype !== Array.prototype) ||
+      (!array && prototype !== null && prototype !== Object.prototype)
+    ) {
+      return UNSAFE_SERIALIZED_PARSER_VALUE;
+    }
+
+    for (
+      let owner: object | null = current;
+      owner !== null;
+      owner = Object.getPrototypeOf(owner) as object | null
+    ) {
+      const serializer = Object.getOwnPropertyDescriptor(owner, 'toJSON');
+      if (!serializer) {
+        continue;
+      }
+      if (!('value' in serializer) || typeof serializer.value === 'function') {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+      break;
+    }
+
+    ancestors.add(current);
+    try {
+      if (!charge(2)) {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+
+      if (array) {
+        const lengthDescriptor = Object.getOwnPropertyDescriptor(current, 'length');
+        const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+        if (
+          typeof length !== 'number' ||
+          !Number.isSafeInteger(length) ||
+          length < 0 ||
+          length > MAX_SERIALIZED_PARSER_SCHEMA_NODES - budget.nodes
+        ) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+
+        const items: string[] = [];
+        for (let index = 0; index < length; index += 1) {
+          const key = String(index);
+          const descriptor = Object.getOwnPropertyDescriptor(current, key);
+          if (!descriptor) {
+            if (
+              Object.getOwnPropertyDescriptor(Array.prototype, key) ||
+              Object.getOwnPropertyDescriptor(Object.prototype, key)
+            ) {
+              return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            budget.nodes += 1;
+            if (!charge(4)) {
+              return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            items.push('null');
+            continue;
+          }
+          if (!('value' in descriptor)) {
+            return UNSAFE_SERIALIZED_PARSER_VALUE;
+          }
+
+          const item = visit(descriptor.value, depth + 1);
+          if (item === UNSAFE_SERIALIZED_PARSER_VALUE) {
+            return item;
+          }
+          items.push(item === OMITTED_SERIALIZED_PARSER_VALUE ? 'null' : item);
+        }
+        return `[${items.join(',')}]`;
+      }
+
+      const keys = Reflect.ownKeys(current);
+      if (keys.length > MAX_SERIALIZED_PARSER_SCHEMA_NODES - budget.nodes) {
+        return UNSAFE_SERIALIZED_PARSER_VALUE;
+      }
+
+      const entries: [string, unknown][] = [];
+      for (const key of keys) {
+        if (typeof key !== 'string') {
+          continue;
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(current, key);
+        if (!descriptor) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        if (!descriptor.enumerable) {
+          continue;
+        }
+        if (!('value' in descriptor)) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        entries.push([key, descriptor.value]);
+      }
+      entries.sort(([left], [right]) => {
+        if (left === right) {
+          return 0;
+        }
+        return left < right ? -1 : 1;
+      });
+
+      const fields: string[] = [];
+      for (const [key, entry] of entries) {
+        const normalized = visit(entry, depth + 1);
+        if (normalized === UNSAFE_SERIALIZED_PARSER_VALUE) {
+          return normalized;
+        }
+        if (normalized === OMITTED_SERIALIZED_PARSER_VALUE) {
+          continue;
+        }
+        if (!charge(key.length * 6 + 3)) {
+          return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        fields.push(`${stringifyParserSchemaValue(key)}:${normalized}`);
+      }
+      return `{${fields.join(',')}}`;
+    } finally {
+      ancestors.delete(current);
+    }
+  };
+
+  try {
+    const normalized = visit(value, 0);
+    return typeof normalized === 'string' ? normalized : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function rememberSerializedParserSchema(
+  signatures: WeakMap<object, string>,
+  source: object,
+  holder: object,
+  key: string,
+): void {
+  const parser = Object.getOwnPropertyDescriptor(source, '$parseRaw');
+  const schema = Object.getOwnPropertyDescriptor(holder, key);
+  if (
+    !parser ||
+    !('value' in parser) ||
+    typeof parser.value !== 'function' ||
+    !schema ||
+    !('value' in schema)
+  ) {
+    return;
+  }
+
+  const normalized = canonicalSerializedParserSchema(schema.value, { nodes: 0, bytes: 0 });
+  if (normalized !== undefined) {
+    signatures.set(source, normalized);
+  }
+}
+
+function hasMatchingSerializedParserSchema(
+  signatures: WeakMap<object, string>,
+  source: object | undefined,
+  holder: object,
+  key: string,
+  value: unknown,
+): boolean {
+  const expected = source && signatures.get(source);
+  const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+  return (
+    expected !== undefined &&
+    descriptor !== undefined &&
+    'value' in descriptor &&
+    canonicalSerializedParserSchema(value, { nodes: 0, bytes: 0 }) === expected
+  );
+}
+
+function serializedParserDescriptor(
+  descriptor: PropertyDescriptor | undefined,
+  value: unknown,
+): PropertyDescriptor {
+  return descriptor && 'value' in descriptor
+    ? { ...descriptor, value }
+    : { configurable: true, enumerable: true, writable: true, value };
+}
+
+function shadowSerializedParserMetadata(
+  descriptors: PropertyDescriptorMap,
+  source: object,
+  fields: readonly string[],
+): void {
+  for (const field of fields) {
+    const descriptor = descriptors[field];
+    if (!descriptor && !(field in source)) {
+      continue;
+    }
+    descriptors[field] =
+      descriptor && 'value' in descriptor
+        ? { ...descriptor, value: undefined }
+        : {
+            configurable: descriptor?.configurable ?? true,
+            enumerable: descriptor?.enumerable ?? false,
+            writable: false,
+            value: undefined,
+          };
+  }
+}
+
+function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): ChatCompletionInputTool {
+  const source =
+    serialized.source ??
+    ({
+      type: serialized.type,
+      ...(serialized.type === 'function' ? { function: {} } : {}),
+    } as ChatCompletionInputTool);
+  const descriptors = Object.getOwnPropertyDescriptors(source);
+  descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
+
+  if (serialized.type !== 'function' || !serialized.function) {
+    if (descriptors.function) {
+      descriptors.function = serializedParserDescriptor(descriptors.function, undefined);
+    }
+    shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
+    return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
+  }
+
+  const descriptor = descriptors.function;
+  const original =
+    descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value !== null
+      ? (descriptor.value as object)
+      : {};
+  const functionDescriptors = Object.getOwnPropertyDescriptors(original);
+  functionDescriptors['name'] = serializedParserDescriptor(
+    functionDescriptors['name'],
+    serialized.function.name,
+  );
+  functionDescriptors['strict'] = serializedParserDescriptor(
+    functionDescriptors['strict'],
+    serialized.function.strict,
+  );
+  descriptors.function = serializedParserDescriptor(
+    descriptor,
+    Object.create(Object.getPrototypeOf(original), functionDescriptors),
+  );
+  if (!serialized.function.schemaMatches) {
+    shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
+  }
+
+  return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
+}
+
+function snapshotSerializedResponseFormat(
+  serialized: SerializedResponseParserConfig,
+): ChatCompletionResponseFormat {
+  const source = serialized.source ?? ({ type: serialized.type } as ChatCompletionResponseFormat);
+  const descriptors = Object.getOwnPropertyDescriptors(source);
+  descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
+  if (serialized.type !== 'json_schema' || !serialized.source || !serialized.schemaMatches) {
+    shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw']);
+  }
+  return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionResponseFormat;
+}
+
+function ownSerializedParserObject(holder: object, key: string): object | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+  if (!descriptor || !('value' in descriptor)) {
+    return undefined;
+  }
+  const { value } = descriptor;
+  return typeof value === 'object' && value !== null ? value : undefined;
+}
+
+function observeSerializedChatCompletionParserParams(
+  body: ChatCompletionCreateParams,
+  initial: ChatCompletionCreateParams,
+  update: (params: ChatCompletionCreateParams) => void,
+): () => void {
+  const originalToolOwners = new WeakMap<object, ChatCompletionInputTool>();
+  const originalSchemaSignatures = new WeakMap<object, string>();
+  // At most 128 tools plus one response format each receive an independent
+  // 4,096-node/1 MiB source and wire allowance (129 MiB maximum per pass).
+  if (body.tools) {
+    for (let index = 0; index < body.tools.length && index < MAX_STREAM_TOOL_CALLS; index += 1) {
+      const owner = ownSerializedParserObject(body.tools, String(index));
+      const source = initial.tools?.[index];
+      if (owner && source) {
+        originalToolOwners.set(owner, source);
+        const originalFunction = ownSerializedParserObject(source, 'function');
+        if (originalFunction) {
+          rememberSerializedParserSchema(originalSchemaSignatures, source, originalFunction, 'parameters');
+        }
+      }
+    }
+  }
+  if (initial.response_format) {
+    rememberSerializedParserSchema(
+      originalSchemaSignatures,
+      initial.response_format,
+      initial.response_format,
+      'json_schema',
+    );
+  }
+  let root: object | undefined;
+  let tools: object | undefined;
+  let responseFormat: object | undefined;
+  let responseFrame: SerializedResponseParserConfig | undefined;
+  let frames: (SerializedToolParserConfig | undefined)[] = [];
+  let toolFrames = new WeakMap<object, SerializedToolParserConfig>();
+  let actualToolOwners = new Map<number, object | undefined>();
+  let functionFrames = new WeakMap<object, SerializedFunctionParserConfig>();
+
+  return observeJSONRequestBody(body, {
+    value(holder, key, value) {
+      if (!root && key === '' && typeof value === 'object' && value !== null) {
+        root = value;
+        tools = undefined;
+        responseFormat = undefined;
+        responseFrame = undefined;
+        frames = [];
+        toolFrames = new WeakMap();
+        actualToolOwners = new Map();
+        functionFrames = new WeakMap();
+        return;
+      }
+
+      if (holder === root && key === 'response_format') {
+        if (typeof value === 'object' && value !== null) {
+          responseFormat = value;
+          const owner = ownSerializedParserObject(holder, key);
+          responseFrame = {
+            source: owner === body.response_format ? initial.response_format : undefined,
+            schemaMatches: false,
+          };
+        }
+        return;
+      }
+
+      if (holder === root && key === 'tools') {
+        if (Array.isArray(value)) {
+          tools = new Proxy(value, {
+            get(target, property) {
+              const actual = Reflect.get(target, property, target) as unknown;
+              if (typeof property === 'string') {
+                const index = Number(property);
+                if (
+                  Number.isSafeInteger(index) &&
+                  index >= 0 &&
+                  index < MAX_STREAM_TOOL_CALLS &&
+                  String(index) === property
+                ) {
+                  actualToolOwners.set(
+                    index,
+                    typeof actual === 'object' && actual !== null ? actual : undefined,
+                  );
+                }
+              }
+              return actual;
+            },
+          });
+          return tools;
+        }
+        return;
+      }
+
+      if (holder === tools) {
+        const index = Number(key);
+        if (
+          !Number.isSafeInteger(index) ||
+          index < 0 ||
+          index >= MAX_STREAM_TOOL_CALLS ||
+          typeof value !== 'object' ||
+          value === null
+        ) {
+          return;
+        }
+        const owner = actualToolOwners.get(index);
+        const source = owner ? originalToolOwners.get(owner) : undefined;
+        const frame: SerializedToolParserConfig = { source };
+        frames[index] = frame;
+        toolFrames.set(value, frame);
+        return;
+      }
+
+      const tool = toolFrames.get(holder);
+      if (tool) {
+        if (key === 'type' && typeof value === 'string') {
+          tool.type = value;
+        } else if (key === 'function' && typeof value === 'object' && value !== null) {
+          const fn: SerializedFunctionParserConfig = { source: tool.source, schemaMatches: false };
+          tool.function = fn;
+          functionFrames.set(value, fn);
+        }
+        return;
+      }
+
+      if (holder === responseFormat && responseFrame) {
+        if (key === 'type' && typeof value === 'string') {
+          responseFrame.type = value;
+        } else if (key === 'json_schema') {
+          responseFrame.schemaMatches = hasMatchingSerializedParserSchema(
+            originalSchemaSignatures,
+            responseFrame.source,
+            holder,
+            key,
+            value,
+          );
+        }
+        return;
+      }
+
+      const fn = functionFrames.get(holder);
+      if (fn) {
+        if (key === 'name' && typeof value === 'string') {
+          fn.name = value;
+        } else if (key === 'strict' && typeof value === 'boolean') {
+          fn.strict = value;
+        } else if (key === 'parameters') {
+          fn.schemaMatches = hasMatchingSerializedParserSchema(
+            originalSchemaSignatures,
+            fn.source,
+            holder,
+            key,
+            value,
+          );
+        }
+      }
+      return undefined;
+    },
+    complete() {
+      if (!root) {
+        return;
+      }
+      const snapshot = cloneParserConfigObject(initial);
+      if (tools) {
+        const serializedTools: ChatCompletionInputTool[] = [];
+        for (let index = 0; index < frames.length; index += 1) {
+          const frame = frames[index];
+          if (frame) {
+            serializedTools[index] = snapshotSerializedParserTool(frame);
+          }
+        }
+        snapshot.tools = serializedTools;
+      } else {
+        delete snapshot.tools;
+      }
+      if (responseFrame) {
+        snapshot.response_format = snapshotSerializedResponseFormat(responseFrame);
+      } else {
+        delete snapshot.response_format;
+      }
+      update(snapshot);
+      root = undefined;
+      tools = undefined;
+      responseFormat = undefined;
+      responseFrame = undefined;
+      frames = [];
+      toolFrames = new WeakMap();
+      actualToolOwners = new Map();
+      functionFrames = new WeakMap();
+    },
+  });
+}
+
 /** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 export class ChatCompletionStream<ParsedT = null>
   extends AbstractChatCompletionRunner<ChatCompletionStreamEvents<ParsedT>, ParsedT>
@@ -303,6 +1256,8 @@ export class ChatCompletionStream<ParsedT = null>
   #audioDoneChoiceIndexes: Set<number>;
   #choiceEventStates: ChoiceEventState[];
   #currentChatCompletionSnapshot: ChatCompletionSnapshot | undefined;
+  #hasAutoParseableTool: boolean;
+  #partialJSONParseBudget: PartialJSONParseBudget;
 
   /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ChatCompletionCreateParams | null) {
@@ -310,6 +1265,27 @@ export class ChatCompletionStream<ParsedT = null>
     this.#params = params;
     this.#audioDoneChoiceIndexes = new Set();
     this.#choiceEventStates = [];
+    this.#hasAutoParseableTool = false;
+    const tools = params?.tools;
+    const lengthDescriptor = tools && Object.getOwnPropertyDescriptor(tools, 'length');
+    const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+    if (tools && typeof length === 'number' && Number.isSafeInteger(length) && length >= 0) {
+      for (let index = 0; index < Math.min(length, MAX_STREAM_TOOL_CALLS); index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(tools, String(index));
+        if (!descriptor || !('value' in descriptor)) {
+          continue;
+        }
+        const tool = descriptor.value as ChatCompletionInputTool;
+        if (
+          isChatCompletionFunctionTool(tool) &&
+          (isAutoParsableTool(tool) || tool.function.strict === true)
+        ) {
+          this.#hasAutoParseableTool = true;
+          break;
+        }
+      }
+    }
+    this.#partialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
   }
 
   /** The latest accumulated completion, or `undefined` before a chunk arrives or after finalization. */
@@ -353,6 +1329,7 @@ export class ChatCompletionStream<ParsedT = null>
     }
     this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
+    this.#partialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
   }
 
   #getChoiceEventState(choice: ChatCompletionSnapshot.Choice): ChoiceEventState {
@@ -363,11 +1340,14 @@ export class ChatCompletionStream<ParsedT = null>
 
     state = {
       content_done: false,
+      content_parse_state: undefined,
       refusal_done: false,
       logprobs_content_done: false,
       logprobs_refusal_done: false,
       done_tool_calls: new Set(),
       current_tool_call_index: null,
+      tool_call_parse_states: new Map(),
+      tool_call_identities: new Map(),
     };
     this.#choiceEventStates[choice.index] = state;
     return state;
@@ -378,45 +1358,52 @@ export class ChatCompletionStream<ParsedT = null>
       return;
     }
 
-    const completion = this.#accumulateChatCompletion(chunk);
+    const capturedChoiceFrames = new WeakMap<object, CapturedChoiceToolCallFrames>();
+    const completion = this.#accumulateChatCompletion(chunk, capturedChoiceFrames);
     this._emit('chunk', chunk, completion);
 
     for (const choice of chunk.choices) {
-      const choiceSnapshot = completion.choices[choice.index]!;
+      const capturedChoice = capturedChoiceFrames.get(choice);
+      const choiceSnapshot = completion.choices[capturedChoice?.index ?? choice.index]!;
+      const capturedToolCalls = capturedChoice?.tool_calls ?? [];
       const { delta } = choice;
+      const structuredResponse = isParseableResponseFormat(this.#params?.response_format);
+      const boundedSnapshot = structuredResponse || this.#hasAutoParseableTool;
+      const messageSnapshot = boundedSnapshot
+        ? captureStructuredMessageSnapshot(choiceSnapshot)
+        : choiceSnapshot.message;
+      const refusal = boundedSnapshot
+        ? captureStructuredJSONSnapshot(messageSnapshot, 'refusal')
+        : messageSnapshot.refusal;
+      const parseableContent = !refusal && structuredResponse;
+      const messageContent = parseableContent
+        ? captureStructuredJSONSnapshot(messageSnapshot, 'content')
+        : messageSnapshot.content;
 
-      if (
-        delta?.content != null &&
-        choiceSnapshot.message?.role === 'assistant' &&
-        choiceSnapshot.message?.content
-      ) {
-        this._emit('content', delta.content, choiceSnapshot.message.content);
+      if (delta?.content != null && messageSnapshot.role === 'assistant' && messageContent) {
+        this._emit('content', delta.content, messageContent);
         this._emit('content.delta', {
           delta: delta.content,
-          snapshot: choiceSnapshot.message.content,
-          parsed: choiceSnapshot.message.parsed,
+          snapshot: messageContent,
+          parsed: messageSnapshot.parsed,
         });
       }
 
-      if (
-        delta?.refusal != null &&
-        choiceSnapshot.message?.role === 'assistant' &&
-        choiceSnapshot.message?.refusal
-      ) {
+      if (delta?.refusal != null && messageSnapshot.role === 'assistant' && refusal) {
         this._emit('refusal.delta', {
           delta: delta.refusal,
-          snapshot: choiceSnapshot.message.refusal,
+          snapshot: refusal,
         });
       }
 
-      if (choice.logprobs?.content != null && choiceSnapshot.message?.role === 'assistant') {
+      if (choice.logprobs?.content != null && messageSnapshot.role === 'assistant') {
         this._emit('logprobs.content.delta', {
           content: choice.logprobs?.content,
           snapshot: choiceSnapshot.logprobs?.content ?? [],
         });
       }
 
-      if (choice.logprobs?.refusal != null && choiceSnapshot.message?.role === 'assistant') {
+      if (choice.logprobs?.refusal != null && messageSnapshot.role === 'assistant') {
         this._emit('logprobs.refusal.delta', {
           refusal: choice.logprobs?.refusal,
           snapshot: choiceSnapshot.logprobs?.refusal ?? [],
@@ -433,7 +1420,7 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
 
-      for (const toolCall of delta?.tool_calls ?? []) {
+      for (const toolCall of capturedToolCalls) {
         if (state.current_tool_call_index !== toolCall.index) {
           this.#emitContentDoneEvents(choiceSnapshot);
 
@@ -446,19 +1433,30 @@ export class ChatCompletionStream<ParsedT = null>
         state.current_tool_call_index = toolCall.index;
       }
 
-      for (const toolCallDelta of delta?.tool_calls ?? []) {
-        const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallDelta.index];
+      for (const toolCallDelta of capturedToolCalls) {
+        const toolCallSnapshot = messageSnapshot.tool_calls?.[toolCallDelta.index];
         if (!toolCallSnapshot?.type) {
           continue;
         }
 
         if (toolCallSnapshot.type === 'function') {
+          const boundIdentity = state.tool_call_identities.get(toolCallDelta.index);
+          let argumentsSnapshot: string;
+          if (boundIdentity?.parseable) {
+            const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
+            if (typeof capturedArguments !== 'string') {
+              throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+            }
+            argumentsSnapshot = capturedArguments;
+          } else {
+            argumentsSnapshot = toolCallSnapshot.function.arguments;
+          }
           this._emit('tool_calls.function.arguments.delta', {
             name: toolCallSnapshot.function.name,
             index: toolCallDelta.index,
-            arguments: toolCallSnapshot.function.arguments,
+            arguments: argumentsSnapshot,
             parsed_arguments: toolCallSnapshot.function.parsed_arguments,
-            arguments_delta: toolCallDelta.function?.arguments ?? '',
+            arguments_delta: toolCallDelta.arguments_delta,
           });
         } else if (toolCallSnapshot.type !== 'custom') {
           assertNever(toolCallSnapshot);
@@ -474,10 +1472,18 @@ export class ChatCompletionStream<ParsedT = null>
       return;
     }
 
-    const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallIndex];
+    const messageSnapshot = this.#hasAutoParseableTool
+      ? captureStructuredMessageSnapshot(choiceSnapshot)
+      : choiceSnapshot.message;
+    const toolCallSnapshot = messageSnapshot.tool_calls?.[toolCallIndex];
     if (!toolCallSnapshot) {
       throw new Error('no tool call snapshot');
     }
+    const boundIdentity = state.tool_call_identities.get(toolCallIndex);
+    if (boundIdentity) {
+      assertBoundToolCallIdentity(toolCallSnapshot, boundIdentity);
+    }
+
     if (!toolCallSnapshot.type) {
       throw new Error('tool call snapshot missing `type`');
     }
@@ -488,19 +1494,33 @@ export class ChatCompletionStream<ParsedT = null>
       ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
 
       let parsedArguments: unknown = null;
+      const parseable = isAutoParsableTool(inputTool) || inputTool?.function.strict === true;
+      let argumentsSnapshot: string;
+      if (parseable) {
+        if (this.#currentChatCompletionSnapshot) {
+          this.#validateStructuredSnapshots(this.#currentChatCompletionSnapshot);
+        }
+        const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
+        if (typeof capturedArguments !== 'string') {
+          throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        argumentsSnapshot = capturedArguments;
+      } else {
+        argumentsSnapshot = toolCallSnapshot.function.arguments;
+      }
       if (isAutoParsableTool(inputTool)) {
-        parsedArguments = inputTool.$parseRaw(toolCallSnapshot.function.arguments);
+        parsedArguments = inputTool.$parseRaw(validateStructuredJSONSnapshot(argumentsSnapshot));
       } else if (inputTool?.function.strict) {
         parsedArguments = parseResponseFormatContent(
           { type: 'json_schema', $parseRaw: undefined },
-          toolCallSnapshot.function.arguments,
+          validateStructuredJSONSnapshot(argumentsSnapshot),
         );
       }
 
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,
-        arguments: toolCallSnapshot.function.arguments,
+        arguments: argumentsSnapshot,
         parsed_arguments: parsedArguments,
       });
     } else if (toolCallSnapshot.type !== 'custom') {
@@ -510,32 +1530,45 @@ export class ChatCompletionStream<ParsedT = null>
 
   #emitContentDoneEvents(choiceSnapshot: ChatCompletionSnapshot.Choice) {
     const state = this.#getChoiceEventState(choiceSnapshot);
+    const structuredResponse = isParseableResponseFormat(this.#params?.response_format);
+    const boundedSnapshot = structuredResponse || this.#hasAutoParseableTool;
+    const messageSnapshot = boundedSnapshot
+      ? captureStructuredMessageSnapshot(choiceSnapshot)
+      : choiceSnapshot.message;
+    const refusal = boundedSnapshot
+      ? captureStructuredJSONSnapshot(messageSnapshot, 'refusal')
+      : messageSnapshot.refusal;
+    const parseableContent = !refusal && structuredResponse;
+    const content = parseableContent
+      ? captureStructuredJSONSnapshot(messageSnapshot, 'content')
+      : messageSnapshot.content;
 
     if (
-      choiceSnapshot.message.content != null &&
-      (choiceSnapshot.message.content !== '' ||
-        (!choiceSnapshot.message.refusal &&
-          !choiceSnapshot.message.tool_calls?.length &&
-          !choiceSnapshot.message.function_call)) &&
+      content != null &&
+      (content !== '' ||
+        (!refusal && !messageSnapshot.tool_calls?.length && !messageSnapshot.function_call)) &&
       !state.content_done
     ) {
+      if (parseableContent && this.#currentChatCompletionSnapshot) {
+        this.#validateStructuredSnapshots(this.#currentChatCompletionSnapshot);
+      }
       state.content_done = true;
 
       this._emit('content.done', {
-        content: choiceSnapshot.message.content,
-        parsed: choiceSnapshot.message.refusal
+        content,
+        parsed: refusal
           ? null
           : parseResponseFormatContent<ParsedT>(
               this.#params?.response_format,
-              choiceSnapshot.message.content,
+              parseableContent ? validateStructuredJSONSnapshot(content) : content,
             ),
       });
     }
 
-    if (choiceSnapshot.message.refusal && !state.refusal_done) {
+    if (refusal && !state.refusal_done) {
       state.refusal_done = true;
 
-      this._emit('refusal.done', { refusal: choiceSnapshot.message.refusal });
+      this._emit('refusal.done', { refusal });
     }
 
     if (choiceSnapshot.logprobs?.content && !state.logprobs_content_done) {
@@ -551,6 +1584,119 @@ export class ChatCompletionStream<ParsedT = null>
     }
   }
 
+  #validateStructuredSnapshots(
+    snapshot: ChatCompletionSnapshot,
+  ): WeakMap<ChatCompletionSnapshot.Choice, ValidatedChoiceSnapshot> {
+    const finalJSONBudget: PartialJSONParseBudget = { bytes: 0, fragments: 0, work: 0 };
+    const parseableContent = isParseableResponseFormat(this.#params?.response_format);
+    const validatedMessages = new WeakMap<ChatCompletionSnapshot.Choice, ValidatedChoiceSnapshot>();
+    const choices = captureSnapshotArray<ChatCompletionSnapshot.Choice>(
+      snapshot,
+      'choices',
+      MAX_STREAM_CHOICES,
+      'choice',
+    );
+    if (!choices) {
+      throw new OpenAIError('Chat completion stream contains an unsafe snapshot choice collection');
+    }
+    for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex += 1) {
+      const choice = captureSnapshotArrayItem(choices, choiceIndex);
+      if (!choice) {
+        continue;
+      }
+      const message = captureStructuredMessageSnapshot(choice);
+      const refusal = captureStructuredJSONSnapshot(message, 'refusal');
+      const content = captureStructuredJSONSnapshot(message, 'content');
+      const validatedTools = new Map<number, ValidatedToolCallSnapshot>();
+      const toolCalls = captureSnapshotArray<ChatCompletionSnapshot.Choice.Message.ToolCall>(
+        message,
+        'tool_calls',
+        MAX_STREAM_TOOL_CALLS,
+        'tool-call',
+      );
+      validatedMessages.set(
+        choice,
+        Object.freeze({
+          message,
+          content,
+          refusal,
+          toolCallCollection: toolCalls,
+          toolCalls: validatedTools,
+        }),
+      );
+      const state = this.#choiceEventStates[choice.index];
+      if (parseableContent && !refusal && typeof content === 'string') {
+        validateStructuredJSONSnapshot(content, finalJSONBudget, this.#partialJSONParseBudget);
+      }
+      for (const [index, identity] of state?.tool_call_identities ?? []) {
+        const toolCall = toolCalls && captureSnapshotArrayItem(toolCalls, index);
+        if (!toolCall) {
+          throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+        }
+        assertBoundToolCallIdentity(toolCall, identity);
+      }
+      if (!this.#hasAutoParseableTool) {
+        continue;
+      }
+      for (let toolCallIndex = 0; toolCallIndex < (toolCalls?.length ?? 0); toolCallIndex += 1) {
+        const toolCall = captureSnapshotArrayItem(toolCalls!, toolCallIndex);
+        if (!toolCall) {
+          continue;
+        }
+        const identity = ownFunctionToolIdentity(toolCall);
+        if (!identity) {
+          const type = Object.getOwnPropertyDescriptor(toolCall, 'type');
+          if (type && !('value' in type)) {
+            throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+          }
+          if (type?.value !== 'function') {
+            continue;
+          }
+          const fn = Object.getOwnPropertyDescriptor(toolCall, 'function');
+          if (fn && !('value' in fn)) {
+            throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+          }
+          if (fn && typeof fn.value === 'object' && fn.value !== null) {
+            const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
+            if (name && !('value' in name)) {
+              throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+            }
+          }
+          continue;
+        }
+        if (
+          !shouldParseToolCall(this.#params, {
+            type: identity.type,
+            function: { name: identity.name },
+          })
+        ) {
+          continue;
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(toolCall, 'function');
+        if (!descriptor || !('value' in descriptor)) {
+          throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        const fn = descriptor.value as ChatCompletionSnapshot.Choice.Message.ToolCall.Function;
+        const argumentsSnapshot = captureStructuredJSONSnapshot(fn, 'arguments');
+        if (typeof argumentsSnapshot !== 'string') {
+          throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget, this.#partialJSONParseBudget);
+        validatedTools.set(
+          toolCallIndex,
+          Object.freeze({
+            tool: toolCall,
+            function: fn,
+            type: identity.type,
+            name: identity.name,
+            arguments: argumentsSnapshot,
+          }),
+        );
+      }
+    }
+    return validatedMessages;
+  }
+
   #endRequest(): ParsedChatCompletion<ParsedT> {
     if (this.ended) {
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
@@ -559,11 +1705,12 @@ export class ChatCompletionStream<ParsedT = null>
     if (!snapshot) {
       throw new OpenAIError(`request ended without sending any chunks`);
     }
+    const validatedMessages = this.#validateStructuredSnapshots(snapshot);
     const audioDoneChoiceIndexes = this.#audioDoneChoiceIndexes;
     this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
     this.#choiceEventStates = [];
-    return finalizeChatCompletion(snapshot, this.#params, audioDoneChoiceIndexes);
+    return finalizeChatCompletion(snapshot, this.#params, audioDoneChoiceIndexes, validatedMessages);
   }
 
   protected override async _createChatCompletion(
@@ -572,12 +1719,35 @@ export class ChatCompletionStream<ParsedT = null>
     options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     this._listenForAbort(options?.signal);
+    const requestParams = { ...params, stream: true as const };
+    this.#params = requestParams;
     this.#beginRequest();
 
-    const stream = await client.chat.completions.create(
-      { ...params, stream: true },
-      { ...options, signal: this.controller.signal },
-    );
+    const parserParams = snapshotChatCompletionParserParams(requestParams);
+    this.#params = parserParams;
+    this.#hasAutoParseableTool =
+      parserParams.tools?.some(
+        (tool) =>
+          isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true),
+      ) ?? false;
+    const stopObserving =
+      requestParams.tools || requestParams.response_format
+        ? observeSerializedChatCompletionParserParams(requestParams, parserParams, (serialized) => {
+            this.#params = serialized;
+            this.#hasAutoParseableTool =
+              serialized.tools?.some(
+                (tool) =>
+                  isChatCompletionFunctionTool(tool) &&
+                  (isAutoParsableTool(tool) || tool.function.strict === true),
+              ) ?? false;
+          })
+        : undefined;
+    const stream = await client.chat.completions
+      .create(requestParams, {
+        ...options,
+        signal: this.controller.signal,
+      })
+      .finally(stopObserving);
     this._connected();
     for await (const chunk of stream) {
       this.#addChunk(chunk);
@@ -644,7 +1814,10 @@ export class ChatCompletionStream<ParsedT = null>
     throw new OpenAIError(`request ended without sending any chunks`);
   }
 
-  #accumulateChatCompletion(chunk: ChatCompletionChunk): ChatCompletionSnapshot {
+  #accumulateChatCompletion(
+    chunk: ChatCompletionChunk,
+    capturedChoiceFrames: WeakMap<object, CapturedChoiceToolCallFrames>,
+  ): ChatCompletionSnapshot {
     let snapshot = this.#currentChatCompletionSnapshot;
     const { choices, obfuscation: _obfuscation, ...rest } = chunk;
     if (!snapshot) {
@@ -666,7 +1839,10 @@ export class ChatCompletionStream<ParsedT = null>
         ? Math.min(requestedChoiceCount, MAX_STREAM_CHOICES)
         : MAX_STREAM_CHOICES;
 
-    for (const { delta, finish_reason, index, logprobs = null, ...other } of chunk.choices) {
+    for (const chunkChoice of chunk.choices) {
+      const { delta, finish_reason, index, logprobs = null, ...other } = chunkChoice;
+      const capturedToolCalls: CapturedToolCallDeltaFrame[] = [];
+      capturedChoiceFrames.set(chunkChoice, Object.freeze({ index, tool_calls: capturedToolCalls }));
       if (!Number.isSafeInteger(index) || index < 0 || index >= maxChoices) {
         throw new OpenAIError(`Chat completion stream contains an invalid choice index: ${index}`);
       }
@@ -676,6 +1852,9 @@ export class ChatCompletionStream<ParsedT = null>
         const newChoice = { finish_reason, index, message: {}, logprobs, ...other };
         snapshot.choices[index] = newChoice;
         choice = newChoice;
+      }
+      if (isParseableResponseFormat(this.#params?.response_format) || this.#hasAutoParseableTool) {
+        captureStructuredJSONSnapshot(captureStructuredMessageSnapshot(choice), 'refusal');
       }
 
       if (logprobs) {
@@ -715,13 +1894,17 @@ export class ChatCompletionStream<ParsedT = null>
       assignOwnProperties(choice, other);
 
       if (!delta) {
+        Object.freeze(capturedToolCalls);
         continue;
       } // Shouldn't happen; just in case.
 
       this.#audioDoneChoiceIndexes.delete(index);
-      const { audio, content, refusal, function_call, role, tool_calls, ...rest } = delta as typeof delta & {
-        audio?: Partial<ChatCompletionAudio> | null;
-      };
+      const { audio, content, refusal, function_call, role, ...capturedDeltaFields } =
+        delta as typeof delta & {
+          audio?: Partial<ChatCompletionAudio> | null;
+        };
+      const { tool_calls: capturedToolCallDelta, ...rest } = capturedDeltaFields;
+      const tool_calls = hasOwn(capturedDeltaFields, 'tool_calls') ? capturedToolCallDelta : delta.tool_calls;
       assertIsEmpty(rest);
       assignOwnProperties(choice.message, rest);
       if (
@@ -775,13 +1958,26 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
       if (content != null) {
-        choice.message.content = (choice.message.content || '') + content;
-
         if (!choice.message.refusal && isParseableResponseFormat(this.#params?.response_format)) {
-          // The partial parser does not accept whitespace-only input.
-          choice.message.parsed = choice.message.content.trim()
-            ? parseStructuredStreamingJSON(choice.message.content)
-            : null;
+          const eventState = this.#getChoiceEventState(choice);
+          const parseState = (eventState.content_parse_state ??= createPartialJSONParseState());
+          const shouldParse = recordPartialJSONFragment(parseState, this.#partialJSONParseBudget, content);
+          choice.message.content = (captureStructuredJSONSnapshot(choice.message, 'content') || '') + content;
+
+          // The partial parser does not accept whitespace-only input. Once output
+          // grows, coalesce prefix reparses while preserving every raw snapshot.
+          if (!parseState.has_non_whitespace) {
+            choice.message.parsed = null;
+          } else if (shouldParse && reservePartialJSONParse(parseState, this.#partialJSONParseBudget)) {
+            this.#validateStructuredSnapshots(snapshot);
+            choice.message.parsed = parseStructuredStreamingJSON(
+              validateStructuredJSONSnapshot(choice.message.content),
+            );
+          } else if (content.length > 0) {
+            choice.message.parsed = null;
+          }
+        } else {
+          choice.message.content = (choice.message.content || '') + content;
         }
       }
 
@@ -791,12 +1987,27 @@ export class ChatCompletionStream<ParsedT = null>
         // once every delta for them has been accumulated.
         const toolCallSnapshots = (choice.message.tool_calls ??= []) as PartialToolCallSnapshot[];
 
-        for (const { index, id, type, function: fn, custom, ...rest } of tool_calls) {
+        for (const toolCallDelta of tool_calls) {
+          const { index, id, type, function: fn, custom, ...rest } = toolCallDelta;
           if (!Number.isSafeInteger(index) || index < 0 || index >= MAX_STREAM_TOOL_CALLS) {
             throw new OpenAIError(`Chat completion stream contains an invalid tool call index: ${index}`);
           }
+          let argumentsDelta = '';
 
           const tool_call = (toolCallSnapshots[index] ??= {});
+          const functionName = fn?.name;
+          const eventState = this.#hasAutoParseableTool ? this.#getChoiceEventState(choice) : undefined;
+          let boundIdentity = eventState?.tool_call_identities.get(index);
+          if (boundIdentity) {
+            assertBoundToolCallIdentity(tool_call, boundIdentity);
+            if (
+              (type !== undefined && type !== boundIdentity.type) ||
+              (functionName !== undefined && functionName !== boundIdentity.name)
+            ) {
+              throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+            }
+          }
+
           assignOwnProperties(tool_call, rest);
           if (id) {
             tool_call.id = id;
@@ -814,20 +2025,80 @@ export class ChatCompletionStream<ParsedT = null>
             }
           }
           if (fn) {
-            const functionSnapshot = (tool_call.function ??= { name: fn.name ?? '', arguments: '' });
-            if (fn.name) {
-              functionSnapshot.name = fn.name;
+            const functionSnapshot = (tool_call.function ??= { name: functionName ?? '', arguments: '' });
+            if (functionName) {
+              functionSnapshot.name = functionName;
             }
-            if (fn.arguments) {
-              functionSnapshot.arguments += fn.arguments;
+            if (eventState && !boundIdentity) {
+              const identity = ownFunctionToolIdentity(tool_call);
+              const configuredTool =
+                identity &&
+                this.#params?.tools?.find(
+                  (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === identity.name,
+                );
+              if (identity) {
+                boundIdentity = {
+                  ...identity,
+                  parseable:
+                    configuredTool !== undefined &&
+                    shouldParseToolCall(this.#params, {
+                      type: identity.type,
+                      function: { name: identity.name },
+                    }),
+                };
+                eventState.tool_call_identities.set(index, boundIdentity);
+                if (!boundIdentity.parseable) {
+                  const provisionalState = eventState.tool_call_parse_states.get(index);
+                  if (provisionalState) {
+                    this.#partialJSONParseBudget.bytes -= provisionalState.bytes;
+                    this.#partialJSONParseBudget.fragments -= provisionalState.fragments;
+                    this.#partialJSONParseBudget.work -= provisionalState.work;
+                    eventState.tool_call_parse_states.delete(index);
+                  }
+                }
+              }
+            }
+            const argumentFragment = fn.arguments;
+            if (argumentFragment != null) {
+              argumentsDelta = argumentFragment;
+              if (eventState && boundIdentity?.parseable !== false) {
+                let parseState = eventState.tool_call_parse_states.get(index);
+                if (!parseState) {
+                  parseState = createPartialJSONParseState();
+                  eventState.tool_call_parse_states.set(index, parseState);
+                }
 
-              if (shouldParseToolCall(this.#params, tool_call)) {
-                functionSnapshot.parsed_arguments = parseStructuredStreamingJSON(functionSnapshot.arguments);
+                const shouldParse = recordPartialJSONFragment(
+                  parseState,
+                  this.#partialJSONParseBudget,
+                  argumentFragment,
+                );
+                const previousArguments = captureStructuredJSONSnapshot(functionSnapshot, 'arguments');
+                if (typeof previousArguments !== 'string') {
+                  throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                }
+                functionSnapshot.arguments = previousArguments + argumentFragment;
+                if (
+                  shouldParse &&
+                  boundIdentity?.parseable === true &&
+                  reservePartialJSONParse(parseState, this.#partialJSONParseBudget)
+                ) {
+                  this.#validateStructuredSnapshots(snapshot);
+                  functionSnapshot.parsed_arguments = parseStructuredStreamingJSON(
+                    validateStructuredJSONSnapshot(functionSnapshot.arguments),
+                  );
+                } else if (argumentFragment.length > 0 && hasOwn(functionSnapshot, 'parsed_arguments')) {
+                  functionSnapshot.parsed_arguments = undefined;
+                }
+              } else {
+                functionSnapshot.arguments += argumentFragment;
               }
             }
           }
+          capturedToolCalls.push(Object.freeze({ index, arguments_delta: argumentsDelta }));
         }
       }
+      Object.freeze(capturedToolCalls);
     }
     return snapshot;
   }
@@ -855,13 +2126,41 @@ function finalizeChatCompletion<ParsedT>(
   snapshot: ChatCompletionSnapshot,
   params: ChatCompletionCreateParams | null,
   audioDoneChoiceIndexes: ReadonlySet<number>,
+  validatedMessages: WeakMap<ChatCompletionSnapshot.Choice, ValidatedChoiceSnapshot>,
 ): ParsedChatCompletion<ParsedT> {
   const { id, choices, created, model, system_fingerprint, ...rest } = snapshot;
   const completion: ChatCompletion = {
     ...rest,
     id,
-    choices: choices.map(
-      ({ message, finish_reason, index, logprobs, ...choiceRest }): ChatCompletion.Choice => {
+    choices: mapCapturedSnapshotArray(
+      choices,
+      MAX_STREAM_CHOICES,
+      'choice',
+      (choice): ChatCompletion.Choice => {
+        const validated = validatedMessages.get(choice);
+        if (!validated) {
+          throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        const stableChoice = new Proxy(choice, {
+          get(target, property, receiver) {
+            return property === 'message' ? validated.message : Reflect.get(target, property, receiver);
+          },
+        });
+        const { message: sourceMessage, finish_reason, index, logprobs, ...choiceRest } = stableChoice;
+        const message = new Proxy(sourceMessage, {
+          get(target, property, receiver) {
+            if (property === 'content') {
+              return validated.content;
+            }
+            if (property === 'refusal') {
+              return validated.refusal;
+            }
+            if (property === 'tool_calls') {
+              return validated.toolCallCollection;
+            }
+            return Reflect.get(target, property, receiver);
+          },
+        });
         const { content = null, function_call, tool_calls, audio, ...messageRest } = message;
         // Audio streams can end with an expires_at-only chunk after the
         // generated audio, without a separate finish_reason.
@@ -914,41 +2213,91 @@ function finalizeChatCompletion<ParsedT>(
               role,
               content,
               refusal: message.refusal ?? null,
-              tool_calls: tool_calls.map((tool_call, i): ChatCompletionMessageToolCall => {
-                if (tool_call.type == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type`);
-                }
-
-                if (tool_call.type === 'custom') {
-                  const { custom, type, id, ...toolRest } = tool_call;
-                  const { input = '', name, ...customRest } = custom || {};
-                  if (name == null) {
-                    throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name`);
+              tool_calls: mapCapturedSnapshotArray(
+                tool_calls,
+                MAX_STREAM_TOOL_CALLS,
+                'tool-call',
+                (tool_call, i): ChatCompletionMessageToolCall => {
+                  const captured = validated.toolCalls.get(i);
+                  if (!captured) {
+                    const identity = ownFunctionToolIdentity(tool_call);
+                    if (
+                      identity &&
+                      shouldParseToolCall(params, {
+                        type: identity.type,
+                        function: { name: identity.name },
+                      })
+                    ) {
+                      throw new OpenAIError(
+                        'Chat completion stream contains an unsafe structured JSON snapshot',
+                      );
+                    }
                   }
+                  if (captured && captured.tool !== tool_call) {
+                    throw new OpenAIError('Chat completion stream contains a changed tool call identity');
+                  }
+                  const stableFunction =
+                    captured &&
+                    new Proxy(captured.function, {
+                      get(target, property, receiver) {
+                        if (property === 'arguments') {
+                          return captured.arguments;
+                        }
+                        if (property === 'name') {
+                          return captured.name;
+                        }
+                        return Reflect.get(target, property, receiver);
+                      },
+                    });
+                  const stableTool =
+                    captured && stableFunction
+                      ? new Proxy(tool_call, {
+                          get(target, property, receiver) {
+                            if (property === 'type') {
+                              return captured.type;
+                            }
+                            if (property === 'function') {
+                              return stableFunction;
+                            }
+                            return Reflect.get(target, property, receiver);
+                          },
+                        })
+                      : tool_call;
+                  if (stableTool.type == null) {
+                    throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type`);
+                  }
+
+                  if (stableTool.type === 'custom') {
+                    const { custom, type, id, ...toolRest } = stableTool;
+                    const { input = '', name, ...customRest } = custom || {};
+                    if (name == null) {
+                      throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name`);
+                    }
+                    return {
+                      ...toolRest,
+                      id: id || `call_${uuid4()}`,
+                      type,
+                      custom: { ...customRest, name, input },
+                    };
+                  }
+
+                  const { function: fn, type, id, ...toolRest } = stableTool;
+                  const { arguments: args, name, ...fnRest } = fn || {};
+                  if (name == null) {
+                    throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name`);
+                  }
+                  if (args == null) {
+                    throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments`);
+                  }
+
                   return {
                     ...toolRest,
                     id: id || `call_${uuid4()}`,
                     type,
-                    custom: { ...customRest, name, input },
+                    function: { ...fnRest, name, arguments: args },
                   };
-                }
-
-                const { function: fn, type, id, ...toolRest } = tool_call;
-                const { arguments: args, name, ...fnRest } = fn || {};
-                if (name == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name`);
-                }
-                if (args == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments`);
-                }
-
-                return {
-                  ...toolRest,
-                  id: id || `call_${uuid4()}`,
-                  type,
-                  function: { ...fnRest, name, arguments: args },
-                };
-              }),
+                },
+              ),
             },
           };
         }

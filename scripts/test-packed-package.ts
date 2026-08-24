@@ -16,6 +16,8 @@ const packedPackagePath = require('node:path');
     engines?: {
       node?: string;
     };
+    peerDependencies?: Record<string, string>;
+    peerDependenciesMeta?: Record<string, { optional?: boolean }>;
   }
 
   interface RunOptions {
@@ -73,6 +75,8 @@ const packedPackagePath = require('node:path');
     source === 'helpers/zod.ts' ||
     source === 'helpers/audio.ts' ||
     source === 'providers/bedrock/aws.ts' ||
+    source === 'auth/x509-transport.ts' ||
+    source === 'internal/auth/x509-transport-capability.ts' ||
     source === 'auth/index.ts' ||
     source === 'auth/subject-token-providers.ts';
 
@@ -212,6 +216,135 @@ const packedPackagePath = require('node:path');
       tarball,
     ]);
 
+    const unsupportedDispatcher =
+      'assert.throws(direct, /Undici 5\\.2\\.0 or later/u); assert.throws(httpConnect, /Undici 5\\.2\\.0 or later/u); assert.throws(httpsConnect, /Undici 5\\.2\\.0 or later/u);';
+    const unsupportedProxy =
+      'assert.doesNotThrow(direct); assert.throws(httpConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u); assert.throws(httpsConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u);';
+    const supportedTransports =
+      'assert.doesNotThrow(direct); assert.doesNotThrow(httpConnect); assert.doesNotThrow(httpsConnect);';
+
+    for (const [undiciVersion, forwardsProxyRequests, transportAssertions] of [
+      ['5.1.1', false, unsupportedDispatcher],
+      ['5.2.0', true, unsupportedProxy],
+      ['5.5.0', true, unsupportedProxy],
+      ['5.5.1', false, supportedTransports],
+      ['6.29.0', false, supportedTransports],
+      ['7.0.0', false, supportedTransports],
+    ] as const) {
+      const undiciFixture = path.join(temporaryDirectory, `undici-${undiciVersion}`);
+      const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
+      fs.mkdirSync(undiciFixture);
+      fs.mkdirSync(consumer);
+      fs.writeFileSync(
+        path.join(undiciFixture, 'package.json'),
+        JSON.stringify({ name: 'undici', version: undiciVersion, main: 'index.js' }),
+      );
+      fs.writeFileSync(
+        path.join(undiciFixture, 'index.js'),
+        [
+          `const undici = require(${JSON.stringify(path.join(root, 'node_modules/undici'))});`,
+          'exports.Agent = undici.Agent;',
+          forwardsProxyRequests
+            ? [
+                'exports.ProxyAgent = class ForwardingProxyAgent extends undici.ProxyAgent {',
+                '  #proxyOrigin;',
+                '  constructor(options) {',
+                '    super(options);',
+                '    this.#proxyOrigin = new URL(options.uri).origin;',
+                '  }',
+                '  dispatch(options, handler) {',
+                '    return super.dispatch({',
+                '      ...options,',
+                '      origin: this.#proxyOrigin,',
+                '      path: options.origin + options.path,',
+                '    }, handler);',
+                '  }',
+                '};',
+              ].join('\n')
+            : 'exports.ProxyAgent = undici.ProxyAgent;',
+          'exports.Request = undici.Request;',
+          undiciVersion === '5.1.1'
+            ? [
+                'exports.fetch = async function fetch(resource) {',
+                '  const options = Object.create(arguments[1] ?? null);',
+                "  Object.defineProperty(options, 'dispatcher', { value: undici.getGlobalDispatcher() });",
+                '  return undici.fetch(resource, options);',
+                '};',
+              ].join('\n')
+            : 'exports.fetch = undici.fetch;',
+        ].join('\n'),
+      );
+      const packedUndici = run(
+        'npm',
+        ['pack', '--silent', '--cache', npmCache, '--pack-destination', temporaryDirectory],
+        { cwd: undiciFixture },
+      )
+        .trim()
+        .split(/\r?\n/)
+        .pop();
+      assert(packedUndici, `npm pack did not report the Undici ${undiciVersion} fixture`);
+      fs.writeFileSync(
+        path.join(consumer, 'package.json'),
+        JSON.stringify({ name: `legacy-undici-${undiciVersion}-consumer`, private: true }),
+      );
+      const installation = childProcess.spawnSync(
+        'npm',
+        [
+          'install',
+          '--offline',
+          '--ignore-scripts',
+          '--no-audit',
+          '--no-fund',
+          '--cache',
+          npmCache,
+          tarball,
+          path.join(temporaryDirectory, packedUndici),
+        ],
+        { cwd: consumer, encoding: 'utf-8' },
+      );
+      assert.equal(
+        installation.status,
+        0,
+        `An existing Undici ${undiciVersion} consumer could not install the SDK: ${installation.stderr}`,
+      );
+      assert.doesNotMatch(
+        installation.stderr,
+        /ERESOLVE/u,
+        `An existing Undici ${undiciVersion} consumer encountered an optional-peer conflict`,
+      );
+      run(process.execPath, ['-e', "require('openai')"], { cwd: consumer });
+      for (const [inputType, imports] of [
+        [
+          'commonjs',
+          "const assert = require('node:assert/strict'); const { Agent, ProxyAgent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+        ],
+        [
+          'module',
+          "import assert from 'node:assert/strict'; import { Agent, ProxyAgent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+        ],
+      ]) {
+        run(
+          process.execPath,
+          [
+            `--input-type=${inputType}`,
+            '-e',
+            [
+              imports,
+              'const dispatcher = new Agent();',
+              "const proxyDispatcher = new ProxyAgent({ uri: 'http://127.0.0.1:1' });",
+              "const secureProxyDispatcher = new ProxyAgent({ uri: 'https://127.0.0.1:1' });",
+              "const direct = () => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' });",
+              "const httpConnect = () => createX509Transport({ runtime: 'node', dispatcher: proxyDispatcher, certificateIdentity: 'static', proxy: 'http-connect' });",
+              "const httpsConnect = () => createX509Transport({ runtime: 'node', dispatcher: secureProxyDispatcher, certificateIdentity: 'static', proxy: 'https-connect' });",
+              transportAssertions,
+              'dispatcher.close(); proxyDispatcher.close(); secureProxyDispatcher.close();',
+            ].join(' '),
+          ],
+          { cwd: consumer },
+        );
+      }
+    }
+
     const installedPackageRoot = path.join(temporaryDirectory, 'node_modules/openai');
     const installedSourceRoot = path.join(installedPackageRoot, 'src');
     const installedSourceConfig = path.join(installedSourceRoot, 'tsconfig.json');
@@ -328,6 +461,28 @@ const packedPackagePath = require('node:path');
       sourcePackage.engines,
       'Packed package engine metadata differs from package.json',
     );
+    assert.equal(installedPackage.peerDependencies?.['undici'], '>=5 <9');
+    assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
+    const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
+    assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
+    fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
+
+    for (const [inputType, consumer] of [
+      [
+        'commonjs',
+        "const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+      ],
+      [
+        'module',
+        "import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+      ],
+    ]) {
+      run(process.execPath, [
+        `--input-type=${inputType}`,
+        '-e',
+        `${consumer} const dispatcher = new Agent(); const transport = createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); if (!Object.isFrozen(transport)) throw new Error('X.509 transport capability is not frozen'); dispatcher.close();`,
+      ]);
+    }
 
     console.log(
       `Packed npm artifact passed CommonJS, ESM, and ${browserSafeSources.length}/${mappedSources.size} source checks across ${sourceMaps.length} source maps on ${process.version}.`,

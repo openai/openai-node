@@ -44,9 +44,9 @@ export function ensureCanonicalOutputText(context: ResponseAccumulatorContext, s
     text += outputText;
     outputTextIndex.append(outputText.length);
   }
-  if (snapshot.output_text !== text) {
-    snapshot.output_text = text;
-  }
+  // Comparing independently accumulated strings can scan all preceding text on
+  // every delta. The recount is authoritative, so assign it without comparing.
+  snapshot.output_text = text;
   context.outputTextIndex = outputTextIndex;
   context.canonicalSnapshot = snapshot;
 }

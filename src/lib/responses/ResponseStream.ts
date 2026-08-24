@@ -154,51 +154,63 @@ export class ResponseStream<ParsedT = null>
       throw new APIError(undefined, error, event.message, undefined);
     }
 
+    let dispatchEvent: ResponseStreamEvent = event;
     const response = accumulateResponseWithContext(
       event,
       this.#currentResponseSnapshot,
       this.#accumulatorContext,
+      true,
+      (sanitizedEvent) => {
+        dispatchEvent = sanitizedEvent;
+      },
     );
     this.#currentResponseSnapshot = response;
     maybeEmit('event', event);
 
-    switch (event.type) {
+    switch (dispatchEvent.type) {
       case 'response.output_text.delta': {
-        const output = response.output[event.output_index];
+        const output = response.output[dispatchEvent.output_index];
         if (!output) {
-          throw new OpenAIError(`missing output at index ${event.output_index}`);
+          throw new OpenAIError(`missing output at index ${dispatchEvent.output_index}`);
         }
         if (output.type === 'message') {
-          const content = output.content[event.content_index];
+          const content = output.content[dispatchEvent.content_index];
           if (!content) {
-            throw new OpenAIError(`missing content at index ${event.content_index}`);
+            throw new OpenAIError(`missing content at index ${dispatchEvent.content_index}`);
           }
           if (content.type !== 'output_text') {
             throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
           }
 
           maybeEmit('response.output_text.delta', {
-            ...event,
+            ...dispatchEvent,
+            type: dispatchEvent.type,
+            item_id: dispatchEvent.item_id,
+            output_index: dispatchEvent.output_index,
+            content_index: dispatchEvent.content_index,
             snapshot: content.text,
           });
         }
         break;
       }
       case 'response.function_call_arguments.delta': {
-        const output = response.output[event.output_index];
+        const output = response.output[dispatchEvent.output_index];
         if (!output) {
-          throw new OpenAIError(`missing output at index ${event.output_index}`);
+          throw new OpenAIError(`missing output at index ${dispatchEvent.output_index}`);
         }
         if (output.type === 'function_call') {
           maybeEmit('response.function_call_arguments.delta', {
-            ...event,
+            ...dispatchEvent,
+            type: dispatchEvent.type,
+            item_id: dispatchEvent.item_id,
+            output_index: dispatchEvent.output_index,
             snapshot: output.arguments,
           });
         }
         break;
       }
       default: {
-        maybeEmit(event.type, event);
+        maybeEmit(dispatchEvent.type, event);
         break;
       }
     }

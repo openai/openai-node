@@ -96,24 +96,95 @@ app.use(express.text());
 //     }
 //   })
 //
+function watchClientDisconnect(req: Request, res: Response) {
+  if (
+    typeof AbortController !== 'function' ||
+    typeof req.on !== 'function' ||
+    typeof req.off !== 'function' ||
+    typeof res.on !== 'function' ||
+    typeof res.off !== 'function'
+  ) {
+    return;
+  }
+
+  const controller = new AbortController();
+  const onRequestAborted = () => controller.abort();
+  const onResponseClosed = () => {
+    if (!res.writableEnded) {
+      controller.abort();
+    }
+  };
+
+  req.on('aborted', onRequestAborted);
+  res.on('close', onResponseClosed);
+
+  return {
+    signal: controller.signal,
+    cleanup() {
+      req.off('aborted', onRequestAborted);
+      res.off('close', onResponseClosed);
+    },
+  };
+}
+
+function rethrowUnlessClientAbort(
+  error: unknown,
+  disconnect: ReturnType<typeof watchClientDisconnect>,
+): void {
+  const clientConstructor = openai.constructor as typeof OpenAI;
+
+  if (!disconnect?.signal.aborted || !(error instanceof clientConstructor.APIUserAbortError)) {
+    throw error;
+  }
+}
+
 const handleRequest = async (req: Request, res: Response) => {
   console.log('Received request:', req.body);
 
-  const stream = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
-    stream: true,
-    messages: [{ role: 'user', content: req.body }],
-  });
+  const disconnect = watchClientDisconnect(req, res);
 
-  res.header('Content-Type', 'text/plain');
+  try {
+    if (res.destroyed) {
+      return;
+    }
 
-  // Sends each content stream chunk-by-chunk, such that the client
-  // ultimately receives a single string.
-  for await (const chunk of stream) {
-    res.write(chunk.choices[0]?.delta.content || '');
+    const completionRequest = {
+      model: 'gpt-3.5-turbo',
+      stream: true as const,
+      messages: [{ role: 'user' as const, content: req.body }],
+    };
+    const stream = await (disconnect
+      ? openai.chat.completions.create(completionRequest, { signal: disconnect.signal })
+      : openai.chat.completions.create(completionRequest));
+
+    if (disconnect?.signal.aborted || res.destroyed) {
+      return;
+    }
+
+    res.header('Content-Type', 'text/plain');
+
+    // Sends each content stream chunk-by-chunk, such that the client
+    // ultimately receives a single string.
+    for await (const chunk of stream) {
+      if (disconnect?.signal.aborted || res.destroyed) {
+        break;
+      }
+
+      res.write(chunk.choices[0]?.delta.content || '');
+
+      if (disconnect?.signal.aborted || res.destroyed) {
+        break;
+      }
+    }
+
+    if (!disconnect?.signal.aborted && !res.destroyed) {
+      res.end();
+    }
+  } catch (error) {
+    rethrowUnlessClientAbort(error, disconnect);
+  } finally {
+    disconnect?.cleanup();
   }
-
-  res.end();
 };
 
 app.post('/', (req: Request, res: Response) => handleRequest(req, res).catch(console.error));
