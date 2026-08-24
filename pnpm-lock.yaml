@@ -113,7 +113,7 @@ importers:
         version: 4.1.10(@types/node@26.2.0)(vite@8.1.5(@types/node@26.2.0)(yaml@2.9.0))
       ws:
         specifier: ^8.18.0
-        version: 8.21.1
+        version: 8.21.3
       yargs:
         specifier: ^18.1.0
         version: 18.1.0
@@ -137,7 +137,7 @@ importers:
         version: 16.3.0(@babel/core@7.29.7)(@types/node@26.2.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       openai:
         specifier: file:..
-        version: file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(undici@8.9.0)(ws@8.21.1)(zod@4.4.3)
+        version: file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(undici@8.9.0)(ws@8.21.3)(zod@4.4.3)
       undici:
         specifier: ^8.9.0
         version: 8.9.0
@@ -816,6 +816,13 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.3
       '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.3
+
+  '@napi-rs/wasm-runtime@1.2.3':
+    resolution: {integrity: sha512-UMduMbqO5s5zF2NkNacMT/yK5Y5QiKvWr2+50bzIIxFDwVJ2h49b+oyjaCGPhJxd2/gC2x39EHv/gHVuu36x2Q==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
+    peerDependencies:
+      '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
+      '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
 
   '@next/env@16.3.0':
     resolution: {integrity: sha512-o9r1S0BNiNreHP9Vs+Qnqd9kviDkJh8xIACY7UFZSmiGbbQRzPBBosvHzAU4TULHOIuOj/18RSsyz2qrREmIFw==}
@@ -3727,8 +3734,8 @@ packages:
     resolution: {integrity: sha512-+QU2zd6OTD8XWIJCbffaiQeH9U73qIqafo1x6V1snCWYGJf6cVE0cDR4D8xRzcEnfI21IFrUPzPGtcPf8AC+Rw==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
-  ws@8.21.1:
-    resolution: {integrity: sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw==}
+  ws@8.21.3:
+    resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -4672,7 +4679,7 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@napi-rs/wasm-runtime@1.2.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+  '@napi-rs/wasm-runtime@1.2.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
@@ -4882,7 +4889,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
-      '@napi-rs/wasm-runtime': 1.2.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      '@napi-rs/wasm-runtime': 1.2.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.1.5':
@@ -6737,13 +6744,13 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
-  openai@file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(undici@8.9.0)(ws@8.21.1)(zod@4.4.3):
+  openai@file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.4.16)(@smithy/signature-v4@5.6.12)(undici@8.9.0)(ws@8.21.3)(zod@4.4.3):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.78
       '@smithy/hash-node': 4.4.16
       '@smithy/signature-v4': 5.6.12
       undici: 8.9.0
-      ws: 8.21.1
+      ws: 8.21.3
       zod: 4.4.3
 
   optionator@0.9.4:
@@ -7472,7 +7479,7 @@ snapshots:
       imurmurhash: 0.1.4
       signal-exit: 4.1.0
 
-  ws@8.21.1: {}
+  ws@8.21.3: {}
 
   wsl-utils@0.1.0:
     dependencies:
