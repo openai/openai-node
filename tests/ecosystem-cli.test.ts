@@ -4,6 +4,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const root = process.cwd();
+const protectedMainCondition =
+  "github.repository == 'openai/openai-node' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'dependabot[bot]'";
+
+function normalizeLineEndings(value: string) {
+  return value.split(/\r\n?/u).join('\n');
+}
 
 function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}) {
   return spawnSync(
@@ -32,7 +38,8 @@ function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}
 }
 
 function workflowJob(workflow: string, name: string) {
-  return workflow.split(`\n  ${name}:\n`)[1]?.split(/\n {2}[a-z_]+:\n/u)[0] ?? '';
+  const normalizedWorkflow = normalizeLineEndings(workflow);
+  return normalizedWorkflow.split(`\n  ${name}:\n`)[1]?.split(/\n {2}[a-z_]+:\n/u)[0] ?? '';
 }
 
 function workflowCondition(job: string) {
@@ -45,15 +52,19 @@ function workflowCondition(job: string) {
     .join(' ');
 }
 
+function writeSuccessfulNpmStub(bin: string) {
+  const filename = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const contents = process.platform === 'win32' ? '@exit /b 0\r\n' : '#!/bin/sh\nexit 0\n';
+  writeFileSync(path.join(bin, filename), contents, { mode: 0o755 });
+}
+
 describe('ecosystem test CLI', () => {
   test('limits live examples and ecosystem credentials to protected main pushes', () => {
     const workflow = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf-8');
     const liveJob = workflowJob(workflow, 'examples');
     const ecosystemJob = workflowJob(workflow, 'ecosystem_tests');
 
-    expect(workflowCondition(liveJob)).toBe(
-      "github.repository == 'openai/openai-node' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'dependabot[bot]'",
-    );
+    expect(workflowCondition(liveJob)).toBe(protectedMainCondition);
     expect(liveJob).toContain('\n    environment: ci\n');
     expect(liveJob).toContain('pnpm tsn examples/chat-completions/demo.ts');
     expect(liveJob).toContain(
@@ -66,6 +77,14 @@ describe('ecosystem test CLI', () => {
     expect(ecosystemJob).not.toContain('OPENAI_API_KEY');
     expect(ecosystemJob).not.toContain('environment: ci');
     expect(workflow.match(/secrets\.OPENAI_API_KEY/gu)).toHaveLength(1);
+  });
+
+  test('reads protected workflow conditions from CRLF checkouts', () => {
+    const workflow = normalizeLineEndings(readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf-8'))
+      .split('\n')
+      .join('\r\n');
+
+    expect(workflowCondition(workflowJob(workflow, 'examples'))).toBe(protectedMainCondition);
   });
 
   test.each([
@@ -187,7 +206,7 @@ describe('ecosystem test CLI', () => {
       mkdirSync(worker, { recursive: true });
       mkdirSync(bin);
       writeFileSync(path.join(fixture, 'package.json'), '{}\n');
-      writeFileSync(path.join(bin, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+      writeSuccessfulNpmStub(bin);
 
       if (existingVars !== undefined) {
         writeFileSync(devVars, existingVars);
