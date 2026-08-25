@@ -75,7 +75,7 @@ pnpm build
 node examples/mtls/x509-workload-identity.mjs
 ```
 
-Set `OPENAI_X509_CLIENT_KEY_PASSPHRASE` when the PEM private key is encrypted. Existing local fixtures can instead provide certificate and key paths through `OPENAI_MTLS_CERT_CHAIN` and `OPENAI_MTLS_KEY`, identity selectors through `OPENAI_IDENTITY_PROVIDER_ID` and `OPENAI_SERVICE_ACCOUNT_ID`, and an optional tenant through `OPENAI_X509_PROJECT_ID`. Keep private-key files readable only by their owner, use managed secret injection where available, and never log PEM contents, passphrases, issued bearer tokens, or proxy credentials.
+Set `OPENAI_X509_CLIENT_KEY_PASSPHRASE` when the PEM private key is encrypted. Existing local fixtures can instead provide certificate and key paths through `OPENAI_MTLS_CERT_CHAIN` and `OPENAI_MTLS_KEY`, identity selectors through `OPENAI_IDENTITY_PROVIDER_ID` and `OPENAI_SERVICE_ACCOUNT_ID`, and an optional tenant through `OPENAI_X509_PROJECT_ID`. The example ignores ambient API keys, admin keys, base URLs, organizations, and ordinary API-key projects so only the selected X.509 identity and tenant determine the request. Keep private-key files readable only by their owner, use managed secret injection where available, and never log PEM contents, passphrases, issued bearer tokens, or proxy credentials.
 
 Proxying is always explicit: set `OPENAI_X509_PROXY_MODE=http_connect` or `OPENAI_X509_PROXY_MODE=https_connect` together with a matching `HTTPS_PROXY` URL. The default `direct` mode ignores ambient proxy variables. The workload certificate is configured only for target TLS, never proxy TLS. The example closes its caller-owned dispatcher after the request.
 

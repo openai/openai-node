@@ -7,6 +7,7 @@ const example = readFileSync(
   'utf-8',
 );
 const exampleDocumentation = readFileSync(path.resolve(process.cwd(), 'examples/mtls/README.md'), 'utf-8');
+const packageDocumentation = readFileSync(path.resolve(process.cwd(), 'README.md'), 'utf-8');
 const packageScripts = JSON.parse(readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8')) as {
   scripts: Record<string, string>;
 };
@@ -42,8 +43,15 @@ describe('X.509 workload-identity runnable example', () => {
     expect(example).toContain('passphrase === undefined ? {} : { passphrase }');
   });
 
-  test('does not inherit the ordinary API-key project when no X.509 project is configured', () => {
-    expect(example).toContain("project: process.env['OPENAI_X509_PROJECT_ID'] ?? null");
+  test.each([
+    ['runnable', example],
+    ['documented', packageDocumentation],
+  ])('keeps the %s X.509 example isolated from ambient credentials and routing', (_name, source) => {
+    expect(source).toContain('apiKey: null');
+    expect(source).toContain('adminAPIKey: null');
+    expect(source).toContain('baseURL: null');
+    expect(source).toContain('organization: null');
+    expect(source).toContain("project: process.env['OPENAI_X509_PROJECT_ID'] ?? null");
   });
 
   test('never exposes credentials from a malformed CONNECT proxy URL', () => {

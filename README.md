@@ -218,6 +218,10 @@ const dispatcher = new Agent({
 
 const client = new OpenAI({
   apiKey: null,
+  adminAPIKey: null,
+  baseURL: null,
+  organization: null,
+  project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
   workloadIdentity: {
     type: 'x509',
     identityProviderId: process.env['OPENAI_X509_IDENTITY_PROVIDER_ID']!,
