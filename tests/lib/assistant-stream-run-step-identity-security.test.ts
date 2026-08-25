@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import OpenAI from 'openai';
 import { OpenAIError } from 'openai/core/error';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
@@ -13,6 +14,22 @@ function readableEvents(events: Event[]) {
 
 function assistantStream(events: Event[]): AssistantStream {
   return AssistantStream.fromReadableStream(readableEvents(events));
+}
+
+function publicAssistantStream(events: Event[]): AssistantStream {
+  const client = new OpenAI({
+    apiKey: 'sk-synthetic-assistant-stream-key',
+    fetch: async () =>
+      new Response(
+        events.map(({ event, data }) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join(''),
+        {
+          headers: { 'content-type': 'text/event-stream' },
+        },
+      ),
+    maxRetries: 0,
+  });
+
+  return client.beta.threads.runs.stream('thread_123', { assistant_id: 'assistant_123' });
 }
 
 function unencodedAssistantStream(events: Event[]): AssistantStream {
@@ -117,6 +134,217 @@ describe('AssistantStream run-step identity security', () => {
     expect(stepCreated).toHaveBeenCalledTimes(1);
     expect(runner.currentEvent()).toEqual(terminalEvent);
     expect(runner.currentRunStepSnapshot()).toBeUndefined();
+  });
+
+  test.each([
+    'first tool call',
+    'tool-call delta',
+    'next tool call',
+    'terminal step',
+    'terminal run',
+  ] as const)(
+    'rejects a retained snapshot changed to a completed step ID before %s callbacks',
+    async (phase) => {
+      const completed = runStep('step_completed', 'call_completed');
+      const privateArguments = '{"token":"sk-synthetic-never-dispatch"}';
+      const active = runStep('step_active', 'call_active', privateArguments);
+      const acceptedDeltas = phase === 'first tool call' ? [] : [toolCallDelta(active.id)];
+      let rejectedEvent: { event: string; data: Event };
+
+      if (phase === 'next tool call') {
+        rejectedEvent = {
+          event: 'thread.run.step.delta',
+          data: {
+            id: active.id,
+            delta: {
+              step_details: {
+                type: 'tool_calls',
+                tool_calls: [
+                  {
+                    index: 1,
+                    type: 'function',
+                    id: 'call_injected',
+                    function: { name: 'transfer', arguments: privateArguments },
+                  },
+                ],
+              },
+            },
+          },
+        };
+      } else if (phase === 'terminal step') {
+        rejectedEvent = {
+          event: 'thread.run.step.completed',
+          data: { ...runStep(active.id, 'call_active', privateArguments), status: 'completed' },
+        };
+      } else {
+        rejectedEvent = phase === 'terminal run' ? completedRun() : toolCallDelta(active.id);
+      }
+
+      const runner = publicAssistantStream([
+        { event: 'thread.run.step.created', data: completed },
+        { event: 'thread.run.step.completed', data: { ...completed, status: 'completed' } },
+        { event: 'thread.run.step.created', data: active },
+        ...acceptedDeltas,
+        rejectedEvent,
+        ...(phase === 'terminal run' ? [] : [completedRun()]),
+      ]);
+      const stepCreated = vi.fn();
+      const stepDelta = vi.fn();
+      const stepDone = vi.fn();
+      const toolCreated = vi.fn();
+      const toolDelta = vi.fn();
+      const toolDone = vi.fn();
+      const runDone = vi.fn();
+      let remainingAcceptedDeltas = acceptedDeltas.length;
+
+      runner.on('event', (event) => {
+        if (
+          event.event !== rejectedEvent.event ||
+          ((event.event === 'thread.run.step.delta' || event.event === 'thread.run.step.completed') &&
+            event.data.id !== active.id)
+        ) {
+          return;
+        }
+        if (remainingAcceptedDeltas > 0 && event.event === 'thread.run.step.delta') {
+          remainingAcceptedDeltas -= 1;
+          return;
+        }
+
+        const retained = runner.currentRunStepSnapshot();
+        expect(retained?.id).toBe(active.id);
+        if (retained) {
+          retained.id = completed.id;
+        }
+      });
+      runner.on('runStepCreated', stepCreated);
+      runner.on('runStepDelta', stepDelta);
+      runner.on('runStepDone', stepDone);
+      runner.on('toolCallCreated', toolCreated);
+      runner.on('toolCallDelta', toolDelta);
+      runner.on('toolCallDone', toolDone);
+      runner.on('run', runDone);
+
+      const failure = await runner.done().catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(OpenAIError);
+      expect((failure as Error).message).toMatch(/already been created/u);
+      expect((failure as Error).message).not.toContain('sk-synthetic-never-dispatch');
+      expect(stepCreated).toHaveBeenCalledTimes(2);
+      expect(stepDone).toHaveBeenCalledTimes(1);
+      expect(stepDelta).toHaveBeenCalledTimes(acceptedDeltas.length);
+      expect(toolCreated).toHaveBeenCalledTimes(acceptedDeltas.length);
+      expect(toolDelta).not.toHaveBeenCalled();
+      expect(toolDone).not.toHaveBeenCalled();
+      expect(runDone).not.toHaveBeenCalled();
+
+      const retained = runner.currentRunStepSnapshot();
+      expect(retained?.id).toBe(completed.id);
+      if (retained?.step_details.type === 'tool_calls') {
+        expect(retained.step_details.tool_calls).toHaveLength(1);
+        const [toolCall] = retained.step_details.tool_calls;
+        expect(toolCall?.type).toBe('function');
+        if (toolCall?.type === 'function') {
+          expect(toolCall.function.arguments).toBe(
+            `${privateArguments}${acceptedDeltas.length ? ' updated' : ''}`,
+          );
+        }
+      }
+    },
+  );
+
+  test('rejects retained snapshot hijacking from nested raw-event listeners before tool callbacks', async () => {
+    const completed = runStep('step_completed');
+    const active = runStep('step_active');
+    const runner = publicAssistantStream([
+      { event: 'thread.run.step.created', data: completed },
+      { event: 'thread.run.step.completed', data: { ...completed, status: 'completed' } },
+      { event: 'thread.run.step.created', data: active },
+      toolCallDelta(active.id),
+      completedRun(),
+    ]);
+    const toolCreated = vi.fn();
+    const toolDelta = vi.fn();
+    const stepDelta = vi.fn();
+    let nested = false;
+
+    runner.on('event', (event) => {
+      if (event.event === 'thread.run.step.delta' && !nested) {
+        nested = true;
+        runner._emit('event', event);
+      }
+    });
+    runner.on('event', (event) => {
+      if (event.event === 'thread.run.step.delta' && nested) {
+        const retained = runner.currentRunStepSnapshot();
+        if (retained) {
+          retained.id = completed.id;
+        }
+      }
+    });
+    runner.on('toolCallCreated', toolCreated);
+    runner.on('toolCallDelta', toolDelta);
+    runner.on('runStepDelta', stepDelta);
+
+    await expect(runner.done()).rejects.toThrow(/already been created/u);
+
+    expect(nested).toBe(true);
+    expect(toolCreated).not.toHaveBeenCalled();
+    expect(toolDelta).not.toHaveBeenCalled();
+    expect(stepDelta).not.toHaveBeenCalled();
+  });
+
+  test('preserves safe retained snapshot mutations, object identity, and callback ordering', async () => {
+    const active = runStep('step_active', 'call_active', 'original');
+    const runner = publicAssistantStream([
+      { event: 'thread.run.step.created', data: active },
+      toolCallDelta(active.id),
+      { event: 'thread.run.step.completed', data: { ...active, status: 'completed' } },
+      completedRun(),
+    ]);
+    const lifecycle: [event: string, id: string][] = [];
+    let createdSnapshot: unknown;
+
+    runner.on('event', (event) => {
+      if (event.event === 'thread.run.step.delta') {
+        const retained = runner.currentRunStepSnapshot();
+        expect(retained).toBe(createdSnapshot);
+        if (retained?.step_details.type === 'tool_calls') {
+          retained.id = 'step_safe_listener_alias';
+          const [toolCall] = retained.step_details.tool_calls;
+          if (toolCall?.type === 'function') {
+            toolCall.function.arguments = 'listener mutation';
+          }
+        }
+      }
+    });
+    runner.on('runStepCreated', (step) => {
+      createdSnapshot = step;
+      lifecycle.push(['runStepCreated', step.id]);
+    });
+    runner.on('toolCallCreated', (toolCall) => lifecycle.push(['toolCallCreated', toolCall.id]));
+    runner.on('runStepDelta', (_delta, snapshot) => {
+      expect(snapshot).toBe(createdSnapshot);
+      if (snapshot.step_details.type === 'tool_calls') {
+        const [toolCall] = snapshot.step_details.tool_calls;
+        expect(toolCall?.type).toBe('function');
+        if (toolCall?.type === 'function') {
+          expect(toolCall.function.arguments).toBe('listener mutation updated');
+        }
+      }
+      lifecycle.push(['runStepDelta', snapshot.id]);
+    });
+    runner.on('toolCallDone', (toolCall) => lifecycle.push(['toolCallDone', toolCall.id]));
+    runner.on('runStepDone', (step) => lifecycle.push(['runStepDone', step.id]));
+
+    await expect(runner.done()).resolves.toBeUndefined();
+
+    expect(lifecycle).toEqual([
+      ['runStepCreated', 'step_active'],
+      ['toolCallCreated', 'call_active'],
+      ['runStepDelta', 'step_safe_listener_alias'],
+      ['toolCallDone', 'call_active'],
+      ['runStepDone', 'step_active'],
+    ]);
   });
 
   test.each([

@@ -427,6 +427,9 @@ export class AssistantStream
     if (runStepID !== undefined && runStepData !== undefined) {
       this.#reserveRunStepAlias(runStepData, runStepID);
     }
+    if (runStepID === undefined && this.#activeRunStepID !== undefined && this.#currentRunStepSnapshot) {
+      this.#reserveRunStepAlias(this.#currentRunStepSnapshot, this.#activeRunStepID);
+    }
 
     switch (stableEvent.event) {
       case 'thread.created': {
