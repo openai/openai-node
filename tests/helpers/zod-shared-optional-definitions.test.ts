@@ -224,15 +224,19 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(schema.definitions!['Optional']).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
   });
 
-  it('keeps every tuple position when an element parses to nothing', () => {
-    // `items` is positional and `minItems`/`maxItems` come from the declared arity, so an
-    // element that parses to `undefined` must not be dropped. `parseOptionalDef` returns
-    // `{}` for it only while the tuple is parsed without a property context.
-    const emptySlot = zv3
+  // `items` is positional while `minItems`/`maxItems` come from the declared arity, so a
+  // slot that parses to nothing has to stay as `{}`. Dropping it shifts every later
+  // element and makes the document accept and reject the opposite arrays from the Zod
+  // schema. The exported converter is reachable without the strict helpers' `ZodTuple`
+  // rejection, so every position is covered here rather than assumed away.
+  const emptySlot = () =>
+    zv3
       .preprocess(() => undefined, zv3.void())
       .transform(() => 0)
       .optional();
-    const tuple = zv3.tuple([emptySlot, zv3.string()]);
+
+  it('keeps every tuple position when the tuple is a supplied definition', () => {
+    const tuple = zv3.tuple([emptySlot(), zv3.string()]);
 
     const schema = zodToJsonSchema(tuple, { definitions: { Tuple: tuple } }) as {
       definitions: Record<string, { items: JsonSchema[]; minItems: number; maxItems: number }>;
@@ -248,6 +252,37 @@ describe('a definition keeps the context it was referenced from', () => {
     // Zod coerces element 0 and requires element 1 to be a string; the schema has to agree.
     expect(tuple.safeParse([123, 'valid']).success).toBe(true);
     expect(tuple.safeParse(['valid', 123]).success).toBe(false);
+  });
+
+  it('keeps every tuple position under `openaiStrictMode` on the exported converter', () => {
+    const tuple = zv3.tuple([emptySlot(), zv3.string()]);
+
+    const schema = zodToJsonSchema(zv3.object({ value: tuple }), {
+      openaiStrictMode: true,
+      definitions: { Tuple: tuple },
+    }) as { definitions: Record<string, { items: JsonSchema[] }> };
+
+    expect(schema.definitions['Tuple']!.items).toEqual([{}, { type: 'string' }]);
+  });
+
+  it('keeps every tuple position under an object property', () => {
+    const schema = zodToJsonSchema(
+      zv3.object({ pair: zv3.tuple([emptySlot(), zv3.string()]) }),
+    ) as { properties: Record<string, { items: JsonSchema[] }> };
+
+    expect(schema.properties!['pair']!.items).toEqual([{}, { type: 'string' }]);
+  });
+
+  it('keeps every tuple position when the tuple has a rest element', () => {
+    const schema = zodToJsonSchema(zv3.tuple([emptySlot(), zv3.string()]).rest(zv3.number())) as {
+      items: JsonSchema[];
+      minItems: number;
+      additionalItems: JsonSchema;
+    };
+
+    expect(schema.items).toEqual([{}, { type: 'string' }]);
+    expect(schema.minItems).toBe(2);
+    expect(schema.additionalItems).toEqual({ type: 'number' });
   });
 
   it('still strips the wrapper for a definition extracted from a property', () => {
