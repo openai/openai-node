@@ -70,6 +70,7 @@ export interface X509RequestScope {
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;
   token?: string;
+  tokenGeneration?: number;
   headers?: Headers;
   authorization?: string | null;
 }

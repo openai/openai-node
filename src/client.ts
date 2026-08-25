@@ -28,7 +28,7 @@ import {
   snapshotX509RequestOptions,
 } from './internal/auth/x509-workload-identity-auth';
 import type { X509Transport } from './internal/auth/x509-transport-registry';
-import { markApprovedX509Client } from '#x509-transport-state';
+import { isTransientX509ConnectionError, markApprovedX509Client } from '#x509-transport-state';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
@@ -614,7 +614,7 @@ export class OpenAI {
     this._provider = providerRuntime;
 
     if (x509Identity) {
-      const authentication = new X509WorkloadIdentityAuth(x509Identity, x509Transport);
+      const authentication = new X509WorkloadIdentityAuth(x509Identity, x509Transport, organization, project);
       this._workloadIdentityAuth = authentication;
       this.#x509Fetch = authentication.fetch();
       this.fetch = this.#x509Fetch;
@@ -696,7 +696,17 @@ export class OpenAI {
         !hasOwn(options, 'baseURL') &&
         !provider,
     };
-    return new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    if (
+      this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
+      client._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
+      this.baseURL === client.baseURL &&
+      this._workloadIdentityAuth.matches(client._workloadIdentityAuth)
+    ) {
+      client._workloadIdentityAuth = this._workloadIdentityAuth;
+      client.#x509Fetch = this.#x509Fetch;
+    }
+    return client;
   }
 
   /**
@@ -786,6 +796,8 @@ export class OpenAI {
               ...this._workloadIdentityAuth.headerSnapshots(),
               ...this._workloadIdentityAuth.requestSnapshot(),
               signal: this._workloadIdentityAuth.effectiveSignal(),
+              organization: this.organization,
+              project: this.project,
             })
           : await this._workloadIdentityAuth.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
@@ -1034,6 +1046,15 @@ export class OpenAI {
           throw abortError();
         }
         if (!timedOut) {
+          if (
+            x509Authentication &&
+            !(error instanceof SyntaxError) &&
+            !(error instanceof Errors.OpenAIError)
+          ) {
+            throw new Errors.APIConnectionError({
+              message: 'X.509 workload identity API response body could not be read.',
+            });
+          }
           throw error;
         }
 
@@ -1248,7 +1269,11 @@ export class OpenAI {
       const isTimeout =
         isAbortError(response) ||
         /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
-      if (retriesRemaining && !hasStreamingBody) {
+      if (
+        retriesRemaining &&
+        !hasStreamingBody &&
+        (!x509Authentication || isTransientX509ConnectionError(response))
+      ) {
         loggerFor(this).info(
           `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`,
         );
@@ -1258,7 +1283,7 @@ export class OpenAI {
             retryOfRequestLogID,
             url,
             durationMs: headersTime - startTime,
-            message: response.message,
+            message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
         return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
@@ -1275,7 +1300,7 @@ export class OpenAI {
           retryOfRequestLogID,
           url,
           durationMs: headersTime - startTime,
-          message: response.message,
+          message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
         }),
       );
       if (response instanceof OAuthError || response instanceof SubjectTokenProviderError) {
@@ -1295,7 +1320,13 @@ export class OpenAI {
                 'configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.',
             })
           : new Errors.APIConnectionTimeoutError();
+        if (x509Authentication) {
+          throw new Errors.APIConnectionTimeoutError();
+        }
         throw Object.assign(timeoutError, { cause: response });
+      }
+      if (x509Authentication) {
+        throw new Errors.APIConnectionError({ message: 'X.509 workload identity API connection failed.' });
       }
       throw new Errors.APIConnectionError({
         message: getConnectionErrorMessage(response),
@@ -1312,6 +1343,14 @@ export class OpenAI {
     } with status ${response.status} in ${headersTime - startTime}ms`;
 
     if (!response.ok) {
+      const rejectedX509Credential =
+        response.status === 401 &&
+        x509Authentication &&
+        security.bearerAuth &&
+        x509Authentication.usedWorkloadToken(options);
+      if (rejectedX509Credential) {
+        x509Authentication.invalidateToken();
+      }
       if (
         response.status === 401 &&
         this._workloadIdentityAuth &&
@@ -1325,8 +1364,8 @@ export class OpenAI {
           void Shims.CancelReadableStream(response.body).catch(() => undefined);
         } else {
           await Shims.CancelReadableStream(response.body);
+          this._workloadIdentityAuth.invalidateToken();
         }
-        this._workloadIdentityAuth.invalidateToken();
 
         const replayOptions = {
           ...options,
