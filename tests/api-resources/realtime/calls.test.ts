@@ -9,6 +9,67 @@ const client = new OpenAI({
 });
 
 describe('resource calls', () => {
+  // binary tests are currently broken
+  test.skip('create: required and optional params', async () => {
+    const response = await client.realtime.calls.create({
+      sdp: 'sdp',
+      session: {
+        type: 'realtime',
+        audio: {
+          input: {
+            format: { rate: 24000, type: 'audio/pcm' },
+            noise_reduction: { type: 'near_field' },
+            transcription: {
+              delay: 'minimal',
+              keywords: ['string'],
+              language: 'language',
+              languages: ['string'],
+              model: 'whisper-1',
+              prompt: 'prompt',
+            },
+            turn_detection: {
+              type: 'server_vad',
+              create_response: true,
+              idle_timeout_ms: 5000,
+              interrupt_response: true,
+              prefix_padding_ms: 0,
+              silence_duration_ms: 0,
+              threshold: 0,
+            },
+          },
+          output: {
+            format: { rate: 24000, type: 'audio/pcm' },
+            speed: 0.25,
+            voice: 'alloy',
+          },
+        },
+        include: ['item.input_audio_transcription.logprobs'],
+        instructions: 'instructions',
+        max_output_tokens: 'inf',
+        model: 'gpt-realtime',
+        output_modalities: ['text'],
+        parallel_tool_calls: true,
+        prompt: {
+          id: 'id',
+          variables: { foo: 'string' },
+          version: 'version',
+        },
+        reasoning: { effort: 'minimal' },
+        tool_choice: 'none',
+        tools: [
+          {
+            description: 'description',
+            name: 'name',
+            parameters: {},
+            type: 'function',
+          },
+        ],
+        tracing: 'auto',
+        truncation: 'auto',
+      },
+    });
+  });
+
   test('accept: only required params', async () => {
     const responsePromise = client.realtime.calls.accept('call_id', { type: 'realtime' });
     const rawResponse = await responsePromise.asResponse();
