@@ -246,6 +246,7 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
       signal.throwIfAborted();
       throw new APIConnectionError({ message: 'X.509 workload identity token exchange connection failed.' });
     }
+    signal.throwIfAborted();
 
     if (response.ok) {
       try {

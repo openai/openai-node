@@ -400,6 +400,20 @@ describe('isolated X.509 workload-identity token exchange', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  test.each([307, 408, 429, 503])(
+    'preserves cancellation racing issuer response headers with status %i',
+    async (status) => {
+      const controller = new AbortController();
+      const cancellation = new Error('synthetic-response-header-cancellation');
+      vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async () => {
+        controller.abort(cancellation);
+        return new Response(null, { status });
+      });
+
+      await expect(exchange(controller.signal)).rejects.toBe(cancellation);
+    },
+  );
+
   test('cancels and unlocks a hanging token response when the caller aborts', async () => {
     const cancel = vi.fn();
     const stream = new ReadableStream<Uint8Array>({
