@@ -198,3 +198,63 @@ describe('Zod v3 standalone optional schemas', () => {
     });
   });
 });
+
+describe('tuple positions survive an element that parses to nothing', () => {
+  // A wrapper whose inner type produces no schema. `parseDef` returns undefined
+  // for the element, which used to be filtered out of `items` while `minItems`
+  // and `maxItems` still described the original arity.
+  const emptySlot = () => zv3.preprocess(() => undefined, zv3.void()).transform(() => 0).optional();
+
+  it('keeps the slot when the tuple is a supplied definition', () => {
+    const tuple = zv3.tuple([emptySlot(), zv3.string()]);
+
+    const schema = zodToJsonSchema(tuple, { definitions: { Tuple: tuple } }) as {
+      definitions: Record<string, { items: JsonSchema[]; minItems: number; maxItems: number }>;
+    };
+
+    expect(schema.definitions['Tuple']).toEqual({
+      type: 'array',
+      minItems: 2,
+      maxItems: 2,
+      items: [{}, { type: 'string' }],
+    });
+  });
+
+  it('keeps the slot when the tuple sits under a property', () => {
+    const schema = zodToJsonSchema(zv3.object({ pair: zv3.tuple([emptySlot(), zv3.string()]) })) as {
+      properties: Record<string, { items: JsonSchema[] }>;
+    };
+
+    expect(schema.properties!['pair']!.items).toEqual([{}, { type: 'string' }]);
+  });
+
+  it('agrees with Zod on which arrays are valid', () => {
+    const tuple = zv3.tuple([emptySlot(), zv3.string()]);
+    const items = (
+      zodToJsonSchema(tuple, { definitions: { Tuple: tuple } }) as {
+        definitions: Record<string, { items: JsonSchema[] }>;
+      }
+    ).definitions['Tuple']!.items;
+
+    // Zod coerces the first element to 0 and requires the second to be a string.
+    expect(tuple.safeParse([123, 'valid']).success).toBe(true);
+    expect(tuple.safeParse(['valid', 123]).success).toBe(false);
+
+    // The schema has to say the same thing: slot 0 unconstrained, slot 1 a string.
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({});
+    expect(items[1]).toEqual({ type: 'string' });
+  });
+
+  it('keeps the slot in a tuple with a rest element', () => {
+    const schema = zodToJsonSchema(zv3.tuple([emptySlot(), zv3.string()]).rest(zv3.number())) as {
+      items: JsonSchema[];
+      minItems: number;
+      additionalItems: JsonSchema;
+    };
+
+    expect(schema.items).toEqual([{}, { type: 'string' }]);
+    expect(schema.minItems).toBe(2);
+    expect(schema.additionalItems).toEqual({ type: 'number' });
+  });
+});
