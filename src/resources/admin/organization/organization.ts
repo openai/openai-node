@@ -71,6 +71,7 @@ import {
 } from './spend-limit';
 import * as UsageAPI from './usage';
 import {
+  CostQuantityUnit,
   Usage,
   UsageAudioSpeechesParams,
   UsageAudioSpeechesResponse,
@@ -111,6 +112,7 @@ import {
   Project,
   ProjectCreateParams,
   ProjectListParams,
+  ProjectResidency,
   ProjectUpdateParams,
   Projects,
   ProjectsPage,
@@ -173,6 +175,7 @@ export declare namespace Organization {
 
   export {
     Usage as Usage,
+    type CostQuantityUnit as CostQuantityUnit,
     type UsageAudioSpeechesResponse as UsageAudioSpeechesResponse,
     type UsageAudioTranscriptionsResponse as UsageAudioTranscriptionsResponse,
     type UsageCodeInterpreterSessionsResponse as UsageCodeInterpreterSessionsResponse,
@@ -280,6 +283,7 @@ export declare namespace Organization {
   export {
     Projects as Projects,
     type Project as Project,
+    type ProjectResidency as ProjectResidency,
     type ProjectsPage as ProjectsPage,
     type ProjectCreateParams as ProjectCreateParams,
     type ProjectUpdateParams as ProjectUpdateParams,

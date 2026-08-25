@@ -815,6 +815,7 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/admin/organization/usage.ts">CostQuantityUnit</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageAudioSpeechesResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageAudioTranscriptionsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageCodeInterpreterSessionsResponse</a></code>
@@ -1012,6 +1013,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/admin/organization/projects/projects.ts">Project</a></code>
+- <code><a href="./src/resources/admin/organization/projects/projects.ts">ProjectResidency</a></code>
 
 Methods:
 

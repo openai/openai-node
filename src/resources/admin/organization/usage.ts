@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
+import * as UsageAPI from './usage';
 import { APIPromise } from '../../../core/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
@@ -232,6 +233,21 @@ export class Usage extends APIResource {
     });
   }
 }
+
+/**
+ * The unit of the `quantity` value. If no single supported unit applies to the
+ * result, this field is `null`.
+ */
+export type CostQuantityUnit =
+  | (string & {})
+  | 'tokens'
+  | '1000_tokens'
+  | 'duration_seconds'
+  | 'duration_minutes'
+  | 'duration_hours'
+  | 'gibibyte_hours'
+  | 'images'
+  | 'characters';
 
 export interface UsageAudioSpeechesResponse {
   data: Array<UsageAudioSpeechesResponse.Data>;
@@ -768,17 +784,7 @@ export namespace UsageAudioSpeechesResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -1335,17 +1341,7 @@ export namespace UsageAudioTranscriptionsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -1902,17 +1898,7 @@ export namespace UsageCodeInterpreterSessionsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -2469,17 +2455,7 @@ export namespace UsageCompletionsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -3036,17 +3012,7 @@ export namespace UsageCostsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -3603,17 +3569,7 @@ export namespace UsageEmbeddingsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -4170,17 +4126,7 @@ export namespace UsageFileSearchCallsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -4737,17 +4683,7 @@ export namespace UsageImagesResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -5304,17 +5240,7 @@ export namespace UsageModerationsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -5871,17 +5797,7 @@ export namespace UsageVectorStoresResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -6438,17 +6354,7 @@ export namespace UsageWebSearchCallsResponse {
        * The unit of the `quantity` value. If no single supported unit applies to the
        * result, this field is `null`.
        */
-      quantity_unit?:
-        | (string & {})
-        | 'tokens'
-        | '1000_tokens'
-        | 'duration_seconds'
-        | 'duration_minutes'
-        | 'duration_hours'
-        | 'gibibyte_hours'
-        | 'images'
-        | 'characters'
-        | null;
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -7105,6 +7011,7 @@ export interface UsageWebSearchCallsParams {
 
 export declare namespace Usage {
   export {
+    type CostQuantityUnit as CostQuantityUnit,
     type UsageAudioSpeechesResponse as UsageAudioSpeechesResponse,
     type UsageAudioTranscriptionsResponse as UsageAudioTranscriptionsResponse,
     type UsageCodeInterpreterSessionsResponse as UsageCodeInterpreterSessionsResponse,

@@ -276,25 +276,27 @@ export interface Project {
   /**
    * The residency configuration for the project.
    */
-  residency?:
-    | 'GLOBAL'
-    | 'US_STORAGE_PROCESSING'
-    | 'EU_STORAGE_PROCESSING'
-    | 'JP_STORAGE'
-    | 'KR_STORAGE'
-    | 'CA_STORAGE'
-    | 'SG_STORAGE'
-    | 'IN_STORAGE'
-    | 'AU_STORAGE'
-    | 'GB_STORAGE'
-    | 'AE_STORAGE'
-    | 'AE_STORAGE_PROCESSING';
+  residency?: ProjectResidency;
 
   /**
    * `active` or `archived`
    */
   status?: string | null;
 }
+
+export type ProjectResidency =
+  | 'GLOBAL'
+  | 'US_STORAGE_PROCESSING'
+  | 'EU_STORAGE_PROCESSING'
+  | 'JP_STORAGE'
+  | 'KR_STORAGE'
+  | 'CA_STORAGE'
+  | 'SG_STORAGE'
+  | 'IN_STORAGE'
+  | 'AU_STORAGE'
+  | 'GB_STORAGE'
+  | 'AE_STORAGE'
+  | 'AE_STORAGE_PROCESSING';
 
 export interface ProjectCreateParams {
   /**
@@ -324,20 +326,7 @@ export interface ProjectCreateParams {
    * [data residency controls](https://platform.openai.com/docs/guides/your-data#data-residency-controls)
    * to review the functionality and limitations of setting this field.
    */
-  residency?:
-    | 'GLOBAL'
-    | 'US_STORAGE_PROCESSING'
-    | 'EU_STORAGE_PROCESSING'
-    | 'JP_STORAGE'
-    | 'KR_STORAGE'
-    | 'CA_STORAGE'
-    | 'SG_STORAGE'
-    | 'IN_STORAGE'
-    | 'AU_STORAGE'
-    | 'GB_STORAGE'
-    | 'AE_STORAGE'
-    | 'AE_STORAGE_PROCESSING'
-    | null;
+  residency?: ProjectResidency | null;
 }
 
 export interface ProjectUpdateParams {
@@ -383,6 +372,7 @@ Projects.Certificates = Certificates;
 export declare namespace Projects {
   export {
     type Project as Project,
+    type ProjectResidency as ProjectResidency,
     type ProjectsPage as ProjectsPage,
     type ProjectCreateParams as ProjectCreateParams,
     type ProjectUpdateParams as ProjectUpdateParams,
