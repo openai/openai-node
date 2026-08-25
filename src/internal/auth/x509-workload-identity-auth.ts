@@ -228,6 +228,21 @@ export class X509WorkloadIdentityAuth {
     return { defaultHeaders, requestHeaders };
   }
 
+  /** Validates and retains the exact destination that authenticated dispatch will use. */
+  snapshotAPIURL(value: string): void {
+    assertX509APIOrigin(value);
+    this.#scope().apiURL = value;
+  }
+
+  /** Reads the already-approved destination without rerendering caller-owned request options. */
+  requestAPIURL(): string {
+    const { apiURL } = this.#scope();
+    if (apiURL === undefined) {
+      throw new OpenAIError('X.509 workload identity requires a snapshotted API destination.');
+    }
+    return apiURL;
+  }
+
   /** Establishes an independent scope even when concurrent requests share caller options. */
   runRequest<T>(operation: () => Promise<T>): Promise<T> {
     return this.#transport.run(async () => {
@@ -261,6 +276,7 @@ export class X509WorkloadIdentityAuth {
   /** Removes dispatched bearer material before settled request promises can retain their scope. */
   releaseRequestCredentials(): void {
     const scope = this.#scope();
+    delete scope.apiURL;
     delete scope.token;
     delete scope.defaultHeaders;
     delete scope.requestHeaders;

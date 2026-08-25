@@ -464,6 +464,7 @@ export class OpenAI {
     {
       timeout: number;
       retriesRemaining: number;
+      hasStreamingBody: boolean;
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
@@ -780,7 +781,7 @@ export class OpenAI {
       const token =
         this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth
           ? await this._workloadIdentityAuth.getToken(opts, {
-              apiURL: this.buildURL(opts.path!, opts.query as Record<string, unknown>, opts.defaultBaseURL),
+              apiURL: this._workloadIdentityAuth.requestAPIURL(),
               ...this._workloadIdentityAuth.headerSnapshots(),
               timeout: opts.timeout ?? this.timeout,
             })
@@ -1034,6 +1035,7 @@ export class OpenAI {
         const retriesRemaining = attempt?.retriesRemaining ?? 0;
         if (
           !retriesRemaining ||
+          attempt?.hasStreamingBody ||
           props.options.__metadata?.['hasStreamingBody'] ||
           ((globalThis as any).ReadableStream &&
             props.options.body instanceof (globalThis as any).ReadableStream) ||
@@ -1375,6 +1377,7 @@ export class OpenAI {
     this.#responseAttempts.set(controller, {
       timeout,
       retriesRemaining,
+      hasStreamingBody,
       ...(continueRequest ? { continueRequest } : {}),
     });
     return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
@@ -1607,6 +1610,7 @@ export class OpenAI {
     const { method, path, query, defaultBaseURL } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
+    x509Authentication?.snapshotAPIURL(url);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });

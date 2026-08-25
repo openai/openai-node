@@ -143,6 +143,41 @@ describe('X.509 review regressions', () => {
     );
   });
 
+  test('validates the exact rendered API destination before presenting its certificate', async () => {
+    const path = vi.fn(() =>
+      path.mock.calls.length === 1 ? 'https://attacker.invalid/v1/models' : '/models',
+    );
+    const request = Object.defineProperty({ method: 'get' as const, path: '/models' }, 'path', {
+      enumerable: true,
+      get: path,
+    });
+    const send = vi.spyOn(transportCapability, 'sendX509Request');
+
+    await expect(new OpenAI(options()).request(request)).rejects.toThrow(/approved.*mTLS.*origin/iu);
+
+    expect(path).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test('never replays a one-shot body installed by a hook after response-body timeout', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : new Response(new ReadableStream(), { headers: { 'content-type': 'application/json' } }),
+      );
+    const client = new OpenAI(options({ timeout: 35, maxRetries: 1 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.body = new ReadableStream();
+      },
+    });
+
+    await expect(client.models.list()).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   test('never retries issuer authentication after a one-shot request body starts pulling', async () => {
     let pulledChunks = 0;
     const body = {

@@ -57,6 +57,7 @@ export interface X509ExchangedToken {
 export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
+  apiURL?: string;
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;
   token?: string;
