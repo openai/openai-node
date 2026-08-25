@@ -60,6 +60,70 @@ describe('formatRequestDetails()', () => {
     expect(Object.getOwnPropertyDescriptor(loggedOptions, 'hidden')).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(loggedOptions, 'inherited')).toBeUndefined();
   });
+
+  test.each(['Authorization', 'API-Key', 'X-API-Key', 'X-Amz-Security-Token', 'Cookie', 'Set-Cookie'])(
+    'redacts the %s header without invoking its accessor',
+    (name) => {
+      const secret = 'private-header-credential';
+      const readSecret = vi.fn(() => {
+        throw new Error(secret);
+      });
+      const readVisible = vi.fn(() => 'preserved');
+      const headers: Record<string, string> = {};
+      Object.defineProperties(headers, {
+        [name]: { enumerable: true, get: readSecret },
+        'x-visible': { enumerable: true, get: readVisible },
+      });
+
+      expect(formatRequestDetails({ headers }).headers).toEqual({ [name]: '***', 'x-visible': 'preserved' });
+      expect(readSecret).not.toHaveBeenCalled();
+      expect(readVisible).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('formats Headers subclasses without invoking an overridden iterator', () => {
+    const iterate = vi.fn(() => {
+      throw new Error('private-header-credential');
+    });
+    class HostileHeaders extends Headers {}
+    Object.defineProperty(HostileHeaders.prototype, Symbol.iterator, { configurable: true, value: iterate });
+    const headers = new HostileHeaders({ authorization: 'private-header-credential', 'x-visible': 'safe' });
+
+    expect(formatRequestDetails({ headers }).headers).toEqual({ authorization: '***', 'x-visible': 'safe' });
+    expect(iterate).not.toHaveBeenCalled();
+  });
+
+  test.each(['Authorization', 'API-Key', 'X-API-Key', 'X-Amz-Security-Token', 'Cookie', 'Set-Cookie'])(
+    'redacts tuple-array %s headers without invoking their value accessors',
+    (name) => {
+      const readSecret = vi.fn(() => {
+        throw new Error('private-header-credential');
+      });
+      const sensitive: [string, string] = [name, 'unused'];
+      Object.defineProperty(sensitive, 1, { get: readSecret });
+      const headers: [string, string][] = [sensitive, ['x-visible', 'preserved']];
+
+      expect(formatRequestDetails({ headers }).headers).toEqual({ [name]: '***', 'x-visible': 'preserved' });
+      expect(readSecret).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['ownKeys', 'getOwnPropertyDescriptor', 'getPrototypeOf'] as const)(
+    'omits headers when a hostile proxy %s trap prevents safe inspection',
+    (operation) => {
+      const inspect = vi.fn(() => {
+        throw Object.assign(new Error('private-header-credential'), {
+          cause: new Error('private-header-credential'),
+        });
+      });
+      const handler: ProxyHandler<Record<string, string>> = {};
+      Object.defineProperty(handler, operation, { value: inspect });
+      const headers = new Proxy({ 'api-key': 'private-header-credential' }, handler);
+
+      expect(formatRequestDetails({ headers }).headers).toEqual({});
+      expect(inspect).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe('debug()', () => {

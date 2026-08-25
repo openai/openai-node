@@ -8,6 +8,18 @@ export function assertAzureCredentialHeaderValue(value: string): void {
   }
 }
 
+/** Coerces and validates an Azure credential without exposing errors from caller-defined hooks. */
+export function safeAzureCredentialHeaderValue(value: unknown): string {
+  let credential: string;
+  try {
+    credential = String(value);
+  } catch {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+  assertAzureCredentialHeaderValue(credential);
+  return credential;
+}
+
 /** Identifies the two credential-bearing Azure HTTP header fields. */
 export function isAzureAuthenticationHeader(name: string): boolean {
   const normalized = name.toLowerCase();
@@ -45,27 +57,27 @@ export function safeAzureWebSocketHeaders<Headers extends Record<string, unknown
 
   for (const name of authenticationNames.values()) {
     const value = safeHeaders.get(name);
-    if (Array.isArray(value)) {
-      const { length } = value;
-      if (!Number.isSafeInteger(length) || length < 0 || length > 1024) {
-        throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
-      }
-      const snapshot: unknown[] = [];
-      for (let index = 0; index < length; index += 1) {
-        const entry = value[index];
-        if (entry === null || entry === undefined) {
-          snapshot.push(entry);
-          continue;
+    try {
+      if (Array.isArray(value)) {
+        const { length } = value;
+        if (!Number.isSafeInteger(length) || length < 0 || length > 1024) {
+          throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
         }
-        const credential = String(entry);
-        assertAzureCredentialHeaderValue(credential);
-        snapshot.push(credential);
+        const snapshot: unknown[] = [];
+        for (let index = 0; index < length; index += 1) {
+          const entry = value[index];
+          if (entry === null || entry === undefined) {
+            snapshot.push(entry);
+            continue;
+          }
+          snapshot.push(safeAzureCredentialHeaderValue(entry));
+        }
+        safeHeaders.set(name, snapshot);
+      } else {
+        safeHeaders.set(name, safeAzureCredentialHeaderValue(value));
       }
-      safeHeaders.set(name, snapshot);
-    } else {
-      const credential = String(value);
-      assertAzureCredentialHeaderValue(credential);
-      safeHeaders.set(name, credential);
+    } catch {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
     }
   }
   return Object.fromEntries(safeHeaders) as Headers;

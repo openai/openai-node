@@ -57,6 +57,15 @@ const noopLogger = {
 };
 
 let cachedLoggers = /* @__PURE__ */ new WeakMap<Logger, [LogLevel, Logger]>();
+const intrinsicHeadersEntries = Headers.prototype.entries;
+const redactedHeaderNames = new Set([
+  'authorization',
+  'api-key',
+  'x-api-key',
+  'x-amz-security-token',
+  'cookie',
+  'set-cookie',
+]);
 
 export function loggerFor(client: OpenAI): Logger {
   const logger = client.logger;
@@ -84,7 +93,7 @@ export function loggerFor(client: OpenAI): Logger {
 
 export const formatRequestDetails = (details: {
   options?: RequestOptions | undefined;
-  headers?: Headers | Record<string, string> | undefined;
+  headers?: Headers | Record<string, string> | [string, string][] | undefined;
   retryOfRequestLogID?: string | undefined;
   retryOf?: string | undefined;
   url?: string | undefined;
@@ -105,21 +114,27 @@ export const formatRequestDetails = (details: {
     );
   }
   if (details.headers) {
-    details.headers = Object.fromEntries(
-      (details.headers instanceof Headers ? [...details.headers] : Object.entries(details.headers)).map(
-        ([name, value]) => [
-          name,
-          name.toLowerCase() === 'authorization' ||
-          name.toLowerCase() === 'api-key' ||
-          name.toLowerCase() === 'x-api-key' ||
-          name.toLowerCase() === 'x-amz-security-token' ||
-          name.toLowerCase() === 'cookie' ||
-          name.toLowerCase() === 'set-cookie'
-            ? '***'
-            : value,
-        ],
-      ),
-    );
+    const headers = details.headers;
+    try {
+      details.headers = Object.fromEntries(
+        headers instanceof Headers
+          ? Array.from(intrinsicHeadersEntries.call(headers), ([name, value]) => [
+              name,
+              redactedHeaderNames.has(name.toLowerCase()) ? '***' : value,
+            ])
+          : Array.isArray(headers)
+            ? headers.map((entry) => {
+                const name = entry[0];
+                return [name, redactedHeaderNames.has(name.toLowerCase()) ? '***' : entry[1]];
+              })
+            : Object.keys(headers).map((name) => [
+                name,
+                redactedHeaderNames.has(name.toLowerCase()) ? '***' : (Reflect.get(headers, name) as string),
+              ]),
+      );
+    } catch {
+      details.headers = {};
+    }
   }
   if ('retryOfRequestLogID' in details) {
     if (details.retryOfRequestLogID) {

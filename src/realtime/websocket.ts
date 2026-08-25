@@ -1,5 +1,5 @@
 import type { AzureOpenAI } from '../index';
-import { assertAzureCredentialHeaderValue } from '../internal/azure';
+import { safeAzureCredentialHeaderValue } from '../internal/azure';
 import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { OpenAI } from '../index';
 import { OpenAIError } from '../error';
@@ -126,8 +126,7 @@ function createAzureWebSocket(
     throw new Error('Azure OpenAI Realtime requires an API key');
   }
 
-  const credential = String(apiKey);
-  assertAzureCredentialHeaderValue(credential);
+  const credential = safeAzureCredentialHeaderValue(apiKey);
   redactAzureCredentials(url, isBearerToken);
   const socketURL = new URL(url);
   socketURL.searchParams.delete('api-key');
@@ -183,10 +182,11 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   ) {
     super();
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
+    const apiKey = client?.apiKey;
     const dangerouslyAllowBrowser =
       props.dangerouslyAllowBrowser ??
       (client as any)?._options?.dangerouslyAllowBrowser ??
-      (client?.apiKey?.startsWith('ek_') ? true : null);
+      (typeof apiKey === 'string' && apiKey.startsWith('ek_') ? true : null);
     if (!dangerouslyAllowBrowser && isRunningInBrowserOrBrowserWorker()) {
       throw new OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",

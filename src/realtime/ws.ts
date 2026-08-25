@@ -1,5 +1,5 @@
 import * as WS from 'ws';
-import { safeAzureWebSocketHeaders } from '../internal/azure';
+import { safeAzureCredentialHeaderValue, safeAzureWebSocketHeaders } from '../internal/azure';
 import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { protectWebSocketOptionsFromCredentialRedirects } from '../internal/ws';
 import type { AzureOpenAI } from '../index';
@@ -62,16 +62,21 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     }
     this.url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, this.url);
+    const azure = isAzure(client);
     const headers = {
       ...props.options?.headers,
-      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${client.apiKey}` }),
+      ...(azure && !props.__resolvedApiKey
+        ? {}
+        : {
+            Authorization: `Bearer ${azure ? safeAzureCredentialHeaderValue(client.apiKey) : client.apiKey}`,
+          }),
     };
 
     this.socket = new WS.WebSocket(
       this.url,
       protectWebSocketOptionsFromCredentialRedirects({
         ...props.options,
-        headers: isAzure(client) ? safeAzureWebSocketHeaders(headers) : headers,
+        headers: azure ? safeAzureWebSocketHeaders(headers) : headers,
       }),
     );
 
