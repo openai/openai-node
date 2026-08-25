@@ -1381,7 +1381,10 @@ export class OpenAI {
         );
       }
 
-      const shouldRetry = await this.shouldRetry(response);
+      const shouldRetry =
+        rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
+          ? false
+          : await this.shouldRetry(response);
       if (retriesRemaining && shouldRetry && !hasStreamingBody) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 
