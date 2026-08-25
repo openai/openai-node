@@ -2,7 +2,7 @@ import { types } from 'node:util';
 import { Agent, ProxyAgent, Request, fetch } from 'undici';
 import { OpenAIError } from '../../core/error';
 import type { RegisteredX509Transport, X509Transport, x509TransportBrand } from './x509-transport-registry';
-import { findRegisteredX509Transport, rememberRegisteredX509Transport } from './x509-transport-state.cjs';
+import { findRegisteredX509Transport, rememberRegisteredX509Transport } from '#x509-transport-state';
 
 export type { X509Transport } from './x509-transport-registry';
 

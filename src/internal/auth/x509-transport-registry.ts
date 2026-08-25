@@ -1,5 +1,5 @@
 import { OpenAIError } from '../../core/error';
-import { findRegisteredX509Transport } from './x509-transport-state.cjs';
+import { findRegisteredX509Transport } from '#x509-transport-state';
 
 export declare const x509TransportBrand: unique symbol;
 

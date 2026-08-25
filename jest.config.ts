@@ -13,7 +13,7 @@ const config: JestConfigWithTsJest = {
     '^.+\\.cts$': ['@swc/jest', { sourceMaps: 'inline' }],
   },
   moduleNameMapper: {
-    '(^|/)x509-transport-state\\.cjs$': '<rootDir>/src/internal/auth/x509-transport-state.cts',
+    '^#x509-transport-state$': '<rootDir>/src/internal/auth/x509-transport-state.cts',
     '^openai$': '<rootDir>/src/index.ts',
     '^openai/(.*)$': '<rootDir>/src/$1',
   },

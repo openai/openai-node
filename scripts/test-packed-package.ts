@@ -226,6 +226,9 @@ const packedPackagePath = require('node:path');
       'openai/internal/auth/x509-transport-registry.mjs',
       'openai/internal/auth/x509-transport-state',
       'openai/internal/auth/x509-transport-state.cjs',
+      'openai/internal/auth/x509-transport-state-browser',
+      'openai/internal/auth/x509-transport-state-browser.js',
+      'openai/internal/auth/x509-transport-state-browser.mjs',
     ];
     const moduleNames = JSON.stringify(privateX509Modules);
     run(process.execPath, [
@@ -488,6 +491,12 @@ const packedPackagePath = require('node:path');
     assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
     const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
     assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
+    run(process.execPath, [
+      '--conditions=browser',
+      '--input-type=module',
+      '--eval',
+      "import OpenAI from 'openai'; new OpenAI({ apiKey: 'synthetic-browser-api-key', dangerouslyAllowBrowser: true });",
+    ]);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
 
     for (const [inputType, consumer] of [
