@@ -1,3 +1,4 @@
+import type { JsonSchema7Type } from 'openai/_vendor/zod-to-json-schema';
 import { ignoreOverride, zodToJsonSchema } from 'openai/_vendor/zod-to-json-schema';
 import {
   zodFunction,
@@ -412,9 +413,9 @@ describe('a definition keeps the context it was referenced from', () => {
 
     zodToJsonSchema(zv3.object({ a: zv3.string() }), {
       definitions: { optional },
-      override: (def: { typeName?: unknown }) => {
-        seen.push(String(def?.typeName));
-        return ignoreOverride as never;
+      override: (def) => {
+        seen.push(String((def as { typeName?: unknown }).typeName));
+        return ignoreOverride;
       },
     });
 
@@ -451,10 +452,10 @@ describe('a definition keeps the context it was referenced from', () => {
       name: 'p',
       $refStrategy: 'extract-to-root',
       nameStrategy: 'duplicate-ref',
-      override: (def: unknown, _refs: unknown, _seen: unknown, forceResolution: boolean) =>
+      override: (def, _refs, _seen, forceResolution) =>
         forceResolution && def === shared._def ?
-          ({ anyOf: [{ not: {} }, { type: 'string', maxLength: 3 }], maxLength: 5 } as never)
-        : (ignoreOverride as never),
+          ({ anyOf: [{ not: {} }, { type: 'string', maxLength: 3 }], maxLength: 5 } as JsonSchema7Type)
+        : ignoreOverride,
     }) as { definitions: Record<string, JsonSchema> };
 
     // Both constraints applied before, so both have to survive. Collapsing here
@@ -477,8 +478,8 @@ describe('a definition keeps the context it was referenced from', () => {
     const schema = zodToJsonSchema(zv3.object({ a: zv3.string() }), {
       openaiStrictMode: true,
       definitions: { optional },
-      override: (def: unknown, _refs: unknown, _seen: unknown, forceResolution: boolean) =>
-        forceResolution && def === optional._def ? (withProto as never) : (ignoreOverride as never),
+      override: (def, _refs, _seen, forceResolution) =>
+        forceResolution && def === optional._def ? (withProto as JsonSchema7Type) : ignoreOverride,
     }) as { definitions: Record<string, { properties: Record<string, unknown> }> };
 
     expect(Object.keys(schema.definitions!['optional']!.properties).sort()).toEqual([
