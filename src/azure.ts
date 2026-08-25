@@ -467,10 +467,14 @@ function snapshotCrossRealmHeaders(headers: RequestInit['headers']): RequestInit
       break;
     }
 
-    if (operations.some((operation) => Object.getOwnPropertyDescriptor(prototype, operation) !== undefined)) {
+    const currentPrototype = prototype;
+    const overriddenOperation = operations.some(
+      (operation) => Object.getOwnPropertyDescriptor(currentPrototype, operation) !== undefined,
+    );
+    if (overriddenOperation) {
       hasOverriddenOperation = true;
     }
-    prototype = Object.getPrototypeOf(prototype) as object | null;
+    prototype = Object.getPrototypeOf(currentPrototype) as object | null;
   }
 
   if (trustedPrototype === undefined) {

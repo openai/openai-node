@@ -1969,13 +1969,17 @@ describe('Azure credential header diagnostic privacy', () => {
       ) as Headers;
       const subclass = Object.getPrototypeOf(injected) as object;
       const ancestor = Object.getPrototypeOf(subclass) as object;
-      const target =
-        override === 'instance accessor' ? injected : override === 'ancestor accessor' ? ancestor : subclass;
+      let target: object = subclass;
+      if (override === 'instance accessor') {
+        target = injected;
+      } else if (override === 'ancestor accessor') {
+        target = ancestor;
+      }
       const key = operation === 'iterator' ? Symbol.iterator : operation;
       let operationReads = 0;
       const maliciousOperation = () => {
         operationReads += 1;
-        throw new Error(PRIVATE_CREDENTIAL + '\n' + PRIVATE_SUFFIX);
+        throw new Error(`${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`);
       };
       Object.defineProperty(target, key, {
         configurable: true,
@@ -1993,7 +1997,7 @@ describe('Azure credential header diagnostic privacy', () => {
 
       await expectPrivateCredentialFailure(
         () => client.invokeProtectedFetch(injected),
-        PRIVATE_CREDENTIAL + '\n' + PRIVATE_SUFFIX,
+        `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`,
       );
       expect(operationReads).toBe(0);
       expect(fetch).not.toHaveBeenCalled();
