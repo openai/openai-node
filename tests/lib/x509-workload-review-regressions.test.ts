@@ -348,6 +348,33 @@ describe('X.509 review regressions', () => {
     expect(send).toHaveBeenCalledTimes(3);
   });
 
+  test('never generically retries a rejected X.509 credential after refreshing it once', async () => {
+    let issuerRequests = 0;
+    let apiRequests = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        issuerRequests += 1;
+        return Response.json({
+          ...TOKEN_RESPONSE,
+          access_token: `synthetic-review-bearer-${issuerRequests}`,
+        });
+      }
+      apiRequests += 1;
+      return apiRequests === 3
+        ? Response.json({ data: [] })
+        : new Response(null, { status: 401, headers: { 'x-should-retry': 'true' } });
+    });
+    const client = new OpenAI(options({ maxRetries: 5 }));
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+    expect(issuerRequests).toBe(2);
+    expect(apiRequests).toBe(2);
+
+    await client.models.list();
+    expect(issuerRequests).toBe(3);
+    expect(apiRequests).toBe(3);
+  });
+
   test('never retries issuer authentication after a one-shot request body starts pulling', async () => {
     let pulledChunks = 0;
     const body = {
