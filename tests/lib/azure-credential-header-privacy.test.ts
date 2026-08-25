@@ -617,6 +617,100 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
+  const statefulBodyCases = [
+    { description: 'false', initial: false },
+    { description: 'null', initial: null },
+    { description: 'zero', initial: 0 },
+    { description: 'an empty string', initial: '' },
+    { description: 'undefined', initial: undefined },
+  ] as const;
+
+  test.each(
+    statefulBodyCases.flatMap(({ description, initial }) =>
+      (['api-key', 'Authorization'] as const).flatMap((name) =>
+        (['own', 'inherited'] as const).map((representation) => ({
+          description,
+          initial,
+          name,
+          representation,
+        })),
+      ),
+    ),
+  )(
+    'protects $name when an $representation body accessor changes from $description',
+    async ({ initial, name, representation }) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const headers = { [name]: credential };
+      const options: FinalRequestOptions = { method: 'post', path: '/models', headers };
+      const owner: object =
+        representation === 'own' ? options : Object.create(Object.getPrototypeOf(options));
+      if (representation === 'inherited') {
+        Object.setPrototypeOf(options, owner);
+      }
+      let reads = 0;
+      Object.defineProperty(owner, 'body', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          reads += 1;
+          return reads === 1 ? initial : { safe: true };
+        },
+      });
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+      expect(reads).toBe(representation === 'own' ? 2 : 1);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['api-key', 'Authorization'] as const)(
+    'protects $name when a body accessor replaces itself with a truthy value',
+    async (name) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        headers: { [name]: credential },
+      };
+      let reads = 0;
+      Object.defineProperty(options, 'body', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          reads += 1;
+          Object.defineProperty(options, 'body', {
+            configurable: true,
+            enumerable: true,
+            value: { safe: true },
+          });
+          return false;
+        },
+      });
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+      expect(reads).toBe(1);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   test.each(['api-key', 'Authorization'] as const)(
     'snapshots the effective %s override once across body preprocessing and final authentication',
     async (name) => {

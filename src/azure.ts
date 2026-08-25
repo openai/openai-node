@@ -174,9 +174,12 @@ export class AzureOpenAI extends OpenAI {
         options.path = path`/deployments/${model}` + options.path;
       }
     }
+    const bodyDescriptor = Object.getOwnPropertyDescriptor(options, 'body');
     const { body } = options;
     const { headers, restore } = snapshotAzureRequestOptionsHeaders(options);
-    const preprocessesHeaders = body === undefined ? 'body' in options : Boolean(body);
+    const preprocessesHeaders =
+      typeof bodyDescriptor?.get === 'function' ||
+      (body === undefined ? 'body' in options : Boolean(body));
     let protection: ReturnType<typeof protectAzureRequestHeaders>;
 
     try {
@@ -352,14 +355,18 @@ function snapshotAzureRequestHeadersAccessor(
     }
 
     const snapshots: { headers: FinalRequestOptions['headers'] }[] = [];
-    const getter = () => snapshots.at(-1)?.headers;
+    const latestSnapshot = () => {
+      const index = snapshots.length - 1;
+      return snapshots[index];
+    };
+    const getter = () => latestSnapshot()?.headers;
     const originalSetter = descriptor.set;
     const setter =
       originalSetter === undefined
         ? undefined
         : function setHeaders(this: FinalRequestOptions, value: FinalRequestOptions['headers']): void {
             originalSetter.call(this, value);
-            const current = snapshots.at(-1);
+            const current = latestSnapshot();
             if (current !== undefined) {
               current.headers = value;
             }
