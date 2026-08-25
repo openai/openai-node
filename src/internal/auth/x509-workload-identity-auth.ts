@@ -85,8 +85,16 @@ export function isX509WorkloadIdentity(
     return false;
   }
 
-  if ('provider' in identity) {
-    return false;
+  let providerOwner: object | null = identity;
+  while (providerOwner !== null && providerOwner !== Object.prototype) {
+    const provider = Object.getOwnPropertyDescriptor(providerOwner, 'provider');
+    if (provider) {
+      if (!('value' in provider) || provider.value !== undefined) {
+        return false;
+      }
+      break;
+    }
+    providerOwner = Object.getPrototypeOf(providerOwner) as object | null;
   }
 
   let current: object | null = identity;
@@ -168,6 +176,7 @@ export function snapshotX509RequestOptions(options: MergedRequestInit | undefine
 export class X509WorkloadIdentityAuth {
   readonly #identityProviderId: string;
   readonly #serviceAccountId: string;
+  readonly #configuredRefreshBufferMs: number | undefined;
   readonly #transport: RegisteredX509Transport;
 
   /** Captures one registered, immutable certificate identity and its enrolled selectors. */
@@ -175,6 +184,19 @@ export class X509WorkloadIdentityAuth {
     this.#transport = resolveX509Transport(transport);
     this.#identityProviderId = identity.identityProviderId;
     this.#serviceAccountId = identity.serviceAccountId;
+    this.#configuredRefreshBufferMs = identity.refreshBufferMs;
+  }
+
+  /** Reconstructs the immutable selectors captured before caller-owned identity mutation. */
+  identitySnapshot(): X509WorkloadIdentity {
+    return {
+      type: 'x509',
+      identityProviderId: this.#identityProviderId,
+      serviceAccountId: this.#serviceAccountId,
+      ...(this.#configuredRefreshBufferMs === undefined
+        ? {}
+        : { refreshBufferMs: this.#configuredRefreshBufferMs }),
+    };
   }
 
   /** Preserves explicitly headerless requests without presenting a certificate to the issuer. */

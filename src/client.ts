@@ -631,6 +631,8 @@ export class OpenAI {
     const residencyBaseURL = resolveDataResidency(options);
     const inheritedProvider = this._options.provider;
     const provider = options.provider ?? inheritedProvider;
+    const x509Authentication =
+      this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
     const inheritedOptions: ClientOptions = {
       ...this._options,
       baseURL: this.baseURL,
@@ -642,13 +644,13 @@ export class OpenAI {
       fetchOptions: this.fetchOptions,
       apiKey: this._options.apiKey,
       adminAPIKey: this.adminAPIKey,
-      workloadIdentity: this._options.workloadIdentity,
+      workloadIdentity: x509Authentication?.identitySnapshot() ?? this._options.workloadIdentity,
       x509Transport: this._options.x509Transport,
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
     };
-    const currentlyX509 = this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth;
+    const currentlyX509 = x509Authentication !== undefined;
     const nextIdentity = hasOwn(options, 'workloadIdentity')
       ? options.workloadIdentity
       : inheritedOptions.workloadIdentity;
@@ -1101,7 +1103,12 @@ export class OpenAI {
         retryCount: maxRetries - retriesRemaining,
       });
     } catch (error) {
-      if (x509Authentication && retriesRemaining && X509WorkloadIdentityAuth.isRetryableFailure(error)) {
+      if (
+        x509Authentication &&
+        retriesRemaining &&
+        !options.__metadata?.['hasStreamingBody'] &&
+        X509WorkloadIdentityAuth.isRetryableFailure(error)
+      ) {
         return await this.retryRequest(
           options,
           retriesRemaining,

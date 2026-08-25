@@ -86,6 +86,28 @@ describe('X.509 review regressions', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  test('never retries issuer authentication after a one-shot request body starts pulling', async () => {
+    let pulledChunks = 0;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        pulledChunks += 1;
+        yield new TextEncoder().encode('synthetic-first-chunk');
+        pulledChunks += 1;
+        yield new TextEncoder().encode('synthetic-second-chunk');
+      },
+    };
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockResolvedValue(new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } }));
+
+    await expect(
+      new OpenAI(options({ maxRetries: 1 })).request({ path: '/responses', method: 'post', body }),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[1].origin).toBe('https://mtls.auth.openai.com');
+    expect(pulledChunks).toBe(1);
+  });
+
   test('cancels API retry backoff immediately when its caller aborts', async () => {
     vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) =>
       url.origin === 'https://mtls.auth.openai.com'
@@ -157,6 +179,52 @@ describe('X.509 review regressions', () => {
     );
 
     expect(client.baseURL).toBe('https://mtls.api.openai.com/v1');
+  });
+
+  test.each(['own', 'inherited'] as const)('treats an %s undefined legacy provider as absent', (location) => {
+    const identity = {
+      type: 'x509',
+      identityProviderId: 'synthetic-undefined-provider',
+      serviceAccountId: 'synthetic-service-account',
+    };
+    const workloadIdentity =
+      location === 'own'
+        ? { ...identity, provider: undefined }
+        : Object.assign(Object.create({ provider: undefined }) as object, identity);
+
+    const client = new OpenAI(
+      options({ workloadIdentity: workloadIdentity as ClientOptions['workloadIdentity'] }),
+    );
+
+    expect(client.baseURL).toBe('https://mtls.api.openai.com/v1');
+  });
+
+  test('clones only the identity selectors captured before caller configuration mutation', async () => {
+    const configuration = options();
+    const client = new OpenAI(configuration);
+    const identity = configuration.workloadIdentity;
+    if (!identity || !('identityProviderId' in identity)) {
+      throw new Error('Expected a synthetic X.509 identity.');
+    }
+    Object.assign(identity, {
+      type: 'mutated',
+      identityProviderId: 'synthetic-attacker-provider',
+      serviceAccountId: 'synthetic-attacker-account',
+    });
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : Response.json({ data: [] }),
+      );
+
+    await client.withOptions({ timeout: 2000 }).models.list();
+
+    expect(JSON.parse(String(send.mock.calls[0]?.[2].body))).toMatchObject({
+      identity_provider_id: 'synthetic-review-provider',
+      service_account_id: 'synthetic-review-account',
+    });
   });
 
   test.each(['own', 'inherited'] as const)(

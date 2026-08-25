@@ -287,7 +287,7 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
       }
     }
     if (response.status === 400 || response.status === 401 || response.status === 403) {
-      throw await oauthError(response, signal, options.signal);
+      throw await oauthError(response, signal, callerSignal);
     }
 
     cancelResponseBody(response);
