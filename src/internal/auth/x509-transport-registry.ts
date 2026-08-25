@@ -57,6 +57,7 @@ export interface X509ExchangedToken {
 export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
+  callerSignal?: AbortSignal | null | undefined;
   apiURL?: string;
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;

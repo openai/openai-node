@@ -238,6 +238,16 @@ export class X509WorkloadIdentityAuth {
     return apiURL;
   }
 
+  /** Captures the exact caller signal that will be attached to authenticated dispatch. */
+  snapshotRequestSignal(signal: AbortSignal | null | undefined): void {
+    this.#scope().callerSignal = signal;
+  }
+
+  /** Returns the request signal without invoking caller-owned accessors again. */
+  requestSignal(): AbortSignal | null | undefined {
+    return this.#scope().callerSignal;
+  }
+
   /** Establishes an independent scope even when concurrent requests share caller options. */
   runRequest<T>(operation: () => Promise<T>): Promise<T> {
     return this.#transport.run(async () => {
@@ -271,6 +281,7 @@ export class X509WorkloadIdentityAuth {
   /** Removes dispatched bearer material before settled request promises can retain their scope. */
   releaseRequestCredentials(): void {
     const scope = this.#scope();
+    delete scope.callerSignal;
     delete scope.apiURL;
     delete scope.token;
     delete scope.defaultHeaders;
@@ -339,17 +350,18 @@ export class X509WorkloadIdentityAuth {
       apiURL: string;
       defaultHeaders: HeadersLike | undefined;
       requestHeaders: HeadersLike;
+      signal: AbortSignal | null | undefined;
       timeout: number;
     },
   ): Promise<string> {
-    if (options?.signal?.aborted) {
-      throw userAbortError(options.signal);
+    const callerSignal = context ? context.signal : options?.signal;
+    if (callerSignal?.aborted) {
+      throw userAbortError(callerSignal);
     }
     X509WorkloadIdentityAuth.#preflight(options, context);
 
     const scope = options ? this.#scope() : undefined;
     const remaining = context && options ? this.remainingTimeout(options, context.timeout) : context?.timeout;
-    const { signal: callerSignal } = options ?? {};
     const { signal, dispose } = exchangeDeadline(remaining, callerSignal);
 
     try {

@@ -784,6 +784,7 @@ export class OpenAI {
           ? await this._workloadIdentityAuth.getToken(opts, {
               apiURL: this._workloadIdentityAuth.requestAPIURL(),
               ...this._workloadIdentityAuth.headerSnapshots(),
+              signal: this._workloadIdentityAuth.requestSignal(),
               timeout: opts.timeout ?? this.timeout,
             })
           : await this._workloadIdentityAuth.getToken();
@@ -1155,7 +1156,10 @@ export class OpenAI {
     if (
       x509Authentication &&
       ((globalThis.ReadableStream && req.body instanceof globalThis.ReadableStream) ||
-        (typeof req.body === 'object' && req.body !== null && Symbol.asyncIterator in req.body))
+        (typeof req.body === 'object' &&
+          req.body !== null &&
+          (Symbol.asyncIterator in req.body ||
+            (Symbol.iterator in req.body && 'next' in req.body && typeof req.body.next === 'function'))))
     ) {
       hasStreamingBody = true;
     }
@@ -1598,6 +1602,7 @@ export class OpenAI {
     const options = { ...inputOptions };
     const x509Authentication =
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
+    x509Authentication?.snapshotRequestSignal(options.signal);
     const x509Headers = x509Authentication?.snapshotHeaders(this._options.defaultHeaders, options.headers);
     if (x509Headers) {
       options.headers = x509Headers.requestHeaders;

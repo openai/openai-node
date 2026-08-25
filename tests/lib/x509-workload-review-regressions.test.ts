@@ -247,6 +247,52 @@ describe('X.509 review regressions', () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  test('never retries a synchronous one-shot iterator installed by a request hook', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } }),
+      );
+    const client = new OpenAI(options({ maxRetries: 1 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        Object.defineProperty(request, 'body', {
+          value: [new TextEncoder().encode('synthetic-one-shot-chunk')][Symbol.iterator](),
+          writable: true,
+          configurable: true,
+        });
+      },
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 503 });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  test('authenticates with the same accessor-backed signal captured for API dispatch', async () => {
+    const actual = new AbortController();
+    const unrelated = new AbortController();
+    const getter = vi.fn(() => (getter.mock.calls.length === 1 ? actual.signal : unrelated.signal));
+    const request = Object.defineProperty({ path: '/models', method: 'get' as const }, 'signal', {
+      enumerable: true,
+      get: getter,
+    });
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, _url, init) => {
+        await delay(500, undefined, { signal: init.signal ?? undefined });
+        return Response.json(TOKEN_RESPONSE);
+      });
+    const pending = new OpenAI(options()).buildRequest(request);
+    await delay(20);
+    actual.abort(new Error('synthetic-snapshotted-signal-canceled'));
+
+    await expect(pending).rejects.toBeInstanceOf(APIUserAbortError);
+    expect(getter).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   test('never retries issuer authentication after a one-shot request body starts pulling', async () => {
     let pulledChunks = 0;
     const body = {
