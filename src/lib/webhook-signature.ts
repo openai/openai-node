@@ -5,43 +5,74 @@ import { encodeUTF8 } from '../internal/utils/bytes';
 const MAX_DIRECT_WEBHOOK_VERIFICATIONS = 32;
 const SHA256_SIGNATURE_LENGTH = 32;
 
-function decodeUniqueSignatures(signatures: string[]): Uint8Array[] {
-  const seenSignatures = new Set<string>();
-  const candidateSignatures: Uint8Array[] = [];
+/**
+ * Checks whether a webhook header requires constant-work HMAC signing without
+ * retaining an unbounded number of signature candidates.
+ *
+ * @internal
+ */
+export function webhookSignatureRequiresSigning(signatureHeader: string): boolean {
+  return (
+    signatureHeader.split(' ', MAX_DIRECT_WEBHOOK_VERIFICATIONS + 1).length > MAX_DIRECT_WEBHOOK_VERIFICATIONS
+  );
+}
 
-  for (const signature of signatures) {
-    if (seenSignatures.has(signature)) {
-      continue;
+function* signatureCandidates(signatureHeader: string): Generator<string> {
+  let start = 0;
+
+  while (start <= signatureHeader.length) {
+    const separator = signatureHeader.indexOf(' ', start);
+    const candidate = signatureHeader.slice(start, separator === -1 ? undefined : separator);
+    yield candidate.startsWith('v1,') ? candidate.slice(3) : candidate;
+
+    if (separator === -1) {
+      break;
     }
-    seenSignatures.add(signature);
+    start = separator + 1;
+  }
+}
 
-    try {
-      const signatureBytes = Uint8Array.from(fromBase64(signature));
-      if (signatureBytes.byteLength === SHA256_SIGNATURE_LENGTH) {
-        candidateSignatures.push(signatureBytes);
-      }
-    } catch {
-      // Invalid base64 does not prevent trying the next value.
+function decodeSignature(signature: string): Uint8Array | undefined {
+  try {
+    const signatureBytes = fromBase64(signature);
+    return signatureBytes.byteLength === SHA256_SIGNATURE_LENGTH ? signatureBytes : undefined;
+  } catch {
+    // Invalid base64 does not prevent trying the next value.
+    return undefined;
+  }
+}
+
+function firstValidLengthSignature(signatureHeader: string): Uint8Array | undefined {
+  for (const signature of signatureCandidates(signatureHeader)) {
+    const signatureBytes = decodeSignature(signature);
+    if (signatureBytes) {
+      return signatureBytes;
     }
   }
 
-  return candidateSignatures;
+  return undefined;
 }
 
 function selectMatchingSignature(
-  signatures: Uint8Array[],
+  signatureHeader: string,
   expectedSignature: Uint8Array,
-): Uint8Array | undefined {
-  let [matchingSignature] = signatures;
+  firstSignature: Uint8Array,
+): Uint8Array {
+  let matchingSignature = firstSignature;
 
-  for (const signature of signatures) {
+  for (const signature of signatureCandidates(signatureHeader)) {
+    const signatureBytes = decodeSignature(signature);
+    if (!signatureBytes) {
+      continue;
+    }
+
     let difference = 0;
-    for (const [index, byte] of signature.entries()) {
+    for (const [index, byte] of signatureBytes.entries()) {
       // oxlint-disable-next-line no-bitwise -- Compare every HMAC byte without short-circuiting on shared prefixes.
       difference |= byte ^ (expectedSignature[index] ?? 0);
     }
     if (difference === 0) {
-      matchingSignature = signature;
+      matchingSignature = signatureBytes;
     }
   }
 
@@ -76,14 +107,11 @@ export async function verifyWebhookSignature(
     throw new InvalidWebhookSignatureError('Webhook timestamp is too new');
   }
 
-  // Multiple signatures are space-separated; accept the first matching value.
-  const signatures = signatureHeader
-    .split(' ')
-    .map((part) => (part.startsWith('v1,') ? part.slice(3) : part));
-  const useBoundedVerification = signatures.length > MAX_DIRECT_WEBHOOK_VERIFICATIONS;
-  const candidateSignatures = useBoundedVerification ? decodeUniqueSignatures(signatures) : [];
+  // Multiple signatures are space-separated; accept a matching value at any position.
+  const useBoundedVerification = webhookSignatureRequiresSigning(signatureHeader);
+  const firstSignature = useBoundedVerification ? firstValidLengthSignature(signatureHeader) : undefined;
 
-  if (useBoundedVerification && candidateSignatures.length === 0) {
+  if (useBoundedVerification && !firstSignature) {
     throw new InvalidWebhookSignatureError(
       'The given webhook signature does not match the expected signature',
     );
@@ -102,15 +130,16 @@ export async function verifyWebhookSignature(
     useBoundedVerification ? ['sign', 'verify'] : ['verify'],
   );
 
-  if (useBoundedVerification) {
+  if (useBoundedVerification && firstSignature) {
     const expectedSignature = new Uint8Array(await crypto.subtle.sign('HMAC', key, signedPayloadBytes));
-    const signatureToVerify = selectMatchingSignature(candidateSignatures, expectedSignature);
+    const signatureToVerify = selectMatchingSignature(signatureHeader, expectedSignature, firstSignature);
 
-    if (
-      signatureToVerify &&
-      (await crypto.subtle.verify('HMAC', key, Uint8Array.from(signatureToVerify), signedPayloadBytes))
-    ) {
-      return;
+    try {
+      if (await crypto.subtle.verify('HMAC', key, Uint8Array.from(signatureToVerify), signedPayloadBytes)) {
+        return;
+      }
+    } catch {
+      // Provider verification failures have the same typed mismatch as the direct path.
     }
 
     throw new InvalidWebhookSignatureError(
@@ -118,7 +147,7 @@ export async function verifyWebhookSignature(
     );
   }
 
-  for (const signature of signatures) {
+  for (const signature of signatureCandidates(signatureHeader)) {
     try {
       const signatureBytes = Uint8Array.from(fromBase64(signature));
       // oxlint-disable-next-line no-await-in-loop -- Check signatures in order and stop at the first match.

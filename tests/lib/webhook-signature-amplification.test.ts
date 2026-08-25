@@ -8,6 +8,8 @@ const webhookID = 'wh_amplification';
 const event = { id: 'evt_amplification', type: 'response.completed', data: { id: 'resp_test' } };
 const payload = JSON.stringify(event);
 const mismatch = 'The given webhook signature does not match the expected signature';
+const unsupportedCrypto =
+  'Webhook signature verification is only supported when the `crypto` global is defined';
 
 type Surface = 'verifySignature' | 'unwrap';
 
@@ -52,15 +54,93 @@ async function expectMismatch(surface: Surface, headers: Headers): Promise<void>
   await expect(operation).rejects.toThrow(mismatch);
 }
 
+function omitWebCryptoMethod(method: 'importKey' | 'sign' | 'verify'): void {
+  const { subtle } = crypto;
+  const methods = {
+    importKey: subtle.importKey.bind(subtle),
+    sign: subtle.sign.bind(subtle),
+    verify: subtle.verify.bind(subtle),
+  };
+  Reflect.deleteProperty(methods, method);
+  vi.stubGlobal('crypto', { subtle: methods });
+}
+
 beforeEach(() => {
   vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('public webhook signature verification work', () => {
+  test.each([
+    { surface: 'verifySignature', capability: 'crypto' },
+    { surface: 'verifySignature', capability: 'subtle' },
+    { surface: 'verifySignature', capability: 'importKey' },
+    { surface: 'verifySignature', capability: 'verify' },
+    { surface: 'unwrap', capability: 'crypto' },
+    { surface: 'unwrap', capability: 'subtle' },
+    { surface: 'unwrap', capability: 'importKey' },
+    { surface: 'unwrap', capability: 'verify' },
+  ] as const)(
+    '$surface rejects missing $capability with the existing unsupported-crypto error',
+    async ({ surface, capability }) => {
+      const headers = makeHeaders([`v1,${validSignature()}`]);
+
+      if (capability === 'crypto') {
+        vi.stubGlobal('crypto', crypto);
+        Reflect.deleteProperty(globalThis, 'crypto');
+      } else if (capability === 'subtle') {
+        vi.stubGlobal('crypto', {});
+      } else {
+        omitWebCryptoMethod(capability);
+      }
+
+      const result = runPublicSurface(surface, headers);
+      await expect(result).rejects.toThrow(unsupportedCrypto);
+      await expect(result).rejects.not.toBeInstanceOf(InvalidWebhookSignatureError);
+    },
+  );
+
+  test.each([
+    { surface: 'verifySignature', candidates: 1 },
+    { surface: 'verifySignature', candidates: 32 },
+    { surface: 'unwrap', candidates: 1 },
+    { surface: 'unwrap', candidates: 32 },
+  ] as const)(
+    '$surface accepts $candidates candidates without an unnecessary sign capability',
+    async ({ surface, candidates }) => {
+      const headers = makeHeaders([
+        ...Array.from({ length: candidates - 1 }, () => 'AAAA'),
+        `v1,${validSignature()}`,
+      ]);
+      omitWebCryptoMethod('sign');
+
+      expectSuccessfulResult(surface, await runPublicSurface(surface, headers));
+    },
+  );
+
+  test.each(['verifySignature', 'unwrap'] as const)(
+    '%s rejects a large valid rotation header without sign using the unsupported-crypto error',
+    async (surface) => {
+      const headers = makeHeaders([
+        ...Array.from({ length: 32 }, (_, index) => invalidSignature(index)),
+        `v1,${validSignature()}`,
+      ]);
+      const importKey = vi.spyOn(crypto.subtle, 'importKey');
+      const verify = vi.spyOn(crypto.subtle, 'verify');
+      omitWebCryptoMethod('sign');
+
+      const result = runPublicSurface(surface, headers);
+      await expect(result).rejects.toThrow(unsupportedCrypto);
+      await expect(result).rejects.not.toBeInstanceOf(InvalidWebhookSignatureError);
+      expect(importKey).not.toHaveBeenCalled();
+      expect(verify).not.toHaveBeenCalled();
+    },
+  );
+
   test.each([
     { surface: 'verifySignature', prefix: 'v1,' },
     { surface: 'verifySignature', prefix: '' },
@@ -143,6 +223,82 @@ describe('public webhook signature verification work', () => {
       await expectMismatch(surface, makeHeaders(candidates));
 
       expect(importKey).toHaveBeenCalledTimes(1);
+      expect(sign).toHaveBeenCalledTimes(1);
+      expect(verify).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['verifySignature', 'unwrap'] as const)(
+    '%s converts a bounded-provider verification rejection into the existing typed mismatch',
+    async (surface) => {
+      const headers = makeHeaders([
+        ...Array.from({ length: 32 }, (_, index) => invalidSignature(index)),
+        `v1,${validSignature()}`,
+      ]);
+      const providerError = new Error('synthetic bounded verification failure');
+      const sign = vi.spyOn(crypto.subtle, 'sign');
+      const verify = vi.spyOn(crypto.subtle, 'verify').mockRejectedValue(providerError);
+
+      await expectMismatch(surface, headers);
+      expect(sign).toHaveBeenCalledTimes(1);
+      expect(verify).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['verifySignature', 'unwrap'] as const)(
+    '%s preserves provider signing failures without treating them as signature mismatches',
+    async (surface) => {
+      const headers = makeHeaders([
+        ...Array.from({ length: 32 }, (_, index) => invalidSignature(index)),
+        `v1,${validSignature()}`,
+      ]);
+      const providerError = new Error('synthetic bounded signing failure');
+      const sign = vi.spyOn(crypto.subtle, 'sign').mockRejectedValue(providerError);
+      const verify = vi.spyOn(crypto.subtle, 'verify');
+
+      await expect(runPublicSurface(surface, headers)).rejects.toBe(providerError);
+      expect(sign).toHaveBeenCalledTimes(1);
+      expect(verify).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['verifySignature', 'unwrap'] as const)(
+    '%s scans a very large rotation incrementally before accepting its final signature',
+    async (surface) => {
+      const signatures = Array.from({ length: 20_000 }, (_, index) => invalidSignature(index));
+      signatures.push(`v1,${validSignature()}`);
+      const headers = makeHeaders(signatures);
+      const copiedBytes = vi.spyOn(Uint8Array, 'from');
+      const originalSign = crypto.subtle.sign.bind(crypto.subtle);
+      let copiesBeforeSigning = 0;
+      const sign = vi.spyOn(crypto.subtle, 'sign').mockImplementation(async (algorithm, key, data) => {
+        copiesBeforeSigning = copiedBytes.mock.calls.length;
+        return await originalSign(algorithm, key, data);
+      });
+      const verify = vi.spyOn(crypto.subtle, 'verify');
+
+      expectSuccessfulResult(surface, await runPublicSurface(surface, headers));
+      expect(copiesBeforeSigning).toBeLessThanOrEqual(35);
+      expect(copiedBytes.mock.calls.length).toBeLessThanOrEqual(35);
+      expect(sign).toHaveBeenCalledTimes(1);
+      expect(verify).toHaveBeenCalledTimes(1);
+      expect(verify.mock.calls[0]?.[2]).toEqual(Uint8Array.from(Buffer.from(validSignature(), 'base64')));
+    },
+  );
+
+  test.each(['verifySignature', 'unwrap'] as const)(
+    '%s verifies a late large-header signature without requiring the Node Buffer global',
+    async (surface) => {
+      const headers = makeHeaders([
+        ...Array.from({ length: 64 }, (_, index) => invalidSignature(index)),
+        `v1,${validSignature()}`,
+      ]);
+      const sign = vi.spyOn(crypto.subtle, 'sign');
+      const verify = vi.spyOn(crypto.subtle, 'verify');
+      vi.stubGlobal('Buffer', Buffer);
+      Reflect.deleteProperty(globalThis, 'Buffer');
+
+      expectSuccessfulResult(surface, await runPublicSurface(surface, headers));
       expect(sign).toHaveBeenCalledTimes(1);
       expect(verify).toHaveBeenCalledTimes(1);
     },
