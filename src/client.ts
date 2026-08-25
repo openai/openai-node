@@ -950,7 +950,7 @@ export class OpenAI {
     const request =
       authentication instanceof X509WorkloadIdentityAuth
         ? Promise.resolve(options).then((resolved) =>
-            authentication.runRequest(() => this.makeRequest(resolved, remainingRetries, undefined)),
+            authentication.runRequest(() => this.makeRequest(resolved, remainingRetries, undefined), this),
           )
         : this.makeRequest(options, remainingRetries, undefined);
     return this.responsePromise<Rsp>(request);
@@ -1488,7 +1488,7 @@ export class OpenAI {
     const request =
       authentication instanceof X509WorkloadIdentityAuth
         ? Promise.resolve(options).then((resolved) =>
-            authentication.runRequest(() => this.makeRequest(resolved, null, undefined)),
+            authentication.runRequest(() => this.makeRequest(resolved, null, undefined), this),
           )
         : this.makeRequest(options, null, undefined);
     const page = new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
@@ -1672,14 +1672,14 @@ export class OpenAI {
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
     if (
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
-      !this._workloadIdentityAuth.inRequest()
+      !this._workloadIdentityAuth.inRequest(this)
     ) {
       const authentication = this._workloadIdentityAuth;
       return await authentication.runRequest(async () => {
         const built = await OpenAI.prototype.buildRequest.call(this, inputOptions, { retryCount });
         authentication.releaseRequestBody(built.req.body);
         return built;
-      });
+      }, this);
     }
     const options = { ...inputOptions };
     const x509Authentication =

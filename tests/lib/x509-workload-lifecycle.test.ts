@@ -167,7 +167,11 @@ describe('X.509 workload credential lifecycle', () => {
     expect(exchanges).toBe(2);
   });
 
-  test('keeps a still-valid cached bearer after failed proactive refresh and applies a cooldown', async () => {
+  test.each([
+    ['default', {}, 1000],
+    ['issuer milliseconds', { 'retry-after-ms': '5000' }, 5000],
+    ['issuer seconds', { 'retry-after': '5' }, 5000],
+  ] as const)('honors the %s cooldown after failed proactive refresh', async (_kind, headers, cooldown) => {
     vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
     let exchanges = 0;
     let dispatches = 0;
@@ -175,8 +179,8 @@ describe('X.509 workload credential lifecycle', () => {
       if (url.origin === 'https://mtls.auth.openai.com') {
         exchanges += 1;
         return exchanges === 1
-          ? token('synthetic-still-valid-bearer', 10)
-          : new Response(null, { status: 503 });
+          ? token('synthetic-still-valid-bearer', 20)
+          : new Response(null, { status: 503, headers });
       }
       dispatches += 1;
       return Response.json({ data: [] });
@@ -184,12 +188,18 @@ describe('X.509 workload credential lifecycle', () => {
     const client = new OpenAI(options());
 
     await client.models.list();
-    await vi.advanceTimersByTimeAsync(5001);
+    await vi.advanceTimersByTimeAsync(10_001);
     await client.models.list();
+    await client.models.list();
+    await vi.advanceTimersByTimeAsync(cooldown - 1);
     await client.models.list();
 
     expect(exchanges).toBe(2);
-    expect(dispatches).toBe(3);
+    expect(dispatches).toBe(4);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await client.models.list();
+    expect(exchanges).toBe(3);
   });
 
   test.each(['permanent-tls', 'permanent-body', 'invalid-token', 'retry-disabled'])(

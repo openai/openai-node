@@ -96,6 +96,19 @@ describe('X.509 review regressions', () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  test('rejects an explicitly null X.509 refresh buffer before presenting its certificate', () => {
+    const identity = {
+      type: 'x509' as const,
+      identityProviderId: 'synthetic-null-refresh-provider',
+      serviceAccountId: 'synthetic-null-refresh-account',
+    };
+    Object.defineProperty(identity, 'refreshBufferMs', { value: null, enumerable: true });
+    const send = vi.spyOn(transportCapability, 'sendX509Request');
+
+    expect(() => new OpenAI(options({ workloadIdentity: identity }))).toThrow(/refreshBufferMs/iu);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   test('preserves an explicitly empty admin credential without presenting its certificate', async () => {
     const send = vi
       .spyOn(transportCapability, 'sendX509Request')
@@ -235,6 +248,38 @@ describe('X.509 review regressions', () => {
     expect(scopes[0]).not.toBe(scopes[1]);
     expect(send.mock.calls.filter((call) => call[1].origin === 'https://mtls.api.openai.com')).toHaveLength(
       2,
+    );
+  });
+
+  test('keeps nested clone header scopes separate while sharing its enrolled credential cache', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : Response.json({ data: [] }),
+      );
+    const original = new OpenAI(options({ defaultHeaders: { 'X-Synthetic-Original': 'yes' } }));
+    const clone = original.withOptions({ defaultHeaders: { 'X-Synthetic-Clone': 'yes' } });
+    let nestedHeaders: Headers | undefined;
+    Object.defineProperty(original, 'prepareRequest', {
+      value: async () => {
+        const nested = await clone.buildRequest({
+          path: '/models',
+          method: 'get',
+          headers: { 'X-Synthetic-Request': 'yes' },
+        });
+        nestedHeaders = nested.req.headers;
+      },
+    });
+
+    await original.models.list();
+
+    expect(nestedHeaders?.get('X-Synthetic-Original')).toBeNull();
+    expect(nestedHeaders?.get('X-Synthetic-Clone')).toBe('yes');
+    expect(nestedHeaders?.get('X-Synthetic-Request')).toBe('yes');
+    expect(send.mock.calls.filter((call) => call[1].origin === 'https://mtls.auth.openai.com')).toHaveLength(
+      1,
     );
   });
 
@@ -774,6 +819,38 @@ describe('X.509 review regressions', () => {
 
     await expect(pending).rejects.toBeInstanceOf(APIUserAbortError);
     expect(performance.now() - startedAt).toBeLessThan(350);
+  });
+
+  test('preserves hook-signal cancellation after successful response headers arrive', async () => {
+    const replacement = new AbortController();
+    const reason = new Error('synthetic-hook-response-body-canceled');
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : new Response(
+              new ReadableStream({
+                start(stream) {
+                  request.signal?.addEventListener('abort', () => stream.error(request.signal?.reason), {
+                    once: true,
+                  });
+                },
+              }),
+              { headers: { 'content-type': 'application/json' } },
+            ),
+      );
+    const client = new OpenAI(options({ timeout: 1000 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.signal = replacement.signal;
+      },
+    });
+    const pending = client.models.list();
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    replacement.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({ constructor: APIUserAbortError, cause: reason });
   });
 
   test('recognizes an inherited plain-data X.509 identity discriminator', () => {

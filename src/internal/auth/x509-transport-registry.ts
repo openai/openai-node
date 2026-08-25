@@ -67,6 +67,7 @@ export interface X509RequestScope {
   effectiveSignal?: AbortSignal;
   materializedBody?: ReadableStream;
   owner?: object;
+  requestOwner?: object;
   apiURL?: string;
   tenant?: { organization: string | null; project: string | null };
   defaultHeaders?: NullableHeaders;

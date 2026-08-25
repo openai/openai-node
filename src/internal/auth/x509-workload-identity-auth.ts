@@ -256,10 +256,13 @@ export class X509WorkloadIdentityAuth {
     this.#configuredRefreshBufferMs = identity.refreshBufferMs;
     this.#organization = organization;
     this.#project = project;
-    this.#refreshBufferMs = this.#configuredRefreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS;
-    if (!Number.isSafeInteger(this.#refreshBufferMs) || this.#refreshBufferMs < 0) {
+    if (
+      this.#configuredRefreshBufferMs !== undefined &&
+      (!Number.isSafeInteger(this.#configuredRefreshBufferMs) || this.#configuredRefreshBufferMs < 0)
+    ) {
       throw new OpenAIError('X.509 workload identity requires a nonnegative integer refreshBufferMs.');
     }
+    this.#refreshBufferMs = this.#configuredRefreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS;
   }
 
   /** Reconstructs the immutable selectors captured before caller-owned identity mutation. */
@@ -462,26 +465,29 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Establishes an independent scope even when concurrent requests share caller options. */
-  runRequest<T>(operation: () => Promise<T>): Promise<T> {
+  runRequest<T>(operation: () => Promise<T>, requestOwner: object): Promise<T> {
     return this.#transport.run(async () => {
       const scope = this.#transport.current();
       if (!scope) {
         throw new OpenAIError('X.509 workload identity requires an active certificate request scope.');
       }
       scope.owner = this;
+      scope.requestOwner = requestOwner;
       try {
         return await operation();
       } finally {
         this.retireRequestBody();
         this.releaseRequestCredentials();
+        delete scope.requestOwner;
         delete scope.owner;
       }
     });
   }
 
   /** Reports whether a public request-building call already belongs to an active logical operation. */
-  inRequest(): boolean {
-    return this.#transport.current()?.owner === this;
+  inRequest(requestOwner: object): boolean {
+    const scope = this.#transport.current();
+    return scope?.owner === this && scope.requestOwner === requestOwner;
   }
 
   /** Shares a cache only when the complete, privately snapshotted credential identity matches. */
@@ -498,13 +504,14 @@ export class X509WorkloadIdentityAuth {
 
   /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
   continuation(): <T>(operation: () => Promise<T>) => Promise<T> {
-    const { wallStartedAt, monotonicStartedAt, request, effectiveSignal } = this.#scope();
+    const { wallStartedAt, monotonicStartedAt, request, requestOwner, effectiveSignal } = this.#scope();
     const scope: X509RequestScope = {
       wallStartedAt,
       monotonicStartedAt,
       owner: this,
       ...(request ? { request } : {}),
       ...(effectiveSignal ? { effectiveSignal } : {}),
+      ...(requestOwner ? { requestOwner } : {}),
     };
     return (operation) =>
       this.#transport.resume(scope, async () => {
@@ -512,6 +519,7 @@ export class X509WorkloadIdentityAuth {
           return await operation();
         } finally {
           this.releaseRequestCredentials();
+          delete scope.requestOwner;
           delete scope.owner;
         }
       });
@@ -680,8 +688,20 @@ export class X509WorkloadIdentityAuth {
     ) {
       return undefined;
     }
-    cached.refreshAt = Math.min(cached.expiresAt, performance.now() + FAILED_REFRESH_COOLDOWN_MS);
-    cached.wallRefreshAt = Math.min(cached.wallExpiresAt, Date.now() + FAILED_REFRESH_COOLDOWN_MS);
+    const headers = X509WorkloadIdentityAuth.retryHeaders(error);
+    const milliseconds = headers?.get('retry-after-ms');
+    let requested = milliseconds ? Number(milliseconds) : undefined;
+    const retryAfter = headers?.get('retry-after');
+    if (retryAfter && (requested === undefined || Number.isNaN(requested))) {
+      const seconds = Number(retryAfter);
+      requested = Number.isNaN(seconds) ? Date.parse(retryAfter) - Date.now() : seconds * 1000;
+    }
+    const cooldown =
+      requested !== undefined && Number.isFinite(requested) && requested >= 0 && requested <= 60_000
+        ? Math.max(FAILED_REFRESH_COOLDOWN_MS, requested)
+        : FAILED_REFRESH_COOLDOWN_MS;
+    cached.refreshAt = Math.min(cached.expiresAt, performance.now() + cooldown);
+    cached.wallRefreshAt = Math.min(cached.wallExpiresAt, Date.now() + cooldown);
     return X509WorkloadIdentityAuth.#assignToken(scope, cached);
   }
 
