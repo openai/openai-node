@@ -15,6 +15,113 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 
+const MAX_OAUTH_JSON_ERROR_CAUSES = 32;
+const getOAuthErrorDescriptor = Object.getOwnPropertyDescriptor;
+const getOAuthErrorPrototype = Object.getPrototypeOf;
+const oauthErrorFunctionSource = Function.prototype.toString;
+const nativeOAuthErrorSource = oauthErrorFunctionSource.call(Error);
+const nativeOAuthSyntaxErrorSource = oauthErrorFunctionSource.call(SyntaxError);
+
+type OAuthJSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
+
+function classifyCrossRealmOAuthError(error: object): OAuthJSONErrorKind {
+  try {
+    let prototype: object | null = getOAuthErrorPrototype(error) as object | null;
+
+    for (let depth = 0; prototype !== null; depth += 1) {
+      if (depth >= MAX_OAUTH_JSON_ERROR_CAUSES) {
+        return 'unsafe';
+      }
+
+      const name = getOAuthErrorDescriptor(prototype, 'name');
+      const constructor = getOAuthErrorDescriptor(prototype, 'constructor');
+      if (
+        name &&
+        'value' in name &&
+        (name.value === 'Error' || name.value === 'SyntaxError') &&
+        constructor &&
+        'value' in constructor &&
+        typeof constructor.value === 'function'
+      ) {
+        const originalPrototype = getOAuthErrorDescriptor(constructor.value, 'prototype');
+        const nativeSource =
+          name.value === 'SyntaxError' ? nativeOAuthSyntaxErrorSource : nativeOAuthErrorSource;
+        if (
+          originalPrototype &&
+          'value' in originalPrototype &&
+          originalPrototype.value === prototype &&
+          oauthErrorFunctionSource.call(constructor.value) === nativeSource
+        ) {
+          return name.value === 'SyntaxError' ? 'syntax' : 'error';
+        }
+      }
+
+      prototype = getOAuthErrorPrototype(prototype) as object | null;
+    }
+
+    return 'unknown';
+  } catch {
+    return 'unsafe';
+  }
+}
+
+function isMalformedOAuthJSONError(error: unknown): boolean {
+  try {
+    const visited = new Set<object>();
+    let current = error;
+
+    for (let depth = 0; depth < MAX_OAUTH_JSON_ERROR_CAUSES; depth += 1) {
+      if (current instanceof SyntaxError) {
+        return true;
+      }
+      if (typeof current !== 'object' || current === null) {
+        return false;
+      }
+      if (visited.has(current)) {
+        return true;
+      }
+      visited.add(current);
+
+      const kind = current instanceof Error ? 'error' : classifyCrossRealmOAuthError(current);
+      if (kind === 'syntax' || kind === 'unsafe') {
+        return true;
+      }
+      if (kind !== 'error') {
+        return false;
+      }
+
+      const parserType = getOAuthErrorDescriptor(current, 'type');
+      if (parserType && (!('value' in parserType) || parserType.value === 'invalid-json')) {
+        return true;
+      }
+
+      const cause = getOAuthErrorDescriptor(current, 'cause');
+      if (!cause) {
+        return false;
+      }
+      if (!('value' in cause)) {
+        return true;
+      }
+      current = cause.value;
+    }
+
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (isMalformedOAuthJSONError(error)) {
+      throw new SyntaxError('Token exchange response contains invalid JSON');
+    }
+    throw error;
+  }
+}
+
 function isUnsafeAccessToken(accessToken: string): boolean {
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
   if (typeof scope.Bun?.version === 'string') {
@@ -134,7 +241,7 @@ export class WorkloadIdentityAuth {
       );
     }
 
-    const tokenResponse: unknown = await response.json();
+    const tokenResponse: unknown = await parseOAuthTokenResponse(response);
     const accessToken =
       typeof tokenResponse === 'object' && tokenResponse !== null && 'access_token' in tokenResponse
         ? tokenResponse.access_token
