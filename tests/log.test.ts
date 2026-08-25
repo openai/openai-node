@@ -42,18 +42,19 @@ describe('formatRequestDetails()', () => {
       },
       hidden: { enumerable: false, value: 'omitted' },
       [metadata]: { enumerable: true, value: 'symbol metadata' },
+      [String('__proto__')]: { enumerable: true, value: 'safe data property' },
     });
-    Object.defineProperty(options, '__proto__', { enumerable: true, value: 'safe data property' });
 
     const details = formatRequestDetails({ options });
     const loggedOptions = details.options ?? {};
+    const expectedOptions = Object.fromEntries([
+      ['visible', 'preserved'],
+      [metadata, 'symbol metadata'],
+      [String('__proto__'), 'safe data property'],
+    ]);
 
     expect(visibleReads).toBe(1);
-    expect(loggedOptions).toEqual({
-      visible: 'preserved',
-      [metadata]: 'symbol metadata',
-      ['__proto__']: 'safe data property',
-    });
+    expect(loggedOptions).toEqual(expectedOptions);
     expect(Object.getPrototypeOf(loggedOptions)).toBe(Object.prototype);
     expect(Object.getOwnPropertyDescriptor(loggedOptions, 'headers')).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(loggedOptions, 'hidden')).toBeUndefined();
