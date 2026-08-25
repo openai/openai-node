@@ -24,7 +24,7 @@
     "test:unit": "vitest run --config vitest.config.mts",
     "test:generated": "OPENAI_TEST_SUITE=generated ./scripts/test",
     "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
-    "test:live:x509": "node --input-type=module < examples/mtls/x509-workload-identity.mjs",
+    "test:live:x509": "pnpm build && node --input-type=module < examples/mtls/x509-workload-identity.mjs",
     "bench": "vitest bench --run --config vitest.bench.config.mts",
     "bench:json": "vitest bench --run --config vitest.bench.config.mts --outputJson benchmark-results.json",
     "build": "./scripts/build",

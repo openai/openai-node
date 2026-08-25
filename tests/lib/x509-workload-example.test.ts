@@ -6,6 +6,10 @@ const example = readFileSync(
   path.resolve(process.cwd(), 'examples/mtls/x509-workload-identity.mjs'),
   'utf-8',
 );
+const exampleDocumentation = readFileSync(path.resolve(process.cwd(), 'examples/mtls/README.md'), 'utf-8');
+const packageScripts = JSON.parse(readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8')) as {
+  scripts: Record<string, string>;
+};
 
 function runExample(environment: Record<string, string>) {
   return spawnSync(process.execPath, ['--input-type=module'], {
@@ -22,6 +26,14 @@ function runExample(environment: Record<string, string>) {
 }
 
 describe('X.509 workload-identity runnable example', () => {
+  test('builds the SDK before running its clean-checkout live validation command', () => {
+    expect(packageScripts.scripts['test:live:x509']).toMatch(/^pnpm build && node /u);
+  });
+
+  test('documents an Undici version compatible with the complete supported Node 22 range', () => {
+    expect(exampleDocumentation).toContain("npm install openai 'undici@^7'");
+  });
+
   test('never exposes credentials from a malformed CONNECT proxy URL', () => {
     const secret = 'synthetic-private-proxy-password';
     const result = runExample({

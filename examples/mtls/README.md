@@ -57,8 +57,10 @@ X.509 workload identity is separate from API-key + HTTP mTLS: an enrolled client
 Install the SDK and its optional Node.js transport peer:
 
 ```sh
-npm install openai undici
+npm install openai 'undici@^7'
 ```
+
+Undici 7 supports the SDK's complete Node.js 22 compatibility range; Undici 8 requires Node.js 22.19 or later.
 
 Provide the complete PEM certificate chain, private key, enrolled identity-provider ID, and service-account ID through environment variables. The chain must contain the leaf certificate followed by any required intermediates:
 
@@ -75,7 +77,7 @@ Set `OPENAI_X509_CLIENT_KEY_PASSPHRASE` when the PEM private key is encrypted. E
 
 Proxying is always explicit: set `OPENAI_X509_PROXY_MODE=http_connect` or `OPENAI_X509_PROXY_MODE=https_connect` together with a matching `HTTPS_PROXY` URL. The default `direct` mode ignores ambient proxy variables. The workload certificate is configured only for target TLS, never proxy TLS. The example closes its caller-owned dispatcher after the request.
 
-From a repository checkout, run the same explicit live-service check with:
+From a repository checkout, the following command builds the SDK first and then runs the same explicit live-service check:
 
 ```sh
 pnpm test:live:x509
