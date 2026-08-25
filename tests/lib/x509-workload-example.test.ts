@@ -34,6 +34,18 @@ describe('X.509 workload-identity runnable example', () => {
     expect(exampleDocumentation).toContain("npm install openai 'undici@^7'");
   });
 
+  test('builds repository self-imports before documenting the direct example command', () => {
+    expect(exampleDocumentation).toMatch(/pnpm build\s+node examples\/mtls\/x509-workload-identity\.mjs/u);
+  });
+
+  test('preserves an explicitly empty encrypted-key passphrase', () => {
+    expect(example).toContain('passphrase !== undefined ? { passphrase } : {}');
+  });
+
+  test('does not inherit the ordinary API-key project when no X.509 project is configured', () => {
+    expect(example).toContain("project: process.env['OPENAI_X509_PROJECT_ID'] ?? null");
+  });
+
   test('never exposes credentials from a malformed CONNECT proxy URL', () => {
     const secret = 'synthetic-private-proxy-password';
     const result = runExample({

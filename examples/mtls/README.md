@@ -70,6 +70,8 @@ export OPENAI_X509_CLIENT_PRIVATE_KEY_PEM="$(cat /secure/path/client-key.pem)"
 export OPENAI_X509_IDENTITY_PROVIDER_ID='your-enrolled-identity-provider-id'
 export OPENAI_X509_SERVICE_ACCOUNT_ID='your-enrolled-service-account-id'
 
+# Build package self-imports when running the example from an SDK repository checkout.
+pnpm build
 node examples/mtls/x509-workload-identity.mjs
 ```
 
