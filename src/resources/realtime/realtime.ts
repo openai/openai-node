@@ -5,7 +5,7 @@ import * as RealtimeAPI from './realtime';
 import * as Shared from '../shared';
 import * as TranscriptionsAPI from '../audio/transcriptions';
 import * as CallsAPI from './calls';
-import { CallAcceptParams, CallReferParams, CallRejectParams, Calls } from './calls';
+import { CallAcceptParams, CallCreateParams, CallReferParams, CallRejectParams, Calls } from './calls';
 import * as ClientSecretsAPI from './client-secrets';
 import {
   ClientSecretCreateParams,
@@ -5570,6 +5570,7 @@ export declare namespace Realtime {
 
   export {
     Calls as Calls,
+    type CallCreateParams as CallCreateParams,
     type CallAcceptParams as CallAcceptParams,
     type CallReferParams as CallReferParams,
     type CallRejectParams as CallRejectParams,
