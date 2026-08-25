@@ -274,7 +274,7 @@ const unbrandedParserFailures: readonly FailureCase[] = [
     name: 'Error prototype carrying a copied genuine native stack accessor',
     create: () => {
       const forged = Object.assign(Object.create(Error.prototype), { type: 'invalid-json' });
-      const stack = Object.getOwnPropertyDescriptor(new Error(), 'stack');
+      const stack = Object.getOwnPropertyDescriptor(new Error('native stack descriptor'), 'stack');
       if (!stack) {
         throw new Error('Expected a native Error stack descriptor.');
       }
@@ -300,8 +300,7 @@ const unbrandedParserFailures: readonly FailureCase[] = [
   },
   {
     name: 'cross-realm Error prototype with an invalid-json marker',
-    create: () =>
-      runInNewContext("Object.assign(Object.create(Error.prototype), { type: 'invalid-json' })"),
+    create: () => runInNewContext("Object.assign(Object.create(Error.prototype), { type: 'invalid-json' })"),
   },
   {
     name: 'cross-realm SyntaxError prototype',
