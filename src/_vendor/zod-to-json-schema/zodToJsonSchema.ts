@@ -132,6 +132,17 @@ const SCHEMA_CHILDREN: Record<string, typeof SCHEMA_KEYWORD | typeof SCHEMA_LIST
     $defs: SCHEMA_MAP_KEYWORD,
   };
 
+/** Keywords that describe a schema without constraining what it accepts. */
+const ANNOTATION_KEYWORDS = new Set([
+  'description',
+  'markdownDescription',
+  'title',
+  '$comment',
+  'deprecated',
+  'readOnly',
+  'writeOnly',
+]);
+
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -155,8 +166,23 @@ const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, un
   if (!isNever || !isPlainObject(second)) {
     return schema;
   }
-  const { anyOf: _dropped, ...siblings } = schema;
-  return { ...second, ...siblings };
+  // Only annotations move across. `addMeta` is what puts them there, and they
+  // constrain nothing. A validation keyword sitting beside the union -- an
+  // `override` can return one -- means both it and the branch's own copy apply,
+  // and letting the outer one win would widen what the document accepts.
+  const carried: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key !== 'anyOf' && ANNOTATION_KEYWORDS.has(key)) {
+      carried[key] = value;
+    }
+  }
+  const collidesOnConstraint = Object.keys(schema).some(
+    (key) => key !== 'anyOf' && !ANNOTATION_KEYWORDS.has(key),
+  );
+  if (collidesOnConstraint) {
+    return schema;
+  }
+  return { ...second, ...carried };
 };
 
 /** `collapseNeverBranch` at every schema position, literal payloads left alone. */
@@ -172,11 +198,14 @@ const collapseNeverBranchesDeep = (value: unknown): unknown => {
     } else if (kind === SCHEMA_LIST_KEYWORD && Array.isArray(child)) {
       walked[key] = child.map(collapseNeverBranchesDeep);
     } else if (kind === SCHEMA_MAP_KEYWORD && isPlainObject(child)) {
-      const mapped: Record<string, unknown> = {};
+      // A null-prototype map: plain assignment of a `__proto__` key reaches the
+      // inherited setter instead of creating an own property, which drops the
+      // entry and installs it as the object's prototype.
+      const mapped: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
       for (const [name, sub] of Object.entries(child)) {
         mapped[name] = collapseNeverBranchesDeep(sub);
       }
-      walked[key] = mapped;
+      walked[key] = { ...mapped };
     } else if (key === 'items') {
       // `items` is a schema in draft 2020-12 and either a schema or a positional
       // list before it.

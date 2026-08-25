@@ -1,4 +1,4 @@
-import { zodToJsonSchema } from 'openai/_vendor/zod-to-json-schema';
+import { ignoreOverride, zodToJsonSchema } from 'openai/_vendor/zod-to-json-schema';
 import {
   zodFunction,
   zodRealtimeFunction,
@@ -414,7 +414,7 @@ describe('a definition keeps the context it was referenced from', () => {
       definitions: { optional },
       override: (def: { typeName?: unknown }) => {
         seen.push(String(def?.typeName));
-        return undefined as never;
+        return ignoreOverride as never;
       },
     });
 
@@ -440,6 +440,51 @@ describe('a definition keeps the context it was referenced from', () => {
       description: 'guidance',
       markdownDescription: 'guidance',
     });
+  });
+
+  it('does not let a sibling constraint override the branch it collapses into', () => {
+    // An `override` may return a union with a validation keyword beside it. Both
+    // apply, so spreading the outer one over the branch would widen the schema.
+    const shared = zv3.string().nullable().optional();
+
+    const schema = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+      name: 'p',
+      $refStrategy: 'extract-to-root',
+      nameStrategy: 'duplicate-ref',
+      override: (def: unknown, _refs: unknown, _seen: unknown, forceResolution: boolean) =>
+        forceResolution && def === shared._def ?
+          ({ anyOf: [{ not: {} }, { type: 'string', maxLength: 3 }], maxLength: 5 } as never)
+        : (ignoreOverride as never),
+    }) as { definitions: Record<string, JsonSchema> };
+
+    // Both constraints applied before, so both have to survive. Collapsing here
+    // would spread `maxLength: 5` over the branch's `maxLength: 3` and let
+    // four-character strings through, so the union is left standing instead.
+    expect(JSON.stringify(schema.definitions!['p_properties_a'])).toContain('"maxLength":3');
+    expect(schema.definitions!['p_properties_a']).toHaveProperty('anyOf');
+  });
+
+  it('keeps a `__proto__` entry in a schema map', () => {
+    // The deep walk rebuilds schema maps. Plain assignment of a `__proto__` key
+    // reaches the inherited setter, which drops the entry and installs it as the
+    // object's prototype instead.
+    const optional = zv3.string().nullable().optional();
+    const withProto = {
+      type: 'object',
+      properties: JSON.parse('{"__proto__": {"type": "string"}, "ok": {"type": "number"}}'),
+    };
+
+    const schema = zodToJsonSchema(zv3.object({ a: zv3.string() }), {
+      openaiStrictMode: true,
+      definitions: { optional },
+      override: (def: unknown, _refs: unknown, _seen: unknown, forceResolution: boolean) =>
+        forceResolution && def === optional._def ? (withProto as never) : (ignoreOverride as never),
+    }) as { definitions: Record<string, { properties: Record<string, unknown> }> };
+
+    expect(Object.keys(schema.definitions!['optional']!.properties).sort()).toEqual([
+      '__proto__',
+      'ok',
+    ]);
   });
 
   it('still strips the wrapper for a definition extracted from a property', () => {
