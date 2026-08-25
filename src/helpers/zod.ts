@@ -3,7 +3,12 @@ import type * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
 import type * as z4Mini from 'zod/v4-mini';
 import type { AutoParseableResponseFormat, AutoParseableTextFormat, AutoParseableTool } from '../lib/parser';
-import { makeParseableResponseFormat, makeParseableTextFormat, makeParseableTool } from '../lib/parser';
+import {
+  makeParseableResponseFormat,
+  makeParseableTextFormat,
+  makeParseableTool,
+  parseResponseFormatContent,
+} from '../lib/parser';
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 import type { AutoParseableResponseTool } from '../lib/ResponsesParser';
 import { makeParseableResponseTool } from '../lib/ResponsesParser';
@@ -12,6 +17,7 @@ import type { RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { forEachJSONSchemaChild, toStrictJsonSchema } from '../lib/transform';
 import type { JSONSchema } from '../lib/jsonschema';
 import { hasOwn } from '../internal/utils/values';
+import { assertJSONSerializableSchema, assertSupportedZodV3Schema } from './zod-v3-strict-schema';
 
 type ZodV4Schema = z4.ZodType | z4Mini.ZodMiniType;
 type ZodSchema = z3.ZodType | ZodV4Schema;
@@ -128,6 +134,7 @@ function zodV3ToJsonSchema(
   schema: z3.ZodType,
   options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
 ): Record<string, unknown> {
+  assertSupportedZodV3Schema(schema, options.schemaDefinitions as Record<string, z3.ZodType> | undefined);
   const rootName = getZodV3RootName(options.name, options.schemaDefinitions);
   const jsonSchema = _zodToJsonSchema(schema, {
     openaiStrictMode: true,
@@ -140,7 +147,9 @@ function zodV3ToJsonSchema(
       : undefined),
   });
 
-  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  const escapedSchema = escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  assertJSONSerializableSchema(escapedSchema);
+  return escapedSchema;
 }
 
 function zodV4ToJsonSchema(
@@ -202,11 +211,15 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
   zodObject: ZodInput,
   content: string,
 ): InferZodType<ZodInput> {
-  const parsed = JSON.parse(content);
+  const parsed = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
   const parser = (zodObject as { parse?: (data: unknown) => unknown }).parse;
 
   if (typeof parser === 'function') {
-    return parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+    const result = parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+    if (!isZodV4(zodObject as unknown as ZodSchema)) {
+      assertJSONSerializableSchema(result);
+    }
+    return result;
   }
 
   return z4.parse(zodObject as unknown as ZodV4Schema, parsed) as InferZodType<ZodInput>;

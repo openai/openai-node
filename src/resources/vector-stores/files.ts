@@ -3,11 +3,11 @@
 import { APIResource } from '../../core/resource';
 import * as VectorStoresAPI from './vector-stores';
 import { APIPromise } from '../../core/api-promise';
-import { CursorPage, type CursorPageParams, PagePromise, Page } from '../../core/pagination';
+import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
-import { sleep } from '../../internal/utils';
 import { Uploadable } from '../../uploads';
+import { pollVectorStoreFile } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
 
 export class Files extends APIResource {
@@ -115,47 +115,7 @@ export class Files extends APIResource {
     fileID: string,
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
-    const headers = buildHeaders([
-      options?.headers,
-      {
-        'X-Stainless-Poll-Helper': 'true',
-        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-      },
-    ]);
-
-    while (true) {
-      const fileResponse = await this.retrieve(
-        fileID,
-        {
-          vector_store_id: vectorStoreID,
-        },
-        { ...options, headers },
-      ).withResponse();
-
-      const file = fileResponse.data;
-
-      switch (file.status) {
-        case 'in_progress':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = fileResponse.response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        case 'failed':
-        case 'completed':
-          return file;
-      }
-    }
+    return await pollVectorStoreFile(this, vectorStoreID, fileID, options);
   }
   /**
    * Upload a file to the `files` API and then attach it to the given vector store.

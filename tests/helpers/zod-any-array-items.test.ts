@@ -67,23 +67,22 @@ describe('strict Zod v3 any-array schemas', () => {
     expect(zodV3Schema).toEqual(zodV4Schema);
   });
 
-  it('preserves defaults on arrays with unconstrained items', () => {
-    const zodV3Schema = zodResponseFormat(
-      zv3.object({ values: zv3.array(zv3.any()).default([]) }),
-      'defaulted_any_array',
-    ).json_schema.schema;
+  it('rejects unprovable Zod v3 any-array defaults while preserving Zod v4 behavior', () => {
+    expect(() =>
+      zodResponseFormat(zv3.object({ values: zv3.array(zv3.any()).default([]) }), 'defaulted_any_array'),
+    ).toThrow(/ZodDefault.*JSON-native/u);
+
     const zodV4Schema = zodResponseFormat(
       zv4.object({ values: zv4.array(zv4.any()).default([]) }),
       'defaulted_any_array',
     ).json_schema.schema;
 
-    expect(zodV3Schema).toMatchObject({
+    expect(zodV4Schema).toMatchObject({
       properties: {
         values: { type: 'array', items: {}, default: [] },
       },
       required: ['values'],
     });
-    expect(zodV3Schema).toEqual(zodV4Schema);
   });
 
   it('retains descriptions attached to unconstrained array items', () => {

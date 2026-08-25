@@ -91,6 +91,37 @@ function customToolChunks(): OpenAI.Chat.ChatCompletionChunk[] {
 }
 
 describe('.stream()', () => {
+  it.each([
+    ['first-padding', 'last-padding'],
+    [undefined, 'last-padding'],
+    ['', ''],
+  ])('keeps chunk obfuscation out of accumulated completions (%s, %s)', async (first, last) => {
+    const padding = [first, last];
+    const chunks = contentChunks('Hello', ' world').map((chunk, index) => ({
+      ...chunk,
+      ...(padding[index] === undefined ? {} : { obfuscation: padding[index] }),
+    }));
+    const original = JSON.stringify(chunks);
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+    });
+    const received: OpenAI.Chat.ChatCompletionChunk[] = [];
+    stream.on('chunk', (chunk, snapshot) => {
+      received.push(chunk);
+      expect(snapshot).not.toHaveProperty('obfuscation');
+      expect(stream.currentChatCompletionSnapshot).not.toHaveProperty('obfuscation');
+    });
+
+    const completion = await stream.finalChatCompletion();
+    expect(received).toEqual(chunks);
+    expect(received.map((chunk) => chunk.obfuscation)).toEqual(padding);
+    expect(JSON.stringify(chunks)).toBe(original);
+    expect(completion.choices[0]?.message.content).toBe('Hello world');
+    expect(completion).not.toHaveProperty('obfuscation');
+    expect(JSON.stringify(completion)).not.toContain('obfuscation');
+  });
+
   it('emits finalization failures as errors', async () => {
     const chunk: OpenAI.Chat.ChatCompletionChunk = {
       id: 'chatcmpl-test',
@@ -654,6 +685,144 @@ describe('.stream()', () => {
       }
     `);
     expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.content?.length);
+  });
+
+  it('does not double-count logprobs carried by the first chunk of a choice', async () => {
+    const contentLogprob: ChatCompletionTokenLogprob = {
+      token: 'Hello',
+      logprob: -0.25,
+      bytes: [72, 101, 108, 108, 111],
+      top_logprobs: [],
+    };
+    const chunks: OpenAI.Chat.ChatCompletionChunk[] = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: { role: 'assistant', content: 'Hello' },
+            finish_reason: 'stop',
+            logprobs: { content: [contentLogprob], refusal: null },
+          },
+        ],
+      },
+    ];
+    const original = JSON.stringify(chunks);
+
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+      logprobs: true,
+    });
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices[0]?.logprobs?.content).toEqual([contentLogprob]);
+    expect(JSON.stringify(chunks)).toBe(original);
+  });
+
+  it('does not double-count refusal logprobs carried by the first chunk of a choice', async () => {
+    const refusalLogprob: ChatCompletionTokenLogprob = {
+      token: 'No',
+      logprob: -0.5,
+      bytes: [78, 111],
+      top_logprobs: [],
+    };
+    const chunks: OpenAI.Chat.ChatCompletionChunk[] = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: { role: 'assistant', refusal: 'No' },
+            finish_reason: 'stop',
+            logprobs: { content: null, refusal: [refusalLogprob] },
+          },
+        ],
+      },
+    ];
+    const original = JSON.stringify(chunks);
+
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+      logprobs: true,
+    });
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices[0]?.logprobs?.refusal).toEqual([refusalLogprob]);
+    expect(JSON.stringify(chunks)).toBe(original);
+  });
+
+  it('does not mutate caller chunks when accumulating logprobs across chunks', async () => {
+    const first: ChatCompletionTokenLogprob = {
+      token: 'Hello',
+      logprob: -0.25,
+      bytes: [72, 101, 108, 108, 111],
+      top_logprobs: [],
+    };
+    const second: ChatCompletionTokenLogprob = {
+      token: ' world',
+      logprob: -0.75,
+      bytes: [32, 119, 111, 114, 108, 100],
+      top_logprobs: [],
+    };
+    const chunks: OpenAI.Chat.ChatCompletionChunk[] = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null, logprobs: null }],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: { content: 'Hello' },
+            finish_reason: null,
+            logprobs: { content: [first], refusal: null },
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: { content: ' world' },
+            finish_reason: 'stop',
+            logprobs: { content: [second], refusal: null },
+          },
+        ],
+      },
+    ];
+    const original = JSON.stringify(chunks);
+
+    const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+      logprobs: true,
+    });
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(completion.choices[0]?.logprobs?.content).toEqual([first, second]);
+    expect(JSON.stringify(chunks)).toBe(original);
   });
 
   it('emits refusal logprobs events', async () => {

@@ -50,8 +50,8 @@ if (message?.parsed) {
 The Zod helpers convert your schema to JSON Schema and adapt it to the strict subset
 supported by [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs#supported-schemas).
 The root schema must be a `z.object()`. Common property schemas such as `z.string()`,
-`z.number()`, `z.boolean()`, `z.array()`, `z.enum()`, `z.literal()`, `z.union()`, and
-nullable fields are supported when they can be represented by that subset. A
+`z.number()`, `z.boolean()`, `z.array()`, `z.enum()`, JSON-native `z.literal()`, unambiguous
+`z.union()`, and nullable fields are supported when they can be represented by that subset. A
 `z.union()` can be nested inside an object, but a root `z.union()` or
 `z.discriminatedUnion()` is not supported because it produces a root-level `anyOf`.
 
@@ -61,9 +61,11 @@ Some Zod behavior cannot be represented in the schema sent to the API:
   To emulate an optional value, make the field nullable instead of using plain
   `.optional()`; the model will return either a value or `null` for that field.
 - Only constraints represented in the generated JSON Schema can guide the model.
-  Custom refinements and transforms still run when the SDK parses the response, but
-  some schemas that cannot be converted, including bare transforms in Zod v4, cause
-  the helper to throw before a request is made.
+  Strict Zod v3 helpers reject custom refinements, transforms, pipelines,
+  intersections, ambiguous unions, and asynchronous or native-only values such as
+  `Date`, `Map`, `Set`, `Promise`, and `BigInt`. Represent large integers as
+  decimal strings and call `BigInt(value)` after parsing. Non-strict Realtime
+  function helpers are unaffected.
 - `zodFunction()` always creates a strict function tool. `.default()` emits
   `default`, but strict conversion still marks the property as required, so it does
   not make model-generated tool arguments optional. String `.min()` and `.max()`
