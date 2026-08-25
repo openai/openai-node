@@ -113,6 +113,32 @@ describe('X.509 review regressions', () => {
     expect(new Headers(send.mock.calls[0]?.[2].headers).get('Authorization')).toBe('Bearer');
   });
 
+  test('preserves explicit X.509 refresh configuration when cloning a client', async () => {
+    let issuerRequests = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        issuerRequests += 1;
+        return Response.json(TOKEN_RESPONSE);
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI(
+      options({
+        workloadIdentity: {
+          type: 'x509',
+          identityProviderId: 'synthetic-review-provider',
+          serviceAccountId: 'synthetic-review-account',
+          refreshBufferMs: 42,
+        },
+      }),
+    );
+
+    await client.models.list();
+    await client.withOptions({ timeout: 1000 }).models.list();
+
+    expect(issuerRequests).toBe(1);
+  });
+
   test('never approves caller-substituted admin credentials', async () => {
     const send = vi.spyOn(transportCapability, 'sendX509Request');
     const client = new OpenAI(options({ adminAPIKey: '' }));
