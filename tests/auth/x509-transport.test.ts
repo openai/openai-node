@@ -59,9 +59,11 @@ describe('explicit X.509 transport capability', () => {
     try {
       const first = createX509Transport(directOptions(dispatcher));
       const rotated = createX509Transport(directOptions(rotatedDispatcher));
+      const exposesNoStringKeys: Extract<keyof X509Transport, string> extends never ? true : false = true;
 
       expect(Object.isFrozen(first)).toBe(true);
       expect(Reflect.ownKeys(first)).toEqual([]);
+      expect(exposesNoStringKeys).toBe(true);
       expect(rotated).not.toBe(first);
     } finally {
       await Promise.all([dispatcher.close(), rotatedDispatcher.close()]);

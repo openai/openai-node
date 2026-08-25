@@ -1,7 +1,8 @@
 import { types } from 'node:util';
 import { Agent, ProxyAgent, Request, fetch } from 'undici';
 import { OpenAIError } from '../../core/error';
-import type { RegisteredX509Transport, X509Transport, x509TransportBrand } from './x509-transport-registry';
+import { x509TransportBrand } from './x509-transport-registry';
+import type { RegisteredX509Transport, X509Transport } from './x509-transport-registry';
 import { findRegisteredX509Transport, rememberRegisteredX509Transport } from '#x509-transport-state';
 
 export type { X509Transport } from './x509-transport-registry';
@@ -25,9 +26,10 @@ export interface X509TransportOptions {
 }
 
 const allowedOptionNames = new Set(['runtime', 'dispatcher', 'certificateIdentity', 'proxy']);
+const transportBrand: typeof x509TransportBrand = x509TransportBrand;
 
 class NodeX509Transport implements X509Transport {
-  declare readonly __opaqueX509Transport: typeof x509TransportBrand;
+  declare readonly [transportBrand]: true;
 
   readonly #dispatcher: Agent | ProxyAgent;
 

@@ -1,12 +1,12 @@
 import { OpenAIError } from '../../core/error';
 import { findRegisteredX509Transport } from '#x509-transport-state';
 
-export declare const x509TransportBrand: unique symbol;
+export const x509TransportBrand: unique symbol = Symbol('X.509 transport capability');
 
 /** Opaque identity of one frozen, caller-owned, explicitly attested X.509 transport. */
 export interface X509Transport {
   /** Prevents ordinary objects from satisfying the transport capability contract. */
-  readonly __opaqueX509Transport: typeof x509TransportBrand;
+  readonly [x509TransportBrand]: true;
 }
 
 /** Validated short-lived token exchanged using a registered certificate identity. */
