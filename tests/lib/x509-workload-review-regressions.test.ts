@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { readFileSync } from 'node:fs';
 import { Agent } from 'undici';
 import { vi } from 'vitest';
 
@@ -59,6 +60,74 @@ afterEach(async () => {
 });
 
 describe('X.509 review regressions', () => {
+  test('documents the public X.509 authentication flow alongside workload-identity guidance', () => {
+    const authenticationGuide = readFileSync('docs/authentication.md', 'utf-8');
+
+    expect(authenticationGuide).toContain("import { createX509Transport } from 'openai/auth/x509-transport'");
+    expect(authenticationGuide).toContain("certificateIdentity: 'static'");
+    expect(authenticationGuide).toContain('https://mtls.api.openai.com/v1');
+    expect(authenticationGuide).toContain('WebSocket');
+  });
+
+  test('classifies an accessor-backed workload identity exactly once', async () => {
+    const configuration = options();
+    const enrolled = configuration.workloadIdentity;
+    const getter = vi.fn(() =>
+      getter.mock.calls.length === 1
+        ? enrolled
+        : {
+            identityProviderId: 'synthetic-other-provider',
+            serviceAccountId: 'synthetic-other-account',
+            provider: { tokenType: 'jwt' as const, getToken: async () => 'synthetic-subject-token' },
+          },
+    );
+    Object.defineProperty(configuration, 'workloadIdentity', { enumerable: true, get: getter });
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : Response.json({ data: [] }),
+      );
+
+    await new OpenAI(configuration).models.list();
+
+    expect(getter).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  test('preserves an explicitly empty admin credential without presenting its certificate', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockResolvedValue(Response.json({ data: [] }));
+    const client = new OpenAI(options({ adminAPIKey: '' }));
+
+    await client.request({
+      path: '/organization/projects',
+      method: 'get',
+      __security: { adminAPIKeyAuth: true },
+    });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[1].origin).toBe('https://mtls.api.openai.com');
+    expect(new Headers(send.mock.calls[0]?.[2].headers).get('Authorization')).toBe('Bearer');
+  });
+
+  test('never approves caller-substituted admin credentials', async () => {
+    const send = vi.spyOn(transportCapability, 'sendX509Request');
+    const client = new OpenAI(options({ adminAPIKey: '' }));
+
+    await expect(
+      client.request({
+        path: '/organization/projects',
+        method: 'get',
+        headers: { Authorization: 'Bearer synthetic-attacker-admin' },
+        __security: { adminAPIKeyAuth: true },
+      }),
+    ).rejects.toThrow(/authorization/iu);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   test.each([408, 409, 429, 500, 503])('retries trusted issuer status %i', async (status) => {
     let issuerRequests = 0;
     const send = vi

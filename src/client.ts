@@ -493,21 +493,7 @@ export class OpenAI {
    */
   constructor(clientOptions: ClientOptions = {}) {
     const residencyBaseURL = resolveDataResidency(clientOptions);
-    const usesX509Identity = isX509WorkloadIdentity(clientOptions.workloadIdentity);
     const provider = clientOptions.provider;
-    if (provider) {
-      const conflictingOptions = (
-        ['apiKey', 'adminAPIKey', 'workloadIdentity', 'x509Transport', 'baseURL', 'dataResidency'] as const
-      ).filter((key) => clientOptions[key] != null);
-      if (conflictingOptions.length) {
-        throw new Errors.OpenAIError(
-          `The \`provider\` option cannot be used with ${conflictingOptions
-            .map((key) => `\`${key}\``)
-            .join(', ')}. Configure authentication and the base URL through the provider instead.`,
-        );
-      }
-    }
-
     const {
       baseURL = provider ? null : readEnv('OPENAI_BASE_URL'),
       dataResidency: _dataResidency,
@@ -521,6 +507,23 @@ export class OpenAI {
       x509Transport,
       ...opts
     } = clientOptions as InternalClientOptions;
+    if (provider) {
+      const conflictingOptions = (
+        ['apiKey', 'adminAPIKey', 'workloadIdentity', 'x509Transport', 'baseURL', 'dataResidency'] as const
+      ).filter((key) => (key === 'workloadIdentity' ? workloadIdentity : clientOptions[key]) != null);
+      if (conflictingOptions.length) {
+        throw new Errors.OpenAIError(
+          `The \`provider\` option cannot be used with ${conflictingOptions
+            .map((key) => `\`${key}\``)
+            .join(', ')}. Configure authentication and the base URL through the provider instead.`,
+        );
+      }
+    }
+    const identity = isX509WorkloadIdentity(workloadIdentity)
+      ? { x509: workloadIdentity, legacy: undefined }
+      : { x509: undefined, legacy: workloadIdentity };
+    const x509Identity = identity.x509;
+    const usesX509Identity = x509Identity !== undefined;
     const providerRuntime = provider ? configureProvider(provider) : undefined;
     const options: ClientOptions = {
       apiKey,
@@ -610,16 +613,14 @@ export class OpenAI {
     this._options = options;
     this._provider = providerRuntime;
 
-    if (workloadIdentity) {
-      if (isX509WorkloadIdentity(workloadIdentity)) {
-        const authentication = new X509WorkloadIdentityAuth(workloadIdentity, x509Transport);
-        this._workloadIdentityAuth = authentication;
-        this.#x509Fetch = authentication.fetch();
-        this.fetch = this.#x509Fetch;
-        markApprovedX509Client(this);
-      } else {
-        this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
-      }
+    if (x509Identity) {
+      const authentication = new X509WorkloadIdentityAuth(x509Identity, x509Transport);
+      this._workloadIdentityAuth = authentication;
+      this.#x509Fetch = authentication.fetch();
+      this.fetch = this.#x509Fetch;
+      markApprovedX509Client(this);
+    } else if (identity.legacy) {
+      this._workloadIdentityAuth = new WorkloadIdentityAuth(identity.legacy, this.fetch);
     }
 
     this.apiKey = typeof apiKey === 'string' ? apiKey : null;

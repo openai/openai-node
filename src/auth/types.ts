@@ -36,16 +36,13 @@ export interface X509WorkloadIdentity {
   /** OpenAI service account authorized for the verified certificate identity. */
   serviceAccountId: string;
 
-  /** Optional milliseconds before expiry when the certificate-backed token should refresh. */
-  refreshBufferMs?: number;
-
   /** X.509 federation proves certificate possession instead of supplying a subject token. */
   provider?: never;
 
   /** X.509 federation does not send an OAuth client identifier. */
   clientId?: never;
 
-  /** X.509 refresh configuration is expressed in milliseconds. */
+  /** X.509 federation does not accept subject-token refresh configuration. */
   refreshBufferSeconds?: never;
 }
 
