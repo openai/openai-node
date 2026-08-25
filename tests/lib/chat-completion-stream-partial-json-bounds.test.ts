@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import OpenAI from 'openai';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { makeParseableResponseFormat, makeParseableTool } from 'openai/lib/parser';
-import * as partialJSONParser from '../../src/_vendor/partial-json-parser/parser';
+import * as partialJSONParser from '../../src/internal/partial-json';
 
 type Chunk = OpenAI.Chat.ChatCompletionChunk;
 

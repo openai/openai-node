@@ -345,16 +345,20 @@ const requiresOptionalPeer = (source: string): boolean =>
     delete isolatedEnvironment['NODE_PATH'];
 
     assert(
-      !fs.existsSync(path.join(installedPackageRoot, '_vendor/zod-to-json-schema')),
-      'Packed SDK unexpectedly includes the removed vendored Zod converter',
+      !fs.existsSync(path.join(installedPackageRoot, '_vendor')),
+      'Packed SDK unexpectedly includes vendored runtime code',
     );
     assert(
-      !fs.existsSync(path.join(installedSourceRoot, '_vendor/zod-to-json-schema')),
-      'Packed SDK source unexpectedly includes the removed vendored Zod converter',
+      !fs.existsSync(path.join(installedSourceRoot, '_vendor')),
+      'Packed SDK source unexpectedly includes vendored runtime code',
     );
     assert(
-      fs.existsSync(path.join(installedPackageRoot, '_vendor/partial-json-parser/parser.js')),
-      'Packed SDK is missing the partial JSON parser required for streaming',
+      fs.existsSync(path.join(installedPackageRoot, 'internal/partial-json.js')),
+      'Packed SDK is missing the first-party partial JSON parser required for streaming',
+    );
+    assert(
+      fs.existsSync(path.join(installedSourceRoot, 'internal/partial-json.ts')),
+      'Packed SDK source is missing the first-party partial JSON parser required for streaming',
     );
     assert(
       !fs.existsSync(path.join(temporaryDirectory, 'node_modules/@types/node')),

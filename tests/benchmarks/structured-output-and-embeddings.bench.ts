@@ -2,8 +2,8 @@ import { bench, describe } from 'vitest';
 import { z as zodV4 } from 'zod/v4';
 
 import OpenAI from '../../src';
-import { partialParse } from '../../src/_vendor/partial-json-parser/parser';
 import { zodResponseFormat, zodTextFormat } from '../../src/helpers/zod';
+import { partialParse } from '../../src/internal/partial-json';
 import { toFloat32Array } from '../../src/internal/utils/base64';
 import base64EmbeddingFixture from '../api-resources/embeddings-base64-response.json';
 import floatEmbeddingFixture from '../api-resources/embeddings-float-response.json';

@@ -93,7 +93,6 @@ module.exports = defineConfig({
         'examples/**',
         'ecosystem-tests/**',
         'scripts/_vendor/**',
-        'src/_vendor/**',
         'src/internal/utils/bytes.ts',
         'src/lib/parser.ts',
         'src/lib/ResponsesParser.ts',
@@ -171,7 +170,7 @@ module.exports = defineConfig({
       },
     },
     {
-      // These fixture, vendor, and state-machine files rely on deliberate
+      // These fixture and state-machine files rely on deliberate
       // declaration ordering or recursive initialization that is risky to reorder.
       files: [
         'ecosystem-tests/bun/openai.test.ts',
@@ -189,7 +188,6 @@ module.exports = defineConfig({
         'examples/chat-completions/parsing-run-tools.ts',
         'examples/chat-completions/tool-call-helpers-zod.ts',
         'examples/responses/websocket.ts',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/azure.ts',
         'src/core/streaming.ts',
         'src/internal/uploads.ts',
@@ -247,7 +245,6 @@ module.exports = defineConfig({
     {
       // These files intentionally colocate one closely related class pair.
       files: [
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/beta/realtime/internal-base.ts',
         'src/core/EventEmitter.ts',
         'src/core/streaming.ts',
@@ -305,10 +302,8 @@ module.exports = defineConfig({
       // ES2020 declaration library, which does not include Array.prototype.at.
       files: [
         'scripts/check-node-version-policy.ts',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/lib/AbstractChatCompletionRunner.ts',
         'src/lib/ChatCompletionStream.ts',
-        'tests/_vendor/partial-json-parser/partial-json-parsing.test.ts',
         'tests/lib/ChatCompletionRunFunctions.test.ts',
         'tests/realtime-websocket.test.ts',
       ],
@@ -594,11 +589,7 @@ module.exports = defineConfig({
     {
       // These parser, encoding, and benchmark paths intentionally use bit masks
       // and shifts; arithmetic rewrites would change low-level behavior.
-      files: [
-        'src/_vendor/partial-json-parser/parser.ts',
-        'src/internal/qs/utils.ts',
-        'tests/benchmarks/streaming.bench.ts',
-      ],
+      files: ['src/internal/qs/utils.ts', 'tests/benchmarks/streaming.bench.ts'],
       rules: {
         'no-bitwise': 'off',
       },
@@ -751,7 +742,6 @@ module.exports = defineConfig({
         'ecosystem-tests/cli.ts',
         'scripts/_vendor/tsc-multi/src/build.ts',
         'scripts/lint-generated.cjs',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/azure.ts',
         'src/helpers/standard-schema.ts',
         'src/internal/decoders/line.ts',
@@ -759,7 +749,6 @@ module.exports = defineConfig({
         'src/internal/ws.ts',
         'src/lib/AbstractChatCompletionRunner.ts',
         'src/lib/transform.ts',
-        'tests/_vendor/partial-json-parser/partial-json-parsing.test.ts',
         'tests/auth/workload-identity-auth.test.ts',
         'tests/benchmarks/streaming.bench.ts',
         'tests/generated-resource-helpers.test.ts',
@@ -776,8 +765,8 @@ module.exports = defineConfig({
       },
     },
     {
-      // These directives intentionally cover cross-version, cross-runtime, and
-      // vendored compatibility cases where changing the directive can break a matrix leg.
+      // These directives intentionally cover cross-version and cross-runtime
+      // compatibility cases where changing the directive can break a matrix leg.
       files: [
         'ecosystem-tests/bun/openai.test.ts',
         'ecosystem-tests/cloudflare-worker/src/uploadWebApiTestCases.ts',
@@ -811,7 +800,7 @@ module.exports = defineConfig({
       },
     },
     {
-      // These vendored and public type aliases intentionally preserve alias
+      // These public type aliases intentionally preserve alias
       // semantics; converting exported aliases to interfaces changes merge behavior.
       files: [
         'ecosystem-tests/cli.ts',
@@ -850,8 +839,8 @@ module.exports = defineConfig({
       },
     },
     {
-      // These inline comments intentionally preserve vendored context, bundler
-      // annotations, release markers, or fixture explanations at the exact site.
+      // These inline comments intentionally preserve bundler annotations,
+      // release markers, or fixture explanations at the exact site.
       files: [
         'ecosystem-tests/browser-direct-import/public/index.js',
         'examples/chat-completions/parsing-run-tools.ts',
@@ -865,7 +854,6 @@ module.exports = defineConfig({
         'examples/responses/structured-outputs-tools.ts',
         'examples/responses/structured-outputs.ts',
         'scripts/utils/postprocess-files.cjs',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/beta/realtime/websocket.ts',
         'src/beta/realtime/ws.ts',
         'src/helpers/audio.ts',
@@ -904,7 +892,6 @@ module.exports = defineConfig({
         'scripts/_vendor/tsc-multi/src/config.ts',
         'scripts/_vendor/tsc-multi/src/worker/worker.ts',
         'scripts/utils/check-version.cjs',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/beta/realtime/internal-base.ts',
         'src/beta/realtime/websocket.ts',
         'src/beta/realtime/ws.ts',
@@ -974,7 +961,6 @@ module.exports = defineConfig({
         'scripts/_vendor/tsc-multi/src/worker/worker.ts',
         'scripts/utils/attw-report.cjs',
         'scripts/utils/postprocess-files.cjs',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/beta/realtime/internal-base.ts',
         'src/core/streaming.ts',
         'src/internal/qs/stringify.ts',
@@ -1017,7 +1003,6 @@ module.exports = defineConfig({
         'examples/chat-completions/ui-generation.ts',
         'examples/responses/stream_background.ts',
         'examples/responses/structured-outputs-tools.ts',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/beta/realtime/internal-base.ts',
         'src/core/streaming.ts',
         'src/helpers/audio.ts',
@@ -1031,7 +1016,6 @@ module.exports = defineConfig({
         'src/lib/transform.ts',
         'src/providers/bedrock/aws.ts',
         'src/realtime/internal-base.ts',
-        'tests/_vendor/partial-json-parser/partial-json-parsing.test.ts',
         'tests/auth/workload-identity-auth.test.ts',
         'tests/benchmarks/structured-output-and-embeddings.bench.ts',
         'tests/helpers/zod.test.ts',
@@ -1213,7 +1197,6 @@ module.exports = defineConfig({
         'examples/fine-tuning/fine-tuning.ts',
         'scripts/_vendor/tsc-multi/src/utils.ts',
         'scripts/_vendor/tsc-multi/src/worker/entry.ts',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/beta/realtime/websocket.ts',
         'src/beta/realtime/ws.ts',
         'src/core/streaming.ts',
@@ -1285,19 +1268,10 @@ module.exports = defineConfig({
       },
     },
     {
-      // The vendored partial parser relies on substring's clamping and bound-swapping
-      // behavior for malformed input, which is not equivalent to slice.
-      files: ['src/_vendor/partial-json-parser/parser.ts'],
-      rules: {
-        'unicorn/prefer-string-slice': 'off',
-      },
-    },
-    {
       // These established parsers and stream state machines intentionally encode
       // protocol branching in one place; splitting them would risk behavior changes.
       files: [
         'scripts/_vendor/tsc-multi/src/transformer.ts',
-        'src/_vendor/partial-json-parser/parser.ts',
         'src/internal/qs/stringify.ts',
         'src/internal/qs/utils.ts',
         'src/lib/AbstractChatCompletionRunner.ts',

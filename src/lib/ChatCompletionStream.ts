@@ -1,4 +1,3 @@
-import { MalformedJSON, partialParse } from '../_vendor/partial-json-parser/parser';
 import {
   APIUserAbortError,
   ContentFilterFinishReasonError,
@@ -6,6 +5,7 @@ import {
   OpenAIError,
 } from '../error';
 import type OpenAI from '../index';
+import { partialParse } from '../internal/partial-json';
 import { observeJSONRequestBody, type RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
@@ -40,7 +40,7 @@ function parseStructuredStreamingJSON(content: string): unknown {
   try {
     return partialParse(content);
   } catch (error) {
-    if (error instanceof MalformedJSON || error instanceof SyntaxError) {
+    if (error instanceof SyntaxError) {
       return parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
     }
 
