@@ -57,7 +57,7 @@ X.509 workload identity is separate from API-key + HTTP mTLS: an enrolled client
 Install the SDK and its optional Node.js transport peer:
 
 ```sh
-npm install openai 'undici@^7'
+npm install openai "undici@^7"
 ```
 
 Undici 7 supports the SDK's complete Node.js 22 compatibility range; Undici 8 requires Node.js 22.19 or later.

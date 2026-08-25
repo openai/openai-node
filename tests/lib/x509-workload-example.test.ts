@@ -32,7 +32,7 @@ describe('X.509 workload-identity runnable example', () => {
   });
 
   test('documents an Undici version compatible with the complete supported Node 22 range', () => {
-    expect(exampleDocumentation).toContain("npm install openai 'undici@^7'");
+    expect(exampleDocumentation).toContain('npm install openai "undici@^7"');
   });
 
   test('builds repository self-imports before documenting the direct example command', () => {
