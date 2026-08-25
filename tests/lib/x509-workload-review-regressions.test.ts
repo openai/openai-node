@@ -525,6 +525,21 @@ describe('X.509 review regressions', () => {
     },
   );
 
+  test.each([
+    ['OpenAI_Organization', 'synthetic-enrolled-organization'],
+    ['OpenAI_Project', 'synthetic-enrolled-project'],
+  ])('rejects an equal-valued %s alias before presenting its certificate', async (header, value) => {
+    const send = vi.spyOn(transportCapability, 'sendX509Request');
+    const client = new OpenAI(
+      options({ organization: 'synthetic-enrolled-organization', project: 'synthetic-enrolled-project' }),
+    );
+
+    await expect(client.models.list({ headers: { [header]: value } })).rejects.toThrow(
+      /organization or project/iu,
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
   test('preserves caller request and header identities while snapshotting authenticated headers', async () => {
     const headers = { 'X-Synthetic-Request': 'synthetic-value' };
     const request = { path: '/models', method: 'get' as const, headers };

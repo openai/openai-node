@@ -740,9 +740,10 @@ export class X509WorkloadIdentityAuth {
     for (const name of supplied.values.keys()) {
       const canonical = name.toLowerCase().split('_').join('-');
       if (
-        (canonical === 'openai-organization' &&
-          headerValue(supplied.values, name) !== context.organization) ||
-        (canonical === 'openai-project' && headerValue(supplied.values, name) !== context.project)
+        (canonical === 'openai-organization' || canonical === 'openai-project') &&
+        (name !== canonical ||
+          headerValue(supplied.values, name) !==
+            (canonical === 'openai-organization' ? context.organization : context.project))
       ) {
         throw new OpenAIError(
           'X.509 workload identity cannot override its enrolled organization or project.',
