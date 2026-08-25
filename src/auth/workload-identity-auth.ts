@@ -2,7 +2,7 @@ import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { APIError, OAuthError, OpenAIError } from '../core/error';
-import { isMalformedJSONError } from './malformed-json-error';
+import { isMalformedJSONError } from '../internal/auth/malformed-json-error';
 
 interface CachedToken {
   token: string;

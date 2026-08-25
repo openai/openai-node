@@ -267,6 +267,22 @@ const parserFailures: readonly FailureCase[] = [
 
 const unbrandedParserFailures: readonly FailureCase[] = [
   {
+    name: 'plain error record with a string stack',
+    create: () => ({ message: 'safe custom parser failure', stack: 'ordinary custom stack' }),
+  },
+  {
+    name: 'plain error record with a null stack',
+    create: () => ({ message: 'safe custom parser failure', stack: null }),
+  },
+  {
+    name: 'Error prototype carrying an own message and stack',
+    create: () =>
+      Object.assign(Object.create(Error.prototype), {
+        message: 'safe custom parser failure',
+        stack: 'ordinary custom stack',
+      }),
+  },
+  {
     name: 'same-realm Error prototype with an invalid-json marker',
     create: () => Object.assign(Object.create(Error.prototype), { type: 'invalid-json' }),
   },

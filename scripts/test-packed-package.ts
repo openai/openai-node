@@ -109,6 +109,7 @@ const packedPackagePath = require('node:path');
           (name) =>
             `if (typeof auth.${name} !== 'function') throw new Error('CommonJS auth export ${name} is unavailable');`,
         ),
+        "try { require.resolve('openai/auth/malformed-json-error'); throw new Error('Private malformed JSON classifier is exposed as a CommonJS auth export'); } catch (error) { if (error.code !== 'MODULE_NOT_FOUND' && error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; }",
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
     );
@@ -124,6 +125,7 @@ const packedPackagePath = require('node:path');
           (name) =>
             `if (typeof ${name} !== 'function') throw new Error('ESM auth export ${name} is unavailable');`,
         ),
+        "try { await import('openai/auth/malformed-json-error'); throw new Error('Private malformed JSON classifier is exposed as an ESM auth export'); } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND' && error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; }",
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
     );
@@ -215,6 +217,17 @@ const packedPackagePath = require('node:path');
       npmCache,
       tarball,
     ]);
+
+    const publicAuthClassifier = path.join(
+      temporaryDirectory,
+      'node_modules/openai/auth/malformed-json-error',
+    );
+    for (const extension of ['.js', '.mjs', '.d.ts', '.d.mts']) {
+      assert(
+        !fs.existsSync(`${publicAuthClassifier}${extension}`),
+        `Private malformed JSON classifier is published under auth/malformed-json-error${extension}`,
+      );
+    }
 
     const unsupportedDispatcher =
       'assert.throws(direct, /Undici 5\\.2\\.0 or later/u); assert.throws(httpConnect, /Undici 5\\.2\\.0 or later/u); assert.throws(httpsConnect, /Undici 5\\.2\\.0 or later/u);';

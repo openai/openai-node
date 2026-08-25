@@ -1,7 +1,6 @@
 const MAX_JSON_ERROR_CAUSES = 32;
 const getErrorDescriptor = Object.getOwnPropertyDescriptor;
 const getErrorPrototype = Object.getPrototypeOf;
-const errorObjectSource = Object.prototype.toString;
 const errorFunctionSource = Function.prototype.toString;
 const nativeErrorSource = errorFunctionSource.call(Error);
 const nativeSyntaxErrorSource = errorFunctionSource.call(SyntaxError);
@@ -48,16 +47,6 @@ function getBuiltinErrorTypes(runtimeProcess: object): object | undefined {
   return types.value;
 }
 
-function getLegacyErrorTypes(runtimeProcess: object): object | undefined {
-  const loader = getErrorDescriptor(runtimeProcess, 'binding');
-  if (!loader || !('value' in loader) || typeof loader.value !== 'function') {
-    return undefined;
-  }
-
-  const utility: unknown = loader.value.call(runtimeProcess, 'util');
-  return typeof utility === 'object' && utility !== null ? utility : undefined;
-}
-
 function getRuntimeErrorTypes(): RuntimeErrorTypes | undefined {
   try {
     const runtimeProcess = (globalThis as { process?: object }).process;
@@ -65,7 +54,7 @@ function getRuntimeErrorTypes(): RuntimeErrorTypes | undefined {
       return undefined;
     }
 
-    const types = getBuiltinErrorTypes(runtimeProcess) ?? getLegacyErrorTypes(runtimeProcess);
+    const types = getBuiltinErrorTypes(runtimeProcess);
     if (!types) {
       return undefined;
     }
@@ -89,44 +78,6 @@ const nativeErrorBrand =
 const nativeProxyBrand = runtimeErrorTypes?.isProxy;
 
 type JSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
-
-function classifyUnbrandedError(error: object): 'unknown' | 'unsafe' {
-  if (nativeProxyBrand) {
-    return nativeProxyBrand(error) ? 'unsafe' : 'unknown';
-  }
-
-  const message = getErrorDescriptor(error, 'message');
-  const stack = getErrorDescriptor(error, 'stack');
-  if (message && 'value' in message && typeof message.value === 'string' && stack) {
-    return 'unsafe';
-  }
-
-  getErrorPrototype(error);
-  return 'unknown';
-}
-
-function classifyErrorBrand(error: object): 'native' | 'unknown' | 'unsafe' {
-  try {
-    if (nativeErrorBrand) {
-      return nativeErrorBrand(error) ? 'native' : classifyUnbrandedError(error);
-    }
-
-    let prototype: object | null = error;
-    for (let depth = 0; prototype !== null; depth += 1) {
-      if (depth >= MAX_JSON_ERROR_CAUSES) {
-        return 'unsafe';
-      }
-      if (getErrorDescriptor(prototype, Symbol.toStringTag)) {
-        return 'unknown';
-      }
-      prototype = getErrorPrototype(prototype) as object | null;
-    }
-
-    return errorObjectSource.call(error) === '[object Error]' ? 'native' : 'unknown';
-  } catch {
-    return 'unsafe';
-  }
-}
 
 function classifyCrossRealmError(error: object): JSONErrorKind {
   try {
@@ -168,6 +119,61 @@ function classifyCrossRealmError(error: object): JSONErrorKind {
   }
 }
 
+function hasNativeErrorDescriptors(error: object): boolean {
+  const message = getErrorDescriptor(error, 'message');
+  const stack = getErrorDescriptor(error, 'stack');
+  return Boolean(
+    message &&
+    'value' in message &&
+    typeof message.value === 'string' &&
+    !message.enumerable &&
+    (!stack ||
+      (!stack.enumerable &&
+        (('value' in stack && typeof stack.value === 'string') ||
+          (!('value' in stack) && typeof stack.get === 'function')))),
+  );
+}
+
+function classifyUnbrandedError(error: object): 'unknown' | 'unsafe' {
+  if (nativeProxyBrand) {
+    return nativeProxyBrand(error) ? 'unsafe' : 'unknown';
+  }
+
+  const kind = classifyCrossRealmError(error);
+  if (kind === 'unsafe') {
+    return 'unsafe';
+  }
+  if (kind === 'unknown') {
+    return 'unknown';
+  }
+
+  return hasNativeErrorDescriptors(error) ? 'unsafe' : 'unknown';
+}
+
+function classifyErrorBrand(error: object): 'native' | 'tagged-wrapper' | 'unknown' | 'unsafe' {
+  try {
+    if (nativeErrorBrand) {
+      return nativeErrorBrand(error) ? 'native' : classifyUnbrandedError(error);
+    }
+
+    const kind = classifyCrossRealmError(error);
+    if (kind === 'unsafe') {
+      return 'unsafe';
+    }
+    if (kind === 'unknown') {
+      return 'unknown';
+    }
+    if (hasNativeErrorDescriptors(error)) {
+      return 'native';
+    }
+
+    const cause = getErrorDescriptor(error, 'cause');
+    return kind === 'error' && cause && 'value' in cause ? 'tagged-wrapper' : 'unknown';
+  } catch {
+    return 'unsafe';
+  }
+}
+
 function isMalformedParserMarker(error: object, options?: MalformedJSONErrorOptions): boolean {
   const parserType = getErrorDescriptor(error, 'type');
   if (!parserType) {
@@ -197,7 +203,7 @@ export function isMalformedJSONError(error: unknown, options?: MalformedJSONErro
       if (brand === 'unsafe') {
         return true;
       }
-      if (brand !== 'native') {
+      if (brand !== 'native' && brand !== 'tagged-wrapper') {
         return false;
       }
       if (current instanceof SyntaxError) {
@@ -216,7 +222,7 @@ export function isMalformedJSONError(error: unknown, options?: MalformedJSONErro
         return false;
       }
 
-      if (isMalformedParserMarker(current, options)) {
+      if (brand === 'native' && isMalformedParserMarker(current, options)) {
         return true;
       }
 

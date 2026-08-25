@@ -483,6 +483,46 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     },
   );
 
+  it.each(
+    (['provider', 'workload'] as const).flatMap((boundary) =>
+      (['plain string stack', 'plain null stack', 'Error prototype'] as const).map((shape) => ({
+        boundary,
+        shape,
+      })),
+    ),
+  )('preserves a $shape custom metadata parser rejection through $boundary', async ({ boundary, shape }) => {
+    const original =
+      shape === 'Error prototype'
+        ? Object.assign(Object.create(Error.prototype), {
+            message: 'safe custom metadata parser failure',
+            stack: 'ordinary custom stack',
+          })
+        : {
+            message: 'safe custom metadata parser failure',
+            stack: shape === 'plain null stack' ? null : 'ordinary custom stack',
+          };
+    const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+    vi.spyOn(response, 'json').mockRejectedValue(original);
+    const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+    const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = createWorkloadClient(provider, apiFetch);
+    const operation = boundary === 'provider' ? () => provider.getToken() : () => client.models.list();
+    let failure: unknown;
+
+    try {
+      await operation();
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+    if (!(failure instanceof SubjectTokenProviderError)) {
+      throw new Error('The public provider did not preserve its custom parser failure.');
+    }
+    expect(failure.cause).toBe(shape === 'Error prototype' ? original : undefined);
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
   it.each(['own name', 'prototype name', 'native prototype', 'foreign type'] as const)(
     'preserves a spoofed or non-syntax cross-realm parser cause: %s',
     async (shape) => {

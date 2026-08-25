@@ -3,7 +3,7 @@ import type { SubjectTokenProvider } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { SubjectTokenProviderError } from '../core/error';
-import { isMalformedJSONError } from './malformed-json-error';
+import { isMalformedJSONError } from '../internal/auth/malformed-json-error';
 
 const DEFAULT_RESOURCE = 'https://management.azure.com/';
 const DEFAULT_AZURE_API_VERSION = '2018-02-01';
