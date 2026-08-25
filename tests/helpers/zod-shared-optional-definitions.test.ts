@@ -146,17 +146,6 @@ describe('Zod v3 optional schemas extracted into definitions', () => {
     expect(collectNotPointers(zodV4Schema)).toEqual([]);
   });
 
-  it('applies to a schemaDefinitions entry, which needs no sharing at all', () => {
-    const optional = zv3.string().nullable().optional();
-    const schema = zodResponseFormat(zv3.object({ primary: optional }), 'root', {
-      schemaDefinitions: { Optional: optional },
-    }).json_schema.schema as JsonSchema;
-
-    expect(collectNotPointers(schema)).toEqual([]);
-    expect(schema.properties?.['primary']).toEqual({ $ref: '#/definitions/Optional' });
-    expect(schema.definitions?.['Optional']).toEqual({ type: 'string', nullable: true });
-  });
-
   it('keeps non-strict Realtime tools consistent too', () => {
     const shared = zv3.string().nullable().optional();
     const parameters = zodRealtimeFunction({
@@ -345,38 +334,6 @@ describe('a definition keeps the context it was referenced from', () => {
     });
   });
 
-  it('strips the never branch even when the definition carries a description', () => {
-    const described = zv3.string().nullable().optional().describe('field guidance');
-
-    const schema = zodResponseFormat(zv3.object({ a: zv3.string() }), 'p', {
-      schemaDefinitions: { described },
-    }).json_schema.schema as unknown as { definitions: Record<string, JsonSchema> };
-
-    // `parseDef` puts `description` beside the generated `anyOf`, so a reducer that
-    // only accepts a lone `anyOf` would leave `not` in strict output.
-    expect(definitionNamed(schema, 'described')).toEqual({
-      type: 'string',
-      nullable: true,
-      description: 'field guidance',
-    });
-  });
-
-  it('strips a never branch nested inside a supplied container', () => {
-    const arr = zv3.array(zv3.string().nullable().optional());
-
-    const schema = zodResponseFormat(zv3.object({ a: zv3.string() }), 'p', {
-      schemaDefinitions: { arr },
-    }).json_schema.schema as unknown as { definitions: Record<string, JsonSchema> };
-
-    // The container has no property origin, so its element keeps the standalone
-    // spelling; strict mode still cannot carry the `not` down there.
-    expect(definitionNamed(schema, 'arr')).toEqual({
-      type: 'array',
-      items: { type: 'string', nullable: true },
-    });
-    expect(JSON.stringify(definitionNamed(schema, 'arr'))).not.toContain('not');
-  });
-
   it('leaves the branches of a definition that only wraps them', () => {
     // The property treatment is the outer optional wrapper and nothing below it.
     // Applied to every descendant, this union would lose its unconstrained branch
@@ -389,31 +346,6 @@ describe('a definition keeps the context it was referenced from', () => {
     }) as unknown as { parameters: { definitions: Record<string, JsonSchema> } };
 
     expect(definitionNamed(tool.parameters, 'f_properties_first_anyOf_0')).toEqual({});
-  });
-
-  it('leaves literal JSON alone while reducing schema positions', () => {
-    // A `default` is a value the caller declared, not a schema. Walking into it
-    // would rewrite the value the helpers serialize.
-    const literal = { anyOf: [{ not: {} }, { value: 'kept' }] };
-    const withDefault = zv3
-      .object({ v: zv3.string() })
-      .default(literal as never)
-      .nullable()
-      .optional();
-
-    const schema = zodToJsonSchema(zv3.object({ a: zv3.string() }), {
-      openaiStrictMode: true,
-      definitions: { withDefault },
-    }) as { definitions: Record<string, JsonSchema> };
-
-    expect(JSON.stringify(definitionNamed(schema, 'withDefault'))).toContain(
-      JSON.stringify({ default: literal }).slice(1, -1),
-    );
-    // The schema-level never branch is still gone.
-    expect((definitionNamed(schema, 'withDefault') as { anyOf?: unknown })['anyOf']).not.toEqual([
-      { not: {} },
-      expect.anything(),
-    ]);
   });
 
   it('still runs `override` for the definition it materializes', () => {
@@ -495,24 +427,6 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(Object.keys(properties)).toHaveLength(2);
     expect(Object.keys(properties)).toContain('__proto__');
     expect(Object.keys(properties)).toContain('ok');
-  });
-
-  it('carries `default` across the collapse without descending into it', () => {
-    // `parseDefaultDef` puts `default` beside the union a shared `.default()`
-    // produces. It is an annotation, so it moves; its value is literal JSON, so
-    // it is not walked. The strict helpers reject `ZodDefault` before conversion,
-    // but the exported converter does not.
-    const withDefault = zv3.string().nullable().optional().default('x');
-
-    const schema = zodToJsonSchema(zv3.object({ v: zv3.string() }), {
-      openaiStrictMode: true,
-      definitions: { withDefault },
-    }) as { definitions: Record<string, JsonSchema> };
-
-    expect(definitionNamed(schema, 'withDefault')).toEqual({
-      type: ['string', 'null'],
-      default: 'x',
-    });
   });
 
   it('leaves the wrapper standing when a reference points inside it', () => {

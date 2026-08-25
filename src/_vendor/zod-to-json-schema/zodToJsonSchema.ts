@@ -87,57 +87,9 @@ const originatedInsideProperty = (seen: Seen | undefined): boolean => {
 };
 
 /**
- * `anyOf: [{ not: {} }, X]` collapsed to `X`, everywhere it appears.
- *
- * The first branch matches nothing, so the union is exactly `X` — an identity in
- * JSON Schema, and the only spelling strict Structured Outputs will take. Any
- * sibling keywords, `description` among them, are carried onto the result.
- *
- * This walks the whole materialized definition rather than only its root: a
- * container supplied through `schemaDefinitions` holds its optional elements
- * nested, and a `not` left down there is rejected just the same.
- */
-/**
- * Keywords whose value is a schema, a list of schemas, or a map of schemas.
- *
- * Everything else -- `default`, `const`, `enum`, `examples`, `required` -- holds
- * literal JSON that happens to be an object, and walking into it would rewrite a
- * value the caller declared. `toStrictJsonSchema` in `lib/transform` draws the
- * same line.
- */
-const SCHEMA_KEYWORD = 'schema';
-const SCHEMA_LIST_KEYWORD = 'list';
-const SCHEMA_MAP_KEYWORD = 'map';
-
-const SCHEMA_CHILDREN = new Map<string, string>([
-  ['not', SCHEMA_KEYWORD],
-  ['if', SCHEMA_KEYWORD],
-  ['then', SCHEMA_KEYWORD],
-  ['else', SCHEMA_KEYWORD],
-  ['contains', SCHEMA_KEYWORD],
-  ['additionalItems', SCHEMA_KEYWORD],
-  ['additionalProperties', SCHEMA_KEYWORD],
-  ['unevaluatedItems', SCHEMA_KEYWORD],
-  ['unevaluatedProperties', SCHEMA_KEYWORD],
-  ['propertyNames', SCHEMA_KEYWORD],
-  ['anyOf', SCHEMA_LIST_KEYWORD],
-  ['oneOf', SCHEMA_LIST_KEYWORD],
-  ['allOf', SCHEMA_LIST_KEYWORD],
-  ['prefixItems', SCHEMA_LIST_KEYWORD],
-  ['properties', SCHEMA_MAP_KEYWORD],
-  ['patternProperties', SCHEMA_MAP_KEYWORD],
-  ['dependentSchemas', SCHEMA_MAP_KEYWORD],
-  ['definitions', SCHEMA_MAP_KEYWORD],
-  ['$defs', SCHEMA_MAP_KEYWORD],
-]);
-
-/**
- * Keywords that describe a schema without constraining what it accepts.
- *
- * `default` and `examples` belong here for the same reason the rest do: JSON
- * Schema files them under annotations, they narrow nothing, and `parseDefaultDef`
- * emits `default` beside the union a shared `.default()` produces. They are still
- * not descended into -- their values are literal JSON, not schemas.
+ * Keywords that describe a schema without constraining what it accepts. JSON
+ * Schema files all of these under annotations, so they can move when the wrapper
+ * around them is removed.
  */
 const ANNOTATION_KEYWORDS = new Set([
   'description',
@@ -151,142 +103,120 @@ const ANNOTATION_KEYWORDS = new Set([
   'examples',
 ]);
 
+/** Keywords whose value is a schema, a list of schemas, or a map of schemas. */
+const SCHEMA_CHILDREN = new Map<string, 'schema' | 'list' | 'map'>([
+  ['not', 'schema'],
+  ['if', 'schema'],
+  ['then', 'schema'],
+  ['else', 'schema'],
+  ['items', 'list'],
+  ['prefixItems', 'list'],
+  ['contains', 'schema'],
+  ['additionalItems', 'schema'],
+  ['additionalProperties', 'schema'],
+  ['unevaluatedItems', 'schema'],
+  ['unevaluatedProperties', 'schema'],
+  ['propertyNames', 'schema'],
+  ['anyOf', 'list'],
+  ['oneOf', 'list'],
+  ['allOf', 'list'],
+  ['properties', 'map'],
+  ['patternProperties', 'map'],
+  ['dependentSchemas', 'map'],
+  ['definitions', 'map'],
+  ['$defs', 'map'],
+]);
+
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * Own enumerable *data* properties only.
+ * The value of an own enumerable data property, or `undefined` for anything else.
  *
  * A schema can reach here from the public `override` hook, where a key may be an
  * accessor. Reading one runs caller code before anything has validated it, and a
- * throwing getter would take the conversion down. An object carrying any is left
- * exactly as it is rather than rebuilt.
+ * throwing getter would take the conversion down.
  */
-const dataProperties = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
-  const out: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  for (const key of Object.keys(value)) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !('value' in descriptor)) {
-      return undefined;
-    }
-    out[key] = descriptor.value;
-  }
-  return { ...out };
+const dataValue = (value: Record<string, unknown>, key: string): unknown => {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && 'value' in descriptor ? descriptor.value : undefined;
 };
 
+const hasAccessor = (value: Record<string, unknown>): boolean =>
+  Object.keys(value).some((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return !descriptor || !('value' in descriptor);
+  });
+
 /**
- * `anyOf: [{ not: {} }, X]` collapsed to `X`, with any sibling keywords kept.
+ * `anyOf: [{ not: {} }, X]` collapsed to `X`, with annotation siblings kept.
  *
  * The first branch matches nothing, so the union is exactly `X` -- an identity in
- * JSON Schema, and the only spelling strict Structured Outputs will take.
+ * JSON Schema. A validation keyword beside the union applies on top of the
+ * branch, so a schema carrying one is left standing rather than merged: spreading
+ * it over the branch would widen what the document accepts.
  */
 const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, unknown> => {
-  const branches = schema['anyOf'];
+  if (hasAccessor(schema)) {
+    return schema;
+  }
+  const branches = dataValue(schema, 'anyOf');
   if (!Array.isArray(branches) || branches.length !== 2) {
     return schema;
   }
   const [first, second] = branches as [unknown, unknown];
-  const isNever =
-    isPlainObject(first) &&
-    Object.keys(first).length === 1 &&
-    isPlainObject(first['not']) &&
-    Object.keys(first['not'] as object).length === 0;
-  if (!isNever || !isPlainObject(second)) {
+  if (!isPlainObject(first) || !isPlainObject(second) || hasAccessor(first)) {
     return schema;
   }
-  // Only annotations move across. `addMeta` is what puts them there, and they
-  // constrain nothing. A validation keyword sitting beside the union -- an
-  // `override` can return one -- means both it and the branch's own copy apply,
-  // and letting the outer one win would widen what the document accepts.
+  const not = dataValue(first, 'not');
+  if (Object.keys(first).length !== 1 || !isPlainObject(not) || Object.keys(not).length > 0) {
+    return schema;
+  }
   const carried: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(schema)) {
-    if (key !== 'anyOf' && ANNOTATION_KEYWORDS.has(key)) {
-      carried[key] = value;
+  for (const key of Object.keys(schema)) {
+    if (key === 'anyOf') {
+      continue;
     }
-  }
-  const collidesOnConstraint = Object.keys(schema).some(
-    (key) => key !== 'anyOf' && !ANNOTATION_KEYWORDS.has(key),
-  );
-  if (collidesOnConstraint) {
-    return schema;
+    if (!ANNOTATION_KEYWORDS.has(key)) {
+      return schema;
+    }
+    carried[key] = dataValue(schema, key);
   }
   return { ...second, ...carried };
 };
 
-/** `collapseNeverBranch` at every schema position, literal payloads left alone. */
-const collapseNeverBranchesDeep = (value: unknown): unknown => {
-  if (!isPlainObject(value)) {
-    return value;
-  }
-  const snapshot = dataProperties(value);
-  if (snapshot === undefined) {
-    return value;
-  }
-  const walked: Record<string, unknown> = { ...snapshot };
-  for (const [key, child] of Object.entries(snapshot)) {
-    const kind = SCHEMA_CHILDREN.get(key);
-    if (kind === SCHEMA_KEYWORD) {
-      walked[key] = collapseNeverBranchesDeep(child);
-    } else if (kind === SCHEMA_LIST_KEYWORD && Array.isArray(child)) {
-      walked[key] = child.map(collapseNeverBranchesDeep);
-    } else if (kind === SCHEMA_MAP_KEYWORD && isPlainObject(child)) {
-      // A null-prototype map: plain assignment of a `__proto__` key reaches the
-      // inherited setter instead of creating an own property, which drops the
-      // entry and installs it as the object's prototype.
-      const mapped: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-      for (const [name, sub] of Object.entries(child)) {
-        mapped[name] = collapseNeverBranchesDeep(sub);
-      }
-      walked[key] = { ...mapped };
-    } else if (key === 'items') {
-      // `items` is a schema in draft 2020-12 and either a schema or a positional
-      // list before it.
-      walked[key] = Array.isArray(child)
-        ? child.map(collapseNeverBranchesDeep)
-        : collapseNeverBranchesDeep(child);
-    }
-  }
-  return collapseNeverBranch(walked);
-};
-
 /**
- * Whether anything in `document` points at a path that only exists while the
- * wrapper is in place.
+ * Whether anything reachable through JSON Schema keywords points at a path that
+ * only exists while the wrapper is in place.
  *
- * Collapsing `anyOf: [{ not: {} }, X]` to `X` removes an `anyOf/1` segment from
- * every JSON pointer below it. References were already generated against the
- * uncollapsed shape -- `parseDef` records where it first saw a def -- so any of
- * them aiming inside would be left dangling. Relative references would shift by
- * a level for the same reason. Where that would happen the wrapper stays: a
- * redundant `anyOf` is a schema that still means what it says, and a broken
- * `$ref` is not.
+ * Collapsing removes an `anyOf/1` segment from every pointer below it, and
+ * references were generated against the uncollapsed shape. Where one aims inside,
+ * the wrapper stays: a redundant `anyOf` still means what it says, a broken
+ * `$ref` does not. Literal payloads are not searched -- a reference-shaped string
+ * inside a `default` is data, not a reference.
  */
-const referencesWrapperPath = (document: unknown, wrapperPath: string): boolean => {
-  const seenObjects = new Set<unknown>();
-  const walk = (value: unknown): boolean => {
-    if (Array.isArray(value)) {
-      return value.some(walk);
-    }
-    if (!isPlainObject(value) || seenObjects.has(value)) {
-      return false;
-    }
-    seenObjects.add(value);
-    for (const key of Object.keys(value)) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor || !('value' in descriptor)) {
-        continue;
-      }
-      const child = descriptor.value;
-      if (key === '$ref' && typeof child === 'string' && child.includes(wrapperPath)) {
-        return true;
-      }
-      if (walk(child)) {
-        return true;
-      }
-    }
+const referencesWrapperPath = (value: unknown, wrapperPath: string): boolean => {
+  if (Array.isArray(value)) {
+    return value.some((item) => referencesWrapperPath(item, wrapperPath));
+  }
+  if (!isPlainObject(value)) {
     return false;
-  };
-  return walk(document);
+  }
+  const ref = dataValue(value, '$ref');
+  if (typeof ref === 'string' && ref.includes(wrapperPath)) {
+    return true;
+  }
+  for (const [key, kind] of SCHEMA_CHILDREN) {
+    const child = dataValue(value, key);
+    if (kind === 'map' && isPlainObject(child)) {
+      if (Object.keys(child).some((name) => referencesWrapperPath(dataValue(child, name), wrapperPath))) {
+        return true;
+      }
+    } else if (referencesWrapperPath(child, wrapperPath)) {
+      return true;
+    }
+  }
+  return false;
 };
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
@@ -380,20 +310,17 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // definition is deliberate: giving it a property context instead would change how
         // everything nested inside it parses, and a container that holds an entry by
         // position or by branch loses that entry when its parser returns nothing.
+        // The one thing a property-derived definition needs is its outer optional
+        // wrapper dropped: the inline occurrence of the same Zod schema is encoded
+        // without it, and the two have to agree. Nothing below the definition is
+        // touched, and the wrapper stays wherever removing it would strand a
+        // pointer generated against the uncollapsed shape.
         let finished: JsonSchema7Type = materialized;
-        if (refs.openaiStrictMode) {
-          // `not` is outside the subset strict Structured Outputs accepts, at any
-          // depth (see `toStrictJsonSchema` in `lib/transform`).
-          finished = collapseNeverBranchesDeep(materialized) as JsonSchema7Type;
-        } else if (originatedInsideProperty(refs.seen.get(def))) {
-          // Only the outer wrapper: the inline occurrence of this same schema is
-          // encoded without it, and the two have to agree.
-          finished = collapseNeverBranch(materialized as Record<string, unknown>) as JsonSchema7Type;
-        }
-        if (finished !== materialized) {
+        if (originatedInsideProperty(refs.seen.get(def)) && isPlainObject(materialized)) {
+          const collapsed = collapseNeverBranch(materialized) as JsonSchema7Type;
           const wrapperPath = [...definitionPath, 'anyOf', '1'].join('/');
-          if (referencesWrapperPath(materialized, wrapperPath)) {
-            finished = materialized;
+          if (collapsed !== materialized && !referencesWrapperPath(materialized, wrapperPath)) {
+            finished = collapsed;
           }
         }
         definitions[key] = finished;
