@@ -335,6 +335,52 @@ describe('a definition keeps the context it was referenced from', () => {
     });
   });
 
+  it('strips the never branch even when the definition carries a description', () => {
+    const described = zv3.string().nullable().optional().describe('field guidance');
+
+    const schema = zodResponseFormat(zv3.object({ a: zv3.string() }), 'p', {
+      schemaDefinitions: { described },
+    }).json_schema.schema as unknown as { definitions: Record<string, JsonSchema> };
+
+    // `parseDef` puts `description` beside the generated `anyOf`, so a reducer that
+    // only accepts a lone `anyOf` would leave `not` in strict output.
+    expect(schema.definitions!['described']).toEqual({
+      type: 'string',
+      nullable: true,
+      description: 'field guidance',
+    });
+  });
+
+  it('strips a never branch nested inside a supplied container', () => {
+    const arr = zv3.array(zv3.string().nullable().optional());
+
+    const schema = zodResponseFormat(zv3.object({ a: zv3.string() }), 'p', {
+      schemaDefinitions: { arr },
+    }).json_schema.schema as unknown as { definitions: Record<string, JsonSchema> };
+
+    // The container has no property origin, so its element keeps the standalone
+    // spelling; strict mode still cannot carry the `not` down there.
+    expect(schema.definitions!['arr']).toEqual({
+      type: 'array',
+      items: { type: 'string', nullable: true },
+    });
+    expect(JSON.stringify(schema.definitions!['arr'])).not.toContain('not');
+  });
+
+  it('leaves the branches of a definition that only wraps them', () => {
+    // The property treatment is the outer optional wrapper and nothing below it.
+    // Applied to every descendant, this union would lose its unconstrained branch
+    // and the two properties sharing it would stop accepting the same values.
+    const shared = zv3.union([emptySlot(), zv3.string()]);
+
+    const tool = zodRealtimeFunction({
+      name: 'f',
+      parameters: zv3.object({ first: shared, second: shared }),
+    }) as unknown as { parameters: { definitions: Record<string, JsonSchema> } };
+
+    expect(tool.parameters.definitions['f_properties_first_anyOf_0']).toEqual({});
+  });
+
   it('still strips the wrapper for a definition extracted from a property', () => {
     const shared = zv3.string().nullable().optional();
 
