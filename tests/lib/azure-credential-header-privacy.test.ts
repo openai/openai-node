@@ -618,6 +618,274 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
+  test.each(
+    authenticationModes.flatMap((authentication) =>
+      (['changes value', 'throws on reuse'] as const).flatMap((behavior) =>
+        (['replaceable', 'fixed'] as const).map((representation) => ({
+          authentication,
+          behavior,
+          representation,
+        })),
+      ),
+    ),
+  )(
+    '$authentication reads a $behavior $representation request body getter only once',
+    async ({ authentication, behavior, representation }) => {
+      const first = { payload: 'first body representation' };
+      const options: FinalRequestOptions = { method: 'post', path: '/models' };
+      let reads = 0;
+      Object.defineProperty(options, 'body', {
+        configurable: representation === 'replaceable',
+        enumerable: true,
+        get() {
+          reads += 1;
+          if (reads === 1) {
+            return first;
+          }
+          if (behavior === 'throws on reuse') {
+            throw new Error('A one-shot request body cannot be read again.');
+          }
+          return { payload: 'incorrect second representation' };
+        },
+      });
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'safe-configured-token' }
+          : { azureADTokenProvider: provider }),
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client._callApiKey();
+      const built = await client.buildRequest(options);
+
+      expect(reads).toBe(1);
+      expect(built.req.body).toBe(JSON.stringify(first));
+      expect(built.req.headers.get(authentication === 'static-api-key' ? 'api-key' : 'authorization')).toBe(
+        authentication === 'static-api-key' ? 'safe-configured-token' : 'Bearer safe-provider-token',
+      );
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(authenticationModes)(
+    '%s dispatches the first representation from a stateful request body getter',
+    async (authentication) => {
+      const first = { payload: 'first body representation' };
+      const options: FinalRequestOptions = { method: 'post', path: '/models' };
+      let reads = 0;
+      Object.defineProperty(options, 'body', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          reads += 1;
+          return reads === 1 ? first : { payload: 'later diagnostic representation' };
+        },
+      });
+      const provider = vi.fn(async () => 'safe-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'safe-configured-token' }
+          : { azureADTokenProvider: provider }),
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client.request(options);
+
+      expect(fetch.mock.calls[0]?.[1]?.body).toBe(JSON.stringify(first));
+      expect(reads).toBe(2);
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('preserves custom body serialization errors after protected options have been copied', async () => {
+    const expected = new Error('custom request body serialization failed');
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/models',
+      headers: { 'x-safe': 'preserved' },
+    };
+    Object.defineProperty(options, 'body', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return {
+          toJSON() {
+            throw expected;
+          },
+        };
+      },
+    });
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      maxRetries: 0,
+    });
+
+    await expect(client.buildRequest(options)).rejects.toBe(expected);
+  });
+
+  test('preserves custom authentication errors after copying a falsy protected body', async () => {
+    const expected = new Error('custom authentication failed');
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      maxRetries: 0,
+    });
+    client.observeAuthenticationOptions = async () => {
+      throw expected;
+    };
+
+    await expect(
+      client.request({
+        method: 'post',
+        path: '/models',
+        headers: { 'x-safe': 'preserved' },
+        body: false,
+      }),
+    ).rejects.toBe(expected);
+  });
+
+  test.each(['inherited', 'non-enumerable'] as const)(
+    'does not consume a request body getter omitted by an %s options copy',
+    async (representation) => {
+      const options: FinalRequestOptions = { method: 'post', path: '/models' };
+      const owner = representation === 'inherited' ? Object.create(Object.getPrototypeOf(options)) : options;
+      if (representation === 'inherited') {
+        Object.setPrototypeOf(options, owner);
+      }
+      const read = vi.fn(() => {
+        throw new Error('An omitted request body getter must not be consumed.');
+      });
+      Object.defineProperty(owner, 'body', {
+        configurable: true,
+        enumerable: representation === 'inherited',
+        get: read,
+      });
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'safe-configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client.request(options);
+
+      expect(read).not.toHaveBeenCalled();
+      expect(fetch.mock.calls[0]?.[1]?.body).toBeUndefined();
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('safe-configured-token');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['data headers', 'headers accessor first', 'headers accessor last'] as const)(
+    'sanitizes a throwing body getter with %s without consuming it twice',
+    async (representation) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const headers = { 'api-key': 'safe-request-token' };
+      const options: FinalRequestOptions = { method: 'post', path: '/models' };
+      const installHeaders = (): void => {
+        Object.defineProperty(options, 'headers', {
+          configurable: true,
+          enumerable: true,
+          get: () => headers,
+        });
+      };
+      if (representation === 'data headers') {
+        options.headers = headers;
+      } else if (representation === 'headers accessor first') {
+        installHeaders();
+      }
+      const read = vi.fn(() => {
+        throw Object.assign(new Error(credential), { cause: new Error(credential) });
+      });
+      Object.defineProperty(options, 'body', {
+        configurable: true,
+        enumerable: true,
+        get: read,
+      });
+      if (representation === 'headers accessor last') {
+        installHeaders();
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(options, 'body');
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(Object.getOwnPropertyDescriptor(options, 'body')).toEqual(descriptor);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['installation', 'restoration'] as const)(
+    'sanitizes a body-accessor snapshot proxy %s trap',
+    async (phase) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const target: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        headers: { 'api-key': 'safe-request-token' },
+      };
+      Object.defineProperty(target, 'body', {
+        configurable: true,
+        enumerable: true,
+        get: () => ({ safe: true }),
+      });
+      const descriptor = Object.getOwnPropertyDescriptor(target, 'body');
+      let writes = 0;
+      const options = new Proxy(target, {
+        defineProperty(value, property, next) {
+          if (property !== 'body') {
+            return Reflect.defineProperty(value, property, next);
+          }
+          writes += 1;
+          if ((phase === 'installation' && writes === 1) || (phase === 'restoration' && writes === 2)) {
+            if (phase === 'restoration') {
+              Reflect.defineProperty(value, property, next);
+            }
+            throw Object.assign(new Error(credential), { cause: new Error(credential) });
+          }
+          return Reflect.defineProperty(value, property, next);
+        },
+      });
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+      expect(Object.getOwnPropertyDescriptor(target, 'body')).toEqual(descriptor);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   const statefulBodyCases = [
     { description: 'false', initial: false },
     { description: 'null', initial: null },
@@ -668,7 +936,7 @@ describe('Azure credential header diagnostic privacy', () => {
 
       await expectPrivateCredentialFailure(() => client.request(options), credential);
 
-      expect(reads).toBe(representation === 'own' ? 2 : 1);
+      expect(reads).toBe(representation === 'own' ? 1 : 0);
       expect(fetch).not.toHaveBeenCalled();
     },
   );
@@ -738,7 +1006,7 @@ describe('Azure credential header diagnostic privacy', () => {
 
       await expectPrivateCredentialFailure(() => client.request(options), credential);
 
-      expect(reads).toBe(2);
+      expect(reads).toBe(depth === 'deep' ? 2 : 0);
       expect(fetch).not.toHaveBeenCalled();
       expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
     },
@@ -3709,6 +3977,458 @@ describe('Azure credential header diagnostic privacy', () => {
       });
       expect(provider).toHaveBeenCalledTimes(scheme === 'auth' ? 0 : 1);
       expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  const liveDeferredHeaderCases = (['auth', 'bearer', 'admin'] as const).flatMap((scheme) =>
+    (['entries', 'keys', 'values', 'iterator', 'forEach'] as const).map((method) => ({ scheme, method })),
+  );
+
+  test.each(liveDeferredHeaderCases)(
+    'keeps deferred $scheme Headers.$method live through sorted and authentication mutations',
+    async ({ scheme, method }) => {
+      const configured = 'configured-token';
+      const authenticationName = scheme === 'auth' ? 'api-key' : 'authorization';
+      const finalAuthentication = scheme === 'auth' ? 'live-static-token' : `Bearer live-${scheme}-token`;
+      const provider = vi.fn(async () => configured);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(scheme === 'auth'
+          ? { apiKey: configured }
+          : { azureADTokenProvider: provider, adminAPIKey: configured }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutationScheme = scheme;
+      const observed: string[] = [];
+      client.mutateCarrier = (headers) => {
+        headers.set('x-a', 'first');
+        headers.set('x-c', 'last');
+        const namesByValue = new Map([
+          ['first', 'x-a'],
+          ['middle', 'x-b'],
+          ['last', 'x-c'],
+        ]);
+        const visit = (name: string, owner: Headers): void => {
+          observed.push(name);
+          if (name === 'x-a') {
+            owner.set('x-b', 'middle');
+          }
+          if (name === 'x-b') {
+            owner.set(authenticationName, finalAuthentication);
+          }
+        };
+
+        switch (method) {
+          case 'entries': {
+            for (const [name] of headers.entries()) {
+              visit(name, headers);
+            }
+            break;
+          }
+          case 'keys': {
+            for (const name of headers.keys()) {
+              visit(name, headers);
+            }
+            break;
+          }
+          case 'values': {
+            for (const value of headers.values()) {
+              const name = namesByValue.get(value) ?? authenticationName;
+              visit(name, headers);
+            }
+            break;
+          }
+          case 'iterator': {
+            for (const [name] of headers) {
+              visit(name, headers);
+            }
+            break;
+          }
+          case 'forEach': {
+            const iterate = headers.forEach;
+            iterate.call(headers, (_value, name, owner) => visit(name, owner));
+            break;
+          }
+          default: {
+            throw new Error('Unknown deferred live header iterator.');
+          }
+        }
+      };
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: scheme === 'admin' },
+      });
+
+      expect(observed).toEqual([authenticationName, 'x-a', 'x-b', 'x-c']);
+      const sent = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      expect(sent.get(authenticationName)).toBe(finalAuthentication);
+      expect(sent.get('x-b')).toBe('middle');
+      expect(provider).toHaveBeenCalledTimes(scheme === 'auth' ? 0 : 1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([
+    {
+      name: 'sorted insertion before the cursor',
+      mutate: (headers: Headers) => headers.set('x-0', 'inserted earlier'),
+    },
+    {
+      name: 'deletion of the current header',
+      mutate: (headers: Headers) => headers.delete('x-a'),
+    },
+    {
+      name: 'deletion of a pending header',
+      mutate: (headers: Headers) => headers.delete('x-c'),
+    },
+    {
+      name: 'replacement of a pending value',
+      mutate: (headers: Headers) => headers.set('x-c', 'replaced'),
+    },
+  ])('matches native Headers iterator position after $name', async ({ mutate }) => {
+    const run = (headers: Headers): readonly [string, string][] => {
+      headers.set('x-a', 'first');
+      headers.set('x-c', 'middle');
+      headers.set('x-d', 'last');
+      const iterator = headers.entries();
+      iterator.next();
+      iterator.next();
+      mutate(headers);
+      return [...iterator];
+    };
+    const expected = run(new Headers([['api-key', 'configured-token']]));
+    let observed: readonly [string, string][] = [];
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.mutateCarrier = (headers) => {
+      observed = run(headers);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(observed).toEqual(expected);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('resumes an exhausted deferred Headers iterator after a later insertion', async () => {
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.mutateCarrier = (headers) => {
+      const iterator = headers.entries();
+      expect(iterator.next()).toEqual({ value: ['api-key', 'configured-token'], done: false });
+      expect(iterator.next()).toEqual({ value: undefined, done: true });
+      headers.set('x-later', 'resumed');
+      expect(iterator.next()).toEqual({ value: ['x-later', 'resumed'], done: false });
+      expect(Object.prototype.toString.call(iterator)).toBe('[object Headers Iterator]');
+      expect(iterator[Symbol.iterator]()).toBe(iterator);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('x-later')).toBe('resumed');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['entries', 'keys', 'values'] as const)(
+    'preserves the native deferred Headers.%s iterator receiver and prototype protocol',
+    async (method) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutateCarrier = (headers) => {
+        const iterator = headers[method]();
+        expect(Object.getOwnPropertyDescriptor(iterator, 'next')).toBeUndefined();
+        expect(() => Reflect.apply(iterator.next, {}, [])).toThrow(TypeError);
+        let value: string | [string, string] = 'configured-token';
+        if (method === 'entries') {
+          value = ['api-key', 'configured-token'];
+        } else if (method === 'keys') {
+          value = 'api-key';
+        }
+        expect(Reflect.apply(Object.getPrototypeOf(iterator).next, iterator, [])).toEqual({
+          value,
+          done: false,
+        });
+        expect(iterator.next()).toEqual({ value: undefined, done: true });
+      };
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([
+    {
+      name: 'native set insertion',
+      mutate: (headers: Headers) => Headers.prototype.set.call(headers, 'x-b', 'inserted'),
+    },
+    {
+      name: 'native append update',
+      mutate: (headers: Headers) => Headers.prototype.append.call(headers, 'x-a', 'appended'),
+    },
+    {
+      name: 'native deletion',
+      mutate: (headers: Headers) => Headers.prototype.delete.call(headers, 'x-a'),
+    },
+  ])('keeps a deferred iterator live across $name', async ({ mutate }) => {
+    const run = (headers: Headers): readonly [string, string][] => {
+      headers.set('x-a', 'first');
+      headers.set('x-c', 'last');
+      const iterator = headers.entries();
+      expect(iterator.next().value).toEqual(['api-key', 'configured-token']);
+      mutate(headers);
+      return [...iterator];
+    };
+    const expected = run(new Headers([['api-key', 'configured-token']]));
+    let observed: readonly [string, string][] = [];
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.mutateCarrier = (headers) => {
+      observed = run(headers);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(observed).toEqual(expected);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['add', 'delete'] as const)(
+    'keeps an active deferred Headers iterator coherent when authentication tombstones %s',
+    async (operation) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.inspectAuthenticationCarrier = (carrier) => {
+        carrier.values.set('x-a', 'first');
+        carrier.values.set('x-b', 'middle');
+        carrier.values.set('x-c', 'last');
+        if (operation === 'delete') {
+          carrier.nulls.add('x-b');
+        }
+        const iterator = carrier.values.entries();
+        expect(iterator.next().value).toEqual(['api-key', 'configured-token']);
+        expect(iterator.next().value).toEqual(['x-a', 'first']);
+        if (operation === 'add') {
+          carrier.nulls.add('x-b');
+        } else {
+          carrier.nulls.delete('x-b');
+        }
+        expect([...iterator]).toEqual(
+          operation === 'add'
+            ? [['x-c', 'last']]
+            : [
+                ['x-b', 'middle'],
+                ['x-c', 'last'],
+              ],
+        );
+      };
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['add', 'delete', 'clear', 'replace'] as const)(
+    'keeps a deferred iterator coherent across intrinsic authentication tombstone %s',
+    async (operation) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.inspectAuthenticationCarrier = (carrier) => {
+        carrier.values.set('x-a', 'first');
+        carrier.values.set('x-b', 'middle');
+        carrier.values.set('x-c', 'last');
+        if (operation !== 'add') {
+          carrier.nulls.add('x-b');
+        }
+        const iterator = carrier.values.entries();
+        iterator.next();
+        iterator.next();
+        if (operation === 'add') {
+          Set.prototype.add.call(carrier.nulls, 'x-b');
+        } else if (operation === 'delete') {
+          Set.prototype.delete.call(carrier.nulls, 'x-b');
+        } else if (operation === 'replace') {
+          Set.prototype.delete.call(carrier.nulls, 'x-b');
+          Set.prototype.add.call(carrier.nulls, 'x-c');
+        } else {
+          Set.prototype.clear.call(carrier.nulls);
+        }
+        const expected: [string, string][] = [];
+        if (operation !== 'add') {
+          expected.push(['x-b', 'middle']);
+        }
+        if (operation !== 'replace') {
+          expected.push(['x-c', 'last']);
+        }
+        expect([...iterator]).toEqual(expected);
+      };
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('observes an equally sized intrinsic authentication-tombstone swap farther ahead', async () => {
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.inspectAuthenticationCarrier = (carrier) => {
+      for (const name of ['x-a', 'x-b', 'x-c', 'x-d', 'x-z']) {
+        carrier.values.set(name, name);
+      }
+      carrier.nulls.add('x-b');
+      const iterator = carrier.values.entries();
+      iterator.next();
+      iterator.next();
+      Set.prototype.delete.call(carrier.nulls, 'x-b');
+      Set.prototype.add.call(carrier.nulls, 'x-d');
+      expect([...iterator]).toEqual([
+        ['x-b', 'x-b'],
+        ['x-c', 'x-c'],
+        ['x-z', 'x-z'],
+      ]);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('never reads hostile own Set.size accessors while iterating deferred authentication', async () => {
+    const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    const fail = vi.fn(() => {
+      throw Object.assign(new Error(credential), { cause: new Error(credential) });
+    });
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.inspectAuthenticationCarrier = (carrier) => {
+      Object.defineProperty(carrier.nulls, 'size', { configurable: true, get: fail });
+      expect([...carrier.values]).toEqual([['api-key', 'configured-token']]);
+    };
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(fail).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['delete absent', 'replace unchanged'] as const)(
+    'does not repeatedly rebuild a live iterator during %s mutations',
+    async (operation) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.inspectAuthenticationCarrier = (carrier) => {
+        for (let index = 0; index < 12; index += 1) {
+          carrier.values.set(`x-${index}`, String(index));
+        }
+        const inspectNulls = vi.spyOn(carrier.nulls, Symbol.iterator);
+        const iterate = carrier.values.forEach;
+        iterate.call(carrier.values, (value, name, headers) => {
+          if (operation === 'delete absent') {
+            headers.delete('x-never-present');
+          } else {
+            headers.set(name, value);
+          }
+        });
+        expect(inspectNulls.mock.calls.length).toBeLessThanOrEqual(4);
+      };
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['api-key', 'Authorization'] as const)(
+    'sanitizes a malformed $name mutation reached through live deferred iteration',
+    async (name) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.mutateCarrier = (headers) => {
+        const iterate = headers.forEach;
+        iterate.call(headers, (_value, current, owner) => {
+          if (current === 'api-key') {
+            owner.set('x-next', 'visited');
+          }
+          if (current === 'x-next') {
+            owner.set(name, credential);
+          }
+        });
+      };
+
+      await expectPrivateCredentialFailure(
+        () => client.request({ method: 'get', path: '/models' }),
+        credential,
+      );
+
+      expect(fetch).not.toHaveBeenCalled();
     },
   );
 

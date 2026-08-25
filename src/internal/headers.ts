@@ -12,6 +12,7 @@ export type HeadersLike =
 
 const brand_privateNullableHeaders = /* @__PURE__ */ Symbol('brand.privateNullableHeaders');
 const httpTokenHeaderName = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const intrinsicSetSize = Object.getOwnPropertyDescriptor(Set.prototype, 'size')?.get;
 
 /**
  * @internal
@@ -33,6 +34,7 @@ type AzureAuthenticationHeaderMutation = {
   kind: 'append' | 'replace' | 'delete';
   values: string[];
 };
+type AzureAuthenticationHeaderIteratorResult = IteratorResult<[string, string] | string>;
 
 type AzureRequestHeaderMarker = {
   active: boolean;
@@ -66,6 +68,12 @@ const azureAuthenticationHeaderMutations = new WeakMap<
   Headers,
   Map<string, AzureAuthenticationHeaderMutation>
 >();
+const azureAuthenticationHeaderMutationVersions = new WeakMap<Headers, number>();
+const azureAuthenticationHeaderIteratorStates = new WeakMap<
+  object,
+  () => AzureAuthenticationHeaderIteratorResult
+>();
+const azureAuthenticationHeaderIteratorPrototypes = new WeakMap<object, object>();
 
 const azureAuthenticationNullCarriers = new WeakMap<Set<string>, NullableHeaders>();
 const azureRequestHeaders = new WeakMap<object, AzureRequestHeaderRegistrations>();
@@ -91,6 +99,31 @@ const coerceAzureCredentialHeaderValue = (value: unknown): string => {
   } catch {
     throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
   }
+};
+
+const invalidateAzureAuthenticationHeaderIterators = (headers: Headers): void => {
+  const version = azureAuthenticationHeaderMutationVersions.get(headers) ?? 0;
+  azureAuthenticationHeaderMutationVersions.set(headers, version + 1);
+};
+
+const azureAuthenticationHeaderIteratorPrototype = (iterator: object): object => {
+  const intrinsic = Object.getPrototypeOf(iterator) as object;
+  let prototype = azureAuthenticationHeaderIteratorPrototypes.get(intrinsic);
+  if (prototype !== undefined) return prototype;
+
+  const nativeNext = Reflect.get(intrinsic, 'next') as () => AzureAuthenticationHeaderIteratorResult;
+  prototype = Object.create(intrinsic) as object;
+  Object.defineProperty(prototype, 'next', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: function next(this: object): AzureAuthenticationHeaderIteratorResult {
+      const advance = azureAuthenticationHeaderIteratorStates.get(this);
+      return advance === undefined ? Reflect.apply(nativeNext, this, []) : advance();
+    },
+  });
+  azureAuthenticationHeaderIteratorPrototypes.set(intrinsic, prototype);
+  return prototype;
 };
 
 class DeferredAzureAuthenticationHeaders extends Headers {
@@ -149,21 +182,21 @@ class DeferredAzureAuthenticationHeaders extends Headers {
         configurable: true,
         writable: true,
         value(this: DeferredAzureAuthenticationHeaders): ReturnType<Headers['entries']> {
-          return this.current().entries() as unknown as ReturnType<Headers['entries']>;
+          return this.iterator('entries');
         },
       },
       keys: {
         configurable: true,
         writable: true,
         value(this: DeferredAzureAuthenticationHeaders): ReturnType<Headers['keys']> {
-          return this.current().keys() as unknown as ReturnType<Headers['keys']>;
+          return this.iterator('keys');
         },
       },
       values: {
         configurable: true,
         writable: true,
         value(this: DeferredAzureAuthenticationHeaders): ReturnType<Headers['values']> {
-          return this.current().values() as unknown as ReturnType<Headers['values']>;
+          return this.iterator('values');
         },
       },
       [Symbol.iterator]: {
@@ -205,11 +238,93 @@ class DeferredAzureAuthenticationHeaders extends Headers {
         writable: true,
         value(this: DeferredAzureAuthenticationHeaders, name: string): void {
           const normalized = String(name).toLowerCase();
+          const mutations = azureAuthenticationHeaderMutations.get(this);
+          const previous = mutations?.get(normalized);
+          const existed = Headers.prototype.has.call(this, normalized);
           Headers.prototype.delete.call(this, normalized);
-          azureAuthenticationHeaderMutations.get(this)?.set(normalized, { kind: 'delete', values: [] });
+          mutations?.set(normalized, { kind: 'delete', values: [] });
+          if (existed || previous?.kind !== 'delete') {
+            invalidateAzureAuthenticationHeaderIterators(this);
+          }
         },
       },
     });
+  }
+
+  private iterator(kind: 'entries'): ReturnType<Headers['entries']>;
+  private iterator(kind: 'keys'): ReturnType<Headers['keys']>;
+  private iterator(kind: 'values'): ReturnType<Headers['values']>;
+  private iterator(
+    kind: 'entries' | 'keys' | 'values',
+  ): ReturnType<Headers['entries']> | ReturnType<Headers['keys']> | ReturnType<Headers['values']> {
+    const iterator =
+      kind === 'entries'
+        ? Headers.prototype.entries.call(this)
+        : kind === 'keys'
+          ? Headers.prototype.keys.call(this)
+          : Headers.prototype.values.call(this);
+    let entries: [string, string][] = [];
+    let nativeEntries: [string, string][] = [];
+    let nativeValues = new Map<string, string>();
+    let nativeObserver = Headers.prototype.entries.call(this);
+    let nativeIndex = 0;
+    let nullNames = new Set<string>();
+    let nullCount = 0;
+    let version: number | undefined;
+    let index = 0;
+    const carrier = azureAuthenticationHeaderCarriers.get(this);
+    const readNullCount = (): number =>
+      carrier !== undefined && intrinsicSetSize !== undefined
+        ? (Reflect.apply(intrinsicSetSize, carrier.nulls, []) as number)
+        : 0;
+
+    const next = (): AzureAuthenticationHeaderIteratorResult => {
+      const currentVersion = azureAuthenticationHeaderMutationVersions.get(this) ?? 0;
+      let changed = version !== currentVersion || readNullCount() !== nullCount;
+      if (!changed) {
+        const observed = nativeObserver.next();
+        const expected = nativeEntries[nativeIndex];
+        changed = observed.done
+          ? expected !== undefined
+          : expected === undefined || observed.value[0] !== expected[0] || observed.value[1] !== expected[1];
+        if (!changed && !observed.done && carrier !== undefined) {
+          changed =
+            nullNames.has(observed.value[0]) !== Set.prototype.has.call(carrier.nulls, observed.value[0]);
+        }
+        if (!observed.done) nativeIndex += 1;
+
+        for (const candidate of [entries[index], entries[index - 1]]) {
+          if (changed || candidate === undefined) continue;
+          const previous = nativeValues.get(candidate[0]) ?? null;
+          const hidden = carrier === undefined ? false : Set.prototype.has.call(carrier.nulls, candidate[0]);
+          changed =
+            Headers.prototype.get.call(this, candidate[0]) !== previous ||
+            nullNames.has(candidate[0]) !== hidden;
+        }
+      }
+      if (changed) {
+        entries = [...this.current()];
+        nativeEntries = [...Headers.prototype.entries.call(this)];
+        nativeValues = new Map(nativeEntries);
+        nativeObserver = Headers.prototype.entries.call(this);
+        nativeIndex = 0;
+        nullNames = new Set(carrier === undefined ? [] : Set.prototype.values.call(carrier.nulls));
+        nullCount = readNullCount();
+        version = azureAuthenticationHeaderMutationVersions.get(this) ?? currentVersion;
+      }
+
+      const entry = entries[index];
+      if (entry === undefined) {
+        return { value: undefined, done: true };
+      }
+      index += 1;
+      const value = kind === 'keys' ? entry[0] : kind === 'values' ? entry[1] : entry;
+      return { value, done: false };
+    };
+    Object.setPrototypeOf(iterator, azureAuthenticationHeaderIteratorPrototype(iterator));
+    azureAuthenticationHeaderIteratorStates.set(iterator, next);
+
+    return iterator;
   }
 
   private current(): Map<string, string> {
@@ -235,6 +350,7 @@ class DeferredAzureAuthenticationHeaders extends Headers {
     const normalized = String(name).toLowerCase();
     const authentication = isAzureAuthenticationHeader(normalized);
     const normalizedValue = authentication ? coerceAzureCredentialHeaderValue(value) : value;
+    const previousValue = Headers.prototype.get.call(this, normalized);
     let safe = true;
 
     if (authentication) {
@@ -269,6 +385,18 @@ class DeferredAzureAuthenticationHeaders extends Headers {
       kind,
       values: authentication ? [...(previousValues ?? []), normalizedValue] : [],
     });
+    const unchanged =
+      operation === 'replace' &&
+      previousValue !== null &&
+      previousValue === Headers.prototype.get.call(this, normalized) &&
+      previous?.kind !== 'append' &&
+      (!authentication ||
+        (previous?.kind === 'replace' &&
+          previous.values.length === 1 &&
+          previous.values[0] === normalizedValue));
+    if (!unchanged) {
+      invalidateAzureAuthenticationHeaderIterators(this);
+    }
   }
 }
 
@@ -367,15 +495,24 @@ class DeferredAzureAuthenticationNulls extends Set<string> {
 
   override add(value: string): this {
     this.initialize();
+    const size = super.size;
     super.add(value);
+    const carrier = azureAuthenticationNullCarriers.get(this);
+    if (carrier && super.size !== size) {
+      invalidateAzureAuthenticationHeaderIterators(carrier.values);
+    }
     return this;
   }
 
   override delete(value: string): boolean {
     this.initialize();
     const removed = super.delete(value);
+    const carrier = azureAuthenticationNullCarriers.get(this);
     if (removed && this.inherited.delete(value)) {
-      azureAuthenticationNullCarriers.get(this)?.values.delete(value);
+      carrier?.values.delete(value);
+    }
+    if (removed && carrier) {
+      invalidateAzureAuthenticationHeaderIterators(carrier.values);
     }
     return removed;
   }

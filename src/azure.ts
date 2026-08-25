@@ -179,11 +179,17 @@ export class AzureOpenAI extends OpenAI {
         ? snapshotAzureRequestAuthentication(this, this.authHeaders, protection)
         : undefined;
       let pending: ReturnType<OpenAI['buildRequest']>;
+      let restoreBody: (() => void) | undefined;
       try {
+        restoreBody = snapshotAzureRequestBodyAccessor(options);
         pending = super.buildRequest(options, props);
       } finally {
-        restoreAuthentication?.();
-        protection?.deactivate();
+        try {
+          restoreBody?.();
+        } finally {
+          restoreAuthentication?.();
+          protection?.deactivate();
+        }
       }
 
       const built = await pending.catch((error: unknown) => {
@@ -294,11 +300,12 @@ function shouldProtectAzureRequestHeaders(options: FinalRequestOptions): boolean
         }
       }
     }
+    if (typeof descriptor?.get === 'function') {
+      return true;
+    }
     const { body } = options;
     return (
-      typeof descriptor?.get === 'function' ||
-      (descriptor === undefined && owner !== null) ||
-      (body === undefined ? 'body' in options : Boolean(body))
+      (descriptor === undefined && owner !== null) || (body === undefined ? 'body' in options : Boolean(body))
     );
   } catch {
     throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
@@ -311,6 +318,58 @@ type AzureAuthenticationHook = (
 ) => Promise<NullableHeaders | undefined>;
 
 const azureRequestAuthenticationOriginals = new WeakMap<AzureAuthenticationHook, AzureAuthenticationHook>();
+
+function snapshotAzureRequestBodyAccessor(options: FinalRequestOptions): (() => void) | undefined {
+  let descriptor: PropertyDescriptor | undefined;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(options, 'body');
+  } catch {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+  if (!descriptor?.enumerable || !descriptor.configurable || typeof descriptor.get !== 'function') {
+    return undefined;
+  }
+
+  const originalDescriptor: PropertyDescriptor = descriptor;
+  const original = descriptor.get;
+  const getter = function getter(this: FinalRequestOptions): unknown {
+    try {
+      return Reflect.apply(original, this, []);
+    } catch {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+  };
+
+  const restore = (): void => {
+    if (Object.getOwnPropertyDescriptor(options, 'body')?.get !== getter) {
+      return;
+    }
+    Object.defineProperty(options, 'body', originalDescriptor);
+  };
+  try {
+    Object.defineProperty(options, 'body', { ...originalDescriptor, get: getter });
+  } catch {
+    try {
+      restore();
+    } catch {
+      // A hostile proxy can prevent restoration after forwarding its first trap.
+    }
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+
+  return () => {
+    try {
+      restore();
+    } catch {
+      try {
+        restore();
+      } catch {
+        // Preserve the original descriptor when repeated hostile hooks prevent restoration.
+      }
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+  };
+}
 
 function snapshotAzureRequestAuthentication(
   client: AzureOpenAI,
