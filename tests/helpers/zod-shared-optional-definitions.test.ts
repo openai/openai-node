@@ -53,7 +53,7 @@ function collectNotPointers(value: unknown, path = '#', pointers: string[] = [])
   }
 
   if (Array.isArray(value)) {
-    value.forEach((item, index) => collectNotPointers(item, `${path}/${index}`, pointers));
+    value.map((item, index) => collectNotPointers(item, `${path}/${index}`, pointers));
     return pointers;
   }
 
@@ -61,7 +61,7 @@ function collectNotPointers(value: unknown, path = '#', pointers: string[] = [])
     if (key === 'not') {
       pointers.push(`${path}/not`);
     }
-    collectNotPointers(child, `${path}/${key.replace(/~/gu, '~0').replace(/\//gu, '~1')}`, pointers);
+    collectNotPointers(child, `${path}/${key.split('~').join('~0').split('/').join('~1')}`, pointers);
   }
 
   return pointers;
@@ -87,6 +87,21 @@ const sharedObject = zv3.object({ street: zv3.string(), city: zv3.string() }).nu
 
 const sharedStringSchema = zv3.object({ primary: sharedString, secondary: sharedString });
 const sharedObjectSchema = zv3.object({ home: sharedObject, work: sharedObject });
+
+/** `definitions[name]`, asserted present so the tests can index it plainly. */
+function definitionNamed(schema: unknown, name: string): Record<string, unknown> {
+  const { definitions } = schema as { definitions?: Record<string, unknown> };
+  expect(definitions).toBeDefined();
+  const found = (definitions as Record<string, unknown>)[name];
+  expect(found).toBeDefined();
+  return found as Record<string, unknown>;
+}
+
+const emptySlot = () =>
+  zv3
+    .preprocess(() => undefined as unknown, zv3.void())
+    .transform(() => 0)
+    .optional();
 
 describe('Zod v3 optional schemas extracted into definitions', () => {
   it.each(strictHelpers)('reuses one encoding for a shared optional string in $name', ({ convert }) => {
@@ -212,7 +227,7 @@ describe('a definition keeps the context it was referenced from', () => {
       definitions: { Optional: optional },
     }) as { definitions: Record<string, JsonSchema> };
 
-    expect(schema.definitions!['Optional']).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
+    expect(definitionNamed(schema, 'Optional')).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
   });
 
   it('keeps the standalone encoding for a definition the caller supplied outright', () => {
@@ -222,7 +237,7 @@ describe('a definition keeps the context it was referenced from', () => {
       definitions: { Optional: optional },
     }) as { definitions: Record<string, JsonSchema> };
 
-    expect(schema.definitions!['Optional']).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
+    expect(definitionNamed(schema, 'Optional')).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
   });
 
   // `items` is positional while `minItems`/`maxItems` come from the declared arity, so a
@@ -230,12 +245,6 @@ describe('a definition keeps the context it was referenced from', () => {
   // element and makes the document accept and reject the opposite arrays from the Zod
   // schema. The exported converter is reachable without the strict helpers' `ZodTuple`
   // rejection, so every position is covered here rather than assumed away.
-  const emptySlot = () =>
-    zv3
-      .preprocess(() => undefined, zv3.void())
-      .transform(() => 0)
-      .optional();
-
   it('keeps every tuple position when the tuple is a supplied definition', () => {
     const tuple = zv3.tuple([emptySlot(), zv3.string()]);
 
@@ -243,7 +252,7 @@ describe('a definition keeps the context it was referenced from', () => {
       definitions: Record<string, { items: JsonSchema[]; minItems: number; maxItems: number }>;
     };
 
-    expect(schema.definitions['Tuple']).toEqual({
+    expect(definitionNamed(schema, 'Tuple')).toEqual({
       type: 'array',
       minItems: 2,
       maxItems: 2,
@@ -263,15 +272,15 @@ describe('a definition keeps the context it was referenced from', () => {
       definitions: { Tuple: tuple },
     }) as { definitions: Record<string, { items: JsonSchema[] }> };
 
-    expect(schema.definitions['Tuple']!.items).toEqual([{}, { type: 'string' }]);
+    expect(definitionNamed(schema, 'Tuple')['items']).toEqual([{}, { type: 'string' }]);
   });
 
   it('keeps every tuple position under an object property', () => {
-    const schema = zodToJsonSchema(
-      zv3.object({ pair: zv3.tuple([emptySlot(), zv3.string()]) }),
-    ) as { properties: Record<string, { items: JsonSchema[] }> };
+    const schema = zodToJsonSchema(zv3.object({ pair: zv3.tuple([emptySlot(), zv3.string()]) })) as {
+      properties: Record<string, { items: JsonSchema[] }>;
+    };
 
-    expect(schema.properties!['pair']!.items).toEqual([{}, { type: 'string' }]);
+    expect(schema.properties['pair']?.items).toEqual([{}, { type: 'string' }]);
   });
 
   it('keeps every tuple position when the tuple has a rest element', () => {
@@ -295,7 +304,7 @@ describe('a definition keeps the context it was referenced from', () => {
     }) as { definitions: Record<string, { anyOf: JsonSchema[] }> };
 
     // Without the empty branch the document rejects `{ value: 42 }`, which Zod accepts.
-    expect(schema.definitions['Choice']!.anyOf).toEqual([{}, { type: 'string' }]);
+    expect(definitionNamed(schema, 'Choice')['anyOf']).toEqual([{}, { type: 'string' }]);
   });
 
   it('keeps `items` on an array definition whose element parses to nothing', () => {
@@ -308,13 +317,13 @@ describe('a definition keeps the context it was referenced from', () => {
 
     // `items: undefined` disappears in serialization and strict validation rejects
     // the result, so the key has to carry a real value.
-    expect(schema.definitions['Arr']).toEqual({ type: 'array', items: {} });
-    expect(JSON.parse(JSON.stringify(schema.definitions['Arr'])).items).toEqual({});
+    expect(definitionNamed(schema, 'Arr')).toEqual({ type: 'array', items: {} });
+    expect((structuredClone(definitionNamed(schema, 'Arr')) as { items?: unknown }).items).toEqual({});
   });
 
   it('keeps the description on a definition that falls back to an empty schema', () => {
     const described = zv3
-      .preprocess(() => undefined, zv3.void())
+      .preprocess(() => undefined as unknown, zv3.void())
       .transform(() => 0)
       .optional()
       .describe('Tell the model this field normalizes to zero');
@@ -328,7 +337,7 @@ describe('a definition keeps the context it was referenced from', () => {
 
     // The second property is a `$ref` to this definition, so losing the text here
     // takes the model-visible guidance for both fields with it.
-    expect(tool.parameters.definitions['normalizer_properties_first']).toEqual({
+    expect(definitionNamed(tool.parameters, 'normalizer_properties_first')).toEqual({
       description: 'Tell the model this field normalizes to zero',
     });
     expect(tool.parameters.properties['second']).toEqual({
@@ -345,7 +354,7 @@ describe('a definition keeps the context it was referenced from', () => {
 
     // `parseDef` puts `description` beside the generated `anyOf`, so a reducer that
     // only accepts a lone `anyOf` would leave `not` in strict output.
-    expect(schema.definitions!['described']).toEqual({
+    expect(definitionNamed(schema, 'described')).toEqual({
       type: 'string',
       nullable: true,
       description: 'field guidance',
@@ -361,11 +370,11 @@ describe('a definition keeps the context it was referenced from', () => {
 
     // The container has no property origin, so its element keeps the standalone
     // spelling; strict mode still cannot carry the `not` down there.
-    expect(schema.definitions!['arr']).toEqual({
+    expect(definitionNamed(schema, 'arr')).toEqual({
       type: 'array',
       items: { type: 'string', nullable: true },
     });
-    expect(JSON.stringify(schema.definitions!['arr'])).not.toContain('not');
+    expect(JSON.stringify(definitionNamed(schema, 'arr'))).not.toContain('not');
   });
 
   it('leaves the branches of a definition that only wraps them', () => {
@@ -379,7 +388,7 @@ describe('a definition keeps the context it was referenced from', () => {
       parameters: zv3.object({ first: shared, second: shared }),
     }) as unknown as { parameters: { definitions: Record<string, JsonSchema> } };
 
-    expect(tool.parameters.definitions['f_properties_first_anyOf_0']).toEqual({});
+    expect(definitionNamed(tool.parameters, 'f_properties_first_anyOf_0')).toEqual({});
   });
 
   it('leaves literal JSON alone while reducing schema positions', () => {
@@ -397,11 +406,11 @@ describe('a definition keeps the context it was referenced from', () => {
       definitions: { withDefault },
     }) as { definitions: Record<string, JsonSchema> };
 
-    expect(JSON.stringify(schema.definitions!['withDefault'])).toContain(
+    expect(JSON.stringify(definitionNamed(schema, 'withDefault'))).toContain(
       JSON.stringify({ default: literal }).slice(1, -1),
     );
     // The schema-level never branch is still gone.
-    expect((schema.definitions!['withDefault'] as { anyOf?: unknown }).anyOf).not.toEqual([
+    expect((definitionNamed(schema, 'withDefault') as { anyOf?: unknown })['anyOf']).not.toEqual([
       { not: {} },
       expect.anything(),
     ]);
@@ -436,7 +445,7 @@ describe('a definition keeps the context it was referenced from', () => {
 
     // The inline occurrence gets both from `addMeta`; the definition the second
     // property points at has to match it.
-    expect(schema.definitions!['p_properties_a']).toEqual({
+    expect(definitionNamed(schema, 'p_properties_a')).toEqual({
       type: ['string', 'null'],
       description: 'guidance',
       markdownDescription: 'guidance',
@@ -453,16 +462,16 @@ describe('a definition keeps the context it was referenced from', () => {
       $refStrategy: 'extract-to-root',
       nameStrategy: 'duplicate-ref',
       override: (def, _refs, _seen, forceResolution) =>
-        forceResolution && def === shared._def ?
-          ({ anyOf: [{ not: {} }, { type: 'string', maxLength: 3 }], maxLength: 5 } as JsonSchema7Type)
-        : ignoreOverride,
+        forceResolution && def === shared._def
+          ? ({ anyOf: [{ not: {} }, { type: 'string', maxLength: 3 }], maxLength: 5 } as JsonSchema7Type)
+          : ignoreOverride,
     }) as { definitions: Record<string, JsonSchema> };
 
     // Both constraints applied before, so both have to survive. Collapsing here
     // would spread `maxLength: 5` over the branch's `maxLength: 3` and let
     // four-character strings through, so the union is left standing instead.
-    expect(JSON.stringify(schema.definitions!['p_properties_a'])).toContain('"maxLength":3');
-    expect(schema.definitions!['p_properties_a']).toHaveProperty('anyOf');
+    expect(JSON.stringify(definitionNamed(schema, 'p_properties_a'))).toContain('"maxLength":3');
+    expect(definitionNamed(schema, 'p_properties_a')).toHaveProperty('anyOf');
   });
 
   it('keeps a `__proto__` entry in a schema map', () => {
@@ -482,10 +491,10 @@ describe('a definition keeps the context it was referenced from', () => {
         forceResolution && def === optional._def ? (withProto as JsonSchema7Type) : ignoreOverride,
     }) as { definitions: Record<string, { properties: Record<string, unknown> }> };
 
-    expect(Object.keys(schema.definitions!['optional']!.properties).sort()).toEqual([
-      '__proto__',
-      'ok',
-    ]);
+    const properties = definitionNamed(schema, 'optional')['properties'] as Record<string, unknown>;
+    expect(Object.keys(properties)).toHaveLength(2);
+    expect(Object.keys(properties)).toContain('__proto__');
+    expect(Object.keys(properties)).toContain('ok');
   });
 
   it('carries `default` across the collapse without descending into it', () => {
@@ -500,10 +509,62 @@ describe('a definition keeps the context it was referenced from', () => {
       definitions: { withDefault },
     }) as { definitions: Record<string, JsonSchema> };
 
-    expect(schema.definitions!['withDefault']).toEqual({
+    expect(definitionNamed(schema, 'withDefault')).toEqual({
       type: ['string', 'null'],
       default: 'x',
     });
+  });
+
+  it('leaves the wrapper standing when a reference points inside it', () => {
+    // Collapsing removes an `anyOf/1` segment from every pointer below it, and
+    // references were generated against the uncollapsed shape. A redundant
+    // `anyOf` still means what it says; a broken `$ref` does not.
+    const shared = zv3.string().min(2);
+    const maybe = zv3.object({ first: shared, second: shared }).optional();
+
+    const schema = zodToJsonSchema(zv3.object({ value: zv3.number() }), {
+      openaiStrictMode: true,
+      definitions: { Maybe: maybe },
+    }) as Record<string, unknown>;
+
+    const pointer = (
+      (
+        (schema['definitions'] as Record<string, { anyOf?: { properties?: Record<string, JsonSchema> }[] }>)[
+          'Maybe'
+        ]?.anyOf?.[1]?.properties?.['second'] as { $ref?: string }
+      )?.$ref ?? ''
+    ).replace('#/', '');
+
+    expect(pointer).toBeTruthy();
+    let resolved: unknown = schema;
+    for (const key of pointer.split('/')) {
+      resolved = (resolved as Record<string, unknown>)?.[key];
+    }
+    expect(resolved).toBeDefined();
+  });
+
+  it('does not invoke accessors on a schema an override returned', () => {
+    // Reading one runs caller code before anything has validated it, and a
+    // throwing getter would take the conversion down.
+    let reads = 0;
+    const definition = zv3.string();
+    const custom: Record<string, unknown> = { type: 'object' };
+    Object.defineProperty(custom, 'properties', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return { value: { type: 'string' } };
+      },
+    });
+
+    zodToJsonSchema(zv3.object({ value: zv3.string() }), {
+      openaiStrictMode: true,
+      definitions: { definition },
+      override: (def, _refs, _seen, forceResolution) =>
+        forceResolution && def === definition._def ? (custom as unknown as JsonSchema7Type) : ignoreOverride,
+    });
+
+    expect(reads).toBe(0);
   });
 
   it('still strips the wrapper for a definition extracted from a property', () => {
@@ -512,6 +573,6 @@ describe('a definition keeps the context it was referenced from', () => {
     const schema = zodResponseFormat(zv3.object({ a: shared, b: shared }), 'p').json_schema
       .schema as unknown as { definitions: Record<string, JsonSchema> };
 
-    expect(schema.definitions!['p_properties_a']).toEqual({ type: 'string', nullable: true });
+    expect(definitionNamed(schema, 'p_properties_a')).toEqual({ type: 'string', nullable: true });
   });
 });
