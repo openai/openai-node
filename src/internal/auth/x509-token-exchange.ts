@@ -201,8 +201,9 @@ async function oauthError(response: Response, signal?: AbortSignal): Promise<OAu
 
 /** Exchanges one enrolled client certificate for a validated OpenAI workload access token. */
 export async function exchangeX509Token(options: X509TokenExchangeOptions): Promise<X509ExchangedToken> {
-  const { identityProviderId, serviceAccountId, signal: callerSignal, transport } = options;
+  const { signal: callerSignal } = options;
   callerSignal?.throwIfAborted();
+  const { identityProviderId, serviceAccountId, transport } = options;
   if (
     typeof identityProviderId !== 'string' ||
     identityProviderId.trim().length === 0 ||

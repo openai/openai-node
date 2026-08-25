@@ -400,6 +400,29 @@ describe('isolated X.509 workload-identity token exchange', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  test('checks a canceled caller signal before evaluating identity or transport accessors', async () => {
+    const controller = new AbortController();
+    const cancellation = new Error('synthetic-preflight-cancellation');
+    const identityGetter = vi.fn(() => 'synthetic-identity-provider');
+    const transportGetter = vi.fn(() => transport);
+    controller.abort(cancellation);
+
+    await expect(
+      exchangeX509Token({
+        get identityProviderId() {
+          return identityGetter();
+        },
+        serviceAccountId: 'synthetic-service-account',
+        get transport() {
+          return transportGetter();
+        },
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(cancellation);
+    expect(identityGetter).not.toHaveBeenCalled();
+    expect(transportGetter).not.toHaveBeenCalled();
+  });
+
   test('snapshots an accessor-provided caller signal before validating and composing it', async () => {
     const controller = new AbortController();
     const cancellation = new Error('synthetic-snapshotted-signal-cancellation');
