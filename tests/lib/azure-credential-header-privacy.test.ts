@@ -1562,7 +1562,7 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
-  test('rejects a nonconfigurable request headers accessor before reading an unsafe credential', async () => {
+  test('sanitizes an unsafe nonconfigurable request headers accessor after reading it once', async () => {
     const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
     let reads = 0;
     const options: FinalRequestOptions = { method: 'post', path: '/models', body: { safe: true } };
@@ -1585,7 +1585,7 @@ describe('Azure credential header diagnostic privacy', () => {
 
     await expectPrivateCredentialFailure(() => client.request(options), malformed);
 
-    expect(reads).toBe(0);
+    expect(reads).toBe(1);
     expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
     expect(fetch).not.toHaveBeenCalled();
   });

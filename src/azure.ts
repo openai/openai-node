@@ -167,7 +167,12 @@ export class AzureOpenAI extends OpenAI {
   }> {
     prepareAzureDeploymentRequest(options, this.deploymentName, this.baseURL);
     const preprocessesHeaders = shouldProtectAzureRequestHeaders(options);
-    const { headers, restore } = snapshotAzureRequestOptionsHeaders(options);
+    const {
+      copied,
+      headers,
+      options: requestOptions = options,
+      restore,
+    } = snapshotAzureRequestOptionsHeaders(options);
     const accessorSnapshot = azureRequestHeadersAccessorSnapshots.get(options);
     const accessorIndex = (accessorSnapshot?.snapshots.length ?? 0) - 1;
     const accessorEntry = accessorSnapshot?.snapshots[accessorIndex];
@@ -175,14 +180,20 @@ export class AzureOpenAI extends OpenAI {
 
     try {
       protection = preprocessesHeaders ? protectAzureRequestHeaders(headers, options) : undefined;
-      const restoreAuthentication = protection
-        ? snapshotAzureRequestAuthentication(this, this.authHeaders, protection)
-        : undefined;
+      const restoreAuthentication =
+        protection !== undefined || requestOptions !== options
+          ? snapshotAzureRequestAuthentication(
+              this,
+              this.authHeaders,
+              protection,
+              requestOptions === options ? undefined : options,
+            )
+          : undefined;
       let pending: ReturnType<OpenAI['buildRequest']>;
       let restoreBody: (() => void) | undefined;
       try {
         restoreBody = snapshotAzureRequestBodyAccessor(options);
-        pending = super.buildRequest(options, props);
+        pending = super.buildRequest(requestOptions, props);
       } finally {
         try {
           restoreBody?.();
@@ -193,7 +204,10 @@ export class AzureOpenAI extends OpenAI {
       }
 
       const built = await pending.catch((error: unknown) => {
-        if (accessorSnapshot?.descriptor.enumerable && accessorEntry?.copied === false) {
+        if (
+          (accessorSnapshot?.descriptor.enumerable && accessorEntry?.copied === false) ||
+          copied?.value === false
+        ) {
           throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
         }
         throw error;
@@ -244,7 +258,7 @@ export class AzureOpenAI extends OpenAI {
   }
 
   protected override async bearerAuth(_opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    if (this.apiKey === null) {
+    if (this.apiKey === null || this.apiKey === undefined) {
       return undefined;
     }
     return buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.apiKey}`]]);
@@ -374,7 +388,8 @@ function snapshotAzureRequestBodyAccessor(options: FinalRequestOptions): (() => 
 function snapshotAzureRequestAuthentication(
   client: AzureOpenAI,
   authenticate: AzureAuthenticationHook,
-  protection: NonNullable<ReturnType<typeof protectAzureRequestHeaders>>,
+  protection: ReturnType<typeof protectAzureRequestHeaders>,
+  originalOptions?: FinalRequestOptions,
 ): () => void {
   const descriptor = Object.getOwnPropertyDescriptor(client, 'authHeaders');
   const replaceable =
@@ -396,8 +411,8 @@ function snapshotAzureRequestAuthentication(
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> => {
     restore();
-    const carrier = await original.call(client, options, schemes);
-    return carrier === undefined ? undefined : protection.bind(carrier);
+    const carrier = await original.call(client, originalOptions ?? options, schemes);
+    return carrier === undefined || protection === undefined ? carrier : protection.bind(carrier);
   };
   azureRequestAuthenticationOriginals.set(snapshot, original);
   const restore = (): void => {
@@ -467,18 +482,23 @@ function findAzureRequestHeadersDescriptor(options: FinalRequestOptions):
     }
   | undefined {
   let prototype: object | null = options;
-  for (let depth = 0; depth < 32 && prototype !== null; depth += 1) {
+  for (let depth = 0; depth < 256 && prototype !== null; depth += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(prototype, 'headers');
     if (descriptor !== undefined) {
       return { descriptor, inherited: prototype !== options };
     }
     prototype = Object.getPrototypeOf(prototype) as object | null;
   }
+  if (prototype !== null) {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
   return undefined;
 }
 
 function snapshotAzureRequestOptionsHeaders(options: FinalRequestOptions): {
+  copied?: { value: boolean };
   headers: FinalRequestOptions['headers'];
+  options?: FinalRequestOptions;
   restore?: () => void;
 } {
   try {
@@ -497,7 +517,25 @@ function snapshotAzureRequestOptionsHeaders(options: FinalRequestOptions): {
       return { headers: options.headers };
     }
     if (found?.inherited ? !Object.isExtensible(options) : !descriptor.configurable) {
-      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+      const { headers } = options;
+      const copied = { value: false };
+      const requestOptions = new Proxy(options, {
+        get(target, property) {
+          if (property === 'headers') {
+            copied.value = true;
+            return headers;
+          }
+          return Reflect.get(target, property, target);
+        },
+        set(target, property, value) {
+          return Reflect.set(target, property, value, target);
+        },
+      });
+      return {
+        ...(descriptor.enumerable ? { copied } : {}),
+        headers,
+        options: requestOptions,
+      };
     }
 
     const headers = active === undefined ? options.headers : descriptor.get?.call(options);
