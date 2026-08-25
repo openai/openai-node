@@ -1147,13 +1147,13 @@ export class OpenAI {
     }
 
     const security = options.__security ?? { bearerAuth: true };
-    if (x509Authentication && options.signal && req.signal !== options.signal) {
-      req.signal = req.signal ? AbortSignal.any([options.signal, req.signal]) : options.signal;
-    }
     // Request hooks may replace the caller signal before it reaches fetch.
     const controller =
       this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
-        ? createRequestController(req.signal)
+        ? createRequestController(
+            req.signal ?? (x509Authentication ? options.signal : undefined),
+            x509Authentication ? options.signal : undefined,
+          )
         : new AbortController();
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
@@ -1834,7 +1834,10 @@ OpenAI.Videos = Videos;
 
 const composedCallerSignals = new WeakMap<AbortController, AbortSignal>();
 
-function createRequestController(callerSignal: AbortSignal | null | undefined): AbortController {
+function createRequestController(
+  callerSignal: AbortSignal | null | undefined,
+  originalSignal?: AbortSignal | null,
+): AbortController {
   const controller = new AbortController();
   if (!callerSignal) return controller;
 
@@ -1846,7 +1849,11 @@ function createRequestController(callerSignal: AbortSignal | null | undefined): 
   try {
     // Native composition keeps cancellation active after response headers without
     // retaining an abort listener on the caller's signal or changing its reason.
-    const composed = nativeAbortSignal.any([controller.signal, callerSignal]) as AbortSignal;
+    const signals = [controller.signal, callerSignal];
+    if (originalSignal && originalSignal !== callerSignal) {
+      signals.push(originalSignal);
+    }
+    const composed = nativeAbortSignal.any(signals) as AbortSignal;
     Object.defineProperty(controller, 'signal', { value: composed, configurable: true });
     composedCallerSignals.set(controller, callerSignal);
   } catch {
