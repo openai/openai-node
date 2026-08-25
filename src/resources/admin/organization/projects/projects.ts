@@ -274,10 +274,29 @@ export interface Project {
   name?: string | null;
 
   /**
+   * The residency configuration for the project.
+   */
+  residency?: ProjectResidency;
+
+  /**
    * `active` or `archived`
    */
   status?: string | null;
 }
+
+export type ProjectResidency =
+  | 'GLOBAL'
+  | 'US_STORAGE_PROCESSING'
+  | 'EU_STORAGE_PROCESSING'
+  | 'JP_STORAGE'
+  | 'KR_STORAGE'
+  | 'CA_STORAGE'
+  | 'SG_STORAGE'
+  | 'IN_STORAGE'
+  | 'AU_STORAGE'
+  | 'GB_STORAGE'
+  | 'AE_STORAGE'
+  | 'AE_STORAGE_PROCESSING';
 
 export interface ProjectCreateParams {
   /**
@@ -291,12 +310,23 @@ export interface ProjectCreateParams {
   external_key_id?: string | null;
 
   /**
-   * Create the project with the specified data residency region. Your organization
-   * must have access to Data residency functionality in order to use. See
+   * @deprecated Create the project with the specified data residency region. Your
+   * organization must have access to Data residency functionality in order to use.
+   * See
+   * [data residency controls](https://platform.openai.com/docs/guides/your-data#data-residency-controls)
+   * to review the functionality and limitations of setting this field. Deprecated:
+   * use `residency` instead. Do not provide both `geography` and `residency`.
+   */
+  geography?: string | null;
+
+  /**
+   * Create the project with the specified residency configuration. Your organization
+   * must have access to the requested residency configuration in order to use it.
+   * See
    * [data residency controls](https://platform.openai.com/docs/guides/your-data#data-residency-controls)
    * to review the functionality and limitations of setting this field.
    */
-  geography?: string | null;
+  residency?: ProjectResidency | null;
 }
 
 export interface ProjectUpdateParams {
@@ -306,7 +336,9 @@ export interface ProjectUpdateParams {
   external_key_id?: string | null;
 
   /**
-   * Geography for the project.
+   * @deprecated Geography for the project. Deprecated: use `residency` when creating
+   * a project to configure data residency. This field is retained for backward
+   * compatibility.
    */
   geography?: string | null;
 
@@ -340,6 +372,7 @@ Projects.Certificates = Certificates;
 export declare namespace Projects {
   export {
     type Project as Project,
+    type ProjectResidency as ProjectResidency,
     type ProjectsPage as ProjectsPage,
     type ProjectCreateParams as ProjectCreateParams,
     type ProjectUpdateParams as ProjectUpdateParams,

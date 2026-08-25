@@ -56,6 +56,15 @@ class FakeBrowserSocket {
 const originalWebSocket = globalThis.WebSocket;
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 
+function expectPrivateBedrockCredentialFailure(failure: unknown, credential: string): void {
+  expect(failure).toBeInstanceOf(TypeError);
+  expect((failure as Error).message).toBe('Bedrock bearer credential contains an invalid HTTP header value.');
+  expect((failure as Error).stack).not.toContain(credential);
+  expect((failure as Error & { cause?: unknown }).cause).toBeUndefined();
+  expect(nodeSocketConstructor).not.toHaveBeenCalled();
+  expect(FakeBrowserSocket.instances).toHaveLength(0);
+}
+
 function lastBrowserSocket(): FakeBrowserSocket {
   const [socket] = FakeBrowserSocket.instances.slice(-1);
   if (!socket) {
@@ -212,6 +221,88 @@ describe('Bedrock WebSocket origin containment', () => {
         }),
     },
   ] as const;
+
+  const malformedCredentials = [
+    { label: 'newline', credential: 'bedrock-secret\nsuffix' },
+    { label: 'forbidden control byte', credential: 'bedrock-secret\u0001suffix' },
+    { label: 'trailing whitespace', credential: 'bedrock-secret ' },
+  ] as const;
+
+  test.each(
+    websocketSurfaces.flatMap(({ name, open }) =>
+      malformedCredentials.map(({ label, credential }) => ({ name, open, label, credential })),
+    ),
+  )(
+    '$name rejects a $label in a static Bedrock credential before opening a socket',
+    ({ open, credential }) => {
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, apiKey: credential });
+      let failure: unknown;
+
+      try {
+        open(client);
+      } catch (error) {
+        failure = error;
+      }
+
+      expectPrivateBedrockCredentialFailure(failure, credential);
+    },
+  );
+
+  test.each(websocketSurfaces.filter(({ path }) => path === 'responses'))(
+    '$name rejects a malformed once-resolved rotating Bedrock credential',
+    async ({ open }) => {
+      const credential = 'rotating-bedrock-secret\nsuffix';
+      const bedrockTokenProvider = vi.fn(async () => credential);
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider });
+      let failure: unknown;
+
+      expect(await client._callApiKey()).toBe(true);
+
+      try {
+        open(client);
+      } catch (error) {
+        failure = error;
+      }
+
+      expectPrivateBedrockCredentialFailure(failure, credential);
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(realtimeFactories)(
+    '$name rejects a malformed rotating Bedrock credential before creating a socket',
+    async ({ create }) => {
+      const credential = 'rotating-bedrock-secret\nsuffix';
+      const bedrockTokenProvider = vi.fn(async () => credential);
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider });
+      let failure: unknown;
+
+      try {
+        await create(client);
+      } catch (error) {
+        failure = error;
+      }
+
+      expectPrivateBedrockCredentialFailure(failure, credential);
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('keeps valid Bedrock credentials writable, enumerable, and unchanged', () => {
+    const client = new BedrockOpenAI({ baseURL: configuredBaseURL, apiKey: 'initial-bedrock-secret' });
+    const descriptor = Object.getOwnPropertyDescriptor(client, 'apiKey');
+
+    expect(descriptor?.enumerable).toBe(true);
+    expect(descriptor?.configurable).toBe(true);
+    client.apiKey = 'replacement-bedrock-secret';
+    expect(client.apiKey).toBe('replacement-bedrock-secret');
+
+    const websocket = new StableResponsesWS(client);
+    expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options.headers).toMatchObject({
+      Authorization: 'Bearer replacement-bedrock-secret',
+    });
+  });
 
   test.each(realtimeSurfaces)(
     '$name rejects a final cross-origin URL before attaching static credentials',

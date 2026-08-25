@@ -25,6 +25,7 @@ describe('resource projects', () => {
       name: 'name',
       external_key_id: 'external_key_id',
       geography: 'geography',
+      residency: 'GLOBAL',
     });
   });
 

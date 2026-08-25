@@ -477,9 +477,7 @@ const projectRunners = {
 
     await run('npm', ['run', 'tsc']);
 
-    if (state.live) {
-      await run('bun', ['test']);
-    }
+    await run('bun', state.live ? ['test'] : ['test', 'workload-identity-access-token.test.ts']);
   },
   deno: async () => {
     const packageJson = {

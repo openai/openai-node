@@ -1,14 +1,10 @@
-import { OpenAIError } from '../../core/error';
 import { decodeUTF8, encodeUTF8 } from '../utils/bytes';
-import { readEnv } from '../utils/env';
 
 /** Text or UTF-8 bytes accepted by the incremental line decoder. */
 export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
 /** Maximum backing-buffer capacity retained when completed lines leave little active data. */
 const MAX_RETAINED_BUFFER_BYTES = 64 * 1024;
-const DEFAULT_MAX_LINE_BYTES = 8 * 1024 * 1024;
-const MAX_LINE_ENDING_BYTES = 2;
 
 /**
  * Incrementally decodes UTF-8 text into lines without losing partial characters
@@ -33,39 +29,9 @@ export class LineDecoder {
   #end: number;
   #searchIndex: number;
   #skipLeadingLF: boolean;
-  #maxLineBytes: number;
-  #maxBufferedBytes: number;
 
-  /**
-   * Creates an empty decoder with an optional maximum UTF-8 line size.
-   *
-   * Defaults to 8 MiB unless `OPENAI_MAX_NDJSON_LINE_BYTES` supplies a valid
-   * positive integer. Explicit limits take precedence; invalid limits throw
-   * `RangeError`, and decoding a line above the limit throws `OpenAIError`.
-   */
-  constructor(options?: { maxLineBytes?: number }) {
-    const configuredMaximum = options?.maxLineBytes;
-    if (configuredMaximum === undefined) {
-      const configuredEnvironmentMaximum = readEnv('OPENAI_MAX_NDJSON_LINE_BYTES');
-      const environmentMaximum = Number(configuredEnvironmentMaximum);
-      this.#maxLineBytes =
-        configuredEnvironmentMaximum !== undefined &&
-        Number.isSafeInteger(environmentMaximum) &&
-        environmentMaximum > 0 &&
-        environmentMaximum <= Number.MAX_SAFE_INTEGER - MAX_LINE_ENDING_BYTES
-          ? environmentMaximum
-          : DEFAULT_MAX_LINE_BYTES;
-    } else {
-      if (
-        !Number.isSafeInteger(configuredMaximum) ||
-        configuredMaximum <= 0 ||
-        configuredMaximum > Number.MAX_SAFE_INTEGER - MAX_LINE_ENDING_BYTES
-      ) {
-        throw new RangeError('The maximum line size must be a positive safe integer.');
-      }
-      this.#maxLineBytes = configuredMaximum;
-    }
-    this.#maxBufferedBytes = this.#maxLineBytes + MAX_LINE_ENDING_BYTES;
+  /** Creates a decoder with no buffered bytes or pending newline continuation. */
+  constructor() {
     this.#buffer = new Uint8Array();
     this.#start = 0;
     this.#end = 0;
@@ -86,140 +52,32 @@ export class LineDecoder {
       return [];
     }
 
+    let binaryChunk: Uint8Array;
     if (chunk instanceof ArrayBuffer) {
-      return this.#decodeBinaryChunk(new Uint8Array(chunk));
+      binaryChunk = new Uint8Array(chunk);
+    } else if (typeof chunk === 'string') {
+      binaryChunk = encodeUTF8(chunk);
+    } else {
+      binaryChunk = chunk;
     }
 
-    if (typeof chunk === 'string') {
-      return this.#decodeTextChunk(chunk);
-    }
-
-    return this.#decodeBinaryChunk(chunk);
-  }
-
-  #decodeTextChunk(chunk: string): string[] {
-    if (chunk.length === 0) {
-      return [];
-    }
-
-    const activeLength = this.#end - this.#start;
-    if (activeLength + chunk.length * 3 <= this.#maxLineBytes) {
-      return this.#decodeBinaryChunk(encodeUTF8(chunk));
-    }
-
-    const byteLength = this.#validateTextChunk(chunk);
-    if (byteLength <= this.#maxBufferedBytes) {
-      return this.#decodeBinaryChunk(encodeUTF8(chunk));
-    }
-
-    const lines: string[] = [];
-    let segmentStart = 0;
-    let segmentLength = 0;
-
-    for (let index = 0; index < chunk.length;) {
-      const codePoint = chunk.codePointAt(index) ?? 0;
-      const codeUnits = codePoint > 0xff_ff ? 2 : 1;
-      const bytes = utf8CodePointByteLength(codePoint);
-
-      if (segmentLength + bytes > this.#maxBufferedBytes) {
-        for (const line of this.#decodeBinaryChunk(encodeUTF8(chunk.slice(segmentStart, index)))) {
-          lines.push(line);
-        }
-        segmentStart = index;
-        segmentLength = 0;
-      }
-
-      segmentLength += bytes;
-      index += codeUnits;
-    }
-
-    if (segmentStart < chunk.length) {
-      for (const line of this.#decodeBinaryChunk(encodeUTF8(chunk.slice(segmentStart)))) {
-        lines.push(line);
-      }
-    }
-
-    return lines;
-  }
-
-  #validateTextChunk(chunk: string): number {
-    let activeLength = this.#end - this.#start;
-    let byteLength = 0;
-
-    for (let index = 0; index < chunk.length;) {
-      const codePoint = chunk.codePointAt(index) ?? 0;
-      index += codePoint > 0xff_ff ? 2 : 1;
-      if (codePoint === 0x0a || codePoint === 0x0d) {
-        activeLength = 0;
-        byteLength += 1;
-        continue;
-      }
-
-      const bytes = utf8CodePointByteLength(codePoint);
-      if (bytes > this.#maxLineBytes - activeLength) {
-        this.#throwLineTooLarge();
-      }
-
-      activeLength += bytes;
-      byteLength += bytes;
-    }
-
-    return byteLength;
-  }
-
-  #decodeBinaryChunk(binaryChunk: Uint8Array): string[] {
     if (binaryChunk.length === 0) {
       return [];
     }
 
-    this.#validateBinaryChunk(binaryChunk);
+    if (this.#skipLeadingLF) {
+      this.#skipLeadingLF = false;
+      if (binaryChunk[0] === 0x0a) {
+        binaryChunk = binaryChunk.subarray(1);
+      }
+      if (binaryChunk.length === 0) {
+        return [];
+      }
+    }
+
+    this.#append(binaryChunk);
 
     const lines: string[] = [];
-    let offset = 0;
-
-    while (offset < binaryChunk.length) {
-      if (this.#skipLeadingLF) {
-        this.#skipLeadingLF = false;
-        if (binaryChunk[offset] === 0x0a) {
-          offset += 1;
-          if (offset === binaryChunk.length) {
-            break;
-          }
-        }
-      }
-
-      const activeLength = this.#end - this.#start;
-      const end = Math.min(binaryChunk.length, offset + this.#maxBufferedBytes - activeLength);
-      const segment =
-        offset === 0 && end === binaryChunk.length ? binaryChunk : binaryChunk.subarray(offset, end);
-      this.#append(segment);
-      this.#extractLines(lines);
-      offset = end;
-    }
-
-    return lines;
-  }
-
-  #validateBinaryChunk(chunk: Uint8Array): void {
-    let activeLength = this.#end - this.#start;
-    if (activeLength + chunk.length <= this.#maxLineBytes) {
-      return;
-    }
-
-    for (const byte of chunk) {
-      if (byte === 0x0a || byte === 0x0d) {
-        activeLength = 0;
-      } else {
-        if (activeLength === this.#maxLineBytes) {
-          this.#throwLineTooLarge();
-        }
-        activeLength += 1;
-      }
-    }
-  }
-
-  #extractLines(lines: string[]): void {
-    const originalLineCount = lines.length;
     let patternIndex;
     while ((patternIndex = findNewlineIndex(this.#buffer, this.#searchIndex, this.#end)) != null) {
       const line = decodeUTF8(this.#buffer.subarray(this.#start, patternIndex.preceding));
@@ -244,15 +102,13 @@ export class LineDecoder {
       if (this.#buffer.length > MAX_RETAINED_BUFFER_BYTES) {
         this.#buffer = new Uint8Array();
       }
-    } else if (lines.length > originalLineCount && this.#buffer.length > MAX_RETAINED_BUFFER_BYTES) {
+    } else if (lines.length > 0 && this.#buffer.length > MAX_RETAINED_BUFFER_BYTES) {
       const length = this.#end - this.#start;
       if (length <= MAX_RETAINED_BUFFER_BYTES || this.#buffer.length > length * 4) {
-        const capacity = Math.min(
+        const capacity =
           length <= MAX_RETAINED_BUFFER_BYTES
             ? Math.min(Math.max(length * 2, 256), MAX_RETAINED_BUFFER_BYTES)
-            : length * 2,
-          this.#maxBufferedBytes,
-        );
+            : length * 2;
         const buffer = new Uint8Array(capacity);
         buffer.set(this.#buffer.subarray(this.#start, this.#end));
         this.#buffer = buffer;
@@ -261,23 +117,17 @@ export class LineDecoder {
         this.#searchIndex = length;
       }
     }
+
+    return lines;
   }
 
   #append(chunk: Uint8Array): void {
-    const activeLength = this.#end - this.#start;
-    if (activeLength + chunk.length > this.#maxBufferedBytes) {
-      this.#throwLineTooLarge();
-    }
-
     if (this.#end + chunk.length > this.#buffer.length) {
-      const length = activeLength;
+      const length = this.#end - this.#start;
       if (this.#start >= this.#buffer.length / 2 && length + chunk.length <= this.#buffer.length) {
         this.#buffer.copyWithin(0, this.#start, this.#end);
       } else {
-        const capacity = Math.min(
-          Math.max(this.#buffer.length * 2, length + chunk.length, 256),
-          this.#maxBufferedBytes,
-        );
+        const capacity = Math.max(this.#buffer.length * 2, length + chunk.length, 256);
         const buffer = new Uint8Array(capacity);
         buffer.set(this.#buffer.subarray(this.#start, this.#end));
         this.#buffer = buffer;
@@ -292,10 +142,6 @@ export class LineDecoder {
     this.#end += chunk.length;
   }
 
-  #throwLineTooLarge(): never {
-    throw new OpenAIError(`Line exceeds the maximum size of ${this.#maxLineBytes} bytes.`);
-  }
-
   /** Emits the remaining unterminated line, or returns an empty array when idle. */
   flush(): string[] {
     this.#skipLeadingLF = false;
@@ -304,19 +150,6 @@ export class LineDecoder {
     }
     return this.decode('\n');
   }
-}
-
-function utf8CodePointByteLength(codePoint: number): number {
-  if (codePoint <= 0x7f) {
-    return 1;
-  }
-  if (codePoint <= 0x7_ff) {
-    return 2;
-  }
-  if (codePoint <= 0xff_ff) {
-    return 3;
-  }
-  return 4;
 }
 
 /**

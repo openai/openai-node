@@ -1262,7 +1262,7 @@ describe.each([
       const Inner = z.object({
         baz:
           version === 'v3'
-            ? z.boolean().transform((v: any) => v ?? true)
+            ? z.boolean().brand<'ReusableBoolean'>()
             : z
                 .boolean()
                 .transform((v: any) => v ?? true)
