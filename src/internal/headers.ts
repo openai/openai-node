@@ -85,6 +85,14 @@ const snapshotAzureAuthenticationHeaders = (
   return layers;
 };
 
+const coerceAzureCredentialHeaderValue = (value: unknown): string => {
+  try {
+    return String(value);
+  } catch {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+};
+
 class DeferredAzureAuthenticationHeaders extends Headers {
   constructor() {
     super();
@@ -215,7 +223,7 @@ class DeferredAzureAuthenticationHeaders extends Headers {
         continue;
       }
       const normalizedValue = isAzureAuthenticationHeader(normalized)
-        ? value.replace(/^[\t ]+|[\t ]+$/g, '')
+        ? coerceAzureCredentialHeaderValue(value).replace(/^[\t ]+|[\t ]+$/g, '')
         : value;
       const previous = effective.get(normalized);
       effective.set(normalized, previous === undefined ? normalizedValue : `${previous}, ${normalizedValue}`);
@@ -226,7 +234,7 @@ class DeferredAzureAuthenticationHeaders extends Headers {
   private update(name: string, value: string, operation: 'append' | 'replace'): void {
     const normalized = String(name).toLowerCase();
     const authentication = isAzureAuthenticationHeader(normalized);
-    const normalizedValue = authentication ? String(value) : value;
+    const normalizedValue = authentication ? coerceAzureCredentialHeaderValue(value) : value;
     let safe = true;
 
     if (authentication) {
@@ -267,6 +275,36 @@ class DeferredAzureAuthenticationHeaders extends Headers {
 class DeferredAzureAuthenticationNulls extends Set<string> {
   private initialized = false;
   private readonly inherited = new Set<string>();
+
+  static {
+    const operations = [
+      'union',
+      'intersection',
+      'difference',
+      'symmetricDifference',
+      'isSubsetOf',
+      'isSupersetOf',
+      'isDisjointFrom',
+    ] as const;
+    for (const name of operations) {
+      const operation = Object.getOwnPropertyDescriptor(Set.prototype, name)?.value;
+      if (typeof operation !== 'function') {
+        continue;
+      }
+      Object.defineProperty(this.prototype, name, {
+        configurable: true,
+        value: this.wrapModernOperation(operation),
+        writable: true,
+      });
+    }
+  }
+
+  private static wrapModernOperation(operation: (...values: unknown[]) => unknown) {
+    return function (this: DeferredAzureAuthenticationNulls, other: unknown): unknown {
+      this.initialize();
+      return Reflect.apply(operation, this, [other]);
+    };
+  }
 
   private initialize(): void {
     if (this.initialized) return;
@@ -528,7 +566,17 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
     iter = headers;
   } else {
     shouldClear = true;
-    iter = Object.entries(headers ?? {});
+    iter = Object.keys(headers ?? {}).map((name) => {
+      try {
+        const record = headers as Record<string, HeaderValue | readonly HeaderValue[]>;
+        return [name, record[name]] as const;
+      } catch (error) {
+        if (isAzureAuthenticationHeader(name)) {
+          throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+        }
+        throw error;
+      }
+    });
   }
   for (let row of iter) {
     const name = row[0];
@@ -553,9 +601,33 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
 export const assertAzureAuthenticationHeaders = (headers: HeadersLike): void => {
   for (const [name, value] of iterateHeaders(headers)) {
     if (value !== null && isAzureAuthenticationHeader(name)) {
-      assertAzureCredentialHeaderValue(value);
+      assertAzureCredentialHeaderValue(coerceAzureCredentialHeaderValue(value));
     }
   }
+};
+
+const findUnboundAzureRequestRegistration = (
+  headers: HeadersLike[],
+): AzureRequestHeaderRegistration | undefined => {
+  let registration: AzureRequestHeaderRegistration | undefined;
+  for (const source of headers) {
+    if (source === null || typeof source !== 'object') {
+      continue;
+    }
+    const active = azureRequestHeaders.get(source);
+    if (active === undefined) {
+      continue;
+    }
+    if (active.registrations.size !== 1) {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+    const [candidate] = active.registrations;
+    if (registration !== undefined && registration !== candidate) {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+    registration = candidate;
+  }
+  return registration;
 };
 
 const buildHeadersWithRegistration = (
@@ -580,7 +652,8 @@ const buildHeadersWithRegistration = (
       protectsAzureCredentials = true;
       requestRegistration =
         azureRequestAuthenticationHeaders.get(headers as NullableHeaders) ??
-        azureRequestAuthenticationHeaders.get(carrier);
+        azureRequestAuthenticationHeaders.get(carrier) ??
+        findUnboundAzureRequestRegistration(newHeaders);
       if (requestRegistration) {
         break;
       }
@@ -634,7 +707,7 @@ const buildHeadersWithRegistration = (
   }
   for (const [name, values] of pendingAuthenticationHeaders) {
     const snapshots = values.map((value) => {
-      const snapshot = String(value);
+      const snapshot = coerceAzureCredentialHeaderValue(value);
       assertAzureCredentialHeaderValue(snapshot);
       return snapshot;
     });
