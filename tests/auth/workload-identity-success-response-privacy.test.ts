@@ -153,6 +153,38 @@ const parserFailures: readonly FailureCase[] = [
     create: (value) => runInNewContext('new SyntaxError(privateValue)', { privateValue: value }),
   },
   {
+    name: 'native parser error with a forged own Error tag',
+    create: (value) =>
+      Object.defineProperty(new SyntaxError(value), Symbol.toStringTag, {
+        configurable: true,
+        value: 'Error',
+      }),
+  },
+  {
+    name: 'native parser error with a forged inherited Error tag',
+    create: (value) => {
+      const prototype = Object.create(SyntaxError.prototype);
+      Object.defineProperty(prototype, Symbol.toStringTag, { configurable: true, value: 'Error' });
+      return Object.setPrototypeOf(new SyntaxError(value), prototype);
+    },
+  },
+  {
+    name: 'native invalid-json wrapper with a forged own Error tag',
+    create: (value) =>
+      Object.defineProperty(nodeFetchParserError(value), Symbol.toStringTag, {
+        configurable: true,
+        value: 'Error',
+      }),
+  },
+  {
+    name: 'cross-realm native parser error with a forged own Error tag',
+    create: (value) =>
+      runInNewContext(
+        "Object.defineProperty(new SyntaxError(privateValue), Symbol.toStringTag, { value: 'Error' })",
+        { privateValue: value },
+      ),
+  },
+  {
     name: 'nested cross-realm native parser error',
     create: (value) =>
       runInNewContext(
@@ -199,6 +231,15 @@ const parserFailures: readonly FailureCase[] = [
       }),
   },
   {
+    name: 'hostile unbranded parser descriptor proxy',
+    create: (value) =>
+      new Proxy(Object.create(Error.prototype), {
+        getOwnPropertyDescriptor() {
+          throw new Error(`private parser descriptor trap ${value}`);
+        },
+      }),
+  },
+  {
     name: 'hostile parser cause accessor',
     create: (value) =>
       Object.defineProperty(new Error(`hostile accessor ${value}`), 'cause', {
@@ -217,6 +258,81 @@ const parserFailures: readonly FailureCase[] = [
           throw new Error(`private type getter ${value}`);
         },
       }),
+  },
+];
+
+const unbrandedParserFailures: readonly FailureCase[] = [
+  {
+    name: 'same-realm Error prototype with an invalid-json marker',
+    create: () => Object.assign(Object.create(Error.prototype), { type: 'invalid-json' }),
+  },
+  {
+    name: 'same-realm SyntaxError prototype',
+    create: () => Object.create(SyntaxError.prototype),
+  },
+  {
+    name: 'Error prototype carrying a copied genuine native stack accessor',
+    create: () => {
+      const forged = Object.assign(Object.create(Error.prototype), { type: 'invalid-json' });
+      const stack = Object.getOwnPropertyDescriptor(new Error(), 'stack');
+      if (!stack) {
+        throw new Error('Expected a native Error stack descriptor.');
+      }
+      Object.defineProperty(forged, 'stack', stack);
+      return forged;
+    },
+  },
+  {
+    name: 'Error prototype with a captured V8 stack',
+    create: () => {
+      const forged = Object.assign(Object.create(Error.prototype), { type: 'invalid-json' });
+      Error.captureStackTrace(forged);
+      return forged;
+    },
+  },
+  {
+    name: 'native Error wrapping an unbranded captured V8 stack',
+    create: () => {
+      const forged = Object.assign(Object.create(Error.prototype), { type: 'invalid-json' });
+      Error.captureStackTrace(forged);
+      return withCause(new Error('custom parser failure'), forged);
+    },
+  },
+  {
+    name: 'cross-realm Error prototype with an invalid-json marker',
+    create: () =>
+      runInNewContext("Object.assign(Object.create(Error.prototype), { type: 'invalid-json' })"),
+  },
+  {
+    name: 'cross-realm SyntaxError prototype',
+    create: () => runInNewContext('Object.create(SyntaxError.prototype)'),
+  },
+  {
+    name: 'native Error wrapping an unbranded same-realm SyntaxError prototype',
+    create: () => withCause(new Error('custom parser failure'), Object.create(SyntaxError.prototype)),
+  },
+  {
+    name: 'native Error wrapping an unbranded cross-realm SyntaxError prototype',
+    create: () =>
+      withCause(new Error('custom parser failure'), runInNewContext('Object.create(SyntaxError.prototype)')),
+  },
+  {
+    name: 'Error prototype with a forged own Error tag',
+    create: () => {
+      const forged = Object.assign(Object.create(Error.prototype), { type: 'invalid-json' });
+      return Object.defineProperty(forged, Symbol.toStringTag, {
+        configurable: true,
+        value: 'Error',
+      });
+    },
+  },
+  {
+    name: 'Error prototype with a forged inherited Error tag',
+    create: () => {
+      const prototype = Object.create(Error.prototype);
+      Object.defineProperty(prototype, Symbol.toStringTag, { configurable: true, value: 'Error' });
+      return Object.assign(Object.create(prototype), { type: 'invalid-json' });
+    },
   },
 ];
 
@@ -329,6 +445,61 @@ describe('successful workload OAuth response JSON privacy', () => {
     const harness = createHarness(async () => parserResponse(forgedFailure));
 
     await expect(operationFor(surface, harness)()).rejects.toBe(forgedFailure);
+  });
+
+  it.each(
+    surfaces.flatMap((surface) =>
+      unbrandedParserFailures.map((failure) => ({ surface, name: failure.name, create: failure.create })),
+    ),
+  )('preserves the original unbranded $name rejection on $surface', async ({ surface, create }) => {
+    const original = create(PRIVATE_TOKEN);
+    const harness = createHarness(async () => parserResponse(original));
+
+    await expect(operationFor(surface, harness)()).rejects.toBe(original);
+    expect(harness.exchange).toHaveBeenCalledTimes(1);
+    expect(harness.api).not.toHaveBeenCalled();
+  });
+
+  it.each(
+    surfaces.flatMap((surface) =>
+      (['own', 'inherited'] as const).map((placement) => ({ surface, placement })),
+    ),
+  )('never invokes an unbranded $placement Error-tag getter on $surface', async ({ surface, placement }) => {
+    const prototype = Object.create(Error.prototype);
+    const original = Object.assign(Object.create(prototype), { type: 'invalid-json' });
+    const readTag = vi.fn(() => {
+      throw new Error('An untrusted OAuth parser branding getter was invoked.');
+    });
+    Object.defineProperty(placement === 'own' ? original : prototype, Symbol.toStringTag, {
+      configurable: true,
+      get: readTag,
+    });
+    const harness = createHarness(async () => parserResponse(original));
+
+    await expect(operationFor(surface, harness)()).rejects.toBe(original);
+    expect(readTag).not.toHaveBeenCalled();
+  });
+
+  it.each(surfaces)(
+    'sanitizes a native parser failure without invoking an Error-tag getter on %s',
+    async (surface) => {
+      const original = new SyntaxError(PRIVATE_TOKEN);
+      const readTag = vi.fn(() => {
+        throw new Error('An untrusted OAuth parser branding getter was invoked.');
+      });
+      Object.defineProperty(original, Symbol.toStringTag, { configurable: true, get: readTag });
+      const harness = createHarness(async () => parserResponse(original));
+
+      await expectPrivateFailure(operationFor(surface, harness), harness);
+      expect(readTag).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(surfaces)('preserves unrelated native DOMException identity on %s', async (surface) => {
+    const original = new DOMException('The OAuth response stream was interrupted.', 'AbortError');
+    const harness = createHarness(async () => parserResponse(original));
+
+    await expect(operationFor(surface, harness)()).rejects.toBe(original);
   });
 
   it.each(surfaces)('requires an own node-fetch invalid-json error marker on %s', async (surface) => {

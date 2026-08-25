@@ -18,11 +18,96 @@ const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchan
 const MAX_OAUTH_JSON_ERROR_CAUSES = 32;
 const getOAuthErrorDescriptor = Object.getOwnPropertyDescriptor;
 const getOAuthErrorPrototype = Object.getPrototypeOf;
+const oauthErrorObjectSource = Object.prototype.toString;
 const oauthErrorFunctionSource = Function.prototype.toString;
 const nativeOAuthErrorSource = oauthErrorFunctionSource.call(Error);
 const nativeOAuthSyntaxErrorSource = oauthErrorFunctionSource.call(SyntaxError);
+const nativeOAuthErrorBrandDescriptor = getOAuthErrorDescriptor(Error, 'isError');
+
+interface OAuthRuntimeErrorTypes {
+  isNativeError?: (error: object) => boolean;
+  isProxy?: (error: object) => boolean;
+}
+
+function getOAuthRuntimeErrorIntrinsic(
+  types: object,
+  name: 'isNativeError' | 'isProxy',
+): ((error: object) => boolean) | undefined {
+  const descriptor = getOAuthErrorDescriptor(types, name);
+  if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
+    return undefined;
+  }
+  return descriptor.value.bind(types) as (error: object) => boolean;
+}
+
+function getOAuthRuntimeErrorTypes(): OAuthRuntimeErrorTypes | undefined {
+  try {
+    const runtime = globalThis as { process?: object };
+    const runtimeProcess = runtime.process;
+    if (!runtimeProcess) {
+      return undefined;
+    }
+
+    const loader = getOAuthErrorDescriptor(runtimeProcess, 'getBuiltinModule');
+    if (!loader || !('value' in loader) || typeof loader.value !== 'function') {
+      return undefined;
+    }
+
+    const utility: unknown = loader.value.call(runtimeProcess, 'node:util');
+    if (typeof utility !== 'object' || utility === null) {
+      return undefined;
+    }
+
+    const types = getOAuthErrorDescriptor(utility, 'types');
+    if (!types || !('value' in types) || typeof types.value !== 'object' || types.value === null) {
+      return undefined;
+    }
+
+    return {
+      isNativeError: getOAuthRuntimeErrorIntrinsic(types.value, 'isNativeError'),
+      isProxy: getOAuthRuntimeErrorIntrinsic(types.value, 'isProxy'),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+const oauthRuntimeErrorTypes = getOAuthRuntimeErrorTypes();
+const nativeOAuthErrorBrand =
+  nativeOAuthErrorBrandDescriptor &&
+  'value' in nativeOAuthErrorBrandDescriptor &&
+  typeof nativeOAuthErrorBrandDescriptor.value === 'function'
+    ? (nativeOAuthErrorBrandDescriptor.value.bind(Error) as (error: object) => boolean)
+    : oauthRuntimeErrorTypes?.isNativeError;
+const nativeOAuthProxyBrand = oauthRuntimeErrorTypes?.isProxy;
 
 type OAuthJSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
+
+function classifyOAuthErrorBrand(error: object): 'native' | 'unknown' | 'unsafe' {
+  try {
+    if (nativeOAuthErrorBrand) {
+      if (nativeOAuthErrorBrand(error)) {
+        return 'native';
+      }
+      return nativeOAuthProxyBrand?.(error) ? 'unsafe' : 'unknown';
+    }
+
+    let prototype: object | null = error;
+    for (let depth = 0; prototype !== null; depth += 1) {
+      if (depth >= MAX_OAUTH_JSON_ERROR_CAUSES) {
+        return 'unsafe';
+      }
+      if (getOAuthErrorDescriptor(prototype, Symbol.toStringTag)) {
+        return 'unknown';
+      }
+      prototype = getOAuthErrorPrototype(prototype) as object | null;
+    }
+
+    return oauthErrorObjectSource.call(error) === '[object Error]' ? 'native' : 'unknown';
+  } catch {
+    return 'unsafe';
+  }
+}
 
 function classifyCrossRealmOAuthError(error: object): OAuthJSONErrorKind {
   try {
@@ -71,11 +156,18 @@ function isMalformedOAuthJSONError(error: unknown): boolean {
     let current = error;
 
     for (let depth = 0; depth < MAX_OAUTH_JSON_ERROR_CAUSES; depth += 1) {
-      if (current instanceof SyntaxError) {
-        return true;
-      }
       if (typeof current !== 'object' || current === null) {
         return false;
+      }
+      const brand = classifyOAuthErrorBrand(current);
+      if (brand === 'unsafe') {
+        return true;
+      }
+      if (brand !== 'native') {
+        return false;
+      }
+      if (current instanceof SyntaxError) {
+        return true;
       }
       if (visited.has(current)) {
         return true;
