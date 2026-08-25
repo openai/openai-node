@@ -39,7 +39,7 @@ describe('X.509 workload-identity runnable example', () => {
   });
 
   test('preserves an explicitly empty encrypted-key passphrase', () => {
-    expect(example).toContain('passphrase !== undefined ? { passphrase } : {}');
+    expect(example).toContain('passphrase === undefined ? {} : { passphrase }');
   });
 
   test('does not inherit the ordinary API-key project when no X.509 project is configured', () => {

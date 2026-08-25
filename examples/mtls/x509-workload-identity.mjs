@@ -7,7 +7,7 @@ import { Agent, ProxyAgent } from 'undici';
 const cert = await requiredPem('OPENAI_X509_CLIENT_CERTIFICATE_CHAIN_PEM', 'OPENAI_MTLS_CERT_CHAIN');
 const key = await requiredPem('OPENAI_X509_CLIENT_PRIVATE_KEY_PEM', 'OPENAI_MTLS_KEY');
 const passphrase = process.env['OPENAI_X509_CLIENT_KEY_PASSPHRASE'];
-const requestTls = { cert, key, ...(passphrase !== undefined ? { passphrase } : {}) };
+const requestTls = { cert, key, ...(passphrase === undefined ? {} : { passphrase }) };
 const proxyMode = process.env['OPENAI_X509_PROXY_MODE'] ?? 'direct';
 const proxy = new Map([
   ['direct', 'direct'],
