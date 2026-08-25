@@ -510,7 +510,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
 
       await expect(client.models.list()).resolves.toMatchObject({ data: [] });
       expect(dispatches).toBe(2);
-      expect(send).toHaveBeenCalledTimes(4);
+      expect(send).toHaveBeenCalledTimes(status === 401 ? 4 : 3);
     },
   );
 
@@ -588,10 +588,8 @@ describe('OpenAI X.509 workload-identity client integration', () => {
 
     await Promise.all([client.request(shared), client.request(shared)]);
 
-    expect(exchangeCount).toBe(2);
-    expect(dispatched).toEqual(
-      new Set(['Bearer synthetic-concurrent-token-1', 'Bearer synthetic-concurrent-token-2']),
-    );
+    expect(exchangeCount).toBe(1);
+    expect(dispatched).toEqual(new Set(['Bearer synthetic-concurrent-token-1']));
   });
 
   test('starts a new isolated operation when caller options are reused sequentially', async () => {
@@ -603,7 +601,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     await delay(60);
     await client.request(shared);
 
-    expect(send).toHaveBeenCalledTimes(4);
+    expect(send).toHaveBeenCalledTimes(3);
   });
 
   test('rejects protected hooks that replace the issued workload bearer', async () => {
