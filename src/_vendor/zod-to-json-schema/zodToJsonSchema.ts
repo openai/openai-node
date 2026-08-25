@@ -137,10 +137,16 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       }
 
       for (const [key, schema] of newDefinitions) {
+        // A definition is only materialized because some property `$ref`s it, so it has to be
+        // parsed in that same position. `propertyPath` is what tells the wrapper parsers they
+        // are inside a property; without it `parseOptionalDef` falls back to its standalone
+        // form and the extracted definition ends up encoded differently from the inline
+        // occurrence of the very same Zod schema.
+        const definitionPath = [...refs.basePath, refs.definitionPath, key];
         definitions[key] =
           parseDef(
             zodDef(schema),
-            { ...refs, currentPath: [...refs.basePath, refs.definitionPath, key] },
+            { ...refs, currentPath: definitionPath, propertyPath: definitionPath },
             true,
           ) ?? {};
         processedDefinitions.add(key);
