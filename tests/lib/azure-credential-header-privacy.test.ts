@@ -23,6 +23,7 @@ class ProtectedHookAzure extends AzureOpenAI {
   mutateCarrier: ((headers: Headers) => void) | undefined;
   inspectAuthenticationCarrier: ((carrier: NullableHeaders) => void) | undefined;
   cloneAuthenticationCarrier: 'spread' | 'assign' | undefined;
+  reusedAuthenticationCarrier: NullableHeaders | undefined;
   observeAuthenticationOptions: ((options: FinalRequestOptions) => Promise<void>) | undefined;
   observePreparedOptions: ((options: FinalRequestOptions) => void) | undefined;
   observeProtectedHookOptions:
@@ -86,7 +87,7 @@ class ProtectedHookAzure extends AzureOpenAI {
     if (this.observeAuthenticationOptions) {
       await this.observeAuthenticationOptions(options);
     }
-    const carrier = await super.authHeaders(options, schemes);
+    const carrier = this.reusedAuthenticationCarrier ?? (await super.authHeaders(options, schemes));
     if (this.mutation === 'auth') {
       carrier?.values.set('API-KEY', 'mutated-static-token');
     } else if (this.mutation === 'auth-null') {
@@ -653,6 +654,158 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
+  test.each(
+    (['api-key', 'Authorization'] as const).flatMap((name) => [
+      { name, body: { safe: 'payload' }, description: 'a JSON body' },
+      { name, body: undefined, description: 'an explicitly undefined body' },
+    ]),
+  )(
+    'snapshots accessor-backed $name request headers once before preprocessing $description',
+    async ({ name, body }) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const firstHeaders = { [name]: 'safe-first-token', 'x-custom': 'preserved' };
+      const unsafeHeaders = { [name]: malformed };
+      let reads = 0;
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body,
+        get headers() {
+          reads += 1;
+          return reads === 1 ? firstHeaders : unsafeHeaders;
+        },
+      };
+      const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+      const state = new WeakMap<FinalRequestOptions, { source: string }>();
+      const marker = { source: 'accessor request options' };
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.observePreparedOptions = (prepared) => state.set(prepared, marker);
+      client.observeProtectedHookOptions = (_hook, received) => {
+        expect(received).toBe(options);
+        expect(state.get(received)).toBe(marker);
+      };
+
+      await client.request(options);
+
+      expect(reads).toBe(1);
+      expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(name)).toBe('safe-first-token');
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('x-custom')).toBe('preserved');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['api-key', 'Authorization'] as const)(
+    'restores accessor-backed request headers after rejecting a malformed %s snapshot',
+    async (name) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      let reads = 0;
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { safe: 'payload' },
+        get headers() {
+          reads += 1;
+          return { [name]: reads === 1 ? malformed : 'safe-second-token' };
+        },
+      };
+      const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), malformed);
+
+      expect(reads).toBe(1);
+      expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test('rejects a nonconfigurable request headers accessor before reading an unsafe credential', async () => {
+    const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    let reads = 0;
+    const options: FinalRequestOptions = { method: 'post', path: '/models', body: { safe: true } };
+    Object.defineProperty(options, 'headers', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return { 'api-key': malformed };
+      },
+    });
+    const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+
+    await expectPrivateCredentialFailure(() => client.request(options), malformed);
+
+    expect(reads).toBe(0);
+    expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('preserves protected-hook mutations of accessor-backed request headers', async () => {
+    let reads = 0;
+    let writes = 0;
+    let headers = { 'api-key': 'first-token' };
+    const replacement = { 'api-key': 'hook-replacement-token' };
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/models',
+      body: { safe: true },
+      get headers() {
+        reads += 1;
+        return headers;
+      },
+      set headers(value) {
+        writes += 1;
+        if (!value || Array.isArray(value) || value instanceof Headers) {
+          throw new Error('Expected replacement request header record.');
+        }
+        headers = value as { 'api-key': string };
+      },
+    };
+    const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.observeProtectedHookOptions = (hook, received) => {
+      if (hook === 'auth') {
+        received.headers = replacement;
+      }
+    };
+
+    await client.request(options);
+
+    expect(reads).toBe(1);
+    expect(writes).toBe(1);
+    expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('hook-replacement-token');
+  });
+
   test('keeps shared request options unchanged across overlapping private authentication waits', async () => {
     const fetch = vi.fn(async () => Response.json({ ok: true }));
     const client = new ProtectedHookAzure({
@@ -709,7 +862,7 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(whileSecondWaits).toBe(rawHeaders);
     expect(options.headers).toBe(rawHeaders);
     expect(observed).toHaveLength(2);
-    expect(reads).toBe(1);
+    expect(reads).toBe(2);
     expect(observed[0]).toBe(options);
     expect(observed[1]).toBe(options);
     expect(observed.every((received) => received.__metadata === metadata)).toBe(true);
@@ -721,7 +874,7 @@ describe('Azure credential header diagnostic privacy', () => {
     rawHeaders['api-key'] = 'updated-token';
     const reused = await client.buildRequest(options);
     expect(reused.req.headers.get('api-key')).toBe('updated-token');
-    expect(reads).toBe(2);
+    expect(reads).toBe(3);
     expect(options.headers).toBe(rawHeaders);
   });
 
@@ -818,6 +971,50 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('safe-outer-token');
   });
 
+  test('isolates a nested Azure request started while snapshotting an outer credential getter', async () => {
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      maxRetries: 0,
+    });
+    let reads = 0;
+    let nested: ReturnType<AzureOpenAI['buildRequest']> | undefined;
+    const headers: Record<string, string> = {};
+    Object.defineProperty(headers, 'api-key', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        if (reads === 1) {
+          nested = client.buildRequest({
+            method: 'post',
+            path: '/models',
+            body: { nested: true },
+            headers: { 'api-key': 'nested-token' },
+          });
+          return 'tenant-a-token';
+        }
+        return 'tenant-b-token';
+      },
+    });
+
+    const outer = client.buildRequest({
+      method: 'post',
+      path: '/models',
+      body: { outer: true },
+      headers,
+    });
+    if (!nested) {
+      throw new Error('Expected the outer credential getter to start the nested request.');
+    }
+    const [outerBuilt, nestedBuilt] = await Promise.all([outer, nested]);
+
+    expect(outerBuilt.req.headers.get('api-key')).toBe('tenant-a-token');
+    expect(nestedBuilt.req.headers.get('api-key')).toBe('nested-token');
+    expect(reads).toBe(1);
+    expect(Object.getOwnPropertyDescriptor(client, 'authHeaders')).toBeUndefined();
+  });
+
   test('isolates concurrent body snapshots for distinct mutable raw header objects', async () => {
     const fetch = vi.fn(async () => Response.json({ ok: true }));
     const client = new ProtectedHookAzure({
@@ -859,6 +1056,272 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(secondBuilt.req.headers.get('api-key')).toBe('second-token');
     expect(firstOptions.headers).toBe(firstHeaders);
     expect(secondOptions.headers).toBe(secondHeaders);
+  });
+
+  test.each([
+    ['the same Azure client', false],
+    ['different Azure clients', true],
+  ] as const)(
+    'isolates overlapping tenant credentials in one mutable header record across %s',
+    async (_description, differentClients) => {
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const firstClient = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-first-client-token',
+        fetch,
+        maxRetries: 0,
+      });
+      const secondClient = differentClients
+        ? new ProtectedHookAzure({
+            baseURL: BASE_URL,
+            apiVersion: API_VERSION,
+            apiKey: 'configured-second-client-token',
+            fetch,
+            maxRetries: 0,
+          })
+        : firstClient;
+      const sharedHeaders = { 'api-key': 'tenant-a-token', 'x-custom': 'preserved' };
+      const firstOptions: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { tenant: 'a' },
+        headers: sharedHeaders,
+      };
+      const secondOptions: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { tenant: 'b' },
+        headers: sharedHeaders,
+      };
+      const observed = new Set<FinalRequestOptions>();
+      const releases = new Set<FinalRequestOptions>();
+      const pauseAuthentication = async (options: FinalRequestOptions) => {
+        observed.add(options);
+        await vi.waitFor(() => expect(releases.has(options)).toBe(true), { interval: 1 });
+      };
+      firstClient.observeAuthenticationOptions = pauseAuthentication;
+      secondClient.observeAuthenticationOptions = pauseAuthentication;
+
+      const first = firstClient.buildRequest(firstOptions);
+      sharedHeaders['api-key'] = 'tenant-b-token';
+      const second = secondClient.buildRequest(secondOptions);
+      expect(observed.size).toBe(2);
+
+      releases.add(secondOptions);
+      const secondBuilt = await second;
+      releases.add(firstOptions);
+      const firstBuilt = await first;
+
+      expect(firstBuilt.req.headers.get('api-key')).toBe('tenant-a-token');
+      expect(secondBuilt.req.headers.get('api-key')).toBe('tenant-b-token');
+      expect(firstBuilt.req.headers.get('x-custom')).toBe('preserved');
+      expect(secondBuilt.req.headers.get('x-custom')).toBe('preserved');
+      expect(firstOptions.headers).toBe(sharedHeaders);
+      expect(secondOptions.headers).toBe(sharedHeaders);
+      expect(sharedHeaders['api-key']).toBe('tenant-b-token');
+    },
+  );
+
+  test.each(['genuine', 'spread clone', 'assigned clone'] as const)(
+    'isolates overlapping requests when a protected hook reuses the same %s authentication carrier',
+    async (representation) => {
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        maxRetries: 0,
+      });
+      const genuine = buildAzureAuthenticationHeaders([['api-key', 'configured-cached-token']]);
+      if (representation === 'spread clone') {
+        client.reusedAuthenticationCarrier = { ...genuine };
+      } else if (representation === 'assigned clone') {
+        const copied = {};
+        client.reusedAuthenticationCarrier = Object.assign(copied, genuine);
+      } else {
+        client.reusedAuthenticationCarrier = genuine;
+      }
+      const headers = { 'api-key': 'tenant-a-token' };
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { shared: true },
+        headers,
+      };
+
+      const first = client.buildRequest(options);
+      headers['api-key'] = 'tenant-b-token';
+      const second = client.buildRequest(options);
+      const [firstBuilt, secondBuilt] = await Promise.all([first, second]);
+
+      expect(firstBuilt.req.headers.get('api-key')).toBe('tenant-a-token');
+      expect(secondBuilt.req.headers.get('api-key')).toBe('tenant-b-token');
+      expect(options.headers).toBe(headers);
+    },
+  );
+
+  test.each([
+    ['the same Azure client', false],
+    ['different Azure clients', true],
+  ] as const)(
+    'isolates mutated tenant credentials when %s concurrently reuse the same request options',
+    async (_description, differentClients) => {
+      const firstClient = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-first-client-token',
+        maxRetries: 0,
+      });
+      const secondClient = differentClients
+        ? new ProtectedHookAzure({
+            baseURL: BASE_URL,
+            apiVersion: API_VERSION,
+            apiKey: 'configured-second-client-token',
+            maxRetries: 0,
+          })
+        : firstClient;
+      const headers = { 'api-key': 'tenant-a-token' };
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { shared: true },
+        headers,
+      };
+      const observed: FinalRequestOptions[] = [];
+      const releases = new Set<number>();
+      const pauseAuthentication = async (received: FinalRequestOptions) => {
+        const index = observed.length;
+        observed.push(received);
+        await vi.waitFor(() => expect(releases.has(index)).toBe(true), { interval: 1 });
+      };
+      firstClient.observeAuthenticationOptions = pauseAuthentication;
+      secondClient.observeAuthenticationOptions = pauseAuthentication;
+
+      const first = firstClient.buildRequest(options);
+      headers['api-key'] = 'tenant-b-token';
+      const second = secondClient.buildRequest(options);
+      expect(observed).toEqual([options, options]);
+
+      releases.add(1);
+      const secondBuilt = await second;
+      releases.add(0);
+      const firstBuilt = await first;
+
+      expect(firstBuilt.req.headers.get('api-key')).toBe('tenant-a-token');
+      expect(secondBuilt.req.headers.get('api-key')).toBe('tenant-b-token');
+      expect(options.headers).toBe(headers);
+      expect(headers['api-key']).toBe('tenant-b-token');
+    },
+  );
+
+  test.each([
+    ['a configurable read-only own hook', true, false, false],
+    ['a nonconfigurable writable own hook', false, true, false],
+    ['a nonextensible configurable own hook', true, false, true],
+    ['a nonextensible nonconfigurable writable own hook', false, true, true],
+  ] as const)(
+    'restores the exact authentication descriptor for %s',
+    async (_description, configurable, writable, preventExtensions) => {
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        maxRetries: 0,
+      });
+      Object.defineProperty(client, 'authHeaders', {
+        configurable,
+        enumerable: true,
+        value: Object.getOwnPropertyDescriptor(ProtectedHookAzure.prototype, 'authHeaders')?.value,
+        writable,
+      });
+      if (preventExtensions) {
+        Object.preventExtensions(client);
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(client, 'authHeaders');
+
+      const built = await client.buildRequest({
+        method: 'post',
+        path: '/models',
+        body: { safe: true },
+        headers: { 'api-key': 'request-token' },
+      });
+
+      expect(built.req.headers.get('api-key')).toBe('request-token');
+      expect(Object.getOwnPropertyDescriptor(client, 'authHeaders')).toEqual(descriptor);
+    },
+  );
+
+  test.each(['nonextensible inherited hook', 'nonconfigurable read-only own hook'] as const)(
+    'fails closed before reading credentials when authentication protection cannot replace a %s',
+    async (representation) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        maxRetries: 0,
+      });
+      if (representation === 'nonextensible inherited hook') {
+        Object.preventExtensions(client);
+      } else {
+        Object.defineProperty(client, 'authHeaders', {
+          configurable: false,
+          value: Object.getOwnPropertyDescriptor(ProtectedHookAzure.prototype, 'authHeaders')?.value,
+          writable: false,
+        });
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(client, 'authHeaders');
+
+      await expectPrivateCredentialFailure(
+        () =>
+          client.buildRequest({
+            method: 'post',
+            path: '/models',
+            body: { safe: true },
+            headers: { 'api-key': credential },
+          }),
+        credential,
+      );
+
+      expect(Object.getOwnPropertyDescriptor(client, 'authHeaders')).toEqual(descriptor);
+    },
+  );
+
+  test('preserves an intentional protected-hook authentication method replacement', async () => {
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      maxRetries: 0,
+    });
+    const replacement = Object.getOwnPropertyDescriptor(ProtectedHookAzure.prototype, 'authHeaders')?.value;
+    client.observeProtectedHookOptions = (hook) => {
+      if (hook === 'auth') {
+        expect(Reflect.get(client, 'authHeaders')).toBe(replacement);
+        expect(Object.getOwnPropertyDescriptor(client, 'authHeaders')).toBeUndefined();
+        Object.defineProperty(client, 'authHeaders', {
+          configurable: true,
+          enumerable: true,
+          value: replacement,
+          writable: false,
+        });
+      }
+    };
+
+    const built = await client.buildRequest({
+      method: 'post',
+      path: '/models',
+      body: { safe: true },
+      headers: { 'api-key': 'request-token' },
+    });
+
+    expect(built.req.headers.get('api-key')).toBe('request-token');
+    expect(Object.getOwnPropertyDescriptor(client, 'authHeaders')).toEqual({
+      configurable: true,
+      enumerable: true,
+      value: replacement,
+      writable: false,
+    });
   });
 
   test('releases failed private body snapshots before the same caller headers are reused', async () => {
@@ -1276,6 +1739,115 @@ describe('Azure credential header diagnostic privacy', () => {
       expect(injected.get('x-custom')).toBe('preserved');
       expect(request?.redirect).toBe(name === 'api-key' ? 'manual' : undefined);
       expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([
+    ['static API key', 'static-api-key', 'api-key', false] as const,
+    ['rotating bearer token', 'rotating-entra-token', 'authorization', false] as const,
+    ['rotating admin token', 'rotating-entra-token', 'authorization', true] as const,
+  ])(
+    'preserves an unmodified inherited Headers subclass identity and metadata for %s',
+    async (_description, authentication, name, admin) => {
+      const trackedPrototype = Object.create(Headers.prototype) as object;
+      const nestedPrototype = Object.create(trackedPrototype) as object;
+      const credential = name === 'api-key' ? 'subclass-static-token' : 'Bearer subclass-rotating-token';
+      const injected = Object.setPrototypeOf(
+        new Headers({ [name]: credential, 'x-custom': 'preserved' }),
+        nestedPrototype,
+      );
+      const metadata = new WeakMap<Headers, { source: string }>();
+      const marker = { source: 'trusted transport metadata' };
+      metadata.set(injected, marker);
+
+      let transportMetadata: { source: string } | undefined;
+      const fetch = vi.fn(async (_url: RequestInfo, init?: RequestInit) => {
+        if (init?.headers instanceof Headers) {
+          transportMetadata = metadata.get(init.headers);
+        }
+        return Response.json({ ok: true });
+      });
+      const provider = vi.fn(async () => 'configured-provider-token');
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'configured-static-token' }
+          : { azureADTokenProvider: provider, adminAPIKey: 'configured-admin-token' }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: admin },
+      });
+
+      const request = fetch.mock.calls[0]?.[1];
+      expect(request?.headers).toBe(injected);
+      expect(transportMetadata).toBe(marker);
+      expect(injected.get(name)).toBe(credential);
+      expect(injected.get('x-custom')).toBe('preserved');
+      expect(request?.redirect).toBe(name === 'api-key' ? 'manual' : undefined);
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(
+    (['get', 'has'] as const).flatMap((operation) =>
+      (['prototype accessor', 'ancestor accessor', 'instance accessor'] as const).map((override) => ({
+        operation,
+        override,
+      })),
+    ),
+  )(
+    'does not preserve or invoke an overridden Headers subclass $override ($operation)',
+    async ({ operation, override }) => {
+      let accessorReads = 0;
+      const trackedPrototype = Object.create(Headers.prototype) as object;
+      const nestedPrototype = Object.create(trackedPrototype) as object;
+      const injected = Object.setPrototypeOf(
+        new Headers({ 'api-key': 'safe-subclass-token', 'x-custom': 'preserved' }),
+        nestedPrototype,
+      );
+      let target: object;
+      if (override === 'instance accessor') {
+        target = injected;
+      } else if (override === 'ancestor accessor') {
+        target = trackedPrototype;
+      } else {
+        target = nestedPrototype;
+      }
+      Object.defineProperty(target, operation, {
+        configurable: true,
+        get() {
+          accessorReads += 1;
+          return Headers.prototype[operation];
+        },
+      });
+
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await client.request({ method: 'get', path: '/models' });
+
+      const sent = fetch.mock.calls[0]?.[1]?.headers;
+      expect(sent).toBeInstanceOf(Headers);
+      expect(sent).not.toBe(injected);
+      expect(new Headers(sent).get('api-key')).toBe('safe-subclass-token');
+      expect(new Headers(sent).get('x-custom')).toBe('preserved');
+      expect(accessorReads).toBe(0);
       expect(fetch).toHaveBeenCalledTimes(1);
     },
   );

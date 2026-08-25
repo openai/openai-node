@@ -2,6 +2,8 @@ import { vi } from 'vitest';
 
 import type { ClientOptions } from 'openai/index';
 import OpenAI from 'openai/index';
+import type { RequestOptions } from 'openai/internal/request-options';
+import { formatRequestDetails } from 'openai/internal/utils/log';
 
 const opts: ClientOptions = {
   apiKey: 'example-api-key',
@@ -17,6 +19,47 @@ const opts: ClientOptions = {
       ),
     ),
 };
+
+describe('formatRequestDetails()', () => {
+  test('omits header accessors while preserving own enumerable request options', () => {
+    const metadata = Symbol('request metadata');
+    const options = Object.create({ inherited: 'omitted' }) as RequestOptions;
+    let visibleReads = 0;
+
+    Object.defineProperties(options, {
+      headers: {
+        enumerable: true,
+        get() {
+          throw new Error('Request header diagnostics must never access the original headers.');
+        },
+      },
+      visible: {
+        enumerable: true,
+        get() {
+          visibleReads += 1;
+          return 'preserved';
+        },
+      },
+      hidden: { enumerable: false, value: 'omitted' },
+      [metadata]: { enumerable: true, value: 'symbol metadata' },
+    });
+    Object.defineProperty(options, '__proto__', { enumerable: true, value: 'safe data property' });
+
+    const details = formatRequestDetails({ options });
+    const loggedOptions = details.options ?? {};
+
+    expect(visibleReads).toBe(1);
+    expect(loggedOptions).toEqual({
+      visible: 'preserved',
+      [metadata]: 'symbol metadata',
+      ['__proto__']: 'safe data property',
+    });
+    expect(Object.getPrototypeOf(loggedOptions)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(loggedOptions, 'headers')).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(loggedOptions, 'hidden')).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(loggedOptions, 'inherited')).toBeUndefined();
+  });
+});
 
 describe('debug()', () => {
   const env = process.env;

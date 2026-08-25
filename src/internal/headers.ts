@@ -36,13 +36,18 @@ type AzureAuthenticationHeaderMutation = {
 
 type AzureRequestHeaderMarker = {
   active: boolean;
+  registration: AzureRequestHeaderRegistration;
 };
 type AzureRequestHeaderRegistration = {
   carrier: NullableHeaders;
+  headers: object;
+};
+type AzureRequestHeaderRegistrations = {
   references: number;
   markers: AzureRequestHeaderMarker[];
 };
 type AzureRequestHeaderProtection = {
+  bind: (carrier: NullableHeaders) => NullableHeaders;
   deactivate: () => void;
   release: () => void;
 };
@@ -60,7 +65,8 @@ const azureAuthenticationHeaderMutations = new WeakMap<
 >();
 
 const azureAuthenticationNullCarriers = new WeakMap<Set<string>, NullableHeaders>();
-const azureRequestHeaders = new WeakMap<object, AzureRequestHeaderRegistration>();
+const azureRequestHeaders = new WeakMap<object, AzureRequestHeaderRegistrations>();
+const azureRequestAuthenticationHeaders = new WeakMap<NullableHeaders, AzureRequestHeaderRegistration>();
 
 const snapshotAzureAuthenticationHeaders = (
   carrier: NullableHeaders,
@@ -365,49 +371,63 @@ export const protectAzureRequestHeaders = (
     return undefined;
   }
 
-  let registration = azureRequestHeaders.get(headers);
-  if (!registration) {
-    registration = {
-      carrier: buildAzureAuthenticationHeaders(headers),
+  let registrations = azureRequestHeaders.get(headers);
+  if (!registrations) {
+    registrations = {
       references: 0,
       markers: [],
     };
-    azureRequestHeaders.set(headers, registration);
+    azureRequestHeaders.set(headers, registrations);
   }
-  const activeRegistration = registration;
-  activeRegistration.references += 1;
-  const marker: AzureRequestHeaderMarker = { active: true };
-  activeRegistration.markers.push(marker);
+  const activeRegistrations = registrations;
+  const activeRegistration = {
+    carrier: buildAzureAuthenticationHeaders(headers),
+    headers,
+  };
+  activeRegistrations.references += 1;
+  const marker: AzureRequestHeaderMarker = { active: true, registration: activeRegistration };
+  activeRegistrations.markers.push(marker);
   let released = false;
 
   const deactivate = (): void => {
     if (!marker.active) return;
     marker.active = false;
-    const position = activeRegistration.markers.indexOf(marker);
+    const position = activeRegistrations.markers.indexOf(marker);
     if (position !== -1) {
-      activeRegistration.markers.splice(position, 1);
+      activeRegistrations.markers.splice(position, 1);
     }
   };
   const release = (): void => {
     if (released) return;
     released = true;
     deactivate();
-    activeRegistration.references -= 1;
-    if (activeRegistration.references === 0) {
+    activeRegistrations.references -= 1;
+    if (activeRegistrations.references === 0) {
       azureRequestHeaders.delete(headers);
     }
   };
 
-  return { deactivate, release };
+  const bind = (carrier: NullableHeaders): NullableHeaders => {
+    const authentic = azureAuthenticationHeaders.has(carrier)
+      ? carrier
+      : azureAuthenticationHeaderCarriers.get(carrier.values);
+    if (!authentic) {
+      return carrier;
+    }
+    const isolated = { ...carrier };
+    azureRequestAuthenticationHeaders.set(isolated, activeRegistration);
+    return isolated;
+  };
+
+  return { bind, deactivate, release };
 };
 
-const consumeAzureBodyMarker = (headers: HeadersLike): NullableHeaders | undefined => {
+const consumeAzureBodyMarker = (headers: HeadersLike): AzureRequestHeaderRegistration | undefined => {
   if (headers === undefined || headers === null || typeof headers !== 'object') return undefined;
-  const registration = azureRequestHeaders.get(headers);
-  const marker = registration?.markers.pop();
-  if (!registration || !marker) return undefined;
+  const marker = azureRequestHeaders.get(headers)?.markers.pop();
+  if (!marker) return undefined;
   marker.active = false;
-  return registration.carrier;
+  return marker.registration;
 };
 
 function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [string, string | null]> {
@@ -512,26 +532,40 @@ export const assertAzureAuthenticationHeaders = (headers: HeadersLike): void => 
 };
 
 export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
-  const bodyCarrier = newHeaders.length === 1 ? consumeAzureBodyMarker(newHeaders[0]) : undefined;
+  const bodyRegistration = newHeaders.length === 1 ? consumeAzureBodyMarker(newHeaders[0]) : undefined;
+  let requestRegistration = bodyRegistration;
+  let protectsAzureCredentials = bodyRegistration !== undefined;
+  if (!protectsAzureCredentials) {
+    for (const headers of newHeaders) {
+      if (typeof headers !== 'object' || headers === null) {
+        continue;
+      }
+      const carrier = azureAuthenticationHeaders.has(headers as NullableHeaders)
+        ? (headers as NullableHeaders)
+        : brand_privateNullableHeaders in headers
+          ? azureAuthenticationHeaderCarriers.get((headers as NullableHeaders).values)
+          : undefined;
+      if (!carrier) {
+        continue;
+      }
+      protectsAzureCredentials = true;
+      requestRegistration =
+        azureRequestAuthenticationHeaders.get(headers as NullableHeaders) ??
+        azureRequestAuthenticationHeaders.get(carrier);
+      if (requestRegistration) {
+        break;
+      }
+    }
+  }
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
-  const protectsAzureCredentials =
-    bodyCarrier !== undefined ||
-    newHeaders.some(
-      (headers) =>
-        typeof headers === 'object' &&
-        headers !== null &&
-        (azureAuthenticationHeaders.has(headers as NullableHeaders) ||
-          (brand_privateNullableHeaders in headers &&
-            azureAuthenticationHeaderCarriers.has((headers as NullableHeaders).values))),
-    );
   const pendingAuthenticationHeaders = new Map<string, string[]>();
 
   for (const source of newHeaders) {
     const seenHeaders = new Set<string>();
     const headers =
-      protectsAzureCredentials && typeof source === 'object' && source !== null
-        ? (azureRequestHeaders.get(source)?.carrier ?? source)
+      protectsAzureCredentials && requestRegistration !== undefined && source === requestRegistration.headers
+        ? requestRegistration.carrier
         : source;
     for (const [name, value] of iterateHeaders(headers)) {
       if (!httpTokenHeaderName.test(name)) {

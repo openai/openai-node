@@ -95,8 +95,14 @@ export const formatRequestDetails = (details: {
   body?: unknown;
 }) => {
   if (details.options) {
-    details.options = { ...details.options };
-    delete details.options['headers']; // redundant + leaks internals
+    const options = details.options;
+    details.options = Object.fromEntries(
+      Reflect.ownKeys(options).flatMap((key) =>
+        key === 'headers' || !Object.prototype.propertyIsEnumerable.call(options, key)
+          ? []
+          : [[key, Reflect.get(options, key)]],
+      ),
+    );
   }
   if (details.headers) {
     details.headers = Object.fromEntries(
