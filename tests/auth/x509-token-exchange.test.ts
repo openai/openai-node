@@ -400,6 +400,28 @@ describe('isolated X.509 workload-identity token exchange', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  test('snapshots an accessor-provided caller signal before validating and composing it', async () => {
+    const controller = new AbortController();
+    const cancellation = new Error('synthetic-snapshotted-signal-cancellation');
+    const signal = vi.fn(() => (signal.mock.calls.length === 1 ? controller.signal : undefined));
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async () => {
+      controller.abort(cancellation);
+      return new Response(null, { status: 503 });
+    });
+
+    await expect(
+      exchangeX509Token({
+        transport,
+        identityProviderId: 'synthetic-identity-provider',
+        serviceAccountId: 'synthetic-service-account',
+        get signal() {
+          return signal();
+        },
+      }),
+    ).rejects.toBe(cancellation);
+    expect(signal).toHaveBeenCalledTimes(1);
+  });
+
   test.each([307, 408, 429, 503])(
     'preserves cancellation racing issuer response headers with status %i',
     async (status) => {

@@ -201,8 +201,8 @@ async function oauthError(response: Response, signal?: AbortSignal): Promise<OAu
 
 /** Exchanges one enrolled client certificate for a validated OpenAI workload access token. */
 export async function exchangeX509Token(options: X509TokenExchangeOptions): Promise<X509ExchangedToken> {
-  options.signal?.throwIfAborted();
-  const { identityProviderId, serviceAccountId } = options;
+  const { identityProviderId, serviceAccountId, signal: callerSignal, transport } = options;
+  callerSignal?.throwIfAborted();
   if (
     typeof identityProviderId !== 'string' ||
     identityProviderId.trim().length === 0 ||
@@ -215,8 +215,8 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
   }
 
   const timeoutController = new AbortController();
-  const signal = options.signal
-    ? AbortSignal.any([options.signal, timeoutController.signal])
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, timeoutController.signal])
     : timeoutController.signal;
   const timeout = setTimeout(() => {
     timeoutController.abort(
@@ -235,7 +235,7 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
 
     let response: Response;
     try {
-      response = await sendX509Request(options.transport, TOKEN_EXCHANGE_URL, {
+      response = await sendX509Request(transport, TOKEN_EXCHANGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
