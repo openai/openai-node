@@ -488,6 +488,24 @@ describe('a definition keeps the context it was referenced from', () => {
     ]);
   });
 
+  it('carries `default` across the collapse without descending into it', () => {
+    // `parseDefaultDef` puts `default` beside the union a shared `.default()`
+    // produces. It is an annotation, so it moves; its value is literal JSON, so
+    // it is not walked. The strict helpers reject `ZodDefault` before conversion,
+    // but the exported converter does not.
+    const withDefault = zv3.string().nullable().optional().default('x');
+
+    const schema = zodToJsonSchema(zv3.object({ v: zv3.string() }), {
+      openaiStrictMode: true,
+      definitions: { withDefault },
+    }) as { definitions: Record<string, JsonSchema> };
+
+    expect(schema.definitions!['withDefault']).toEqual({
+      type: ['string', 'null'],
+      default: 'x',
+    });
+  });
+
   it('still strips the wrapper for a definition extracted from a property', () => {
     const shared = zv3.string().nullable().optional();
 

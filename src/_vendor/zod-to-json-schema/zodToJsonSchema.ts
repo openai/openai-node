@@ -132,7 +132,14 @@ const SCHEMA_CHILDREN: Record<string, typeof SCHEMA_KEYWORD | typeof SCHEMA_LIST
     $defs: SCHEMA_MAP_KEYWORD,
   };
 
-/** Keywords that describe a schema without constraining what it accepts. */
+/**
+ * Keywords that describe a schema without constraining what it accepts.
+ *
+ * `default` and `examples` belong here for the same reason the rest do: JSON
+ * Schema files them under annotations, they narrow nothing, and `parseDefaultDef`
+ * emits `default` beside the union a shared `.default()` produces. They are still
+ * not descended into -- their values are literal JSON, not schemas.
+ */
 const ANNOTATION_KEYWORDS = new Set([
   'description',
   'markdownDescription',
@@ -141,6 +148,8 @@ const ANNOTATION_KEYWORDS = new Set([
   'deprecated',
   'readOnly',
   'writeOnly',
+  'default',
+  'examples',
 ]);
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
