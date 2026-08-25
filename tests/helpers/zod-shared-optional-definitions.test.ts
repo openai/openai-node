@@ -381,6 +381,67 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(tool.parameters.definitions['f_properties_first_anyOf_0']).toEqual({});
   });
 
+  it('leaves literal JSON alone while reducing schema positions', () => {
+    // A `default` is a value the caller declared, not a schema. Walking into it
+    // would rewrite the value the helpers serialize.
+    const literal = { anyOf: [{ not: {} }, { value: 'kept' }] };
+    const withDefault = zv3
+      .object({ v: zv3.string() })
+      .default(literal as never)
+      .nullable()
+      .optional();
+
+    const schema = zodToJsonSchema(zv3.object({ a: zv3.string() }), {
+      openaiStrictMode: true,
+      definitions: { withDefault },
+    }) as { definitions: Record<string, JsonSchema> };
+
+    expect(JSON.stringify(schema.definitions!['withDefault'])).toContain(
+      JSON.stringify({ default: literal }).slice(1, -1),
+    );
+    // The schema-level never branch is still gone.
+    expect((schema.definitions!['withDefault'] as { anyOf?: unknown }).anyOf).not.toEqual([
+      { not: {} },
+      expect.anything(),
+    ]);
+  });
+
+  it('still runs `override` for the definition it materializes', () => {
+    const seen: string[] = [];
+    const optional = zv3.string().nullable().optional();
+
+    zodToJsonSchema(zv3.object({ a: zv3.string() }), {
+      definitions: { optional },
+      override: (def: { typeName?: unknown }) => {
+        seen.push(String(def?.typeName));
+        return undefined as never;
+      },
+    });
+
+    // Parsing the inner type directly instead of the wrapper would hide the
+    // `ZodOptional` from the public override hook.
+    expect(seen).toContain('ZodOptional');
+  });
+
+  it('carries `markdownDescription` onto the definition as well', () => {
+    const described = zv3.string().nullable().optional().describe('guidance');
+
+    const schema = zodToJsonSchema(zv3.object({ a: described, b: described }), {
+      name: 'p',
+      markdownDescription: true,
+      $refStrategy: 'extract-to-root',
+      nameStrategy: 'duplicate-ref',
+    }) as { definitions: Record<string, JsonSchema> };
+
+    // The inline occurrence gets both from `addMeta`; the definition the second
+    // property points at has to match it.
+    expect(schema.definitions!['p_properties_a']).toEqual({
+      type: ['string', 'null'],
+      description: 'guidance',
+      markdownDescription: 'guidance',
+    });
+  });
+
   it('still strips the wrapper for a definition extracted from a property', () => {
     const shared = zv3.string().nullable().optional();
 

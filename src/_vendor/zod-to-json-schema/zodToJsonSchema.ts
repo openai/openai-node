@@ -1,4 +1,4 @@
-import type { ZodSchema, ZodTypeDef } from 'zod/v3';
+import type { ZodSchema } from 'zod/v3';
 import type { Options, Targets } from './Options';
 import type { JsonSchema7Type } from './parseDef';
 import { parseDef } from './parseDef';
@@ -97,45 +97,95 @@ const originatedInsideProperty = (seen: Seen | undefined): boolean => {
  * container supplied through `schemaDefinitions` holds its optional elements
  * nested, and a `not` left down there is rejected just the same.
  */
-/** The inner def of a `ZodOptional`, or `undefined` for anything else. */
-const innerTypeOfOptional = (def: unknown): ZodTypeDef | undefined => {
-  const candidate = def as { typeName?: unknown; innerType?: { _def?: ZodTypeDef } };
-  if (candidate?.typeName !== 'ZodOptional') {
-    return undefined;
-  }
-  return candidate.innerType?._def;
-};
+/**
+ * Keywords whose value is a schema, a list of schemas, or a map of schemas.
+ *
+ * Everything else -- `default`, `const`, `enum`, `examples`, `required` -- holds
+ * literal JSON that happens to be an object, and walking into it would rewrite a
+ * value the caller declared. `toStrictJsonSchema` in `lib/transform` draws the
+ * same line.
+ */
+const SCHEMA_KEYWORD = 'schema';
+const SCHEMA_LIST_KEYWORD = 'list';
+const SCHEMA_MAP_KEYWORD = 'map';
 
-const reduceNeverBranches = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map(reduceNeverBranches);
-  }
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-  const walked: Record<string, unknown> = {};
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    walked[key] = reduceNeverBranches(child);
-  }
+const SCHEMA_CHILDREN: Record<string, typeof SCHEMA_KEYWORD | typeof SCHEMA_LIST_KEYWORD | typeof SCHEMA_MAP_KEYWORD> =
+  {
+    not: SCHEMA_KEYWORD,
+    if: SCHEMA_KEYWORD,
+    then: SCHEMA_KEYWORD,
+    else: SCHEMA_KEYWORD,
+    contains: SCHEMA_KEYWORD,
+    additionalItems: SCHEMA_KEYWORD,
+    additionalProperties: SCHEMA_KEYWORD,
+    unevaluatedItems: SCHEMA_KEYWORD,
+    unevaluatedProperties: SCHEMA_KEYWORD,
+    propertyNames: SCHEMA_KEYWORD,
+    anyOf: SCHEMA_LIST_KEYWORD,
+    oneOf: SCHEMA_LIST_KEYWORD,
+    allOf: SCHEMA_LIST_KEYWORD,
+    prefixItems: SCHEMA_LIST_KEYWORD,
+    properties: SCHEMA_MAP_KEYWORD,
+    patternProperties: SCHEMA_MAP_KEYWORD,
+    dependentSchemas: SCHEMA_MAP_KEYWORD,
+    definitions: SCHEMA_MAP_KEYWORD,
+    $defs: SCHEMA_MAP_KEYWORD,
+  };
 
-  const branches = walked['anyOf'];
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * `anyOf: [{ not: {} }, X]` collapsed to `X`, with any sibling keywords kept.
+ *
+ * The first branch matches nothing, so the union is exactly `X` -- an identity in
+ * JSON Schema, and the only spelling strict Structured Outputs will take.
+ */
+const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, unknown> => {
+  const branches = schema['anyOf'];
   if (!Array.isArray(branches) || branches.length !== 2) {
-    return walked;
+    return schema;
   }
   const [first, second] = branches as [unknown, unknown];
   const isNever =
-    !!first &&
-    typeof first === 'object' &&
-    Object.keys(first as object).length === 1 &&
-    typeof (first as Record<string, unknown>)['not'] === 'object' &&
-    (first as Record<string, unknown>)['not'] !== null &&
-    Object.keys((first as Record<string, unknown>)['not'] as object).length === 0;
-  if (!isNever || !second || typeof second !== 'object' || Array.isArray(second)) {
-    return walked;
+    isPlainObject(first) &&
+    Object.keys(first).length === 1 &&
+    isPlainObject(first['not']) &&
+    Object.keys(first['not'] as object).length === 0;
+  if (!isNever || !isPlainObject(second)) {
+    return schema;
   }
+  const { anyOf: _dropped, ...siblings } = schema;
+  return { ...second, ...siblings };
+};
 
-  const { anyOf: _dropped, ...siblings } = walked;
-  return { ...(second as Record<string, unknown>), ...siblings };
+/** `collapseNeverBranch` at every schema position, literal payloads left alone. */
+const collapseNeverBranchesDeep = (value: unknown): unknown => {
+  if (!isPlainObject(value)) {
+    return value;
+  }
+  const walked: Record<string, unknown> = { ...value };
+  for (const [key, child] of Object.entries(value)) {
+    const kind = SCHEMA_CHILDREN[key];
+    if (kind === SCHEMA_KEYWORD) {
+      walked[key] = collapseNeverBranchesDeep(child);
+    } else if (kind === SCHEMA_LIST_KEYWORD && Array.isArray(child)) {
+      walked[key] = child.map(collapseNeverBranchesDeep);
+    } else if (kind === SCHEMA_MAP_KEYWORD && isPlainObject(child)) {
+      const mapped: Record<string, unknown> = {};
+      for (const [name, sub] of Object.entries(child)) {
+        mapped[name] = collapseNeverBranchesDeep(sub);
+      }
+      walked[key] = mapped;
+    } else if (key === 'items') {
+      // `items` is a schema in draft 2020-12 and either a schema or a positional
+      // list before it.
+      walked[key] = Array.isArray(child) ? child.map(collapseNeverBranchesDeep) : (
+          collapseNeverBranchesDeep(child)
+        );
+    }
+  }
+  return collapseNeverBranch(walked);
 };
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
@@ -214,24 +264,16 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // else keep no property context: that is what they were parsed with the first
         // time, and the standalone encoding is the correct one for them.
         //
-        // The property treatment a definition needs is exactly one thing: the outer
-        // optional wrapper is dropped, the way `parseOptionalDef` drops it inside a
-        // property. Doing that here, rather than handing the definition a property
-        // path, keeps the treatment off every descendant -- a path prefix matches
-        // the whole subtree, so a nested union or array would be parsed as though it
-        // too sat directly in a property and would lose the entries it holds by
-        // branch or by position.
-        const unwrapped =
-          originatedInsideProperty(refs.seen.get(def)) ? innerTypeOfOptional(def) : undefined;
-
-        let materialized =
-          parseDef(unwrapped ?? def, { ...refs, currentPath: definitionPath }, true) ?? {};
-        const outerDescription = (def as { description?: string }).description;
-        if (unwrapped && outerDescription !== undefined) {
-          // `parseDef` attached the inner type's metadata; the wrapper's own
-          // `.describe()` still has to land, as it would on the inline occurrence.
-          materialized = { ...materialized, description: outerDescription };
-        }
+        // Parsed with no property context, so nothing below the definition is
+        // treated as though it sat directly in a property -- a path prefix matches
+        // the whole subtree, and a nested union or array would lose the entries it
+        // holds by branch or by position. The one thing a property-derived
+        // definition does need, dropping its outer optional wrapper, is the same
+        // identity the strict reduction applies, so it is done afterwards on the
+        // finished schema. The def itself still goes through `parseDef`, so
+        // `override` and `.describe()` behave exactly as they did.
+        const materialized =
+          parseDef(def, { ...refs, currentPath: definitionPath }, true) ?? {};
         // `not` is outside the subset strict Structured Outputs accepts (see
         // `toStrictJsonSchema` in `lib/transform`), so a standalone optional cannot keep
         // its `anyOf: [{ not: {} }, ...]` spelling there. Rewriting the finished
@@ -240,7 +282,13 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // position or by branch loses that entry when its parser returns nothing.
         definitions[key] =
           refs.openaiStrictMode ?
-            (reduceNeverBranches(materialized) as JsonSchema7Type)
+            // `not` is outside the subset strict Structured Outputs accepts, at any
+            // depth (see `toStrictJsonSchema` in `lib/transform`).
+            (collapseNeverBranchesDeep(materialized) as JsonSchema7Type)
+          : originatedInsideProperty(refs.seen.get(def)) ?
+            // Only the outer wrapper: the inline occurrence of this same schema is
+            // encoded without it, and the two have to agree.
+            (collapseNeverBranch(materialized as Record<string, unknown>) as JsonSchema7Type)
           : materialized;
         processedDefinitions.add(key);
       }
