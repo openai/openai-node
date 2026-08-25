@@ -2,9 +2,11 @@ const MAX_JSON_ERROR_CAUSES = 32;
 const getErrorDescriptor = Object.getOwnPropertyDescriptor;
 const getErrorPrototype = Object.getPrototypeOf;
 const errorFunctionSource = Function.prototype.toString;
+const nativeObjectSource = errorFunctionSource.call(Object);
 const nativeErrorSource = errorFunctionSource.call(Error);
 const nativeSyntaxErrorSource = errorFunctionSource.call(SyntaxError);
 const nativeErrorBrandDescriptor = getErrorDescriptor(Error, 'isError');
+const nativeStructuredCloneDescriptor = getErrorDescriptor(globalThis, 'structuredClone');
 
 type ErrorBrand = (error: object) => boolean;
 
@@ -76,8 +78,16 @@ const nativeErrorBrand =
     ? (nativeErrorBrandDescriptor.value.bind(Error) as ErrorBrand)
     : runtimeErrorTypes?.isNativeError;
 const nativeProxyBrand = runtimeErrorTypes?.isProxy;
+const nativeStructuredClone =
+  nativeStructuredCloneDescriptor &&
+  'value' in nativeStructuredCloneDescriptor &&
+  typeof nativeStructuredCloneDescriptor.value === 'function'
+    ? (nativeStructuredCloneDescriptor.value.bind(globalThis) as (value: object) => unknown)
+    : undefined;
 
 type JSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
+type JSONErrorBrand = 'native' | 'proxy' | 'tagged-wrapper' | 'unknown' | 'unsafe';
+type ClonedErrorBrand = 'native' | 'proxy' | 'unknown' | 'unavailable';
 
 function classifyCrossRealmError(error: object): JSONErrorKind {
   try {
@@ -134,9 +144,135 @@ function hasNativeErrorDescriptors(error: object): boolean {
   );
 }
 
-function classifyUnbrandedError(error: object): 'unknown' | 'unsafe' {
+// A custom or proxied prototype can replace checked diagnostics before cloning.
+function hasSafeClonePrototypeChain(error: object): boolean {
+  let prototype: object | null = getErrorPrototype(error) as object | null;
+
+  for (let depth = 0; prototype !== null; depth += 1) {
+    if (depth >= MAX_JSON_ERROR_CAUSES) {
+      return false;
+    }
+
+    const constructor = getErrorDescriptor(prototype, 'constructor');
+    if (!constructor || !('value' in constructor) || typeof constructor.value !== 'function') {
+      return false;
+    }
+
+    const originalPrototype = getErrorDescriptor(constructor.value, 'prototype');
+    if (!originalPrototype || !('value' in originalPrototype) || originalPrototype.value !== prototype) {
+      return false;
+    }
+
+    const source = errorFunctionSource.call(constructor.value);
+    if (source === nativeObjectSource) {
+      return getErrorPrototype(prototype) === null;
+    }
+    if (source !== nativeErrorSource && source !== nativeSyntaxErrorSource) {
+      return false;
+    }
+
+    prototype = getErrorPrototype(prototype) as object | null;
+  }
+
+  return false;
+}
+
+function hasSafeCloneDiagnostic(error: object, name: 'name' | 'message' | 'stack' | 'cause'): boolean {
+  let current: object | null = error;
+
+  for (let depth = 0; current !== null; depth += 1) {
+    if (depth >= MAX_JSON_ERROR_CAUSES) {
+      return false;
+    }
+
+    const descriptor = getErrorDescriptor(current, name);
+    if (descriptor) {
+      if (!('value' in descriptor)) {
+        return false;
+      }
+      if (name !== 'cause') {
+        return typeof descriptor.value === 'string';
+      }
+      if (descriptor.value === null) {
+        return true;
+      }
+
+      const kind = typeof descriptor.value;
+      return kind !== 'object' && kind !== 'function' && kind !== 'symbol';
+    }
+
+    current = getErrorPrototype(current) as object | null;
+  }
+
+  return true;
+}
+
+function classifyStructuredError(error: object): ClonedErrorBrand {
+  if (!nativeStructuredClone || !hasSafeClonePrototypeChain(error)) {
+    return 'unavailable';
+  }
+
+  for (const name of ['name', 'message', 'stack', 'cause'] as const) {
+    if (!hasSafeCloneDiagnostic(error, name)) {
+      return 'unavailable';
+    }
+  }
+
+  const keys = Reflect.ownKeys(error);
+  if (keys.length > MAX_JSON_ERROR_CAUSES) {
+    return 'unavailable';
+  }
+
+  for (const key of keys) {
+    if (typeof key !== 'string') {
+      continue;
+    }
+
+    const descriptor = getErrorDescriptor(error, key);
+    if (!descriptor) {
+      return 'proxy';
+    }
+    if (!descriptor.enumerable) {
+      continue;
+    }
+    if (!('value' in descriptor)) {
+      return 'unavailable';
+    }
+    if (descriptor.value !== null) {
+      const kind = typeof descriptor.value;
+      if (kind === 'object' || kind === 'function' || kind === 'symbol') {
+        return 'unavailable';
+      }
+    }
+  }
+
+  let clone: unknown;
+  try {
+    clone = nativeStructuredClone(error);
+  } catch {
+    // Structured cloning rejects proxies before invoking their getters or traps.
+    return 'proxy';
+  }
+
+  if (typeof clone !== 'object' || clone === null) {
+    return 'unknown';
+  }
+
+  const kind = classifyCrossRealmError(clone);
+  return kind === 'error' || kind === 'syntax' ? 'native' : 'unknown';
+}
+
+function classifyUnbrandedError(error: object): JSONErrorBrand {
   if (nativeProxyBrand) {
-    return nativeProxyBrand(error) ? 'unsafe' : 'unknown';
+    if (!nativeProxyBrand(error)) {
+      return 'unknown';
+    }
+
+    const kind = classifyCrossRealmError(error);
+    if (kind === 'unsafe' || kind === 'unknown') {
+      return kind;
+    }
+    return 'proxy';
   }
 
   const kind = classifyCrossRealmError(error);
@@ -147,10 +283,19 @@ function classifyUnbrandedError(error: object): 'unknown' | 'unsafe' {
     return 'unknown';
   }
 
-  return hasNativeErrorDescriptors(error) ? 'unsafe' : 'unknown';
+  const clone = classifyStructuredError(error);
+  if (clone !== 'unavailable') {
+    return clone;
+  }
+
+  if (hasNativeErrorDescriptors(error)) {
+    return 'proxy';
+  }
+
+  return kind === 'syntax' ? 'unsafe' : 'unknown';
 }
 
-function classifyErrorBrand(error: object): 'native' | 'tagged-wrapper' | 'unknown' | 'unsafe' {
+function classifyErrorBrand(error: object): JSONErrorBrand {
   try {
     if (nativeErrorBrand) {
       return nativeErrorBrand(error) ? 'native' : classifyUnbrandedError(error);
@@ -163,8 +308,21 @@ function classifyErrorBrand(error: object): 'native' | 'tagged-wrapper' | 'unkno
     if (kind === 'unknown') {
       return 'unknown';
     }
+
+    const clone = classifyStructuredError(error);
+    if (clone !== 'unavailable') {
+      return clone;
+    }
+
+    const message = getErrorDescriptor(error, 'message');
+    if (kind === 'syntax' && message && !('value' in message)) {
+      return 'unsafe';
+    }
     if (hasNativeErrorDescriptors(error)) {
       return 'native';
+    }
+    if (kind === 'syntax') {
+      return 'unsafe';
     }
 
     const cause = getErrorDescriptor(error, 'cause');
@@ -203,7 +361,7 @@ export function isMalformedJSONError(error: unknown, options?: MalformedJSONErro
       if (brand === 'unsafe') {
         return true;
       }
-      if (brand !== 'native' && brand !== 'tagged-wrapper') {
+      if (brand !== 'native' && brand !== 'proxy' && brand !== 'tagged-wrapper') {
         return false;
       }
       if (current instanceof SyntaxError) {
@@ -222,7 +380,7 @@ export function isMalformedJSONError(error: unknown, options?: MalformedJSONErro
         return false;
       }
 
-      if (brand === 'native' && isMalformedParserMarker(current, options)) {
+      if (brand !== 'tagged-wrapper' && isMalformedParserMarker(current, options)) {
         return true;
       }
 

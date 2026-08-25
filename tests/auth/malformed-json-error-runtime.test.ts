@@ -7,24 +7,33 @@ import { vi } from 'vitest';
 
 const PRIVATE_VALUE = 'sk-runtime-private-fixture';
 type PublicSurface = 'azure-provider' | 'public-workload';
+type RuntimeErrorBrand = 'native intrinsics' | 'fallback' | 'fallback without structuredClone';
 const publicSurfaces: readonly PublicSurface[] = ['azure-provider', 'public-workload'];
+const runtimeErrorBrands: readonly RuntimeErrorBrand[] = ['native intrinsics', 'fallback'];
 
-async function importWithoutNativeErrorBrand() {
+async function importPublicSDK() {
+  const [{ default: OpenAI, SubjectTokenProviderError }, { azureManagedIdentityTokenProvider }] =
+    await Promise.all([import('openai'), import('openai/auth/subject-token-providers')]);
+  return { OpenAI, SubjectTokenProviderError, azureManagedIdentityTokenProvider };
+}
+
+async function importWithoutNativeErrorBrand(withoutStructuredClone = false) {
   vi.resetModules();
-  const properties = [
+  const properties: { target: object; name: string }[] = [
     { target: Error, name: 'isError' },
     { target: process, name: 'getBuiltinModule' },
     { target: process, name: 'binding' },
   ];
+  if (withoutStructuredClone) {
+    properties.push({ target: globalThis, name: 'structuredClone' });
+  }
   const descriptors = properties.map(({ target, name }) => Object.getOwnPropertyDescriptor(target, name));
 
   try {
     for (const { target, name } of properties) {
       Object.defineProperty(target, name, { configurable: true, value: undefined });
     }
-    const [{ default: OpenAI, SubjectTokenProviderError }, { azureManagedIdentityTokenProvider }] =
-      await Promise.all([import('openai'), import('openai/auth/subject-token-providers')]);
-    return { OpenAI, SubjectTokenProviderError, azureManagedIdentityTokenProvider };
+    return await importPublicSDK();
   } finally {
     for (const [index, { target, name }] of properties.entries()) {
       const descriptor = descriptors[index];
@@ -37,9 +46,18 @@ async function importWithoutNativeErrorBrand() {
   }
 }
 
-async function publicParserRejection(surface: PublicSurface, rejected: unknown) {
+async function publicParserRejection(
+  surface: PublicSurface,
+  rejected: unknown,
+  runtimeErrorBrand: RuntimeErrorBrand = 'fallback',
+) {
+  if (runtimeErrorBrand === 'native intrinsics') {
+    vi.resetModules();
+  }
   const { OpenAI, SubjectTokenProviderError, azureManagedIdentityTokenProvider } =
-    await importWithoutNativeErrorBrand();
+    runtimeErrorBrand === 'native intrinsics'
+      ? await importPublicSDK()
+      : await importWithoutNativeErrorBrand(runtimeErrorBrand === 'fallback without structuredClone');
   const response = new Response(null, { status: 200 });
   vi.spyOn(response, 'json').mockRejectedValue(rejected);
   const fetch = vi.fn(async () => response);
@@ -61,6 +79,65 @@ async function publicParserRejection(surface: PublicSurface, rejected: unknown) 
   });
 
   return { run: () => client.models.list(), fetch, SubjectTokenProviderError };
+}
+
+async function expectOriginalPublicFailure(
+  surface: PublicSurface,
+  rejected: object,
+  runtimeErrorBrand: RuntimeErrorBrand,
+) {
+  const { run, fetch, SubjectTokenProviderError } = await publicParserRejection(
+    surface,
+    rejected,
+    runtimeErrorBrand,
+  );
+  let failure: unknown;
+  try {
+    await run();
+  } catch (error) {
+    failure = error;
+  }
+
+  if (surface === 'azure-provider') {
+    expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+    if (!(failure instanceof SubjectTokenProviderError)) {
+      throw new Error('The public Azure provider did not preserve its custom parser failure.');
+    }
+    expect(failure.cause === (rejected instanceof Error ? rejected : undefined)).toBe(true);
+  } else {
+    expect(failure === rejected).toBe(true);
+  }
+
+  expect(fetch).toHaveBeenCalledTimes(1);
+}
+
+async function expectSanitizedPublicFailure(
+  surface: PublicSurface,
+  rejected: object,
+  runtimeErrorBrand: RuntimeErrorBrand,
+) {
+  const { run, fetch, SubjectTokenProviderError } = await publicParserRejection(
+    surface,
+    rejected,
+    runtimeErrorBrand,
+  );
+  let failure: unknown;
+  try {
+    await run();
+  } catch (error) {
+    failure = error;
+  }
+  const sanitized =
+    surface === 'azure-provider' && failure instanceof SubjectTokenProviderError ? failure.cause : failure;
+
+  expect(sanitized).toBeInstanceOf(SyntaxError);
+  expect(sanitized && Object.getOwnPropertyDescriptor(sanitized, 'message')?.value).toBe(
+    surface === 'azure-provider'
+      ? 'IMDS response contains invalid JSON'
+      : 'Token exchange response contains invalid JSON',
+  );
+  expect(inspect(failure, { depth: null })).not.toContain(PRIVATE_VALUE);
+  expect(fetch).toHaveBeenCalledTimes(1);
 }
 
 describe('malformed JSON runtime compatibility', () => {
@@ -149,6 +226,417 @@ describe('malformed JSON runtime compatibility', () => {
       await expect(run()).rejects.toBe(rejected);
       expect(readTag).not.toHaveBeenCalled();
       expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['same-realm', 'cross-realm'] as const).flatMap((realm) =>
+          (['Error', 'SyntaxError'] as const).map((prototype) => ({
+            runtimeErrorBrand,
+            surface,
+            realm,
+            prototype,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'preserves a forged $realm $prototype with a non-enumerable message through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, realm, prototype }) => {
+      const forged =
+        realm === 'same-realm'
+          ? (Object.create(prototype === 'Error' ? Error.prototype : SyntaxError.prototype) as object)
+          : (runInNewContext(`Object.create(${prototype}.prototype)`) as object);
+      Object.defineProperty(forged, 'message', {
+        configurable: true,
+        value: 'safe custom parser rejection',
+        writable: true,
+      });
+      if (prototype === 'Error') {
+        Object.defineProperty(forged, 'type', {
+          configurable: true,
+          enumerable: true,
+          value: 'invalid-json',
+        });
+      }
+
+      const rejected =
+        realm === 'cross-realm' && surface === 'azure-provider'
+          ? Object.defineProperty(new Error('safe cross-realm custom parser wrapper'), 'cause', {
+              configurable: true,
+              value: forged,
+            })
+          : forged;
+
+      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['Error', 'SyntaxError'] as const).map((prototype) => ({
+          runtimeErrorBrand,
+          surface,
+          prototype,
+        })),
+      ),
+    ),
+  )(
+    'preserves a forged $prototype with non-enumerable message and stack through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, prototype }) => {
+      const rejected: object = Object.create(prototype === 'Error' ? Error.prototype : SyntaxError.prototype);
+      Object.defineProperties(rejected, {
+        message: { configurable: true, value: 'safe custom parser rejection', writable: true },
+        stack: { configurable: true, value: 'safe custom parser stack', writable: true },
+      });
+      if (prototype === 'Error') {
+        Object.defineProperty(rejected, 'type', { configurable: true, value: 'invalid-json' });
+      }
+
+      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+    },
+  );
+
+  it.each(
+    [...runtimeErrorBrands, 'fallback without structuredClone' as const].flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['direct', 'nested'] as const).map((placement) => ({ runtimeErrorBrand, surface, placement })),
+      ),
+    ),
+  )(
+    'sanitizes a $placement parser proxy hiding its descriptors through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, placement }) => {
+      const readTag = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted parser tag getter`);
+      });
+      const readProxy = vi.fn((_target: SyntaxError, property: PropertyKey) => {
+        throw new Error(`${PRIVATE_VALUE} escaped through the ${String(property)} parser proxy getter`);
+      });
+      const parserFailure = new SyntaxError(PRIVATE_VALUE);
+      Object.defineProperty(parserFailure, Symbol.toStringTag, { configurable: true, get: readTag });
+      const proxy = new Proxy(parserFailure, {
+        get: readProxy,
+        getOwnPropertyDescriptor(target, property) {
+          return property === 'message' || property === 'stack'
+            ? undefined
+            : Reflect.getOwnPropertyDescriptor(target, property);
+        },
+      });
+      const rejected =
+        placement === 'direct'
+          ? proxy
+          : Object.defineProperty(
+              new Error(`${PRIVATE_VALUE} escaped through a nested parser wrapper`),
+              'cause',
+              {
+                configurable: true,
+                value: proxy,
+              },
+            );
+
+      await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readTag).not.toHaveBeenCalled();
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    publicSurfaces.flatMap((surface) =>
+      (
+        [
+          'own name',
+          'inherited name',
+          'own message',
+          'inherited message',
+          'own stack',
+          'inherited stack',
+          'own cause',
+          'inherited cause',
+          'own tag',
+          'inherited tag',
+        ] as const
+      ).map((shape) => ({ surface, shape })),
+    ),
+  )(
+    'never invokes a $shape parser getter through $surface without native intrinsics',
+    async ({ surface, shape }) => {
+      const read = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted ${shape} getter`);
+      });
+      const rejected = new SyntaxError(PRIVATE_VALUE);
+      Reflect.deleteProperty(rejected, 'stack');
+      const property = shape.endsWith('tag')
+        ? Symbol.toStringTag
+        : shape.slice(shape.startsWith('inherited ') ? 'inherited '.length : 'own '.length);
+      if (shape.startsWith('inherited ')) {
+        const prototype: object = Object.create(SyntaxError.prototype);
+        Object.defineProperty(prototype, property, { configurable: true, get: read });
+        Object.setPrototypeOf(rejected, prototype);
+        if (shape === 'inherited message') {
+          Reflect.deleteProperty(rejected, 'message');
+        }
+      } else {
+        Object.defineProperty(rejected, property, { configurable: true, get: read });
+      }
+
+      await expectSanitizedPublicFailure(surface, rejected, 'fallback');
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    publicSurfaces.flatMap((surface) =>
+      (['own name', 'inherited name', 'own message', 'inherited message', 'own stack'] as const).map(
+        (shape) => ({
+          surface,
+          shape,
+        }),
+      ),
+    ),
+  )(
+    'never invokes a stack-deleted Error wrapper $shape getter through $surface without native intrinsics',
+    async ({ surface, shape }) => {
+      const read = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted wrapper ${shape} getter`);
+      });
+      const rejected = new Error(`${PRIVATE_VALUE} escaped through a parser wrapper`);
+      Reflect.deleteProperty(rejected, 'stack');
+      Object.defineProperty(rejected, 'cause', { configurable: true, value: new SyntaxError(PRIVATE_VALUE) });
+      const property = shape.slice(shape.startsWith('inherited ') ? 'inherited '.length : 'own '.length);
+      if (shape.startsWith('inherited ')) {
+        const prototype: object = Object.create(Error.prototype);
+        Object.defineProperty(prototype, property, { configurable: true, get: read });
+        Object.setPrototypeOf(rejected, prototype);
+        if (shape === 'inherited message') {
+          Reflect.deleteProperty(rejected, 'message');
+        }
+      } else {
+        Object.defineProperty(rejected, property, { configurable: true, get: read });
+      }
+
+      await expectSanitizedPublicFailure(surface, rejected, 'fallback');
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(publicSurfaces)(
+    'never invokes a foreign parser getter installed by a later prototype descriptor trap through %s',
+    async (surface) => {
+      const rejected = runInNewContext('new SyntaxError(privateValue)', {
+        privateValue: PRIVATE_VALUE,
+      }) as Error;
+      Reflect.deleteProperty(rejected, 'stack');
+      const errorPrototype = Object.getPrototypeOf(Object.getPrototypeOf(rejected)) as object;
+      const original = Object.getPrototypeOf(errorPrototype) as object;
+      const read = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through a mutated foreign parser getter`);
+      });
+      Object.setPrototypeOf(
+        errorPrototype,
+        new Proxy(original, {
+          getOwnPropertyDescriptor(target, property) {
+            if (property === 'cause') {
+              Object.defineProperty(rejected, 'name', { configurable: true, get: read });
+            }
+            return Reflect.getOwnPropertyDescriptor(target, property);
+          },
+        }),
+      );
+
+      await expectSanitizedPublicFailure(surface, rejected, 'fallback');
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    publicSurfaces.flatMap((surface) =>
+      (['enumerable accessor', 'enumerable nested object'] as const).map((shape) => ({ surface, shape })),
+    ),
+  )(
+    'fails closed without reading an unknown $shape on an unbranded parser rejection through $surface',
+    async ({ surface, shape }) => {
+      const read = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted clone getter`);
+      });
+      const rejected: object = Object.create(Error.prototype);
+      Object.defineProperties(rejected, {
+        message: { configurable: true, value: PRIVATE_VALUE },
+        type: { configurable: true, enumerable: true, value: 'invalid-json' },
+      });
+      if (shape === 'enumerable accessor') {
+        Object.defineProperty(rejected, 'metadata', { configurable: true, enumerable: true, get: read });
+      } else {
+        const metadata = Object.defineProperty({}, 'privateValue', {
+          configurable: true,
+          enumerable: true,
+          get: read,
+        });
+        Object.defineProperty(rejected, 'metadata', {
+          configurable: true,
+          enumerable: true,
+          value: metadata,
+        });
+      }
+
+      await expectSanitizedPublicFailure(surface, rejected, 'fallback');
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(publicSurfaces)(
+    'does not invoke Error.prepareStackTrace while classifying a native parser failure through %s',
+    async (surface) => {
+      const rejected = new SyntaxError(PRIVATE_VALUE);
+      const { run, SubjectTokenProviderError } = await publicParserRejection(surface, rejected, 'fallback');
+      const prepareStackTrace = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted stack formatter`);
+      });
+      const original = Object.getOwnPropertyDescriptor(Error, 'prepareStackTrace');
+      let failure: unknown;
+
+      try {
+        Object.defineProperty(Error, 'prepareStackTrace', {
+          configurable: true,
+          value: prepareStackTrace,
+          writable: true,
+        });
+        try {
+          await run();
+        } catch (error) {
+          failure = error;
+        }
+      } finally {
+        if (original) {
+          Object.defineProperty(Error, 'prepareStackTrace', original);
+        } else {
+          Reflect.deleteProperty(Error, 'prepareStackTrace');
+        }
+      }
+
+      const sanitized =
+        surface === 'azure-provider' && failure instanceof SubjectTokenProviderError
+          ? failure.cause
+          : failure;
+      expect(sanitized).toBeInstanceOf(SyntaxError);
+      expect(sanitized && Object.getOwnPropertyDescriptor(sanitized, 'message')?.value).toBe(
+        surface === 'azure-provider'
+          ? 'IMDS response contains invalid JSON'
+          : 'Token exchange response contains invalid JSON',
+      );
+      expect(prepareStackTrace).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (
+          [
+            'invalid-json Error marker',
+            'invalid-json TypeError marker',
+            'Error SyntaxError cause',
+            'TypeError SyntaxError cause',
+          ] as const
+        ).map((shape) => ({ runtimeErrorBrand, surface, shape })),
+      ),
+    ),
+  )(
+    'sanitizes a transparent proxy with an authentic $shape through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, shape }) => {
+      const target = shape.includes('TypeError')
+        ? new TypeError(`${PRIVATE_VALUE} escaped through a parser wrapper`)
+        : new Error(`${PRIVATE_VALUE} escaped through a parser wrapper`);
+      const isParserMarker = shape.startsWith('invalid-json ');
+      Object.defineProperty(target, isParserMarker ? 'type' : 'cause', {
+        configurable: true,
+        value: isParserMarker ? 'invalid-json' : new SyntaxError(PRIVATE_VALUE),
+      });
+      const readProxy = vi.fn((value: Error, property: PropertyKey, receiver: unknown) =>
+        Reflect.get(value, property, receiver),
+      );
+      const rejected = new Proxy(target, { get: readProxy });
+
+      await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['TypeError', 'DOMException', 'Error', 'custom record'] as const).map((shape) => ({
+          runtimeErrorBrand,
+          surface,
+          shape,
+        })),
+      ),
+    ),
+  )(
+    'preserves a transparent $shape transport proxy through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, shape }) => {
+      let target: object;
+      if (shape === 'TypeError') {
+        target = new TypeError('safe custom response body transport failure');
+      } else if (shape === 'DOMException') {
+        target = new DOMException('safe custom response body cancellation', 'AbortError');
+      } else if (shape === 'Error') {
+        target = new Error('safe custom response body transport failure');
+      } else {
+        target = Object.create(Error.prototype) as object;
+        Object.defineProperties(target, {
+          message: { configurable: true, value: 'safe custom parser record' },
+          type: { configurable: true, value: 'system' },
+        });
+      }
+      const readProxy = vi.fn((value: object, property: PropertyKey, receiver: unknown) =>
+        Reflect.get(value, property, receiver),
+      );
+      const rejected = new Proxy(target, { get: readProxy });
+
+      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['TypeError', 'DOMException', 'custom record'] as const).map((shape) => ({
+          runtimeErrorBrand,
+          surface,
+          shape,
+        })),
+      ),
+    ),
+  )(
+    'preserves a nested transparent $shape transport proxy through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, shape }) => {
+      let target: object;
+      if (shape === 'TypeError') {
+        target = new TypeError('safe nested response body transport failure');
+      } else if (shape === 'DOMException') {
+        target = new DOMException('safe nested response body cancellation', 'AbortError');
+      } else {
+        target = Object.create(Error.prototype) as object;
+        Object.defineProperty(target, 'message', {
+          configurable: true,
+          value: 'safe nested custom parser record',
+        });
+      }
+      const readProxy = vi.fn((value: object, property: PropertyKey, receiver: unknown) =>
+        Reflect.get(value, property, receiver),
+      );
+      const proxy = new Proxy(target, { get: readProxy });
+      const rejected = Object.defineProperty(new Error('safe custom parser wrapper'), 'cause', {
+        configurable: true,
+        value: proxy,
+      });
+
+      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
     },
   );
 
