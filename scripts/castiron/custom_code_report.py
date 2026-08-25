@@ -766,6 +766,77 @@ def api(method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
     return json.loads(result.stdout)
 
 
+def associated_pull_request(
+    repository: str,
+    run: dict[str, Any],
+    *,
+    base_ref: str = "main",
+    base_sha: str | None = None,
+) -> dict[str, Any] | None:
+    """Resolve one current upstream PR without trusting fork-side associations."""
+    if not REPOSITORY.fullmatch(repository) or any(
+        part in {".", ".."} for part in repository.split("/")
+    ):
+        raise ReportError("invalid associated repository")
+    upstream = run.get("repository")
+    source = run.get("head_repository")
+    source_name = source.get("full_name") if isinstance(source, dict) else None
+    if (
+        not isinstance(upstream, dict)
+        or upstream.get("full_name") != repository
+        or not isinstance(source_name, str)
+        or not REPOSITORY.fullmatch(source_name)
+        or any(part in {".", ".."} for part in source_name.split("/"))
+    ):
+        raise ReportError("workflow run has invalid source repository")
+    owner, name = source_name.split("/", 1)
+    if "name" in source and source["name"] != name:
+        raise ReportError("workflow run has invalid source repository")
+    source_owner = source.get("owner")
+    if source_owner is not None and (
+        not isinstance(source_owner, dict) or source_owner.get("login") != owner
+    ):
+        raise ReportError("workflow run has invalid source repository")
+
+    head = require_sha(run["head_sha"])
+    if base_sha is not None:
+        require_sha(base_sha)
+    associated = run.get("pull_requests")
+    if not isinstance(associated, list):
+        raise ReportError("invalid associated pull request")
+    if not associated:
+        associated = api("GET", f"repos/{source_name}/commits/{head}/pulls?per_page=100")
+    if not isinstance(associated, list):
+        raise ReportError("invalid associated pull request")
+    numbers: set[int] = set()
+    for candidate in associated:
+        number = candidate.get("number") if isinstance(candidate, dict) else None
+        if type(number) is not int or number <= 0:
+            raise ReportError("invalid associated pull request")
+        numbers.add(number)
+
+    current: list[dict[str, Any]] = []
+    for number in sorted(numbers):
+        pull = api("GET", f"repos/{repository}/pulls/{number}")
+        if not isinstance(pull, dict) or type(pull.get("number")) is not int:
+            raise ReportError("invalid associated pull request")
+        if pull["number"] != number:
+            raise ReportError("invalid associated pull request")
+        if (
+            pull["state"] == "open"
+            and pull["head"]["sha"] == head
+            and pull["head"]["repo"]["full_name"] == source_name
+            and pull["base"]["repo"]["full_name"] == repository
+            and pull["base"]["ref"] == base_ref
+            and (base_sha is None or pull["base"]["sha"] == base_sha)
+        ):
+            require_sha(pull["base"]["sha"])
+            current.append(pull)
+    if len(current) > 1:
+        raise ReportError("workflow run has multiple current pull requests")
+    return current[0] if current else None
+
+
 def publish_comment(
     report: dict[str, Any],
     repository: str,
@@ -793,14 +864,11 @@ def publish_comment(
         or run["head_sha"] != report["head_sha"]
     ):
         raise ReportError("workflow run does not match report PR/head")
-    associated = run["pull_requests"]
-    if not associated:
-        # GitHub can omit the PR association on workflow runs from forks.
-        associated = api("GET", f"{root}/commits/{require_sha(run['head_sha'])}/pulls?per_page=100")
-    if not any(pr["number"] == number for pr in associated):
-        raise ReportError("workflow run does not match report PR/head")
     if run["run_attempt"] != run_attempt:
         return "Skipped stale report"
+    current = associated_pull_request(repository, run, base_sha=report["target_base_sha"])
+    if current is None or current["number"] != number:
+        raise ReportError("workflow run does not match report PR/head")
     artifact_run_id = artifact_run_id or run_id
     artifact_run_attempt = artifact_run_attempt or run_attempt
     body = render_report(
@@ -833,6 +901,9 @@ def publish_comment(
     if (
         pull["state"] != "open"
         or pull["head"]["sha"] != report["head_sha"]
+        or pull["head"]["repo"]["full_name"] != current["head"]["repo"]["full_name"]
+        or pull["base"]["repo"]["full_name"] != repository
+        or pull["base"]["ref"] != "main"
         or pull["base"]["sha"] != report["target_base_sha"]
     ):
         return "Skipped stale report"
@@ -890,23 +961,10 @@ def trusted_report(repo: Path, repository: str, run_id: int, run_attempt: int, o
     if run["run_attempt"] != run_attempt:
         return
     head = require_sha(run["head_sha"])
-    associated = run["pull_requests"] or api("GET", f"{root}/commits/{head}/pulls?per_page=100")
-    current: list[tuple[int, str]] = []
-    for number in sorted({int(pr["number"]) for pr in associated}):
-        if number <= 0:
-            raise ReportError("invalid associated pull request")
-        pull = api("GET", f"{root}/pulls/{number}")
-        if (
-            pull["state"] == "open"
-            and pull["head"]["sha"] == head
-            and pull["base"]["repo"]["full_name"] == repository
-        ):
-            current.append((number, require_sha(pull["base"]["sha"])))
-    if not current:
+    pull = associated_pull_request(repository, run)
+    if pull is None:
         return
-    if len(current) != 1:
-        raise ReportError("workflow run has multiple current pull requests")
-    number, base = current[0]
+    number, base = pull["number"], require_sha(pull["base"]["sha"])
     public = not api("GET", root)["private"]
     # This must be a new, bare repository: no PR worktree, hooks, configuration,
     # submodules, or Python imports can affect the trusted reporter.
