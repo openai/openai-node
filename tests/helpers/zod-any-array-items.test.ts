@@ -1,4 +1,3 @@
-import { zodToJsonSchema } from 'openai/_vendor/zod-to-json-schema';
 import {
   zodFunction,
   zodRealtimeFunction,
@@ -7,184 +6,93 @@ import {
   zodTextFormat,
 } from 'openai/helpers/zod';
 import { toStrictJsonSchema } from 'openai/lib/transform';
-import { z as zv3 } from 'zod/v3';
-import { z as zv4 } from 'zod/v4';
+import { z as z4 } from 'zod/v4';
+import { z as z4Mini } from 'zod/v4-mini';
 
-const zodV3AnyArray = zv3.object({ values: zv3.array(zv3.any()) });
-const zodV4AnyArray = zv4.object({ values: zv4.array(zv4.any()) });
+type SupportedSchema = z4.ZodType | z4Mini.ZodMiniType;
 
-type AnyArraySchema = typeof zodV3AnyArray | typeof zodV4AnyArray;
-
-describe.each([
+const strictHelpers = [
   {
-    helper: 'zodResponseFormat',
-    getSchema: (schema: AnyArraySchema) => zodResponseFormat(schema, 'any_array').json_schema.schema,
+    name: 'zodResponseFormat',
+    convert: (schema: SupportedSchema) => zodResponseFormat(schema, 'any_array').json_schema.schema,
   },
   {
-    helper: 'zodTextFormat',
-    getSchema: (schema: AnyArraySchema) => zodTextFormat(schema, 'any_array').schema,
+    name: 'zodTextFormat',
+    convert: (schema: SupportedSchema) => zodTextFormat(schema, 'any_array').schema,
   },
   {
-    helper: 'zodFunction',
-    getSchema: (schema: AnyArraySchema) =>
+    name: 'zodFunction',
+    convert: (schema: SupportedSchema) =>
       zodFunction({ name: 'any_array', parameters: schema }).function.parameters,
   },
   {
-    helper: 'zodResponsesFunction',
-    getSchema: (schema: AnyArraySchema) =>
+    name: 'zodResponsesFunction',
+    convert: (schema: SupportedSchema) =>
       zodResponsesFunction({ name: 'any_array', parameters: schema }).parameters,
   },
-])('$helper', ({ getSchema }) => {
-  it('gives Zod v3 any-array items the same schema as Zod v4', () => {
-    const zodV3Schema = getSchema(zodV3AnyArray);
-    const zodV4Schema = getSchema(zodV4AnyArray);
+];
 
-    expect(zodV4Schema).toMatchObject({
-      properties: {
-        values: { type: 'array', items: {} },
-      },
-    });
-    expect(zodV3Schema).toEqual(zodV4Schema);
-  });
-});
+const schemaVariants = [
+  { version: 'Classic', schema: z4.object({ values: z4.array(z4.any()) }) },
+  { version: 'Mini', schema: z4Mini.object({ values: z4Mini.array(z4Mini.any()) }) },
+];
 
-describe('strict Zod v3 any-array schemas', () => {
-  it('includes item schemas for nested arrays', () => {
-    const zodV3Schema = zodResponseFormat(
-      zv3.object({ values: zv3.array(zv3.array(zv3.any())) }),
-      'nested_any_arrays',
-    ).json_schema.schema;
-    const zodV4Schema = zodResponseFormat(
-      zv4.object({ values: zv4.array(zv4.array(zv4.any())) }),
-      'nested_any_arrays',
-    ).json_schema.schema;
-
-    expect(zodV3Schema).toMatchObject({
-      properties: {
-        values: { type: 'array', items: { type: 'array', items: {} } },
-      },
-    });
-    expect(zodV3Schema).toEqual(zodV4Schema);
-  });
-
-  it('rejects unprovable Zod v3 any-array defaults while preserving Zod v4 behavior', () => {
-    expect(() =>
-      zodResponseFormat(zv3.object({ values: zv3.array(zv3.any()).default([]) }), 'defaulted_any_array'),
-    ).toThrow(/ZodDefault.*JSON-native/u);
-
-    const zodV4Schema = zodResponseFormat(
-      zv4.object({ values: zv4.array(zv4.any()).default([]) }),
-      'defaulted_any_array',
-    ).json_schema.schema;
-
-    expect(zodV4Schema).toMatchObject({
-      properties: {
-        values: { type: 'array', items: {}, default: [] },
-      },
-      required: ['values'],
-    });
-  });
-
-  it('retains descriptions attached to unconstrained array items', () => {
-    const { schema } = zodResponseFormat(
-      zv3.object({ values: zv3.array(zv3.any().describe('An unconstrained item')) }),
-      'described_any_array',
-    ).json_schema;
-
-    expect(schema).toMatchObject({
-      properties: {
-        values: {
-          type: 'array',
-          items: { description: 'An unconstrained item' },
-        },
-      },
-    });
-  });
-
-  it('references and resolves a named unconstrained item definition', () => {
-    const anyItem = zv3.any().describe('A reusable unconstrained item');
-    const { schema } = zodResponseFormat(zv3.object({ values: zv3.array(anyItem) }), 'named_any_array', {
-      schemaDefinitions: { anyItem },
-    }).json_schema;
-
-    expect(schema).toMatchObject({
-      properties: {
-        values: {
-          type: 'array',
-          items: { $ref: '#/definitions/anyItem' },
-        },
-      },
-      definitions: {
-        anyItem: { description: 'A reusable unconstrained item' },
-      },
-    });
-  });
-
-  it('does not change typed or unknown array items', () => {
-    const { schema } = zodResponseFormat(
-      zv3.object({
-        typed: zv3.array(zv3.string()),
-        unknown: zv3.array(zv3.unknown()),
-      }),
-      'other_array_items',
-    ).json_schema;
-
-    expect(schema).toMatchObject({
-      properties: {
-        typed: { type: 'array', items: { type: 'string' } },
-        unknown: { type: 'array', items: {} },
-      },
-    });
-  });
-
-  it('matches strictification requirements for present array items', () => {
-    expect(() =>
-      toStrictJsonSchema({
-        type: 'object',
-        properties: { values: { type: 'array' } },
-        required: ['values'],
-      }),
-    ).toThrow('declares an array without `items`');
-
-    const strictSchema = toStrictJsonSchema({
-      type: 'object',
+describe.each(strictHelpers)('$name unconstrained arrays', ({ convert }) => {
+  it.each(schemaVariants)('includes the Zod v4 $version array item schema', ({ schema }) => {
+    expect(convert(schema)).toMatchObject({
       properties: { values: { type: 'array', items: {} } },
       required: ['values'],
     });
-
-    expect(strictSchema.properties?.['values']).toEqual({ type: 'array', items: {} });
   });
 });
 
-describe('non-strict Zod v3 any-array compatibility', () => {
-  it('preserves the existing Realtime function schema exactly', () => {
-    expect(zodRealtimeFunction({ name: 'any_array', parameters: zodV3AnyArray })).toEqual({
-      type: 'function',
-      name: 'any_array',
-      parameters: {
-        type: 'object',
-        properties: { values: { type: 'array' } },
-        required: ['values'],
-        additionalProperties: false,
-        $schema: 'http://json-schema.org/draft-07/schema#',
-      },
-    });
-  });
+it('retains nested and described unconstrained Zod v4 array items', () => {
+  const { schema } = zodResponseFormat(
+    z4.object({ values: z4.array(z4.array(z4.any().describe('An unconstrained item'))) }),
+    'nested_any_arrays',
+  ).json_schema;
 
-  it.each([
-    {
-      target: 'jsonSchema7',
-      expectedSchema: { type: 'array', $schema: 'http://json-schema.org/draft-07/schema#' },
+  expect(schema).toMatchObject({
+    properties: {
+      values: { type: 'array', items: { type: 'array', items: { description: 'An unconstrained item' } } },
     },
-    {
-      target: 'jsonSchema2019-09',
-      expectedSchema: { type: 'array', $schema: 'https://json-schema.org/draft/2019-09/schema#' },
-    },
-    {
-      target: 'openApi3',
-      expectedSchema: { type: 'array' },
-    },
-  ] as const)('preserves the existing $target converter output exactly', ({ target, expectedSchema }) => {
-    expect(zodToJsonSchema(zv3.array(zv3.any()), { target })).toEqual(expectedSchema);
   });
+});
+
+it.each([
+  { version: 'Classic', schema: z4.object({ values: z4.array(z4.any()).default([]) }) },
+  {
+    version: 'Mini',
+    schema: z4Mini.object({ values: z4Mini._default(z4Mini.array(z4Mini.any()), []) }),
+  },
+])('retains defaulted Zod v4 $version unconstrained array items', ({ schema }) => {
+  expect(zodResponseFormat(schema, 'defaulted_any_array').json_schema.schema).toMatchObject({
+    properties: { values: { type: 'array', items: {}, default: [] } },
+    required: ['values'],
+  });
+});
+
+it.each(schemaVariants)('preserves non-strict Zod v4 $version Realtime array items', ({ schema }) => {
+  const tool = zodRealtimeFunction({ name: 'any_array', parameters: schema });
+
+  expect(tool.parameters).toMatchObject({ properties: { values: { type: 'array', items: {} } } });
+  expect(tool).not.toHaveProperty('strict');
+});
+
+it('requires present array item schemas during strictification', () => {
+  expect(() =>
+    toStrictJsonSchema({
+      type: 'object',
+      properties: { values: { type: 'array' } },
+      required: ['values'],
+    }),
+  ).toThrow('declares an array without `items`');
+
+  expect(
+    toStrictJsonSchema({
+      type: 'object',
+      properties: { values: { type: 'array', items: {} } },
+      required: ['values'],
+    }).properties?.['values'],
+  ).toEqual({ type: 'array', items: {} });
 });

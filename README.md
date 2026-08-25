@@ -817,7 +817,7 @@ We are keen for your feedback; please open an [issue](https://www.github.com/ope
 
 ## Requirements
 
-TypeScript >= 4.9 is supported.
+TypeScript >= 4.9 is supported. The optional Zod helpers require Zod 4 and TypeScript >= 5.5.
 
 The following runtimes are supported:
 

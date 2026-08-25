@@ -42,10 +42,25 @@ if (response.output_parsed) {
 output. For example, incomplete responses are left unparsed so their status and `incomplete_details` remain
 available.
 
-The Zod helpers support schemas imported from `zod/v3`, `zod/v4`, and `zod/v4-mini`. Use the import that
-matches the Zod version in your application.
+The Zod helpers support Zod 4 Classic and Zod 4 Mini schemas imported from `zod/v4` and `zod/v4-mini`.
 
 See the complete [Responses Structured Outputs example](../examples/responses/structured-outputs.ts).
+
+## Migrate from Zod v3
+
+Install Zod 4 and update your schema imports:
+
+```sh
+npm install zod@^4
+```
+
+Import Zod 4 Classic from `zod/v4` or `zod`, or import Zod 4 Mini from `zod/v4-mini` or `zod/mini`.
+Schemas created with `zod/v3` are unsupported, including v3 schemas imported from the compatibility
+entrypoint included in Zod 4. Recreate those schemas with Zod 4 before passing them to any SDK Zod helper.
+
+Zod remains an optional dependency: applications that do not use `openai/helpers/zod` do not need to install
+it. The optional Zod helpers require TypeScript 5.5 or later; the rest of the SDK continues to support
+TypeScript 4.9 or later.
 
 ## Parse function arguments with Zod
 
@@ -189,9 +204,9 @@ Standard Schema validators:
   values, and discriminated unions work when they can be represented in the supported strict JSON Schema subset.
 - Model-visible descriptions must come from the schema, for example `z.string().describe('...')`. TypeScript
   comments are not available at runtime.
-- Zod v3 strict schemas reject native `Date`, `BigInt`, `Map`, `Set`, and `Promise` values, custom
-  refinements, transforms, pipelines, intersections, and ambiguous unions. These behaviors cannot be represented
-  faithfully in the JSON Schema sent to the model. Non-strict Realtime tools keep their existing behavior.
+- Native `Date`, `BigInt`, `Map`, `Set`, and `Promise` values, transforms, and asynchronous parsing cannot be
+  represented faithfully in the JSON Schema sent to the model. Custom refinements validate parsed output but
+  cannot add model-visible constraints to the generated schema.
 
 ### Represent large integers as strings
 
@@ -199,7 +214,7 @@ JSON numbers lose integer precision before Zod validation. Keep large integers a
 model-facing schema, then convert them after parsing:
 
 ```ts
-import { z } from 'zod/v3';
+import { z } from 'zod/v4';
 
 const Invoice = z.object({
   amount: z.string().regex(/^-?(?:0|[1-9][0-9]*)$/u),
@@ -209,7 +224,7 @@ const invoice = Invoice.parse(JSON.parse('{"amount":"90071992547409931234567890"
 const exactAmount = BigInt(invoice.amount);
 ```
 
-The same JSON-native pattern works with Zod v4 and avoids relying on lossy numeric coercion.
+This JSON-native pattern avoids relying on lossy numeric coercion.
 
 For details, see the [Structured Outputs API guide](https://platform.openai.com/docs/guides/structured-outputs)
 and the existing [helper compatibility notes](helpers.md#supported-zod-features).

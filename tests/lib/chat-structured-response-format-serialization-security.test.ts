@@ -8,7 +8,6 @@ import {
   parseResponseFormatContent,
 } from 'openai/lib/parser';
 import type { AutoParseableResponseFormat } from 'openai/lib/parser';
-import { z as zodV3 } from 'zod/v3';
 import { z as zodV4 } from 'zod/v4';
 import { z as zodV4Mini } from 'zod/v4-mini';
 
@@ -56,16 +55,6 @@ interface FormatFactory {
 }
 
 const formatFactories: FormatFactory[] = [
-  {
-    name: 'Zod v3',
-    expectedParsed: { city: 'Paris' },
-    create: (metadata) =>
-      zodResponseFormat(
-        zodV3.object({ city: zodV3.string() }),
-        trustedName,
-        metadata as Parameters<typeof zodResponseFormat>[2],
-      ),
-  },
   {
     name: 'Zod v4',
     expectedParsed: { city: 'Paris' },

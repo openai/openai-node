@@ -68,7 +68,7 @@
     "vitest": "4.1.10",
     "ws": "^8.18.0",
     "yargs": "^18.1.0",
-    "zod": "^3.25 || ^4.0"
+    "zod": "^4.0"
   },
   "overrides": {
     "minimatch": "^9.0.5"
@@ -95,7 +95,7 @@
     "@smithy/signature-v4": ">=5.4.0 <6",
     "undici": ">=5 <9",
     "ws": "^8.18.0",
-    "zod": "^3.25 || ^4.0"
+    "zod": "^4.0"
   },
   "peerDependenciesMeta": {
     "@aws-sdk/credential-provider-node": {

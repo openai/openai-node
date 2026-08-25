@@ -5,7 +5,6 @@ import {
   zodResponsesFunction,
   zodTextFormat,
 } from 'openai/helpers/zod';
-import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 
@@ -15,10 +14,8 @@ function schemaProperties(schema: unknown): Record<string, JSONSchemaRecord> {
   return (schema as { properties: Record<string, JSONSchemaRecord> }).properties;
 }
 
-describe.each([
-  { version: 'v3', z: zv3 },
-  { version: 'v4', z: zv4 as unknown as typeof zv3 },
-])('Zod $version schema reference literals', ({ version, z }) => {
+describe('Zod v4 schema reference literals', () => {
+  const z = zv4;
   const referenceLiteral = () => z.object({ $ref: z.string() });
   const nestedReferenceLiteral = () => z.object({ $ref: z.string(), nested: referenceLiteral() });
   it('preserves literal defaults and caller-owned objects while escaping real definition references', () => {
@@ -120,35 +117,6 @@ describe.each([
     expect(properties['payload']?.['default']).toEqual(payload);
     expect(payload.$ref).toBe('#/definitions/account/admin');
   });
-
-  if (version === 'v3') {
-    it('preserves shared literal defaults and rejects cyclic JSON values', () => {
-      const Account = z.object({ id: z.string() });
-      const shared = { $ref: '#/definitions/account/admin' };
-      const cyclic: { $ref: string; self?: unknown } = { $ref: '#/definitions/account/admin' };
-      cyclic.self = cyclic;
-      const Root = z.object({
-        account: Account,
-        first: referenceLiteral().default(shared),
-        second: referenceLiteral().default(shared),
-      });
-
-      const { schema } = zodResponseFormat(Root, 'account_response', {
-        schemaDefinitions: { 'account/admin': Account },
-      }).json_schema;
-      const properties = schemaProperties(schema);
-      const firstDefault = properties['first']?.['default'] as typeof shared;
-      const secondDefault = properties['second']?.['default'] as typeof shared;
-
-      expect(properties['account']?.['$ref']).toBe('#/definitions/account~1admin');
-      expect(firstDefault.$ref).toBe('#/definitions/account/admin');
-      expect(secondDefault.$ref).toBe('#/definitions/account/admin');
-      expect(() =>
-        zodResponseFormat(z.object({ value: z.string().default(cyclic as unknown as string) }), 'cyclic'),
-      ).toThrow(/circular JSON value/u);
-      expect(cyclic.self).toBe(cyclic);
-    });
-  }
 });
 
 describe('Zod v4 schema reference literals', () => {

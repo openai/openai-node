@@ -6,6 +6,15 @@ const packedPackageFs = require('node:fs');
 const packedPackageOs = require('node:os');
 const packedPackagePath = require('node:path');
 
+const requiresOptionalPeer = (source: string): boolean =>
+  source === 'helpers/zod.ts' ||
+  source === 'helpers/audio.ts' ||
+  source === 'providers/bedrock/aws.ts' ||
+  source === 'auth/x509-transport.ts' ||
+  source === 'internal/auth/x509-transport-capability.ts' ||
+  source === 'auth/index.ts' ||
+  source === 'auth/subject-token-providers.ts';
+
 (() => {
   const assert = packedPackageAssert;
   const childProcess = packedPackageChildProcess;
@@ -63,23 +72,6 @@ const packedPackagePath = require('node:path');
     }
     return maps;
   };
-  const standaloneZodParsers = new Set([
-    '_vendor/zod-to-json-schema/parsers/any.ts',
-    '_vendor/zod-to-json-schema/parsers/boolean.ts',
-    '_vendor/zod-to-json-schema/parsers/never.ts',
-    '_vendor/zod-to-json-schema/parsers/undefined.ts',
-    '_vendor/zod-to-json-schema/parsers/unknown.ts',
-  ]);
-  const requiresOptionalPeer = (source: string): boolean =>
-    (source.startsWith('_vendor/zod-to-json-schema/') && !standaloneZodParsers.has(source)) ||
-    source === 'helpers/zod.ts' ||
-    source === 'helpers/audio.ts' ||
-    source === 'providers/bedrock/aws.ts' ||
-    source === 'auth/x509-transport.ts' ||
-    source === 'internal/auth/x509-transport-capability.ts' ||
-    source === 'auth/index.ts' ||
-    source === 'auth/subject-token-providers.ts';
-
   try {
     assert(fs.existsSync(path.join(dist, 'package.json')), 'Run pnpm build before packed-package tests');
 
@@ -353,6 +345,18 @@ const packedPackagePath = require('node:path');
     delete isolatedEnvironment['NODE_PATH'];
 
     assert(
+      !fs.existsSync(path.join(installedPackageRoot, '_vendor/zod-to-json-schema')),
+      'Packed SDK unexpectedly includes the removed vendored Zod converter',
+    );
+    assert(
+      !fs.existsSync(path.join(installedSourceRoot, '_vendor/zod-to-json-schema')),
+      'Packed SDK source unexpectedly includes the removed vendored Zod converter',
+    );
+    assert(
+      fs.existsSync(path.join(installedPackageRoot, '_vendor/partial-json-parser/parser.js')),
+      'Packed SDK is missing the partial JSON parser required for streaming',
+    );
+    assert(
       !fs.existsSync(path.join(temporaryDirectory, 'node_modules/@types/node')),
       'Packed browser/edge consumer unexpectedly installed @types/node',
     );
@@ -463,6 +467,12 @@ const packedPackagePath = require('node:path');
     );
     assert.equal(installedPackage.peerDependencies?.['undici'], '>=5 <9');
     assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
+    assert.equal(installedPackage.peerDependencies?.['zod'], '^4.0');
+    assert.equal(installedPackage.peerDependenciesMeta?.['zod']?.optional, true);
+    assert(
+      !fs.existsSync(path.join(temporaryDirectory, 'node_modules/zod')),
+      'Zod must remain optional for ordinary SDK consumers',
+    );
     const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
     assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');

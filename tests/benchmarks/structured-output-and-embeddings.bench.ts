@@ -1,5 +1,4 @@
 import { bench, describe } from 'vitest';
-import { z as zodV3 } from 'zod/v3';
 import { z as zodV4 } from 'zod/v4';
 
 import OpenAI from '../../src';
@@ -18,20 +17,6 @@ const BENCHMARK_OPTIONS = {
 
 const STEP_COUNT = 32;
 const STREAM_CHUNK_SIZE = 128;
-
-const stepSchemaV3 = zodV3.object({
-  index: zodV3.number().int(),
-  explanation: zodV3.string(),
-  evidence: zodV3.object({ source: zodV3.string(), score: zodV3.number() }),
-  tags: zodV3.array(zodV3.string()),
-});
-
-const structuredOutputSchemaV3 = zodV3.object({
-  request_id: zodV3.string(),
-  final_answer: zodV3.string(),
-  steps: zodV3.array(stepSchemaV3),
-  metadata: zodV3.object({ version: zodV3.number().int(), category: zodV3.enum(['analysis', 'summary']) }),
-});
 
 const stepSchemaV4 = zodV4.object({
   index: zodV4.number().int(),
@@ -97,16 +82,6 @@ const structuredOutputRequest = {
 };
 
 describe('structured output', () => {
-  bench(
-    'generate a strict response schema with reusable definitions (Zod v3)',
-    () => {
-      zodResponseFormat(structuredOutputSchemaV3, 'benchmark_structured_output', {
-        schemaDefinitions: { Step: stepSchemaV3 },
-      });
-    },
-    BENCHMARK_OPTIONS,
-  );
-
   bench(
     'generate a strict response schema with reusable definitions (Zod v4)',
     () => {

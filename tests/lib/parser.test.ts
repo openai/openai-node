@@ -1,5 +1,4 @@
 import { z as z4 } from 'zod/v4';
-import { z as z3 } from 'zod/v3';
 import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
@@ -15,10 +14,8 @@ import { mockFetch } from '../utils/mock-fetch';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
 import { compareType, expectType } from '../utils/typing';
 
-describe.each([
-  { version: 'v3', z: z3 },
-  { version: 'v4', z: z4 as any as typeof z3 },
-])('.parse()', ({ z, version }) => {
+describe('.parse()', () => {
+  const z = z4;
   describe('zod', () => {
     it('deserialises response_format', async () => {
       const completion = await makeSnapshotRequest((openai) =>
@@ -170,120 +167,7 @@ describe.each([
         }
       `);
 
-      if (version === 'v3') {
-        expect(zodResponseFormat(UI, 'ui').json_schema).toMatchInlineSnapshot(`
-        {
-          "name": "ui",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "additionalProperties": false,
-            "definitions": {
-              "ui": {
-                "additionalProperties": false,
-                "properties": {
-                  "attributes": {
-                    "items": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                        },
-                        "value": {
-                          "type": "string",
-                        },
-                      },
-                      "required": [
-                        "name",
-                        "value",
-                      ],
-                      "type": "object",
-                    },
-                    "type": "array",
-                  },
-                  "children": {
-                    "items": {
-                      "$ref": "#/definitions/ui",
-                    },
-                    "type": "array",
-                  },
-                  "label": {
-                    "type": "string",
-                  },
-                  "type": {
-                    "enum": [
-                      "div",
-                      "button",
-                      "header",
-                      "section",
-                      "field",
-                      "form",
-                    ],
-                    "type": "string",
-                  },
-                },
-                "required": [
-                  "type",
-                  "label",
-                  "children",
-                  "attributes",
-                ],
-                "type": "object",
-              },
-            },
-            "properties": {
-              "attributes": {
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                    },
-                    "value": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "name",
-                    "value",
-                  ],
-                  "type": "object",
-                },
-                "type": "array",
-              },
-              "children": {
-                "items": {
-                  "$ref": "#/definitions/ui",
-                },
-                "type": "array",
-              },
-              "label": {
-                "type": "string",
-              },
-              "type": {
-                "enum": [
-                  "div",
-                  "button",
-                  "header",
-                  "section",
-                  "field",
-                  "form",
-                ],
-                "type": "string",
-              },
-            },
-            "required": [
-              "type",
-              "label",
-              "children",
-              "attributes",
-            ],
-            "type": "object",
-          },
-          "strict": true,
-        }
-      `);
-      } else {
-        expect(zodResponseFormat(UI, 'ui').json_schema).toMatchInlineSnapshot(`
+      expect(zodResponseFormat(UI, 'ui').json_schema).toMatchInlineSnapshot(`
 {
   "name": "ui",
   "schema": {
@@ -341,7 +225,6 @@ describe.each([
   "strict": true,
 }
 `);
-      }
     });
 
     test('merged schemas', async () => {
@@ -369,161 +252,8 @@ describe.each([
         ),
       });
 
-      if (version === 'v3') {
-        expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
-          .toMatchInlineSnapshot(`
-        {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "additionalProperties": false,
-          "definitions": {
-            "contactPerson": {
-              "additionalProperties": false,
-              "properties": {
-                "person1": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "description": {
-                      "description": "Open text for any other relevant information about what the contact does.",
-                      "nullable": true,
-                      "type": "string",
-                    },
-                    "name": {
-                      "type": "string",
-                    },
-                    "phone_number": {
-                      "nullable": true,
-                      "type": "string",
-                    },
-                    "roles": {
-                      "description": "Any roles for which the contact is important, use other for custom roles",
-                      "items": {
-                        "enum": [
-                          "parent",
-                          "child",
-                          "sibling",
-                          "spouse",
-                          "friend",
-                          "other",
-                        ],
-                        "type": "string",
-                      },
-                      "type": "array",
-                    },
-                  },
-                  "required": [
-                    "name",
-                    "phone_number",
-                    "roles",
-                    "description",
-                  ],
-                  "type": "object",
-                },
-                "person2": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "differentField": {
-                      "type": "string",
-                    },
-                    "name": {
-                      "$ref": "#/definitions/contactPerson_properties_person1_properties_name",
-                    },
-                    "phone_number": {
-                      "$ref": "#/definitions/contactPerson_properties_person1_properties_phone_number",
-                    },
-                  },
-                  "required": [
-                    "name",
-                    "phone_number",
-                    "differentField",
-                  ],
-                  "type": "object",
-                },
-              },
-              "required": [
-                "person1",
-                "person2",
-              ],
-              "type": "object",
-            },
-            "contactPerson_properties_person1_properties_name": {
-              "type": "string",
-            },
-            "contactPerson_properties_person1_properties_phone_number": {
-              "nullable": true,
-              "type": "string",
-            },
-          },
-          "properties": {
-            "person1": {
-              "additionalProperties": false,
-              "properties": {
-                "description": {
-                  "description": "Open text for any other relevant information about what the contact does.",
-                  "nullable": true,
-                  "type": "string",
-                },
-                "name": {
-                  "type": "string",
-                },
-                "phone_number": {
-                  "nullable": true,
-                  "type": "string",
-                },
-                "roles": {
-                  "description": "Any roles for which the contact is important, use other for custom roles",
-                  "items": {
-                    "enum": [
-                      "parent",
-                      "child",
-                      "sibling",
-                      "spouse",
-                      "friend",
-                      "other",
-                    ],
-                    "type": "string",
-                  },
-                  "type": "array",
-                },
-              },
-              "required": [
-                "name",
-                "phone_number",
-                "roles",
-                "description",
-              ],
-              "type": "object",
-            },
-            "person2": {
-              "additionalProperties": false,
-              "properties": {
-                "differentField": {
-                  "type": "string",
-                },
-                "name": {
-                  "$ref": "#/definitions/contactPerson_properties_person1_properties_name",
-                },
-                "phone_number": {
-                  "$ref": "#/definitions/contactPerson_properties_person1_properties_phone_number",
-                },
-              },
-              "required": [
-                "name",
-                "phone_number",
-                "differentField",
-              ],
-              "type": "object",
-            },
-          },
-          "required": [
-            "person1",
-            "person2",
-          ],
-          "type": "object",
-        }
-      `);
-      } else {
-        expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
-          .toMatchInlineSnapshot(`
+      expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
+        .toMatchInlineSnapshot(`
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
@@ -614,7 +344,6 @@ describe.each([
   "type": "object",
 }
 `);
-      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>
@@ -687,187 +416,7 @@ describe.each([
         fields: z.array(z.union([fieldA, fieldB])),
       });
 
-      if (version === 'v3') {
-        expect(zodResponseFormat(model, 'query').json_schema.schema).toMatchInlineSnapshot(`
-        {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "additionalProperties": false,
-          "definitions": {
-            "query": {
-              "additionalProperties": false,
-              "properties": {
-                "fields": {
-                  "items": {
-                    "anyOf": [
-                      {
-                        "additionalProperties": false,
-                        "properties": {
-                          "metadata": {
-                            "anyOf": [
-                              {
-                                "additionalProperties": false,
-                                "properties": {
-                                  "foo": {
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "foo",
-                                ],
-                                "type": "object",
-                              },
-                              {
-                                "type": "null",
-                              },
-                            ],
-                          },
-                          "name": {
-                            "type": "string",
-                          },
-                          "type": {
-                            "const": "string",
-                            "type": "string",
-                          },
-                        },
-                        "required": [
-                          "type",
-                          "name",
-                          "metadata",
-                        ],
-                        "type": "object",
-                      },
-                      {
-                        "additionalProperties": false,
-                        "properties": {
-                          "metadata": {
-                            "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata",
-                          },
-                          "type": {
-                            "const": "number",
-                            "type": "string",
-                          },
-                        },
-                        "required": [
-                          "type",
-                          "metadata",
-                        ],
-                        "type": "object",
-                      },
-                    ],
-                  },
-                  "type": "array",
-                },
-                "name": {
-                  "type": "string",
-                },
-              },
-              "required": [
-                "name",
-                "fields",
-              ],
-              "type": "object",
-            },
-            "query_properties_fields_items_anyOf_0_properties_metadata": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0": {
-              "additionalProperties": false,
-              "properties": {
-                "foo": {
-                  "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0_properties_foo",
-                },
-              },
-              "required": [
-                "foo",
-              ],
-              "type": "object",
-            },
-            "query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0_properties_foo": {
-              "type": "string",
-            },
-          },
-          "properties": {
-            "fields": {
-              "items": {
-                "anyOf": [
-                  {
-                    "additionalProperties": false,
-                    "properties": {
-                      "metadata": {
-                        "anyOf": [
-                          {
-                            "additionalProperties": false,
-                            "properties": {
-                              "foo": {
-                                "type": "string",
-                              },
-                            },
-                            "required": [
-                              "foo",
-                            ],
-                            "type": "object",
-                          },
-                          {
-                            "type": "null",
-                          },
-                        ],
-                      },
-                      "name": {
-                        "type": "string",
-                      },
-                      "type": {
-                        "const": "string",
-                        "type": "string",
-                      },
-                    },
-                    "required": [
-                      "type",
-                      "name",
-                      "metadata",
-                    ],
-                    "type": "object",
-                  },
-                  {
-                    "additionalProperties": false,
-                    "properties": {
-                      "metadata": {
-                        "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata",
-                      },
-                      "type": {
-                        "const": "number",
-                        "type": "string",
-                      },
-                    },
-                    "required": [
-                      "type",
-                      "metadata",
-                    ],
-                    "type": "object",
-                  },
-                ],
-              },
-              "type": "array",
-            },
-            "name": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "name",
-            "fields",
-          ],
-          "type": "object",
-        }
-      `);
-      } else {
-        expect(zodResponseFormat(model, 'query').json_schema.schema).toMatchInlineSnapshot(`
+      expect(zodResponseFormat(model, 'query').json_schema.schema).toMatchInlineSnapshot(`
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
@@ -960,7 +509,6 @@ describe.each([
   "type": "object",
 }
 `);
-      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>
@@ -1059,11 +607,11 @@ describe.each([
         value: z.number(),
       });
 
-      type LinkedListNode = z3.infer<typeof baseLinkedListNodeSchema> & {
+      type LinkedListNode = z4.infer<typeof baseLinkedListNodeSchema> & {
         next: LinkedListNode | null;
       };
 
-      const linkedListNodeSchema: z3.ZodType<LinkedListNode> = baseLinkedListNodeSchema.extend({
+      const linkedListNodeSchema: z4.ZodType<LinkedListNode> = baseLinkedListNodeSchema.extend({
         next: z.lazy(() => z.union([linkedListNodeSchema, z.null()])),
       });
 
@@ -1072,107 +620,7 @@ describe.each([
         linked_list: linkedListNodeSchema,
       });
 
-      if (version === 'v3') {
-        expect(zodResponseFormat(mainSchema, 'query').json_schema.schema).toMatchInlineSnapshot(`
-        {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "additionalProperties": false,
-          "definitions": {
-            "query": {
-              "additionalProperties": false,
-              "properties": {
-                "linked_list": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "next": {
-                      "anyOf": [
-                        {
-                          "$ref": "#/definitions/query_properties_linked_list",
-                        },
-                        {
-                          "type": "null",
-                        },
-                      ],
-                    },
-                    "value": {
-                      "type": "number",
-                    },
-                  },
-                  "required": [
-                    "value",
-                    "next",
-                  ],
-                  "type": "object",
-                },
-              },
-              "required": [
-                "linked_list",
-              ],
-              "type": "object",
-            },
-            "query_properties_linked_list": {
-              "additionalProperties": false,
-              "properties": {
-                "next": {
-                  "$ref": "#/definitions/query_properties_linked_list_properties_next",
-                },
-                "value": {
-                  "$ref": "#/definitions/query_properties_linked_list_properties_value",
-                },
-              },
-              "required": [
-                "value",
-                "next",
-              ],
-              "type": "object",
-            },
-            "query_properties_linked_list_properties_next": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/query_properties_linked_list",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "query_properties_linked_list_properties_value": {
-              "type": "number",
-            },
-          },
-          "properties": {
-            "linked_list": {
-              "additionalProperties": false,
-              "properties": {
-                "next": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/query_properties_linked_list",
-                    },
-                    {
-                      "type": "null",
-                    },
-                  ],
-                },
-                "value": {
-                  "type": "number",
-                },
-              },
-              "required": [
-                "value",
-                "next",
-              ],
-              "type": "object",
-            },
-          },
-          "required": [
-            "linked_list",
-          ],
-          "type": "object",
-        }
-      `);
-      } else {
-        expect(zodResponseFormat(mainSchema, 'query').json_schema.schema).toMatchInlineSnapshot(`
+      expect(zodResponseFormat(mainSchema, 'query').json_schema.schema).toMatchInlineSnapshot(`
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
@@ -1212,7 +660,6 @@ describe.each([
   "type": "object",
 }
 `);
-      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>
@@ -1260,91 +707,17 @@ describe.each([
 
     test('ref schemas with `.transform()`', async () => {
       const Inner = z.object({
-        baz:
-          version === 'v3'
-            ? z.boolean().brand<'ReusableBoolean'>()
-            : z
-                .boolean()
-                .transform((v: any) => v ?? true)
-                .pipe(z.boolean()),
+        baz: z
+          .boolean()
+          .transform((v: any) => v ?? true)
+          .pipe(z.boolean()),
       });
       const Outer = z.object({
         first: Inner,
         second: Inner,
       });
-      if (version === 'v3') {
-        expect(zodResponseFormat(Outer, 'data').json_schema.schema).toMatchInlineSnapshot(`
-        {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "additionalProperties": false,
-          "definitions": {
-            "data": {
-              "additionalProperties": false,
-              "properties": {
-                "first": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "baz": {
-                      "type": "boolean",
-                    },
-                  },
-                  "required": [
-                    "baz",
-                  ],
-                  "type": "object",
-                },
-                "second": {
-                  "$ref": "#/definitions/data_properties_first",
-                },
-              },
-              "required": [
-                "first",
-                "second",
-              ],
-              "type": "object",
-            },
-            "data_properties_first": {
-              "additionalProperties": false,
-              "properties": {
-                "baz": {
-                  "$ref": "#/definitions/data_properties_first_properties_baz",
-                },
-              },
-              "required": [
-                "baz",
-              ],
-              "type": "object",
-            },
-            "data_properties_first_properties_baz": {
-              "type": "boolean",
-            },
-          },
-          "properties": {
-            "first": {
-              "additionalProperties": false,
-              "properties": {
-                "baz": {
-                  "type": "boolean",
-                },
-              },
-              "required": [
-                "baz",
-              ],
-              "type": "object",
-            },
-            "second": {
-              "$ref": "#/definitions/data_properties_first",
-            },
-          },
-          "required": [
-            "first",
-            "second",
-          ],
-          "type": "object",
-        }
-      `);
-      } else {
-        expect(zodResponseFormat(Outer, 'data').json_schema.schema).toMatchInlineSnapshot(`
+
+      expect(zodResponseFormat(Outer, 'data').json_schema.schema).toMatchInlineSnapshot(`
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
@@ -1381,7 +754,6 @@ describe.each([
   "type": "object",
 }
 `);
-      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>

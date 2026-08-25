@@ -45,7 +45,6 @@ module.exports = defineConfig({
       // to exercise cancellation; the queue-draining loop is also falsely flagged.
       files: [
         'ecosystem-tests/cli.ts',
-        'src/_vendor/zod-to-json-schema/util.ts',
         'tests/internal/stream-utils.test.ts',
         'tests/lib/streaming-core.test.ts',
       ],
@@ -59,13 +58,6 @@ module.exports = defineConfig({
       files: ['examples/responses/manual-conversation-state.ts', 'tests/lib/ResponsesParser.test.ts'],
       rules: {
         'unicorn/prefer-single-call': 'off',
-      },
-    },
-    {
-      // Preserve the vendored module's existing named and default export topology.
-      files: ['src/_vendor/zod-to-json-schema/index.ts'],
-      rules: {
-        'unicorn/prefer-export-from': 'off',
       },
     },
     {
@@ -198,10 +190,6 @@ module.exports = defineConfig({
         'examples/chat-completions/tool-call-helpers-zod.ts',
         'examples/responses/websocket.ts',
         'src/_vendor/partial-json-parser/parser.ts',
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/date.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
-        'src/_vendor/zod-to-json-schema/parsers/union.ts',
         'src/azure.ts',
         'src/core/streaming.ts',
         'src/internal/uploads.ts',
@@ -228,7 +216,6 @@ module.exports = defineConfig({
     },
     {
       files: [
-        'src/_vendor/zod-to-json-schema/index.ts',
         'src/api-promise.ts',
         'src/pagination.ts',
         'src/resource.ts',
@@ -238,21 +225,6 @@ module.exports = defineConfig({
       ],
       rules: {
         'oxc/no-barrel-file': 'off',
-      },
-    },
-    {
-      // Vendored zod-to-json-schema uses `{}` for the intentionally empty schema
-      // that accepts any JSON value; preserve that public type surface.
-      files: [
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/any.ts',
-        'src/_vendor/zod-to-json-schema/parsers/never.ts',
-        'src/_vendor/zod-to-json-schema/parsers/undefined.ts',
-        'src/_vendor/zod-to-json-schema/parsers/unknown.ts',
-      ],
-      rules: {
-        'typescript/ban-types': 'off',
-        'typescript/no-empty-object-type': 'off',
       },
     },
     {
@@ -348,12 +320,6 @@ module.exports = defineConfig({
       // These switches intentionally enumerate schema, event, or test fixture
       // variants; preserving their no-op behavior for unknown variants is safer.
       files: [
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/bigint.ts',
-        'src/_vendor/zod-to-json-schema/parsers/date.ts',
-        'src/_vendor/zod-to-json-schema/parsers/number.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
-        'src/_vendor/zod-to-json-schema/parsers/union.ts',
         'src/lib/AssistantStream.ts',
         'tests/lib/AssistantStream.test.ts',
         'tests/live/bedrock.live.test.ts',
@@ -480,9 +446,6 @@ module.exports = defineConfig({
       // arity, protocol snapshots, and tests that cover undefined behavior.
       files: [
         'scripts/_vendor/tsc-multi/src/worker/worker.ts',
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
-        'src/_vendor/zod-to-json-schema/zodToJsonSchema.ts',
         'src/core/streaming.ts',
         'src/helpers/standard-schema.ts',
         'src/lib/AssistantStream.ts',
@@ -552,7 +515,6 @@ module.exports = defineConfig({
         'scripts/utils/fix-index-exports.cjs',
         'scripts/utils/make-dist-package-json.cjs',
         'scripts/utils/postprocess-files.cjs',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
         'src/providers/bedrock/aws.ts',
         'vitest.config.mts',
       ],
@@ -766,9 +728,6 @@ module.exports = defineConfig({
         'ecosystem-tests/vercel-edge/src/uploadWebApiTestCases.ts',
         'examples/chat-completions/chat-params-types.ts',
         'examples/chat-completions/stream-to-client-browser.ts',
-        'src/_vendor/zod-to-json-schema/parsers/date.ts',
-        'src/_vendor/zod-to-json-schema/parsers/intersection.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
         'src/core/EventEmitter.ts',
         'src/helpers/audio.ts',
         'src/lib/AbstractChatCompletionRunner.ts',
@@ -793,9 +752,6 @@ module.exports = defineConfig({
         'scripts/_vendor/tsc-multi/src/build.ts',
         'scripts/lint-generated.cjs',
         'src/_vendor/partial-json-parser/parser.ts',
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
-        'src/_vendor/zod-to-json-schema/zodToJsonSchema.ts',
         'src/azure.ts',
         'src/helpers/standard-schema.ts',
         'src/internal/decoders/line.ts',
@@ -838,7 +794,6 @@ module.exports = defineConfig({
         'examples/chat-completions/stream-to-client-browser.ts',
         'examples/chat-completions/stream-to-client-next.ts',
         'examples/chat-completions/tool-calls-stream.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
         'src/beta/realtime/internal-base.ts',
         'src/beta/realtime/websocket.ts',
         'src/internal/qs/stringify.ts',
@@ -865,7 +820,6 @@ module.exports = defineConfig({
         'ecosystem-tests/vercel-edge/src/pages/api/edge-test.ts',
         'ecosystem-tests/vercel-edge/src/pages/api/node-test.ts',
         'examples/responses/websocket.ts',
-        'src/_vendor/zod-to-json-schema/**',
         'src/core/streaming.ts',
         'src/helpers/audio.ts',
         'src/helpers/standard-schema.ts',
@@ -912,10 +866,6 @@ module.exports = defineConfig({
         'examples/responses/structured-outputs.ts',
         'scripts/utils/postprocess-files.cjs',
         'src/_vendor/partial-json-parser/parser.ts',
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/date.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
-        'src/_vendor/zod-to-json-schema/parsers/union.ts',
         'src/beta/realtime/websocket.ts',
         'src/beta/realtime/ws.ts',
         'src/helpers/audio.ts',
@@ -1068,10 +1018,6 @@ module.exports = defineConfig({
         'examples/responses/stream_background.ts',
         'examples/responses/structured-outputs-tools.ts',
         'src/_vendor/partial-json-parser/parser.ts',
-        'src/_vendor/zod-to-json-schema/parsers/nativeEnum.ts',
-        'src/_vendor/zod-to-json-schema/parsers/object.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
-        'src/_vendor/zod-to-json-schema/parsers/union.ts',
         'src/beta/realtime/internal-base.ts',
         'src/core/streaming.ts',
         'src/helpers/audio.ts',
@@ -1104,10 +1050,9 @@ module.exports = defineConfig({
       },
     },
     {
-      // These are the two existing SDK/vendor cycle clusters; untangling module
+      // These are the existing SDK cycle clusters; untangling module
       // topology would be a behavior and public-surface refactor, not lint cleanup.
       files: [
-        'src/_vendor/zod-to-json-schema/**',
         'src/azure.ts',
         'src/bedrock.ts',
         'src/core/streaming.ts',
@@ -1142,8 +1087,6 @@ module.exports = defineConfig({
         'scripts/utils/fix-index-exports.cjs',
         'scripts/utils/make-dist-package-json.cjs',
         'scripts/utils/postprocess-files.cjs',
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
         'src/bedrock.ts',
         'src/helpers/zod.ts',
         'src/internal/bedrock.ts',
@@ -1241,7 +1184,6 @@ module.exports = defineConfig({
         'examples/audio/audio.ts',
         'examples/mtls/deno.mjs',
         'scripts/_vendor/tsc-multi/src/transformer.ts',
-        'src/_vendor/zod-to-json-schema/zodToJsonSchema.ts',
         'src/auth/workload-identity-auth.ts',
         'src/helpers/zod.ts',
         'src/lib/AbstractChatCompletionRunner.ts',
@@ -1296,12 +1238,6 @@ module.exports = defineConfig({
         'ecosystem-tests/deno/main_test.ts',
         'ecosystem-tests/vercel-edge/src/uploadWebApiTestCases.ts',
         'examples/responses/stream_background.ts',
-        'src/_vendor/zod-to-json-schema/Options.ts',
-        'src/_vendor/zod-to-json-schema/Refs.ts',
-        'src/_vendor/zod-to-json-schema/errorMessages.ts',
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/nativeEnum.ts',
-        'src/_vendor/zod-to-json-schema/zodToJsonSchema.ts',
         'src/core/EventEmitter.ts',
         'src/lib/AbstractChatCompletionRunner.ts',
         'src/lib/AssistantStream.ts',
@@ -1362,9 +1298,6 @@ module.exports = defineConfig({
       files: [
         'scripts/_vendor/tsc-multi/src/transformer.ts',
         'src/_vendor/partial-json-parser/parser.ts',
-        'src/_vendor/zod-to-json-schema/parseDef.ts',
-        'src/_vendor/zod-to-json-schema/parsers/string.ts',
-        'src/_vendor/zod-to-json-schema/parsers/union.ts',
         'src/internal/qs/stringify.ts',
         'src/internal/qs/utils.ts',
         'src/lib/AbstractChatCompletionRunner.ts',

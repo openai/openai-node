@@ -162,10 +162,66 @@ describe('Zod v4 mini', () => {
   });
 });
 
-describe.each([
-  { version: 'v3', z: zv3 },
-  { version: 'v4', z: zv4 as any as typeof zv3 },
-])('zodRealtimeFunction (Zod $version)', ({ z }) => {
+describe('legacy Zod schema rejection', () => {
+  const unsupportedSchema = zv3.object({ value: zv3.string() });
+  // @ts-expect-error Zod v3 schemas are intentionally invalid public helper inputs.
+  const legacySchema: zv4.ZodType = unsupportedSchema;
+
+  it.each([
+    {
+      name: 'zodResponseFormat',
+      create: () => zodResponseFormat(legacySchema, 'legacy'),
+    },
+    {
+      name: 'zodTextFormat',
+      create: () => zodTextFormat(legacySchema, 'legacy'),
+    },
+    {
+      name: 'zodFunction',
+      create: () => zodFunction({ name: 'legacy', parameters: legacySchema }),
+    },
+    {
+      name: 'zodResponsesFunction',
+      create: () => zodResponsesFunction({ name: 'legacy', parameters: legacySchema }),
+    },
+    {
+      name: 'zodRealtimeFunction',
+      create: () => zodRealtimeFunction({ name: 'legacy', parameters: legacySchema }),
+    },
+  ])('rejects Zod v3 schemas in $name', ({ create }) => {
+    expect(create).toThrow(TypeError);
+    expect(create).toThrow(/Zod v3 schemas are no longer supported/);
+  });
+
+  it('rejects Zod v3 schemas inside otherwise valid schema definitions', () => {
+    const root = zv4.object({ value: zv4.string() });
+
+    expect(() =>
+      zodResponseFormat(root, 'mixed', {
+        schemaDefinitions: { valid: root, legacy: legacySchema },
+      }),
+    ).toThrow(/schemaDefinitions\.legacy.*Zod v3 schemas are no longer supported/);
+  });
+});
+
+describe('Zod v4 Classic validation errors', () => {
+  const schema = zv4.object({ value: zv4.string() });
+
+  it.each([
+    { name: 'zodResponseFormat', parse: zodResponseFormat(schema, 'classic').$parseRaw },
+    { name: 'zodTextFormat', parse: zodTextFormat(schema, 'classic').$parseRaw },
+    { name: 'zodFunction', parse: zodFunction({ name: 'classic', parameters: schema }).$parseRaw },
+    {
+      name: 'zodResponsesFunction',
+      parse: zodResponsesFunction({ name: 'classic', parameters: schema }).$parseRaw,
+    },
+  ])('preserves ZodError instances in $name', ({ parse }) => {
+    expect(() => parse('{"value":42}')).toThrow(zv4.ZodError);
+  });
+});
+
+describe('zodRealtimeFunction (Zod v4)', () => {
+  const z = zv4;
   it('builds a Realtime function tool without strict', () => {
     const tool = zodRealtimeFunction({
       name: 'get_weather',
@@ -240,10 +296,8 @@ it('preserves inferred output types', () => {
   expect(parsed.value).toBe('ok');
 });
 
-describe.each([
-  { version: 'v3', z: zv3 },
-  { version: 'v4', z: zv4 as any as typeof zv3 },
-])('zodResponseFormat (Zod $version)', ({ version, z }) => {
+describe('zodResponseFormat (Zod v4)', () => {
+  const z = zv4;
   it('does the thing', () => {
     expect(
       zodResponseFormat(
@@ -306,18 +360,6 @@ describe.each([
 
     expect(refs).not.toContainEqual(expect.stringMatching(/\s/));
     expect(definitionNames).not.toContainEqual(expect.stringMatching(/\s/));
-    if (version === 'v3') {
-      const rootProperties = schema['properties'] as Record<string, Record<string, unknown>>;
-      const groupProperties = rootProperties['group']?.['properties'] as Record<string, { $ref?: string }>;
-      const spacedRef = groupProperties['anotherSpacedUsage']?.$ref;
-      const underscoredRef = groupProperties['anotherUnderscoredUsage']?.$ref;
-
-      expect(spacedRef).toBeDefined();
-      expect(underscoredRef).toBe(
-        '#/definitions/example-scope_properties_group_properties_Thing_With_Spaces',
-      );
-      expect(spacedRef).not.toBe(underscoredRef);
-    }
 
     for (const ref of refs) {
       const definitionName = ref.split('/').pop();
@@ -629,59 +671,31 @@ describe.each([
   });
 
   it('throws error on optional fields', () => {
-    if (version === 'v3') {
-      expect(() =>
-        zodResponseFormat(
-          z.object({
-            required: z.string(),
-            optional: z.string().optional(),
-            optional_and_nullable: z.string().optional().nullable(),
-          }),
-          'schema',
-        ),
-      ).toThrow(
-        'Zod field at `#/definitions/schema/properties/optional` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
-      );
-    } else {
-      expect(() =>
-        zodResponseFormat(
-          z.object({
-            required: z.string(),
-            optional: z.string().optional(),
-            optional_and_nullable: z.string().optional().nullable(),
-          }),
-          'schema',
-        ),
-      ).toThrow(
-        'Schema field at `properties/optional` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
-      );
-    }
+    expect(() =>
+      zodResponseFormat(
+        z.object({
+          required: z.string(),
+          optional: z.string().optional(),
+          optional_and_nullable: z.string().optional().nullable(),
+        }),
+        'schema',
+      ),
+    ).toThrow(
+      'Schema field at `properties/optional` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
+    );
   });
 
   it('throws error on nested optional fields', () => {
-    if (version === 'v3') {
-      expect(() =>
-        zodResponseFormat(
-          z.object({
-            foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
-          }),
-          'schema',
-        ),
-      ).toThrow(
-        'Zod field at `#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
-      );
-    } else {
-      expect(() =>
-        zodResponseFormat(
-          z.object({
-            foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
-          }),
-          'schema',
-        ),
-      ).toThrow(
-        'Schema field at `properties/foo/properties/bar/items/properties/can_be_missing` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
-      );
-    }
+    expect(() =>
+      zodResponseFormat(
+        z.object({
+          foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
+        }),
+        'schema',
+      ),
+    ).toThrow(
+      'Schema field at `properties/foo/properties/bar/items/properties/can_be_missing` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
+    );
   });
 
   it('does not warn on union nullable fields', () => {
@@ -697,101 +711,6 @@ describe.each([
 
     expect(consoleSpy).toHaveBeenCalledTimes(0);
   });
-
-  if (version === 'v3') {
-    it('fully resolves reused wrapper types', () => {
-      const branded = z.string().brand<'BlockId'>();
-      const defaulted = z.string().default('fallback');
-      const readonly = z.string().readonly();
-      const optionalNullable = z.string().nullable().optional();
-      const lazy = z.lazy(() => z.string());
-      const nullable = z.object({ value: z.string() }).nullable();
-      const schema = zodTextFormat(
-        z.object({
-          brandedFirst: branded,
-          brandedSecond: branded,
-          defaultedFirst: defaulted,
-          defaultedSecond: defaulted,
-          readonlyFirst: readonly,
-          readonlySecond: readonly,
-          optionalNullableFirst: optionalNullable,
-          optionalNullableSecond: optionalNullable,
-          lazyFirst: lazy,
-          lazySecond: lazy,
-          nullableFirst: nullable,
-          nullableSecond: nullable,
-        }),
-        'wrappers',
-      ).schema as Record<string, unknown>;
-
-      expectDefinitionRefsToResolve(schema);
-
-      const properties = schema['properties'] as Record<string, { $ref?: string }>;
-      const brandedRef = properties['brandedSecond']?.$ref;
-      expect(brandedRef).toBeDefined();
-
-      const definitions = schema['definitions'] as Record<string, unknown>;
-      expect(definitions[brandedRef!.replace('#/definitions/', '')]).toMatchObject({ type: 'string' });
-    });
-
-    it('does not rebind shared inner types to wrapper definitions', () => {
-      const base = z.string();
-      const early = z.object({ value: base });
-      const defaulted = base.default('fallback');
-      const late = z.object({ value: base });
-
-      const schema = zodTextFormat(
-        z.object({
-          earlyFirst: early,
-          earlySecond: early,
-          defaultedFirst: defaulted,
-          defaultedSecond: defaulted,
-          lateFirst: late,
-          lateSecond: late,
-        }),
-        'wrapperState',
-      ).schema as Record<string, any>;
-      const definitions = schema['definitions'] as Record<string, any>;
-
-      const lateRef = schema['properties']['lateSecond']['$ref'] as string;
-      const lateDefinition = definitions[lateRef.replace('#/definitions/', '')];
-      const valueRef = lateDefinition['properties']['value']['$ref'] as string;
-      const valueDefinition = definitions[valueRef.replace('#/definitions/', '')];
-
-      expect(valueDefinition).toEqual({ type: 'string' });
-    });
-
-    it('preserves intentional recursion through lazy types', () => {
-      const recursive: zv3.ZodTypeAny = z.lazy(() =>
-        z.object({
-          value: z.string(),
-          children: z.array(recursive),
-        }),
-      );
-
-      const schema = zodTextFormat(
-        z.object({
-          first: recursive,
-          second: recursive,
-        }),
-        'recursive',
-      ).schema as Record<string, any>;
-      const definitions = schema['definitions'] as Record<string, any>;
-
-      const recursiveRef = schema['properties']['second']['$ref'] as string;
-      const recursiveDefinition = definitions[recursiveRef.replace('#/definitions/', '')];
-
-      expect(recursiveDefinition).toMatchObject({
-        type: 'object',
-        properties: {
-          children: {
-            type: 'array',
-            items: { $ref: recursiveRef },
-          },
-        },
-      });
-    });
-  }
 });
 
 function _typeTests() {

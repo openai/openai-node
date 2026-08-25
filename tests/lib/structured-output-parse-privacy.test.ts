@@ -9,7 +9,6 @@ import {
   standardTextFormat,
 } from 'openai/helpers/standard-schema';
 import { zodFunction, zodResponseFormat, zodResponsesFunction, zodTextFormat } from 'openai/helpers/zod';
-import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 import type { ChatCompletionFunctionTool } from 'openai/resources/chat/completions';
@@ -72,7 +71,6 @@ const privacyStandardSchema = {
 };
 
 const zodSchemas = [
-  { title: 'Zod v3', schema: zv3.object({ ok: zv3.boolean() }) },
   { title: 'Zod v4', schema: zv4.object({ ok: zv4.boolean() }) },
   { title: 'Zod v4 Mini', schema: zv4Mini.object({ ok: zv4Mini.boolean() }) },
 ];

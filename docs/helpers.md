@@ -13,7 +13,7 @@ into a JSON schema, send it to the API and parse the response content back using
 ```ts
 import { zodResponseFormat } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4';
 
 const Step = z.object({
   explanation: z.string(),
@@ -61,11 +61,10 @@ Some Zod behavior cannot be represented in the schema sent to the API:
   To emulate an optional value, make the field nullable instead of using plain
   `.optional()`; the model will return either a value or `null` for that field.
 - Only constraints represented in the generated JSON Schema can guide the model.
-  Strict Zod v3 helpers reject custom refinements, transforms, pipelines,
-  intersections, ambiguous unions, and asynchronous or native-only values such as
-  `Date`, `Map`, `Set`, `Promise`, and `BigInt`. Represent large integers as
-  decimal strings and call `BigInt(value)` after parsing. Non-strict Realtime
-  function helpers are unaffected.
+  Custom refinements cannot add model-visible constraints, and transforms,
+  asynchronous parsing, and native-only values such as `Date`, `Map`, `Set`,
+  `Promise`, and `BigInt` cannot be represented faithfully. Represent large
+  integers as decimal strings and call `BigInt(value)` after parsing.
 - `zodFunction()` always creates a strict function tool. `.default()` emits
   `default`, but strict conversion still marks the property as required, so it does
   not make model-generated tool arguments optional. String `.min()` and `.max()`
@@ -88,7 +87,7 @@ For example:
 ```ts
 import { zodFunction } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4';
 
 const Table = z.enum(['orders', 'customers', 'products']);
 
@@ -784,12 +783,12 @@ const runner = client.chat.completions.runTools(
 #### Integrate with `zod`
 
 [`zod`](https://www.npmjs.com/package/zod) is a schema validation library which can help with validating the
-assistant's response to make sure it conforms to a schema. Paired with [`zod-to-json-schema`](https://www.npmjs.com/package/zod-to-json-schema), the validation schema also acts as the `parameters` JSON Schema passed to the API.
+assistant's response to make sure it conforms to a schema. Zod 4 converts the validation schema into the
+`parameters` JSON Schema passed to the API without a separate conversion dependency.
 
 ```ts
 import OpenAI from 'openai';
-import { z } from 'zod/v3';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod/v4';
 
 const client = new OpenAI();
 
@@ -804,7 +803,7 @@ async function main() {
           function: {
             function: getWeather,
             parse: GetWeatherParameters.parse,
-            parameters: zodToJsonSchema(GetWeatherParameters),
+            parameters: z.toJSONSchema(GetWeatherParameters, { target: 'draft-7' }),
           },
         },
       ],
