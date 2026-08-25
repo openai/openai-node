@@ -197,9 +197,28 @@ const nativeStructuredClone = nativeStructuredCloneIntrinsics?.clone;
 type JSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
 type JSONErrorBrand = 'native' | 'proxy' | 'tagged-wrapper' | 'unknown' | 'unsafe';
 type ClonedErrorBrand = 'native' | 'proxy' | 'parser-proxy' | 'unknown' | 'unavailable';
-type ClonePropertySafety = 'safe' | 'proxy' | 'parser-proxy' | 'unavailable';
+type ClonePropertySafety = 'safe' | 'proxy' | 'parser-proxy' | 'unknown' | 'unavailable';
 
-function classifyProxyCloneFailure(failure: unknown): JSONErrorKind {
+function hasNativeProxyErrorDescriptors(error: object): boolean {
+  const message = getErrorDescriptor(error, 'message');
+  const stack = getErrorDescriptor(error, 'stack');
+  if (
+    message &&
+    (('value' in message && typeof message.value === 'string' && !message.enumerable) ||
+      (stack &&
+        !stack.enumerable &&
+        (('value' in stack && typeof stack.value === 'string') ||
+          (!('value' in stack) && typeof stack.get === 'function'))))
+  ) {
+    return true;
+  }
+
+  // A proxy may conceal configurable native descriptors while still reporting their own keys.
+  const keys = Reflect.ownKeys(error);
+  return (!message && keys.includes('message')) || (!stack && keys.includes('stack'));
+}
+
+function classifyProxyCloneFailure(target: object, failure: unknown): JSONErrorKind {
   if (!nativeStructuredCloneIntrinsics || typeof failure !== 'object' || failure === null) {
     return 'unsafe';
   }
@@ -213,13 +232,18 @@ function classifyProxyCloneFailure(failure: unknown): JSONErrorKind {
     if (typeof detail !== 'string') {
       return 'unsafe';
     }
-    if (/^SyntaxError(?::|\s)/u.test(detail)) {
-      return 'syntax';
+
+    const syntax = /^SyntaxError(?::|\s)/u.test(detail);
+    if (syntax || /^[A-Za-z]*Error(?::|\s)/u.test(detail)) {
+      // Clone-failure text reflects an unbranded record's prototype as well as native errors.
+      if (!hasNativeProxyErrorDescriptors(target)) {
+        return 'unknown';
+      }
+      return syntax ? 'syntax' : 'error';
     }
-    if (/^[A-Za-z]*Error(?::|\s)/u.test(detail)) {
-      return 'error';
-    }
-    return detail.startsWith('#<') || detail === ' could not be cloned.' ? 'unknown' : 'unsafe';
+    return detail.startsWith('#<') || detail.startsWith('[object ') || detail === ' could not be cloned.'
+      ? 'unknown'
+      : 'unsafe';
   } catch {
     return 'unsafe';
   }
@@ -235,7 +259,7 @@ function classifyNativeProxyTarget(target: object): JSONErrorKind {
     nativeStructuredClone(target);
     return 'unsafe';
   } catch (error) {
-    return classifyProxyCloneFailure(error);
+    return classifyProxyCloneFailure(target, error);
   }
 }
 
@@ -371,6 +395,9 @@ function classifyCloneProperties(error: object): ClonePropertySafety {
     const descriptor = getErrorDescriptor(error, key);
     if (!descriptor) {
       const kind = classifyNativeProxyTarget(error);
+      if (kind === 'unknown') {
+        return 'unknown';
+      }
       return kind === 'syntax' || kind === 'unsafe' ? 'parser-proxy' : 'proxy';
     }
     if (!descriptor.enumerable) {
@@ -411,7 +438,10 @@ function classifyStructuredError(target: object): ClonedErrorBrand {
     clone = nativeStructuredClone(target);
   } catch (error) {
     // Structured cloning rejects proxies before invoking their getters or traps.
-    const kind = classifyProxyCloneFailure(error);
+    const kind = classifyProxyCloneFailure(target, error);
+    if (kind === 'unknown') {
+      return 'unknown';
+    }
     return kind === 'syntax' || kind === 'unsafe' ? 'parser-proxy' : 'proxy';
   }
 
@@ -456,11 +486,11 @@ function classifyUnbrandedError(error: object): JSONErrorBrand {
     return clone;
   }
 
-  if (hasNativeErrorDescriptors(error)) {
+  if (hasNativeErrorDescriptors(error) || hasNativeProxyErrorDescriptors(error)) {
     return 'proxy';
   }
 
-  return kind === 'syntax' ? 'unsafe' : 'unknown';
+  return 'unknown';
 }
 
 function classifyErrorBrand(error: object): JSONErrorBrand {
@@ -489,11 +519,11 @@ function classifyErrorBrand(error: object): JSONErrorBrand {
     if (kind === 'syntax' && message && !('value' in message)) {
       return 'unsafe';
     }
-    if (hasNativeErrorDescriptors(error)) {
+    if (hasNativeErrorDescriptors(error) || hasNativeProxyErrorDescriptors(error)) {
       return 'native';
     }
     if (kind === 'syntax') {
-      return 'unsafe';
+      return hasSafeCloneDiagnostic(error, 'message') ? 'unknown' : 'unsafe';
     }
 
     const cause = getErrorDescriptor(error, 'cause');
@@ -506,7 +536,8 @@ function classifyErrorBrand(error: object): JSONErrorBrand {
 function isMalformedParserMarker(error: object, options?: MalformedJSONErrorOptions): boolean {
   const parserType = getErrorDescriptor(error, 'type');
   if (!parserType) {
-    return false;
+    // Configurable own parser markers can be hidden by a proxy's descriptor trap.
+    return Reflect.ownKeys(error).includes('type');
   }
   if (!('value' in parserType)) {
     return !options?.preserveAccessors;
