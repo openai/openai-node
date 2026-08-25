@@ -661,6 +661,47 @@ describe('malformed JSON runtime compatibility', () => {
   it.each(
     runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
       publicSurfaces.flatMap((surface) =>
+        (['Error', 'TypeError'] as const).flatMap((constructor) =>
+          (['direct', 'nested'] as const).map((placement) => ({
+            runtimeErrorBrand,
+            surface,
+            constructor,
+            placement,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'preserves a $placement native $constructor renamed SyntaxError by assignment through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, constructor, placement }) => {
+      const target =
+        constructor === 'Error'
+          ? new Error('safe custom parser transport failure')
+          : new TypeError('safe custom parser transport failure');
+      target.name = 'SyntaxError';
+      const readHook = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through a renamed transport error hook`);
+      });
+      Object.defineProperties(target, {
+        toJSON: { configurable: true, get: readHook },
+        [Symbol.toStringTag]: { configurable: true, get: readHook },
+      });
+      const rejected =
+        placement === 'direct'
+          ? target
+          : Object.defineProperty(new Error('safe custom parser transport wrapper'), 'cause', {
+              configurable: true,
+              value: target,
+            });
+
+      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readHook).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
         (['same-realm', 'cross-realm'] as const).flatMap((realm) =>
           (['direct', 'nested'] as const).map((placement) => ({
             runtimeErrorBrand,
@@ -1373,6 +1414,43 @@ describe('malformed JSON runtime compatibility', () => {
       const rejected = new Proxy(target, { get: readProxy });
 
       await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    publicSurfaces.flatMap((surface) =>
+      (['Error', 'TypeError'] as const).flatMap((constructor) =>
+        (['direct', 'nested'] as const).map((placement) => ({
+          surface,
+          constructor,
+          placement,
+        })),
+      ),
+    ),
+  )(
+    'preserves a $placement stackless $constructor transport proxy with native runtime diagnostics through $surface',
+    async ({ surface, constructor, placement }) => {
+      const target =
+        constructor === 'Error'
+          ? new Error('safe custom response body transport failure')
+          : new TypeError('safe custom response body transport failure');
+      Reflect.deleteProperty(target, 'stack');
+      const readProxy = vi.fn((_target: Error, property: PropertyKey) => {
+        throw new Error(
+          `${PRIVATE_VALUE} escaped through the ${String(property)} stackless transport proxy getter`,
+        );
+      });
+      const proxy = new Proxy(target, { get: readProxy });
+      const rejected =
+        placement === 'direct'
+          ? proxy
+          : Object.defineProperty(new Error('safe custom parser wrapper'), 'cause', {
+              configurable: true,
+              value: proxy,
+            });
+
+      await expectOriginalPublicFailure(surface, rejected, 'native intrinsics');
       expect(readProxy).not.toHaveBeenCalled();
     },
   );

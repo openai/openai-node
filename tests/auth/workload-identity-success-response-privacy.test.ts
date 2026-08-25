@@ -438,6 +438,57 @@ describe('successful workload OAuth response JSON privacy', () => {
     expect(harness.api).not.toHaveBeenCalled();
   });
 
+  it.each(
+    surfaces.flatMap((surface) =>
+      (['Error', 'TypeError'] as const).flatMap((constructor) =>
+        (['direct', 'nested'] as const).flatMap((placement) =>
+          (['native stack', 'without stack'] as const).map((stack) => ({
+            surface,
+            constructor,
+            placement,
+            stack,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'preserves a $placement $constructor transport error renamed SyntaxError $stack on $surface',
+    async ({ surface, constructor, placement, stack }) => {
+      const transportFailure =
+        constructor === 'Error'
+          ? new Error('OAuth response body stream was interrupted.')
+          : new TypeError('OAuth response body stream was interrupted.');
+      transportFailure.name = 'SyntaxError';
+      if (stack === 'without stack') {
+        Reflect.deleteProperty(transportFailure, 'stack');
+      }
+      const rejected =
+        placement === 'direct'
+          ? transportFailure
+          : withCause(new Error('OAuth response body transport failed.'), transportFailure);
+      const harness = createHarness(async () => parserResponse(rejected));
+
+      expect(Object.getOwnPropertyDescriptor(transportFailure, 'name')).toMatchObject({
+        configurable: true,
+        enumerable: true,
+        writable: true,
+      });
+      await expect(operationFor(surface, harness)()).rejects.toBe(rejected);
+      expect(harness.api).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(surfaces)(
+    'sanitizes a genuinely native SyntaxError after its prototype is changed on %s',
+    async (surface) => {
+      const parserFailure = Object.setPrototypeOf(new SyntaxError(PRIVATE_TOKEN), Error.prototype) as Error;
+      Object.defineProperty(parserFailure, 'name', { configurable: true, value: 'SyntaxError' });
+      const harness = createHarness(async () => parserResponse(parserFailure));
+
+      await expectPrivateFailure(operationFor(surface, harness), harness);
+    },
+  );
+
   it.each(surfaces)('preserves nested non-parser response failures on %s', async (surface) => {
     const transportFailure = withCause(new Error('OAuth body transport failed'), new TypeError('socket'));
     const harness = createHarness(async () => parserResponse(transportFailure));

@@ -41,6 +41,17 @@ const packedPackagePath = require('node:path');
     'OAuthError',
     'SubjectTokenProviderError',
   ];
+  const privateMalformedJSONClassifierModules = [
+    'openai/internal/auth/malformed-json-error',
+    'openai/internal/auth/malformed-json-error.js',
+    'openai/internal/auth/malformed-json-error.mjs',
+  ];
+  const privateMalformedJSONClassifierTypeImports = privateMalformedJSONClassifierModules.flatMap(
+    (moduleName, index) => [
+      `// @ts-expect-error Private malformed JSON classifier is not an exported package subpath: ${moduleName}`,
+      `import { isMalformedJSONError as privateMalformedJSONError${index} } from '${moduleName}';`,
+    ],
+  );
   const run = (command: string, args: string[], options: RunOptions = {}): string =>
     childProcess.execFileSync(command, args, {
       cwd: temporaryDirectory,
@@ -140,6 +151,7 @@ const packedPackagePath = require('node:path');
         "import type { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';",
         "import type { OpenAIRealtimeWS as RealtimeWS } from 'openai/realtime/ws';",
         "import type { OpenAIRealtimeWS as BetaRealtimeWS } from 'openai/beta/realtime/ws';",
+        ...privateMalformedJSONClassifierTypeImports,
         "new OpenAI({ apiKey: 'test', dangerouslyAllowBrowser: true });",
         'void AzureOpenAI;',
         ...authExportNames.map((name) => `void ${name};`),
@@ -152,6 +164,7 @@ const packedPackagePath = require('node:path');
       [
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
         "import type { WorkloadIdentity } from 'openai/auth';",
+        ...privateMalformedJSONClassifierTypeImports,
         ...authExportNames.map((name) => `void ${name};`),
         'void (null as unknown as WorkloadIdentity);',
       ].join('\n'),
@@ -230,7 +243,8 @@ const packedPackagePath = require('node:path');
       );
     }
 
-    const privateX509Modules = [
+    const privateAuthModules = [
+      ...privateMalformedJSONClassifierModules,
       'openai/internal/auth/x509-transport-capability',
       'openai/internal/auth/x509-transport-capability.js',
       'openai/internal/auth/x509-transport-capability.mjs',
@@ -243,7 +257,7 @@ const packedPackagePath = require('node:path');
       'openai/internal/auth/x509-transport-state-browser.js',
       'openai/internal/auth/x509-transport-state-browser.mjs',
     ];
-    const moduleNames = JSON.stringify(privateX509Modules);
+    const moduleNames = JSON.stringify(privateAuthModules);
     run(process.execPath, [
       '--input-type=commonjs',
       '--eval',

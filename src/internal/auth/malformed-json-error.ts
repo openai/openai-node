@@ -327,7 +327,12 @@ function classifyGenericProxyCloneFailure(target: object): JSONErrorKind {
   }
 
   const kind = classifyCrossRealmError(target);
-  if (!stack && kind !== 'syntax' && hasCapturedNativeDiagnosticKeys(keys)) {
+  if (
+    !stack &&
+    kind !== 'syntax' &&
+    hasCapturedNativeDiagnosticKeys(keys) &&
+    (!message || !nativeProxyBrand)
+  ) {
     return 'unsafe';
   }
   return kind === 'unknown' ? 'error' : kind;
@@ -502,6 +507,17 @@ function classifyCloneProperties(error: object): ClonePropertySafety {
   return 'safe';
 }
 
+function hasAmbiguousSyntaxErrorName(name: PropertyDescriptor | undefined): boolean {
+  // Ordinary assignment creates an enumerable, writable shadow rather than a native syntax brand.
+  return Boolean(
+    name &&
+    'value' in name &&
+    name.value === 'SyntaxError' &&
+    name.configurable &&
+    (!name.enumerable || !name.writable),
+  );
+}
+
 function classifyStructuredError(target: object): ClonedErrorBrand {
   if (!nativeStructuredClone || !hasSafeClonePrototypeChain(target)) {
     return 'unavailable';
@@ -543,7 +559,7 @@ function classifyStructuredError(target: object): ClonedErrorBrand {
   return name &&
     'value' in name &&
     name.value === 'SyntaxError' &&
-    !name.configurable &&
+    !hasAmbiguousSyntaxErrorName(name) &&
     classifyCrossRealmError(target) !== 'syntax'
     ? 'native'
     : 'native-syntax';
@@ -590,10 +606,7 @@ function classifyUnbrandedError(error: object): JSONErrorBrand {
 }
 
 function classifyBrandedNativeError(error: object): JSONErrorBrand {
-  const name = getErrorDescriptor(error, 'name');
-  return name && 'value' in name && name.value === 'SyntaxError' && name.configurable
-    ? 'native-syntax'
-    : 'native';
+  return hasAmbiguousSyntaxErrorName(getErrorDescriptor(error, 'name')) ? 'native-syntax' : 'native';
 }
 
 function classifyErrorBrand(error: object): JSONErrorBrand {
@@ -650,11 +663,12 @@ function isMalformedParserMarker(error: object, options?: MalformedJSONErrorOpti
 
 function classifyParserErrorKind(error: object, brand: JSONErrorBrand): JSONErrorKind {
   const kind = classifyCrossRealmError(error);
-  if (kind === 'error' && brand === 'native') {
-    const name = getErrorDescriptor(error, 'name');
-    if (name && 'value' in name && name.value === 'SyntaxError' && name.configurable) {
-      return 'syntax';
-    }
+  if (
+    kind === 'error' &&
+    brand === 'native' &&
+    hasAmbiguousSyntaxErrorName(getErrorDescriptor(error, 'name'))
+  ) {
+    return 'syntax';
   }
   return kind === 'unknown' && brand === 'proxy' ? classifyNativeProxyTarget(error) : kind;
 }
