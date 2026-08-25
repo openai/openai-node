@@ -2,7 +2,11 @@ import * as Errors from './error';
 import { OpenAI } from './client';
 import type { ApiKeySetter, ClientOptions } from './client';
 import { assertNoDataResidency } from './internal/data-residency';
-import { assertBedrockRequestOrigin, brand_privateBedrockClient } from './internal/bedrock';
+import {
+  assertBedrockRequestOrigin,
+  assertValidBedrockBearerCredential,
+  brand_privateBedrockClient,
+} from './internal/bedrock';
 import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
@@ -177,6 +181,21 @@ export class BedrockOpenAI extends OpenAI {
       ...opts,
     });
 
+    let currentApiKey = this.apiKey;
+    Object.defineProperty(this, 'apiKey', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        if (currentApiKey !== null) {
+          assertValidBedrockBearerCredential(currentApiKey);
+        }
+        return currentApiKey;
+      },
+      set(nextApiKey: string | null) {
+        currentApiKey = nextApiKey;
+      },
+    });
+
     const trustedBaseURL = this.baseURL;
     let currentBaseURL = trustedBaseURL;
     Object.defineProperty(this, 'baseURL', {
@@ -222,8 +241,18 @@ export class BedrockOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    if ((security.bearerAuth || security.adminAPIKeyAuth) && this.apiKey !== null) {
-      return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+    const credential = this.apiKey;
+    if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
+      assertValidBedrockBearerCredential(credential);
+      try {
+        return buildHeaders([{ Authorization: `Bearer ${credential}` }]);
+      } catch (error) {
+        if (error instanceof TypeError) {
+          // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
+          throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+        }
+        throw error;
+      }
     }
 
     return super.authHeaders(opts, security);

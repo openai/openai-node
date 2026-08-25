@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
+import * as UsageAPI from './usage';
 import { APIPromise } from '../../../core/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
@@ -232,6 +233,21 @@ export class Usage extends APIResource {
     });
   }
 }
+
+/**
+ * The unit of the `quantity` value. If no single supported unit applies to the
+ * result, this field is `null`.
+ */
+export type CostQuantityUnit =
+  | (string & {})
+  | 'tokens'
+  | '1000_tokens'
+  | 'duration_seconds'
+  | 'duration_minutes'
+  | 'duration_hours'
+  | 'gibibyte_hours'
+  | 'images'
+  | 'characters';
 
 export interface UsageAudioSpeechesResponse {
   data: Array<UsageAudioSpeechesResponse.Data>;
@@ -763,6 +779,12 @@ export namespace UsageAudioSpeechesResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -1314,6 +1336,12 @@ export namespace UsageAudioTranscriptionsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -1865,6 +1893,12 @@ export namespace UsageCodeInterpreterSessionsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -2416,6 +2450,12 @@ export namespace UsageCompletionsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -2967,6 +3007,12 @@ export namespace UsageCostsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -3518,6 +3564,12 @@ export namespace UsageEmbeddingsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -4069,6 +4121,12 @@ export namespace UsageFileSearchCallsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -4620,6 +4678,12 @@ export namespace UsageImagesResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -5171,6 +5235,12 @@ export namespace UsageModerationsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -5722,6 +5792,12 @@ export namespace UsageVectorStoresResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -6273,6 +6349,12 @@ export namespace UsageWebSearchCallsResponse {
        * result.
        */
       quantity?: number | null;
+
+      /**
+       * The unit of the `quantity` value. If no single supported unit applies to the
+       * result, this field is `null`.
+       */
+      quantity_unit?: UsageAPI.CostQuantityUnit | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -6929,6 +7011,7 @@ export interface UsageWebSearchCallsParams {
 
 export declare namespace Usage {
   export {
+    type CostQuantityUnit as CostQuantityUnit,
     type UsageAudioSpeechesResponse as UsageAudioSpeechesResponse,
     type UsageAudioTranscriptionsResponse as UsageAudioTranscriptionsResponse,
     type UsageCodeInterpreterSessionsResponse as UsageCodeInterpreterSessionsResponse,

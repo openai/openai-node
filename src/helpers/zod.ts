@@ -17,6 +17,7 @@ import type { RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { forEachJSONSchemaChild, toStrictJsonSchema } from '../lib/transform';
 import type { JSONSchema } from '../lib/jsonschema';
 import { hasOwn } from '../internal/utils/values';
+import { assertJSONSerializableSchema, assertSupportedZodV3Schema } from './zod-v3-strict-schema';
 
 type ZodV4Schema = z4.ZodType | z4Mini.ZodMiniType;
 type ZodSchema = z3.ZodType | ZodV4Schema;
@@ -133,6 +134,7 @@ function zodV3ToJsonSchema(
   schema: z3.ZodType,
   options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
 ): Record<string, unknown> {
+  assertSupportedZodV3Schema(schema, options.schemaDefinitions as Record<string, z3.ZodType> | undefined);
   const rootName = getZodV3RootName(options.name, options.schemaDefinitions);
   const jsonSchema = _zodToJsonSchema(schema, {
     openaiStrictMode: true,
@@ -145,7 +147,9 @@ function zodV3ToJsonSchema(
       : undefined),
   });
 
-  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  const escapedSchema = escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  assertJSONSerializableSchema(escapedSchema);
+  return escapedSchema;
 }
 
 function zodV4ToJsonSchema(
@@ -211,7 +215,11 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
   const parser = (zodObject as { parse?: (data: unknown) => unknown }).parse;
 
   if (typeof parser === 'function') {
-    return parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+    const result = parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+    if (!isZodV4(zodObject as unknown as ZodSchema)) {
+      assertJSONSerializableSchema(result);
+    }
+    return result;
   }
 
   return z4.parse(zodObject as unknown as ZodV4Schema, parsed) as InferZodType<ZodInput>;
