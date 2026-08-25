@@ -7,15 +7,25 @@ import { isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
 import type { ClientOptions } from './client';
+import type { WorkloadIdentity } from './auth/types';
 import { assertNoDataResidency } from './internal/data-residency';
 
 /** API Client for interfacing with the Azure OpenAI API. */
-export interface AzureClientOptions extends Omit<ClientOptions, 'provider' | 'dataResidency'> {
+export interface AzureClientOptions extends Omit<
+  ClientOptions,
+  'provider' | 'dataResidency' | 'workloadIdentity' | 'x509Transport'
+> {
   /** AzureOpenAI does not support third-party provider configuration. */
   provider?: never;
 
   /** OpenAI data residency cannot be combined with Azure routing. */
   dataResidency?: never;
+
+  /** Azure cannot receive OpenAI X.509 workload-identity certificate transports. */
+  x509Transport?: never;
+
+  /** Existing subject-token workload-identity configuration remains unchanged. */
+  workloadIdentity?: WorkloadIdentity | undefined;
 
   /**
    * Defaults to process.env['OPENAI_API_VERSION'].

@@ -19,6 +19,7 @@ export interface X509TestLab {
   proxyCertificateAuthority: Buffer;
   server: TestCertificate;
   issuerServer: TestCertificate;
+  apiServer: TestCertificate;
   proxyServer: TestCertificate;
   firstClient: TestCertificate;
   secondClient: TestCertificate;
@@ -161,6 +162,7 @@ export function createX509TestLab(): X509TestLab {
     proxyCertificateAuthority: proxyAuthority.certificate,
     server: issueCertificate('localhost', 'server', workloadAuthority),
     issuerServer: issueCertificate('mtls.auth.openai.com', 'server', workloadAuthority),
+    apiServer: issueCertificate('mtls.api.openai.com', 'server', workloadAuthority),
     proxyServer: issueCertificate('localhost', 'server', proxyAuthority),
     firstClient: issueCertificate('workload-a', 'client', workloadAuthority),
     secondClient: issueCertificate('workload-b', 'client', workloadAuthority),

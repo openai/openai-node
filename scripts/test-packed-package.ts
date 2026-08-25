@@ -502,17 +502,25 @@ const packedPackagePath = require('node:path');
     for (const [inputType, consumer] of [
       [
         'commonjs',
-        "const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+        "const OpenAI = require('openai'); const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
       ],
       [
         'module',
-        "import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+        "import OpenAI from 'openai'; import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+      ],
+      [
+        'module',
+        "import OpenAI from 'openai'; import { createRequire } from 'node:module'; const require = createRequire(import.meta.url); const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+      ],
+      [
+        'module',
+        "import { createRequire } from 'node:module'; import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport'; const OpenAI = createRequire(import.meta.url)('openai');",
       ],
     ]) {
       run(process.execPath, [
         `--input-type=${inputType}`,
         '-e',
-        `${consumer} const dispatcher = new Agent(); const transport = createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); if (!Object.isFrozen(transport)) throw new Error('X.509 transport capability is not frozen'); dispatcher.close();`,
+        `${consumer} const dispatcher = new Agent(); const transport = createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); if (!Object.isFrozen(transport)) throw new Error('X.509 transport capability is not frozen'); new OpenAI({ apiKey: null, workloadIdentity: { type: 'x509', identityProviderId: 'synthetic-provider', serviceAccountId: 'synthetic-account' }, x509Transport: transport }); dispatcher.close();`,
       ]);
     }
 
