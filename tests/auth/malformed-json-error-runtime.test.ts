@@ -153,6 +153,29 @@ async function expectSanitizedPublicFailure(
   expect(fetch).toHaveBeenCalledTimes(1);
 }
 
+async function withNativeCloneFailureMessage<T>(message: string, run: () => Promise<T>): Promise<T> {
+  const originalName = Object.getOwnPropertyDescriptor(DOMException.prototype, 'name');
+  const originalMessage = Object.getOwnPropertyDescriptor(DOMException.prototype, 'message');
+  if (!originalName?.get || !originalMessage?.get) {
+    throw new Error('Expected native DOMException diagnostic accessors.');
+  }
+
+  const getName = originalName.get;
+  const getMessage = originalMessage.get;
+  Object.defineProperty(DOMException.prototype, 'message', {
+    ...originalMessage,
+    get(this: object) {
+      return getName.call(this) === 'DataCloneError' ? message : getMessage.call(this);
+    },
+  });
+
+  try {
+    return await run();
+  } finally {
+    Object.defineProperty(DOMException.prototype, 'message', originalMessage);
+  }
+}
+
 describe('malformed JSON runtime compatibility', () => {
   it.each(
     publicSurfaces.flatMap((surface) =>
@@ -468,6 +491,203 @@ describe('malformed JSON runtime compatibility', () => {
       await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
       expect(readTag).not.toHaveBeenCalled();
       expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['same-realm', 'cross-realm'] as const).flatMap((realm) =>
+          (['direct', 'nested'] as const).flatMap((placement) =>
+            (['without marker', 'with concealed marker'] as const).map((marker) => ({
+              runtimeErrorBrand,
+              surface,
+              realm,
+              placement,
+              marker,
+            })),
+          ),
+        ),
+      ),
+    ),
+  )(
+    'sanitizes a $placement $realm parser proxy with fully concealed diagnostic keys $marker through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, realm, placement, marker }) => {
+      const target =
+        realm === 'same-realm'
+          ? new SyntaxError(PRIVATE_VALUE)
+          : (runInNewContext('new SyntaxError(privateValue)', {
+              privateValue: PRIVATE_VALUE,
+            }) as SyntaxError);
+      if (marker === 'with concealed marker') {
+        Object.defineProperty(target, 'type', { configurable: true, value: 'invalid-json' });
+      }
+
+      const readHook = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through a fully concealed parser hook`);
+      });
+      Object.defineProperties(target, {
+        toJSON: { configurable: true, get: readHook },
+        [Symbol.toStringTag]: { configurable: true, get: readHook },
+      });
+      const readProxy = vi.fn((_target: SyntaxError, property: PropertyKey) => {
+        throw new Error(
+          `${PRIVATE_VALUE} escaped through the ${String(property)} fully concealed parser getter`,
+        );
+      });
+      const concealed = new Set<PropertyKey>(['message', 'stack', 'type']);
+      const proxy = new Proxy(target, {
+        get: readProxy,
+        getOwnPropertyDescriptor(value, property) {
+          return concealed.has(property) ? undefined : Reflect.getOwnPropertyDescriptor(value, property);
+        },
+        ownKeys(value) {
+          return Reflect.ownKeys(value).filter((property) => !concealed.has(property));
+        },
+      });
+      const rejected =
+        placement === 'direct'
+          ? proxy
+          : Object.defineProperty(
+              new Error(`${PRIVATE_VALUE} escaped through a nested parser wrapper`),
+              'cause',
+              {
+                configurable: true,
+                value: proxy,
+              },
+            );
+
+      await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readHook).not.toHaveBeenCalled();
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    [...runtimeErrorBrands, 'fallback without structuredClone' as const].flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['Error', 'SyntaxError'] as const).flatMap((prototype) =>
+          (['direct', 'nested'] as const).map((placement) => ({
+            runtimeErrorBrand,
+            surface,
+            prototype,
+            placement,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'preserves a $placement fully concealed forged $prototype proxy through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, prototype, placement }) => {
+      const target = Object.create(prototype === 'Error' ? Error.prototype : SyntaxError.prototype) as object;
+      if (prototype === 'Error') {
+        Object.defineProperty(target, 'type', { configurable: true, value: 'invalid-json' });
+      }
+
+      const readProxy = vi.fn((_target: object, property: PropertyKey) => {
+        throw new Error(
+          `${PRIVATE_VALUE} escaped through the ${String(property)} fully concealed forged getter`,
+        );
+      });
+      const concealed = new Set<PropertyKey>(['message', 'stack', 'type']);
+      const proxy = new Proxy(target, {
+        get: readProxy,
+        getOwnPropertyDescriptor(value, property) {
+          return concealed.has(property) ? undefined : Reflect.getOwnPropertyDescriptor(value, property);
+        },
+        ownKeys(value) {
+          return Reflect.ownKeys(value).filter((property) => !concealed.has(property));
+        },
+      });
+      const rejected =
+        placement === 'direct'
+          ? proxy
+          : Object.defineProperty(new Error('safe custom parser wrapper'), 'cause', {
+              configurable: true,
+              value: proxy,
+            });
+
+      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['same-realm', 'cross-realm'] as const).flatMap((realm) =>
+          (['direct', 'Error cause', 'TypeError cause'] as const).map((placement) => ({
+            runtimeErrorBrand,
+            surface,
+            realm,
+            placement,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'sanitizes a $placement $realm native SyntaxError after prototype mutation through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, realm, placement }) => {
+      const target =
+        realm === 'same-realm'
+          ? Object.setPrototypeOf(new SyntaxError(PRIVATE_VALUE), Error.prototype)
+          : (runInNewContext('Object.setPrototypeOf(new SyntaxError(privateValue), Error.prototype)', {
+              privateValue: PRIVATE_VALUE,
+            }) as Error);
+      Object.defineProperty(target, 'name', { configurable: true, value: 'SyntaxError' });
+      const readHook = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through a mutated native parser hook`);
+      });
+      Object.defineProperties(target, {
+        toJSON: { configurable: true, get: readHook },
+        [Symbol.toStringTag]: { configurable: true, get: readHook },
+      });
+      const rejected =
+        placement === 'direct'
+          ? target
+          : Object.defineProperty(
+              placement === 'TypeError cause'
+                ? new TypeError(`${PRIVATE_VALUE} escaped through a nested parser wrapper`)
+                : new Error(`${PRIVATE_VALUE} escaped through a nested parser wrapper`),
+              'cause',
+              { configurable: true, value: target },
+            );
+
+      await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readHook).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['same-realm', 'cross-realm'] as const).flatMap((realm) =>
+          (['direct', 'nested'] as const).map((placement) => ({
+            runtimeErrorBrand,
+            surface,
+            realm,
+            placement,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'preserves a $placement $realm native Error with a spoofed SyntaxError name through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, realm, placement }) => {
+      const target =
+        realm === 'same-realm'
+          ? new Error('safe custom parser failure')
+          : (runInNewContext("new Error('safe custom parser failure')") as Error);
+      Object.defineProperty(target, 'name', { value: 'SyntaxError' });
+      const rejected =
+        placement === 'direct'
+          ? target
+          : Object.defineProperty(new Error('safe custom parser wrapper'), 'cause', {
+              configurable: true,
+              value: target,
+            });
+
+      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
     },
   );
 
@@ -939,11 +1159,29 @@ describe('malformed JSON runtime compatibility', () => {
     },
   );
 
-  it.each(publicSurfaces)(
-    'does not invoke Error.prepareStackTrace while classifying a native parser failure through %s',
-    async (surface) => {
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['native', 'prototype-mutated'] as const).map((prototype) => ({
+          runtimeErrorBrand,
+          surface,
+          prototype,
+        })),
+      ),
+    ),
+  )(
+    'does not invoke Error.prepareStackTrace while classifying a $prototype parser failure through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, prototype }) => {
       const rejected = new SyntaxError(PRIVATE_VALUE);
-      const { run, SubjectTokenProviderError } = await publicParserRejection(surface, rejected, 'fallback');
+      if (prototype === 'prototype-mutated') {
+        Object.setPrototypeOf(rejected, Error.prototype);
+        Object.defineProperty(rejected, 'name', { configurable: true, value: 'SyntaxError' });
+      }
+      const { run, SubjectTokenProviderError } = await publicParserRejection(
+        surface,
+        rejected,
+        runtimeErrorBrand,
+      );
       const prepareStackTrace = vi.fn(() => {
         throw new Error(`${PRIVATE_VALUE} escaped through an untrusted stack formatter`);
       });
@@ -1135,6 +1373,92 @@ describe('malformed JSON runtime compatibility', () => {
       const rejected = new Proxy(target, { get: readProxy });
 
       await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['Error', 'TypeError'] as const).flatMap((constructor) =>
+          (['direct', 'nested'] as const).map((placement) => ({
+            runtimeErrorBrand,
+            surface,
+            constructor,
+            placement,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'preserves a $placement $constructor transport proxy with a Bun-compatible native clone failure through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, constructor, placement }) => {
+      const target =
+        constructor === 'Error'
+          ? new Error('safe custom response body transport failure')
+          : new TypeError('safe custom response body transport failure');
+      const readProxy = vi.fn((_target: Error, property: PropertyKey) => {
+        throw new Error(
+          `${PRIVATE_VALUE} escaped through the ${String(property)} Bun transport proxy getter`,
+        );
+      });
+      const proxy = new Proxy(target, { get: readProxy });
+      const rejected =
+        placement === 'direct'
+          ? proxy
+          : Object.defineProperty(new Error('safe custom parser wrapper'), 'cause', {
+              configurable: true,
+              value: proxy,
+            });
+
+      await withNativeCloneFailureMessage('The object can not be cloned.', async () => {
+        await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      });
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (
+          [
+            'native SyntaxError',
+            'invalid-json Error marker',
+            'invalid-json TypeError marker',
+            'Error SyntaxError cause',
+            'TypeError SyntaxError cause',
+          ] as const
+        ).map((shape) => ({ runtimeErrorBrand, surface, shape })),
+      ),
+    ),
+  )(
+    'sanitizes a proxy with an authentic $shape and a Bun-compatible native clone failure through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, shape }) => {
+      let target: Error;
+      if (shape === 'native SyntaxError') {
+        target = new SyntaxError(PRIVATE_VALUE);
+      } else if (shape.includes('TypeError')) {
+        target = new TypeError(`${PRIVATE_VALUE} escaped through a parser wrapper`);
+      } else {
+        target = new Error(`${PRIVATE_VALUE} escaped through a parser wrapper`);
+      }
+      if (shape !== 'native SyntaxError') {
+        const parserMarker = shape.startsWith('invalid-json ');
+        Object.defineProperty(target, parserMarker ? 'type' : 'cause', {
+          configurable: true,
+          value: parserMarker ? 'invalid-json' : new SyntaxError(PRIVATE_VALUE),
+        });
+      }
+
+      const readProxy = vi.fn((_target: Error, property: PropertyKey) => {
+        throw new Error(`${PRIVATE_VALUE} escaped through the ${String(property)} Bun parser proxy getter`);
+      });
+      const rejected = new Proxy(target, { get: readProxy });
+
+      await withNativeCloneFailureMessage('The object can not be cloned.', async () => {
+        await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      });
       expect(readProxy).not.toHaveBeenCalled();
     },
   );
