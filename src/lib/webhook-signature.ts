@@ -2,6 +2,8 @@ import { InvalidWebhookSignatureError } from '../error';
 import { fromBase64 } from '../internal/utils/base64';
 import { encodeUTF8 } from '../internal/utils/bytes';
 
+const MAX_WEBHOOK_SIGNATURES = 32;
+
 /**
  * Checks the timestamp and HMAC signatures after the resource has validated its
  * crypto capabilities, secret, and required headers.
@@ -34,6 +36,12 @@ export async function verifyWebhookSignature(
   const signatures = signatureHeader
     .split(' ')
     .map((part) => (part.startsWith('v1,') ? part.slice(3) : part));
+
+  if (signatures.length > MAX_WEBHOOK_SIGNATURES) {
+    throw new InvalidWebhookSignatureError(
+      'The given webhook signature does not match the expected signature',
+    );
+  }
   const decodedSecret = Uint8Array.from(
     secret.startsWith('whsec_') ? fromBase64(secret.slice('whsec_'.length)) : encodeUTF8(secret),
   );
