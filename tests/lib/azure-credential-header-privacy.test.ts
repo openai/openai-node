@@ -793,6 +793,60 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
+  test.each(
+    (['descriptor', 'value', 'membership'] as const).flatMap((operation) =>
+      (['/models', '/chat/completions'] as const).flatMap((route) =>
+        (['api-key', 'Authorization'] as const).map((header) => ({ operation, route, header })),
+      ),
+    ),
+  )(
+    'sanitizes $header credentials thrown by own body $operation proxy inspection on $route',
+    async ({ operation, route, header }) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const fail = vi.fn(() => {
+        throw Object.assign(new Error(credential), { cause: new Error(credential) });
+      });
+      const target: FinalRequestOptions = {
+        method: 'post',
+        path: route,
+        body: operation === 'membership' ? undefined : { model: 'safe-model', safe: true },
+        headers: { [header]: 'safe-request-token' },
+      };
+      const options = new Proxy(target, {
+        getOwnPropertyDescriptor(value, property) {
+          return property === 'body' && operation === 'descriptor'
+            ? fail()
+            : Reflect.getOwnPropertyDescriptor(value, property);
+        },
+        get(value, property, receiver) {
+          return property === 'body' && operation === 'value'
+            ? fail()
+            : Reflect.get(value, property, receiver);
+        },
+        has(value, property) {
+          return property === 'body' && operation === 'membership' ? fail() : Reflect.has(value, property);
+        },
+      });
+      const logger = createLogger();
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        logger,
+        logLevel: 'debug',
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+      expect(fail).toHaveBeenCalledTimes(1);
+      expect(fetch).not.toHaveBeenCalled();
+      expectPrivateLogs(logger, credential);
+    },
+  );
+
   test.each(['api-key', 'Authorization'] as const)(
     'protects $name when a body accessor replaces itself with a truthy value',
     async (name) => {
@@ -916,6 +970,297 @@ describe('Azure credential header diagnostic privacy', () => {
       expect(fetch).toHaveBeenCalledTimes(1);
     },
   );
+
+  test.each(
+    (['own', 'inherited'] as const).flatMap((representation) =>
+      (['installation', 'restoration'] as const).flatMap((phase) =>
+        (['throws', 'forwards then throws'] as const).flatMap((behavior) =>
+          (['api-key', 'Authorization'] as const).map((header) => ({
+            representation,
+            phase,
+            behavior,
+            header,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'sanitizes $header when an $representation snapshot $phase trap $behavior',
+    async ({ representation, phase, behavior, header }) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const suppliedHeaders = { [header]: 'safe-request-token', 'x-custom': 'preserved' };
+      let reads = 0;
+      const target: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { safe: true },
+        get headers() {
+          reads += 1;
+          return suppliedHeaders;
+        },
+      };
+      if (representation === 'inherited') {
+        const prototype = Object.create(Object.getPrototypeOf(target)) as object;
+        const descriptor = Object.getOwnPropertyDescriptor(target, 'headers');
+        if (descriptor === undefined) {
+          throw new Error('Expected the request headers accessor to be configurable.');
+        }
+        Object.defineProperty(prototype, 'headers', descriptor);
+        Reflect.deleteProperty(target, 'headers');
+        Object.setPrototypeOf(target, prototype);
+      }
+      const original = Object.getOwnPropertyDescriptor(target, 'headers');
+      const fail = vi.fn(() => {
+        throw Object.assign(new Error(credential), { cause: new Error(credential) });
+      });
+      let definitions = 0;
+      let failed = false;
+      const options = new Proxy(target, {
+        defineProperty(value, property, descriptor) {
+          if (property === 'headers') {
+            definitions += 1;
+            const shouldFail = phase === 'installation' || (representation === 'own' && definitions === 2);
+            if (shouldFail && !failed) {
+              failed = true;
+              if (behavior === 'forwards then throws') {
+                Reflect.defineProperty(value, property, descriptor);
+              }
+              return fail();
+            }
+          }
+          return Reflect.defineProperty(value, property, descriptor);
+        },
+        deleteProperty(value, property) {
+          if (
+            property === 'headers' &&
+            representation === 'inherited' &&
+            phase === 'restoration' &&
+            !failed
+          ) {
+            failed = true;
+            if (behavior === 'forwards then throws') {
+              Reflect.deleteProperty(value, property);
+            }
+            return fail();
+          }
+          return Reflect.deleteProperty(value, property);
+        },
+      });
+      const logger = createLogger();
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        logger,
+        logLevel: 'debug',
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+      expect(fail).toHaveBeenCalledTimes(1);
+      expect(fetch).not.toHaveBeenCalled();
+      expectPrivateLogs(logger, credential);
+      expect(Object.getOwnPropertyDescriptor(target, 'headers')).toEqual(original);
+      expect(options.headers).toBe(suppliedHeaders);
+
+      await client.request(options);
+
+      expect(reads).toBe(3);
+      expect(Object.getOwnPropertyDescriptor(target, 'headers')).toEqual(original);
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(header)).toBe('safe-request-token');
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('x-custom')).toBe('preserved');
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expectPrivateLogs(logger, credential);
+    },
+  );
+
+  test.each([
+    'descriptor lookup',
+    'prototype lookup',
+    'extensibility inspection',
+    'descriptor restoration',
+  ] as const)('sanitizes an inherited header snapshot proxy during %s', async (operation) => {
+    const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    let reads = 0;
+    const prototype = {
+      get headers() {
+        reads += 1;
+        return { 'api-key': 'safe-request-token' };
+      },
+    };
+    const target = Object.assign(Object.create(prototype) as FinalRequestOptions, {
+      method: 'post' as const,
+      path: '/models',
+      body: { safe: true },
+    });
+    const fail = vi.fn(() => {
+      throw Object.assign(new Error(credential), { cause: new Error(credential) });
+    });
+    let descriptors = 0;
+    let failed = false;
+    const options = new Proxy(target, {
+      getOwnPropertyDescriptor(value, property) {
+        if (property === 'headers') {
+          descriptors += 1;
+          if (
+            !failed &&
+            (operation === 'descriptor lookup' ||
+              (operation === 'descriptor restoration' && descriptors === 4))
+          ) {
+            failed = true;
+            return fail();
+          }
+        }
+        return Reflect.getOwnPropertyDescriptor(value, property);
+      },
+      getPrototypeOf(value) {
+        if (operation === 'prototype lookup' && !failed) {
+          failed = true;
+          return fail();
+        }
+        return Reflect.getPrototypeOf(value);
+      },
+      isExtensible(value) {
+        if (operation === 'extensibility inspection' && !failed) {
+          failed = true;
+          return fail();
+        }
+        return Reflect.isExtensible(value);
+      },
+    });
+    const logger = createLogger();
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      logger,
+      logLevel: 'debug',
+      maxRetries: 0,
+    });
+
+    await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+    expect(fail).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+    expectPrivateLogs(logger, credential);
+
+    await client.request(options);
+
+    expect(reads).toBe(operation === 'descriptor restoration' ? 2 : 1);
+    expect(Object.getOwnPropertyDescriptor(target, 'headers')).toBeUndefined();
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('safe-request-token');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expectPrivateLogs(logger, credential);
+  });
+
+  test.each(
+    (['own', 'inherited'] as const).flatMap((representation) =>
+      (['descriptor', 'value', 'enumeration'] as const).map((operation) => ({ representation, operation })),
+    ),
+  )(
+    'sanitizes an $representation header snapshot proxy during request-option $operation copying',
+    async ({ representation, operation }) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const source = {
+        get headers() {
+          return { 'api-key': 'safe-request-token' };
+        },
+      };
+      const target = Object.assign(
+        representation === 'own' ? source : (Object.create(source) as FinalRequestOptions),
+        { method: 'post' as const, path: '/models', body: { safe: true } },
+      );
+      const original = Object.getOwnPropertyDescriptor(target, 'headers');
+      const fail = vi.fn(() => {
+        throw Object.assign(new Error(credential), { cause: new Error(credential) });
+      });
+      let installed = false;
+      let failed = false;
+      const options = new Proxy(target, {
+        defineProperty(value, property, descriptor) {
+          const defined = Reflect.defineProperty(value, property, descriptor);
+          if (property === 'headers') {
+            installed = true;
+          }
+          return defined;
+        },
+        getOwnPropertyDescriptor(value, property) {
+          if (installed && !failed && property === 'headers' && operation === 'descriptor') {
+            failed = true;
+            return fail();
+          }
+          return Reflect.getOwnPropertyDescriptor(value, property);
+        },
+        get(value, property, receiver) {
+          if (installed && !failed && property === 'headers' && operation === 'value') {
+            failed = true;
+            return fail();
+          }
+          return Reflect.get(value, property, receiver);
+        },
+        ownKeys(value) {
+          if (installed && !failed && operation === 'enumeration') {
+            failed = true;
+            return fail();
+          }
+          return Reflect.ownKeys(value);
+        },
+      });
+      const logger = createLogger();
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        logger,
+        logLevel: 'debug',
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(() => client.request(options), credential);
+
+      expect(fail).toHaveBeenCalledTimes(1);
+      expect(Object.getOwnPropertyDescriptor(target, 'headers')).toEqual(original);
+      expect(fetch).not.toHaveBeenCalled();
+      expectPrivateLogs(logger, credential);
+    },
+  );
+
+  test('preserves unrelated caller errors after accessor-backed request options have been copied', async () => {
+    const failure = new Error('custom request body serialization failed');
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/models',
+      body: {
+        toJSON() {
+          throw failure;
+        },
+      },
+      get headers() {
+        return { 'api-key': 'safe-request-token' };
+      },
+    };
+    const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.request(options)).rejects.toBe(failure);
+
+    expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
   test.each(['api-key', 'Authorization'] as const)(
     'restores accessor-backed request headers after rejecting a malformed %s snapshot',
@@ -2609,6 +2954,246 @@ describe('Azure credential header diagnostic privacy', () => {
     await expect(client.invokeProtectedFetch(injected)).rejects.toThrow(SAFE_ERROR);
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  test.each(
+    (['own', 'subclass', 'ancestor'] as const).flatMap((representation) =>
+      (['overlong', 'nonterminating', 'credential-bearing cleanup'] as const).map((behavior) => ({
+        representation,
+        behavior,
+      })),
+    ),
+  )(
+    'bounds a $behavior matched same-realm Headers $representation iterator before dispatch',
+    async ({ representation, behavior }) => {
+      const prototype = Object.create(Headers.prototype) as object;
+      const subclass = Object.create(prototype) as object;
+      const injected = Object.setPrototypeOf(new Headers({ 'api-key': 'placeholder' }), subclass);
+      let owner: object = prototype;
+      if (representation === 'own') {
+        owner = injected;
+      } else if (representation === 'subclass') {
+        owner = subclass;
+      }
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      let yielded = 0;
+      let closed = false;
+      function iterate(): IterableIterator<[string, string]> {
+        let index = 0;
+        return {
+          [Symbol.iterator]() {
+            return this;
+          },
+          next(): IteratorResult<[string, string]> {
+            if (behavior !== 'nonterminating' && index >= 2048) {
+              closed = true;
+              return { done: true, value: undefined };
+            }
+            const current = index;
+            index += 1;
+            yielded += 1;
+            const value: [string, string] =
+              current === 0 ? ['api-key', 'safe-request-token'] : [`x-custom-${current}`, 'preserved'];
+            return { done: false, value };
+          },
+          return(): IteratorResult<[string, string]> {
+            closed = true;
+            if (behavior === 'credential-bearing cleanup') {
+              throw Object.assign(new Error(credential), { cause: new Error(credential) });
+            }
+            return { done: true, value: undefined };
+          },
+        };
+      }
+      Object.defineProperties(owner, {
+        entries: { configurable: true, value: iterate },
+        [Symbol.iterator]: { configurable: true, value: iterate },
+      });
+      const logger = createLogger();
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        logger,
+        logLevel: 'debug',
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await expectPrivateTransportCredentialFailure(
+        () => client.request({ method: 'get', path: '/models' }),
+        credential,
+      );
+
+      expect(yielded).toBe(1025);
+      expect(closed).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+      expectPrivateLogs(logger, credential);
+    },
+  );
+
+  test('preserves exactly 1,024 custom same-realm Headers entries and virtual credentials', async () => {
+    let reads = 0;
+    function* iterate(): IterableIterator<[string, string]> {
+      reads += 1;
+      yield ['api-key', 'safe-virtual-token'];
+      for (let index = 1; index < 1024; index += 1) {
+        yield [`x-custom-${index}`, `value-${index}`];
+      }
+    }
+    const prototype = Object.create(Headers.prototype) as object;
+    Object.defineProperties(prototype, {
+      entries: { configurable: true, value: iterate },
+      [Symbol.iterator]: { configurable: true, value: iterate },
+    });
+    const injected = Object.setPrototypeOf(new Headers({ 'api-key': 'placeholder' }), prototype);
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.injectedHeaders = injected;
+
+    await client.request({ method: 'get', path: '/models' });
+
+    const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('api-key')).toBe('safe-virtual-token');
+    expect(headers.get('x-custom-1023')).toBe('value-1023');
+    expect(reads).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['own', 'subclass', 'ancestor'] as const)(
+    'preserves more than 1,024 intrinsic entries through a matched same-realm Headers %s iterator',
+    async (representation) => {
+      const entries: [string, string][] = [['api-key', 'safe-intrinsic-token']];
+      for (let index = 0; index < 1200; index += 1) {
+        entries.push([`x-intrinsic-${index}`, `value-${index}`]);
+      }
+      const prototype = Object.create(Headers.prototype) as object;
+      const subclass = Object.create(prototype) as object;
+      const injected = Object.setPrototypeOf(new Headers(entries), subclass);
+      let owner: object = prototype;
+      if (representation === 'own') {
+        owner = injected;
+      } else if (representation === 'subclass') {
+        owner = subclass;
+      }
+      const iterate = vi.fn(function iterate(this: Headers) {
+        return Headers.prototype.entries.call(this);
+      });
+      Object.defineProperties(owner, {
+        entries: { configurable: true, value: iterate },
+        [Symbol.iterator]: { configurable: true, value: iterate },
+      });
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await client.request({ method: 'get', path: '/models' });
+
+      const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      expect(headers.get('api-key')).toBe('safe-intrinsic-token');
+      expect(headers.get('x-intrinsic-1199')).toBe('value-1199');
+      expect(iterate).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('preserves more than 1,024 intrinsic entries while ignoring a hostile iterator alias', async () => {
+    const entries: [string, string][] = [['api-key', 'safe-intrinsic-token']];
+    for (let index = 0; index < 1200; index += 1) {
+      entries.push([`x-intrinsic-${index}`, `value-${index}`]);
+    }
+    const injected = new Headers(entries);
+    const iterate = vi.fn(() => {
+      throw new Error(`${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`);
+    });
+    Object.defineProperty(injected, Symbol.iterator, { configurable: true, value: iterate });
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new ProtectedHookAzure({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+    client.injectedHeaders = injected;
+
+    await client.request({ method: 'get', path: '/models' });
+
+    const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('api-key')).toBe('safe-intrinsic-token');
+    expect(headers.get('x-intrinsic-1199')).toBe('value-1199');
+    expect(iterate).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['not a tuple', 'throwing tuple element', 'non-string tuple element'] as const)(
+    'sanitizes a hostile matched same-realm Headers iterator row: %s',
+    async (representation) => {
+      const credential = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      const readCredential = vi.fn(() => {
+        throw Object.assign(new Error(credential), { cause: new Error(credential) });
+      });
+      let closed = false;
+      function* iterate(): IterableIterator<unknown> {
+        try {
+          if (representation === 'not a tuple') {
+            yield { 0: 'api-key', 1: 'safe-token' };
+          } else if (representation === 'throwing tuple element') {
+            yield new Proxy(['api-key', 'safe-token'], {
+              get(target, property, receiver) {
+                return property === '1' ? readCredential() : Reflect.get(target, property, receiver);
+              },
+            });
+          } else {
+            yield ['api-key', { toString: readCredential }];
+          }
+        } finally {
+          closed = true;
+        }
+      }
+      const prototype = Object.create(Headers.prototype) as object;
+      Object.defineProperties(prototype, {
+        entries: { configurable: true, value: iterate },
+        [Symbol.iterator]: { configurable: true, value: iterate },
+      });
+      const injected = Object.setPrototypeOf(new Headers({ 'api-key': 'placeholder' }), prototype);
+      const logger = createLogger();
+      const fetch = vi.fn(async () => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        logger,
+        logLevel: 'debug',
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await expectPrivateTransportCredentialFailure(
+        () => client.request({ method: 'get', path: '/models' }),
+        credential,
+      );
+
+      expect(closed).toBe(true);
+      expect(readCredential).toHaveBeenCalledTimes(representation === 'throwing tuple element' ? 1 : 0);
+      expect(fetch).not.toHaveBeenCalled();
+      expectPrivateLogs(logger, credential);
+    },
+  );
 
   test.each(['subclass override', 'own override'] as const)(
     'materializes a mutable post-hook Headers %s exactly once before dispatch',
