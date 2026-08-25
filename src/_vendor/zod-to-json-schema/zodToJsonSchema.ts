@@ -86,6 +86,29 @@ const originatedInsideProperty = (seen: Seen | undefined): boolean => {
   return seen!.path.slice(0, propertyPath.length).toString() === propertyPath.toString();
 };
 
+/**
+ * `anyOf: [{ not: {} }, X]` reduced to `X`.
+ *
+ * The first branch matches nothing, so the union is exactly `X` — an identity in
+ * JSON Schema, and the only spelling strict Structured Outputs will take.
+ * Anything of a different shape is returned untouched.
+ */
+const withoutNeverBranch = (schema: JsonSchema7Type): JsonSchema7Type => {
+  const anyOf = (schema as { anyOf?: unknown }).anyOf;
+  if (!Array.isArray(anyOf) || anyOf.length !== 2 || Object.keys(schema).length !== 1) {
+    return schema;
+  }
+  const [first, second] = anyOf as [Record<string, unknown>, JsonSchema7Type];
+  const isNever =
+    first &&
+    typeof first === 'object' &&
+    Object.keys(first).length === 1 &&
+    typeof first['not'] === 'object' &&
+    first['not'] !== null &&
+    Object.keys(first['not'] as object).length === 0;
+  return isNever && second && typeof second === 'object' ? second : schema;
+};
+
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   schema: ZodSchema<any>,
   options?: Partial<Options<Target>> | string,
@@ -162,24 +185,25 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // else keep no property context: that is what they were parsed with the first
         // time, and the standalone encoding is the correct one for them.
         //
-        // Strict mode is the exception, including for definitions the caller supplied
-        // outright: `not` is not in the subset strict Structured Outputs accepts (see
-        // `toStrictJsonSchema` in `lib/transform`), so the standalone form is not
-        // representable there at all. Positional `items` are the reason the distinction
-        // matters elsewhere, and `ZodTuple` is rejected before conversion in this mode.
-        definitions[key] =
+        const materialized =
           parseDef(
             def,
             {
               ...refs,
               currentPath: definitionPath,
               propertyPath:
-                originatedInsideProperty(refs.seen.get(def)) || refs.openaiStrictMode ?
-                  definitionPath
-                : undefined,
+                originatedInsideProperty(refs.seen.get(def)) ? definitionPath : undefined,
             },
             true,
           ) ?? {};
+        // `not` is outside the subset strict Structured Outputs accepts (see
+        // `toStrictJsonSchema` in `lib/transform`), so a standalone optional cannot keep
+        // its `anyOf: [{ not: {} }, ...]` spelling there. Rewriting the finished
+        // definition is deliberate: giving it a property context instead would change how
+        // everything nested inside it parses, and a container that holds an entry by
+        // position or by branch loses that entry when its parser returns nothing.
+        definitions[key] =
+          refs.openaiStrictMode ? withoutNeverBranch(materialized) : materialized;
         processedDefinitions.add(key);
       }
     }

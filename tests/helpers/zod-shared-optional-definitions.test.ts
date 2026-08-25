@@ -285,6 +285,56 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(schema.additionalItems).toEqual({ type: 'number' });
   });
 
+  it('keeps the unconstrained branch of a union definition', () => {
+    const choice = zv3.union([emptySlot(), zv3.string()]);
+
+    const schema = zodToJsonSchema(zv3.object({ value: choice }), {
+      openaiStrictMode: true,
+      definitions: { Choice: choice },
+    }) as { definitions: Record<string, { anyOf: JsonSchema[] }> };
+
+    // Without the empty branch the document rejects `{ value: 42 }`, which Zod accepts.
+    expect(schema.definitions['Choice']!.anyOf).toEqual([{}, { type: 'string' }]);
+  });
+
+  it('keeps `items` on an array definition whose element parses to nothing', () => {
+    const arr = zv3.array(emptySlot());
+
+    const schema = zodToJsonSchema(zv3.object({ value: arr }), {
+      openaiStrictMode: true,
+      definitions: { Arr: arr },
+    }) as { definitions: Record<string, JsonSchema> };
+
+    // `items: undefined` disappears in serialization and strict validation rejects
+    // the result, so the key has to carry a real value.
+    expect(schema.definitions['Arr']).toEqual({ type: 'array', items: {} });
+    expect(JSON.parse(JSON.stringify(schema.definitions['Arr'])).items).toEqual({});
+  });
+
+  it('keeps the description on a definition that falls back to an empty schema', () => {
+    const described = zv3
+      .preprocess(() => undefined, zv3.void())
+      .transform(() => 0)
+      .optional()
+      .describe('Tell the model this field normalizes to zero');
+
+    const tool = zodRealtimeFunction({
+      name: 'normalizer',
+      parameters: zv3.object({ first: described, second: described }),
+    }) as unknown as {
+      parameters: { definitions: Record<string, JsonSchema>; properties: Record<string, JsonSchema> };
+    };
+
+    // The second property is a `$ref` to this definition, so losing the text here
+    // takes the model-visible guidance for both fields with it.
+    expect(tool.parameters.definitions['normalizer_properties_first']).toEqual({
+      description: 'Tell the model this field normalizes to zero',
+    });
+    expect(tool.parameters.properties['second']).toEqual({
+      $ref: '#/definitions/normalizer_properties_first',
+    });
+  });
+
   it('still strips the wrapper for a definition extracted from a property', () => {
     const shared = zv3.string().nullable().optional();
 

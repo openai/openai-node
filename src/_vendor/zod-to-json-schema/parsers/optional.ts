@@ -12,7 +12,21 @@ export const parseOptionalDef = (
     refs.propertyPath &&
     refs.currentPath.slice(0, refs.propertyPath.length).toString() === refs.propertyPath.toString()
   ) {
-    return parseDef(def.innerType._def, { ...refs, currentPath: refs.currentPath }, forceResolution);
+    const inner = parseDef(
+      def.innerType._def,
+      { ...refs, currentPath: refs.currentPath },
+      forceResolution,
+    );
+    if (inner !== undefined) {
+      return inner;
+    }
+    // An inner type that produces no schema. Inside a plain property that means
+    // "omit the property", which is what `parseObjectDef` does with `undefined`.
+    // A definition being materialized cannot be omitted, though: something already
+    // holds a `$ref` to it, and returning nothing loses the `.describe()` text with
+    // it, because `parseDef` only attaches metadata to a schema it actually got.
+    // `forceResolution` is set only while materializing a definition.
+    return forceResolution ? {} : undefined;
   }
 
   const innerSchema = parseDef(
