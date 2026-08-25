@@ -77,6 +77,7 @@ const packedPackagePath = require('node:path');
     source === 'providers/bedrock/aws.ts' ||
     source === 'auth/x509-transport.ts' ||
     source === 'internal/auth/x509-transport-capability.ts' ||
+    source === 'internal/auth/x509-token-exchange.ts' ||
     source === 'auth/index.ts' ||
     source === 'auth/subject-token-providers.ts';
 
@@ -228,6 +229,31 @@ const packedPackagePath = require('node:path');
         `Private malformed JSON classifier is published under auth/malformed-json-error${extension}`,
       );
     }
+
+    const privateX509Modules = [
+      'openai/internal/auth/x509-transport-capability',
+      'openai/internal/auth/x509-transport-capability.js',
+      'openai/internal/auth/x509-transport-capability.mjs',
+      'openai/internal/auth/x509-transport-registry',
+      'openai/internal/auth/x509-transport-registry.js',
+      'openai/internal/auth/x509-transport-registry.mjs',
+      'openai/internal/auth/x509-transport-state',
+      'openai/internal/auth/x509-transport-state.cjs',
+      'openai/internal/auth/x509-transport-state-browser',
+      'openai/internal/auth/x509-transport-state-browser.js',
+      'openai/internal/auth/x509-transport-state-browser.mjs',
+    ];
+    const moduleNames = JSON.stringify(privateX509Modules);
+    run(process.execPath, [
+      '--input-type=commonjs',
+      '--eval',
+      `for (const name of ${moduleNames}) { try { require(name); throw new Error(name + ' is publicly accessible'); } catch (error) { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; } }`,
+    ]);
+    run(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      `for (const name of ${moduleNames}) { try { await import(name); throw new Error(name + ' is publicly accessible'); } catch (error) { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; } }`,
+    ]);
 
     const unsupportedDispatcher =
       'assert.throws(direct, /Undici 5\\.2\\.0 or later/u); assert.throws(httpConnect, /Undici 5\\.2\\.0 or later/u); assert.throws(httpsConnect, /Undici 5\\.2\\.0 or later/u);';
@@ -478,6 +504,12 @@ const packedPackagePath = require('node:path');
     assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
     const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
     assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
+    run(process.execPath, [
+      '--conditions=browser',
+      '--input-type=module',
+      '--eval',
+      "import OpenAI from 'openai'; new OpenAI({ apiKey: 'synthetic-browser-api-key', dangerouslyAllowBrowser: true });",
+    ]);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
 
     for (const [inputType, consumer] of [
