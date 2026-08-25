@@ -1,4 +1,5 @@
 import { OpenAIError } from '../../core/error';
+import type { NullableHeaders } from '../headers';
 import { findRegisteredX509Transport } from '#x509-transport-state';
 
 const transientX509TransportCodes = new Set([
@@ -56,6 +57,8 @@ export interface X509ExchangedToken {
 export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
+  defaultHeaders?: NullableHeaders;
+  requestHeaders?: NullableHeaders;
   token?: string;
   headers?: Headers;
   authorization?: string | null;

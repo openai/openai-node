@@ -7,7 +7,10 @@ import type { ClientOptions } from 'openai';
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
 import * as transportCapability from 'openai/internal/auth/x509-transport-capability';
-import { isRetryableX509TransportFailure } from 'openai/internal/auth/x509-transport-registry';
+import {
+  isRetryableX509TransportFailure,
+  resolveX509Transport,
+} from 'openai/internal/auth/x509-transport-registry';
 import { OpenAIRealtimeWebSocket as StableNativeRealtime } from 'openai/realtime/websocket';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaNativeRealtime } from 'openai/beta/realtime/websocket';
@@ -141,6 +144,127 @@ describe('X.509 review regressions', () => {
     await expect(new OpenAI(options({ timeout: 35 })).models.list()).rejects.toBeInstanceOf(
       APIConnectionTimeoutError,
     );
+  });
+
+  test('preserves caller cancellation when an error body fails synchronously on abort', async () => {
+    const caller = new AbortController();
+    const reason = new Error('synthetic-immediate-error-body-cancellation');
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) =>
+      url.origin === 'https://mtls.auth.openai.com'
+        ? Response.json(TOKEN_RESPONSE)
+        : new Response(
+            new ReadableStream({
+              pull(controller) {
+                caller.abort(reason);
+                controller.error(reason);
+              },
+            }),
+            { status: 403 },
+          ),
+    );
+
+    await expect(new OpenAI(options()).models.list({ signal: caller.signal })).rejects.toMatchObject({
+      constructor: APIUserAbortError,
+      cause: reason,
+    });
+  });
+
+  test.each(['default', 'request'] as const)(
+    'renders mutable %s header values only once before presenting its certificate',
+    async (location) => {
+      const getter = vi.fn(() => (getter.mock.calls.length === 1 ? undefined : 'synthetic-forbidden'));
+      const headers = Object.defineProperty({}, 'api-key', { enumerable: true, get: getter });
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockImplementation(async (_transport, url) =>
+          url.origin === 'https://mtls.auth.openai.com'
+            ? Response.json(TOKEN_RESPONSE)
+            : Response.json({ data: [] }),
+        );
+      const client = new OpenAI(options(location === 'default' ? { defaultHeaders: headers } : {}));
+
+      await client.models.list(location === 'request' ? { headers } : {});
+
+      expect(getter).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(new Headers(send.mock.calls[1]?.[2].headers).has('api-key')).toBe(false);
+    },
+  );
+
+  test.each(['default', 'request'] as const)(
+    'rejects forbidden %s header snapshots before presenting its certificate',
+    async (location) => {
+      const getter = vi.fn(() => 'synthetic-forbidden');
+      const headers = Object.defineProperty({}, 'Proxy-Authorization', { enumerable: true, get: getter });
+      const send = vi.spyOn(transportCapability, 'sendX509Request');
+      const client = new OpenAI(options(location === 'default' ? { defaultHeaders: headers } : {}));
+
+      await expect(client.models.list(location === 'request' ? { headers } : {})).rejects.toThrow(
+        /caller-supplied.*credentials/iu,
+      );
+      expect(getter).toHaveBeenCalledTimes(1);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  test('preserves caller request and header identities while snapshotting authenticated headers', async () => {
+    const headers = { 'X-Synthetic-Request': 'synthetic-value' };
+    const request = { path: '/models', method: 'get' as const, headers };
+    let observedOptions: unknown;
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (_request: RequestInit, context: { options: unknown }) => {
+        observedOptions = context.options;
+      },
+    });
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) =>
+      url.origin === 'https://mtls.auth.openai.com'
+        ? Response.json(TOKEN_RESPONSE)
+        : Response.json({ data: [] }),
+    );
+
+    await client.request(request);
+
+    expect(observedOptions).toBe(request);
+    expect(request.headers).toBe(headers);
+  });
+
+  test('clears authenticated request credentials when a protected request hook fails', async () => {
+    let observedScope: ReturnType<ReturnType<typeof resolveX509Transport>['current']>;
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async () => {
+        observedScope = resolveX509Transport(transport).current();
+        throw new Error('synthetic-request-hook-failure');
+      },
+    });
+    vi.spyOn(transportCapability, 'sendX509Request').mockResolvedValue(Response.json(TOKEN_RESPONSE));
+
+    await expect(client.models.list()).rejects.toThrow('synthetic-request-hook-failure');
+    expect(observedScope).toBeDefined();
+    expect(observedScope).not.toHaveProperty('token');
+    expect(observedScope).not.toHaveProperty('headers');
+    expect(observedScope).not.toHaveProperty('authorization');
+    expect(observedScope).not.toHaveProperty('defaultHeaders');
+    expect(observedScope).not.toHaveProperty('requestHeaders');
+  });
+
+  test('cancels an unread successful response when parsing begins after its request deadline', async () => {
+    const canceled = vi.fn();
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) =>
+      url.origin === 'https://mtls.auth.openai.com'
+        ? Response.json(TOKEN_RESPONSE)
+        : new Response(new ReadableStream({ cancel: canceled }), {
+            headers: { 'content-type': 'application/json' },
+          }),
+    );
+    const request = new OpenAI(options({ timeout: 25 })).models.list();
+
+    await request.asResponse();
+    await delay(35);
+
+    await expect(request).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    expect(canceled).toHaveBeenCalledTimes(1);
   });
 
   test('preserves caller cancellation when a protected hook replaces the request signal', async () => {

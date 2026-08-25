@@ -2,7 +2,7 @@ import { APIConnectionTimeoutError, APIUserAbortError, OAuthError, OpenAIError }
 import type { WorkloadIdentity, X509WorkloadIdentity } from '../../auth/types';
 import type { Fetch } from '../builtin-types';
 import { buildHeaders } from '../headers';
-import type { HeadersLike } from '../headers';
+import type { HeadersLike, NullableHeaders } from '../headers';
 import type { FinalRequestOptions } from '../request-options';
 import type { MergedRequestInit } from '../types';
 import { hasOwn } from '../utils/values';
@@ -200,13 +200,43 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Preserves explicitly headerless requests without presenting a certificate to the issuer. */
-  static shouldAuthenticate(options: FinalRequestOptions, defaultHeaders: HeadersLike | undefined): boolean {
-    return !buildHeaders([defaultHeaders, options.headers]).nulls.has('authorization');
+  static shouldAuthenticate(
+    options: FinalRequestOptions,
+    defaultHeaders: HeadersLike | undefined,
+    requestHeaders: HeadersLike = options.headers,
+  ): boolean {
+    return !buildHeaders([defaultHeaders, requestHeaders]).nulls.has('authorization');
+  }
+
+  /** Snapshots each caller-owned header layer once while preserving nulls and precedence. */
+  snapshotHeaders(
+    defaultHeaders: HeadersLike,
+    requestHeaders: HeadersLike,
+  ): { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } {
+    const scope = this.#scope();
+    scope.defaultHeaders ??= buildHeaders([defaultHeaders]);
+    scope.requestHeaders ??= buildHeaders([requestHeaders]);
+    return this.headerSnapshots();
+  }
+
+  /** Returns the already rendered caller headers without touching mutable inputs again. */
+  headerSnapshots(): { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } {
+    const { defaultHeaders, requestHeaders } = this.#scope();
+    if (!defaultHeaders || !requestHeaders) {
+      throw new OpenAIError('X.509 workload identity requires snapshotted request headers.');
+    }
+    return { defaultHeaders, requestHeaders };
   }
 
   /** Establishes an independent scope even when concurrent requests share caller options. */
-  runRequest<T>(operation: () => T): T {
-    return this.#transport.run(operation);
+  runRequest<T>(operation: () => Promise<T>): Promise<T> {
+    return this.#transport.run(async () => {
+      try {
+        return await operation();
+      } finally {
+        this.releaseRequestCredentials();
+      }
+    });
   }
 
   /** Reports whether a public request-building call already belongs to an active logical operation. */
@@ -215,16 +245,25 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
-  continuation(): <T>(operation: () => T) => T {
+  continuation(): <T>(operation: () => Promise<T>) => Promise<T> {
     const { wallStartedAt, monotonicStartedAt } = this.#scope();
     const scope: X509RequestScope = { wallStartedAt, monotonicStartedAt };
-    return (operation) => this.#transport.resume(scope, operation);
+    return (operation) =>
+      this.#transport.resume(scope, async () => {
+        try {
+          return await operation();
+        } finally {
+          this.releaseRequestCredentials();
+        }
+      });
   }
 
   /** Removes dispatched bearer material before settled request promises can retain their scope. */
   releaseRequestCredentials(): void {
     const scope = this.#scope();
     delete scope.token;
+    delete scope.defaultHeaders;
+    delete scope.requestHeaders;
     delete scope.headers;
     delete scope.authorization;
   }
@@ -285,7 +324,12 @@ export class X509WorkloadIdentityAuth {
   /** Exchanges the exact certificate capability selected for the matching API dispatch. */
   async getToken(
     options?: FinalRequestOptions,
-    context?: { apiURL: string; defaultHeaders: HeadersLike | undefined; timeout: number },
+    context?: {
+      apiURL: string;
+      defaultHeaders: HeadersLike | undefined;
+      requestHeaders: HeadersLike;
+      timeout: number;
+    },
   ): Promise<string> {
     if (options?.signal?.aborted) {
       throw userAbortError(options.signal);
@@ -330,7 +374,14 @@ export class X509WorkloadIdentityAuth {
 
   static #preflight(
     options: FinalRequestOptions | undefined,
-    context: { apiURL: string; defaultHeaders: HeadersLike | undefined; timeout: number } | undefined,
+    context:
+      | {
+          apiURL: string;
+          defaultHeaders: HeadersLike | undefined;
+          requestHeaders: HeadersLike;
+          timeout: number;
+        }
+      | undefined,
   ): void {
     if (options) {
       assertX509RequestOptions(options.fetchOptions);
@@ -339,7 +390,7 @@ export class X509WorkloadIdentityAuth {
       return;
     }
     assertX509APIOrigin(context.apiURL);
-    const supplied = buildHeaders([context.defaultHeaders, options?.headers]);
+    const supplied = buildHeaders([context.defaultHeaders, context.requestHeaders]);
     for (const name of supplied.values.keys()) {
       const canonical = name.toLowerCase().split('_').join('-');
       if (
