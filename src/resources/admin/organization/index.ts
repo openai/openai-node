@@ -59,6 +59,7 @@ export { Organization } from './organization';
 export {
   Projects,
   type Project,
+  type ProjectResidency,
   type ProjectCreateParams,
   type ProjectUpdateParams,
   type ProjectListParams,
@@ -90,6 +91,7 @@ export {
 } from './spend-limit';
 export {
   Usage,
+  type CostQuantityUnit,
   type UsageAudioSpeechesResponse,
   type UsageAudioTranscriptionsResponse,
   type UsageCodeInterpreterSessionsResponse,
