@@ -66,7 +66,9 @@ export interface X509RequestScope {
   phase?: 'planning' | 'authorizing';
   effectiveSignal?: AbortSignal;
   materializedBody?: ReadableStream;
+  owner?: object;
   apiURL?: string;
+  tenant?: { organization: string | null; project: string | null };
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;
   token?: string;
