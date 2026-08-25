@@ -1,6 +1,12 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
-export { Calls, type CallAcceptParams, type CallReferParams, type CallRejectParams } from './calls';
+export {
+  Calls,
+  type CallCreateParams,
+  type CallAcceptParams,
+  type CallReferParams,
+  type CallRejectParams,
+} from './calls';
 export {
   ClientSecrets,
   type RealtimeSessionCreateResponse,
