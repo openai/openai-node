@@ -932,11 +932,13 @@ export class OpenAI {
     options: PromiseOrValue<FinalRequestOptions>,
     remainingRetries: number | null = null,
   ): APIPromise<Rsp> {
-    const operation = () => this.makeRequest(options, remainingRetries, undefined);
+    const authentication = this._workloadIdentityAuth;
     const request =
-      this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth
-        ? this._workloadIdentityAuth.runRequest(operation)
-        : operation();
+      authentication instanceof X509WorkloadIdentityAuth
+        ? Promise.resolve(options).then((resolved) =>
+            authentication.runRequest(() => this.makeRequest(resolved, remainingRetries, undefined)),
+          )
+        : this.makeRequest(options, remainingRetries, undefined);
     return this.responsePromise<Rsp>(request);
   }
 
@@ -1398,11 +1400,13 @@ export class OpenAI {
     Page: new (...args: ConstructorParameters<typeof Pagination.AbstractPage>) => PageClass,
     options: PromiseOrValue<FinalRequestOptions>,
   ): Pagination.PagePromise<PageClass, Item> {
-    const operation = () => this.makeRequest(options, null, undefined);
+    const authentication = this._workloadIdentityAuth;
     const request =
-      this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth
-        ? this._workloadIdentityAuth.runRequest(operation)
-        : operation();
+      authentication instanceof X509WorkloadIdentityAuth
+        ? Promise.resolve(options).then((resolved) =>
+            authentication.runRequest(() => this.makeRequest(resolved, null, undefined)),
+          )
+        : this.makeRequest(options, null, undefined);
     const page = new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
     const guarded = this.responsePromise<PageClass>(request, async (client, props) => {
       const body = await this.parseResponseWithTimeout(client, props);

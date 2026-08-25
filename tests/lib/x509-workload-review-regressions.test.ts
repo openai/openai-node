@@ -6,6 +6,7 @@ import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
 import type { ClientOptions } from 'openai';
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
+import { Page } from 'openai/core/pagination';
 import * as transportCapability from 'openai/internal/auth/x509-transport-capability';
 import {
   isRetryableX509TransportFailure,
@@ -87,6 +88,59 @@ describe('X.509 review regressions', () => {
       status: 503,
     });
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['request', 'method', 'list'] as const)(
+    'starts the %s X.509 deadline only after deferred request options resolve',
+    async (surface) => {
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockImplementation(async (_transport, url) =>
+          url.origin === 'https://mtls.auth.openai.com'
+            ? Response.json(TOKEN_RESPONSE)
+            : Response.json({ data: [] }),
+        );
+      const client = new OpenAI(options({ timeout: 20 }));
+      const deferred = delay(45).then(() => ({}));
+
+      if (surface === 'request') {
+        await client.request(deferred.then((request) => ({ ...request, path: '/models', method: 'get' })));
+      } else if (surface === 'method') {
+        await client.get('/models', deferred);
+      } else {
+        await client.getAPIList('/models', Page, deferred);
+      }
+
+      expect(send).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  test('keeps a nested public request in an independent X.509 authentication scope', async () => {
+    const scopes: ReturnType<ReturnType<typeof resolveX509Transport>['current']>[] = [];
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : Response.json({ data: [] }),
+      );
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async () => {
+        scopes.push(resolveX509Transport(transport).current());
+        if (scopes.length === 1) {
+          await client.models.list();
+        }
+      },
+    });
+
+    await client.models.list();
+
+    expect(scopes).toHaveLength(2);
+    expect(scopes[0]).not.toBe(scopes[1]);
+    expect(send.mock.calls.filter((call) => call[1].origin === 'https://mtls.api.openai.com')).toHaveLength(
+      2,
+    );
   });
 
   test('never retries issuer authentication after a one-shot request body starts pulling', async () => {
