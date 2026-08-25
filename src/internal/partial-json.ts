@@ -152,6 +152,9 @@ function consumeNumber(state: CompletionState): void {
   while (state.index < state.source.length && !',]} \n\r\t'.includes(state.source.charAt(state.index))) {
     state.index += 1;
   }
+  if (state.index === start) {
+    throw new SyntaxError(`Unexpected JSON token at position ${state.index}`);
+  }
   if (state.index < state.source.length) {
     completeValue(state);
     return;
@@ -220,10 +223,8 @@ export function partialParse(input: string): unknown {
   if (!source) {
     throw new SyntaxError('Cannot parse an empty JSON value');
   }
-  try {
+  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/u.test(source)) {
     return JSON.parse(source);
-  } catch {
-    // Complete the current token and open containers before parsing again.
   }
 
   const state: CompletionState = {

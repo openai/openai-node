@@ -42,6 +42,11 @@ describe('partial JSON parsing', () => {
     ['an incomplete negative number', '[1,-', [1]],
     ['a completed object number', '{"field":12}', { field: 12 }],
     ['a completed top-level number', '-12.5e+2', -1250],
+    ['a completed top-level zero', '0', 0],
+    ['a completed top-level exponent', '1E-2', 0.01],
+    ['a completed top-level string', '"complete"', 'complete'],
+    ['a completed top-level boolean', 'false', false],
+    ['a completed top-level null', 'null', null],
     ['surrounding JSON whitespace', '\n {"field":"value"} \t', { field: 'value' }],
   ] as const)('completes %s', (_name, input, expected) => {
     expect(partialParse(input)).toEqual(expected);
@@ -81,6 +86,26 @@ describe('partial JSON parsing', () => {
     expect(Object.getOwnPropertyDescriptor(parsed, '__proto__')?.value).toEqual({ polluted: true });
   });
 
+  test('parses consecutive escaped-property prefixes natively exactly once', () => {
+    const expected = {
+      k0C: { 'k0\\^Y': [null] },
+      'k1"': { 'nested\\key': 'value' },
+    };
+    const input = JSON.stringify(expected);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    try {
+      for (let index = 1; index <= input.length; index += 1) {
+        partialParse(input.slice(0, index));
+        expect(parse).toHaveBeenCalledTimes(index);
+      }
+    } finally {
+      parse.mockRestore();
+    }
+
+    expect(partialParse(input)).toEqual(expected);
+  });
+
   test('repairs many nested trailing commas with linear string-copy work', () => {
     const count = 512;
     const input = `[${Array.from({ length: count }, () => '[0,]').join(',')}]`;
@@ -116,6 +141,12 @@ describe('partial JSON parsing', () => {
     ['trailing non-JSON content', '{} trailing'],
     ['an invalid escaped string', '{"field":"\\x"}'],
     ['a malformed object separator', '{"field" true}'],
+    ['an unmatched root array closer', ']'],
+    ['an unmatched root object closer', '}'],
+    ['an unmatched root comma', ','],
+    ['an array closer following a completed root object', '{}]'],
+    ['an object closer following a completed root array', '[]}'],
+    ['a comma following a completed root literal', 'true,'],
   ] as const)('rejects %s', (_name, input) => {
     expect(() => partialParse(input)).toThrow(SyntaxError);
   });
