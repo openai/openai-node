@@ -2,6 +2,7 @@ import type { ZodSchema } from 'zod/v3';
 import type { Options, Targets } from './Options';
 import type { JsonSchema7Type } from './parseDef';
 import { parseDef } from './parseDef';
+import type { Seen } from './Refs';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
@@ -70,6 +71,21 @@ function ownStrictRootSchema(
   return owned as JsonSchema7Type;
 }
 
+/**
+ * Whether the def was first reached from inside an object property.
+ *
+ * `Seen.propertyPath` is the nearest enclosing property at the reference site, and
+ * `Seen.path` is where the def itself sat. The def is inside that property when its path
+ * starts with it -- the same test `parseOptionalDef` applies.
+ */
+const originatedInsideProperty = (seen: Seen | undefined): boolean => {
+  const propertyPath = seen?.propertyPath;
+  if (!propertyPath) {
+    return false;
+  }
+  return seen!.path.slice(0, propertyPath.length).toString() === propertyPath.toString();
+};
+
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   schema: ZodSchema<any>,
   options?: Partial<Options<Target>> | string,
@@ -137,16 +153,31 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       }
 
       for (const [key, schema] of newDefinitions) {
-        // A definition is only materialized because some property `$ref`s it, so it has to be
-        // parsed in that same position. `propertyPath` is what tells the wrapper parsers they
-        // are inside a property; without it `parseOptionalDef` falls back to its standalone
-        // form and the extracted definition ends up encoded differently from the inline
-        // occurrence of the very same Zod schema.
+        const def = zodDef(schema);
         const definitionPath = [...refs.basePath, refs.definitionPath, key];
+        // A definition extracted from a property has to be parsed as though it were still
+        // in that property, or the wrapper parsers encode it differently from the inline
+        // occurrence of the same Zod schema -- `parseOptionalDef` falls back to its
+        // standalone `anyOf: [{ not: {} }, ...]` form. Definitions reached from anywhere
+        // else keep no property context: that is what they were parsed with the first
+        // time, and the standalone encoding is the correct one for them.
+        //
+        // Strict mode is the exception, including for definitions the caller supplied
+        // outright: `not` is not in the subset strict Structured Outputs accepts (see
+        // `toStrictJsonSchema` in `lib/transform`), so the standalone form is not
+        // representable there at all. Positional `items` are the reason the distinction
+        // matters elsewhere, and `ZodTuple` is rejected before conversion in this mode.
         definitions[key] =
           parseDef(
-            zodDef(schema),
-            { ...refs, currentPath: definitionPath, propertyPath: definitionPath },
+            def,
+            {
+              ...refs,
+              currentPath: definitionPath,
+              propertyPath:
+                originatedInsideProperty(refs.seen.get(def)) || refs.openaiStrictMode ?
+                  definitionPath
+                : undefined,
+            },
             true,
           ) ?? {};
         processedDefinitions.add(key);

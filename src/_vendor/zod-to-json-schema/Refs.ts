@@ -20,6 +20,12 @@ export type Seen = {
   def: ZodTypeDef;
   path: string[];
   jsonSchema: JsonSchema7Type | undefined;
+  /**
+   * `propertyPath` at the place this def was first reached. A definition that
+   * is materialized later has to be parsed the way its reference site was, and
+   * only the reference site knows whether that was inside a property.
+   */
+  propertyPath?: string[] | undefined;
 };
 
 export const getRefs = (options?: string | Partial<Options<Targets>>): Refs => {

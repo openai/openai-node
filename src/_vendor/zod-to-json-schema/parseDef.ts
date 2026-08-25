@@ -120,7 +120,12 @@ export function parseDef(
     }
   }
 
-  const newItem: Seen = { def, path: refs.currentPath, jsonSchema: undefined };
+  const newItem: Seen = {
+    def,
+    path: refs.currentPath,
+    jsonSchema: undefined,
+    propertyPath: refs.propertyPath,
+  };
 
   refs.seen.set(def, newItem);
 

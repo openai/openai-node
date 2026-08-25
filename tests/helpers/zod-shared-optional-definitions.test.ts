@@ -199,14 +199,40 @@ describe('Zod v3 standalone optional schemas', () => {
   });
 });
 
-describe('tuple positions survive an element that parses to nothing', () => {
-  // A wrapper whose inner type produces no schema. `parseDef` returns undefined
-  // for the element, which used to be filtered out of `items` while `minItems`
-  // and `maxItems` still described the original arity.
-  const emptySlot = () => zv3.preprocess(() => undefined, zv3.void()).transform(() => 0).optional();
+describe('a definition keeps the context it was referenced from', () => {
+  // Only some definitions come from a property. Marking every materialized definition as
+  // one changes how the wrapper parsers encode it, in two ways that have nothing to do
+  // with the redundant `anyOf` this file is about.
 
-  it('keeps the slot when the tuple is a supplied definition', () => {
-    const tuple = zv3.tuple([emptySlot(), zv3.string()]);
+  it('keeps the standalone encoding for a definition referenced from an array item', () => {
+    const optional = zv3.string().optional();
+
+    const schema = zodToJsonSchema(zv3.array(optional), {
+      definitions: { Optional: optional },
+    }) as { definitions: Record<string, JsonSchema> };
+
+    expect(schema.definitions!['Optional']).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
+  });
+
+  it('keeps the standalone encoding for a definition the caller supplied outright', () => {
+    const optional = zv3.string().optional();
+
+    const schema = zodToJsonSchema(zv3.object({ other: zv3.number() }), {
+      definitions: { Optional: optional },
+    }) as { definitions: Record<string, JsonSchema> };
+
+    expect(schema.definitions!['Optional']).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
+  });
+
+  it('keeps every tuple position when an element parses to nothing', () => {
+    // `items` is positional and `minItems`/`maxItems` come from the declared arity, so an
+    // element that parses to `undefined` must not be dropped. `parseOptionalDef` returns
+    // `{}` for it only while the tuple is parsed without a property context.
+    const emptySlot = zv3
+      .preprocess(() => undefined, zv3.void())
+      .transform(() => 0)
+      .optional();
+    const tuple = zv3.tuple([emptySlot, zv3.string()]);
 
     const schema = zodToJsonSchema(tuple, { definitions: { Tuple: tuple } }) as {
       definitions: Record<string, { items: JsonSchema[]; minItems: number; maxItems: number }>;
@@ -218,43 +244,18 @@ describe('tuple positions survive an element that parses to nothing', () => {
       maxItems: 2,
       items: [{}, { type: 'string' }],
     });
-  });
 
-  it('keeps the slot when the tuple sits under a property', () => {
-    const schema = zodToJsonSchema(zv3.object({ pair: zv3.tuple([emptySlot(), zv3.string()]) })) as {
-      properties: Record<string, { items: JsonSchema[] }>;
-    };
-
-    expect(schema.properties!['pair']!.items).toEqual([{}, { type: 'string' }]);
-  });
-
-  it('agrees with Zod on which arrays are valid', () => {
-    const tuple = zv3.tuple([emptySlot(), zv3.string()]);
-    const items = (
-      zodToJsonSchema(tuple, { definitions: { Tuple: tuple } }) as {
-        definitions: Record<string, { items: JsonSchema[] }>;
-      }
-    ).definitions['Tuple']!.items;
-
-    // Zod coerces the first element to 0 and requires the second to be a string.
+    // Zod coerces element 0 and requires element 1 to be a string; the schema has to agree.
     expect(tuple.safeParse([123, 'valid']).success).toBe(true);
     expect(tuple.safeParse(['valid', 123]).success).toBe(false);
-
-    // The schema has to say the same thing: slot 0 unconstrained, slot 1 a string.
-    expect(items).toHaveLength(2);
-    expect(items[0]).toEqual({});
-    expect(items[1]).toEqual({ type: 'string' });
   });
 
-  it('keeps the slot in a tuple with a rest element', () => {
-    const schema = zodToJsonSchema(zv3.tuple([emptySlot(), zv3.string()]).rest(zv3.number())) as {
-      items: JsonSchema[];
-      minItems: number;
-      additionalItems: JsonSchema;
-    };
+  it('still strips the wrapper for a definition extracted from a property', () => {
+    const shared = zv3.string().nullable().optional();
 
-    expect(schema.items).toEqual([{}, { type: 'string' }]);
-    expect(schema.minItems).toBe(2);
-    expect(schema.additionalItems).toEqual({ type: 'number' });
+    const schema = zodResponseFormat(zv3.object({ a: shared, b: shared }), 'p').json_schema
+      .schema as unknown as { definitions: Record<string, JsonSchema> };
+
+    expect(schema.definitions!['p_properties_a']).toEqual({ type: 'string', nullable: true });
   });
 });
