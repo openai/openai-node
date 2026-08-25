@@ -481,6 +481,59 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(reads).toBe(0);
   });
 
+  it('uses the context a supplied definition is first referenced from', () => {
+    // Pre-seeded from `definitions`, so its `Seen` entry carries no context until
+    // something references it. Here that is a property, and the extracted
+    // definition has to be encoded the way the property spells it.
+    const shared = zv3.string().nullable().optional();
+
+    const schema = zodResponseFormat(zv3.object({ a: shared, b: shared }), 'p', {
+      schemaDefinitions: { shared },
+    }).json_schema.schema as unknown as Record<string, unknown>;
+
+    expect(definitionNamed(schema, 'shared')).toEqual({ type: 'string', nullable: true });
+  });
+
+  it('reaches optionality spelled inside a nullable wrapper', () => {
+    // `z.string().optional().nullable()` puts the union inside. Inline the inner
+    // wrapper is dropped, so the extracted definition has to match.
+    const shared = zv3.string().optional().nullable();
+
+    const schema = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+      openaiStrictMode: true,
+      definitions: { shared },
+    }) as Record<string, unknown>;
+
+    expect(definitionNamed(schema, 'shared')).toEqual({
+      anyOf: [{ type: 'string' }, { type: 'null' }],
+    });
+  });
+
+  it('does not invoke accessors on the branch it collapses into', () => {
+    let reads = 0;
+    const shared = zv3.string().nullable().optional();
+    const surviving: Record<string, unknown> = { type: 'string' };
+    Object.defineProperty(surviving, 'nullable', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return true;
+      },
+    });
+
+    zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+      name: 'p',
+      $refStrategy: 'extract-to-root',
+      nameStrategy: 'duplicate-ref',
+      override: (def, _refs, _seen, forceResolution) =>
+        forceResolution && def === shared._def
+          ? ({ anyOf: [{ not: {} }, surviving] } as unknown as JsonSchema7Type)
+          : ignoreOverride,
+    });
+
+    expect(reads).toBe(0);
+  });
+
   it('still strips the wrapper for a definition extracted from a property', () => {
     const shared = zv3.string().nullable().optional();
 

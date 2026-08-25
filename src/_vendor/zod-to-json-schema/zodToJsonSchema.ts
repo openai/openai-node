@@ -83,7 +83,10 @@ const originatedInsideProperty = (seen: Seen | undefined): boolean => {
   if (!seen || !propertyPath) {
     return false;
   }
-  return seen.path.slice(0, propertyPath.length).toString() === propertyPath.toString();
+  // `referencePath` is set for a def pre-seeded from `definitions`, where `path`
+  // points at the definition rather than the place it was referenced from.
+  const from = seen.referencePath ?? seen.path;
+  return from.slice(0, propertyPath.length).toString() === propertyPath.toString();
 };
 
 /**
@@ -156,6 +159,37 @@ const hasAccessor = (value: Record<string, unknown>): boolean =>
  * branch, so a schema carrying one is left standing rather than merged: spreading
  * it over the branch would widen what the document accepts.
  */
+/**
+ * `anyOf: [X, { type: 'null' }]` -- how `parseNullableDef` spells a nullable in
+ * this target. Returns the index of the non-null branch, or -1.
+ *
+ * Optionality is not always the outermost wrapper: `z.string().optional().nullable()`
+ * puts the union inside. Inline, `propertyPath` reaches through the nullable and
+ * the inner wrapper is dropped; the extracted definition has to match. This is the
+ * one wrapper it steps through -- it is transparent by construction, unlike an
+ * arbitrary container whose entries are positional or alternative.
+ */
+const nullableBranchIndex = (branches: unknown[]): number => {
+  if (branches.length !== 2) {
+    return -1;
+  }
+  for (const [nullIndex, otherIndex] of [
+    [1, 0],
+    [0, 1],
+  ]) {
+    const candidate = branches[nullIndex as number];
+    if (
+      isPlainObject(candidate) &&
+      !hasAccessor(candidate) &&
+      Object.keys(candidate).length === 1 &&
+      dataValue(candidate, 'type') === 'null'
+    ) {
+      return otherIndex as number;
+    }
+  }
+  return -1;
+};
+
 const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, unknown> => {
   if (hasAccessor(schema)) {
     return schema;
@@ -164,8 +198,22 @@ const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, un
   if (!Array.isArray(branches) || branches.length !== 2) {
     return schema;
   }
+  const throughNullable = nullableBranchIndex(branches);
+  if (throughNullable !== -1) {
+    const inner = branches[throughNullable];
+    if (!isPlainObject(inner)) {
+      return schema;
+    }
+    const collapsedInner = collapseNeverBranch(inner);
+    if (collapsedInner === inner) {
+      return schema;
+    }
+    const rebuilt = [...branches];
+    rebuilt[throughNullable] = collapsedInner;
+    return { ...schema, anyOf: rebuilt };
+  }
   const [first, second] = branches as [unknown, unknown];
-  if (!isPlainObject(first) || !isPlainObject(second) || hasAccessor(first)) {
+  if (!isPlainObject(first) || !isPlainObject(second) || hasAccessor(first) || hasAccessor(second)) {
     return schema;
   }
   const not = dataValue(first, 'not');
