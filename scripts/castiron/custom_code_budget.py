@@ -300,23 +300,7 @@ def github_evaluate(
         raise ValueError("unexpected or superseded source workflow run")
     head = report.require_sha(run["head_sha"])
     if run["event"] == "pull_request":
-        associated = run["pull_requests"] or report.api(
-            "GET", f"{root}/commits/{head}/pulls?per_page=100"
-        )
-        current: list[int] = []
-        for number in sorted({int(pr["number"]) for pr in associated}):
-            if number <= 0:
-                raise ValueError("invalid associated PR number")
-            pull = report.api("GET", f"{root}/pulls/{number}")
-            if (
-                pull["state"] == "open"
-                and pull["head"]["sha"] == head
-                and pull["base"]["repo"]["full_name"] == repository
-                and pull["base"]["ref"] == branch
-                and pull["base"]["sha"] == main
-            ):
-                current.append(number)
-        if len(current) != 1:
+        if report.associated_pull_request(repository, run, base_ref=branch, base_sha=main) is None:
             raise ValueError("source run must identify exactly one current PR targeting main")
     elif run["event"] == "merge_group":
         if not run["head_branch"].startswith(f"gh-readonly-queue/{branch}/"):
