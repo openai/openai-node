@@ -534,6 +534,70 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(reads).toBe(0);
   });
 
+  it('checks every wrapper path the collapse would remove, not just the outer one', () => {
+    // Stepping through a nullable puts the wrapper a level down, so the pointer
+    // aims at `anyOf/0/anyOf/1` and a guard built only from the outer path would
+    // miss it.
+    const leaf = zv3.string().min(2);
+    const maybe = zv3.object({ first: leaf, second: leaf }).optional().nullable();
+
+    const schema = zodToJsonSchema(zv3.object({ v: zv3.number() }), {
+      openaiStrictMode: true,
+      definitions: { maybe },
+    }) as Record<string, unknown>;
+
+    const pointers: string[] = [];
+    const collect = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          collect(item);
+        }
+        return;
+      }
+      if (!node || typeof node !== 'object') {
+        return;
+      }
+      const ref = (node as { $ref?: unknown }).$ref;
+      if (typeof ref === 'string') {
+        pointers.push(ref);
+      }
+      for (const key of Object.keys(node)) {
+        collect((node as Record<string, unknown>)[key]);
+      }
+    };
+    collect(definitionNamed(schema, 'maybe'));
+
+    expect(pointers.length).toBeGreaterThan(0);
+    for (const pointer of pointers) {
+      let resolved: unknown = schema;
+      for (const key of pointer.replace('#/', '').split('/')) {
+        resolved = (resolved as Record<string, unknown>)?.[key];
+      }
+      expect(resolved).toBeDefined();
+    }
+  });
+
+  it('ignores a non-enumerable property the document would not carry', () => {
+    // `JSON.stringify` emits own enumerable properties, so a non-enumerable
+    // `anyOf` is not in the document being normalized.
+    const shared = zv3.string().nullable().optional();
+    const custom: Record<string, unknown> = { type: 'string' };
+    Object.defineProperty(custom, 'anyOf', {
+      enumerable: false,
+      value: [{ not: {} }, { type: 'number' }],
+    });
+
+    const schema = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+      name: 'p',
+      $refStrategy: 'extract-to-root',
+      nameStrategy: 'duplicate-ref',
+      override: (def, _refs, _seen, forceResolution) =>
+        forceResolution && def === shared._def ? (custom as unknown as JsonSchema7Type) : ignoreOverride,
+    }) as Record<string, unknown>;
+
+    expect(definitionNamed(schema, 'p_properties_a')).toEqual({ type: 'string' });
+  });
+
   it('still strips the wrapper for a definition extracted from a property', () => {
     const shared = zv3.string().nullable().optional();
 

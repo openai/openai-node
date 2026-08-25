@@ -142,7 +142,9 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  */
 const dataValue = (value: Record<string, unknown>, key: string): unknown => {
   const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+  // `enumerable` as well: serialization emits own enumerable properties, so a
+  // non-enumerable one is not in the document this is normalizing.
+  return descriptor && descriptor.enumerable && 'value' in descriptor ? descriptor.value : undefined;
 };
 
 const hasAccessor = (value: Record<string, unknown>): boolean =>
@@ -190,7 +192,11 @@ const nullableBranchIndex = (branches: unknown[]): number => {
   return -1;
 };
 
-const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, unknown> => {
+const collapseNeverBranch = (
+  schema: Record<string, unknown>,
+  wrapperSegments: string[][] = [],
+  prefix: string[] = [],
+): Record<string, unknown> => {
   if (hasAccessor(schema)) {
     return schema;
   }
@@ -204,7 +210,11 @@ const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, un
     if (!isPlainObject(inner)) {
       return schema;
     }
-    const collapsedInner = collapseNeverBranch(inner);
+    const collapsedInner = collapseNeverBranch(inner, wrapperSegments, [
+      ...prefix,
+      'anyOf',
+      String(throughNullable),
+    ]);
     if (collapsedInner === inner) {
       return schema;
     }
@@ -230,6 +240,7 @@ const collapseNeverBranch = (schema: Record<string, unknown>): Record<string, un
     }
     carried[key] = dataValue(schema, key);
   }
+  wrapperSegments.push([...prefix, 'anyOf', '1']);
   return { ...second, ...carried };
 };
 
@@ -365,9 +376,14 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // pointer generated against the uncollapsed shape.
         let finished: JsonSchema7Type = materialized;
         if (originatedInsideProperty(refs.seen.get(def)) && isPlainObject(materialized)) {
-          const collapsed = collapseNeverBranch(materialized) as JsonSchema7Type;
-          const wrapperPath = [...definitionPath, 'anyOf', '1'].join('/');
-          if (collapsed !== materialized && !referencesWrapperPath(materialized, wrapperPath)) {
+          const removedWrappers: string[][] = [];
+          const collapsed = collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type;
+          // Every path the collapse actually removed, not just the outer one:
+          // stepping through a nullable puts the wrapper a level down.
+          const stranded = removedWrappers.some((segments) =>
+            referencesWrapperPath(materialized, [...definitionPath, ...segments].join('/')),
+          );
+          if (collapsed !== materialized && !stranded) {
             finished = collapsed;
           }
         }
