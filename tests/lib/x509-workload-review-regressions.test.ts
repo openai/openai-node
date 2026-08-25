@@ -540,6 +540,83 @@ describe('X.509 review regressions', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  test.each(['organization', 'project'] as const)(
+    'rejects a mutable public %s before presenting its certificate',
+    async (selector) => {
+      const enrolled = `synthetic-enrolled-${selector}`;
+      const getter = vi.fn(() => (getter.mock.calls.length === 1 ? 'synthetic-other-tenant' : enrolled));
+      const client = new OpenAI(options({ [selector]: enrolled }));
+      Object.defineProperty(client, selector, { get: getter });
+      const send = vi.spyOn(transportCapability, 'sendX509Request');
+
+      await expect(client.models.list()).rejects.toThrow(/organization or project/iu);
+      expect(getter).toHaveBeenCalledTimes(1);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  test('sanitizes malformed X.509 JSON without changing its SyntaxError contract', async () => {
+    const secret = 'sekret42!';
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) =>
+      url.origin === 'https://mtls.auth.openai.com'
+        ? Response.json(TOKEN_RESPONSE)
+        : new Response(secret, { headers: { 'content-type': 'application/json' } }),
+    );
+
+    const failure: unknown = await new OpenAI(options()).models.list().catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SyntaxError);
+    if (failure instanceof Error) {
+      expect(failure.message).not.toContain(secret);
+      expect(Object.getOwnPropertyDescriptor(failure, 'cause')).toBeUndefined();
+    }
+  });
+
+  test('keeps nested clients sharing a transport in separately owned authentication scopes', async () => {
+    const exchangedAccounts: string[] = [];
+    let apiRequests = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url, request) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        const payload = JSON.parse(String(request.body)) as { service_account_id: string };
+        exchangedAccounts.push(payload.service_account_id);
+        return Response.json({
+          ...TOKEN_RESPONSE,
+          access_token: `synthetic-account-token-${exchangedAccounts.length}`,
+        });
+      }
+      apiRequests += 1;
+      return apiRequests === 1 ? new Response(null, { status: 401 }) : Response.json({ data: [] });
+    });
+    const first = new OpenAI(options());
+    const second = new OpenAI(
+      options({
+        workloadIdentity: {
+          type: 'x509',
+          identityProviderId: 'synthetic-review-provider',
+          serviceAccountId: 'synthetic-other-account',
+        },
+      }),
+    );
+    let nested = false;
+    Object.defineProperty(first, 'prepareRequest', {
+      value: async () => {
+        if (!nested) {
+          nested = true;
+          await second.buildRequest({ path: '/models', method: 'get' });
+        }
+      },
+    });
+
+    await expect(first.models.list()).rejects.toMatchObject({ status: 401 });
+    await first.models.list();
+
+    expect(exchangedAccounts).toEqual([
+      'synthetic-review-account',
+      'synthetic-other-account',
+      'synthetic-review-account',
+    ]);
+  });
+
   test('preserves caller request and header identities while snapshotting authenticated headers', async () => {
     const headers = { 'X-Synthetic-Request': 'synthetic-value' };
     const request = { path: '/models', method: 'get' as const, headers };
@@ -621,6 +698,9 @@ describe('X.509 review regressions', () => {
     await expect(client.models.list()).rejects.toThrow('synthetic-request-hook-failure');
     expect(observedScope).toBeDefined();
     expect(observedScope).not.toHaveProperty('token');
+    expect(observedScope).not.toHaveProperty('owner');
+    expect(observedScope).not.toHaveProperty('apiURL');
+    expect(observedScope).not.toHaveProperty('tenant');
     expect(observedScope).not.toHaveProperty('headers');
     expect(observedScope).not.toHaveProperty('authorization');
     expect(observedScope).not.toHaveProperty('defaultHeaders');

@@ -303,6 +303,28 @@ export class X509WorkloadIdentityAuth {
     return { defaultHeaders, requestHeaders };
   }
 
+  /** Captures enrolled public tenant selectors once before certificate presentation. */
+  snapshotTenant(
+    organization: string | null,
+    project: string | null,
+  ): { organization: string | null; project: string | null } {
+    if (organization !== this.#organization || project !== this.#project) {
+      throw new OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+    }
+    const scope = this.#scope();
+    scope.tenant = { organization, project };
+    return scope.tenant;
+  }
+
+  /** Returns the tenant selectors already approved for this logical request. */
+  tenantSnapshot(): { organization: string | null; project: string | null } {
+    const { tenant } = this.#scope();
+    if (!tenant) {
+      throw new OpenAIError('X.509 workload identity requires snapshotted tenant selectors.');
+    }
+    return tenant;
+  }
+
   /** Validates and retains the exact destination that authenticated dispatch will use. */
   snapshotAPIURL(value: string): void {
     assertX509APIOrigin(value);
@@ -442,18 +464,24 @@ export class X509WorkloadIdentityAuth {
   /** Establishes an independent scope even when concurrent requests share caller options. */
   runRequest<T>(operation: () => Promise<T>): Promise<T> {
     return this.#transport.run(async () => {
+      const scope = this.#transport.current();
+      if (!scope) {
+        throw new OpenAIError('X.509 workload identity requires an active certificate request scope.');
+      }
+      scope.owner = this;
       try {
         return await operation();
       } finally {
         this.retireRequestBody();
         this.releaseRequestCredentials();
+        delete scope.owner;
       }
     });
   }
 
   /** Reports whether a public request-building call already belongs to an active logical operation. */
   inRequest(): boolean {
-    return this.#transport.current() !== undefined;
+    return this.#transport.current()?.owner === this;
   }
 
   /** Shares a cache only when the complete, privately snapshotted credential identity matches. */
@@ -474,6 +502,7 @@ export class X509WorkloadIdentityAuth {
     const scope: X509RequestScope = {
       wallStartedAt,
       monotonicStartedAt,
+      owner: this,
       ...(request ? { request } : {}),
       ...(effectiveSignal ? { effectiveSignal } : {}),
     };
@@ -483,6 +512,7 @@ export class X509WorkloadIdentityAuth {
           return await operation();
         } finally {
           this.releaseRequestCredentials();
+          delete scope.owner;
         }
       });
   }
@@ -495,6 +525,7 @@ export class X509WorkloadIdentityAuth {
     delete scope.effectiveSignal;
     delete scope.materializedBody;
     delete scope.apiURL;
+    delete scope.tenant;
     delete scope.token;
     delete scope.defaultHeaders;
     delete scope.requestHeaders;
@@ -782,7 +813,7 @@ export class X509WorkloadIdentityAuth {
 
   #scope(): X509RequestScope {
     const scope = this.#transport.current();
-    if (!scope) {
+    if (!scope || scope.owner !== this) {
       throw new OpenAIError('X.509 workload identity requires an active certificate request scope.');
     }
     return scope;

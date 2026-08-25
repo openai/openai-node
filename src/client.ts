@@ -796,8 +796,7 @@ export class OpenAI {
               ...this._workloadIdentityAuth.headerSnapshots(),
               ...this._workloadIdentityAuth.requestSnapshot(),
               signal: this._workloadIdentityAuth.effectiveSignal(),
-              organization: this.organization,
-              project: this.project,
+              ...this._workloadIdentityAuth.tenantSnapshot(),
             })
           : await this._workloadIdentityAuth.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
@@ -1046,11 +1045,10 @@ export class OpenAI {
           throw abortError();
         }
         if (!timedOut) {
-          if (
-            x509Authentication &&
-            !(error instanceof SyntaxError) &&
-            !(error instanceof Errors.OpenAIError)
-          ) {
+          if (x509Authentication && error instanceof SyntaxError) {
+            throw new SyntaxError('X.509 workload identity API response contains invalid JSON.');
+          }
+          if (x509Authentication && !(error instanceof Errors.OpenAIError)) {
             throw new Errors.APIConnectionError({
               message: 'X.509 workload identity API response body could not be read.',
             });
@@ -1686,6 +1684,7 @@ export class OpenAI {
     const options = { ...inputOptions };
     const x509Authentication =
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
+    const x509Tenant = x509Authentication?.snapshotTenant(this.organization, this.project);
     const x509Headers = x509Authentication?.snapshotHeaders(this._options.defaultHeaders, options.headers);
     if (x509Headers) {
       options.headers = x509Headers.requestHeaders;
@@ -1732,6 +1731,7 @@ export class OpenAI {
       retryCount,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
+      x509Tenant,
     });
 
     const req: FinalizedRequestInit = {
@@ -1755,6 +1755,7 @@ export class OpenAI {
     retryCount,
     x509Headers,
     x509Timeout,
+    x509Tenant,
   }: {
     options: FinalRequestOptions;
     method: HTTPMethod;
@@ -1762,6 +1763,7 @@ export class OpenAI {
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
+    x509Tenant?: { organization: string | null; project: string | null } | undefined;
   }): Promise<Headers> {
     let idempotencyHeaders: HeadersLike = {};
     if (this.idempotencyHeader && method !== 'get') {
@@ -1780,8 +1782,8 @@ export class OpenAI {
         ...(timeout ? { 'X-Stainless-Timeout': String(Math.trunc(timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
         ...(typeof helperMethod === 'string' ? { 'X-Stainless-Helper-Method': helperMethod } : {}),
-        'OpenAI-Organization': this.organization,
-        'OpenAI-Project': this.project,
+        'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
+        'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
       this._provider ||
       (this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
