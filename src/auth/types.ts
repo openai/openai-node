@@ -25,30 +25,6 @@ export interface WorkloadIdentity {
   refreshBufferSeconds?: number;
 }
 
-/** Configures OpenAI-only federation from an explicitly attested X.509 client certificate. */
-export interface X509WorkloadIdentity {
-  /** Selects certificate-authenticated OAuth federation without an external subject token. */
-  type: 'x509';
-
-  /** Identity-provider resource enrolled for the caller-owned client certificate. */
-  identityProviderId: string;
-
-  /** OpenAI service account authorized for the verified certificate identity. */
-  serviceAccountId: string;
-
-  /** Optional milliseconds before expiry when the certificate-backed token should refresh. */
-  refreshBufferMs?: number;
-
-  /** X.509 federation proves certificate possession instead of supplying a subject token. */
-  provider?: never;
-
-  /** X.509 federation does not send an OAuth client identifier. */
-  clientId?: never;
-
-  /** X.509 refresh configuration is expressed in milliseconds. */
-  refreshBufferSeconds?: never;
-}
-
 /** OAuth token-exchange response returned by the OpenAI workload-identity endpoint. */
 export interface TokenExchangeResponse {
   /** OpenAI access token to use as the request's bearer credential. */
