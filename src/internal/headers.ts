@@ -36,15 +36,18 @@ type AzureAuthenticationHeaderMutation = {
 
 type AzureRequestHeaderMarker = {
   active: boolean;
+  reserved: boolean;
   registration: AzureRequestHeaderRegistration;
 };
 type AzureRequestHeaderRegistration = {
   carrier: NullableHeaders;
   headers: object;
+  owner: object | undefined;
 };
 type AzureRequestHeaderRegistrations = {
   references: number;
   markers: AzureRequestHeaderMarker[];
+  registrations: Set<AzureRequestHeaderRegistration>;
 };
 type AzureRequestHeaderProtection = {
   bind: (carrier: NullableHeaders) => NullableHeaders;
@@ -366,6 +369,7 @@ export const buildAzureAuthenticationHeaders = (...headers: AzureAuthenticationV
 /** Privately protects one synchronous Azure body pass and its authenticated final merge. */
 export const protectAzureRequestHeaders = (
   headers: HeadersLike,
+  owner?: object,
 ): AzureRequestHeaderProtection | undefined => {
   if (headers === undefined || headers === null || typeof headers !== 'object') {
     return undefined;
@@ -376,6 +380,7 @@ export const protectAzureRequestHeaders = (
     registrations = {
       references: 0,
       markers: [],
+      registrations: new Set(),
     };
     azureRequestHeaders.set(headers, registrations);
   }
@@ -383,9 +388,15 @@ export const protectAzureRequestHeaders = (
   const activeRegistration = {
     carrier: buildAzureAuthenticationHeaders(headers),
     headers,
+    owner,
   };
   activeRegistrations.references += 1;
-  const marker: AzureRequestHeaderMarker = { active: true, registration: activeRegistration };
+  activeRegistrations.registrations.add(activeRegistration);
+  const marker: AzureRequestHeaderMarker = {
+    active: true,
+    reserved: false,
+    registration: activeRegistration,
+  };
   activeRegistrations.markers.push(marker);
   let released = false;
 
@@ -401,6 +412,7 @@ export const protectAzureRequestHeaders = (
     if (released) return;
     released = true;
     deactivate();
+    activeRegistrations.registrations.delete(activeRegistration);
     activeRegistrations.references -= 1;
     if (activeRegistrations.references === 0) {
       azureRequestHeaders.delete(headers);
@@ -422,12 +434,27 @@ export const protectAzureRequestHeaders = (
   return { bind, deactivate, release };
 };
 
-const consumeAzureBodyMarker = (headers: HeadersLike): AzureRequestHeaderRegistration | undefined => {
+const reserveAzureBodyMarker = (headers: HeadersLike): AzureRequestHeaderMarker | undefined => {
   if (headers === undefined || headers === null || typeof headers !== 'object') return undefined;
-  const marker = azureRequestHeaders.get(headers)?.markers.pop();
-  if (!marker) return undefined;
-  marker.active = false;
-  return marker.registration;
+  const markers = azureRequestHeaders.get(headers)?.markers;
+  const marker = markers?.[markers.length - 1];
+  if (marker === undefined || !marker.active || marker.reserved) return undefined;
+  marker.reserved = true;
+  return marker;
+};
+
+const matchesAzureRequestHeaders = (
+  headers: HeadersLike,
+  registration: AzureRequestHeaderRegistration,
+): boolean => {
+  if (headers === registration.headers) return true;
+  if (registration.owner === undefined || typeof headers !== 'object' || headers === null) return false;
+  const registrations = azureRequestHeaders.get(headers);
+  if (registrations === undefined) return false;
+  for (const candidate of registrations.registrations) {
+    if (candidate.owner === registration.owner) return true;
+  }
+  return false;
 };
 
 function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [string, string | null]> {
@@ -531,8 +558,10 @@ export const assertAzureAuthenticationHeaders = (headers: HeadersLike): void => 
   }
 };
 
-export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
-  const bodyRegistration = newHeaders.length === 1 ? consumeAzureBodyMarker(newHeaders[0]) : undefined;
+const buildHeadersWithRegistration = (
+  newHeaders: HeadersLike[],
+  bodyRegistration: AzureRequestHeaderRegistration | undefined,
+): NullableHeaders => {
   let requestRegistration = bodyRegistration;
   let protectsAzureCredentials = bodyRegistration !== undefined;
   if (!protectsAzureCredentials) {
@@ -564,7 +593,9 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
   for (const source of newHeaders) {
     const seenHeaders = new Set<string>();
     const headers =
-      protectsAzureCredentials && requestRegistration !== undefined && source === requestRegistration.headers
+      protectsAzureCredentials &&
+      requestRegistration !== undefined &&
+      matchesAzureRequestHeaders(source, requestRegistration)
         ? requestRegistration.carrier
         : source;
     for (const [name, value] of iterateHeaders(headers)) {
@@ -615,6 +646,17 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
     }
   }
   return { [brand_privateNullableHeaders]: true, values: targetHeaders, nulls: nullHeaders };
+};
+
+export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
+  const marker = newHeaders.length === 1 ? reserveAzureBodyMarker(newHeaders[0]) : undefined;
+  try {
+    return buildHeadersWithRegistration(newHeaders, marker?.registration);
+  } finally {
+    if (marker !== undefined) {
+      marker.reserved = false;
+    }
+  }
 };
 
 export const isEmptyHeaders = (headers: HeadersLike) => {

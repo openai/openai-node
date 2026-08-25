@@ -180,7 +180,7 @@ export class AzureOpenAI extends OpenAI {
     let protection: ReturnType<typeof protectAzureRequestHeaders>;
 
     try {
-      protection = preprocessesHeaders ? protectAzureRequestHeaders(headers) : undefined;
+      protection = preprocessesHeaders ? protectAzureRequestHeaders(headers, options) : undefined;
       const restoreAuthentication = protection
         ? snapshotAzureRequestAuthentication(this, this.authHeaders, protection)
         : undefined;
@@ -319,7 +319,7 @@ const azureRequestHeadersAccessorSnapshots = new WeakMap<
   {
     descriptor: PropertyDescriptor;
     getter: () => FinalRequestOptions['headers'];
-    references: number;
+    snapshots: Array<{ headers: FinalRequestOptions['headers'] }>;
   }
 >();
 
@@ -327,7 +327,8 @@ function snapshotAzureRequestOptionsHeaders(options: FinalRequestOptions): {
   headers: FinalRequestOptions['headers'];
   restore?: () => void;
 } {
-  const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+  const active = azureRequestHeadersAccessorSnapshots.get(options);
+  const descriptor = active?.descriptor ?? Object.getOwnPropertyDescriptor(options, 'headers');
   if (descriptor === undefined || 'value' in descriptor) {
     return { headers: options.headers };
   }
@@ -335,7 +336,7 @@ function snapshotAzureRequestOptionsHeaders(options: FinalRequestOptions): {
     throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
   }
 
-  const { headers } = options;
+  const headers = active === undefined ? options.headers : descriptor.get?.call(options);
   return { headers, restore: snapshotAzureRequestHeadersAccessor(options, headers) };
 }
 
@@ -349,35 +350,43 @@ function snapshotAzureRequestHeadersAccessor(
     if (descriptor === undefined || 'value' in descriptor || !descriptor.configurable) {
       throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
     }
-    let current = headers;
-    const getter = () => current;
+
+    const snapshots: Array<{ headers: FinalRequestOptions['headers'] }> = [];
+    const getter = () => snapshots[snapshots.length - 1]?.headers;
     const originalSetter = descriptor.set;
     const setter =
       originalSetter === undefined
         ? undefined
         : function setHeaders(this: FinalRequestOptions, value: FinalRequestOptions['headers']): void {
             originalSetter.call(this, value);
-            current = value;
+            const current = snapshots[snapshots.length - 1];
+            if (current !== undefined) {
+              current.headers = value;
+            }
           };
     Object.defineProperty(options, 'headers', {
       ...descriptor,
       get: getter,
       ...(setter === undefined ? {} : { set: setter }),
     });
-    snapshot = { descriptor, getter, references: 0 };
+    snapshot = { descriptor, getter, snapshots };
     azureRequestHeadersAccessorSnapshots.set(options, snapshot);
   }
 
   const active = snapshot;
-  active.references += 1;
+  const entry = { headers };
+  active.snapshots.push(entry);
   let restored = false;
   return () => {
     if (restored) {
       return;
     }
     restored = true;
-    active.references -= 1;
-    if (active.references !== 0) {
+    const index = active.snapshots.indexOf(entry);
+    if (index !== -1) {
+      active.snapshots.splice(index, 1);
+    }
+    if (active.snapshots.length !== 0) {
       return;
     }
 
@@ -450,7 +459,21 @@ function snapshotCrossRealmHeaders(headers: RequestInit['headers']): RequestInit
   if (headers === undefined || headers === null || typeof headers !== 'object') {
     return headers;
   }
-  if (headers instanceof Headers || Array.isArray(headers)) {
+  if (headers instanceof Headers) {
+    if (hasIntrinsicHeadersIdentity(headers)) {
+      return headers;
+    }
+    const entries = intrinsicHeadersDescriptors.get('entries');
+    if (typeof entries !== 'function') {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+    try {
+      return Array.from(entries.call(headers)) as [string, string][];
+    } catch {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
+  }
+  if (Array.isArray(headers)) {
     return headers;
   }
 

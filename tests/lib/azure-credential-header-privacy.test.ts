@@ -806,6 +806,69 @@ describe('Azure credential header diagnostic privacy', () => {
     expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('hook-replacement-token');
   });
 
+  test.each([
+    ['the same Azure client', false],
+    ['different Azure clients', true],
+  ] as const)(
+    'isolates rotating request-header accessors when %s share request options',
+    async (_description, differentClients) => {
+      const firstClient = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-first-client-token',
+        maxRetries: 0,
+      });
+      const secondClient = differentClients
+        ? new ProtectedHookAzure({
+            baseURL: BASE_URL,
+            apiVersion: API_VERSION,
+            apiKey: 'configured-second-client-token',
+            maxRetries: 0,
+          })
+        : firstClient;
+      const snapshots = [
+        { 'api-key': 'tenant-a-token', 'x-custom': 'preserved' },
+        { 'api-key': 'tenant-b-token', 'x-custom': 'preserved' },
+      ];
+      let reads = 0;
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { shared: true },
+        get headers() {
+          return snapshots[reads++];
+        },
+      };
+      const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+      const observed: FinalRequestOptions[] = [];
+      const releases = new Set<number>();
+      const pauseAuthentication = async (received: FinalRequestOptions) => {
+        const index = observed.length;
+        observed.push(received);
+        await vi.waitFor(() => expect(releases.has(index)).toBe(true), { interval: 1 });
+      };
+      firstClient.observeAuthenticationOptions = pauseAuthentication;
+      secondClient.observeAuthenticationOptions = pauseAuthentication;
+
+      const first = firstClient.buildRequest(options);
+      const second = secondClient.buildRequest(options);
+      expect(observed).toEqual([options, options]);
+      expect(reads).toBe(2);
+
+      releases.add(0);
+      const firstBuilt = await first;
+      releases.add(1);
+      const secondBuilt = await second;
+
+      expect(firstBuilt.req.headers.get('api-key')).toBe('tenant-a-token');
+      expect(secondBuilt.req.headers.get('api-key')).toBe('tenant-b-token');
+      expect(firstBuilt.req.headers.get('x-custom')).toBe('preserved');
+      expect(secondBuilt.req.headers.get('x-custom')).toBe('preserved');
+      expect(reads).toBe(2);
+      expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+    },
+  );
+
   test('keeps shared request options unchanged across overlapping private authentication waits', async () => {
     const fetch = vi.fn(async () => Response.json({ ok: true }));
     const client = new ProtectedHookAzure({
@@ -932,6 +995,43 @@ describe('Azure credential header diagnostic privacy', () => {
       expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
     },
   );
+
+  test('keeps the Azure body marker reserved across a reentrant query-header merge', async () => {
+    const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+    const headers = { 'api-key': malformed };
+    let nestedFailure: unknown;
+    let queryReads = 0;
+    const query = {
+      get tenant() {
+        queryReads += 1;
+        try {
+          buildHeaders([headers]);
+        } catch (error) {
+          nestedFailure = error;
+        }
+        return 'safe-tenant';
+      },
+    };
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new AzureOpenAI({
+      baseURL: BASE_URL,
+      apiVersion: API_VERSION,
+      apiKey: 'configured-token',
+      fetch,
+      maxRetries: 0,
+    });
+
+    await expectPrivateCredentialFailure(
+      () => client.request({ method: 'post', path: '/models', body: { safe: true }, headers, query }),
+      malformed,
+    );
+
+    expect(queryReads).toBe(1);
+    expect(nestedFailure).toBeInstanceOf(TypeError);
+    expect((nestedFailure as Error).message).toBe(SAFE_ERROR);
+    expect((nestedFailure as Error).message).not.toContain(PRIVATE_CREDENTIAL);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
   test('never leaks an Azure body marker into reentrant non-Azure processing of the same raw object', async () => {
     const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
@@ -1798,7 +1898,7 @@ describe('Azure credential header diagnostic privacy', () => {
   );
 
   test.each(
-    (['get', 'has'] as const).flatMap((operation) =>
+    (['get', 'has', 'entries'] as const).flatMap((operation) =>
       (['prototype accessor', 'ancestor accessor', 'instance accessor'] as const).map((override) => ({
         operation,
         override,
@@ -1826,6 +1926,9 @@ describe('Azure credential header diagnostic privacy', () => {
         configurable: true,
         get() {
           accessorReads += 1;
+          if (operation === 'entries') {
+            throw new Error(`${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`);
+          }
           return Headers.prototype[operation];
         },
       });
