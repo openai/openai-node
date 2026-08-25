@@ -153,6 +153,10 @@ const parserFailures: readonly FailureCase[] = [
     create: (value) => runInNewContext('new SyntaxError(privateValue)', { privateValue: value }),
   },
   {
+    name: 'proxy-wrapped native parser error',
+    create: (value) => new Proxy(new SyntaxError(value), {}),
+  },
+  {
     name: 'native parser error with a forged own Error tag',
     create: (value) =>
       Object.defineProperty(new SyntaxError(value), Symbol.toStringTag, {

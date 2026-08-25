@@ -454,6 +454,35 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     },
   );
 
+  it.each(['Error marker', 'SyntaxError prototype', 'captured stack'] as const)(
+    'preserves an unbranded metadata parser rejection with a $0',
+    async (shape) => {
+      const original =
+        shape === 'SyntaxError prototype'
+          ? Object.create(SyntaxError.prototype)
+          : Object.assign(Object.create(Error.prototype), { type: 'invalid-json' });
+      if (shape === 'captured stack') {
+        Error.captureStackTrace(original);
+      }
+      const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
+      vi.spyOn(response, 'json').mockRejectedValue(original);
+      const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+      let failure: unknown;
+
+      try {
+        await provider.getToken();
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+      if (!(failure instanceof SubjectTokenProviderError)) {
+        throw new Error('The public provider did not preserve its unbranded parser failure.');
+      }
+      expect(failure.cause).toBe(original);
+    },
+  );
+
   it.each(['own name', 'prototype name', 'native prototype', 'foreign type'] as const)(
     'preserves a spoofed or non-syntax cross-realm parser cause: %s',
     async (shape) => {
