@@ -1900,6 +1900,106 @@ describe('Azure credential header diagnostic privacy', () => {
     },
   );
 
+  test.each([
+    ['static API key', 'static-api-key', 'api-key', false] as const,
+    ['rotating bearer token', 'rotating-entra-token', 'authorization', false] as const,
+    ['rotating admin token', 'rotating-entra-token', 'authorization', true] as const,
+  ])(
+    'safely snapshots inherited cross-realm undici Headers subclasses for %s',
+    async (_description, authentication, name, admin) => {
+      const credential = name === 'api-key' ? 'subclass-static-token' : 'Bearer subclass-rotating-token';
+      const values: [string, string][] = [
+        [name, credential],
+        ['x-custom', 'preserved'],
+      ];
+      const injected = runInNewContext(
+        'class Ancestor extends ForeignHeaders {} class Subclass extends Ancestor {} new Subclass(values)',
+        { ForeignHeaders, values },
+      ) as Headers;
+      expect(injected).not.toBeInstanceOf(Headers);
+      expect(
+        Object.getOwnPropertyDescriptor(Object.getPrototypeOf(injected), Symbol.toStringTag),
+      ).toBeUndefined();
+
+      const provider = vi.fn(async () => 'configured-provider-token');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        ...(authentication === 'static-api-key'
+          ? { apiKey: 'configured-static-token' }
+          : { azureADTokenProvider: provider, adminAPIKey: 'configured-admin-token' }),
+        fetch,
+        maxRetries: 0,
+      });
+      client.injectedHeaders = injected;
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        __security: { bearerAuth: true, adminAPIKeyAuth: admin },
+      });
+
+      const request = fetch.mock.calls[0]?.[1];
+      expect(request?.headers).toBeInstanceOf(Headers);
+      expect(request?.headers).not.toBe(injected);
+      expect(new Headers(request?.headers).get(name)).toBe(credential);
+      expect(new Headers(request?.headers).get('x-custom')).toBe('preserved');
+      expect(request?.redirect).toBe(name === 'api-key' ? 'manual' : undefined);
+      expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
+    },
+  );
+
+  test.each(
+    (['get', 'has', 'entries', 'iterator'] as const).flatMap((operation) =>
+      (['instance accessor', 'subclass accessor', 'ancestor accessor', 'subclass method'] as const).map(
+        (override) => ({ operation, override }),
+      ),
+    ),
+  )(
+    'rejects an overridden cross-realm Headers subclass $override ($operation) without invoking it',
+    async ({ operation, override }) => {
+      const values: [string, string][] = [
+        ['api-key', 'safe-subclass-token'],
+        ['x-custom', 'preserved'],
+      ];
+      const injected = runInNewContext(
+        'class Ancestor extends ForeignHeaders {} class Subclass extends Ancestor {} new Subclass(values)',
+        { ForeignHeaders, values },
+      ) as Headers;
+      const subclass = Object.getPrototypeOf(injected) as object;
+      const ancestor = Object.getPrototypeOf(subclass) as object;
+      const target =
+        override === 'instance accessor' ? injected : override === 'ancestor accessor' ? ancestor : subclass;
+      const key = operation === 'iterator' ? Symbol.iterator : operation;
+      let operationReads = 0;
+      const maliciousOperation = () => {
+        operationReads += 1;
+        throw new Error(PRIVATE_CREDENTIAL + '\n' + PRIVATE_SUFFIX);
+      };
+      Object.defineProperty(target, key, {
+        configurable: true,
+        ...(override === 'subclass method' ? { value: maliciousOperation } : { get: maliciousOperation }),
+      });
+
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await expectPrivateCredentialFailure(
+        () => client.invokeProtectedFetch(injected),
+        PRIVATE_CREDENTIAL + '\n' + PRIVATE_SUFFIX,
+      );
+      expect(operationReads).toBe(0);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   test.each([false, true] as const)(
     'snapshots cross-realm credential iteration once (malformed first: %s)',
     async (malformedFirst) => {

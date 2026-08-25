@@ -454,27 +454,40 @@ function snapshotCrossRealmHeaders(headers: RequestInit['headers']): RequestInit
     return headers;
   }
 
-  const prototype = Object.getPrototypeOf(headers) as object | null;
-  if (
-    prototype === null ||
-    Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value !== 'Headers'
-  ) {
+  const operations = [Symbol.iterator, 'entries', 'get', 'has'] as const;
+  let prototype = Object.getPrototypeOf(headers) as object | null;
+  let trustedPrototype: object | undefined;
+  let hasOverriddenOperation = operations.some(
+    (operation) => Object.getOwnPropertyDescriptor(headers, operation) !== undefined,
+  );
+
+  for (let depth = 0; depth < 32 && prototype !== null; depth++) {
+    if (Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers') {
+      trustedPrototype = prototype;
+      break;
+    }
+
+    if (operations.some((operation) => Object.getOwnPropertyDescriptor(prototype, operation) !== undefined)) {
+      hasOverriddenOperation = true;
+    }
+    prototype = Object.getPrototypeOf(prototype) as object | null;
+  }
+
+  if (trustedPrototype === undefined) {
     return headers;
   }
 
-  const operations = [Symbol.iterator, 'entries', 'get', 'has'] as const;
-  const valid = operations.every((operation) => {
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, operation);
-    return (
-      typeof descriptor?.value === 'function' &&
-      Object.getOwnPropertyDescriptor(headers, operation) === undefined
+  const headerPrototype = trustedPrototype;
+  const valid =
+    !hasOverriddenOperation &&
+    operations.every(
+      (operation) => typeof Object.getOwnPropertyDescriptor(headerPrototype, operation)?.value === 'function',
     );
-  });
   if (!valid) {
     throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
   }
 
-  const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator) as PropertyDescriptor;
+  const iterator = Object.getOwnPropertyDescriptor(headerPrototype, Symbol.iterator) as PropertyDescriptor;
   const snapshots: [string, string][] = [];
   for (const row of iterator.value.call(headers) as Iterable<unknown>) {
     if (snapshots.length >= 1024 || !Array.isArray(row)) {
