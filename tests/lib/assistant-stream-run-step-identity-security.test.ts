@@ -345,4 +345,75 @@ describe('AssistantStream run-step identity security', () => {
 
     expect(doneCalls).toEqual(['call_trusted']);
   });
+
+  test.each([
+    { name: 'a first delta', event: 'thread.run.step.delta', prime: false },
+    { name: 'a later delta', event: 'thread.run.step.delta', prime: true },
+    { name: 'a terminal event', event: 'thread.run.step.completed', prime: true },
+  ])(
+    'revalidates a listener-mutated active snapshot before tool callbacks for $name',
+    async ({ event, prime }) => {
+      const completed = runStep('step_completed', 'call_completed');
+      const active = runStep('step_active', 'call_active');
+      const terminalCompleted = {
+        event: 'thread.run.step.completed',
+        data: { ...completed, status: 'completed' },
+      };
+      const attackedEvent =
+        event === 'thread.run.step.delta'
+          ? toolCallDelta(active.id)
+          : {
+              event,
+              data: { ...runStep(active.id, 'call_injected', '{"to":"attacker"}'), status: 'completed' },
+            };
+      const runner = assistantStream([
+        { event: 'thread.run.step.created', data: completed },
+        terminalCompleted,
+        { event: 'thread.run.step.created', data: active },
+        ...(prime ? [toolCallDelta(active.id)] : []),
+        attackedEvent,
+        completedRun(),
+      ]);
+      const toolCreated = vi.fn();
+      const toolDelta = vi.fn();
+      const stepDelta = vi.fn();
+      const toolDone = vi.fn();
+      const stepDone = vi.fn();
+      let remainingPrimedEvents = prime && event === 'thread.run.step.delta' ? 1 : 0;
+
+      runner.on('toolCallCreated', toolCreated);
+      runner.on('toolCallDelta', toolDelta);
+      runner.on('runStepDelta', stepDelta);
+      runner.on('toolCallDone', toolDone);
+      runner.on('runStepDone', stepDone);
+      runner.on('event', (received) => {
+        if (received.event !== event || !('id' in received.data) || received.data.id !== active.id) {
+          return;
+        }
+        if (remainingPrimedEvents > 0) {
+          remainingPrimedEvents -= 1;
+          return;
+        }
+
+        toolCreated.mockClear();
+        toolDelta.mockClear();
+        stepDelta.mockClear();
+        toolDone.mockClear();
+        stepDone.mockClear();
+
+        const retained = runner.currentRunStepSnapshot();
+        if (retained) {
+          retained.id = completed.id;
+        }
+      });
+
+      await expect(runner.done()).rejects.toThrow(/already been created/u);
+
+      expect(toolCreated).not.toHaveBeenCalled();
+      expect(toolDelta).not.toHaveBeenCalled();
+      expect(stepDelta).not.toHaveBeenCalled();
+      expect(toolDone).not.toHaveBeenCalled();
+      expect(stepDone).not.toHaveBeenCalled();
+    },
+  );
 });

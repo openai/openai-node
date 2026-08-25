@@ -458,6 +458,10 @@ export class AssistantStream
         if (runStepID === undefined) {
           throw new OpenAIError('Received assistant run-step event without a canonical run-step ID');
         }
+        const activeRunStep = this.#runStepSnapshots[runStepID];
+        if (activeRunStep) {
+          this.#reserveRunStepAlias(activeRunStep, runStepID);
+        }
         this.#handleRunStep(stableEvent, runStepID);
         this.#reserveRunStepAlias(stableEvent.data, runStepID);
         const retainedRunStep = this.#runStepSnapshots[runStepID];
