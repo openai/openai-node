@@ -400,6 +400,51 @@ describe('isolated X.509 workload-identity token exchange', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  test('checks a canceled caller signal before evaluating identity or transport accessors', async () => {
+    const controller = new AbortController();
+    const cancellation = new Error('synthetic-preflight-cancellation');
+    const identityGetter = vi.fn(() => 'synthetic-identity-provider');
+    const transportGetter = vi.fn(() => transport);
+    controller.abort(cancellation);
+
+    await expect(
+      exchangeX509Token({
+        get identityProviderId() {
+          return identityGetter();
+        },
+        serviceAccountId: 'synthetic-service-account',
+        get transport() {
+          return transportGetter();
+        },
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(cancellation);
+    expect(identityGetter).not.toHaveBeenCalled();
+    expect(transportGetter).not.toHaveBeenCalled();
+  });
+
+  test('snapshots an accessor-provided caller signal before validating and composing it', async () => {
+    const controller = new AbortController();
+    const cancellation = new Error('synthetic-snapshotted-signal-cancellation');
+    const signal = vi.fn(() => (signal.mock.calls.length === 1 ? controller.signal : undefined));
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async () => {
+      controller.abort(cancellation);
+      return new Response(null, { status: 503 });
+    });
+
+    await expect(
+      exchangeX509Token({
+        transport,
+        identityProviderId: 'synthetic-identity-provider',
+        serviceAccountId: 'synthetic-service-account',
+        get signal() {
+          return signal();
+        },
+      }),
+    ).rejects.toBe(cancellation);
+    expect(signal).toHaveBeenCalledTimes(1);
+  });
+
   test.each([307, 408, 429, 503])(
     'preserves cancellation racing issuer response headers with status %i',
     async (status) => {

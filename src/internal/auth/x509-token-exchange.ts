@@ -7,7 +7,9 @@ import {
 } from '../../core/error';
 import { hasOwn } from '../utils/values';
 import { sendX509Request } from './x509-transport-capability';
-import type { X509Transport } from './x509-transport-capability';
+import type { X509ExchangedToken, X509Transport } from './x509-transport-registry';
+
+export type { X509ExchangedToken } from './x509-transport-registry';
 
 const TOKEN_EXCHANGE_URL = new URL('https://mtls.auth.openai.com/oauth/token');
 const TOKEN_EXCHANGE_GRANT = 'urn:ietf:params:oauth:grant-type:token-exchange';
@@ -31,15 +33,6 @@ export interface X509TokenExchangeOptions {
 
   /** Optional caller cancellation propagated through request and response consumption. */
   signal?: AbortSignal | undefined;
-}
-
-/** Fully validated, short-lived OAuth credential returned by the X.509 issuer. */
-export interface X509ExchangedToken {
-  /** Header-safe OAuth bearer token; never persisted or included in error messages. */
-  accessToken: string;
-
-  /** Positive issuer-granted lifetime in seconds, never exceeding one hour. */
-  expiresIn: number;
 }
 
 async function cancelReader(
@@ -201,8 +194,9 @@ async function oauthError(response: Response, signal?: AbortSignal): Promise<OAu
 
 /** Exchanges one enrolled client certificate for a validated OpenAI workload access token. */
 export async function exchangeX509Token(options: X509TokenExchangeOptions): Promise<X509ExchangedToken> {
-  options.signal?.throwIfAborted();
-  const { identityProviderId, serviceAccountId } = options;
+  const { signal: callerSignal } = options;
+  callerSignal?.throwIfAborted();
+  const { identityProviderId, serviceAccountId, transport } = options;
   if (
     typeof identityProviderId !== 'string' ||
     identityProviderId.trim().length === 0 ||
@@ -215,8 +209,8 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
   }
 
   const timeoutController = new AbortController();
-  const signal = options.signal
-    ? AbortSignal.any([options.signal, timeoutController.signal])
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, timeoutController.signal])
     : timeoutController.signal;
   const timeout = setTimeout(() => {
     timeoutController.abort(
@@ -235,7 +229,7 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
 
     let response: Response;
     try {
-      response = await sendX509Request(options.transport, TOKEN_EXCHANGE_URL, {
+      response = await sendX509Request(transport, TOKEN_EXCHANGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,

@@ -73,11 +73,30 @@
   "overrides": {
     "minimatch": "^9.0.5"
   },
+  "imports": {
+    "#x509-transport-state": {
+      "types": "./src/internal/auth/x509-transport-state.cts",
+      "browser": "./src/internal/auth/x509-transport-state-browser.ts",
+      "node": "./src/internal/auth/x509-transport-state.cts",
+      "default": "./src/internal/auth/x509-transport-state-browser.ts"
+    }
+  },
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
+    "./internal/auth/x509-transport-capability": null,
+    "./internal/auth/x509-transport-capability.js": null,
+    "./internal/auth/x509-transport-capability.mjs": null,
+    "./internal/auth/x509-transport-registry": null,
+    "./internal/auth/x509-transport-registry.js": null,
+    "./internal/auth/x509-transport-registry.mjs": null,
+    "./internal/auth/x509-transport-state": null,
+    "./internal/auth/x509-transport-state.cjs": null,
+    "./internal/auth/x509-transport-state-browser": null,
+    "./internal/auth/x509-transport-state-browser.js": null,
+    "./internal/auth/x509-transport-state-browser.mjs": null,
     "./*.mjs": {
       "default": "./dist/*.mjs"
     },
