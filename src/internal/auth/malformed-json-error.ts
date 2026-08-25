@@ -23,6 +23,119 @@ interface MalformedJSONErrorOptions {
   preserveAccessors?: boolean;
 }
 
+type StructuredClone = (value: object) => unknown;
+
+interface StructuredCloneIntrinsics {
+  clone: StructuredClone;
+  getCloneFailureName: (this: object) => unknown;
+  getCloneFailureMessage: (this: object) => unknown;
+}
+
+function hasNativeStructuredCloneSource(candidate: StructuredClone): boolean {
+  const source = errorFunctionSource.call(candidate);
+  const nativeBrowserSource = /^function structuredClone\([^)]*\)\s*\{\s*\[native code\]\s*\}$/u;
+  const nativeNodeSource =
+    source.startsWith('function structuredClone(value, options) {\n  if (arguments.length === 0) {') &&
+    source.includes('const idlOptions = webidl.converters.StructuredSerializeOptions(') &&
+    source.includes('const serializedData = nativeStructuredClone(value, idlOptions);') &&
+    source.endsWith('\n  return serializedData;\n}');
+  return nativeBrowserSource.test(source) || nativeNodeSource;
+}
+
+// Capture trusted DataCloneError accessors before an untrusted proxy can replace them.
+function getCloneFailureIntrinsics(
+  clone: StructuredClone,
+  probe: object,
+  onProxyAccess: () => void,
+): StructuredCloneIntrinsics | undefined {
+  let proxyFailure: unknown;
+  try {
+    clone(new Proxy(probe, { get: onProxyAccess }));
+    return undefined;
+  } catch (error) {
+    proxyFailure = error;
+  }
+
+  if (typeof proxyFailure !== 'object' || proxyFailure === null) {
+    return undefined;
+  }
+  const prototype = getErrorPrototype(proxyFailure) as object | null;
+  if (!prototype) {
+    return undefined;
+  }
+
+  const name = getErrorDescriptor(prototype, 'name');
+  const message = getErrorDescriptor(prototype, 'message');
+  if (!name || !message || 'value' in name || 'value' in message || !name.get || !message.get) {
+    return undefined;
+  }
+  if (
+    name.get.call(proxyFailure) !== 'DataCloneError' ||
+    typeof message.get.call(proxyFailure) !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return {
+    clone,
+    getCloneFailureName: name.get,
+    getCloneFailureMessage: message.get,
+  };
+}
+
+function getNativeStructuredClone(): StructuredCloneIntrinsics | undefined {
+  if (
+    !nativeStructuredCloneDescriptor ||
+    !('value' in nativeStructuredCloneDescriptor) ||
+    typeof nativeStructuredCloneDescriptor.value !== 'function'
+  ) {
+    return undefined;
+  }
+
+  try {
+    const candidate = nativeStructuredCloneDescriptor.value as StructuredClone;
+    if (!hasNativeStructuredCloneSource(candidate)) {
+      return undefined;
+    }
+
+    const clone = candidate.bind(globalThis) as StructuredClone;
+    const nativeProbe = new SyntaxError('structured clone validation');
+    Reflect.deleteProperty(nativeProbe, 'stack');
+    let serializationHookRead = false;
+    Object.defineProperty(nativeProbe, 'toJSON', {
+      configurable: true,
+      get: () => {
+        serializationHookRead = true;
+      },
+    });
+    const clonedNative = clone(nativeProbe);
+    if (
+      serializationHookRead ||
+      typeof clonedNative !== 'object' ||
+      clonedNative === null ||
+      getErrorPrototype(clonedNative) !== SyntaxError.prototype
+    ) {
+      return undefined;
+    }
+
+    const clonedForgery = clone(Object.create(SyntaxError.prototype) as object);
+    if (
+      typeof clonedForgery !== 'object' ||
+      clonedForgery === null ||
+      getErrorPrototype(clonedForgery) !== Object.prototype
+    ) {
+      return undefined;
+    }
+
+    const intrinsics = getCloneFailureIntrinsics(clone, nativeProbe, () => {
+      serializationHookRead = true;
+    });
+    return serializationHookRead ? undefined : intrinsics;
+  } catch {
+    return undefined;
+  }
+}
+
 function getRuntimeErrorIntrinsic(types: object, name: 'isNativeError' | 'isProxy'): ErrorBrand | undefined {
   const descriptor = getErrorDescriptor(types, name);
   if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
@@ -78,16 +191,53 @@ const nativeErrorBrand =
     ? (nativeErrorBrandDescriptor.value.bind(Error) as ErrorBrand)
     : runtimeErrorTypes?.isNativeError;
 const nativeProxyBrand = runtimeErrorTypes?.isProxy;
-const nativeStructuredClone =
-  nativeStructuredCloneDescriptor &&
-  'value' in nativeStructuredCloneDescriptor &&
-  typeof nativeStructuredCloneDescriptor.value === 'function'
-    ? (nativeStructuredCloneDescriptor.value.bind(globalThis) as (value: object) => unknown)
-    : undefined;
+const nativeStructuredCloneIntrinsics = getNativeStructuredClone();
+const nativeStructuredClone = nativeStructuredCloneIntrinsics?.clone;
 
 type JSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
 type JSONErrorBrand = 'native' | 'proxy' | 'tagged-wrapper' | 'unknown' | 'unsafe';
-type ClonedErrorBrand = 'native' | 'proxy' | 'unknown' | 'unavailable';
+type ClonedErrorBrand = 'native' | 'proxy' | 'parser-proxy' | 'unknown' | 'unavailable';
+type ClonePropertySafety = 'safe' | 'proxy' | 'parser-proxy' | 'unavailable';
+
+function classifyProxyCloneFailure(failure: unknown): JSONErrorKind {
+  if (!nativeStructuredCloneIntrinsics || typeof failure !== 'object' || failure === null) {
+    return 'unsafe';
+  }
+
+  try {
+    if (nativeStructuredCloneIntrinsics.getCloneFailureName.call(failure) !== 'DataCloneError') {
+      return 'unsafe';
+    }
+
+    const detail: unknown = nativeStructuredCloneIntrinsics.getCloneFailureMessage.call(failure);
+    if (typeof detail !== 'string') {
+      return 'unsafe';
+    }
+    if (/^SyntaxError(?::|\s)/u.test(detail)) {
+      return 'syntax';
+    }
+    if (/^[A-Za-z]*Error(?::|\s)/u.test(detail)) {
+      return 'error';
+    }
+    return detail.startsWith('#<') || detail === ' could not be cloned.' ? 'unknown' : 'unsafe';
+  } catch {
+    return 'unsafe';
+  }
+}
+
+function classifyNativeProxyTarget(target: object): JSONErrorKind {
+  if (!nativeStructuredClone) {
+    return 'unsafe';
+  }
+
+  try {
+    // Native serialization rejects a proxy without invoking its traps or getters.
+    nativeStructuredClone(target);
+    return 'unsafe';
+  } catch (error) {
+    return classifyProxyCloneFailure(error);
+  }
+}
 
 function classifyCrossRealmError(error: object): JSONErrorKind {
   try {
@@ -207,17 +357,7 @@ function hasSafeCloneDiagnostic(error: object, name: 'name' | 'message' | 'stack
   return true;
 }
 
-function classifyStructuredError(error: object): ClonedErrorBrand {
-  if (!nativeStructuredClone || !hasSafeClonePrototypeChain(error)) {
-    return 'unavailable';
-  }
-
-  for (const name of ['name', 'message', 'stack', 'cause'] as const) {
-    if (!hasSafeCloneDiagnostic(error, name)) {
-      return 'unavailable';
-    }
-  }
-
+function classifyCloneProperties(error: object): ClonePropertySafety {
   const keys = Reflect.ownKeys(error);
   if (keys.length > MAX_JSON_ERROR_CAUSES) {
     return 'unavailable';
@@ -230,7 +370,8 @@ function classifyStructuredError(error: object): ClonedErrorBrand {
 
     const descriptor = getErrorDescriptor(error, key);
     if (!descriptor) {
-      return 'proxy';
+      const kind = classifyNativeProxyTarget(error);
+      return kind === 'syntax' || kind === 'unsafe' ? 'parser-proxy' : 'proxy';
     }
     if (!descriptor.enumerable) {
       continue;
@@ -246,12 +387,32 @@ function classifyStructuredError(error: object): ClonedErrorBrand {
     }
   }
 
+  return 'safe';
+}
+
+function classifyStructuredError(target: object): ClonedErrorBrand {
+  if (!nativeStructuredClone || !hasSafeClonePrototypeChain(target)) {
+    return 'unavailable';
+  }
+
+  for (const name of ['name', 'message', 'stack', 'cause'] as const) {
+    if (!hasSafeCloneDiagnostic(target, name)) {
+      return 'unavailable';
+    }
+  }
+
+  const properties = classifyCloneProperties(target);
+  if (properties !== 'safe') {
+    return properties;
+  }
+
   let clone: unknown;
   try {
-    clone = nativeStructuredClone(error);
-  } catch {
+    clone = nativeStructuredClone(target);
+  } catch (error) {
     // Structured cloning rejects proxies before invoking their getters or traps.
-    return 'proxy';
+    const kind = classifyProxyCloneFailure(error);
+    return kind === 'syntax' || kind === 'unsafe' ? 'parser-proxy' : 'proxy';
   }
 
   if (typeof clone !== 'object' || clone === null) {
@@ -268,11 +429,15 @@ function classifyUnbrandedError(error: object): JSONErrorBrand {
       return 'unknown';
     }
 
-    const kind = classifyCrossRealmError(error);
-    if (kind === 'unsafe' || kind === 'unknown') {
-      return kind;
+    if (classifyCrossRealmError(error) === 'unsafe') {
+      return 'unsafe';
     }
-    return 'proxy';
+
+    const kind = classifyNativeProxyTarget(error);
+    if (kind === 'syntax' || kind === 'unsafe') {
+      return 'unsafe';
+    }
+    return kind === 'error' ? 'proxy' : 'unknown';
   }
 
   const kind = classifyCrossRealmError(error);
@@ -280,10 +445,13 @@ function classifyUnbrandedError(error: object): JSONErrorBrand {
     return 'unsafe';
   }
   if (kind === 'unknown') {
-    return 'unknown';
+    return classifyStructuredError(error) === 'parser-proxy' ? 'unsafe' : 'unknown';
   }
 
   const clone = classifyStructuredError(error);
+  if (clone === 'parser-proxy') {
+    return 'unsafe';
+  }
   if (clone !== 'unavailable') {
     return clone;
   }
@@ -306,10 +474,13 @@ function classifyErrorBrand(error: object): JSONErrorBrand {
       return 'unsafe';
     }
     if (kind === 'unknown') {
-      return 'unknown';
+      return classifyStructuredError(error) === 'parser-proxy' ? 'unsafe' : 'unknown';
     }
 
     const clone = classifyStructuredError(error);
+    if (clone === 'parser-proxy') {
+      return 'unsafe';
+    }
     if (clone !== 'unavailable') {
       return clone;
     }
@@ -343,6 +514,11 @@ function isMalformedParserMarker(error: object, options?: MalformedJSONErrorOpti
   return parserType.value === 'invalid-json';
 }
 
+function classifyParserErrorKind(error: object, brand: JSONErrorBrand): JSONErrorKind {
+  const kind = error instanceof Error ? 'error' : classifyCrossRealmError(error);
+  return kind === 'unknown' && brand === 'proxy' ? classifyNativeProxyTarget(error) : kind;
+}
+
 /**
  * Identifies real malformed-JSON parser failures without exposing hostile diagnostics.
  * Provider-specific accessor policies preserve existing public rejection contracts.
@@ -372,7 +548,7 @@ export function isMalformedJSONError(error: unknown, options?: MalformedJSONErro
       }
       visited.add(current);
 
-      const kind = current instanceof Error ? 'error' : classifyCrossRealmError(current);
+      const kind = classifyParserErrorKind(current, brand);
       if (kind === 'syntax' || kind === 'unsafe') {
         return true;
       }
