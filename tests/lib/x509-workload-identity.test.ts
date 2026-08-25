@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 
 import OpenAI, { APIUserAbortError, AzureOpenAI, BedrockOpenAI } from 'openai';
 import type { ClientOptions } from 'openai';
-import type { WorkloadIdentity } from 'openai/auth';
+import type { WorkloadIdentity, X509WorkloadIdentity } from 'openai/auth';
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
 import * as transportCapability from 'openai/internal/auth/x509-transport-capability';
@@ -29,7 +29,7 @@ const TOKEN_RESPONSE = {
 let dispatcher: Agent;
 let transport: X509Transport;
 
-function identity() {
+function identity(): X509WorkloadIdentity {
   return {
     type: 'x509' as const,
     identityProviderId: 'synthetic-identity-provider',
