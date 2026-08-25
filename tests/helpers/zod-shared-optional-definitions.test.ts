@@ -598,6 +598,65 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(definitionNamed(schema, 'p_properties_a')).toEqual({ type: 'string' });
   });
 
+  it('waits for every definition before committing a collapse', () => {
+    // A definition materialized later can add a reference into a branch an
+    // earlier collapse removed, so the decision cannot be made mid-loop.
+    const leaf = zv3.object({ n: zv3.number() });
+    const maybe = zv3.object({ value: leaf }).optional().nullable();
+    const later = zv3.object({ value: leaf });
+
+    const schema = zodToJsonSchema(zv3.object({ a: maybe, b: later }), {
+      openaiStrictMode: true,
+      definitions: { maybe, later },
+    }) as Record<string, unknown>;
+
+    const pointers: string[] = [];
+    const collect = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          collect(item);
+        }
+        return;
+      }
+      if (!node || typeof node !== 'object') {
+        return;
+      }
+      const ref = (node as { $ref?: unknown }).$ref;
+      if (typeof ref === 'string') {
+        pointers.push(ref);
+      }
+      for (const key of Object.keys(node)) {
+        collect((node as Record<string, unknown>)[key]);
+      }
+    };
+    collect(schema);
+
+    expect(pointers.length).toBeGreaterThan(0);
+    for (const pointer of pointers) {
+      let resolved: unknown = schema;
+      for (const key of pointer.replace('#/', '').split('/')) {
+        resolved = (resolved as Record<string, unknown>)?.[key];
+      }
+      expect(resolved).toBeDefined();
+    }
+  });
+
+  it('records the first reference context even when it is not a property', () => {
+    // `propertyPath` is legitimately undefined for a reference outside a
+    // property, so it cannot be the sentinel for "not yet recorded" -- a later
+    // property reference would overwrite it and the definition would be
+    // collapsed as though it had come from one.
+    const shared = zv3.string().nullable().optional();
+
+    const schema = zodToJsonSchema(zv3.union([zv3.array(shared), zv3.object({ value: shared })]), {
+      definitions: { shared },
+    }) as Record<string, unknown>;
+
+    expect(definitionNamed(schema, 'shared')).toEqual({
+      anyOf: [{ not: {} }, { type: ['string', 'null'] }],
+    });
+  });
+
   it('still strips the wrapper for a definition extracted from a property', () => {
     const shared = zv3.string().nullable().optional();
 

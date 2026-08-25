@@ -330,6 +330,9 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
 
     const definitions: Record<string, any> = {};
     const processedDefinitions = new Set();
+    // A collapse cannot be committed while definitions are still being built:
+    // a later one can add a `$ref` into a branch an earlier collapse removed.
+    const pendingCollapses: { key: string; collapsed: JsonSchema7Type; wrapperPaths: string[] }[] = [];
 
     // the call to `parseDef()` here might itself add more entries to `.definitions`
     // so we need to continually evaluate definitions until we've resolved all of them
@@ -374,21 +377,35 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // without it, and the two have to agree. Nothing below the definition is
         // touched, and the wrapper stays wherever removing it would strand a
         // pointer generated against the uncollapsed shape.
-        let finished: JsonSchema7Type = materialized;
-        if (originatedInsideProperty(refs.seen.get(def)) && isPlainObject(materialized)) {
-          const removedWrappers: string[][] = [];
-          const collapsed = collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type;
-          // Every path the collapse actually removed, not just the outer one:
-          // stepping through a nullable puts the wrapper a level down.
-          const stranded = removedWrappers.some((segments) =>
-            referencesWrapperPath(materialized, [...definitionPath, ...segments].join('/')),
-          );
-          if (collapsed !== materialized && !stranded) {
-            finished = collapsed;
-          }
+        // Collapse decided below, once every definition exists: a definition
+        // materialized later can add a reference into a branch removed here.
+        const removedWrappers: string[][] = [];
+        const collapsed =
+          originatedInsideProperty(refs.seen.get(def)) && isPlainObject(materialized)
+            ? (collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type)
+            : materialized;
+        if (collapsed !== materialized) {
+          pendingCollapses.push({
+            key,
+            collapsed,
+            wrapperPaths: removedWrappers.map((segments) => [...definitionPath, ...segments].join('/')),
+          });
         }
-        definitions[key] = finished;
+        definitions[key] = materialized;
         processedDefinitions.add(key);
+      }
+    }
+
+    for (const { key, collapsed, wrapperPaths } of pendingCollapses) {
+      const stranded = wrapperPaths.some(
+        (wrapperPath) =>
+          referencesWrapperPath(main, wrapperPath) ||
+          // Wrapped so the walk recognises `definitions` as a map of schemas;
+          // its own keys are names, not keywords.
+          referencesWrapperPath({ definitions }, wrapperPath),
+      );
+      if (!stranded) {
+        definitions[key] = collapsed;
       }
     }
 

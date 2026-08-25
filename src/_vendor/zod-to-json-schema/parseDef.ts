@@ -109,11 +109,13 @@ export function parseDef(
   }
 
   if (seenItem && !forceResolution) {
-    if (seenItem.propertyPath === undefined && seenItem.jsonSchema === undefined) {
+    if (seenItem.referencePath === undefined) {
       // A definition supplied through `definitions` is pre-seeded before anything
       // has been parsed, so it carries no context. This is the first place it is
       // actually referenced from, and that is the context its materialization has
-      // to be encoded for.
+      // to be encoded for. `referencePath` is the sentinel rather than
+      // `propertyPath`, which is legitimately undefined for a first reference
+      // that was not inside a property and would let a later one overwrite it.
       seenItem.propertyPath = refs.propertyPath;
       seenItem.referencePath = refs.currentPath;
     }
