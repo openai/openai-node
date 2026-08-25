@@ -573,7 +573,11 @@ function snapshotAzureRequestHeadersAccessor(
             originalSetter.call(this, value);
             const current = latestSnapshot();
             if (current !== undefined) {
-              current.headers = value;
+              try {
+                current.headers = descriptor.get?.call(this);
+              } catch {
+                throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+              }
             }
           };
     snapshot = { descriptor, getter, inherited, snapshots };

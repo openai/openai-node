@@ -1628,11 +1628,113 @@ describe('Azure credential header diagnostic privacy', () => {
 
     await client.request(options);
 
-    expect(reads).toBe(1);
+    expect(reads).toBe(2);
     expect(writes).toBe(1);
     expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
     expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('api-key')).toBe('hook-replacement-token');
   });
+
+  test.each(
+    (['own', 'inherited'] as const).flatMap((representation) =>
+      (['api-key', 'Authorization'] as const).map((name) => ({ representation, name })),
+    ),
+  )(
+    'dispatches the effective $representation $name request-header accessor setter value',
+    async ({ representation, name }) => {
+      let reads = 0;
+      let writes = 0;
+      let effective: Record<string, string> = { [name]: 'initial-token' };
+      const owner = {
+        get headers() {
+          reads += 1;
+          if (reads > 2) {
+            throw new Error(PRIVATE_CREDENTIAL);
+          }
+          return effective;
+        },
+        set headers(value: Record<string, string>) {
+          writes += 1;
+          effective = { [name]: String(value[name]).toLowerCase(), 'x-setter': 'normalized' };
+        },
+      };
+      const options: FinalRequestOptions = Object.assign(
+        representation === 'own' ? owner : Object.create(owner),
+        { method: 'post' as const, path: '/models', body: { safe: true } },
+      );
+      const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        maxRetries: 0,
+      });
+      client.observeProtectedHookOptions = (hook, received) => {
+        if (hook === 'auth') {
+          received.headers = { [name]: 'CASE-SENSITIVE-TOKEN' };
+        }
+      };
+
+      await client.request(options);
+
+      expect(reads).toBe(2);
+      expect(writes).toBe(1);
+      expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+      const dispatched = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      expect(dispatched.get(name)).toBe('case-sensitive-token');
+      expect(dispatched.get('x-setter')).toBe('normalized');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(['throws', 'returns an invalid credential'] as const)(
+    'sanitizes a request-header accessor that %s after its setter runs',
+    async (behavior) => {
+      const malformed = `${PRIVATE_CREDENTIAL}\n${PRIVATE_SUFFIX}`;
+      let reads = 0;
+      let assigned = false;
+      const options: FinalRequestOptions = {
+        method: 'post',
+        path: '/models',
+        body: { safe: true },
+        get headers() {
+          reads += 1;
+          if (assigned && behavior === 'throws') {
+            throw Object.assign(new Error(malformed), { cause: new Error(malformed) });
+          }
+          return { 'api-key': assigned ? malformed : 'safe-initial-token' };
+        },
+        set headers(_value) {
+          assigned = true;
+        },
+      };
+      const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+      const logger = createLogger();
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new ProtectedHookAzure({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-token',
+        fetch,
+        logger,
+        logLevel: 'debug',
+        maxRetries: 0,
+      });
+      client.observeProtectedHookOptions = (hook, received) => {
+        if (hook === 'auth') {
+          received.headers = { 'api-key': 'safe-supplied-token' };
+        }
+      };
+
+      await expectPrivateCredentialFailure(() => client.request(options), malformed);
+
+      expect(reads).toBe(2);
+      expect(Object.getOwnPropertyDescriptor(options, 'headers')).toEqual(descriptor);
+      expect(fetch).not.toHaveBeenCalled();
+      expectPrivateLogs(logger, malformed);
+    },
+  );
 
   test.each([
     ['the same Azure client', false],
@@ -4614,7 +4716,35 @@ describe('Azure credential header diagnostic privacy', () => {
       };
       let expected = [first, second];
       client.inspectAuthenticationCarrier = (carrier) => {
+        const expectCookieIteration = (): void => {
+          const expectedEntries = expected.map((value) => ['set-cookie', value]);
+          expect([...carrier.values.entries()].filter(([name]) => name === 'set-cookie')).toEqual(
+            expectedEntries,
+          );
+          expect([...carrier.values.keys()].filter((name) => name === 'set-cookie')).toEqual(
+            expected.map(() => 'set-cookie'),
+          );
+          expect(
+            [...carrier.values.values()].filter(
+              (value) =>
+                value.startsWith('session=') || value.startsWith('preference=') || value.includes('=value'),
+            ),
+          ).toEqual(expected);
+          expect([...carrier.values].filter(([name]) => name === 'set-cookie')).toEqual(expectedEntries);
+          const visited: [string, string][] = [];
+          const visitCookies = carrier.values.forEach;
+          visitCookies.call(carrier.values, (value, name, parent) => {
+            if (name === 'set-cookie') {
+              expect(parent).toBe(carrier.values);
+              visited.push([name, value]);
+            }
+          });
+          expect(visited).toEqual(expectedEntries);
+          expect(carrier.values.get('set-cookie')).toBe(expected.length === 0 ? null : expected.join(', '));
+        };
+
         expect(carrier.values.getSetCookie()).toEqual(expected);
+        expectCookieIteration();
         expect(Object.getOwnPropertyDescriptor(carrier.values, 'getSetCookie')).toBeUndefined();
         expect(
           typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(carrier.values), 'getSetCookie')
@@ -4636,6 +4766,7 @@ describe('Azure credential header diagnostic privacy', () => {
         }
 
         expect(carrier.values.getSetCookie()).toEqual(expected);
+        expectCookieIteration();
         const detached = carrier.values.getSetCookie;
         expect(() => detached()).toThrow(TypeError);
       };

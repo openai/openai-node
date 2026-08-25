@@ -147,26 +147,7 @@ class DeferredAzureAuthenticationHeaders extends Headers {
         configurable: true,
         writable: true,
         value(this: DeferredAzureAuthenticationHeaders): string[] {
-          Headers.prototype.has.call(this, 'set-cookie');
-          const carrier = azureAuthenticationHeaderCarriers.get(this);
-          const source = carrier ? iterateHeaders(carrier) : Headers.prototype.entries.call(this);
-          const cookies: string[] = [];
-
-          for (const [name, value] of source) {
-            if (name.toLowerCase() !== 'set-cookie') {
-              continue;
-            }
-            if (value === null) {
-              cookies.length = 0;
-              continue;
-            }
-            const normalized = new Headers([['set-cookie', value]]).get('set-cookie');
-            if (normalized !== null) {
-              cookies.push(normalized);
-            }
-          }
-
-          return cookies;
+          return this.cookieValues();
         },
       },
       has: {
@@ -251,6 +232,29 @@ class DeferredAzureAuthenticationHeaders extends Headers {
     });
   }
 
+  private cookieValues(): string[] {
+    Headers.prototype.has.call(this, 'set-cookie');
+    const carrier = azureAuthenticationHeaderCarriers.get(this);
+    const source = carrier ? iterateHeaders(carrier) : Headers.prototype.entries.call(this);
+    const cookies: string[] = [];
+
+    for (const [name, value] of source) {
+      if (name.toLowerCase() !== 'set-cookie') {
+        continue;
+      }
+      if (value === null) {
+        cookies.length = 0;
+        continue;
+      }
+      const normalized = new Headers([['set-cookie', value]]).get('set-cookie');
+      if (normalized !== null) {
+        cookies.push(normalized);
+      }
+    }
+
+    return cookies;
+  }
+
   private iterator(kind: 'entries'): ReturnType<Headers['entries']>;
   private iterator(kind: 'keys'): ReturnType<Headers['keys']>;
   private iterator(kind: 'values'): ReturnType<Headers['values']>;
@@ -304,8 +308,20 @@ class DeferredAzureAuthenticationHeaders extends Headers {
       }
       if (changed) {
         entries = [...this.current()];
+        const cookies = entries.findIndex(([name]) => name === 'set-cookie');
+        if (cookies !== -1) {
+          entries.splice(
+            cookies,
+            1,
+            ...this.cookieValues().map((value): [string, string] => ['set-cookie', value]),
+          );
+        }
         nativeEntries = [...Headers.prototype.entries.call(this)];
         nativeValues = new Map(nativeEntries);
+        const nativeCookies = Headers.prototype.get.call(this, 'set-cookie');
+        if (nativeCookies !== null) {
+          nativeValues.set('set-cookie', nativeCookies);
+        }
         nativeObserver = Headers.prototype.entries.call(this);
         nativeIndex = 0;
         nullNames = new Set(carrier === undefined ? [] : Set.prototype.values.call(carrier.nulls));
