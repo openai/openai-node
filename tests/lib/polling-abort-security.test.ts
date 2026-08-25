@@ -11,6 +11,7 @@ type FetchMock = ReturnType<typeof vi.fn<Fetch>>;
 type Method = [string, number, (client: OpenAI, options: Options) => Promise<unknown>];
 type AbortListener = Parameters<AbortSignal['addEventListener']>[1];
 type AbortListenerOptions = Parameters<AbortSignal['addEventListener']>[2];
+type AbortListenerRemovalOptions = Parameters<AbortSignal['removeEventListener']>[2];
 
 const runs = (client: OpenAI) => client.beta.threads.runs;
 const files = (client: OpenAI) => client.vectorStores.files;
@@ -151,6 +152,72 @@ function hiddenSignal(signal: AbortSignal, inherited: boolean): Options {
     : Object.defineProperty(options, 'signal', { value: signal });
 }
 
+function throwingStructuralSignal(controller: AbortController): {
+  signal: AbortSignal;
+  removeEventListener: ReturnType<typeof vi.fn<AbortSignal['removeEventListener']>>;
+  callbackErrors: unknown[];
+  failNextRemovals: (count?: number) => void;
+} {
+  const callbackErrors: unknown[] = [];
+  const listeners = new Map<NonNullable<AbortListener>, NonNullable<AbortListener>>();
+  let failuresRemaining = 0;
+  const removeEventListener = vi.fn<AbortSignal['removeEventListener']>(
+    (type: string, listener: AbortListener, options?: AbortListenerRemovalOptions) => {
+      const registered = listener ? (listeners.get(listener) ?? listener) : listener;
+      controller.signal.removeEventListener(type, registered, options);
+      if (listener) {
+        listeners.delete(listener);
+      }
+      if (failuresRemaining > 0) {
+        failuresRemaining -= 1;
+        throw new Error('structural signal listener removal failed');
+      }
+    },
+  );
+
+  const signal: AbortSignal = {
+    get aborted() {
+      return controller.signal.aborted;
+    },
+    get reason() {
+      return controller.signal.reason;
+    },
+    onabort: null,
+    throwIfAborted: controller.signal.throwIfAborted.bind(controller.signal),
+    addEventListener(type: string, listener: AbortListener, options?: AbortListenerOptions) {
+      if (!listener) {
+        controller.signal.addEventListener(type, listener, options);
+        return;
+      }
+
+      const guarded = (event: Event) => {
+        try {
+          if (typeof listener === 'function') {
+            listener.call(controller.signal, event);
+          } else {
+            listener.handleEvent(event);
+          }
+        } catch (error) {
+          callbackErrors.push(error);
+        }
+      };
+      listeners.set(listener, guarded);
+      controller.signal.addEventListener(type, guarded, options);
+    },
+    removeEventListener,
+    dispatchEvent: controller.signal.dispatchEvent.bind(controller.signal),
+  };
+
+  return {
+    signal,
+    removeEventListener,
+    callbackErrors,
+    failNextRemovals(count = 1) {
+      failuresRemaining = count;
+    },
+  };
+}
+
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.clearAllTimers();
@@ -183,6 +250,52 @@ describe.each(transitiveMethods)('%s transitive cancellation', (_name, requests,
     await expectAbort(pending, controller.signal, fetch, requests);
   });
 });
+
+describe.each([...directMethods, ...transitiveMethods])(
+  '%s structural listener-removal failures',
+  (_name, requests, invoke) => {
+    test('still rejects cancellation exactly once and cleans up its listener', async () => {
+      const controller = new AbortController();
+      const { signal, removeEventListener, callbackErrors, failNextRemovals } =
+        throwingStructuralSignal(controller);
+      const { client, fetch } = createClient();
+      const pending = observe(invoke(client, { signal, pollIntervalMs: 6000 }));
+
+      await waitForDelay(fetch, requests);
+      removeEventListener.mockClear();
+      failNextRemovals();
+      controller.abort(new Error('structural signal cancellation during throwing removal'));
+
+      await expectAbort(pending, controller.signal, fetch, requests);
+      expect(removeEventListener).toHaveBeenCalledTimes(1);
+      expect(callbackErrors).toEqual([]);
+    });
+
+    test('still completes its timer without leaking a callback exception', async () => {
+      const controller = new AbortController();
+      const { signal, removeEventListener, callbackErrors, failNextRemovals } =
+        throwingStructuralSignal(controller);
+      const { client, fetch } = createClient();
+      const pending = observe(invoke(client, { signal, pollIntervalMs: 25 }));
+
+      await waitForDelay(fetch, requests);
+      const retainedListeners = getEventListeners(controller.signal, 'abort').slice(0, -1);
+      removeEventListener.mockClear();
+      failNextRemovals();
+      await vi.advanceTimersByTimeAsync(25);
+
+      await expect(pending).resolves.toMatchObject({ completed: { status: 'completed' } });
+      expect(requestCount(fetch)).toBe(requests + 1);
+      expect(getEventListeners(controller.signal, 'abort')).toEqual([
+        ...retainedListeners,
+        expect.any(Function),
+      ]);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(removeEventListener).toHaveBeenCalledTimes(2);
+      expect(callbackErrors).toEqual([]);
+    });
+  },
+);
 
 describe('poll interval, caller-signal ownership, and listener lifecycle', () => {
   test.each([
@@ -350,6 +463,84 @@ describe('caller-signal reentrancy and polling compatibility', () => {
     controller.abort(new Error('structural signal cancellation'));
 
     await expectAbort(pending, controller.signal, fetch, 1);
+  });
+
+  test.each([false, true])(
+    'preserves public cancellation when registration races and removal throws (late throw: %s)',
+    async (throwAfterInstall) => {
+      const controller = new AbortController();
+      const reason = new Error('structural abort raced with listener installation');
+      const { signal, removeEventListener, callbackErrors, failNextRemovals } =
+        throwingStructuralSignal(controller);
+      const original = signal.addEventListener.bind(signal);
+
+      vi.spyOn(signal, 'addEventListener').mockImplementation(((
+        type: string,
+        listener: AbortListener,
+        options?: AbortListenerOptions,
+      ) => {
+        if (removeEventListener.mock.calls.length === 0) {
+          original(type, listener, options);
+          return;
+        }
+
+        removeEventListener.mockClear();
+        failNextRemovals(2);
+        controller.abort(reason);
+        if (typeof listener === 'function') {
+          listener.call(signal, new Event('abort'));
+          listener.call(signal, new Event('abort'));
+        }
+        original(type, listener, options);
+        if (throwAfterInstall) {
+          throw new Error('structural registration threw after cancellation and installation');
+        }
+      }) as typeof signal.addEventListener);
+
+      const { client, fetch } = createClient();
+      const pending = observe(files(client).poll('vs_123', 'file_123', { signal, pollIntervalMs: 4000 }));
+
+      await expectAbort(pending, controller.signal, fetch, 1);
+      expect(removeEventListener).toHaveBeenCalledTimes(2);
+      expect(callbackErrors).toEqual([]);
+    },
+  );
+
+  test('preserves a public registration failure when listener removal also throws', async () => {
+    const controller = new AbortController();
+    const failure = new Error('structural registration failed after installation');
+    const { signal, removeEventListener, callbackErrors, failNextRemovals } =
+      throwingStructuralSignal(controller);
+    const original = signal.addEventListener.bind(signal);
+    let retainedListeners: unknown[] = [];
+
+    vi.spyOn(signal, 'addEventListener').mockImplementation(((
+      type: string,
+      listener: AbortListener,
+      options?: AbortListenerOptions,
+    ) => {
+      if (removeEventListener.mock.calls.length === 0) {
+        original(type, listener, options);
+        return;
+      }
+
+      retainedListeners = getEventListeners(controller.signal, 'abort');
+      removeEventListener.mockClear();
+      failNextRemovals();
+      original(type, listener, options);
+      throw failure;
+    }) as typeof signal.addEventListener);
+
+    const { client, fetch } = createClient();
+    const pending = observe(files(client).poll('vs_123', 'file_123', { signal, pollIntervalMs: 4000 }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    await expect(pending).resolves.toBe(failure);
+    expect(requestCount(fetch)).toBe(1);
+    expect(getEventListeners(controller.signal, 'abort')).toEqual(retainedListeners);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(removeEventListener).toHaveBeenCalledTimes(1);
+    expect(callbackErrors).toEqual([]);
   });
 
   test.each([

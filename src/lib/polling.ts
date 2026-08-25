@@ -14,6 +14,14 @@ function sleepUntilAborted(milliseconds: number, signal: AbortSignal): Promise<v
     let registered: (() => void) | undefined;
     let settled = false;
 
+    const removeAbortListener = (listener: () => void) => {
+      try {
+        signal.removeEventListener('abort', listener);
+      } catch {
+        // Caller-controlled cleanup must never prevent the polling promise from settling.
+      }
+    };
+
     const cleanup = () => {
       if (timer !== undefined) {
         clearTimeout(timer);
@@ -22,7 +30,7 @@ function sleepUntilAborted(milliseconds: number, signal: AbortSignal): Promise<v
       if (registered) {
         const listener = registered;
         registered = undefined;
-        signal.removeEventListener('abort', listener);
+        removeAbortListener(listener);
       }
     };
 
@@ -66,13 +74,13 @@ function sleepUntilAborted(milliseconds: number, signal: AbortSignal): Promise<v
       signal.addEventListener('abort', abort, { once: true });
 
       if (settled) {
-        signal.removeEventListener('abort', abort);
+        removeAbortListener(abort);
       } else if (signal.aborted) {
         abort();
       }
     } catch (error) {
       if (settled) {
-        signal.removeEventListener('abort', abort);
+        removeAbortListener(abort);
       } else {
         settled = true;
         cleanup();
