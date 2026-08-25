@@ -319,7 +319,7 @@ const azureRequestHeadersAccessorSnapshots = new WeakMap<
   {
     descriptor: PropertyDescriptor;
     getter: () => FinalRequestOptions['headers'];
-    snapshots: Array<{ headers: FinalRequestOptions['headers'] }>;
+    snapshots: { headers: FinalRequestOptions['headers'] }[];
   }
 >();
 
@@ -351,15 +351,15 @@ function snapshotAzureRequestHeadersAccessor(
       throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
     }
 
-    const snapshots: Array<{ headers: FinalRequestOptions['headers'] }> = [];
-    const getter = () => snapshots[snapshots.length - 1]?.headers;
+    const snapshots: { headers: FinalRequestOptions['headers'] }[] = [];
+    const getter = () => snapshots.at(-1)?.headers;
     const originalSetter = descriptor.set;
     const setter =
       originalSetter === undefined
         ? undefined
         : function setHeaders(this: FinalRequestOptions, value: FinalRequestOptions['headers']): void {
             originalSetter.call(this, value);
-            const current = snapshots[snapshots.length - 1];
+            const current = snapshots.at(-1);
             if (current !== undefined) {
               current.headers = value;
             }
@@ -455,23 +455,27 @@ function hasIntrinsicHeadersIdentity(headers: RequestInit['headers']): headers i
   return false;
 }
 
+function snapshotSameRealmHeaders(headers: Headers): RequestInit['headers'] {
+  if (hasIntrinsicHeadersIdentity(headers)) {
+    return headers;
+  }
+  const entries = intrinsicHeadersDescriptors.get('entries');
+  if (typeof entries !== 'function') {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+  try {
+    return [...entries.call(headers)] as [string, string][];
+  } catch {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+}
+
 function snapshotCrossRealmHeaders(headers: RequestInit['headers']): RequestInit['headers'] {
   if (headers === undefined || headers === null || typeof headers !== 'object') {
     return headers;
   }
   if (headers instanceof Headers) {
-    if (hasIntrinsicHeadersIdentity(headers)) {
-      return headers;
-    }
-    const entries = intrinsicHeadersDescriptors.get('entries');
-    if (typeof entries !== 'function') {
-      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
-    }
-    try {
-      return Array.from(entries.call(headers)) as [string, string][];
-    } catch {
-      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
-    }
+    return snapshotSameRealmHeaders(headers);
   }
   if (Array.isArray(headers)) {
     return headers;

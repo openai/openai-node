@@ -836,7 +836,9 @@ describe('Azure credential header diagnostic privacy', () => {
         path: '/models',
         body: { shared: true },
         get headers() {
-          return snapshots[reads++];
+          const snapshot = snapshots[reads];
+          reads += 1;
+          return snapshot;
         },
       };
       const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
