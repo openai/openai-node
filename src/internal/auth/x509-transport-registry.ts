@@ -1,6 +1,40 @@
 import { OpenAIError } from '../../core/error';
 import { findRegisteredX509Transport } from '#x509-transport-state';
 
+const transientX509TransportCodes = new Set([
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EPIPE',
+  'ETIMEDOUT',
+  'EAI_AGAIN',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_SOCKET',
+]);
+
+/** Retries only known temporary failures when neither error layer reports a permanent code. */
+export function isRetryableX509TransportFailure(failure: unknown): boolean {
+  const cause =
+    typeof failure === 'object' && failure !== null
+      ? Object.getOwnPropertyDescriptor(failure, 'cause')?.value
+      : undefined;
+  let retryable = false;
+  for (const candidate of [failure, cause]) {
+    const code =
+      typeof candidate === 'object' && candidate !== null
+        ? Object.getOwnPropertyDescriptor(candidate, 'code')?.value
+        : undefined;
+    if (typeof code === 'string') {
+      if (!transientX509TransportCodes.has(code)) {
+        return false;
+      }
+      retryable = true;
+    }
+  }
+  return retryable;
+}
+
 export const x509TransportBrand: unique symbol = Symbol('X.509 transport capability');
 
 /** Opaque identity of one frozen, caller-owned, explicitly attested X.509 transport. */
@@ -47,6 +81,9 @@ export interface RegisteredX509Transport {
 
   /** Re-enters the original request scope when response parsing resumes outside its promise chain. */
   resume: <T>(scope: X509RequestScope, operation: () => T) => T;
+
+  /** Waits for retry backoff using an abortable timer that keeps an active request alive. */
+  sleep: (duration: number, signal?: AbortSignal | null) => Promise<void>;
 }
 
 /** Resolves a previously registered opaque capability without importing an optional transport peer. */

@@ -28,6 +28,7 @@ import {
   snapshotX509RequestOptions,
 } from './internal/auth/x509-workload-identity-auth';
 import type { X509Transport } from './internal/auth/x509-transport-registry';
+import { markApprovedX509Client } from '#x509-transport-state';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
@@ -610,6 +611,7 @@ export class OpenAI {
         this._workloadIdentityAuth = authentication;
         this.#x509Fetch = authentication.fetch();
         this.fetch = this.#x509Fetch;
+        markApprovedX509Client(this);
       } else {
         this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
       }
@@ -1040,6 +1042,44 @@ export class OpenAI {
     }
   }
 
+  /** Keeps terminal X.509 error-body consumption inside the original logical request deadline. */
+  private async readX509ResponseError(
+    response: Response,
+    options: FinalRequestOptions,
+    timeout: number,
+    controller: AbortController,
+    authentication: X509WorkloadIdentityAuth,
+  ): Promise<string> {
+    const deadline = new AbortController();
+    const callerSignal = options.signal;
+    const cancel = () => deadline.abort(callerSignal?.reason);
+    callerSignal?.addEventListener('abort', cancel, { once: true });
+    if (callerSignal?.aborted) {
+      cancel();
+    }
+
+    try {
+      const remaining = authentication.remainingTimeout(options, timeout);
+      const expiration = authentication.waitForRetry(remaining, deadline.signal).then(() => {
+        controller.abort();
+        void Shims.CancelReadableStream(response.body).catch(() => undefined);
+        throw new Errors.APIConnectionTimeoutError();
+      });
+      return await Promise.race([
+        response.text().catch(() => 'X.509 workload identity API response body could not be read.'),
+        expiration,
+      ]);
+    } catch (error) {
+      if (callerSignal?.aborted) {
+        throw this._makeUserAbortError(callerSignal);
+      }
+      throw error;
+    } finally {
+      callerSignal?.removeEventListener('abort', cancel);
+      deadline.abort();
+    }
+  }
+
   private async makeRequest(
     optionsInput: PromiseOrValue<FinalRequestOptions>,
     retriesRemaining: number | null,
@@ -1053,11 +1093,25 @@ export class OpenAI {
 
     await this.prepareOptions(options);
 
-    const { req, url, timeout } = await this.buildRequest(options, {
-      retryCount: maxRetries - retriesRemaining,
-    });
     const x509Authentication =
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
+    let built: { req: FinalizedRequestInit; url: string; timeout: number };
+    try {
+      built = await this.buildRequest(options, {
+        retryCount: maxRetries - retriesRemaining,
+      });
+    } catch (error) {
+      if (x509Authentication && retriesRemaining && X509WorkloadIdentityAuth.isRetryableFailure(error)) {
+        return await this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? 'x509-token-exchange',
+          X509WorkloadIdentityAuth.retryHeaders(error),
+        );
+      }
+      throw error;
+    }
+    const { req, url, timeout } = built;
     x509Authentication?.bindRequest(options, req, this.adminAPIKey);
     let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
@@ -1093,6 +1147,9 @@ export class OpenAI {
     }
 
     const security = options.__security ?? { bearerAuth: true };
+    if (x509Authentication && options.signal && req.signal !== options.signal) {
+      req.signal = req.signal ? AbortSignal.any([options.signal, req.signal]) : options.signal;
+    }
     // Request hooks may replace the caller signal before it reaches fetch.
     const controller =
       this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
@@ -1248,7 +1305,9 @@ export class OpenAI {
 
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
-      const errText = await response.text().catch((err: any) => castToError(err).message);
+      const errText = x509Authentication
+        ? await this.readX509ResponseError(response, options, timeout, controller, x509Authentication)
+        : await response.text().catch((err: any) => castToError(err).message);
       const errJSON = safeJSON(errText) as any;
       const errMessage = errJSON ? undefined : errText;
 
@@ -1281,6 +1340,7 @@ export class OpenAI {
     );
 
     const continueRequest = x509Authentication?.continuation();
+    x509Authentication?.releaseRequestCredentials();
     this.#responseAttempts.set(controller, {
       timeout,
       retriesRemaining,
@@ -1454,13 +1514,19 @@ export class OpenAI {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
-    if (this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth) {
-      const remaining = this._workloadIdentityAuth.remainingTimeout(options, options.timeout ?? this.timeout);
+    const x509Authentication =
+      this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
+    if (x509Authentication) {
+      const remaining = x509Authentication.remainingTimeout(options, options.timeout ?? this.timeout);
       if (timeoutMillis >= remaining) {
         throw new Errors.APIConnectionTimeoutError();
       }
     }
-    await sleep(timeoutMillis);
+    if (x509Authentication) {
+      await x509Authentication.waitForRetry(timeoutMillis, options.signal);
+    } else {
+      await sleep(timeoutMillis);
+    }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
   }

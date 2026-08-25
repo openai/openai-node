@@ -7,6 +7,13 @@ import {
 } from '../../core/error';
 import { hasOwn } from '../utils/values';
 import { sendX509Request } from './x509-transport-capability';
+import { isRetryableX509TransportFailure } from './x509-transport-registry';
+import {
+  isTransientX509ConnectionError,
+  markRetryableX509IssuerError,
+  markTransientX509ConnectionError,
+  rememberX509OAuthError,
+} from '#x509-transport-state';
 import type { X509ExchangedToken, X509Transport } from './x509-transport-registry';
 
 export type { X509ExchangedToken } from './x509-transport-registry';
@@ -19,6 +26,14 @@ const SAFE_ACCESS_TOKEN = /^[A-Za-z0-9._~+/-]+=*$/u;
 const SAFE_OAUTH_ERRORS = new Set(['invalid_grant', 'invalid_subject_token', 'token_exchange_server_error']);
 const SAFE_RESPONSE_HEADERS = ['retry-after', 'retry-after-ms', 'x-should-retry', 'x-request-id'];
 const MAX_TOKEN_EXCHANGE_DURATION_MS = 5000;
+
+function transientConnectionError(message: string, failure: unknown): APIConnectionError {
+  const error = new APIConnectionError({ message });
+  if (isRetryableX509TransportFailure(failure)) {
+    markTransientX509ConnectionError(error);
+  }
+  return error;
+}
 
 /** Parameters for one certificate-authenticated OAuth exchange. */
 export interface X509TokenExchangeOptions {
@@ -84,12 +99,12 @@ async function readResponseBody(response: Response, signal?: AbortSignal): Promi
       chunks.push(chunk.value);
       totalBytes += chunk.value.byteLength;
     }
-  } catch {
+  } catch (error) {
     cancel();
     if (signal?.aborted) {
       signal.throwIfAborted();
     }
-    throw new APIConnectionError({ message: 'X.509 workload identity token response could not be read.' });
+    throw transientConnectionError('X.509 workload identity token response could not be read.', error);
   } finally {
     signal?.removeEventListener('abort', cancel);
     reader.releaseLock();
@@ -170,7 +185,11 @@ function readOAuthErrorCode(value: unknown): string | undefined {
   return undefined;
 }
 
-async function oauthError(response: Response, signal?: AbortSignal): Promise<OAuthError> {
+async function oauthError(
+  response: Response,
+  signal?: AbortSignal,
+  callerSignal?: AbortSignal,
+): Promise<OAuthError> {
   let errorCode: { error: string } | undefined;
 
   try {
@@ -182,14 +201,23 @@ async function oauthError(response: Response, signal?: AbortSignal): Promise<OAu
       }
     }
   } catch {
-    signal?.throwIfAborted();
+    callerSignal?.throwIfAborted();
+    if (
+      signal?.aborted &&
+      !(signal.reason instanceof APIConnectionTimeoutError && isTransientX509ConnectionError(signal.reason))
+    ) {
+      signal.throwIfAborted();
+    }
   }
 
   const { status } = response;
   if (status !== 400 && status !== 401 && status !== 403) {
     throw new OpenAIError('X.509 workload identity received an invalid OAuth error status.');
   }
-  return new OAuthError(status, errorCode, safeResponseHeaders(response));
+  const headers = safeResponseHeaders(response);
+  const error = new OAuthError(status, errorCode, headers);
+  rememberX509OAuthError(error, { status, error: errorCode, headers });
+  return error;
 }
 
 /** Exchanges one enrolled client certificate for a validated OpenAI workload access token. */
@@ -213,9 +241,11 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
     ? AbortSignal.any([callerSignal, timeoutController.signal])
     : timeoutController.signal;
   const timeout = setTimeout(() => {
-    timeoutController.abort(
-      new APIConnectionTimeoutError({ message: 'X.509 workload identity token exchange timed out.' }),
-    );
+    const error = new APIConnectionTimeoutError({
+      message: 'X.509 workload identity token exchange timed out.',
+    });
+    markTransientX509ConnectionError(error);
+    timeoutController.abort(error);
   }, MAX_TOKEN_EXCHANGE_DURATION_MS);
   timeout.unref();
 
@@ -236,9 +266,9 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
         redirect: 'manual',
         signal,
       });
-    } catch {
+    } catch (error) {
       signal.throwIfAborted();
-      throw new APIConnectionError({ message: 'X.509 workload identity token exchange connection failed.' });
+      throw transientConnectionError('X.509 workload identity token exchange connection failed.', error);
     }
     signal.throwIfAborted();
 
@@ -257,22 +287,23 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
       }
     }
     if (response.status === 400 || response.status === 401 || response.status === 403) {
-      throw await oauthError(response, signal);
+      throw await oauthError(response, signal, options.signal);
     }
 
     cancelResponseBody(response);
-    throw APIError.generate(
+    const retryableStatus =
+      response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
+    const headers = safeResponseHeaders(response, retryableStatus);
+    const error = APIError.generate(
       response.status,
       undefined,
       'X.509 workload identity token exchange failed.',
-      safeResponseHeaders(
-        response,
-        response.status === 408 ||
-          response.status === 409 ||
-          response.status === 429 ||
-          response.status >= 500,
-      ),
+      headers,
     );
+    if (retryableStatus && headers.get('x-should-retry') !== 'false') {
+      markRetryableX509IssuerError(error);
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

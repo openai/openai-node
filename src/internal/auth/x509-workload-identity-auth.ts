@@ -1,4 +1,4 @@
-import { APIConnectionTimeoutError, APIUserAbortError, OpenAIError } from '../../core/error';
+import { APIConnectionTimeoutError, APIUserAbortError, OAuthError, OpenAIError } from '../../core/error';
 import type { WorkloadIdentity, X509WorkloadIdentity } from '../../auth/types';
 import type { Fetch } from '../builtin-types';
 import { buildHeaders } from '../headers';
@@ -7,6 +7,12 @@ import type { FinalRequestOptions } from '../request-options';
 import type { MergedRequestInit } from '../types';
 import { hasOwn } from '../utils/values';
 import { resolveX509Transport } from './x509-transport-registry';
+import {
+  isApprovedX509Client,
+  findX509OAuthError,
+  isRetryableX509IssuerError,
+  isTransientX509ConnectionError,
+} from '#x509-transport-state';
 import type { RegisteredX509Transport, X509RequestScope, X509Transport } from './x509-transport-registry';
 
 /** Sole API authority approved for OpenAI X.509 workload-identity federation. */
@@ -79,10 +85,33 @@ export function isX509WorkloadIdentity(
     return false;
   }
 
-  const discriminator = Object.getOwnPropertyDescriptor(identity, 'type');
-  return (
-    !!discriminator && 'value' in discriminator && discriminator.value === 'x509' && !('provider' in identity)
-  );
+  if ('provider' in identity) {
+    return false;
+  }
+
+  let current: object | null = identity;
+  while (current !== null && current !== Object.prototype) {
+    const discriminator = Object.getOwnPropertyDescriptor(current, 'type');
+    if (discriminator) {
+      if (!('value' in discriminator)) {
+        throw new OpenAIError('X.509 workload identity type must be a plain data property.');
+      }
+      return discriminator.value === 'x509';
+    }
+    current = Object.getPrototypeOf(current) as object | null;
+  }
+  return false;
+}
+
+/** Rejects unsupported WebSocket authentication before any connection or credential side effect. */
+export function assertX509WebSocketSupported(client: unknown): void {
+  if (!client || typeof client !== 'object') {
+    return;
+  }
+
+  if (isApprovedX509Client(client)) {
+    throw new OpenAIError('X.509 workload identity does not support WebSocket connections.');
+  }
 }
 
 /** Rejects every destination outside the sole enrolled, global X.509 API authority. */
@@ -165,8 +194,17 @@ export class X509WorkloadIdentityAuth {
 
   /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
   continuation(): <T>(operation: () => T) => T {
-    const scope = this.#scope();
+    const { wallStartedAt, monotonicStartedAt } = this.#scope();
+    const scope: X509RequestScope = { wallStartedAt, monotonicStartedAt };
     return (operation) => this.#transport.resume(scope, operation);
+  }
+
+  /** Removes dispatched bearer material before settled request promises can retain their scope. */
+  releaseRequestCredentials(): void {
+    const scope = this.#scope();
+    delete scope.token;
+    delete scope.headers;
+    delete scope.authorization;
   }
 
   /** Returns the original authentication start so response consumption shares its request deadline. */
@@ -190,6 +228,36 @@ export class X509WorkloadIdentityAuth {
       throw new APIConnectionTimeoutError();
     }
     return remaining;
+  }
+
+  /** Cancels active retry timers promptly without changing public caller-abort semantics. */
+  async waitForRetry(duration: number, signal?: AbortSignal | null): Promise<void> {
+    try {
+      await this.#transport.sleep(duration, signal);
+    } catch (error) {
+      if (signal?.aborted) {
+        throw userAbortError(signal);
+      }
+      throw error;
+    }
+  }
+
+  /** Trusts only issuer or connection failures privately branded by the approved transport. */
+  static isRetryableFailure(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      (isTransientX509ConnectionError(error) || isRetryableX509IssuerError(error))
+    );
+  }
+
+  /** Reads safe retry hints only from a privately branded, sanitized issuer response. */
+  static retryHeaders(error: unknown): Headers | undefined {
+    if (!error || typeof error !== 'object' || !isRetryableX509IssuerError(error)) {
+      return undefined;
+    }
+    const headers: unknown = Object.getOwnPropertyDescriptor(error, 'headers')?.value;
+    return headers instanceof Headers ? headers : undefined;
   }
 
   /** Exchanges the exact certificate capability selected for the matching API dispatch. */
@@ -223,6 +291,14 @@ export class X509WorkloadIdentityAuth {
     } catch (error) {
       if (callerSignal?.aborted) {
         throw userAbortError(callerSignal);
+      }
+      if (error && typeof error === 'object' && !(error instanceof OAuthError)) {
+        const oauth:
+          | { status: 400 | 401 | 403; error: { error: string } | undefined; headers: Headers }
+          | undefined = findX509OAuthError(error);
+        if (oauth) {
+          throw new OAuthError(oauth.status, oauth.error, oauth.headers);
+        }
       }
       throw error;
     } finally {
