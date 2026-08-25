@@ -217,6 +217,28 @@ const packedPackagePath = require('node:path');
       tarball,
     ]);
 
+    const privateX509Modules = [
+      'openai/internal/auth/x509-transport-capability',
+      'openai/internal/auth/x509-transport-capability.js',
+      'openai/internal/auth/x509-transport-capability.mjs',
+      'openai/internal/auth/x509-transport-registry',
+      'openai/internal/auth/x509-transport-registry.js',
+      'openai/internal/auth/x509-transport-registry.mjs',
+      'openai/internal/auth/x509-transport-state',
+      'openai/internal/auth/x509-transport-state.cjs',
+    ];
+    const moduleNames = JSON.stringify(privateX509Modules);
+    run(process.execPath, [
+      '--input-type=commonjs',
+      '--eval',
+      `for (const name of ${moduleNames}) { try { require(name); throw new Error(name + ' is publicly accessible'); } catch (error) { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; } }`,
+    ]);
+    run(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      `for (const name of ${moduleNames}) { try { await import(name); throw new Error(name + ' is publicly accessible'); } catch (error) { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; } }`,
+    ]);
+
     const unsupportedDispatcher =
       'assert.throws(direct, /Undici 5\\.2\\.0 or later/u); assert.throws(httpConnect, /Undici 5\\.2\\.0 or later/u); assert.throws(httpsConnect, /Undici 5\\.2\\.0 or later/u);';
     const unsupportedProxy =

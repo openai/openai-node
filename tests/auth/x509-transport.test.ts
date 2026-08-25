@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport, X509TransportOptions } from 'openai/auth/x509-transport';
-import { sendX509Request } from 'openai/internal/auth/x509-transport-capability';
+import { registerX509Transport, sendX509Request } from 'openai/internal/auth/x509-transport-capability';
 
 import {
   closeObservedServers,
@@ -65,6 +65,70 @@ describe('explicit X.509 transport capability', () => {
       expect(rotated).not.toBe(first);
     } finally {
       await Promise.all([dispatcher.close(), rotatedDispatcher.close()]);
+    }
+  });
+
+  test('rejects counterfeit capability registration before attacker callbacks can be installed', () => {
+    const dispatch = vi.fn(async () => Response.json({ data: [] }));
+    const exchange = vi.fn(async () => ({ accessToken: 'synthetic-forged-token', expiresIn: 3600 }));
+
+    expect(() =>
+      registerX509Transport(Object.freeze({}) as X509Transport, {
+        dispatch,
+        exchange,
+        run: (operation) => operation(),
+        current: vi.fn(),
+        resume: (_scope, operation) => operation(),
+      }),
+    ).toThrow(/genuine.*capability/iu);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(exchange).not.toHaveBeenCalled();
+  });
+
+  test('rejects replacement callbacks for an already-approved transport capability', async () => {
+    const ownedDispatcher = new Agent();
+    const dispatch = vi.fn(async () => Response.json({ data: [] }));
+    const exchange = vi.fn(async () => ({ accessToken: 'synthetic-stolen-token', expiresIn: 3600 }));
+
+    try {
+      const approved = createX509Transport(directOptions(ownedDispatcher));
+      expect(() =>
+        registerX509Transport(approved, {
+          dispatch,
+          exchange,
+          run: (operation) => operation(),
+          current: vi.fn(),
+          resume: (_scope, operation) => operation(),
+        }),
+      ).toThrow(/more than once/iu);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(exchange).not.toHaveBeenCalled();
+    } finally {
+      await ownedDispatcher.close();
+    }
+  });
+
+  test('rejects a counterfeit that copies a genuine transport prototype without its private dispatcher', async () => {
+    const ownedDispatcher = new Agent();
+    const dispatch = vi.fn(async () => Response.json({ data: [] }));
+    const exchange = vi.fn(async () => ({ accessToken: 'synthetic-forged-token', expiresIn: 3600 }));
+
+    try {
+      const approved = createX509Transport(directOptions(ownedDispatcher));
+      const counterfeit = Object.freeze(Object.create(Object.getPrototypeOf(approved))) as X509Transport;
+      expect(() =>
+        registerX509Transport(counterfeit, {
+          dispatch,
+          exchange,
+          run: (operation) => operation(),
+          current: vi.fn(),
+          resume: (_scope, operation) => operation(),
+        }),
+      ).toThrow(/genuine.*capability/iu);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(exchange).not.toHaveBeenCalled();
+    } finally {
+      await ownedDispatcher.close();
     }
   });
 

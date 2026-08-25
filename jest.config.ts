@@ -10,8 +10,10 @@ const config: JestConfigWithTsJest = {
   ),
   transform: {
     '^.+\\.(t|j)sx?$': ['@swc/jest', { sourceMaps: 'inline' }],
+    '^.+\\.cts$': ['@swc/jest', { sourceMaps: 'inline' }],
   },
   moduleNameMapper: {
+    '(^|/)x509-transport-state\\.cjs$': '<rootDir>/src/internal/auth/x509-transport-state.cts',
     '^openai$': '<rootDir>/src/index.ts',
     '^openai/(.*)$': '<rootDir>/src/$1',
   },

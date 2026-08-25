@@ -1,16 +1,13 @@
 import { types } from 'node:util';
 import { Agent, ProxyAgent, Request, fetch } from 'undici';
+import { OpenAIError } from '../../core/error';
+import type { RegisteredX509Transport, X509Transport, x509TransportBrand } from './x509-transport-registry';
+import { findRegisteredX509Transport, rememberRegisteredX509Transport } from './x509-transport-state.cjs';
 
-declare const x509TransportBrand: unique symbol;
+export type { X509Transport } from './x509-transport-registry';
 
 /** Explicitly supported, application-owned Undici proxy configurations. */
 export type X509ProxyMode = 'direct' | 'http-connect' | 'https-connect';
-
-/** An opaque, immutable X.509 transport identity created by {@link createX509Transport}. */
-export interface X509Transport {
-  /** Prevents ordinary objects from being accepted as X.509 transport capabilities. */
-  readonly [x509TransportBrand]: true;
-}
 
 /** Application attestation for one caller-owned static-certificate Undici transport. */
 export interface X509TransportOptions {
@@ -30,7 +27,7 @@ export interface X509TransportOptions {
 const allowedOptionNames = new Set(['runtime', 'dispatcher', 'certificateIdentity', 'proxy']);
 
 class NodeX509Transport implements X509Transport {
-  declare readonly [x509TransportBrand]: true;
+  declare readonly __opaqueX509Transport: typeof x509TransportBrand;
 
   readonly #dispatcher: Agent | ProxyAgent;
 
@@ -42,6 +39,23 @@ class NodeX509Transport implements X509Transport {
   static dispatcher(value: object): Agent | ProxyAgent | undefined {
     return #dispatcher in value ? value.#dispatcher : undefined;
   }
+}
+
+/** Registers only a genuine frozen capability whose JavaScript private dispatcher cannot be forged. */
+export function registerX509Transport(transport: X509Transport, registered: RegisteredX509Transport): void {
+  if (
+    !transport ||
+    typeof transport !== 'object' ||
+    types.isProxy(transport) ||
+    !Object.isFrozen(transport) ||
+    !NodeX509Transport.dispatcher(transport)
+  ) {
+    throw new OpenAIError('Only a genuine frozen X.509 transport capability can be registered.');
+  }
+  if (findRegisteredX509Transport(transport)) {
+    throw new OpenAIError('An approved X.509 transport capability cannot be registered more than once.');
+  }
+  rememberRegisteredX509Transport(transport, Object.freeze(registered));
 }
 
 function dataOption(options: X509TransportOptions, name: keyof X509TransportOptions): unknown {
