@@ -22,6 +22,11 @@ def source_run(head: str, event: str = "pull_request") -> dict[str, Any]:
         "head_sha": head,
         "head_branch": "gh-readonly-queue/main/pr-7-example" if event == "merge_group" else "sdk",
         "repository": {"full_name": "openai/example"},
+        "head_repository": {
+            "full_name": "openai/example",
+            "name": "example",
+            "owner": {"login": "openai"},
+        },
         "path": ".github/workflows/castiron-custom-code.yml",
         "status": "completed",
         "run_attempt": 1,
@@ -309,6 +314,9 @@ class StatusPublisherTests(unittest.TestCase):
         base_changed: bool = False,
         no_result: bool = False,
         failed_budget: bool = False,
+        head_repository: str = "openai/example",
+        pull_repository: str | None = None,
+        associations: list[dict[str, Any]] | None = None,
         run_overrides: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         path = (
@@ -319,6 +327,17 @@ class StatusPublisherTests(unittest.TestCase):
         publisher = section.split("          script: |\n", 1)[1]
         script = "\n".join(line[12:] for line in publisher.splitlines())
         base, head = "a" * 40, "b" * 40
+        owner, _, name = head_repository.partition("/")
+        run = {
+            **source_run(head, event_name),
+            "head_repository": {
+                "full_name": head_repository,
+                "name": name,
+                "owner": {"login": owner},
+            },
+            **({"pull_requests": []} if associations is not None else {}),
+            **(run_overrides or {}),
+        }
         payload = {
             "script": script,
             "context": {
@@ -330,10 +349,15 @@ class StatusPublisherTests(unittest.TestCase):
                     "workflow_run": source_run(head, event_name),
                 },
             },
-            "run": {**source_run(head, event_name), **(run_overrides or {})},
+            "run": run,
+            "associations": associations,
+            "association_repository": head_repository,
             "current": {
                 "state": "open",
-                "head": {"sha": "c" * 40 if head_changed else head},
+                "head": {
+                    "sha": "c" * 40 if head_changed else head,
+                    "repo": {"full_name": pull_repository or head_repository},
+                },
                 "base": {
                     "sha": "c" * 40 if base_changed else base,
                     "ref": "main",
@@ -351,12 +375,22 @@ class StatusPublisherTests(unittest.TestCase):
           const fs = require('node:fs');
           const data = JSON.parse(fs.readFileSync(0, 'utf8'));
           const published = [];
-          const github = {rest: {
-            pulls: {get: async () => ({data: data.current})},
-            actions: {getWorkflowRun: async () => ({data: data.run})},
-            git: {getRef: async () => ({data: {object: {sha: data.current.base.sha}}})},
-            repos: {createCommitStatus: async value => published.push(value)},
-          }};
+          const github = {
+            paginate: async (_method, options) => {
+              if (`${options.owner}/${options.repo}` !== data.association_repository)
+                throw new Error('Associated PRs queried from the wrong repository');
+              return data.associations;
+            },
+            rest: {
+              pulls: {get: async options => ({data: {...data.current, number: options.pull_number}})},
+              actions: {getWorkflowRun: async () => ({data: data.run})},
+              git: {getRef: async () => ({data: {object: {sha: data.current.base.sha}}})},
+              repos: {
+                listPullRequestsAssociatedWithCommit: async () => {},
+                createCommitStatus: async value => published.push(value),
+              },
+            },
+          };
           const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
           new AsyncFunction('github','context','process', data.script)(github, data.context, {env:data.env})
             .then(() => process.stdout.write(JSON.stringify(published)))
@@ -379,6 +413,87 @@ class StatusPublisherTests(unittest.TestCase):
                 self.assertTrue(
                     all(r["sha"] == "b" * 40 and r["state"] == "success" for r in results)
                 )
+
+    def test_missing_fork_associations_are_resolved_from_the_source_repository(self) -> None:
+        for source in ("contributor/example", "contributor/renamed-fork"):
+            with self.subTest(source=source):
+                results = self.publish(head_repository=source, associations=[{"number": 3}])
+                self.assertEqual(
+                    [result["context"] for result in results],
+                    ["Castiron / budget-only change", "Castiron / custom-code budget"],
+                )
+                self.assertTrue(all(result["state"] == "success" for result in results))
+
+    def test_missing_same_repository_associations_still_publish(self) -> None:
+        self.assertEqual(len(self.publish(associations=[{"number": 3}])), 2)
+
+    def test_invalid_or_spoofed_source_repositories_cannot_publish(self) -> None:
+        cases: list[tuple[str, dict[str, Any] | None]] = [
+            ("contributor/example/unrelated", None),
+            ("./example", None),
+            ("../example", None),
+            ("contributor/.", None),
+            ("contributor/..", None),
+            (
+                "contributor/example",
+                {
+                    "head_repository": {
+                        "full_name": "contributor/example",
+                        "name": "unrelated",
+                        "owner": {"login": "contributor"},
+                    }
+                },
+            ),
+            (
+                "contributor/example",
+                {
+                    "head_repository": {
+                        "full_name": "contributor/example",
+                        "name": "example",
+                        "owner": {"login": "someone-else"},
+                    }
+                },
+            ),
+            (
+                "contributor/example",
+                {"head_repository": {"full_name": "contributor/example", "owner": {}}},
+            ),
+            (
+                "contributor/example",
+                {"head_repository": {"full_name": "contributor/example", "owner": "contributor"}},
+            ),
+            ("contributor/example", {"head_repository": None}),
+        ]
+        for repository, overrides in cases:
+            with self.subTest(repository=repository, overrides=overrides):
+                self.assertEqual(
+                    self.publish(
+                        head_repository=repository,
+                        associations=[{"number": 3}],
+                        run_overrides=overrides,
+                    ),
+                    [],
+                )
+
+    def test_pr_head_must_belong_to_the_source_repository(self) -> None:
+        self.assertEqual(
+            self.publish(
+                head_repository="contributor/example",
+                pull_repository="someone-else/example",
+                associations=[{"number": 3}],
+            ),
+            [],
+        )
+
+    def test_associations_must_identify_exactly_one_valid_pr(self) -> None:
+        self.assertEqual(self.publish(associations=[]), [])
+        self.assertEqual(self.publish(associations=[{"number": 3}, {"number": 4}]), [])
+        self.assertEqual(len(self.publish(associations=[{"number": 3}, {"number": 3}])), 2)
+
+    def test_invalid_association_numbers_cannot_publish(self) -> None:
+        for number in (True, 0, -1, 1.5, "3", 9007199254740992):
+            with self.subTest(number=number):
+                self.assertEqual(self.publish(associations=[{"number": number}]), [])
 
     def test_stale_pr_head_is_not_published(self) -> None:
         self.assertEqual(self.publish(head_changed=True), [])
@@ -408,6 +523,86 @@ class StatusPublisherTests(unittest.TestCase):
 
 
 class GitHubBudgetTests(unittest.TestCase):
+    def test_missing_associations_are_resolved_from_the_source_repository(self) -> None:
+        base, head = "a" * 40, "b" * 40
+        for source in ("openai/example", "contributor/example", "contributor/renamed-fork"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as temp:
+                owner, name = source.split("/")
+                run = {
+                    **source_run(head),
+                    "head_repository": {
+                        "full_name": source,
+                        "name": name,
+                        "owner": {"login": owner},
+                    },
+                    "pull_requests": [],
+                }
+                event = {"repository": {"full_name": "openai/example"}, "workflow_run": run}
+                pull = {
+                    "number": 3,
+                    "state": "open",
+                    "head": {"sha": head, "repo": {"full_name": source}},
+                    "base": {
+                        "sha": base,
+                        "ref": "main",
+                        "repo": {"full_name": "openai/example"},
+                    },
+                }
+                responses = [
+                    {"default_branch": "main", "private": False},
+                    {"object": {"sha": base}},
+                    run,
+                    [{"number": 3}],
+                    pull,
+                    [{"type": "merge_queue"}],
+                ]
+                with (
+                    mock.patch.object(budget.report, "api", side_effect=responses) as api,
+                    mock.patch.object(budget.report, "git"),
+                    mock.patch.object(budget, "evaluate", return_value=({}, b"")) as evaluate,
+                ):
+                    budget.github_evaluate(
+                        Path(temp) / "objects.git", "openai/example", event, base
+                    )
+
+                api.assert_any_call("GET", f"repos/{source}/commits/{head}/pulls?per_page=100")
+                api.assert_any_call("GET", "repos/openai/example/pulls/3")
+                evaluate.assert_called_once()
+
+    def test_ambiguous_fork_associations_fail_before_creating_objects(self) -> None:
+        base, head = "a" * 40, "b" * 40
+        run = {
+            **source_run(head),
+            "head_repository": {"full_name": "contributor/example"},
+            "pull_requests": [],
+        }
+        event = {"repository": {"full_name": "openai/example"}, "workflow_run": run}
+        pull = {
+            "number": 3,
+            "state": "open",
+            "head": {"sha": head, "repo": {"full_name": "contributor/example"}},
+            "base": {"sha": base, "ref": "main", "repo": {"full_name": "openai/example"}},
+        }
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(
+                budget.report,
+                "api",
+                side_effect=[
+                    {"default_branch": "main"},
+                    {"object": {"sha": base}},
+                    run,
+                    [{"number": 3}, {"number": 4}],
+                    pull,
+                    {**pull, "number": 4},
+                ],
+            ),
+        ):
+            repo = Path(temp) / "objects.git"
+            with self.assertRaises(ValueError):
+                budget.github_evaluate(repo, "openai/example", event, base)
+            self.assertFalse(repo.exists())
+
     def test_merge_queue_rule_is_required_before_passing(self) -> None:
         base, head = "a" * 40, "b" * 40
         event = {
@@ -464,8 +659,9 @@ class GitHubBudgetTests(unittest.TestCase):
         base, head = "a" * 40, "b" * 40
         event = {"repository": {"full_name": "openai/example"}, "workflow_run": source_run(head)}
         pull = {
+            "number": 3,
             "state": "open",
-            "head": {"sha": head},
+            "head": {"sha": head, "repo": {"full_name": "openai/example"}},
             "base": {
                 "sha": base,
                 "ref": "main",
@@ -564,8 +760,9 @@ class GitHubBudgetTests(unittest.TestCase):
             "workflow_run": source_run(head),
         }
         pull = {
+            "number": 3,
             "state": "open",
-            "head": {"sha": head},
+            "head": {"sha": head, "repo": {"full_name": "openai/example"}},
             "base": {"sha": base, "ref": "main", "repo": {"full_name": "openai/example"}},
         }
         responses = [
@@ -594,7 +791,7 @@ class GitHubBudgetTests(unittest.TestCase):
             )
 
     def test_stale_pull_and_wrong_target_fail_before_objects_created(self) -> None:
-        for kind in ("head", "base", "repository", "branch", "closed"):
+        for kind in ("head", "source_repository", "base", "repository", "branch", "closed"):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
                 base, head = "a" * 40, "b" * 40
                 event = {
@@ -602,12 +799,15 @@ class GitHubBudgetTests(unittest.TestCase):
                     "workflow_run": source_run(head),
                 }
                 pull: dict[str, Any] = {
+                    "number": 3,
                     "state": "open",
-                    "head": {"sha": head},
+                    "head": {"sha": head, "repo": {"full_name": "openai/example"}},
                     "base": {"sha": base, "ref": "main", "repo": {"full_name": "openai/example"}},
                 }
                 if kind == "head":
                     pull["head"]["sha"] = "c" * 40
+                elif kind == "source_repository":
+                    pull["head"]["repo"]["full_name"] = "someone-else/example"
                 elif kind == "base":
                     pull["base"]["sha"] = "c" * 40
                 elif kind == "repository":

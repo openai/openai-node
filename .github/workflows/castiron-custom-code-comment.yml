@@ -137,21 +137,37 @@ jobs:
           script: |
             const event = context.payload.workflow_run;
             const {data: run} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: event.id});
+            const upstream = `${context.repo.owner}/${context.repo.repo}`;
             if (run.head_sha !== event.head_sha || run.run_attempt !== event.run_attempt ||
                 run.status !== 'completed' || run.path.split('@', 1)[0] !== '.github/workflows/castiron-custom-code.yml' ||
-                run.repository.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
+                run.repository.full_name !== upstream) return;
             const head = run.head_sha;
             if (!/^[0-9a-f]{40}$/.test(head)) throw new Error('Invalid candidate SHA');
             const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
             const base = main.object.sha;
             if (run.event === 'pull_request') {
+              const source = run.head_repository;
+              const identity = typeof source?.full_name === 'string' &&
+                /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(source.full_name);
+              if (!identity || identity.slice(1).some(part => part === '.' || part === '..') ||
+                  (source.name !== undefined && source.name !== identity[2]) ||
+                  (source.owner != null &&
+                    (typeof source.owner !== 'object' || source.owner.login !== identity[1])) ||
+                  !Array.isArray(run.pull_requests)) return;
               const pulls = run.pull_requests.length ? run.pull_requests : await github.paginate(
-                github.rest.repos.listPullRequestsAssociatedWithCommit, {...context.repo, commit_sha: head});
-              const current = [];
+                github.rest.repos.listPullRequestsAssociatedWithCommit,
+                {owner: identity[1], repo: identity[2], commit_sha: head});
+              const numbers = new Set();
               for (const pull of pulls) {
-                const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: pull.number});
-                if (pr.state === 'open' && pr.head.sha === head && pr.base.sha === base &&
-                    pr.base.ref === 'main' && pr.base.repo.full_name === `${context.repo.owner}/${context.repo.repo}`) current.push(pr);
+                if (!Number.isSafeInteger(pull?.number) || pull.number <= 0) return;
+                numbers.add(pull.number);
+              }
+              const current = [];
+              for (const number of numbers) {
+                const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
+                if (pr.number === number && pr.state === 'open' && pr.head.sha === head && pr.base.sha === base &&
+                    pr.head.repo?.full_name === source.full_name && pr.base.ref === 'main' &&
+                    pr.base.repo.full_name === upstream) current.push(pr);
               }
               if (current.length !== 1) return;
             } else if (run.event !== 'merge_group' || !run.head_branch.startsWith('gh-readonly-queue/main/')) {
@@ -220,18 +236,43 @@ jobs:
         with:
           script: |
             const marker = '<!-- castiron:custom-code-report:v1 -->';
-            const run = context.payload.workflow_run;
-            if (run.event !== 'pull_request' || run.path !== '.github/workflows/castiron-custom-code.yml') return;
-            const pulls = run.pull_requests?.length ? run.pull_requests : await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {...context.repo, commit_sha: run.head_sha});
+            const event = context.payload.workflow_run;
+            const {data: run} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: event.id});
+            const upstream = `${context.repo.owner}/${context.repo.repo}`;
+            if (run.event !== 'pull_request' || run.head_sha !== event.head_sha ||
+                run.run_attempt !== event.run_attempt || run.status !== 'completed' ||
+                run.path.split('@', 1)[0] !== '.github/workflows/castiron-custom-code.yml' ||
+                run.repository.full_name !== upstream || !/^[0-9a-f]{40}$/.test(run.head_sha)) return;
+            const source = run.head_repository;
+            const identity = typeof source?.full_name === 'string' &&
+              /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(source.full_name);
+            if (!identity || identity.slice(1).some(part => part === '.' || part === '..') ||
+                (source.name !== undefined && source.name !== identity[2]) ||
+                (source.owner != null &&
+                  (typeof source.owner !== 'object' || source.owner.login !== identity[1])) ||
+                !Array.isArray(run.pull_requests)) return;
+            const pulls = run.pull_requests.length ? run.pull_requests : await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              {owner: identity[1], repo: identity[2], commit_sha: run.head_sha});
+            const numbers = new Set();
             for (const pull of pulls) {
-              const {data: current} = await github.rest.pulls.get({...context.repo, pull_number: pull.number});
-              if (current.state !== 'open' || current.head.sha !== run.head_sha) continue;
-              const comments = await github.paginate(github.rest.issues.listComments, {...context.repo, issue_number: pull.number});
-              const previous = comments.find(c => c.user?.type === 'Bot' && c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker));
-              const prior = previous?.body?.match(/<!-- castiron:run:v1:(\d+):(\d+) -->/);
-              if (prior && (Number(prior[1]) > run.id || (Number(prior[1]) === run.id && Number(prior[2]) > run.run_attempt))) continue;
-              const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}`;
-              const body = `${marker}\n\n## Castiron custom code\n\n⚠️ Report unavailable for \`${run.head_sha.slice(0, 12)}\`.\n\nThe report setup or validation failed. [Inspect the workflow run](${url}).\n\n<!-- castiron:run:v1:${run.id}:${run.run_attempt} -->`;
-              if (previous) await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
-              else await github.rest.issues.createComment({...context.repo, issue_number: pull.number, body});
+              if (!Number.isSafeInteger(pull?.number) || pull.number <= 0) return;
+              numbers.add(pull.number);
             }
+            const current = [];
+            for (const number of numbers) {
+              const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              if (pr.number === number && pr.state === 'open' && pr.head.sha === run.head_sha &&
+                  pr.head.repo?.full_name === source.full_name && pr.base.ref === 'main' &&
+                  pr.base.repo.full_name === upstream) current.push({number, pr});
+            }
+            if (current.length !== 1) return;
+            const number = current[0].number;
+            const comments = await github.paginate(github.rest.issues.listComments, {...context.repo, issue_number: number});
+            const previous = comments.find(c => c.user?.type === 'Bot' && c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker));
+            const prior = previous?.body?.match(/<!-- castiron:run:v1:(\d+):(\d+) -->/);
+            if (prior && (Number(prior[1]) > run.id || (Number(prior[1]) === run.id && Number(prior[2]) > run.run_attempt))) return;
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}`;
+            const body = `${marker}\n\n## Castiron custom code\n\n⚠️ Report unavailable for \`${run.head_sha.slice(0, 12)}\`.\n\nThe report setup or validation failed. [Inspect the workflow run](${url}).\n\n<!-- castiron:run:v1:${run.id}:${run.run_attempt} -->`;
+            if (previous) await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
+            else await github.rest.issues.createComment({...context.repo, issue_number: number, body});

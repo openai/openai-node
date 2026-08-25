@@ -46,6 +46,7 @@ export {
 export {
   Projects,
   type Project,
+  type ProjectResidency,
   type ProjectCreateParams,
   type ProjectUpdateParams,
   type ProjectListParams,
