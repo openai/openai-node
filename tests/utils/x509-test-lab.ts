@@ -18,6 +18,7 @@ export interface X509TestLab {
   certificateAuthority: Buffer;
   proxyCertificateAuthority: Buffer;
   server: TestCertificate;
+  issuerServer: TestCertificate;
   proxyServer: TestCertificate;
   firstClient: TestCertificate;
   secondClient: TestCertificate;
@@ -31,6 +32,7 @@ export interface ObservedRequest {
   cookie: string | undefined;
   path: string | undefined;
   proxyAuthorization: string | undefined;
+  serverName: string | undefined;
 }
 
 export interface ObservedServer {
@@ -109,12 +111,11 @@ function issueCertificate(
     extensions.push(extension([0x55, 0x1d, 0x25], sequence(objectIdentifier(keyPurpose))));
   }
   if (purpose === 'server') {
-    extensions.push(
-      extension(
-        [0x55, 0x1d, 0x11],
-        sequence(encodeDER(0x82, Buffer.from('localhost')), encodeDER(0x87, Buffer.from([127, 0, 0, 1]))),
-      ),
-    );
+    const names = [encodeDER(0x82, Buffer.from(name))];
+    if (name === 'localhost') {
+      names.push(encodeDER(0x87, Buffer.from([127, 0, 0, 1])));
+    }
+    extensions.push(extension([0x55, 0x1d, 0x11], sequence(...names)));
   }
 
   const serial = randomBytes(16);
@@ -159,6 +160,7 @@ export function createX509TestLab(): X509TestLab {
     certificateAuthority: workloadAuthority.certificate,
     proxyCertificateAuthority: proxyAuthority.certificate,
     server: issueCertificate('localhost', 'server', workloadAuthority),
+    issuerServer: issueCertificate('mtls.auth.openai.com', 'server', workloadAuthority),
     proxyServer: issueCertificate('localhost', 'server', proxyAuthority),
     firstClient: issueCertificate('workload-a', 'client', workloadAuthority),
     secondClient: issueCertificate('workload-b', 'client', workloadAuthority),
@@ -175,19 +177,21 @@ function observeRequest(request: IncomingMessage): ObservedRequest {
     cookie: request.headers.cookie,
     path: request.url,
     proxyAuthorization: request.headers['proxy-authorization'],
+    serverName: typeof socket.servername === 'string' ? socket.servername : undefined,
   };
 }
 
 export function createMutualTLSServer(
   lab: X509TestLab,
   respond: (request: IncomingMessage, response: ServerResponse) => void,
+  certificate: TestCertificate = lab.server,
 ): ObservedServer {
   const requests: ObservedRequest[] = [];
   const server = createHTTPSServer(
     {
       ca: lab.certificateAuthority,
-      cert: lab.server.certificate,
-      key: lab.server.privateKey,
+      cert: certificate.certificate,
+      key: certificate.privateKey,
       requestCert: true,
       rejectUnauthorized: true,
     },
@@ -204,6 +208,7 @@ export function createConnectProxy(
   lab: X509TestLab,
   encrypted: boolean,
   serverCertificate: TestCertificate = lab.proxyServer,
+  routes?: ReadonlyMap<string, URL>,
 ): ObservedServer {
   const requests: ObservedRequest[] = [];
   const connections = new Set<Duplex>();
@@ -220,12 +225,13 @@ export function createConnectProxy(
   server.on('connect', (request, downstream, head) => {
     requests.push(observeRequest(request));
     const target = new URL(`https://${request.url}`);
-    if (target.hostname !== '127.0.0.1') {
+    const destination = routes?.get(request.url ?? '') ?? target;
+    if (destination.hostname !== '127.0.0.1') {
       downstream.destroy();
       return;
     }
 
-    const upstream = connect({ host: target.hostname, port: Number(target.port) });
+    const upstream = connect({ host: destination.hostname, port: Number(destination.port) });
     connections.add(downstream);
     connections.add(upstream);
     downstream.once('close', () => connections.delete(downstream));

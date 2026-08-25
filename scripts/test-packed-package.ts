@@ -77,6 +77,7 @@ const packedPackagePath = require('node:path');
     source === 'providers/bedrock/aws.ts' ||
     source === 'auth/x509-transport.ts' ||
     source === 'internal/auth/x509-transport-capability.ts' ||
+    source === 'internal/auth/x509-token-exchange.ts' ||
     source === 'auth/index.ts' ||
     source === 'auth/subject-token-providers.ts';
 
