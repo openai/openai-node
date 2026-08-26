@@ -133,12 +133,14 @@ describe('X.509 request ownership boundaries', () => {
     vi.stubEnv('OPENAI_PROJECT_ID', 'synthetic-ambient-project');
     vi.stubEnv('OPENAI_CUSTOM_HEADERS', 'OpenAI-Organization: synthetic-ambient-header-organization');
     let dispatchedHeaders: Headers | undefined;
+    let dispatchedURL: URL | undefined;
     const send = vi
       .spyOn(transportCapability, 'sendX509Request')
       .mockImplementation(async (_transport, url, request) => {
         if (url.origin === 'https://mtls.auth.openai.com') {
           return Response.json(tokenResponse);
         }
+        dispatchedURL = url;
         dispatchedHeaders = new Headers(request.headers);
         return Response.json({ data: [] });
       });
@@ -150,6 +152,7 @@ describe('X.509 request ownership boundaries', () => {
         organization: 'synthetic-original-organization',
         project: 'synthetic-original-project',
         defaultHeaders: { 'X-Synthetic-Original': 'must-not-cross' },
+        defaultQuery: { api_key: 'synthetic-original-private-api-key' },
       });
       const clone = original.withOptions({ credential });
 
@@ -162,6 +165,7 @@ describe('X.509 request ownership boundaries', () => {
       expect(clone.project).toBeNull();
       expect(dispatchedHeaders?.get('X-Synthetic-Original')).toBeNull();
       expect(dispatchedHeaders?.get('OpenAI-Organization')).toBeNull();
+      expect(dispatchedURL?.href).toBe('https://mtls.api.openai.com/v1/models');
       expect(send).toHaveBeenCalledTimes(2);
     } finally {
       vi.unstubAllEnvs();

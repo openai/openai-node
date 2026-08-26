@@ -105,6 +105,7 @@ export function prepareX509ClientClone(
     delete inherited.organization;
     delete inherited.project;
     delete inherited.defaultHeaders;
+    delete inherited.defaultQuery;
     delete inherited.fetchOptions;
   }
   return nextCredential;

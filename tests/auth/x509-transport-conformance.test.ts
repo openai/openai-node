@@ -267,28 +267,44 @@ describe('real-wire X.509 transport conformance', () => {
     }
   });
 
-  test('switches an independently authenticated provider to an owned certificate credential', async () => {
-    const credential = fromX509({
-      certificateChain: lab.firstClient.certificate.toString(),
-      privateKey: lab.firstClient.privateKey.toString(),
-      identityProviderId: 'synthetic-identity-provider',
-      serviceAccountId: 'synthetic-service-account',
-    });
-
-    try {
-      const provider = createProvider({
-        configure: () => ({ name: 'synthetic-provider', baseURL: 'https://provider.example/v1' }),
+  test.each([
+    { label: 'without replacement query defaults', defaultQuery: undefined, search: '' },
+    { label: 'with explicit replacement query defaults', defaultQuery: { page: '1' }, search: '?page=1' },
+  ])(
+    'switches an independently authenticated provider to an owned credential $label',
+    async ({ defaultQuery, search }) => {
+      const credential = fromX509({
+        certificateChain: lab.firstClient.certificate.toString(),
+        privateKey: lab.firstClient.privateKey.toString(),
+        identityProviderId: 'synthetic-identity-provider',
+        serviceAccountId: 'synthetic-service-account',
       });
-      const original = new OpenAI({ provider });
-      const clone = original.withOptions({ credential });
 
-      expect(clone.baseURL).toBe('https://mtls.api.openai.com/v1');
-      expect(clone.apiKey).toBeNull();
-      expect(original.baseURL).toBe('https://provider.example/v1');
-    } finally {
-      await credential.close();
-    }
-  });
+      try {
+        const provider = createProvider({
+          configure: () => ({ name: 'synthetic-provider', baseURL: 'https://provider.example/v1' }),
+        });
+        const original = new OpenAI({
+          provider,
+          defaultQuery: { api_key: 'synthetic-provider-private-api-key' },
+        });
+        const clone = original.withOptions({
+          credential,
+          ...(defaultQuery === undefined ? {} : { defaultQuery }),
+        });
+
+        expect(clone.baseURL).toBe('https://mtls.api.openai.com/v1');
+        expect(clone.apiKey).toBeNull();
+        expect(clone.buildURL('/models', null)).toBe(`https://mtls.api.openai.com/v1/models${search}`);
+        expect(original.baseURL).toBe('https://provider.example/v1');
+        expect(original.buildURL('/models', null)).toBe(
+          'https://provider.example/v1/models?api_key=synthetic-provider-private-api-key',
+        );
+      } finally {
+        await credential.close();
+      }
+    },
+  );
 
   test.each([
     { label: 'no proxy credentials', username: '', password: '', authorization: undefined },
@@ -372,7 +388,13 @@ describe('real-wire X.509 transport conformance', () => {
           proxy: { url: proxyURL, mode: 'http-connect' },
         });
         trustRoots[0] = lab.proxyCertificateAuthority.toString();
-        const client = new OpenAI({ apiKey: null, credential, maxRetries: 0 });
+        const provider = createProvider({
+          configure: () => ({ name: 'synthetic-provider', baseURL: 'https://provider.example/v1' }),
+        });
+        const client = new OpenAI({
+          provider,
+          defaultQuery: { api_key: 'synthetic-provider-private-api-key' },
+        }).withOptions({ credential, maxRetries: 0 });
 
         await expect(client.models.list()).resolves.toMatchObject({ data: [] });
 
