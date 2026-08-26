@@ -2,7 +2,7 @@ import { X509Certificate } from 'node:crypto';
 import { Agent, ProxyAgent, fetch } from 'undici';
 import { expect } from 'vitest';
 import OpenAI from 'openai';
-import { fromX509 } from 'openai/auth/x509-transport';
+import { createX509Transport, fromX509 } from 'openai/auth/x509-transport';
 import { createProvider } from 'openai/internal/provider';
 
 import {
@@ -115,6 +115,135 @@ beforeAll(() => {
 });
 
 describe('real-wire X.509 transport conformance', () => {
+  test.each([
+    { label: 'API key', options: { apiKey: 'synthetic-ordinary-api-key' } },
+    { label: 'admin API key', options: { adminAPIKey: 'synthetic-ordinary-admin-key' } },
+  ])('switches an SDK-owned certificate client to an ordinary $label', async ({ options }) => {
+    const credential = fromX509({
+      certificateChain: lab.firstClient.certificate.toString(),
+      privateKey: lab.firstClient.privateKey.toString(),
+      identityProviderId: 'synthetic-identity-provider',
+      serviceAccountId: 'synthetic-service-account',
+    });
+
+    try {
+      const original = new OpenAI({ credential });
+      const clone = original.withOptions(options);
+
+      expect(clone.baseURL).toBe('https://api.openai.com/v1');
+      expect(clone.apiKey).toBe(options.apiKey ?? null);
+      expect(clone.adminAPIKey).toBe(options.adminAPIKey ?? null);
+      expect(original.baseURL).toBe('https://mtls.api.openai.com/v1');
+    } finally {
+      await credential.close();
+    }
+  });
+
+  test.each([
+    { label: 'without admin credentials', options: {} },
+    { label: 'with separate admin credentials', options: { adminAPIKey: 'synthetic-admin-key' } },
+  ])(
+    'rejects replacing an owned X.509 identity $label without a replacement transport',
+    async ({ options }) => {
+      const credential = fromX509({
+        certificateChain: lab.firstClient.certificate.toString(),
+        privateKey: lab.firstClient.privateKey.toString(),
+        identityProviderId: 'synthetic-identity-provider',
+        serviceAccountId: 'synthetic-service-account',
+      });
+
+      try {
+        const original = new OpenAI({ credential });
+
+        expect(() =>
+          original.withOptions({
+            ...options,
+            workloadIdentity: {
+              type: 'x509',
+              identityProviderId: 'replacement-identity-provider',
+              serviceAccountId: 'replacement-service-account',
+            },
+          }),
+        ).toThrow(/transport/iu);
+        expect(original.baseURL).toBe('https://mtls.api.openai.com/v1');
+      } finally {
+        await credential.close();
+      }
+    },
+  );
+
+  test('retains owned credential isolation when an explicit undefined credential is inherited', async () => {
+    const credential = fromX509({
+      certificateChain: lab.firstClient.certificate.toString(),
+      privateKey: lab.firstClient.privateKey.toString(),
+      identityProviderId: 'synthetic-identity-provider',
+      serviceAccountId: 'synthetic-service-account',
+    });
+
+    try {
+      const inherited = new OpenAI({ credential }).withOptions({ credential: undefined });
+      const ordinary = inherited.withOptions({ adminAPIKey: 'synthetic-admin-key' });
+
+      expect(inherited.baseURL).toBe('https://mtls.api.openai.com/v1');
+      expect(ordinary.baseURL).toBe('https://api.openai.com/v1');
+    } finally {
+      await credential.close();
+    }
+  });
+
+  test('rejects an explicit null credential without downgrading owned transport isolation', async () => {
+    const credential = fromX509({
+      certificateChain: lab.firstClient.certificate.toString(),
+      privateKey: lab.firstClient.privateKey.toString(),
+      identityProviderId: 'synthetic-identity-provider',
+      serviceAccountId: 'synthetic-service-account',
+    });
+
+    try {
+      const original = new OpenAI({ credential });
+
+      expect(() => Reflect.apply(original.withOptions, original, [{ credential: null }])).toThrow(
+        /credential.*SDK|SDK.*credential/iu,
+      );
+      expect(original.baseURL).toBe('https://mtls.api.openai.com/v1');
+    } finally {
+      await credential.close();
+    }
+  });
+
+  test('accepts an explicitly replaced X.509 identity and separately owned transport', async () => {
+    const credential = fromX509({
+      certificateChain: lab.firstClient.certificate.toString(),
+      privateKey: lab.firstClient.privateKey.toString(),
+      identityProviderId: 'synthetic-identity-provider',
+      serviceAccountId: 'synthetic-service-account',
+    });
+    const replacementDispatcher = createAgent(lab.secondClient);
+    const replacementTransport = createX509Transport({
+      runtime: 'node',
+      dispatcher: replacementDispatcher,
+      certificateIdentity: 'static',
+      proxy: 'direct',
+    });
+
+    try {
+      const original = new OpenAI({ credential });
+      const replacement = original.withOptions({
+        workloadIdentity: {
+          type: 'x509',
+          identityProviderId: 'replacement-identity-provider',
+          serviceAccountId: 'replacement-service-account',
+        },
+        x509Transport: replacementTransport,
+      });
+
+      expect(replacement.baseURL).toBe('https://mtls.api.openai.com/v1');
+      expect(original.baseURL).toBe('https://mtls.api.openai.com/v1');
+    } finally {
+      await Promise.all([credential.close(), replacementDispatcher.close()]);
+    }
+  });
+
   test('switches an owned certificate client to an independently authenticated provider', async () => {
     const credential = fromX509({
       certificateChain: lab.firstClient.certificate.toString(),
@@ -161,111 +290,140 @@ describe('real-wire X.509 transport conformance', () => {
     }
   });
 
-  test('authenticates the public X.509 credential over both pinned certificate-bound endpoints', async () => {
-    const exchangedBodies: string[] = [];
-    const issuer = createMutualTLSServer(
-      lab,
-      (request, response) => {
-        let body = '';
-        request.setEncoding('utf-8');
-        request.on('data', (chunk: string) => {
-          body += chunk;
-        });
-        request.once('end', () => {
-          exchangedBodies.push(body);
-          response.writeHead(200, { 'Content-Type': 'application/json' });
-          response.end(
-            JSON.stringify({
-              access_token: ACCESS_TOKEN,
-              token_type: 'Bearer',
-              issued_token_type: 'urn:ietf:params:oauth:token-type:access_token',
-              expires_in: 3600,
-            }),
-          );
-        });
-      },
-      lab.issuerServer,
-    );
-    const api = createMutualTLSServer(
-      lab,
-      (_request, response) => {
-        response.writeHead(200, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify({ data: [] }));
-      },
-      lab.apiServer,
-    );
-    let proxy: ObservedServer | undefined;
-    let credential: ReturnType<typeof fromX509> | undefined;
-
-    try {
-      const [issuerURL, apiURL] = await Promise.all([listenLoopback(issuer), listenLoopback(api)]);
-      proxy = createConnectProxy(
+  test.each([
+    { label: 'no proxy credentials', username: '', password: '', authorization: undefined },
+    {
+      label: 'username-only proxy credentials',
+      username: 'synthetic-user',
+      password: '',
+      authorization: `Basic ${Buffer.from('synthetic-user:').toString('base64')}`,
+    },
+    {
+      label: 'password-only proxy credentials',
+      username: '',
+      password: 'synthetic-password',
+      authorization: `Basic ${Buffer.from(':synthetic-password').toString('base64')}`,
+    },
+    {
+      label: 'percent-encoded proxy credentials',
+      username: 'synthetic@example.com',
+      password: 'synthetic:secret value',
+      authorization: `Basic ${Buffer.from('synthetic@example.com:synthetic:secret value').toString('base64')}`,
+    },
+  ])(
+    'authenticates both pinned X.509 endpoints with $label',
+    async ({ username, password, authorization }) => {
+      const exchangedBodies: string[] = [];
+      const issuer = createMutualTLSServer(
         lab,
-        false,
-        lab.proxyServer,
-        new Map([
-          ['mtls.auth.openai.com:443', issuerURL],
-          ['mtls.api.openai.com:443', apiURL],
-        ]),
+        (request, response) => {
+          let body = '';
+          request.setEncoding('utf-8');
+          request.on('data', (chunk: string) => {
+            body += chunk;
+          });
+          request.once('end', () => {
+            exchangedBodies.push(body);
+            response.writeHead(200, { 'Content-Type': 'application/json' });
+            response.end(
+              JSON.stringify({
+                access_token: ACCESS_TOKEN,
+                token_type: 'Bearer',
+                issued_token_type: 'urn:ietf:params:oauth:token-type:access_token',
+                expires_in: 3600,
+              }),
+            );
+          });
+        },
+        lab.issuerServer,
       );
-      const proxyURL = await listenLoopback(proxy, false);
-      const trustRoots = [lab.certificateAuthority.toString()];
-      credential = fromX509({
-        certificateChain: lab.firstClient.certificate.toString(),
-        privateKey: lab.firstClient.privateKey.toString(),
-        identityProviderId: 'synthetic-identity-provider',
-        serviceAccountId: 'synthetic-service-account',
-        ca: trustRoots,
-        proxy: { url: proxyURL, mode: 'http-connect' },
-      });
-      trustRoots[0] = lab.proxyCertificateAuthority.toString();
-      const client = new OpenAI({ apiKey: null, credential, maxRetries: 0 });
+      const api = createMutualTLSServer(
+        lab,
+        (_request, response) => {
+          response.writeHead(200, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ data: [] }));
+        },
+        lab.apiServer,
+      );
+      let proxy: ObservedServer | undefined;
+      let credential: ReturnType<typeof fromX509> | undefined;
 
-      await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+      try {
+        const [issuerURL, apiURL] = await Promise.all([listenLoopback(issuer), listenLoopback(api)]);
+        proxy = createConnectProxy(
+          lab,
+          false,
+          lab.proxyServer,
+          new Map([
+            ['mtls.auth.openai.com:443', issuerURL],
+            ['mtls.api.openai.com:443', apiURL],
+          ]),
+        );
+        const proxyURL = await listenLoopback(proxy, false);
+        proxyURL.username = username;
+        proxyURL.password = password;
+        const trustRoots = [lab.certificateAuthority.toString()];
+        credential = fromX509({
+          certificateChain: lab.firstClient.certificate.toString(),
+          privateKey: lab.firstClient.privateKey.toString(),
+          identityProviderId: 'synthetic-identity-provider',
+          serviceAccountId: 'synthetic-service-account',
+          ca: trustRoots,
+          proxy: { url: proxyURL, mode: 'http-connect' },
+        });
+        trustRoots[0] = lab.proxyCertificateAuthority.toString();
+        const client = new OpenAI({ apiKey: null, credential, maxRetries: 0 });
 
-      expect(exchangedBodies).toHaveLength(1);
-      expect(JSON.parse(exchangedBodies[0] ?? '')).toEqual({
-        grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-        subject_token_type: 'urn:openai:params:oauth:token-type:x509',
-        identity_provider_id: 'synthetic-identity-provider',
-        service_account_id: 'synthetic-service-account',
-      });
-      const certificateFingerprint = new X509Certificate(lab.firstClient.certificate).fingerprint256;
-      expect(issuer.requests).toEqual([
-        expect.objectContaining({
-          authority: 'mtls.auth.openai.com',
-          authorization: undefined,
-          certificateFingerprint,
-          path: '/oauth/token',
-          serverName: 'mtls.auth.openai.com',
-        }),
-      ]);
-      expect(api.requests).toEqual([
-        expect.objectContaining({
-          authority: 'mtls.api.openai.com',
-          authorization: `Bearer ${ACCESS_TOKEN}`,
-          certificateFingerprint,
-          path: '/v1/models',
-          serverName: 'mtls.api.openai.com',
-        }),
-      ]);
-      expect(proxy.requests).toEqual([
-        expect.objectContaining({
-          authorization: undefined,
-          certificateFingerprint: undefined,
-          path: 'mtls.auth.openai.com:443',
-        }),
-        expect.objectContaining({
-          authorization: undefined,
-          certificateFingerprint: undefined,
-          path: 'mtls.api.openai.com:443',
-        }),
-      ]);
-    } finally {
-      await credential?.close();
-      await closeObservedServers(issuer, api, ...(proxy ? [proxy] : []));
-    }
-  });
+        await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+
+        expect(exchangedBodies).toHaveLength(1);
+        expect(JSON.parse(exchangedBodies[0] ?? '')).toEqual({
+          grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+          subject_token_type: 'urn:openai:params:oauth:token-type:x509',
+          identity_provider_id: 'synthetic-identity-provider',
+          service_account_id: 'synthetic-service-account',
+        });
+        const certificateFingerprint = new X509Certificate(lab.firstClient.certificate).fingerprint256;
+        expect(issuer.requests).toEqual([
+          expect.objectContaining({
+            authority: 'mtls.auth.openai.com',
+            authorization: undefined,
+            certificateFingerprint,
+            path: '/oauth/token',
+            proxyAuthorization: undefined,
+            serverName: 'mtls.auth.openai.com',
+          }),
+        ]);
+        expect(api.requests).toEqual([
+          expect.objectContaining({
+            authority: 'mtls.api.openai.com',
+            authorization: `Bearer ${ACCESS_TOKEN}`,
+            certificateFingerprint,
+            path: '/v1/models',
+            proxyAuthorization: undefined,
+            serverName: 'mtls.api.openai.com',
+          }),
+        ]);
+        expect(proxy.requests).toEqual([
+          expect.objectContaining({
+            authorization: undefined,
+            certificateFingerprint: undefined,
+            path: 'mtls.auth.openai.com:443',
+            proxyAuthorization: authorization,
+          }),
+          expect.objectContaining({
+            authorization: undefined,
+            certificateFingerprint: undefined,
+            path: 'mtls.api.openai.com:443',
+            proxyAuthorization: authorization,
+          }),
+        ]);
+      } finally {
+        await credential?.close();
+        await closeObservedServers(issuer, api, ...(proxy ? [proxy] : []));
+      }
+    },
+  );
 
   test.each(['issuer', 'API'] as const)(
     'rejects an untrusted $0 certificate before disclosing workload credentials',

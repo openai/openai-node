@@ -671,7 +671,12 @@ export class OpenAI {
       project: this.project,
       webhookSecret: this.webhookSecret,
     };
-    prepareX509ClientClone(inheritedOptions, options, this.#x509Credential, x509Authentication !== undefined);
+    const credential = prepareX509ClientClone(
+      inheritedOptions,
+      options,
+      this.#x509Credential,
+      x509Authentication !== undefined,
+    );
     if (residencyBaseURL !== undefined) {
       delete inheritedOptions.baseURL;
     }
@@ -692,6 +697,7 @@ export class OpenAI {
     const clientOptions: InternalClientOptions = {
       ...inheritedOptions,
       ...options,
+      credential,
       provider,
       [inheritedDataResidencySelection]:
         this.#explicitDataResidency &&

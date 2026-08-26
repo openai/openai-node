@@ -205,6 +205,24 @@ interface VerifiedX509TLSOptions {
   ca?: string | string[];
 }
 
+function proxyAuthentication(url: URL): string | undefined {
+  if (url.username === '' && url.password === '') {
+    return undefined;
+  }
+  let username: string;
+  let password: string;
+  try {
+    username = decodeURIComponent(url.username);
+    password = decodeURIComponent(url.password);
+  } catch {
+    throw new Error('X.509 CONNECT proxy credentials contain invalid URL encoding.');
+  }
+  if (username.includes(':')) {
+    throw new Error('X.509 CONNECT proxy username cannot contain a colon.');
+  }
+  return Buffer.from(`${username}:${password}`, 'utf-8').toString('base64');
+}
+
 function credentialDispatcher(
   proxyOptionsInput: unknown,
   requestTls: VerifiedX509TLSOptions,
@@ -240,11 +258,13 @@ function credentialDispatcher(
   if (proxy === 'http-connect' && proxyCA !== undefined) {
     throw new Error('A plaintext X.509 CONNECT proxy cannot configure proxy TLS authorities.');
   }
+  const auth = proxyAuthentication(url);
 
   return {
     proxy,
     dispatcher: new ProxyAgent({
       uri: url.href,
+      ...(auth === undefined ? {} : { auth }),
       requestTls,
       ...(proxy === 'https-connect'
         ? {

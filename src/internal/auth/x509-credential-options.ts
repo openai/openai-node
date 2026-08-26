@@ -47,32 +47,37 @@ export function normalizeX509CredentialOptions(options: ClientOptions): {
   };
 }
 
-/** Preserves credential ownership while isolating transitions between API keys, providers, and X.509. */
+/** Distinguishes explicitly supplied ordinary credentials from nullish inheritance. */
+function overridesOrdinaryAuthentication({ apiKey, adminAPIKey }: Partial<ClientOptions>): boolean {
+  return (apiKey !== null && apiKey !== undefined) || (adminAPIKey !== null && adminAPIKey !== undefined);
+}
+
+/** Returns the effective credential after reconciling one client's authentication transition. */
 export function prepareX509ClientClone(
   inherited: ClientOptions,
   overrides: Partial<ClientOptions>,
   credential: X509Credential | undefined,
   currentlyX509: boolean,
-): void {
+): X509Credential | undefined {
   const nextIdentity = hasOwn(overrides, 'workloadIdentity')
     ? overrides.workloadIdentity
     : inherited.workloadIdentity;
-  const overridingApiKey = overrides.apiKey;
   const dropping =
     credential !== undefined &&
-    ((overridingApiKey !== null &&
-      overridingApiKey !== undefined &&
-      overrides.workloadIdentity === undefined) ||
+    ((overridesOrdinaryAuthentication(overrides) && overrides.workloadIdentity === undefined) ||
       overrides.provider !== undefined);
+  if (credential !== undefined && hasOwn(overrides, 'workloadIdentity')) {
+    delete inherited.x509Transport;
+  }
   const inheritedCredential =
     credential !== undefined &&
     !dropping &&
-    !hasOwn(overrides, 'credential') &&
+    overrides.credential === undefined &&
     !hasOwn(overrides, 'workloadIdentity') &&
     !hasOwn(overrides, 'x509Transport')
       ? credential
       : undefined;
-  const nextCredential = overrides.credential ?? inheritedCredential;
+  const nextCredential = overrides.credential === undefined ? inheritedCredential : overrides.credential;
   const nextX509 = nextCredential !== undefined || (!dropping && isX509WorkloadIdentity(nextIdentity));
 
   if (currentlyX509 !== nextX509) {
@@ -89,7 +94,7 @@ export function prepareX509ClientClone(
   }
 
   if (nextCredential === undefined) {
-    return;
+    return undefined;
   }
   delete inherited.apiKey;
   delete inherited.adminAPIKey;
@@ -102,4 +107,5 @@ export function prepareX509ClientClone(
     delete inherited.defaultHeaders;
     delete inherited.fetchOptions;
   }
+  return nextCredential;
 }

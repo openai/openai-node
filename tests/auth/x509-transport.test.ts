@@ -102,6 +102,41 @@ describe('SDK-owned X.509 credential transport', () => {
     expect(JSON.stringify(failure)).not.toContain(secret);
   });
 
+  test('rejects malformed encoded proxy credentials without exposing their contents', () => {
+    const secret = 'synthetic-private-proxy-username';
+    const options = {
+      ...credentialOptions(),
+      proxy: {
+        url: `http://${secret}%E0%A4%A@127.0.0.1:1`,
+        mode: 'http-connect' as const,
+      },
+    };
+    let failure: unknown;
+
+    try {
+      fromX509(options);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).toMatch(/proxy.*credential|authentication/iu);
+    expect(inspect(failure)).not.toContain(secret);
+    expect(JSON.stringify(failure)).not.toContain(secret);
+  });
+
+  test('rejects ambiguous proxy Basic usernames containing an encoded colon', () => {
+    const options = {
+      ...credentialOptions(),
+      proxy: {
+        url: 'http://synthetic%3Auser:password@127.0.0.1:1',
+        mode: 'http-connect' as const,
+      },
+    };
+
+    expect(() => fromX509(options)).toThrow(/proxy.*username|credential/iu);
+  });
+
   test('rejects inherited certificate material without invoking its accessor', () => {
     const { privateKey, ...ownOptions } = credentialOptions();
     const getter = vi.fn(() => privateKey);
