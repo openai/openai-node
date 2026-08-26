@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { inspect } from 'node:util';
+import { inspect, types } from 'node:util';
 import { runInNewContext } from 'node:vm';
 
 import { vi } from 'vitest';
@@ -245,6 +245,27 @@ describe('malformed JSON runtime compatibility', () => {
     },
   );
 
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.map((surface) => ({ runtimeErrorBrand, surface })),
+    ),
+  )(
+    'sanitizes a stack-only native parser proxy through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface }) => {
+      const parserFailure = new SyntaxError(PRIVATE_VALUE);
+      expect(parserFailure.stack).toContain(PRIVATE_VALUE);
+      expect(Reflect.deleteProperty(parserFailure, 'message')).toBe(true);
+
+      const readProxy = vi.fn((_target: SyntaxError, property: PropertyKey) => {
+        throw new Error(`${PRIVATE_VALUE} escaped through the ${String(property)} stack-only parser getter`);
+      });
+      const rejected = new Proxy(parserFailure, { get: readProxy });
+
+      await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['plain record', 'cross-realm prototype'] as const)(
     'preserves a forged $0 parser rejection without invoking its branding getter',
     async (shape) => {
@@ -357,7 +378,7 @@ describe('malformed JSON runtime compatibility', () => {
       ),
     ),
   )(
-    'preserves a $placement transparent forged $realm $prototype proxy with $diagnostics through $surface using $runtimeErrorBrand',
+    'handles a $placement transparent forged $realm $prototype proxy with $diagnostics through $surface using $runtimeErrorBrand',
     async ({ runtimeErrorBrand, surface, realm, prototype, diagnostics, placement }) => {
       const target =
         realm === 'same-realm'
@@ -406,7 +427,25 @@ describe('malformed JSON runtime compatibility', () => {
               value: proxy,
             });
 
-      await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      const stack = Object.getOwnPropertyDescriptor(target, 'stack');
+      const indistinguishableSyntaxStack =
+        prototype === 'SyntaxError' &&
+        (diagnostics === 'captured stack' || diagnostics === 'copied native stack') &&
+        stack &&
+        !('value' in stack) &&
+        typeof stack.get === 'function' &&
+        !(
+          runtimeErrorBrand === 'native intrinsics' &&
+          realm === 'cross-realm' &&
+          diagnostics === 'copied native stack'
+        );
+
+      if (indistinguishableSyntaxStack) {
+        expect(types.isNativeError(target)).toBe(false);
+        await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      } else {
+        await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      }
       expect(readHook).not.toHaveBeenCalled();
       expect(readProxy).not.toHaveBeenCalled();
     },
@@ -1414,6 +1453,36 @@ describe('malformed JSON runtime compatibility', () => {
       const rejected = new Proxy(target, { get: readProxy });
 
       await expectOriginalPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    publicSurfaces.flatMap((surface) =>
+      (['Error', 'TypeError'] as const).map((constructor) => ({ surface, constructor })),
+    ),
+  )(
+    'safely handles a diagnostic-free $constructor transport proxy through $surface',
+    async ({ surface, constructor }) => {
+      const target =
+        constructor === 'Error'
+          ? new Error('safe custom response body transport failure')
+          : new TypeError('safe custom response body transport failure');
+      expect(Reflect.deleteProperty(target, 'message')).toBe(true);
+      expect(Reflect.deleteProperty(target, 'stack')).toBe(true);
+
+      const readProxy = vi.fn((_target: Error, property: PropertyKey) => {
+        throw new Error(
+          `${PRIVATE_VALUE} escaped through the ${String(property)} diagnostic-free transport getter`,
+        );
+      });
+      const rejected = new Proxy(target, { get: readProxy });
+
+      const expectPublicFailure =
+        typeof process.versions['bun'] === 'string'
+          ? expectSanitizedPublicFailure
+          : expectOriginalPublicFailure;
+      await expectPublicFailure(surface, rejected, 'native intrinsics');
       expect(readProxy).not.toHaveBeenCalled();
     },
   );

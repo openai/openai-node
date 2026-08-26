@@ -257,6 +257,24 @@ function classifyCrossRealmError(error: object): JSONErrorKind {
   }
 }
 
+function hasNativeSyntaxStack(stack: PropertyDescriptor | undefined): boolean {
+  return Boolean(
+    stack && 'value' in stack && typeof stack.value === 'string' && /^SyntaxError(?::|\s)/u.test(stack.value),
+  );
+}
+
+function hasStackOnlyNativeSyntaxProxyDescriptors(
+  error: object,
+  stack: PropertyDescriptor | undefined,
+): boolean {
+  return Boolean(
+    stack &&
+    !stack.enumerable &&
+    (hasNativeSyntaxStack(stack) || (!('value' in stack) && typeof stack.get === 'function')) &&
+    classifyCrossRealmError(error) === 'syntax',
+  );
+}
+
 function hasNativeProxyErrorDescriptors(error: object): boolean {
   const message = getErrorDescriptor(error, 'message');
   const stack = getErrorDescriptor(error, 'stack');
@@ -268,6 +286,10 @@ function hasNativeProxyErrorDescriptors(error: object): boolean {
         (('value' in stack && typeof stack.value === 'string') ||
           (!('value' in stack) && typeof stack.get === 'function'))))
   ) {
+    return true;
+  }
+
+  if (!message && hasStackOnlyNativeSyntaxProxyDescriptors(error, stack)) {
     return true;
   }
 
@@ -291,12 +313,6 @@ function hasNativeProxyErrorDescriptors(error: object): boolean {
         descriptor && 'value' in descriptor && !descriptor.enumerable && typeof descriptor.value === kind,
       );
     }),
-  );
-}
-
-function hasNativeSyntaxStack(stack: PropertyDescriptor | undefined): boolean {
-  return Boolean(
-    stack && 'value' in stack && typeof stack.value === 'string' && /^SyntaxError(?::|\s)/u.test(stack.value),
   );
 }
 
