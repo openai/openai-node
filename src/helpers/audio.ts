@@ -100,7 +100,7 @@ export async function playAudio(input: NodeJS.ReadableStream | Response | File):
 
 /** Controls microphone selection and when an in-progress recording is finalized. */
 type RecordAudioOptions = {
-  /** Stops recording when aborted and resolves with the audio captured so far. */
+  /** Stops recording when aborted; successful termination returns the captured audio. */
   signal?: AbortSignal;
 
   /** Zero-based audio-input device number passed to FFmpeg; defaults to `0`. */
@@ -287,13 +287,13 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
  * This helper is supported only in Node.js-compatible runtimes and requires
  * the `ffmpeg` executable from FFmpeg to be available on `PATH`. Recording
  * continues until the FFmpeg process exits, the supplied signal is aborted, or
- * a positive timeout elapses. Aborting or timing out finalizes and returns the
- * audio captured so far instead of rejecting.
+ * a positive timeout elapses. Successful cancellation returns the audio captured
+ * so far; if sending `SIGTERM` throws, recording rejects with that error.
  *
  * @param options Audio-input device, optional abort signal, and recording timeout.
  * @returns The captured WAV file with MIME type `audio/wav`.
- * @throws {Error} If recording is unsupported, `ffmpeg` cannot start, or the
- * recording process exits unsuccessfully before an intentional stop.
+ * @throws {Error} If recording is unsupported, `ffmpeg` cannot start or exits
+ * unsuccessfully before an intentional stop, or sending it `SIGTERM` throws.
  */
 export async function recordAudio(options: RecordAudioOptions = {}): Promise<File> {
   if (isNode) {
