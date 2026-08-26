@@ -422,6 +422,17 @@ export class X509WorkloadIdentityAuth {
     }
   }
 
+  /** Recognizes every one-shot upload before issuer authentication or request replay. */
+  static isStreamingRequestBody(body: unknown): boolean {
+    return (
+      (globalThis.ReadableStream !== undefined && body instanceof globalThis.ReadableStream) ||
+      (typeof body === 'object' &&
+        body !== null &&
+        (Symbol.asyncIterator in body ||
+          (Symbol.iterator in body && 'next' in body && typeof body.next === 'function')))
+    );
+  }
+
   /** Retires abandoned upload adapters without masking or blocking their authentication failure. */
   retireRequestBody(): void {
     const scope = this.#scope();

@@ -1161,6 +1161,9 @@ export class OpenAI {
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
         x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout);
+        if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
+          options.__metadata = { ...options.__metadata, hasStreamingBody: true };
+        }
         const security = options.__security ?? { bearerAuth: true };
         const authenticationHeaders = await this.authHeaders(options, security);
         const suppliedHeaders = x509Authentication.headerSnapshots();
@@ -1199,14 +1202,7 @@ export class OpenAI {
     await this.prepareRequest(req, { url, options });
     await this._provider?.prepareRequest?.(req, { url, options });
     x509Authentication?.adoptRequestHeaders(req);
-    if (
-      x509Authentication &&
-      ((globalThis.ReadableStream && req.body instanceof globalThis.ReadableStream) ||
-        (typeof req.body === 'object' &&
-          req.body !== null &&
-          (Symbol.asyncIterator in req.body ||
-            (Symbol.iterator in req.body && 'next' in req.body && typeof req.body.next === 'function'))))
-    ) {
+    if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
       hasStreamingBody = true;
     }
 

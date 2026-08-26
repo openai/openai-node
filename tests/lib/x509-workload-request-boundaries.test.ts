@@ -71,6 +71,59 @@ describe('X.509 request ownership boundaries', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  test.each(['ReadableStream', 'async iterator', 'sync iterator'] as const)(
+    'never retries certificate authentication after a buildRequest override installs a %s',
+    async (kind) => {
+      let pulledChunks = 0;
+      let canceled = false;
+      const chunks = (function* sharedChunks() {
+        pulledChunks += 1;
+        yield new TextEncoder().encode('synthetic-first-override-chunk');
+        pulledChunks += 1;
+        yield new TextEncoder().encode('synthetic-second-override-chunk');
+      })();
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockResolvedValue(new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } }));
+      const client = new OpenAI(options({ maxRetries: 1 }));
+      const original = client.buildRequest.bind(client);
+      const builds = vi.fn(async (...args: Parameters<OpenAI['buildRequest']>) => {
+        const built = await original(...args);
+        let body: unknown;
+        if (kind === 'ReadableStream') {
+          body = new ReadableStream({
+            start(controller) {
+              const next = chunks.next();
+              if (!next.done) {
+                controller.enqueue(next.value);
+              }
+            },
+            cancel() {
+              canceled = true;
+            },
+          });
+        } else if (kind === 'async iterator') {
+          body = {
+            async *[Symbol.asyncIterator]() {
+              yield* chunks;
+            },
+          };
+        } else {
+          body = chunks;
+        }
+        Object.defineProperty(built.req, 'body', { configurable: true, enumerable: true, value: body });
+        return built;
+      });
+      Object.defineProperty(client, 'buildRequest', { value: builds });
+
+      await expect(client.models.list()).rejects.toMatchObject({ status: 503 });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(builds).toHaveBeenCalledTimes(1);
+      expect(pulledChunks).toBe(kind === 'ReadableStream' ? 1 : 0);
+      expect(canceled).toBe(false);
+    },
+  );
+
   test('retires an unread error response when its headers exhaust the request deadline', async () => {
     let elapsed = 0;
     let apiSignal: AbortSignal | undefined;
