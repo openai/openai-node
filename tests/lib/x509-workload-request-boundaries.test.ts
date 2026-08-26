@@ -95,6 +95,30 @@ describe('X.509 request ownership boundaries', () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  test('preserves caller cancellation when error headers also exhaust the request deadline', async () => {
+    let elapsed = 0;
+    const caller = new AbortController();
+    const reason = new Error('synthetic-error-headers-cancellation');
+    const canceled = vi.fn();
+    vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        return Response.json(tokenResponse);
+      }
+      elapsed = 51;
+      caller.abort(reason);
+      return new Response(new ReadableStream({ cancel: canceled }), { status: 403 });
+    });
+
+    await expect(
+      new OpenAI(options({ timeout: 50 })).models.list({ signal: caller.signal }),
+    ).rejects.toMatchObject({
+      constructor: APIUserAbortError,
+      cause: reason,
+    });
+    expect(canceled).toHaveBeenCalledTimes(1);
+  });
+
   test('retires an SDK-materialized one-shot iterator when certificate authentication fails', async () => {
     let finalized = false;
     const body = {

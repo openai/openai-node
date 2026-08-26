@@ -1102,7 +1102,7 @@ export class OpenAI {
       return body;
     } catch (error) {
       if (error instanceof Errors.APIConnectionTimeoutError) {
-        timedOut = true;
+        timedOut = !callerSignal.aborted;
         controller.abort();
         void Shims.CancelReadableStream(response.body).catch(() => undefined);
       }
