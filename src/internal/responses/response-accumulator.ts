@@ -273,10 +273,44 @@ function getResponseOutputIdentityIndex(
   return identityIndex;
 }
 
-function cloneValidatedResponse(context: ResponseAccumulatorContext, response: Response): Response {
+function getResponseID(snapshot: Response): string {
+  let id: string | undefined;
+  try {
+    ({ id } = snapshot);
+  } catch {
+    throw new OpenAIError('Response event does not match the active response.');
+  }
+  if (typeof id !== 'string') {
+    throw new OpenAIError('Response event does not match the active response.');
+  }
+  return id;
+}
+
+function cloneValidatedResponse(
+  context: ResponseAccumulatorContext,
+  response: Response,
+  expectedResponseID?: string,
+  onValidatedResponse?: () => void,
+): Response {
+  if (expectedResponseID !== undefined) {
+    let responseID: PropertyDescriptor | undefined;
+    try {
+      responseID = Object.getOwnPropertyDescriptor(response, 'id');
+    } catch {
+      throw new OpenAIError('Response event does not match the active response.');
+    }
+    if (responseID && 'value' in responseID && responseID.value !== expectedResponseID) {
+      throw new OpenAIError('Response event does not match the active response.');
+    }
+  }
+
   const nextContext = createCanonicalResponseContext();
   const snapshot = cloneResponse(nextContext, response);
+  if (expectedResponseID !== undefined && snapshot.id !== expectedResponseID) {
+    throw new OpenAIError('Response event does not match the active response.');
+  }
   const identityIndex = createResponseOutputIdentityIndex(snapshot);
+  onValidatedResponse?.();
 
   context.canonicalSnapshot = nextContext.canonicalSnapshot;
   context.outputTextLengths = nextContext.outputTextLengths;
@@ -1176,17 +1210,29 @@ export function accumulateResponseWithContext(
   onSanitizedEvent?: (event: ResponseStreamEvent) => void,
 ): Response {
   const dispatchEvent = sanitizeResponseEvent(event);
-  if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
-    onSanitizedEvent(dispatchEvent);
-  }
 
   if (!snapshot) {
+    if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
+      onSanitizedEvent(dispatchEvent);
+    }
     if (dispatchEvent.type !== 'response.created') {
       throw new OpenAIError(
         `When snapshot hasn't been set yet, expected 'response.created' event, got ${dispatchEvent.type}`,
       );
     }
     return cloneValidatedResponse(context, dispatchEvent.response);
+  }
+
+  if (isResponseLifecycleEvent(dispatchEvent)) {
+    const expectedResponseID = getResponseID(snapshot);
+    const { response } = dispatchEvent;
+    return cloneValidatedResponse(context, response, expectedResponseID, () =>
+      onSanitizedEvent?.(dispatchEvent),
+    );
+  }
+
+  if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
+    onSanitizedEvent(dispatchEvent);
   }
 
   validateOutputItemIdentity(dispatchEvent, snapshot, rejectInvalidShellTargets);
@@ -1222,9 +1268,6 @@ export function accumulateResponseWithContext(
     return snapshot;
   }
 
-  if (isResponseLifecycleEvent(dispatchEvent)) {
-    return cloneValidatedResponse(context, dispatchEvent.response);
-  }
   if (isIgnoredResponseEvent(dispatchEvent)) {
     return snapshot;
   }

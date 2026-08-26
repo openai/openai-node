@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { OpenAIError } from 'openai/core/error';
 import { hasOwn } from 'openai/internal/utils';
 import { accumulateResponse } from 'openai/lib/responses/ResponseAccumulator';
+import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 
 type OutputItem = Response['output'][number];
@@ -689,6 +690,170 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       expect(result.output_text).toBe('authoritative');
     },
   );
+
+  test.each([
+    'response.created',
+    'response.queued',
+    'response.in_progress',
+    'response.completed',
+    'response.failed',
+    'response.incomplete',
+  ] as const)('rejects a foreign %s response before exposing or mutating it', (type) => {
+    const snapshot = makeResponse();
+    const matching = makeResponse();
+    expect(accumulateResponse({ type, sequence_number: 1, response: matching }, snapshot)).toMatchObject({
+      id: snapshot.id,
+    });
+    const foreign = { ...makeResponse(), id: 'resp_foreign_private' };
+    const readForeignOutput = vi.fn(() => []);
+    Object.defineProperty(foreign, 'output', { enumerable: true, get: readForeignOutput });
+
+    expect(() => accumulateResponse({ type, sequence_number: 1, response: foreign }, snapshot)).toThrow(
+      'Response event does not match the active response.',
+    );
+
+    expect(readForeignOutput).not.toHaveBeenCalled();
+    expect(snapshot.id).toBe('resp_123');
+    expect(snapshot.output).toEqual([]);
+  });
+
+  test.each([
+    ['matching', 'resp_123', 'resp_foreign', false],
+    ['foreign', 'resp_foreign', 'resp_123', true],
+  ] as const)('materializes a %s stateful response ID exactly once', (_case, first, second, rejected) => {
+    const response = makeResponse();
+    const readID = vi.fn(() => (readID.mock.calls.length === 1 ? first : second));
+    Object.defineProperty(response, 'id', { configurable: true, enumerable: true, get: readID });
+    const accumulate = () =>
+      accumulateResponse({ type: 'response.completed', sequence_number: 1, response }, makeResponse());
+
+    if (rejected) {
+      expect(accumulate).toThrow('Response event does not match the active response.');
+    } else {
+      expect(accumulate()).toMatchObject({ id: 'resp_123' });
+    }
+    expect(readID).toHaveBeenCalledTimes(1);
+  });
+
+  test('captures the active response ID before invoking the lifecycle response getter', () => {
+    const foreign = { ...makeResponse(), id: 'resp_foreign' };
+    const readResponse = vi.fn(() => foreign);
+    const snapshot = makeResponse();
+    const readSnapshotID = vi.fn(() => (readResponse.mock.calls.length === 0 ? 'resp_123' : 'resp_foreign'));
+    Object.defineProperty(snapshot, 'id', { configurable: true, enumerable: true, get: readSnapshotID });
+    const event: Extract<ResponseStreamEvent, { type: 'response.completed' }> = {
+      type: 'response.completed',
+      sequence_number: 1,
+      get response() {
+        return readResponse();
+      },
+    };
+
+    expect(() => accumulateResponse(event, snapshot)).toThrow(
+      'Response event does not match the active response.',
+    );
+    expect(readSnapshotID).toHaveBeenCalledTimes(1);
+    expect(readResponse).toHaveBeenCalledTimes(1);
+  });
+
+  test('redacts response ID descriptor-trap failures before reading private output', () => {
+    const readOutput = vi.fn(() => []);
+    const response = makeResponse();
+    Object.defineProperty(response, 'output', { configurable: true, enumerable: true, get: readOutput });
+    const untrusted = new Proxy(response, {
+      getOwnPropertyDescriptor(target, property) {
+        if (property === 'id') {
+          throw new Error('synthetic-private-descriptor-secret');
+        }
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+    });
+
+    expect(() =>
+      accumulateResponse(
+        { type: 'response.completed', sequence_number: 1, response: untrusted },
+        makeResponse(),
+      ),
+    ).toThrow(new OpenAIError('Response event does not match the active response.'));
+    expect(readOutput).not.toHaveBeenCalled();
+  });
+
+  test.each(['missing', 'throwing'] as const)(
+    'rejects a %s established response ID before reading the next response',
+    (kind) => {
+      const snapshot = makeResponse();
+      if (kind === 'missing') {
+        Reflect.deleteProperty(snapshot, 'id');
+      } else {
+        Object.defineProperty(snapshot, 'id', {
+          get() {
+            throw new Error('synthetic-private-snapshot-secret');
+          },
+        });
+      }
+      const readResponse = vi.fn(makeResponse);
+      const event: Extract<ResponseStreamEvent, { type: 'response.completed' }> = {
+        type: 'response.completed',
+        sequence_number: 1,
+        get response() {
+          return readResponse();
+        },
+      };
+
+      expect(() => accumulateResponse(event, snapshot)).toThrow(
+        new OpenAIError('Response event does not match the active response.'),
+      );
+      expect(readResponse).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['', 'provider:custom/42'] as const)('preserves provider-defined response ID %j', (id) => {
+    const response = { ...makeResponse(), id };
+    const snapshot = accumulateResponse({ type: 'response.created', sequence_number: 0, response });
+
+    expect(
+      accumulateResponse({ type: 'response.completed', sequence_number: 1, response }, snapshot).id,
+    ).toBe(id);
+  });
+
+  test('rejects foreign lifecycle events before public stream listeners can observe them', async () => {
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const foreign = {
+      type: 'response.completed',
+      sequence_number: 1,
+      response: {
+        ...makeResponse(),
+        id: 'resp_foreign_private',
+        metadata: { private: 'foreign private output' },
+      },
+    } satisfies ResponseStreamEvent;
+    const readable = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const event of [created, foreign]) {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        }
+        controller.close();
+      },
+    });
+    const stream = ResponseStream.fromReadableStream(readable);
+    const exposedEvent = vi.fn();
+    const exposedLifecycle = vi.fn();
+    stream.on('event', exposedEvent);
+    stream.on('response.completed', exposedLifecycle);
+
+    await expect(stream.finalResponse()).rejects.toThrow(
+      'Response event does not match the active response.',
+    );
+
+    expect(exposedEvent).toHaveBeenCalledTimes(1);
+    expect(exposedEvent).toHaveBeenCalledWith(created);
+    expect(exposedLifecycle).not.toHaveBeenCalled();
+  });
 
   test.each([
     'response.audio.delta',
