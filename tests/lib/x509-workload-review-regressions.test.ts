@@ -96,6 +96,19 @@ describe('X.509 review regressions', () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  test('rejects an explicitly null X.509 refresh buffer before presenting its certificate', () => {
+    const identity = {
+      type: 'x509' as const,
+      identityProviderId: 'synthetic-null-refresh-provider',
+      serviceAccountId: 'synthetic-null-refresh-account',
+    };
+    Object.defineProperty(identity, 'refreshBufferMs', { value: null, enumerable: true });
+    const send = vi.spyOn(transportCapability, 'sendX509Request');
+
+    expect(() => new OpenAI(options({ workloadIdentity: identity }))).toThrow(/refreshBufferMs/iu);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   test('preserves an explicitly empty admin credential without presenting its certificate', async () => {
     const send = vi
       .spyOn(transportCapability, 'sendX509Request')
@@ -111,6 +124,32 @@ describe('X.509 review regressions', () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]?.[1].origin).toBe('https://mtls.api.openai.com');
     expect(new Headers(send.mock.calls[0]?.[2].headers).get('Authorization')).toBe('Bearer');
+  });
+
+  test('preserves explicit X.509 refresh configuration when cloning a client', async () => {
+    let issuerRequests = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        issuerRequests += 1;
+        return Response.json(TOKEN_RESPONSE);
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI(
+      options({
+        workloadIdentity: {
+          type: 'x509',
+          identityProviderId: 'synthetic-review-provider',
+          serviceAccountId: 'synthetic-review-account',
+          refreshBufferMs: 42,
+        },
+      }),
+    );
+
+    await client.models.list();
+    await client.withOptions({ timeout: 1000 }).models.list();
+
+    expect(issuerRequests).toBe(1);
   });
 
   test('never approves caller-substituted admin credentials', async () => {
@@ -209,6 +248,38 @@ describe('X.509 review regressions', () => {
     expect(scopes[0]).not.toBe(scopes[1]);
     expect(send.mock.calls.filter((call) => call[1].origin === 'https://mtls.api.openai.com')).toHaveLength(
       2,
+    );
+  });
+
+  test('keeps nested clone header scopes separate while sharing its enrolled credential cache', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : Response.json({ data: [] }),
+      );
+    const original = new OpenAI(options({ defaultHeaders: { 'X-Synthetic-Original': 'yes' } }));
+    const clone = original.withOptions({ defaultHeaders: { 'X-Synthetic-Clone': 'yes' } });
+    let nestedHeaders: Headers | undefined;
+    Object.defineProperty(original, 'prepareRequest', {
+      value: async () => {
+        const nested = await clone.buildRequest({
+          path: '/models',
+          method: 'get',
+          headers: { 'X-Synthetic-Request': 'yes' },
+        });
+        nestedHeaders = nested.req.headers;
+      },
+    });
+
+    await original.models.list();
+
+    expect(nestedHeaders?.get('X-Synthetic-Original')).toBeNull();
+    expect(nestedHeaders?.get('X-Synthetic-Clone')).toBe('yes');
+    expect(nestedHeaders?.get('X-Synthetic-Request')).toBe('yes');
+    expect(send.mock.calls.filter((call) => call[1].origin === 'https://mtls.auth.openai.com')).toHaveLength(
+      1,
     );
   });
 
@@ -346,6 +417,33 @@ describe('X.509 review regressions', () => {
     expect(dispatchedSignal).toBe(actual.signal);
     expect(getter.mock.calls.length).toBeGreaterThan(1);
     expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  test('never generically retries a rejected X.509 credential after refreshing it once', async () => {
+    let issuerRequests = 0;
+    let apiRequests = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        issuerRequests += 1;
+        return Response.json({
+          ...TOKEN_RESPONSE,
+          access_token: `synthetic-review-bearer-${issuerRequests}`,
+        });
+      }
+      apiRequests += 1;
+      return apiRequests === 3
+        ? Response.json({ data: [] })
+        : new Response(null, { status: 401, headers: { 'x-should-retry': 'true' } });
+    });
+    const client = new OpenAI(options({ maxRetries: 5 }));
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+    expect(issuerRequests).toBe(2);
+    expect(apiRequests).toBe(2);
+
+    await client.models.list();
+    expect(issuerRequests).toBe(3);
+    expect(apiRequests).toBe(3);
   });
 
   test('never retries issuer authentication after a one-shot request body starts pulling', async () => {
@@ -498,6 +596,98 @@ describe('X.509 review regressions', () => {
     },
   );
 
+  test.each([
+    ['OpenAI_Organization', 'synthetic-enrolled-organization'],
+    ['OpenAI_Project', 'synthetic-enrolled-project'],
+  ])('rejects an equal-valued %s alias before presenting its certificate', async (header, value) => {
+    const send = vi.spyOn(transportCapability, 'sendX509Request');
+    const client = new OpenAI(
+      options({ organization: 'synthetic-enrolled-organization', project: 'synthetic-enrolled-project' }),
+    );
+
+    await expect(client.models.list({ headers: { [header]: value } })).rejects.toThrow(
+      /organization or project/iu,
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test.each(['organization', 'project'] as const)(
+    'rejects a mutable public %s before presenting its certificate',
+    async (selector) => {
+      const enrolled = `synthetic-enrolled-${selector}`;
+      const getter = vi.fn(() => (getter.mock.calls.length === 1 ? 'synthetic-other-tenant' : enrolled));
+      const client = new OpenAI(options({ [selector]: enrolled }));
+      Object.defineProperty(client, selector, { get: getter });
+      const send = vi.spyOn(transportCapability, 'sendX509Request');
+
+      await expect(client.models.list()).rejects.toThrow(/organization or project/iu);
+      expect(getter).toHaveBeenCalledTimes(1);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  test('sanitizes malformed X.509 JSON without changing its SyntaxError contract', async () => {
+    const secret = 'sekret42!';
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) =>
+      url.origin === 'https://mtls.auth.openai.com'
+        ? Response.json(TOKEN_RESPONSE)
+        : new Response(secret, { headers: { 'content-type': 'application/json' } }),
+    );
+
+    const failure: unknown = await new OpenAI(options()).models.list().catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SyntaxError);
+    if (failure instanceof Error) {
+      expect(failure.message).not.toContain(secret);
+      expect(Object.getOwnPropertyDescriptor(failure, 'cause')).toBeUndefined();
+    }
+  });
+
+  test('keeps nested clients sharing a transport in separately owned authentication scopes', async () => {
+    const exchangedAccounts: string[] = [];
+    let apiRequests = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url, request) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        const payload = JSON.parse(String(request.body)) as { service_account_id: string };
+        exchangedAccounts.push(payload.service_account_id);
+        return Response.json({
+          ...TOKEN_RESPONSE,
+          access_token: `synthetic-account-token-${exchangedAccounts.length}`,
+        });
+      }
+      apiRequests += 1;
+      return apiRequests === 1 ? new Response(null, { status: 401 }) : Response.json({ data: [] });
+    });
+    const first = new OpenAI(options());
+    const second = new OpenAI(
+      options({
+        workloadIdentity: {
+          type: 'x509',
+          identityProviderId: 'synthetic-review-provider',
+          serviceAccountId: 'synthetic-other-account',
+        },
+      }),
+    );
+    let nested = false;
+    Object.defineProperty(first, 'prepareRequest', {
+      value: async () => {
+        if (!nested) {
+          nested = true;
+          await second.buildRequest({ path: '/models', method: 'get' });
+        }
+      },
+    });
+
+    await expect(first.models.list()).rejects.toMatchObject({ status: 401 });
+    await first.models.list();
+
+    expect(exchangedAccounts).toEqual([
+      'synthetic-other-account',
+      'synthetic-review-account',
+      'synthetic-review-account',
+    ]);
+  });
+
   test('preserves caller request and header identities while snapshotting authenticated headers', async () => {
     const headers = { 'X-Synthetic-Request': 'synthetic-value' };
     const request = { path: '/models', method: 'get' as const, headers };
@@ -562,7 +752,7 @@ describe('X.509 review regressions', () => {
     });
 
     await expect(client.models.list()).rejects.toThrow(/authorization|authentication/iu);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('clears authenticated request credentials when a protected request hook fails', async () => {
@@ -579,6 +769,9 @@ describe('X.509 review regressions', () => {
     await expect(client.models.list()).rejects.toThrow('synthetic-request-hook-failure');
     expect(observedScope).toBeDefined();
     expect(observedScope).not.toHaveProperty('token');
+    expect(observedScope).not.toHaveProperty('owner');
+    expect(observedScope).not.toHaveProperty('apiURL');
+    expect(observedScope).not.toHaveProperty('tenant');
     expect(observedScope).not.toHaveProperty('headers');
     expect(observedScope).not.toHaveProperty('authorization');
     expect(observedScope).not.toHaveProperty('defaultHeaders');
@@ -626,6 +819,38 @@ describe('X.509 review regressions', () => {
 
     await expect(pending).rejects.toBeInstanceOf(APIUserAbortError);
     expect(performance.now() - startedAt).toBeLessThan(350);
+  });
+
+  test('preserves hook-signal cancellation after successful response headers arrive', async () => {
+    const replacement = new AbortController();
+    const reason = new Error('synthetic-hook-response-body-canceled');
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : new Response(
+              new ReadableStream({
+                start(stream) {
+                  request.signal?.addEventListener('abort', () => stream.error(request.signal?.reason), {
+                    once: true,
+                  });
+                },
+              }),
+              { headers: { 'content-type': 'application/json' } },
+            ),
+      );
+    const client = new OpenAI(options({ timeout: 1000 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.signal = replacement.signal;
+      },
+    });
+    const pending = client.models.list();
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    replacement.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({ constructor: APIUserAbortError, cause: reason });
   });
 
   test('recognizes an inherited plain-data X.509 identity discriminator', () => {

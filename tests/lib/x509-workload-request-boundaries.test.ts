@@ -71,6 +71,80 @@ describe('X.509 request ownership boundaries', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  test.each(['ReadableStream', 'async iterator', 'sync iterator'] as const)(
+    'never retries certificate authentication after a buildRequest override installs a %s',
+    async (kind) => {
+      let pulledChunks = 0;
+      let canceled = false;
+      const chunks = (function* sharedChunks() {
+        pulledChunks += 1;
+        yield new TextEncoder().encode('synthetic-first-override-chunk');
+        pulledChunks += 1;
+        yield new TextEncoder().encode('synthetic-second-override-chunk');
+      })();
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockResolvedValue(new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } }));
+      const client = new OpenAI(options({ maxRetries: 1 }));
+      const original = client.buildRequest.bind(client);
+      const builds = vi.fn(async (...args: Parameters<OpenAI['buildRequest']>) => {
+        const built = await original(...args);
+        let body: unknown;
+        if (kind === 'ReadableStream') {
+          body = new ReadableStream({
+            start(controller) {
+              const next = chunks.next();
+              if (!next.done) {
+                controller.enqueue(next.value);
+              }
+            },
+            cancel() {
+              canceled = true;
+            },
+          });
+        } else if (kind === 'async iterator') {
+          body = {
+            async *[Symbol.asyncIterator]() {
+              yield* chunks;
+            },
+          };
+        } else {
+          body = chunks;
+        }
+        Object.defineProperty(built.req, 'body', { configurable: true, enumerable: true, value: body });
+        return built;
+      });
+      Object.defineProperty(client, 'buildRequest', { value: builds });
+
+      await expect(client.models.list()).rejects.toMatchObject({ status: 503 });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(builds).toHaveBeenCalledTimes(1);
+      expect(pulledChunks).toBe(kind === 'ReadableStream' ? 1 : 0);
+      expect(canceled).toBe(false);
+    },
+  );
+
+  test('rejects an accessor-backed final override body before certificate authentication', async () => {
+    const hiddenStream = new ReadableStream();
+    const getter = vi.fn(() => hiddenStream);
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockResolvedValue(new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } }));
+    const client = new OpenAI(options({ maxRetries: 1 }));
+    const original = client.buildRequest.bind(client);
+    Object.defineProperty(client, 'buildRequest', {
+      value: async (...args: Parameters<OpenAI['buildRequest']>) => {
+        const built = await original(...args);
+        Object.defineProperty(built.req, 'body', { configurable: true, enumerable: true, get: getter });
+        return built;
+      },
+    });
+
+    await expect(client.models.list()).rejects.toThrow(/approved final request/iu);
+    expect(getter).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   test('retires an unread error response when its headers exhaust the request deadline', async () => {
     let elapsed = 0;
     let apiSignal: AbortSignal | undefined;
@@ -368,6 +442,29 @@ describe('X.509 request ownership boundaries', () => {
     },
   );
 
+  test.each(['OpenAI-Organization', 'OpenAI-Project', 'OpenAI_Organization', 'OpenAI_Project'])(
+    'rejects overridden final tenant selector %s before certificate exchange',
+    async (name) => {
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockResolvedValue(Response.json(tokenResponse));
+      const client = new OpenAI(
+        options({ organization: 'synthetic-enrolled-org', project: 'synthetic-enrolled-project' }),
+      );
+      const original = client.buildRequest.bind(client);
+      Object.defineProperty(client, 'buildRequest', {
+        value: async (...args: Parameters<OpenAI['buildRequest']>) => {
+          const built = await original(...args);
+          built.req.headers.set(name, 'synthetic-unapproved-tenant');
+          return built;
+        },
+      });
+
+      await expect(client.models.list()).rejects.toThrow(/organization|project/iu);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
   test('starts its network deadline only after asynchronous request preparation completes', async () => {
     const send = vi
       .spyOn(transportCapability, 'sendX509Request')
@@ -385,6 +482,140 @@ describe('X.509 request ownership boundaries', () => {
       data: [],
     });
     expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  test('starts its network deadline only after an asynchronous protected request hook completes', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(tokenResponse)
+          : Response.json({ data: [] }),
+      );
+    const client = new OpenAI(options({ timeout: 45 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async () => await delay(90),
+    });
+
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  test.each(['dispatcher', 'redirect', 'authorization', 'failure'] as const)(
+    'rejects a protected request hook %s before presenting a certificate',
+    async (mutation) => {
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockResolvedValue(Response.json(tokenResponse));
+      const client = new OpenAI(options());
+      Object.defineProperty(client, 'prepareRequest', {
+        value: async (request: RequestInit) => {
+          if (mutation === 'dispatcher') {
+            Object.defineProperty(request, 'dispatcher', { value: {}, enumerable: true });
+          } else if (mutation === 'redirect') {
+            request.redirect = 'follow';
+          } else if (mutation === 'authorization') {
+            if (request.headers instanceof Headers) {
+              request.headers.set('Authorization', 'Bearer synthetic-unapproved-hook-secret');
+            }
+          } else {
+            throw new Error('synthetic-preauthentication-hook-failure');
+          }
+        },
+      });
+
+      await expect(client.models.list()).rejects.toThrow();
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  test('retains response authentication mode when a protected hook changes mutable client state', async () => {
+    const hook = new AbortController();
+    const reason = new Error('synthetic-preserved-response-authentication-mode');
+    const canceled = vi.fn();
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(tokenResponse)
+          : new Response(new ReadableStream({ cancel: canceled }), {
+              headers: { 'content-type': 'application/json' },
+            }),
+      );
+    const client = new OpenAI(options({ timeout: 75 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.signal = hook.signal;
+        Object.defineProperty(client, '_workloadIdentityAuth', { value: undefined });
+      },
+    });
+    const pending = client.models.list();
+
+    await pending.asResponse();
+    hook.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({ constructor: APIUserAbortError, cause: reason });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  test('retains its private authentication owner when a protected hook changes client state before retry', async () => {
+    let apiCalls = 0;
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          return Response.json(tokenResponse);
+        }
+        apiCalls += 1;
+        return apiCalls === 1
+          ? new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } })
+          : Response.json({ data: [] });
+      });
+    const client = new OpenAI(options({ maxRetries: 1 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async () => {
+        Object.defineProperty(client, '_workloadIdentityAuth', { value: undefined });
+      },
+    });
+
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+    expect(apiCalls).toBe(2);
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  test('isolates a same-client request built from inside a protected request hook', async () => {
+    let nestedHeaders: Headers | undefined;
+    let dispatchedHeaders: Headers | undefined;
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          return Response.json(tokenResponse);
+        }
+        dispatchedHeaders = new Headers(request.headers);
+        return Response.json({ data: [] });
+      });
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async () => {
+        const nested = await client.buildRequest({
+          path: '/models',
+          method: 'get',
+          headers: { 'X-Synthetic-Nested': 'nested' },
+        });
+        nestedHeaders = nested.req.headers;
+      },
+    });
+
+    await client.request({ path: '/models', method: 'get', headers: { 'X-Synthetic-Outer': 'outer' } });
+
+    expect(nestedHeaders?.get('X-Synthetic-Nested')).toBe('nested');
+    expect(nestedHeaders?.get('X-Synthetic-Outer')).toBeNull();
+    expect(dispatchedHeaders?.get('X-Synthetic-Outer')).toBe('outer');
+    expect(dispatchedHeaders?.get('X-Synthetic-Nested')).toBeNull();
+    expect(send.mock.calls.filter((call) => call[1].origin === 'https://mtls.auth.openai.com')).toHaveLength(
+      1,
+    );
   });
 
   test('cancels retry backoff promptly through the effective protected-hook signal', async () => {

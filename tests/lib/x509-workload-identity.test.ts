@@ -510,7 +510,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
 
       await expect(client.models.list()).resolves.toMatchObject({ data: [] });
       expect(dispatches).toBe(2);
-      expect(send).toHaveBeenCalledTimes(4);
+      expect(send).toHaveBeenCalledTimes(status === 401 ? 4 : 3);
     },
   );
 
@@ -588,10 +588,8 @@ describe('OpenAI X.509 workload-identity client integration', () => {
 
     await Promise.all([client.request(shared), client.request(shared)]);
 
-    expect(exchangeCount).toBe(2);
-    expect(dispatched).toEqual(
-      new Set(['Bearer synthetic-concurrent-token-1', 'Bearer synthetic-concurrent-token-2']),
-    );
+    expect(exchangeCount).toBe(1);
+    expect(dispatched).toEqual(new Set(['Bearer synthetic-concurrent-token-1']));
   });
 
   test('starts a new isolated operation when caller options are reused sequentially', async () => {
@@ -603,7 +601,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     await delay(60);
     await client.request(shared);
 
-    expect(send).toHaveBeenCalledTimes(4);
+    expect(send).toHaveBeenCalledTimes(3);
   });
 
   test('rejects protected hooks that replace the issued workload bearer', async () => {
@@ -618,8 +616,8 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       },
     });
 
-    await expect(client.models.list()).rejects.toThrow(/issued workload authorization/iu);
-    expect(send).toHaveBeenCalledTimes(1);
+    await expect(client.models.list()).rejects.toThrow(/caller-supplied.*authorization/iu);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test.each([401, 503])(
@@ -664,8 +662,8 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       },
     });
 
-    await expect(client.models.list()).rejects.toThrow(/issued workload authorization/iu);
-    expect(send).toHaveBeenCalledTimes(1);
+    await expect(client.models.list()).rejects.toThrow(/caller-supplied.*authorization/iu);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('rejects forbidden proxy credentials before they can reach an enabled debug logger', async () => {
@@ -681,9 +679,9 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       },
     });
 
-    await expect(client.models.list()).rejects.toThrow(/conflicting authentication/iu);
+    await expect(client.models.list()).rejects.toThrow(/caller-supplied.*authentication/iu);
     expect(JSON.stringify(logger.debug.mock.calls)).not.toContain(secret);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test.each(['fetchWithAuth', 'fetchWithTimeout'])(
@@ -831,22 +829,28 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     expect(client.baseURL).toBe('https://api.openai.com/v1');
   });
 
-  test('uses the exact same attested TLS identity for the real issuer and API handshakes', async () => {
+  test('reuses and rotates real TLS-issued credentials without exposing them to a CONNECT proxy', async () => {
     const lab = createX509TestLab();
+    let exchanges = 0;
+    let dispatches = 0;
     const issuer = createMutualTLSServer(
       lab,
       (_request, response) => {
+        exchanges += 1;
         response.writeHead(200, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify(TOKEN_RESPONSE));
+        response.end(
+          JSON.stringify({ ...TOKEN_RESPONSE, access_token: `synthetic-wire-token-${exchanges}` }),
+        );
       },
       lab.issuerServer,
     );
     const api = createMutualTLSServer(
       lab,
       (request, response) => {
-        if (request.headers.authorization !== `Bearer ${ACCESS_TOKEN}`) {
-          response.writeHead(401);
-          response.end();
+        dispatches += 1;
+        if (dispatches === 2) {
+          response.writeHead(401, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ error: { message: 'synthetic rejected workload credential' } }));
           return;
         }
         response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -883,34 +887,46 @@ describe('OpenAI X.509 workload-identity client integration', () => {
         certificateIdentity: 'static',
         proxy: 'http-connect',
       });
-      const client = new OpenAI(options({ x509Transport: approved }));
+      const client = new OpenAI(options({ x509Transport: approved, maxRetries: 1 }));
 
-      const models = await client.models.list();
+      const models = [await client.models.list(), await client.models.list(), await client.models.list()];
 
-      expect(models.data).toEqual([]);
+      expect(models.map((result) => result.data)).toEqual([[], [], []]);
+      expect(exchanges).toBe(2);
+      expect(dispatches).toBe(4);
       const fingerprint = new X509Certificate(lab.firstClient.certificate).fingerprint256;
-      expect(issuer.requests).toEqual([
-        expect.objectContaining({
+      expect(issuer.requests).toHaveLength(2);
+      for (const request of issuer.requests) {
+        expect(request).toMatchObject({
           authority: 'mtls.auth.openai.com',
           authorization: undefined,
           certificateFingerprint: fingerprint,
           path: '/oauth/token',
           serverName: 'mtls.auth.openai.com',
-        }),
+        });
+      }
+      expect(api.requests.map((request) => request.authorization)).toEqual([
+        'Bearer synthetic-wire-token-1',
+        'Bearer synthetic-wire-token-1',
+        'Bearer synthetic-wire-token-2',
+        'Bearer synthetic-wire-token-2',
       ]);
-      expect(api.requests).toEqual([
-        expect.objectContaining({
+      for (const request of api.requests) {
+        expect(request).toMatchObject({
           authority: 'mtls.api.openai.com',
-          authorization: `Bearer ${ACCESS_TOKEN}`,
           certificateFingerprint: fingerprint,
           path: '/v1/models',
           serverName: 'mtls.api.openai.com',
-        }),
-      ]);
-      expect(proxy.requests.map((request) => request.path)).toEqual([
-        'mtls.auth.openai.com:443',
-        'mtls.api.openai.com:443',
-      ]);
+        });
+      }
+      expect(new Set(proxy.requests.map((request) => request.path))).toEqual(
+        new Set(['mtls.auth.openai.com:443', 'mtls.api.openai.com:443']),
+      );
+      for (const request of proxy.requests) {
+        expect(request.authorization).toBeUndefined();
+        expect(request.proxyAuthorization).toBeUndefined();
+        expect(request.certificateFingerprint).toBeUndefined();
+      }
     } finally {
       await proxyDispatcher?.close();
       await closeObservedServers(issuer, api, ...(proxy ? [proxy] : []));

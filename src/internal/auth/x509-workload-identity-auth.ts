@@ -14,7 +14,12 @@ import {
   isRetryableX509IssuerError,
   isTransientX509ConnectionError,
 } from '#x509-transport-state';
-import type { RegisteredX509Transport, X509RequestScope, X509Transport } from './x509-transport-registry';
+import type {
+  RegisteredX509Transport,
+  X509ExchangedToken,
+  X509RequestScope,
+  X509Transport,
+} from './x509-transport-registry';
 
 /** Sole API authority approved for OpenAI X.509 workload-identity federation. */
 export const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
@@ -23,7 +28,8 @@ const X509_API_ORIGIN = 'https://mtls.api.openai.com';
 const FORBIDDEN_TRANSPORT_OPTIONS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'];
 const headerValue = (headers: Headers, name: string): string | null =>
   Headers.prototype.get.call(headers, name);
-const invalidateUncachedToken = (): undefined => undefined;
+const DEFAULT_REFRESH_BUFFER_MS = 20 * 60 * 1000;
+const FAILED_REFRESH_COOLDOWN_MS = 1000;
 const userAbortError = (signal: AbortSignal): APIUserAbortError => {
   const error = new APIUserAbortError();
   Object.defineProperty(error, 'cause', { value: signal.reason, writable: true, configurable: true });
@@ -73,6 +79,57 @@ function exchangeDeadline(
       callerSignal?.removeEventListener('abort', cancel);
       if (timer) {
         clearTimeout(timer);
+      }
+    },
+  };
+}
+
+interface CachedX509Token {
+  accessToken: string;
+  generation: number;
+  expiresAt: number;
+  refreshAt: number;
+  wallExpiresAt: number;
+  wallRefreshAt: number;
+}
+
+interface X509RefreshAttempt {
+  controller: AbortController;
+  generation: number;
+  promise: Promise<X509ExchangedToken>;
+  waiters: number;
+}
+
+interface X509TokenRequestContext {
+  apiURL: string;
+  defaultHeaders: HeadersLike | undefined;
+  requestHeaders: HeadersLike;
+  signal: AbortSignal | null | undefined;
+  organization: string | null;
+  project: string | null;
+  timeout: number;
+  fetchOptions: MergedRequestInit;
+}
+
+function waitForRefresh(
+  attempt: X509RefreshAttempt,
+  signal: AbortSignal,
+): { result: Promise<X509ExchangedToken>; dispose: () => void } {
+  let abort: (() => void) | undefined;
+  // AbortSignal remains callback-only on supported TypeScript/runtime combinations.
+  // oxlint-disable-next-line promise/avoid-new -- A callback-only AbortSignal must race a shared refresh.
+  const canceled = new Promise<never>((_resolve, reject) => {
+    abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) {
+      abort();
+    }
+  });
+  return {
+    result: Promise.race([attempt.promise, canceled]),
+    dispose: () => {
+      if (abort) {
+        signal.removeEventListener('abort', abort);
       }
     },
   };
@@ -155,7 +212,7 @@ export function assertX509FetchOptions(options: MergedRequestInit | RequestInit 
   }
 }
 
-/** Rejects caller body replacement while allowing the SDK's legitimate final RequestInit body. */
+/** Rejects caller overrides while allowing the SDK-owned fields on the final RequestInit. */
 export function assertX509RequestOptions(options: MergedRequestInit | RequestInit | undefined): void {
   assertX509FetchOptions(options);
   if (options && ['body', 'headers', 'method', 'signal'].some((name) => hasOwn(options, name))) {
@@ -177,13 +234,35 @@ export function snapshotX509RequestOptions(options: MergedRequestInit | undefine
 export class X509WorkloadIdentityAuth {
   readonly #identityProviderId: string;
   readonly #serviceAccountId: string;
+  readonly #configuredRefreshBufferMs: number | undefined;
+  readonly #organization: string | null;
+  readonly #project: string | null;
   readonly #transport: RegisteredX509Transport;
+  readonly #refreshBufferMs: number;
+  #cachedToken: CachedX509Token | undefined;
+  #refresh: X509RefreshAttempt | undefined;
+  #tokenGeneration = 0;
 
   /** Captures one registered, immutable certificate identity and its enrolled selectors. */
-  constructor(identity: X509WorkloadIdentity, transport: X509Transport | undefined) {
+  constructor(
+    identity: X509WorkloadIdentity,
+    transport: X509Transport | undefined,
+    organization: string | null,
+    project: string | null,
+  ) {
     this.#transport = resolveX509Transport(transport);
     this.#identityProviderId = identity.identityProviderId;
     this.#serviceAccountId = identity.serviceAccountId;
+    this.#configuredRefreshBufferMs = identity.refreshBufferMs;
+    this.#organization = organization;
+    this.#project = project;
+    if (
+      this.#configuredRefreshBufferMs !== undefined &&
+      (!Number.isSafeInteger(this.#configuredRefreshBufferMs) || this.#configuredRefreshBufferMs < 0)
+    ) {
+      throw new OpenAIError('X.509 workload identity requires a nonnegative integer refreshBufferMs.');
+    }
+    this.#refreshBufferMs = this.#configuredRefreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS;
   }
 
   /** Reconstructs the immutable selectors captured before caller-owned identity mutation. */
@@ -192,6 +271,9 @@ export class X509WorkloadIdentityAuth {
       type: 'x509',
       identityProviderId: this.#identityProviderId,
       serviceAccountId: this.#serviceAccountId,
+      ...(this.#configuredRefreshBufferMs === undefined
+        ? {}
+        : { refreshBufferMs: this.#configuredRefreshBufferMs }),
     };
   }
 
@@ -222,6 +304,28 @@ export class X509WorkloadIdentityAuth {
       throw new OpenAIError('X.509 workload identity requires snapshotted request headers.');
     }
     return { defaultHeaders, requestHeaders };
+  }
+
+  /** Captures enrolled public tenant selectors once before certificate presentation. */
+  snapshotTenant(
+    organization: string | null,
+    project: string | null,
+  ): { organization: string | null; project: string | null } {
+    if (organization !== this.#organization || project !== this.#project) {
+      throw new OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+    }
+    const scope = this.#scope();
+    scope.tenant = { organization, project };
+    return scope.tenant;
+  }
+
+  /** Returns the tenant selectors already approved for this logical request. */
+  tenantSnapshot(): { organization: string | null; project: string | null } {
+    const { tenant } = this.#scope();
+    if (!tenant) {
+      throw new OpenAIError('X.509 workload identity requires snapshotted tenant selectors.');
+    }
+    return tenant;
   }
 
   /** Validates and retains the exact destination that authenticated dispatch will use. */
@@ -261,14 +365,19 @@ export class X509WorkloadIdentityAuth {
     return request;
   }
 
-  /** Arms one logical network deadline only after protected option preparation completes. */
+  /** Begins local request construction without charging protected hook latency to the network. */
   beginRequestPlanning(): void {
+    this.#scope().phase = 'planning';
+  }
+
+  /** Arms one absolute network deadline only after all local request preparation completes. */
+  beginRequestNetwork(): void {
     const scope = this.#scope();
-    if (!scope.request) {
+    if (!scope.deadlineArmed) {
       scope.wallStartedAt = Date.now();
       scope.monotonicStartedAt = performance.now();
+      scope.deadlineArmed = true;
     }
-    scope.phase = 'planning';
   }
 
   /** Keeps certificate authentication outside overridable request construction. */
@@ -277,18 +386,18 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Approves the final overridden destination and transport before minting a bearer. */
-  authorizePlannedRequest(url: string, request: RequestInit, timeout: number): void {
+  authorizePlannedRequest(url: string, request: RequestInit, timeout: number, allowHookSignal = false): void {
     const scope = this.#scope();
     const headers = Object.getOwnPropertyDescriptor(request, 'headers');
+    const body = Object.getOwnPropertyDescriptor(request, 'body');
     const signal = Object.getOwnPropertyDescriptor(request, 'signal');
     const redirect = Object.getOwnPropertyDescriptor(request, 'redirect');
     if (
       scope.phase !== 'planning' ||
       !headers ||
-      !('value' in headers) ||
       !(headers.value instanceof Headers) ||
-      (signal && !('value' in signal)) ||
-      (redirect && !('value' in redirect))
+      (!body && 'body' in request) ||
+      [body, signal, redirect].some((descriptor) => descriptor && !('value' in descriptor))
     ) {
       throw new OpenAIError('X.509 workload identity requires an approved final request.');
     }
@@ -302,7 +411,8 @@ export class X509WorkloadIdentityAuth {
     if (headerValue(headers.value, 'Authorization') !== null) {
       throw new OpenAIError('X.509 workload identity cannot use caller-supplied authorization credentials.');
     }
-    if ((signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
+    this.#assertTenantHeaders(headers.value);
+    if (!allowHookSignal && (signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
       throw new OpenAIError('X.509 workload identity must preserve its approved request signal.');
     }
     const approved = this.requestSnapshot();
@@ -315,6 +425,17 @@ export class X509WorkloadIdentityAuth {
     if (body instanceof ReadableStream && body !== source) {
       this.#scope().materializedBody = body;
     }
+  }
+
+  /** Recognizes every one-shot upload before issuer authentication or request replay. */
+  static isStreamingRequestBody(body: unknown): boolean {
+    return (
+      (globalThis.ReadableStream !== undefined && body instanceof globalThis.ReadableStream) ||
+      (typeof body === 'object' &&
+        body !== null &&
+        (Symbol.asyncIterator in body ||
+          (Symbol.iterator in body && 'next' in body && typeof body.next === 'function')))
+    );
   }
 
   /** Retires abandoned upload adapters without masking or blocking their authentication failure. */
@@ -361,30 +482,55 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Establishes an independent scope even when concurrent requests share caller options. */
-  runRequest<T>(operation: () => Promise<T>): Promise<T> {
+  runRequest<T>(operation: () => Promise<T>, requestOwner: object): Promise<T> {
     return this.#transport.run(async () => {
+      const scope = this.#transport.current();
+      if (!scope) {
+        throw new OpenAIError('X.509 workload identity requires an active certificate request scope.');
+      }
+      scope.owner = this;
+      scope.requestOwner = requestOwner;
       try {
         return await operation();
       } finally {
         this.retireRequestBody();
         this.releaseRequestCredentials();
+        delete scope.requestOwner;
+        delete scope.owner;
       }
     });
   }
 
   /** Reports whether a public request-building call already belongs to an active logical operation. */
-  inRequest(): boolean {
-    return this.#transport.current() !== undefined;
+  inRequest(requestOwner: object): boolean {
+    const scope = this.#transport.current();
+    return scope?.owner === this && scope.requestOwner === requestOwner && scope.phase !== 'authorizing';
+  }
+
+  /** Shares a cache only when the complete, privately snapshotted credential identity matches. */
+  matches(other: X509WorkloadIdentityAuth): boolean {
+    return (
+      this.#transport === other.#transport &&
+      this.#identityProviderId === other.#identityProviderId &&
+      this.#serviceAccountId === other.#serviceAccountId &&
+      this.#organization === other.#organization &&
+      this.#project === other.#project &&
+      this.#refreshBufferMs === other.#refreshBufferMs
+    );
   }
 
   /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
   continuation(): <T>(operation: () => Promise<T>) => Promise<T> {
-    const { wallStartedAt, monotonicStartedAt, request, effectiveSignal } = this.#scope();
+    const { wallStartedAt, monotonicStartedAt, deadlineArmed, request, requestOwner, effectiveSignal } =
+      this.#scope();
     const scope: X509RequestScope = {
       wallStartedAt,
       monotonicStartedAt,
+      owner: this,
+      ...(deadlineArmed ? { deadlineArmed } : {}),
       ...(request ? { request } : {}),
       ...(effectiveSignal ? { effectiveSignal } : {}),
+      ...(requestOwner ? { requestOwner } : {}),
     };
     return (operation) =>
       this.#transport.resume(scope, async () => {
@@ -392,6 +538,8 @@ export class X509WorkloadIdentityAuth {
           return await operation();
         } finally {
           this.releaseRequestCredentials();
+          delete scope.requestOwner;
+          delete scope.owner;
         }
       });
   }
@@ -401,12 +549,15 @@ export class X509WorkloadIdentityAuth {
     const scope = this.#scope();
     delete scope.request;
     delete scope.phase;
+    delete scope.deadlineArmed;
     delete scope.effectiveSignal;
     delete scope.materializedBody;
     delete scope.apiURL;
+    delete scope.tenant;
     delete scope.token;
     delete scope.defaultHeaders;
     delete scope.requestHeaders;
+    delete scope.tokenGeneration;
     delete scope.headers;
     delete scope.authorization;
   }
@@ -465,80 +616,210 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Exchanges the exact certificate capability selected for the matching API dispatch. */
-  async getToken(
-    options?: FinalRequestOptions,
-    context?: {
-      apiURL: string;
-      defaultHeaders: HeadersLike | undefined;
-      requestHeaders: HeadersLike;
-      signal: AbortSignal | null | undefined;
-      timeout: number;
-      fetchOptions: MergedRequestInit;
-    },
+  async getToken(options?: FinalRequestOptions, context?: X509TokenRequestContext): Promise<string> {
+    const callerSignal = context ? context.signal : options?.signal;
+    if (callerSignal?.aborted) {
+      throw userAbortError(callerSignal);
+    }
+    if (options) {
+      assertX509RequestOptions(context ? context.fetchOptions : options.fetchOptions);
+    }
+    this.#preflight(context);
+
+    const scope = options ? this.#scope() : undefined;
+    const cached = this.#cachedToken;
+    if (cached && performance.now() < cached.refreshAt && Date.now() < cached.wallRefreshAt) {
+      return X509WorkloadIdentityAuth.#assignToken(scope, cached);
+    }
+
+    const remaining = context && options ? this.remainingTimeout(options, context.timeout) : context?.timeout;
+    const { signal, dispose } = exchangeDeadline(remaining, callerSignal);
+    if (callerSignal?.aborted) {
+      dispose();
+      throw userAbortError(callerSignal);
+    }
+    const attempt = this.#refresh ?? this.#beginRefresh();
+    attempt.waiters += 1;
+    const waiter = waitForRefresh(attempt, signal);
+
+    try {
+      const exchanged = await waiter.result;
+      const refreshed = this.#cachedToken;
+      if (!refreshed || refreshed.accessToken !== exchanged.accessToken) {
+        throw new APIUserAbortError();
+      }
+      return X509WorkloadIdentityAuth.#assignToken(scope, refreshed);
+    } catch (error) {
+      return await this.#recoverRefreshFailure(error, attempt, cached, scope, options, context);
+    } finally {
+      waiter.dispose();
+      dispose();
+      attempt.waiters -= 1;
+      this.#retireRefresh(attempt);
+    }
+  }
+
+  static #assignToken(scope: X509RequestScope | undefined, token: CachedX509Token): string {
+    if (scope) {
+      scope.token = token.accessToken;
+      scope.tokenGeneration = token.generation;
+    }
+    return token.accessToken;
+  }
+
+  async #recoverRefreshFailure(
+    error: unknown,
+    attempt: X509RefreshAttempt,
+    cached: CachedX509Token | undefined,
+    scope: X509RequestScope | undefined,
+    options: FinalRequestOptions | undefined,
+    context: X509TokenRequestContext | undefined,
   ): Promise<string> {
     const callerSignal = context ? context.signal : options?.signal;
     if (callerSignal?.aborted) {
       throw userAbortError(callerSignal);
     }
-    X509WorkloadIdentityAuth.#preflight(options, context);
-
-    const scope = options ? this.#scope() : undefined;
-    const remaining = context && options ? this.remainingTimeout(options, context.timeout) : context?.timeout;
-    const { signal, dispose } = exchangeDeadline(remaining, callerSignal);
-
-    try {
-      if (callerSignal?.aborted) {
-        throw userAbortError(callerSignal);
+    if (attempt.controller.signal.aborted && attempt.generation !== this.#tokenGeneration) {
+      return await this.getToken(options, context);
+    }
+    const fallback = this.#fallbackToken(error, cached, scope);
+    if (fallback !== undefined) {
+      return fallback;
+    }
+    if (error && typeof error === 'object' && !(error instanceof OAuthError)) {
+      const oauth:
+        | { status: 400 | 401 | 403; error: { error: string } | undefined; headers: Headers }
+        | undefined = findX509OAuthError(error);
+      if (oauth) {
+        throw new OAuthError(oauth.status, oauth.error, oauth.headers);
       }
-      const exchanged = await this.#transport.exchange(
+    }
+    throw error;
+  }
+
+  #fallbackToken(
+    error: unknown,
+    cached: CachedX509Token | undefined,
+    scope: X509RequestScope | undefined,
+  ): string | undefined {
+    if (
+      !cached ||
+      cached !== this.#cachedToken ||
+      performance.now() >= cached.expiresAt ||
+      Date.now() >= cached.wallExpiresAt ||
+      !X509WorkloadIdentityAuth.isRetryableFailure(error)
+    ) {
+      return undefined;
+    }
+    const headers = X509WorkloadIdentityAuth.retryHeaders(error);
+    const milliseconds = headers?.get('retry-after-ms');
+    let requested = milliseconds ? Number(milliseconds) : undefined;
+    const retryAfter = headers?.get('retry-after');
+    if (retryAfter && (requested === undefined || Number.isNaN(requested))) {
+      const seconds = Number(retryAfter);
+      requested = Number.isNaN(seconds) ? Date.parse(retryAfter) - Date.now() : seconds * 1000;
+    }
+    const cooldown =
+      requested !== undefined && Number.isFinite(requested) && requested >= 0 && requested <= 60_000
+        ? Math.max(FAILED_REFRESH_COOLDOWN_MS, requested)
+        : FAILED_REFRESH_COOLDOWN_MS;
+    cached.refreshAt = Math.min(cached.expiresAt, performance.now() + cooldown);
+    cached.wallRefreshAt = Math.min(cached.wallExpiresAt, Date.now() + cooldown);
+    return X509WorkloadIdentityAuth.#assignToken(scope, cached);
+  }
+
+  #retireRefresh(attempt: X509RefreshAttempt): void {
+    if (attempt.waiters !== 0 || this.#refresh !== attempt) {
+      return;
+    }
+    queueMicrotask(() => {
+      if (attempt.waiters === 0 && this.#refresh === attempt) {
+        this.#refresh = undefined;
+        this.#tokenGeneration += 1;
+        attempt.controller.abort(new APIUserAbortError());
+      }
+    });
+  }
+
+  #beginRefresh(): X509RefreshAttempt {
+    const controller = new AbortController();
+    const generation = this.#tokenGeneration;
+    const attempt: X509RefreshAttempt = {
+      controller,
+      generation,
+      waiters: 0,
+      promise: this.#refreshToken(controller, generation),
+    };
+    this.#refresh = attempt;
+    return attempt;
+  }
+
+  async #refreshToken(controller: AbortController, generation: number): Promise<X509ExchangedToken> {
+    const startedAt = performance.now();
+    const wallStartedAt = Date.now();
+    try {
+      const token = await this.#transport.exchange(
         this.#identityProviderId,
         this.#serviceAccountId,
-        signal,
+        controller.signal,
       );
-      if (scope) {
-        scope.token = exchanged.accessToken;
+      const lifetime = token.expiresIn * 1000;
+      const expiresAt = startedAt + lifetime;
+      const wallExpiresAt = wallStartedAt + lifetime;
+      if (performance.now() >= expiresAt || Date.now() >= wallExpiresAt) {
+        throw new OpenAIError('X.509 workload identity token expired before its exchange completed.');
       }
-      return exchanged.accessToken;
-    } catch (error) {
-      if (callerSignal?.aborted) {
-        throw userAbortError(callerSignal);
+      if (
+        this.#tokenGeneration !== generation ||
+        controller.signal.aborted ||
+        this.#refresh?.controller !== controller
+      ) {
+        throw new APIUserAbortError();
       }
-      if (error && typeof error === 'object' && !(error instanceof OAuthError)) {
-        const oauth:
-          | { status: 400 | 401 | 403; error: { error: string } | undefined; headers: Headers }
-          | undefined = findX509OAuthError(error);
-        if (oauth) {
-          throw new OAuthError(oauth.status, oauth.error, oauth.headers);
-        }
-      }
-      throw error;
+      this.#tokenGeneration += 1;
+      this.#cachedToken = {
+        accessToken: token.accessToken,
+        generation: this.#tokenGeneration,
+        expiresAt,
+        refreshAt: expiresAt - Math.min(this.#refreshBufferMs, lifetime / 2),
+        wallExpiresAt,
+        wallRefreshAt: wallExpiresAt - Math.min(this.#refreshBufferMs, lifetime / 2),
+      };
+      return token;
     } finally {
-      dispose();
+      if (this.#refresh?.controller === controller) {
+        this.#refresh = undefined;
+      }
     }
   }
 
-  static #preflight(
-    options: FinalRequestOptions | undefined,
-    context:
-      | {
-          apiURL: string;
-          defaultHeaders: HeadersLike | undefined;
-          requestHeaders: HeadersLike;
-          timeout: number;
-          fetchOptions: MergedRequestInit;
-        }
-      | undefined,
-  ): void {
-    if (options) {
-      assertX509RequestOptions(context ? context.fetchOptions : options.fetchOptions);
-    }
+  #preflight(context: X509TokenRequestContext | undefined): void {
     if (!context) {
       return;
     }
+    if (context.organization !== this.#organization || context.project !== this.#project) {
+      throw new OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+    }
     assertX509APIOrigin(context.apiURL);
     const supplied = buildHeaders([context.defaultHeaders, context.requestHeaders]);
+    if (
+      (this.#organization !== null && supplied.nulls.has('openai-organization')) ||
+      (this.#project !== null && supplied.nulls.has('openai-project'))
+    ) {
+      throw new OpenAIError('X.509 workload identity cannot omit its enrolled organization or project.');
+    }
     for (const name of supplied.values.keys()) {
       const canonical = name.toLowerCase().split('_').join('-');
+      if (
+        (canonical === 'openai-organization' || canonical === 'openai-project') &&
+        (name !== canonical ||
+          headerValue(supplied.values, name) !==
+            (canonical === 'openai-organization' ? context.organization : context.project))
+      ) {
+        throw new OpenAIError(
+          'X.509 workload identity cannot override its enrolled organization or project.',
+        );
+      }
       if (
         canonical === 'authorization' ||
         canonical === 'api-key' ||
@@ -553,12 +834,26 @@ export class X509WorkloadIdentityAuth {
     }
   }
 
-  /** Token caching is added separately; every current exchange already produces a fresh credential. */
-  readonly invalidateToken = invalidateUncachedToken;
+  /** Invalidates only the workload-token generation actually rejected by the current request. */
+  invalidateToken(): void {
+    const rejected = this.#transport.current();
+    if (
+      !rejected?.token ||
+      this.#cachedToken?.accessToken !== rejected.token ||
+      this.#cachedToken.generation !== rejected.tokenGeneration
+    ) {
+      return;
+    }
+    this.#tokenGeneration += 1;
+    this.#cachedToken = undefined;
+    const refresh = this.#refresh;
+    this.#refresh = undefined;
+    refresh?.controller.abort(new APIUserAbortError());
+  }
 
   #scope(): X509RequestScope {
     const scope = this.#transport.current();
-    if (!scope) {
+    if (!scope || scope.owner !== this) {
       throw new OpenAIError('X.509 workload identity requires an active certificate request scope.');
     }
     return scope;
@@ -617,7 +912,26 @@ export class X509WorkloadIdentityAuth {
     ) {
       throw new OpenAIError('X.509 workload identity must preserve its issued workload authorization.');
     }
+    this.#assertTenantHeaders(headers);
     assertSafeHeaders(headers);
+  }
+
+  /** Enforces the same enrolled selectors before certificate issuance and final dispatch. */
+  #assertTenantHeaders(headers: Headers): void {
+    if (
+      headerValue(headers, 'OpenAI-Organization') !== this.#organization ||
+      headerValue(headers, 'OpenAI-Project') !== this.#project
+    ) {
+      throw new OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+    }
+    for (const name of Headers.prototype.keys.call(headers)) {
+      const canonical = name.toLowerCase().split('_').join('-');
+      if ((canonical === 'openai-organization' || canonical === 'openai-project') && name !== canonical) {
+        throw new OpenAIError(
+          'X.509 workload identity cannot override its enrolled organization or project.',
+        );
+      }
+    }
   }
 
   /** Returns a guarded final dispatcher while preserving all existing request hook object identities. */

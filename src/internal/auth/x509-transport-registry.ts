@@ -62,14 +62,19 @@ export interface X509ExchangedToken {
 export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
+  deadlineArmed?: boolean;
   request?: { signal: AbortSignal | null | undefined; timeout: number; fetchOptions: MergedRequestInit };
   phase?: 'planning' | 'authorizing';
   effectiveSignal?: AbortSignal;
   materializedBody?: ReadableStream;
+  owner?: object;
+  requestOwner?: object;
   apiURL?: string;
+  tenant?: { organization: string | null; project: string | null };
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;
   token?: string;
+  tokenGeneration?: number;
   headers?: Headers;
   authorization?: string | null;
 }
