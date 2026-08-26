@@ -1060,11 +1060,11 @@ interface RunOpts extends execa.Options {
 
 async function run(command: string, args: string[], config?: RunOpts): Promise<execa.ExecaReturnValue> {
   const { allowApiKey = false, alwaysPipe = false, ...options } = config ?? {};
-  const env = { ...process.env, ...options.env };
-
-  if (!allowApiKey) {
-    delete env['OPENAI_API_KEY'];
-  }
+  const env = Object.fromEntries(
+    Object.entries({ ...process.env, ...options.env }).filter(
+      ([name]) => allowApiKey || name.toLowerCase() !== 'openai_api_key',
+    ),
+  );
 
   if (state.verbose && !alwaysPipe) {
     options.stdio = 'inherit';

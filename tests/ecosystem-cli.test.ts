@@ -183,16 +183,23 @@ describe('ecosystem test CLI', () => {
       scripts: { tsc: 'node observe.cjs typecheck', deploy: 'node observe.cjs deploy' },
     },
   ])(
-    'provides API credentials only to the $phase ecosystem command',
+    'provides API credentials and case variants only to the $phase ecosystem command',
     ({ projectName, option, phase, scripts }) => {
       const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
       const project = path.join(fixture, 'ecosystem-tests', projectName);
       const dependency = path.join(fixture, 'local-dependency');
       const observations = path.join(fixture, 'observations.jsonl');
       const apiKey = 'synthetic-ecosystem-test-key';
+      const mixedCaseApiKey = 'synthetic-ecosystem-mixed-case-key';
+      const lowercaseApiKey = 'synthetic-ecosystem-lowercase-key';
+      const inheritedApiKeyNames =
+        process.platform === 'win32'
+          ? ['OPENAI_API_KEY']
+          : ['OPENAI_API_KEY', 'OpenAI_API_Key', 'openai_api_key'];
       const observe = [
         "const fs = require('node:fs');",
-        'const observation = { phase: process.argv[2], apiKey: process.env.OPENAI_API_KEY ?? null };',
+        'const apiKeyNames = Object.keys(process.env).filter((name) => name.toLowerCase() === "openai_api_key").sort();',
+        'const observation = { phase: process.argv[2], apiKey: process.env.OPENAI_API_KEY ?? null, apiKeyNames, unrelatedValue: process.env.ECOSYSTEM_UNRELATED_VALUE ?? null };',
         "fs.appendFileSync(process.env.ECOSYSTEM_COMMAND_OBSERVATIONS, JSON.stringify(observation) + '\\n');",
       ].join('\n');
 
@@ -224,7 +231,10 @@ describe('ecosystem test CLI', () => {
           fixture,
           {
             OPENAI_API_KEY: apiKey,
+            OpenAI_API_Key: mixedCaseApiKey,
+            openai_api_key: lowercaseApiKey,
             ECOSYSTEM_COMMAND_OBSERVATIONS: observations,
+            ECOSYSTEM_UNRELATED_VALUE: 'preserved-value',
             npm_config_audit: 'false',
             npm_config_fund: 'false',
             npm_config_offline: 'true',
@@ -234,15 +244,19 @@ describe('ecosystem test CLI', () => {
 
         expect(result.error).toBeUndefined();
         expect(result.status).toBe(0);
+        for (const secret of [apiKey, mixedCaseApiKey, lowercaseApiKey]) {
+          expect(result.stdout).not.toContain(secret);
+          expect(result.stderr).not.toContain(secret);
+        }
         expect(
           readFileSync(observations, 'utf-8')
             .trim()
             .split('\n')
             .map((observation) => JSON.parse(observation)),
         ).toEqual([
-          { phase: 'install', apiKey: null },
-          { phase: 'typecheck', apiKey: null },
-          { phase, apiKey },
+          { phase: 'install', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' },
+          { phase: 'typecheck', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' },
+          { phase, apiKey, apiKeyNames: inheritedApiKeyNames, unrelatedValue: 'preserved-value' },
         ]);
       } finally {
         rmSync(fixture, { recursive: true, force: true });
