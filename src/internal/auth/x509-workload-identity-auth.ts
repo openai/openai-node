@@ -601,7 +601,10 @@ export class X509WorkloadIdentityAuth {
     if (callerSignal?.aborted) {
       throw userAbortError(callerSignal);
     }
-    this.#preflight(options, context);
+    if (options) {
+      assertX509RequestOptions(context ? context.fetchOptions : options.fetchOptions);
+    }
+    this.#preflight(context);
 
     const scope = options ? this.#scope() : undefined;
     const cached = this.#cachedToken;
@@ -770,10 +773,7 @@ export class X509WorkloadIdentityAuth {
     }
   }
 
-  #preflight(options: FinalRequestOptions | undefined, context: X509TokenRequestContext | undefined): void {
-    if (options) {
-      assertX509RequestOptions(context ? context.fetchOptions : options.fetchOptions);
-    }
+  #preflight(context: X509TokenRequestContext | undefined): void {
     if (!context) {
       return;
     }
