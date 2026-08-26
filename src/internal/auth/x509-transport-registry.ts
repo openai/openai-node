@@ -64,6 +64,7 @@ export interface X509RequestScope {
   request?: { signal: AbortSignal | null | undefined; timeout: number; fetchOptions: MergedRequestInit };
   phase?: 'planning' | 'authorizing';
   effectiveSignal?: AbortSignal;
+  materializedBody?: ReadableStream;
   apiURL?: string;
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;

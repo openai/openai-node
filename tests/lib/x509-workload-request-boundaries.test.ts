@@ -48,6 +48,147 @@ afterEach(async () => {
 });
 
 describe('X.509 request ownership boundaries', () => {
+  test('applies a lowered final override deadline before certificate authentication', async () => {
+    let minted = false;
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, _url, request) => {
+        await delay(140, undefined, { signal: request.signal ?? undefined });
+        minted = true;
+        return Response.json(tokenResponse);
+      });
+    const client = new OpenAI(options({ timeout: 500 }));
+    const original = client.buildRequest.bind(client);
+    Object.defineProperty(client, 'buildRequest', {
+      value: async (...args: Parameters<OpenAI['buildRequest']>) => ({
+        ...(await original(...args)),
+        timeout: 35,
+      }),
+    });
+
+    await expect(client.models.list()).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+    expect(minted).toBe(false);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  test('retires an SDK-materialized one-shot iterator when certificate authentication fails', async () => {
+    let finalized = false;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        try {
+          yield new TextEncoder().encode('synthetic-private-upload');
+          yield new TextEncoder().encode('synthetic-never-dispatched');
+        } finally {
+          finalized = true;
+        }
+      },
+    };
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockResolvedValue(new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } }));
+
+    await expect(
+      new OpenAI(options({ maxRetries: 1 })).request({ path: '/responses', method: 'post', body }),
+    ).rejects.toMatchObject({ status: 503 });
+    await vi.waitFor(() => expect(finalized).toBe(true), { timeout: 200 });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not cancel a caller-owned request stream after certificate authentication fails', async () => {
+    let canceled = false;
+    const body = new ReadableStream({
+      cancel() {
+        canceled = true;
+      },
+    });
+    vi.spyOn(transportCapability, 'sendX509Request').mockResolvedValue(new Response(null, { status: 503 }));
+
+    await expect(
+      new OpenAI(options()).request({ path: '/responses', method: 'post', body }),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(canceled).toBe(false);
+  });
+
+  test('retires an SDK-owned upload when direct authenticated request construction fails', async () => {
+    let finalized = false;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        try {
+          yield new TextEncoder().encode('synthetic-direct-upload');
+        } finally {
+          finalized = true;
+        }
+      },
+    };
+    vi.spyOn(transportCapability, 'sendX509Request').mockResolvedValue(new Response(null, { status: 503 }));
+
+    await expect(
+      new OpenAI(options()).buildRequest({ path: '/responses', method: 'post', body }),
+    ).rejects.toMatchObject({ status: 503 });
+    await vi.waitFor(() => expect(finalized).toBe(true), { timeout: 200 });
+  });
+
+  test('transfers a directly built SDK-owned upload to its caller without cancellation', async () => {
+    let finalized = false;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        try {
+          yield new TextEncoder().encode('synthetic-direct-approved-upload');
+        } finally {
+          finalized = true;
+        }
+      },
+    };
+    vi.spyOn(transportCapability, 'sendX509Request').mockResolvedValue(Response.json(tokenResponse));
+
+    const built = await new OpenAI(options()).buildRequest({ path: '/responses', method: 'post', body });
+    expect(finalized).toBe(false);
+    if (!(built.req.body instanceof ReadableStream)) {
+      throw new Error('Expected the SDK-owned upload stream.');
+    }
+    await built.req.body.cancel();
+    expect(finalized).toBe(true);
+  });
+
+  test('preserves protected-hook cancellation into the next certificate exchange', async () => {
+    const hook = new AbortController();
+    const reason = new Error('synthetic-retried-issuer-hook-cancellation');
+    let issuerAttempts = 0;
+    let apiAttempts = 0;
+    let retriedIssuerMinted = false;
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          issuerAttempts += 1;
+          if (issuerAttempts > 1) {
+            await delay(500, undefined, { signal: request.signal ?? undefined });
+            retriedIssuerMinted = true;
+          }
+          return Response.json(tokenResponse);
+        }
+        apiAttempts += 1;
+        return new Response(null, { status: 401 });
+      });
+    const client = new OpenAI(options({ timeout: 2000, maxRetries: 1 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.signal = hook.signal;
+      },
+    });
+
+    const pending = client.models.list();
+    await vi.waitFor(() => expect(issuerAttempts).toBe(2));
+    const canceledAt = performance.now();
+    hook.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({ constructor: APIUserAbortError, cause: reason });
+    expect(performance.now() - canceledAt).toBeLessThan(250);
+    expect(retriedIssuerMinted).toBe(false);
+    expect(apiAttempts).toBe(1);
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
   test('validates the final overridden destination before presenting a certificate', async () => {
     const send = vi
       .spyOn(transportCapability, 'sendX509Request')

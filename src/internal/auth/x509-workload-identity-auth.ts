@@ -4,6 +4,7 @@ import type { Fetch } from '../builtin-types';
 import { buildHeaders } from '../headers';
 import type { HeadersLike, NullableHeaders } from '../headers';
 import type { FinalRequestOptions } from '../request-options';
+import { CancelReadableStream } from '../shims';
 import type { MergedRequestInit } from '../types';
 import { hasOwn } from '../utils/values';
 import { resolveX509Transport } from './x509-transport-registry';
@@ -268,7 +269,6 @@ export class X509WorkloadIdentityAuth {
       scope.monotonicStartedAt = performance.now();
     }
     scope.phase = 'planning';
-    delete scope.effectiveSignal;
   }
 
   /** Keeps certificate authentication outside overridable request construction. */
@@ -277,7 +277,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Approves the final overridden destination and transport before minting a bearer. */
-  authorizePlannedRequest(url: string, request: RequestInit): void {
+  authorizePlannedRequest(url: string, request: RequestInit, timeout: number): void {
     const scope = this.#scope();
     const headers = Object.getOwnPropertyDescriptor(request, 'headers');
     const signal = Object.getOwnPropertyDescriptor(request, 'signal');
@@ -305,13 +305,47 @@ export class X509WorkloadIdentityAuth {
     if ((signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
       throw new OpenAIError('X.509 workload identity must preserve its approved request signal.');
     }
+    const approved = this.requestSnapshot();
+    scope.request = { ...approved, timeout: Math.min(approved.timeout, timeout) };
     scope.phase = 'authorizing';
+  }
+
+  /** Owns only SDK-created iterator adapters until authenticated dispatch takes responsibility. */
+  ownRequestBody(body: unknown, source: unknown): void {
+    if (body instanceof ReadableStream && body !== source) {
+      this.#scope().materializedBody = body;
+    }
+  }
+
+  /** Retires abandoned upload adapters without masking or blocking their authentication failure. */
+  retireRequestBody(): void {
+    const scope = this.#scope();
+    const body = scope.materializedBody;
+    delete scope.materializedBody;
+    if (body) {
+      void X509WorkloadIdentityAuth.#cancelRequestBody(body);
+    }
+  }
+
+  static async #cancelRequestBody(body: ReadableStream): Promise<void> {
+    try {
+      await CancelReadableStream(body);
+    } catch {
+      // Upload retirement must never replace the original authentication failure.
+    }
+  }
+
+  /** Transfers an approved upload to the actual request transport without cancelling it. */
+  releaseRequestBody(): void {
+    delete this.#scope().materializedBody;
   }
 
   /** Retains caller-only cancellation separately from SDK-created deadline controllers. */
   setEffectiveSignal(signal: AbortSignal | undefined): void {
     if (signal) {
       this.#scope().effectiveSignal = signal;
+    } else {
+      delete this.#scope().effectiveSignal;
     }
   }
 
@@ -327,6 +361,7 @@ export class X509WorkloadIdentityAuth {
       try {
         return await operation();
       } finally {
+        this.retireRequestBody();
         this.releaseRequestCredentials();
       }
     });
@@ -362,6 +397,7 @@ export class X509WorkloadIdentityAuth {
     delete scope.request;
     delete scope.phase;
     delete scope.effectiveSignal;
+    delete scope.materializedBody;
     delete scope.apiURL;
     delete scope.token;
     delete scope.defaultHeaders;

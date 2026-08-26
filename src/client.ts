@@ -785,6 +785,7 @@ export class OpenAI {
               apiURL: this._workloadIdentityAuth.requestAPIURL(),
               ...this._workloadIdentityAuth.headerSnapshots(),
               ...this._workloadIdentityAuth.requestSnapshot(),
+              signal: this._workloadIdentityAuth.effectiveSignal(),
             })
           : await this._workloadIdentityAuth.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
@@ -1137,7 +1138,7 @@ export class OpenAI {
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
-        x509Authentication.authorizePlannedRequest(built.url, built.req);
+        x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout);
         const security = options.__security ?? { bearerAuth: true };
         const authenticationHeaders = await this.authHeaders(options, security);
         const suppliedHeaders = x509Authentication.headerSnapshots();
@@ -1150,6 +1151,7 @@ export class OpenAI {
         this.validateHeaders(buildHeaders([supplied, built.req.headers]), security);
       }
     } catch (error) {
+      x509Authentication?.retireRequestBody();
       if (
         x509Authentication &&
         retriesRemaining &&
@@ -1206,9 +1208,11 @@ export class OpenAI {
     if (callerSignal?.aborted || req.signal?.aborted) {
       throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
     }
-    if (x509Authentication && (req.signal || callerSignal)) {
+    if (x509Authentication) {
       x509Authentication.setEffectiveSignal(
-        createRequestController(req.signal ?? callerSignal, callerSignal).signal,
+        req.signal || callerSignal
+          ? createRequestController(req.signal ?? callerSignal, callerSignal).signal
+          : undefined,
       );
     }
 
@@ -1223,6 +1227,7 @@ export class OpenAI {
         : new AbortController();
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
+    x509Authentication?.releaseRequestBody();
     const response = await fetchWithAuth
       .call(this, url, req, remainingTimeout, controller, security)
       .catch(castToError);
@@ -1626,9 +1631,12 @@ export class OpenAI {
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
       !this._workloadIdentityAuth.inRequest()
     ) {
-      return await this._workloadIdentityAuth.runRequest(() =>
-        OpenAI.prototype.buildRequest.call(this, inputOptions, { retryCount }),
-      );
+      const authentication = this._workloadIdentityAuth;
+      return await authentication.runRequest(async () => {
+        const built = await OpenAI.prototype.buildRequest.call(this, inputOptions, { retryCount });
+        authentication.releaseRequestBody();
+        return built;
+      });
     }
     const options = { ...inputOptions };
     const x509Authentication =
@@ -1669,6 +1677,7 @@ export class OpenAI {
         ...inputOptions.__metadata,
         hasStreamingBody: true,
       };
+      x509Authentication?.ownRequestBody(body, options.body);
     }
 
     const reqHeaders = await this.buildHeaders({
