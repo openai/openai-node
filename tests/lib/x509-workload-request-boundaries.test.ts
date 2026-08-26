@@ -368,6 +368,29 @@ describe('X.509 request ownership boundaries', () => {
     },
   );
 
+  test.each(['OpenAI-Organization', 'OpenAI-Project', 'OpenAI_Organization', 'OpenAI_Project'])(
+    'rejects overridden final tenant selector %s before certificate exchange',
+    async (name) => {
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockResolvedValue(Response.json(tokenResponse));
+      const client = new OpenAI(
+        options({ organization: 'synthetic-enrolled-org', project: 'synthetic-enrolled-project' }),
+      );
+      const original = client.buildRequest.bind(client);
+      Object.defineProperty(client, 'buildRequest', {
+        value: async (...args: Parameters<OpenAI['buildRequest']>) => {
+          const built = await original(...args);
+          built.req.headers.set(name, 'synthetic-unapproved-tenant');
+          return built;
+        },
+      });
+
+      await expect(client.models.list()).rejects.toThrow(/organization|project/iu);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
   test('starts its network deadline only after asynchronous request preparation completes', async () => {
     const send = vi
       .spyOn(transportCapability, 'sendX509Request')

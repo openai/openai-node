@@ -406,6 +406,7 @@ export class X509WorkloadIdentityAuth {
     if (headerValue(headers.value, 'Authorization') !== null) {
       throw new OpenAIError('X.509 workload identity cannot use caller-supplied authorization credentials.');
     }
+    this.#assertTenantHeaders(headers.value);
     if ((signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
       throw new OpenAIError('X.509 workload identity must preserve its approved request signal.');
     }
@@ -892,6 +893,12 @@ export class X509WorkloadIdentityAuth {
     ) {
       throw new OpenAIError('X.509 workload identity must preserve its issued workload authorization.');
     }
+    this.#assertTenantHeaders(headers);
+    assertSafeHeaders(headers);
+  }
+
+  /** Enforces the same enrolled selectors before certificate issuance and final dispatch. */
+  #assertTenantHeaders(headers: Headers): void {
     if (
       headerValue(headers, 'OpenAI-Organization') !== this.#organization ||
       headerValue(headers, 'OpenAI-Project') !== this.#project
@@ -906,7 +913,6 @@ export class X509WorkloadIdentityAuth {
         );
       }
     }
-    assertSafeHeaders(headers);
   }
 
   /** Returns a guarded final dispatcher while preserving all existing request hook object identities. */
