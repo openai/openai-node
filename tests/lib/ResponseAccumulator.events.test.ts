@@ -717,22 +717,213 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     expect(snapshot.output).toEqual([]);
   });
 
-  test.each([
-    ['matching', 'resp_123', 'resp_foreign', false],
-    ['foreign', 'resp_foreign', 'resp_123', true],
-  ] as const)('materializes a %s stateful response ID exactly once', (_case, first, second, rejected) => {
-    const response = makeResponse();
-    const readID = vi.fn(() => (readID.mock.calls.length === 1 ? first : second));
-    Object.defineProperty(response, 'id', { configurable: true, enumerable: true, get: readID });
-    const accumulate = () =>
-      accumulateResponse({ type: 'response.completed', sequence_number: 1, response }, makeResponse());
+  test.each(
+    (['initial', 'subsequent'] as const).flatMap((position) =>
+      (['missing', 'inherited', 'accessor', 'invalid', 'non-enumerable'] as const).map((kind) => ({
+        position,
+        kind,
+      })),
+    ),
+  )(
+    'rejects an $position lifecycle response with an $kind ID before reading private output',
+    ({ position, kind }) => {
+      const response = makeResponse();
+      const readID = vi.fn(() => 'resp_123');
+      const readOutput = vi.fn(() => {
+        throw new Error('synthetic-private-lifecycle-output');
+      });
+      Object.defineProperty(response, 'output', { configurable: true, enumerable: true, get: readOutput });
 
-    if (rejected) {
-      expect(accumulate).toThrow('Response event does not match the active response.');
-    } else {
-      expect(accumulate()).toMatchObject({ id: 'resp_123' });
-    }
+      if (kind === 'missing' || kind === 'inherited') {
+        Reflect.deleteProperty(response, 'id');
+        if (kind === 'inherited') {
+          Object.setPrototypeOf(response, { id: 'resp_123' });
+        }
+      } else if (kind === 'accessor') {
+        Object.defineProperty(response, 'id', { configurable: true, enumerable: true, get: readID });
+      } else if (kind === 'non-enumerable') {
+        Object.defineProperty(response, 'id', { configurable: true, enumerable: false, value: 'resp_123' });
+      } else {
+        Object.defineProperty(response, 'id', { configurable: true, enumerable: true, value: 123 });
+      }
+
+      const event = {
+        type: position === 'initial' ? ('response.created' as const) : ('response.completed' as const),
+        sequence_number: position === 'initial' ? 0 : 1,
+        response,
+      };
+
+      expect(() => accumulateResponse(event, position === 'initial' ? undefined : makeResponse())).toThrow(
+        new OpenAIError('Response event does not match the active response.'),
+      );
+      expect(readID).not.toHaveBeenCalled();
+      expect(readOutput).not.toHaveBeenCalled();
+    },
+  );
+
+  test('rejects a proxy response without an own ID before invoking its get traps', () => {
+    const response = makeResponse();
+    Reflect.deleteProperty(response, 'id');
+    Object.setPrototypeOf(response, { id: 'resp_123' });
+    const readProperty = vi.fn();
+    const untrusted = new Proxy(response, {
+      get(target, property, receiver) {
+        readProperty();
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    expect(() =>
+      accumulateResponse(
+        { type: 'response.completed', sequence_number: 1, response: untrusted },
+        makeResponse(),
+      ),
+    ).toThrow(new OpenAIError('Response event does not match the active response.'));
+    expect(readProperty).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['matching', 'resp_123', 'resp_foreign'],
+    ['foreign', 'resp_foreign', 'resp_123'],
+  ] as const)(
+    'rejects a %s stateful lifecycle response ID without invoking its getter',
+    (_case, first, second) => {
+      const response = makeResponse();
+      const readID = vi.fn(() => (readID.mock.calls.length === 1 ? first : second));
+      Object.defineProperty(response, 'id', { configurable: true, enumerable: true, get: readID });
+
+      expect(() =>
+        accumulateResponse({ type: 'response.completed', sequence_number: 1, response }, makeResponse()),
+      ).toThrow('Response event does not match the active response.');
+      expect(readID).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([
+    'response.created',
+    'response.queued',
+    'response.in_progress',
+    'response.completed',
+    'response.failed',
+    'response.incomplete',
+  ] as const)('keeps the canonical response identity after snapshot mutation for %s', (type) => {
+    const snapshot = accumulateResponse({
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    });
+    snapshot.id = 'resp_mutated';
+
+    const replacement = accumulateResponse({ type, sequence_number: 1, response: makeResponse() }, snapshot);
+
+    expect(replacement.id).toBe('resp_123');
+    expect(snapshot.id).toBe('resp_mutated');
+
+    replacement.id = 'resp_foreign';
+    const foreign = { ...makeResponse(), id: 'resp_foreign' };
+    const readOutput = vi.fn(() => []);
+    Object.defineProperty(foreign, 'output', { configurable: true, enumerable: true, get: readOutput });
+
+    expect(() => accumulateResponse({ type, sequence_number: 2, response: foreign }, replacement)).toThrow(
+      new OpenAIError('Response event does not match the active response.'),
+    );
+    expect(readOutput).not.toHaveBeenCalled();
+  });
+
+  test('keeps interleaved response snapshots isolated despite swapped mutable IDs', () => {
+    const firstResponse = { ...makeResponse(), id: 'resp_first' };
+    const secondResponse = { ...makeResponse(), id: 'resp_second' };
+    const first = accumulateResponse({
+      type: 'response.created',
+      sequence_number: 0,
+      response: firstResponse,
+    });
+    const second = accumulateResponse({
+      type: 'response.created',
+      sequence_number: 0,
+      response: secondResponse,
+    });
+    first.id = 'resp_second';
+    second.id = 'resp_first';
+
+    expect(
+      accumulateResponse({ type: 'response.completed', sequence_number: 1, response: firstResponse }, first)
+        .id,
+    ).toBe('resp_first');
+    expect(
+      accumulateResponse({ type: 'response.failed', sequence_number: 1, response: secondResponse }, second)
+        .id,
+    ).toBe('resp_second');
+    expect(() =>
+      accumulateResponse({ type: 'response.completed', sequence_number: 2, response: secondResponse }, first),
+    ).toThrow('Response event does not match the active response.');
+  });
+
+  test.each(['deleted', 'throwing accessor'] as const)(
+    'uses the captured response identity when the snapshot ID becomes a %s',
+    (mutation) => {
+      const snapshot = accumulateResponse({
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      });
+      const readID = vi.fn(() => {
+        throw new Error('synthetic-private-mutated-snapshot-id');
+      });
+
+      if (mutation === 'deleted') {
+        Reflect.deleteProperty(snapshot, 'id');
+      } else {
+        Object.defineProperty(snapshot, 'id', { configurable: true, enumerable: true, get: readID });
+      }
+
+      expect(
+        accumulateResponse(
+          { type: 'response.completed', sequence_number: 1, response: makeResponse() },
+          snapshot,
+        ),
+      ).toMatchObject({ id: 'resp_123' });
+      expect(readID).not.toHaveBeenCalled();
+    },
+  );
+
+  test('binds a caller-supplied proxy snapshot identity without touching later proxy getters', () => {
+    const response = makeResponse();
+    const readID = vi.fn(() => response.id);
+    const snapshot = new Proxy(response, {
+      get(target, property, receiver) {
+        return property === 'id' ? readID() : Reflect.get(target, property, receiver);
+      },
+    });
+
+    expect(
+      accumulateResponse(
+        { type: 'response.in_progress', sequence_number: 1, response: makeResponse() },
+        snapshot,
+      ),
+    ).toMatchObject({ id: 'resp_123' });
+    response.id = 'resp_foreign';
+    expect(
+      accumulateResponse(
+        { type: 'response.completed', sequence_number: 2, response: makeResponse() },
+        snapshot,
+      ),
+    ).toMatchObject({ id: 'resp_123' });
     expect(readID).toHaveBeenCalledTimes(1);
+  });
+
+  test('accepts matching lifecycle responses for frozen snapshots without mutating them', () => {
+    const snapshot = Object.freeze(
+      accumulateResponse({ type: 'response.created', sequence_number: 0, response: makeResponse() }),
+    );
+
+    expect(
+      accumulateResponse(
+        { type: 'response.completed', sequence_number: 1, response: makeResponse() },
+        snapshot,
+      ),
+    ).toMatchObject({ id: 'resp_123' });
+    expect(Object.isFrozen(snapshot)).toBe(true);
   });
 
   test('captures the active response ID before invoking the lifecycle response getter', () => {
@@ -807,14 +998,17 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     },
   );
 
-  test.each(['', 'provider:custom/42'] as const)('preserves provider-defined response ID %j', (id) => {
-    const response = { ...makeResponse(), id };
-    const snapshot = accumulateResponse({ type: 'response.created', sequence_number: 0, response });
+  test.each(['', 'provider:custom/42', '__proto__', 'constructor'] as const)(
+    'preserves provider-defined response ID %j',
+    (id) => {
+      const response = { ...makeResponse(), id };
+      const snapshot = accumulateResponse({ type: 'response.created', sequence_number: 0, response });
 
-    expect(
-      accumulateResponse({ type: 'response.completed', sequence_number: 1, response }, snapshot).id,
-    ).toBe(id);
-  });
+      expect(
+        accumulateResponse({ type: 'response.completed', sequence_number: 1, response }, snapshot).id,
+      ).toBe(id);
+    },
+  );
 
   test('rejects foreign lifecycle events before public stream listeners can observe them', async () => {
     const created = {

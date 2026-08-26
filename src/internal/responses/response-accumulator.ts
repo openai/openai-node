@@ -145,6 +145,7 @@ interface ResponseOutputIdentityIndex {
 }
 
 const responseOutputIdentityIndexes = new WeakMap<ResponseAccumulatorContext, ResponseOutputIdentityIndex>();
+const activeResponseIDs = new WeakMap<Response, string>();
 
 function validateArrayIndex(
   collection: readonly unknown[],
@@ -274,6 +275,11 @@ function getResponseOutputIdentityIndex(
 }
 
 function getResponseID(snapshot: Response): string {
+  const activeResponseID = activeResponseIDs.get(snapshot);
+  if (activeResponseID !== undefined) {
+    return activeResponseID;
+  }
+
   let id: string | undefined;
   try {
     ({ id } = snapshot);
@@ -283,6 +289,7 @@ function getResponseID(snapshot: Response): string {
   if (typeof id !== 'string') {
     throw new OpenAIError('Response event does not match the active response.');
   }
+  activeResponseIDs.set(snapshot, id);
   return id;
 }
 
@@ -290,34 +297,53 @@ function cloneValidatedResponse(
   context: ResponseAccumulatorContext,
   response: Response,
   expectedResponseID?: string,
-  onValidatedResponse?: () => void,
+  onValidatedResponse?: (snapshot: Response) => void,
 ): Response {
-  if (expectedResponseID !== undefined) {
-    let responseID: PropertyDescriptor | undefined;
-    try {
-      responseID = Object.getOwnPropertyDescriptor(response, 'id');
-    } catch {
-      throw new OpenAIError('Response event does not match the active response.');
-    }
-    if (responseID && 'value' in responseID && responseID.value !== expectedResponseID) {
-      throw new OpenAIError('Response event does not match the active response.');
-    }
+  let responseID: PropertyDescriptor | undefined;
+  try {
+    responseID = Object.getOwnPropertyDescriptor(response, 'id');
+  } catch {
+    throw new OpenAIError('Response event does not match the active response.');
+  }
+  if (
+    !responseID ||
+    !responseID.enumerable ||
+    !('value' in responseID) ||
+    typeof responseID.value !== 'string' ||
+    (expectedResponseID !== undefined && responseID.value !== expectedResponseID)
+  ) {
+    throw new OpenAIError('Response event does not match the active response.');
   }
 
   const nextContext = createCanonicalResponseContext();
   const snapshot = cloneResponse(nextContext, response);
-  if (expectedResponseID !== undefined && snapshot.id !== expectedResponseID) {
+  if (snapshot.id !== responseID.value) {
     throw new OpenAIError('Response event does not match the active response.');
   }
   const identityIndex = createResponseOutputIdentityIndex(snapshot);
-  onValidatedResponse?.();
+  onValidatedResponse?.(snapshot);
 
   context.canonicalSnapshot = nextContext.canonicalSnapshot;
   context.outputTextLengths = nextContext.outputTextLengths;
   context.outputTextIndex = nextContext.outputTextIndex;
   responseOutputIdentityIndexes.set(context, identityIndex);
+  activeResponseIDs.set(snapshot, responseID.value);
 
   return snapshot;
+}
+
+function snapshotResponseLifecycleEvent(
+  event: ResponseLifecycleEvent,
+  response: Response,
+): ResponseLifecycleEvent {
+  const descriptors = Object.getOwnPropertyDescriptors(event);
+  descriptors.response = {
+    configurable: true,
+    enumerable: true,
+    value: structuredClone(response),
+    writable: true,
+  };
+  return Object.create(Object.getPrototypeOf(event), descriptors) as ResponseLifecycleEvent;
 }
 
 const expectedOutputItemTypes = {
@@ -1212,22 +1238,24 @@ export function accumulateResponseWithContext(
   const dispatchEvent = sanitizeResponseEvent(event);
 
   if (!snapshot) {
-    if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
-      onSanitizedEvent(dispatchEvent);
-    }
     if (dispatchEvent.type !== 'response.created') {
+      if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
+        onSanitizedEvent(dispatchEvent);
+      }
       throw new OpenAIError(
         `When snapshot hasn't been set yet, expected 'response.created' event, got ${dispatchEvent.type}`,
       );
     }
-    return cloneValidatedResponse(context, dispatchEvent.response);
+    return cloneValidatedResponse(context, dispatchEvent.response, undefined, (validatedResponse) =>
+      onSanitizedEvent?.(snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
+    );
   }
 
   if (isResponseLifecycleEvent(dispatchEvent)) {
     const expectedResponseID = getResponseID(snapshot);
     const { response } = dispatchEvent;
-    return cloneValidatedResponse(context, response, expectedResponseID, () =>
-      onSanitizedEvent?.(dispatchEvent),
+    return cloneValidatedResponse(context, response, expectedResponseID, (validatedResponse) =>
+      onSanitizedEvent?.(snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
     );
   }
 

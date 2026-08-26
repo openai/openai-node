@@ -336,6 +336,155 @@ describe('.stream()', () => {
     );
   });
 
+  it.each([
+    'response.created',
+    'response.queued',
+    'response.in_progress',
+    'response.completed',
+    'response.failed',
+    'response.incomplete',
+  ] as const)(
+    'emits the exact validated %s response when a transport getter changes identity',
+    async (type) => {
+      const matching = makeResponse({ metadata: { source: 'validated' } });
+      const foreign = makeResponse({ id: 'resp_foreign', metadata: { source: 'private foreign response' } });
+      const readResponse = vi.fn(() => (readResponse.mock.calls.length === 1 ? matching : foreign));
+      const lifecycle = {
+        type,
+        sequence_number: type === 'response.created' ? 0 : 1,
+        get response() {
+          return readResponse();
+        },
+        provider_metadata: 'preserved',
+      } as ResponseStreamEvent;
+      const events: ResponseStreamEvent[] =
+        type === 'response.created'
+          ? [lifecycle]
+          : [{ type: 'response.created', sequence_number: 0, response: makeResponse() }, lifecycle];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+      const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'protect lifecycle' });
+      const rawLifecycleResponses: Response[] = [];
+      const typedLifecycleResponses: Response[] = [];
+      const emittedEvents: ResponseStreamEvent[] = [];
+
+      stream.on('event', (event) => {
+        if (event.type === type && event.sequence_number === lifecycle.sequence_number) {
+          emittedEvents.push(event);
+          rawLifecycleResponses.push(event.response);
+        }
+      });
+      stream.on(type, (event: Extract<ResponseStreamEvent, { response: Response }>) =>
+        typedLifecycleResponses.push(event.response),
+      );
+
+      const final = await stream.finalResponse();
+
+      expect(readResponse).toHaveBeenCalledTimes(1);
+      expect(rawLifecycleResponses).toHaveLength(1);
+      expect(typedLifecycleResponses).toHaveLength(1);
+      expect(rawLifecycleResponses[0]).toBe(typedLifecycleResponses[0]);
+      expect(rawLifecycleResponses[0]).not.toBe(matching);
+      expect(rawLifecycleResponses[0]).toMatchObject({ id: 'resp_123', metadata: { source: 'validated' } });
+      expect(emittedEvents[0]).toMatchObject({ type, provider_metadata: 'preserved' });
+      expect(final.id).toBe('resp_123');
+    },
+  );
+
+  it('preserves frozen lifecycle event metadata while exposing its validated response snapshot', async () => {
+    const response = makeResponse({ status: 'completed' });
+    const lifecycle = Object.freeze({
+      type: 'response.completed' as const,
+      sequence_number: 1,
+      response,
+      provider_metadata: 'frozen',
+    });
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      lifecycle,
+    ];
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield* events;
+      },
+    };
+    const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+    const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'frozen lifecycle' });
+    let raw: ResponseStreamEvent | undefined;
+    let typed: ResponseStreamEvent | undefined;
+
+    stream.on('event', (event) => {
+      if (event.type === 'response.completed') {
+        raw = event;
+      }
+    });
+    stream.on('response.completed', (event) => {
+      typed = event;
+    });
+
+    await expect(stream.finalResponse()).resolves.toMatchObject({ id: 'resp_123' });
+
+    expect(raw).toBe(typed);
+    expect(raw).toMatchObject({ type: 'response.completed', provider_metadata: 'frozen' });
+    expect(raw).not.toBe(lifecycle);
+    expect(raw && 'response' in raw ? raw.response : undefined).not.toBe(response);
+    expect(Object.isFrozen(lifecycle)).toBe(true);
+  });
+
+  it.each(['initial', 'subsequent'] as const)(
+    'rejects an %s lifecycle response ID accessor before exposing private payloads or events',
+    async (position) => {
+      const response = makeResponse();
+      const readID = vi.fn(() => 'resp_123');
+      const readOutput = vi.fn(() => {
+        throw new Error('synthetic-private-stream-output');
+      });
+      Object.defineProperty(response, 'id', { configurable: true, enumerable: true, get: readID });
+      Object.defineProperty(response, 'output', { configurable: true, enumerable: true, get: readOutput });
+      const lifecycle = {
+        type: position === 'initial' ? ('response.created' as const) : ('response.completed' as const),
+        sequence_number: position === 'initial' ? 0 : 1,
+        response,
+      };
+      const events: ResponseStreamEvent[] =
+        position === 'initial'
+          ? [lifecycle]
+          : [{ type: 'response.created', sequence_number: 0, response: makeResponse() }, lifecycle];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+      const stream = ResponseStream.createResponse(client, {
+        model: 'gpt-test',
+        input: 'reject private output',
+      });
+      const emitted = vi.fn();
+      const errors: OpenAIError[] = [];
+      stream.on('event', emitted);
+      stream.on('error', (error) => errors.push(error));
+
+      await expect(stream.finalResponse()).rejects.toThrow(
+        'Response event does not match the active response.',
+      );
+
+      expect(readID).not.toHaveBeenCalled();
+      expect(readOutput).not.toHaveBeenCalled();
+      expect(emitted).toHaveBeenCalledTimes(position === 'initial' ? 0 : 1);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toBeInstanceOf(OpenAIError);
+      expect(errors[0]?.message).not.toContain('synthetic-private-stream-output');
+    },
+  );
+
   it('replays hosted shell events, dispatches typed listeners, and preserves each command output', async () => {
     const events: ResponseStreamEvent[] = [
       {

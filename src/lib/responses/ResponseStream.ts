@@ -165,7 +165,16 @@ export class ResponseStream<ParsedT = null>
       },
     );
     this.#currentResponseSnapshot = response;
-    maybeEmit('event', event);
+    const emittedEvent =
+      dispatchEvent.type === 'response.created' ||
+      dispatchEvent.type === 'response.queued' ||
+      dispatchEvent.type === 'response.in_progress' ||
+      dispatchEvent.type === 'response.completed' ||
+      dispatchEvent.type === 'response.failed' ||
+      dispatchEvent.type === 'response.incomplete'
+        ? dispatchEvent
+        : event;
+    maybeEmit('event', emittedEvent);
 
     switch (dispatchEvent.type) {
       case 'response.output_text.delta': {
@@ -210,7 +219,7 @@ export class ResponseStream<ParsedT = null>
         break;
       }
       default: {
-        maybeEmit(dispatchEvent.type, event);
+        maybeEmit(dispatchEvent.type, emittedEvent);
         break;
       }
     }
