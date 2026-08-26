@@ -5,6 +5,47 @@ import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
+class ProviderLifecycleEvent {
+  readonly type: 'response.created' | 'response.in_progress' | 'response.completed';
+  #sequenceNumber: number;
+  #response: Response;
+  #metadata: string;
+  #readMetadata: (value: string) => string;
+  #failingProperty: 'sequence_number' | 'provider_metadata' | undefined;
+
+  constructor(
+    type: 'response.created' | 'response.in_progress' | 'response.completed',
+    sequenceNumber: number,
+    readMetadata: (value: string) => string = (value) => value,
+    failingProperty?: 'sequence_number' | 'provider_metadata',
+  ) {
+    this.type = type;
+    this.#sequenceNumber = sequenceNumber;
+    this.#response = makeResponse({ status: type === 'response.completed' ? 'completed' : 'in_progress' });
+    this.#metadata = `provider-${sequenceNumber}`;
+    this.#readMetadata = readMetadata;
+    this.#failingProperty = failingProperty;
+  }
+
+  get sequence_number(): number {
+    if (this.#failingProperty === 'sequence_number') {
+      throw new Error('synthetic-private-inherited-sequence_number-secret');
+    }
+    return this.#sequenceNumber;
+  }
+
+  get response(): Response {
+    return this.#response;
+  }
+
+  get provider_metadata(): string {
+    if (this.#failingProperty === 'provider_metadata') {
+      throw new Error('synthetic-private-inherited-provider_metadata-secret');
+    }
+    return this.#readMetadata(this.#metadata);
+  }
+}
+
 describe('.stream()', () => {
   it('replays prior events when resuming by ID so snapshots stay complete', async () => {
     const requests: string[] = [];
@@ -440,6 +481,149 @@ describe('.stream()', () => {
     expect(emitted).toHaveBeenCalledWith(
       expect.objectContaining({ output_index: 0, content_index: 0, snapshot: 'first!' }),
     );
+  });
+
+  it.each(
+    (
+      [
+        'response.created',
+        'response.queued',
+        'response.in_progress',
+        'response.completed',
+        'response.failed',
+        'response.incomplete',
+      ] as const
+    ).flatMap((type) =>
+      (['error', 'response.output_text.delta', 'response.queued'] as const).map((mutatedType) => ({
+        type,
+        mutatedType:
+          type === 'response.queued' && mutatedType === 'response.queued'
+            ? ('response.completed' as const)
+            : mutatedType,
+      })),
+    ),
+  )(
+    'keeps the validated $type route when a generic listener changes its type to $mutatedType',
+    async ({ type, mutatedType }) => {
+      const lifecycle = {
+        type,
+        sequence_number: type === 'response.created' ? 0 : 1,
+        response: makeResponse(),
+      } as ResponseStreamEvent;
+      const events: ResponseStreamEvent[] =
+        type === 'response.created'
+          ? [lifecycle]
+          : [{ type: 'response.created', sequence_number: 0, response: makeResponse() }, lifecycle];
+      const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const typed = vi.fn();
+      const misrouted = vi.fn();
+      stream.on('event', (event) => {
+        if (event.type === type && event.sequence_number === lifecycle.sequence_number) {
+          Reflect.set(event, 'type', mutatedType);
+        }
+      });
+      stream.on(type, typed);
+      stream.on('error', misrouted);
+      if (mutatedType === 'response.output_text.delta') {
+        stream.on(mutatedType, misrouted);
+      } else if (mutatedType === 'response.queued' || mutatedType === 'response.completed') {
+        stream.on(mutatedType, misrouted);
+      }
+
+      await expect(stream.finalResponse()).resolves.toMatchObject({ id: 'resp_123' });
+
+      expect(typed).toHaveBeenCalledTimes(1);
+      expect(typed).toHaveBeenCalledWith(expect.objectContaining({ type: mutatedType }));
+      expect(misrouted).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['create', 'replay'] as const)(
+    'materializes private inherited lifecycle metadata and sequence numbers through %s',
+    async (mode) => {
+      const readMetadata = vi.fn((value: string) => value);
+
+      const events: ResponseStreamEvent[] = [
+        new ProviderLifecycleEvent('response.created', 0, readMetadata),
+        new ProviderLifecycleEvent('response.in_progress', 1, readMetadata),
+        new ProviderLifecycleEvent('response.completed', 2, readMetadata),
+      ];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      const client = {
+        responses: { create: vi.fn(async () => transport), retrieve: vi.fn(async () => transport) },
+      } as unknown as OpenAI;
+      const stream =
+        mode === 'replay'
+          ? ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: 0 })
+          : ResponseStream.createResponse(client, { model: 'gpt-test', input: 'private lifecycle metadata' });
+      const emitted: ResponseStreamEvent[] = [];
+      const typed: ResponseStreamEvent[] = [];
+      stream.on('event', (event) => {
+        expect(Reflect.get(event, 'provider_metadata')).toBe(`provider-${event.sequence_number}`);
+        emitted.push(event);
+      });
+      stream.on('response.created', (event) => typed.push(event));
+      stream.on('response.in_progress', (event) => typed.push(event));
+      stream.on('response.completed', (event) => typed.push(event));
+
+      await expect(stream.finalResponse()).resolves.toMatchObject({ id: 'resp_123', status: 'completed' });
+
+      const expectedSequences = mode === 'replay' ? [1, 2] : [0, 1, 2];
+      expect(emitted.map((event) => event.sequence_number)).toEqual(expectedSequences);
+      expect(typed).toEqual(emitted);
+      expect(readMetadata).toHaveBeenCalledTimes(expectedSequences.length);
+      for (const event of emitted) {
+        expect(Object.getPrototypeOf(event)).toBe(Object.prototype);
+        expect(event).not.toBeInstanceOf(ProviderLifecycleEvent);
+        expect(Object.getOwnPropertyDescriptor(event, 'provider_metadata')).toMatchObject({
+          value: `provider-${event.sequence_number}`,
+        });
+        expect(Object.getOwnPropertyDescriptor(event, 'sequence_number')).toMatchObject({
+          value: event.sequence_number,
+        });
+      }
+    },
+  );
+
+  it.each(
+    (['create', 'replay'] as const).flatMap((mode) =>
+      (['sequence_number', 'provider_metadata'] as const).map((property) => ({ mode, property })),
+    ),
+  )('redacts inherited $property accessor failures during $mode', async ({ mode, property }) => {
+    const privateMessage = `synthetic-private-inherited-${property}-secret`;
+
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield new ProviderLifecycleEvent('response.created', 0, undefined, property);
+      },
+    };
+    const client = {
+      responses: { create: vi.fn(async () => transport), retrieve: vi.fn(async () => transport) },
+    } as unknown as OpenAI;
+    const stream =
+      mode === 'replay'
+        ? ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: -1 })
+        : ResponseStream.createResponse(client, { model: 'gpt-test', input: 'redact inherited metadata' });
+    const emitted = vi.fn();
+    const errors: OpenAIError[] = [];
+    stream.on('event', emitted);
+    stream.on('error', (error) => errors.push(error));
+
+    await expect(stream.finalResponse()).rejects.toThrow(
+      'Response event does not match the active response.',
+    );
+
+    expect(emitted).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(OpenAIError);
+    expect(errors[0]?.message).not.toContain(privateMessage);
+    expect(errors[0]).not.toHaveProperty('cause');
   });
 
   it.each([

@@ -16,7 +16,6 @@ import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } 
 import {
   accumulateResponseWithContext,
   createResponseContext,
-  isResponseLifecycleEvent,
 } from '../../internal/responses/response-accumulator';
 import type { ParseableToolsParams } from '../ResponsesParser';
 import { maybeParseResponse } from '../ResponsesParser';
@@ -141,10 +140,8 @@ export class ResponseStream<ParsedT = null>
       return;
     }
 
-    const maybeEmit = (name: string, event: ResponseStreamEvent & { snapshot?: string }) => {
-      if (starting_after == null || event.sequence_number > starting_after) {
-        this._emit(name as any, event);
-      }
+    const emit = (name: string, event: ResponseStreamEvent & { snapshot?: string }) => {
+      this._emit(name as any, event);
     };
 
     if (event.type === 'error') {
@@ -155,16 +152,26 @@ export class ResponseStream<ParsedT = null>
       throw new APIError(undefined, error, event.message, undefined);
     }
 
-    const shouldEmit = starting_after == null || event.sequence_number > starting_after;
+    let shouldEmit = true;
+    if (starting_after != null) {
+      try {
+        shouldEmit = event.sequence_number > starting_after;
+      } catch {
+        throw new OpenAIError('Response event does not match the active response.');
+      }
+    }
+
     let dispatchEvent: ResponseStreamEvent = event;
+    let emittedEvent: ResponseStreamEvent = event;
     const response = accumulateResponseWithContext(
       event,
       this.#currentResponseSnapshot,
       this.#accumulatorContext,
       true,
       shouldEmit
-        ? (sanitizedEvent) => {
+        ? (sanitizedEvent, sanitizedLifecycleEvent) => {
             dispatchEvent = sanitizedEvent;
+            emittedEvent = sanitizedLifecycleEvent ?? event;
           }
         : undefined,
     );
@@ -173,8 +180,7 @@ export class ResponseStream<ParsedT = null>
       return;
     }
 
-    const emittedEvent = isResponseLifecycleEvent(dispatchEvent) ? dispatchEvent : event;
-    maybeEmit('event', emittedEvent);
+    emit('event', emittedEvent);
 
     switch (dispatchEvent.type) {
       case 'response.output_text.delta': {
@@ -191,7 +197,7 @@ export class ResponseStream<ParsedT = null>
             throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
           }
 
-          maybeEmit('response.output_text.delta', {
+          emit('response.output_text.delta', {
             ...dispatchEvent,
             type: dispatchEvent.type,
             item_id: dispatchEvent.item_id,
@@ -208,7 +214,7 @@ export class ResponseStream<ParsedT = null>
           throw new OpenAIError(`missing output at index ${dispatchEvent.output_index}`);
         }
         if (output.type === 'function_call') {
-          maybeEmit('response.function_call_arguments.delta', {
+          emit('response.function_call_arguments.delta', {
             ...dispatchEvent,
             type: dispatchEvent.type,
             item_id: dispatchEvent.item_id,
@@ -219,7 +225,7 @@ export class ResponseStream<ParsedT = null>
         break;
       }
       default: {
-        maybeEmit(dispatchEvent.type, emittedEvent);
+        emit(dispatchEvent.type, emittedEvent);
         break;
       }
     }

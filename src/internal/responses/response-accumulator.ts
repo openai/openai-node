@@ -342,15 +342,43 @@ function snapshotResponseLifecycleEvent(
   response: Response,
 ): ResponseLifecycleEvent {
   try {
-    const descriptors = Object.getOwnPropertyDescriptors(event);
-    descriptors.type.value = event.type;
-    descriptors.response = {
+    const detached = Object.create(Object.prototype) as ResponseLifecycleEvent;
+
+    for (
+      let source = event as object | null;
+      source !== null && source !== Object.prototype;
+      source = Object.getPrototypeOf(source) as object | null
+    ) {
+      for (const key of Reflect.ownKeys(source)) {
+        if (key === 'response' || hasOwn(detached, key) || (source !== event && key === 'constructor')) {
+          continue;
+        }
+
+        const descriptor = Object.getOwnPropertyDescriptor(source, key);
+        if (
+          !descriptor ||
+          (source !== event && 'value' in descriptor && typeof descriptor.value === 'function')
+        ) {
+          continue;
+        }
+
+        const value = 'value' in descriptor ? descriptor.value : Reflect.get(event, key, event);
+        Object.defineProperty(detached, key, {
+          configurable: Boolean(descriptor.configurable),
+          enumerable: Boolean(descriptor.enumerable),
+          value: key === 'type' ? event.type : value,
+          writable: 'writable' in descriptor ? Boolean(descriptor.writable) : true,
+        });
+      }
+    }
+
+    Object.defineProperty(detached, 'response', {
       configurable: true,
       enumerable: true,
       value: structuredClone(response),
       writable: true,
-    };
-    return Object.create(Object.getPrototypeOf(event), descriptors) as ResponseLifecycleEvent;
+    });
+    return detached;
   } catch {
     throw new OpenAIError('Response event does not match the active response.');
   }
@@ -1198,7 +1226,7 @@ function accumulateImageAndMcpStatusEvent(
   }
 }
 
-export function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is ResponseLifecycleEvent {
+function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is ResponseLifecycleEvent {
   switch (event.type) {
     case 'response.created':
     case 'response.queued':
@@ -1243,7 +1271,7 @@ export function accumulateResponseWithContext(
   snapshot: Response | undefined,
   context: ResponseAccumulatorContext,
   rejectInvalidShellTargets = false,
-  onSanitizedEvent?: (event: ResponseStreamEvent) => void,
+  onSanitizedEvent?: (event: ResponseStreamEvent, emittedEvent?: ResponseStreamEvent) => void,
 ): Response {
   const dispatchEvent = sanitizeResponseEvent(event);
 
@@ -1257,7 +1285,7 @@ export function accumulateResponseWithContext(
       );
     }
     return cloneValidatedResponse(context, dispatchEvent.response, undefined, (validatedResponse) =>
-      onSanitizedEvent?.(snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
+      onSanitizedEvent?.(dispatchEvent, snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
     );
   }
 
@@ -1265,7 +1293,7 @@ export function accumulateResponseWithContext(
     const expectedResponseID = getResponseID(snapshot);
     const { response } = dispatchEvent;
     return cloneValidatedResponse(context, response, expectedResponseID, (validatedResponse) =>
-      onSanitizedEvent?.(snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
+      onSanitizedEvent?.(dispatchEvent, snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
     );
   }
 
