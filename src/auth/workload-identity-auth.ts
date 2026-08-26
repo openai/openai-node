@@ -2,7 +2,6 @@ import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { APIError, OAuthError, OpenAIError } from '../core/error';
-import { hasOwn } from '../internal/utils/values';
 
 interface CachedToken {
   token: string;
@@ -17,9 +16,30 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 
 async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
-  if (hasOwn(response, 'json')) {
-    // Explicit custom parsers own their results and failures; rejection provenance cannot be inferred.
-    return await response.json();
+  for (
+    let depth = 0, prototype: object | null = response;
+    prototype !== null && depth < 16;
+    prototype = Object.getPrototypeOf(prototype), depth += 1
+  ) {
+    if (prototype === Response.prototype) {
+      break;
+    }
+
+    const parser = Object.getOwnPropertyDescriptor(prototype, 'json');
+    if (!parser) {
+      continue;
+    }
+
+    if (
+      typeof parser.value !== 'function' ||
+      (prototype !== response &&
+        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Response')
+    ) {
+      break;
+    }
+
+    // Custom parsers own their results and failures; rejection provenance cannot be inferred.
+    return parser.value.call(response);
   }
 
   const body = await response.text();

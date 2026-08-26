@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import type { Server } from 'node:http';
 import { inspect } from 'node:util';
 
+import { Response as UndiciResponse } from 'undici';
 import { vi } from 'vitest';
 
 import OpenAI, { OAuthError } from 'openai';
@@ -17,6 +18,21 @@ const SAFE_PARSE_FAILURE = 'Token exchange response contains invalid JSON';
 type Surface = 'direct-auth' | 'public-client';
 
 const surfaces: readonly Surface[] = ['direct-auth', 'public-client'];
+
+class CustomResponse extends Response {
+  readonly readJSON: () => Promise<unknown>;
+
+  constructor(readJSON: () => Promise<unknown>) {
+    super(null, { status: 200 });
+    this.readJSON = readJSON;
+  }
+}
+Object.defineProperty(CustomResponse.prototype, 'json', {
+  configurable: true,
+  value(this: CustomResponse): Promise<unknown> {
+    return this.readJSON();
+  },
+});
 
 function createHarness(
   response: (url: RequestInfo, init?: RequestInit) => Promise<Response> | Response,
@@ -224,6 +240,26 @@ describe('successful workload OAuth response JSON privacy', () => {
   );
 
   it.each(surfaces)(
+    'preserves prototype-defined successful JSON parsers and token caching on %s',
+    async (surface) => {
+      const readJSON = vi.fn(async () => ({ access_token: 'safe-override-token', expires_in: 3600 }));
+      const response = new CustomResponse(readJSON);
+      const readText = vi.spyOn(response, 'text');
+      const harness = createHarness(async () => response);
+      const run = operationFor(surface, harness);
+
+      await expect(run()).resolves.toEqual(
+        surface === 'direct-auth' ? 'safe-override-token' : expect.objectContaining({ data: [] }),
+      );
+      await expect(run()).resolves.toBeDefined();
+
+      expect(readJSON).toHaveBeenCalledTimes(1);
+      expect(readText).not.toHaveBeenCalled();
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(surfaces)(
     'preserves rejection identity for an explicitly overridden JSON parser on %s',
     async (surface) => {
       const original = new SyntaxError('custom JSON parser rejected its trusted representation');
@@ -240,6 +276,53 @@ describe('successful workload OAuth response JSON privacy', () => {
       expect(harness.api).not.toHaveBeenCalled();
     },
   );
+
+  it.each(
+    surfaces.flatMap((surface) =>
+      [
+        {
+          name: 'parser SyntaxError',
+          original: new SyntaxError('custom parser rejected its representation'),
+        },
+        { name: 'transport TypeError', original: new TypeError('custom parser transport was interrupted') },
+      ].map((failure) => ({ surface, ...failure })),
+    ),
+  )('preserves inherited JSON parser $name identity on $surface', async (failure) => {
+    const response = new CustomResponse(() => Promise.reject(failure.original));
+    const readText = vi.spyOn(response, 'text');
+    const harness = createHarness(async () => response);
+
+    await expect(operationFor(failure.surface, harness)()).rejects.toBe(failure.original);
+    expect(readText).not.toHaveBeenCalled();
+    expect(harness.api).not.toHaveBeenCalled();
+  });
+
+  it.each(surfaces)('does not invoke inherited JSON accessors on %s', async (surface) => {
+    const readJSON = vi.fn(() => {
+      throw new Error('inherited JSON getter was evaluated');
+    });
+    const prototype = Object.create(Response.prototype);
+    Object.defineProperty(prototype, 'json', { configurable: true, get: readJSON });
+    const response = new Response(`${PRIVATE_TOKEN} customer-private-record`);
+    Object.setPrototypeOf(response, prototype);
+    const harness = createHarness(async () => response);
+
+    await expectPrivateFailure(operationFor(surface, harness), harness);
+
+    expect(readJSON).not.toHaveBeenCalled();
+    expect(response.bodyUsed).toBe(true);
+  });
+
+  it.each(surfaces)('sanitizes malformed cross-realm Response bodies on %s', async (surface) => {
+    const readJSON = vi.spyOn(UndiciResponse.prototype, 'json');
+    const response = new UndiciResponse(`${PRIVATE_TOKEN} customer-private-record`);
+    const harness = createHarness(async () => response);
+
+    await expectPrivateFailure(operationFor(surface, harness), harness);
+
+    expect(readJSON).not.toHaveBeenCalled();
+    expect(response.bodyUsed).toBe(true);
+  });
 
   it.each(
     surfaces.flatMap((surface) =>
