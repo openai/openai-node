@@ -1096,7 +1096,7 @@ export class OpenAI {
         response.text().catch(() => 'X.509 workload identity API response body could not be read.'),
         expiration,
       ]);
-      if (callerSignal.aborted && !timedOut) {
+      if (callerSignal.aborted) {
         throw this._makeUserAbortError(callerSignal);
       }
       return body;
