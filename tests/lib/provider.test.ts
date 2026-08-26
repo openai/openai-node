@@ -400,6 +400,30 @@ test('request logging redacts credentials in structured request-option queries',
   expect(details.options?.query).toEqual({ api_key: '***', Authorization: '***', view: 'public' });
 });
 
+test.each(['ordinary', 'provider'] as const)(
+  '%s client debug logging redacts authentication embedded in public request paths',
+  async (kind) => {
+    const debug = vi.fn();
+    const client = new OpenAI({
+      ...(kind === 'provider' ? { provider: provider() } : { apiKey: 'synthetic-api-key' }),
+      fetch: async () => Response.json({}),
+      logLevel: 'debug',
+      logger: { debug, info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+
+    await client.get(
+      '/models?api_key=synthetic-path-api-secret&x_session_token=synthetic-path-token&view=public#synthetic-path-fragment',
+    );
+
+    const logged = JSON.stringify(debug.mock.calls);
+    expect(debug).toHaveBeenCalled();
+    expect(logged).not.toContain('synthetic-path-api-secret');
+    expect(logged).not.toContain('synthetic-path-token');
+    expect(logged).not.toContain('synthetic-path-fragment');
+    expect(logged).toContain('/models?api_key=***&x_session_token=***&view=public');
+  },
+);
+
 test.each(['X-API-Key', 'X-Session-Token', 'X-Session-Id', 'X-Auth-Token', 'X-ID-Token'])(
   'request logging redacts the %s authentication query from URLs and structured options',
   (name) => {

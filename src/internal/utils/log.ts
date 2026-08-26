@@ -153,6 +153,14 @@ export const formatRequestDetails = (details: {
   if (details.options) {
     details.options = { ...details.options };
     delete details.options['headers']; // redundant + leaks internals
+    if (details.options.path) {
+      const path = details.options.path;
+      const redacted = new URL(redactURL(new URL(path, 'https://redacted.invalid').href));
+      details.options.path =
+        redacted.origin === 'https://redacted.invalid'
+          ? `${path.startsWith('/') ? '/' : ''}${redacted.pathname.slice(1)}${redacted.search}`
+          : redacted.href;
+    }
     if (details.options.query) {
       details.options.query = Object.fromEntries(
         Object.entries(details.options.query).map(([name, value]) => [
