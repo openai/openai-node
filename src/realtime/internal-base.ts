@@ -8,6 +8,7 @@ import { EventEmitter } from '../lib/EventEmitter';
 import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import { AzureOpenAI } from '../index';
+import { assertX509WebSocketSupported } from '../internal/auth/x509-workload-identity-auth';
 
 /** Parses frame data without exposing malformed payloads through JSON syntax errors. */
 export function parseRealtimeEvent(data: string): RealtimeServerEvent {
@@ -252,6 +253,7 @@ export function buildRealtimeURL(
   client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   connection: string | RealtimeConnectionConfig,
 ): URL {
+  assertX509WebSocketSupported(client);
   const config: RealtimeConnectionConfig =
     typeof connection === 'string' ? { model: connection } : connection;
   const baseURL = client.baseURL;

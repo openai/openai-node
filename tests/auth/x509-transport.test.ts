@@ -81,6 +81,7 @@ describe('explicit X.509 transport capability', () => {
         run: (operation) => operation(),
         current: vi.fn(),
         resume: (_scope, operation) => operation(),
+        sleep: vi.fn(),
       }),
     ).toThrow(/genuine.*capability/iu);
     expect(dispatch).not.toHaveBeenCalled();
@@ -101,6 +102,7 @@ describe('explicit X.509 transport capability', () => {
           run: (operation) => operation(),
           current: vi.fn(),
           resume: (_scope, operation) => operation(),
+          sleep: vi.fn(),
         }),
       ).toThrow(/more than once/iu);
       expect(dispatch).not.toHaveBeenCalled();
@@ -125,6 +127,7 @@ describe('explicit X.509 transport capability', () => {
           run: (operation) => operation(),
           current: vi.fn(),
           resume: (_scope, operation) => operation(),
+          sleep: vi.fn(),
         }),
       ).toThrow(/genuine.*capability/iu);
       expect(dispatch).not.toHaveBeenCalled();

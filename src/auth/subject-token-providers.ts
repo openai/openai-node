@@ -229,7 +229,7 @@ export function gcpIDTokenProvider(
     fetch?: Fetch;
   },
 ): SubjectTokenProvider {
-  const timeout = config?.timeout || 10_000;
+  const timeout = config?.timeout ?? 10_000;
 
   return {
     tokenType: 'id',

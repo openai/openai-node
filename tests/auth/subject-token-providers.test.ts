@@ -209,6 +209,22 @@ describe('Azure IMDS Token Provider', () => {
     },
   );
 
+  test('honors an explicit zero-millisecond metadata timeout', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    try {
+      const provider = azureManagedIdentityTokenProvider(undefined, {
+        timeout: 0,
+        fetch: async () => Response.json({ access_token: 'azure-token' }, { status: 200 }),
+      });
+
+      await expect(provider.getToken()).resolves.toBe('azure-token');
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 0);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+
   test('throws SubjectTokenProviderError on failed request', async () => {
     global.fetch = vi.fn(async () => new Response('Not found', { status: 404 })) as typeof fetch;
 
@@ -264,6 +280,22 @@ describe('GCP Metadata Server Token Provider', () => {
     await provider.getToken();
 
     expect(customFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('honors an explicit zero-millisecond metadata timeout', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    try {
+      const provider = gcpIDTokenProvider(undefined, {
+        timeout: 0,
+        fetch: async () => new Response('gcp-id-token', { status: 200 }),
+      });
+
+      await expect(provider.getToken()).resolves.toBe('gcp-id-token');
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 0);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
   });
 
   test('throws SubjectTokenProviderError on failed request', async () => {
