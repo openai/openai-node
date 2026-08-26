@@ -293,6 +293,61 @@ describe('X.509 review regressions', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  test('authenticates within the same accessor-backed timeout captured for API dispatch', async () => {
+    const getter = vi.fn(() => (getter.mock.calls.length === 1 ? 30 : 1000));
+    const request = Object.defineProperty({ path: '/models', method: 'get' as const }, 'timeout', {
+      enumerable: true,
+      get: getter,
+    });
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, _url, init) => {
+        await delay(150, undefined, { signal: init.signal ?? undefined });
+        return Response.json(TOKEN_RESPONSE);
+      });
+
+    await expect(new OpenAI(options()).buildRequest(request)).rejects.toBeInstanceOf(
+      APIConnectionTimeoutError,
+    );
+    expect(getter).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves its original accessor-backed signal when issuer authentication retries', async () => {
+    const actual = new AbortController();
+    const unrelated = new AbortController();
+    const getter = vi.fn(() => (getter.mock.calls.length === 1 ? actual.signal : unrelated.signal));
+    const request = Object.defineProperty({ path: '/models', method: 'get' as const }, 'signal', {
+      enumerable: true,
+      get: getter,
+    });
+    let issuerCalls = 0;
+    let dispatchedSignal: RequestInit['signal'];
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) => {
+        if (url.origin !== 'https://mtls.auth.openai.com') {
+          return Response.json({ data: [] });
+        }
+        issuerCalls += 1;
+        return issuerCalls === 1
+          ? new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } })
+          : Response.json(TOKEN_RESPONSE);
+      });
+    const client = new OpenAI(options({ maxRetries: 1 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (prepared: RequestInit) => {
+        dispatchedSignal = prepared.signal;
+      },
+    });
+
+    await client.request(request);
+
+    expect(dispatchedSignal).toBe(actual.signal);
+    expect(getter.mock.calls.length).toBeGreaterThan(1);
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
   test('never retries issuer authentication after a one-shot request body starts pulling', async () => {
     let pulledChunks = 0;
     const body = {
@@ -373,6 +428,38 @@ describe('X.509 review regressions', () => {
     });
   });
 
+  test('preserves hook-signal cancellation while reading a stalled terminal error body', async () => {
+    const replacement = new AbortController();
+    const reason = new Error('synthetic-hook-error-body-cancellation');
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : new Response(
+              new ReadableStream({
+                start(stream) {
+                  request.signal?.addEventListener('abort', () => stream.error(request.signal?.reason), {
+                    once: true,
+                  });
+                },
+              }),
+              { status: 403 },
+            ),
+      );
+    const client = new OpenAI(options({ timeout: 1000 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.signal = replacement.signal;
+      },
+    });
+    const pending = client.models.list();
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    replacement.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({ constructor: APIUserAbortError, cause: reason });
+  });
+
   test.each(['default', 'request'] as const)(
     'renders mutable %s header values only once before presenting its certificate',
     async (location) => {
@@ -431,6 +518,51 @@ describe('X.509 review regressions', () => {
 
     expect(observedOptions).toBe(request);
     expect(request.headers).toBe(headers);
+  });
+
+  test('accepts an equivalent Headers replacement from a protected request hook', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(TOKEN_RESPONSE)
+          : Response.json({ data: [] }),
+      );
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.headers = new Headers(request.headers);
+        request.headers.set('X-Synthetic-Hook', 'synthetic-approved-value');
+      },
+    });
+
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(new Headers(send.mock.calls[1]?.[2].headers).get('Authorization')).toBe(
+      'Bearer synthetic-review-bearer',
+    );
+    expect(new Headers(send.mock.calls[1]?.[2].headers).get('X-Synthetic-Hook')).toBe(
+      'synthetic-approved-value',
+    );
+  });
+
+  test.each([
+    ['Authorization', 'Bearer synthetic-attacker-bearer'],
+    ['Proxy-Authorization', 'synthetic-attacker-proxy'],
+  ])('rejects a hook-replaced Headers container carrying forbidden %s', async (name, value) => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockResolvedValue(Response.json(TOKEN_RESPONSE));
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.headers = new Headers(request.headers);
+        request.headers.set(name, value);
+      },
+    });
+
+    await expect(client.models.list()).rejects.toThrow(/authorization|authentication/iu);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   test('clears authenticated request credentials when a protected request hook fails', async () => {

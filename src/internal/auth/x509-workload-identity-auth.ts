@@ -238,14 +238,18 @@ export class X509WorkloadIdentityAuth {
     return apiURL;
   }
 
-  /** Captures the exact caller signal that will be attached to authenticated dispatch. */
-  snapshotRequestSignal(signal: AbortSignal | null | undefined): void {
-    this.#scope().callerSignal = signal;
+  /** Captures the exact caller signal and deadline approved for authenticated dispatch. */
+  snapshotRequest(signal: AbortSignal | null | undefined, timeout: number): void {
+    this.#scope().request ??= { signal, timeout };
   }
 
-  /** Returns the request signal without invoking caller-owned accessors again. */
-  requestSignal(): AbortSignal | null | undefined {
-    return this.#scope().callerSignal;
+  /** Returns immutable request settings without invoking caller-owned accessors again. */
+  requestSnapshot(): { signal: AbortSignal | null | undefined; timeout: number } {
+    const { request } = this.#scope();
+    if (!request) {
+      throw new OpenAIError('X.509 workload identity requires snapshotted request settings.');
+    }
+    return request;
   }
 
   /** Establishes an independent scope even when concurrent requests share caller options. */
@@ -266,8 +270,12 @@ export class X509WorkloadIdentityAuth {
 
   /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
   continuation(): <T>(operation: () => Promise<T>) => Promise<T> {
-    const { wallStartedAt, monotonicStartedAt } = this.#scope();
-    const scope: X509RequestScope = { wallStartedAt, monotonicStartedAt };
+    const { wallStartedAt, monotonicStartedAt, request } = this.#scope();
+    const scope: X509RequestScope = {
+      wallStartedAt,
+      monotonicStartedAt,
+      ...(request ? { request } : {}),
+    };
     return (operation) =>
       this.#transport.resume(scope, async () => {
         try {
@@ -281,7 +289,7 @@ export class X509WorkloadIdentityAuth {
   /** Removes dispatched bearer material before settled request promises can retain their scope. */
   releaseRequestCredentials(): void {
     const scope = this.#scope();
-    delete scope.callerSignal;
+    delete scope.request;
     delete scope.apiURL;
     delete scope.token;
     delete scope.defaultHeaders;
@@ -461,6 +469,22 @@ export class X509WorkloadIdentityAuth {
     scope.headers = request.headers;
     scope.authorization = approvedAuthorization;
     this.assertRequest(request);
+  }
+
+  /** Rebinds an equivalent protected-hook container without relaxing final dispatch identity checks. */
+  adoptRequestHeaders(request: RequestInit): void {
+    const scope = this.#scope();
+    const original = scope.headers;
+    if (!(original instanceof Headers) || !(request.headers instanceof Headers)) {
+      throw new OpenAIError('X.509 workload identity must preserve its issued workload authorization.');
+    }
+    scope.headers = request.headers;
+    try {
+      this.assertRequest(request);
+    } catch (error) {
+      scope.headers = original;
+      throw error;
+    }
   }
 
   /** Rejects request hooks that replace the selected bearer or its approved header identity. */

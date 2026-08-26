@@ -784,8 +784,7 @@ export class OpenAI {
           ? await this._workloadIdentityAuth.getToken(opts, {
               apiURL: this._workloadIdentityAuth.requestAPIURL(),
               ...this._workloadIdentityAuth.headerSnapshots(),
-              signal: this._workloadIdentityAuth.requestSignal(),
-              timeout: opts.timeout ?? this.timeout,
+              ...this._workloadIdentityAuth.requestSnapshot(),
             })
           : await this._workloadIdentityAuth.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
@@ -1077,16 +1076,18 @@ export class OpenAI {
     authentication: X509WorkloadIdentityAuth,
   ): Promise<string> {
     const deadline = new AbortController();
-    const callerSignal = options.signal;
-    const cancel = () => deadline.abort(callerSignal?.reason);
-    callerSignal?.addEventListener('abort', cancel, { once: true });
-    if (callerSignal?.aborted) {
+    const callerSignal = controller.signal;
+    let timedOut = false;
+    const cancel = () => deadline.abort(callerSignal.reason);
+    callerSignal.addEventListener('abort', cancel, { once: true });
+    if (callerSignal.aborted) {
       cancel();
     }
 
     try {
       const remaining = authentication.remainingTimeout(options, timeout);
       const expiration = authentication.waitForRetry(remaining, deadline.signal).then(() => {
+        timedOut = true;
         controller.abort();
         void Shims.CancelReadableStream(response.body).catch(() => undefined);
         throw new Errors.APIConnectionTimeoutError();
@@ -1095,17 +1096,17 @@ export class OpenAI {
         response.text().catch(() => 'X.509 workload identity API response body could not be read.'),
         expiration,
       ]);
-      if (callerSignal?.aborted) {
+      if (callerSignal.aborted && !timedOut) {
         throw this._makeUserAbortError(callerSignal);
       }
       return body;
     } catch (error) {
-      if (callerSignal?.aborted) {
+      if (callerSignal.aborted && !timedOut) {
         throw this._makeUserAbortError(callerSignal);
       }
       throw error;
     } finally {
-      callerSignal?.removeEventListener('abort', cancel);
+      callerSignal.removeEventListener('abort', cancel);
       deadline.abort();
     }
   }
@@ -1152,7 +1153,7 @@ export class OpenAI {
 
     await this.prepareRequest(req, { url, options });
     await this._provider?.prepareRequest?.(req, { url, options });
-    x509Authentication?.assertRequest(req);
+    x509Authentication?.adoptRequestHeaders(req);
     if (
       x509Authentication &&
       ((globalThis.ReadableStream && req.body instanceof globalThis.ReadableStream) ||
@@ -1180,8 +1181,9 @@ export class OpenAI {
       }),
     );
 
-    if (options.signal?.aborted || req.signal?.aborted) {
-      throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal!);
+    const callerSignal = x509Authentication ? x509Authentication.requestSnapshot().signal : options.signal;
+    if (callerSignal?.aborted || req.signal?.aborted) {
+      throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
     }
 
     const security = options.__security ?? { bearerAuth: true };
@@ -1189,8 +1191,8 @@ export class OpenAI {
     const controller =
       this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
         ? createRequestController(
-            req.signal ?? (x509Authentication ? options.signal : undefined),
-            x509Authentication ? options.signal : undefined,
+            req.signal ?? (x509Authentication ? callerSignal : undefined),
+            x509Authentication ? callerSignal : undefined,
           )
         : new AbortController();
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
@@ -1202,8 +1204,8 @@ export class OpenAI {
 
     if (response instanceof globalThis.Error) {
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
-      if (options.signal?.aborted || req.signal?.aborted) {
-        throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal!);
+      if (callerSignal?.aborted || req.signal?.aborted) {
+        throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
       }
       // detect native connection timeout errors
       // deno throws "TypeError: error sending request for url (https://example/): client error (Connect): tcp connect error: Operation timed out (os error 60): Operation timed out (os error 60)"
@@ -1558,13 +1560,16 @@ export class OpenAI {
     const x509Authentication =
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
     if (x509Authentication) {
-      const remaining = x509Authentication.remainingTimeout(options, options.timeout ?? this.timeout);
+      const remaining = x509Authentication.remainingTimeout(
+        options,
+        x509Authentication.requestSnapshot().timeout,
+      );
       if (timeoutMillis >= remaining) {
         throw new Errors.APIConnectionTimeoutError();
       }
     }
     if (x509Authentication) {
-      await x509Authentication.waitForRetry(timeoutMillis, options.signal);
+      await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.requestSnapshot().signal);
     } else {
       await sleep(timeoutMillis);
     }
@@ -1602,7 +1607,6 @@ export class OpenAI {
     const options = { ...inputOptions };
     const x509Authentication =
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
-    x509Authentication?.snapshotRequestSignal(options.signal);
     const x509Headers = x509Authentication?.snapshotHeaders(this._options.defaultHeaders, options.headers);
     if (x509Headers) {
       options.headers = x509Headers.requestHeaders;
@@ -1617,8 +1621,19 @@ export class OpenAI {
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
     x509Authentication?.snapshotAPIURL(url);
-    if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
+    const explicitTimeout = 'timeout' in options;
+    if (explicitTimeout) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
+    x509Authentication?.snapshotRequest(options.signal, options.timeout);
+    if (x509Authentication) {
+      const snapshot = x509Authentication.requestSnapshot();
+      options.timeout = snapshot.timeout;
+      if (snapshot.signal === undefined) {
+        delete options.signal;
+      } else {
+        options.signal = snapshot.signal;
+      }
+    }
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
     if (isStreamingBody) {
@@ -1634,6 +1649,7 @@ export class OpenAI {
       bodyHeaders,
       retryCount,
       x509Headers,
+      x509Timeout: explicitTimeout ? options.timeout : undefined,
     });
 
     const req: FinalizedRequestInit = {
@@ -1656,12 +1672,14 @@ export class OpenAI {
     bodyHeaders,
     retryCount,
     x509Headers,
+    x509Timeout,
   }: {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
+    x509Timeout: number | undefined;
   }): Promise<Headers> {
     let idempotencyHeaders: HeadersLike = {};
     if (this.idempotencyHeader && method !== 'get') {
@@ -1670,13 +1688,14 @@ export class OpenAI {
     }
 
     const helperMethod = options.__metadata?.['helperMethod'];
+    const timeout = x509Headers ? x509Timeout : options.timeout;
     const headers = buildHeaders([
       idempotencyHeaders,
       {
         Accept: 'application/json',
         ...(!isRunningInBrowserOrBrowserWorker() ? { 'User-Agent': this.getUserAgent() } : undefined),
         'X-Stainless-Retry-Count': String(retryCount),
-        ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
+        ...(timeout ? { 'X-Stainless-Timeout': String(Math.trunc(timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
         ...(typeof helperMethod === 'string' ? { 'X-Stainless-Helper-Method': helperMethod } : {}),
         'OpenAI-Organization': this.organization,
