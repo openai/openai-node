@@ -119,6 +119,41 @@ describe('X.509 request ownership boundaries', () => {
     expect(canceled).toHaveBeenCalledTimes(1);
   });
 
+  test.each(['caller', 'protected hook'] as const)(
+    'preserves %s cancellation when successful response parsing starts after its deadline',
+    async (source) => {
+      let elapsed = 0;
+      const caller = new AbortController();
+      const reason = new Error(`synthetic-delayed-${source}-cancellation`);
+      const canceled = vi.fn();
+      vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+      vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(tokenResponse)
+          : new Response(new ReadableStream({ cancel: canceled }), {
+              headers: { 'content-type': 'application/json' },
+            }),
+      );
+      const client = new OpenAI(options({ timeout: 50 }));
+      if (source === 'protected hook') {
+        Object.defineProperty(client, 'prepareRequest', {
+          value: async (request: RequestInit) => {
+            request.signal = caller.signal;
+          },
+        });
+      }
+      const request =
+        source === 'caller' ? client.models.list({ signal: caller.signal }) : client.models.list();
+
+      await request.asResponse();
+      caller.abort(reason);
+      elapsed = 51;
+
+      await expect(request).rejects.toMatchObject({ constructor: APIUserAbortError, cause: reason });
+      expect(canceled).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test('retires an SDK-materialized one-shot iterator when certificate authentication fails', async () => {
     let finalized = false;
     const body = {
@@ -140,6 +175,39 @@ describe('X.509 request ownership boundaries', () => {
     ).rejects.toMatchObject({ status: 503 });
     await vi.waitFor(() => expect(finalized).toBe(true), { timeout: 200 });
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  test('retires an SDK-owned upload when a protected request hook replaces its body', async () => {
+    let finalized = false;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        try {
+          yield new TextEncoder().encode('synthetic-replaced-private-upload');
+          yield new TextEncoder().encode('synthetic-never-dispatched');
+        } finally {
+          finalized = true;
+        }
+      },
+    };
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          return Response.json(tokenResponse);
+        }
+        expect(request.body).toBe('synthetic-protected-hook-replacement');
+        return Response.json({ data: [] });
+      });
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.body = 'synthetic-protected-hook-replacement';
+      },
+    });
+
+    await client.request({ path: '/responses', method: 'post', body });
+    await vi.waitFor(() => expect(finalized).toBe(true), { timeout: 200 });
+    expect(send).toHaveBeenCalledTimes(2);
   });
 
   test('does not cancel a caller-owned request stream after certificate authentication fails', async () => {

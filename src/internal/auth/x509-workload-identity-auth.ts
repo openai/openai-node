@@ -335,9 +335,14 @@ export class X509WorkloadIdentityAuth {
     }
   }
 
-  /** Transfers an approved upload to the actual request transport without cancelling it. */
-  releaseRequestBody(): void {
-    delete this.#scope().materializedBody;
+  /** Transfers the dispatched upload while retiring any SDK-owned body replaced by a hook. */
+  releaseRequestBody(body: unknown): void {
+    const scope = this.#scope();
+    if (scope.materializedBody === body) {
+      delete scope.materializedBody;
+    } else {
+      this.retireRequestBody();
+    }
   }
 
   /** Retains caller-only cancellation separately from SDK-created deadline controllers. */

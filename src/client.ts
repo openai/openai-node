@@ -987,21 +987,22 @@ export class OpenAI {
         this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth
           ? this._workloadIdentityAuth
           : undefined;
+      const callerSignal = x509Authentication ? props.controller.signal : props.options.signal;
+      const abortError = () =>
+        x509Authentication && callerSignal
+          ? this._makeUserAbortError(callerSignal)
+          : new Errors.APIUserAbortError();
       let remaining: number;
       try {
         remaining =
           x509Authentication?.remainingTimeout(props.options, timeout) ??
           Math.max(0, props.startTime + timeout - Date.now());
       } catch (error) {
+        const cancellation = callerSignal?.aborted ? abortError() : undefined;
         props.controller.abort();
         void Shims.CancelReadableStream(props.response.body).catch(() => undefined);
-        throw error;
+        throw cancellation ?? error;
       }
-      const callerSignal = x509Authentication ? props.controller.signal : props.options.signal;
-      const abortError = () =>
-        x509Authentication && callerSignal
-          ? this._makeUserAbortError(callerSignal)
-          : new Errors.APIUserAbortError();
       let timer: ReturnType<typeof setTimeout> | undefined;
       let abortListener: (() => void) | undefined;
       let timedOut = false;
@@ -1229,7 +1230,7 @@ export class OpenAI {
         : new AbortController();
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
-    x509Authentication?.releaseRequestBody();
+    x509Authentication?.releaseRequestBody(req.body);
     const response = await fetchWithAuth
       .call(this, url, req, remainingTimeout, controller, security)
       .catch(castToError);
@@ -1636,7 +1637,7 @@ export class OpenAI {
       const authentication = this._workloadIdentityAuth;
       return await authentication.runRequest(async () => {
         const built = await OpenAI.prototype.buildRequest.call(this, inputOptions, { retryCount });
-        authentication.releaseRequestBody();
+        authentication.releaseRequestBody(built.req.body);
         return built;
       });
     }
