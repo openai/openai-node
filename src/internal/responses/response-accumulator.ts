@@ -303,7 +303,7 @@ function cloneValidatedResponse(
   context: ResponseAccumulatorContext,
   response: Response,
   expectedResponseID?: string,
-  onValidatedResponse?: (snapshot: Response) => void,
+  onValidatedResponse?: (snapshot: Response, wireOutputText: PropertyDescriptor | undefined) => void,
 ): Response {
   let responseID: PropertyDescriptor | undefined;
   try {
@@ -322,12 +322,15 @@ function cloneValidatedResponse(
   }
 
   const nextContext = createCanonicalResponseContext();
-  const snapshot = cloneResponse(nextContext, response);
+  let wireOutputText: PropertyDescriptor | undefined;
+  const snapshot = cloneResponse(nextContext, response, (wireResponse) => {
+    wireOutputText = Object.getOwnPropertyDescriptor(wireResponse, 'output_text');
+  });
   if (snapshot.id !== responseID.value) {
     throw new OpenAIError('Response event does not match the active response.');
   }
   const identityIndex = createResponseOutputIdentityIndex(snapshot);
-  onValidatedResponse?.(snapshot);
+  onValidatedResponse?.(snapshot, wireOutputText);
 
   context.canonicalSnapshot = nextContext.canonicalSnapshot;
   context.outputTextLengths = nextContext.outputTextLengths;
@@ -338,9 +341,26 @@ function cloneValidatedResponse(
   return snapshot;
 }
 
+function cloneValidatedWireResponse(
+  response: Response,
+  wireOutputText: PropertyDescriptor | undefined,
+): Response {
+  const wireResponse = structuredClone(response);
+  if (!wireOutputText) {
+    Reflect.deleteProperty(wireResponse, 'output_text');
+  } else if (wireOutputText.value === null || wireOutputText.value === undefined) {
+    Object.defineProperty(wireResponse, 'output_text', wireOutputText);
+  }
+  if (getResponseID(wireResponse) !== getResponseID(response)) {
+    throw new OpenAIError('Response event does not match the active response.');
+  }
+  return wireResponse;
+}
+
 function snapshotResponseLifecycleEvent(
   event: ResponseLifecycleEvent,
   response: Response,
+  wireOutputText: PropertyDescriptor | undefined,
 ): ResponseLifecycleEvent {
   try {
     const detached = Object.create(Object.prototype) as ResponseLifecycleEvent;
@@ -385,7 +405,7 @@ function snapshotResponseLifecycleEvent(
     Object.defineProperty(detached, 'response', {
       configurable: true,
       enumerable: true,
-      value: structuredClone(response),
+      value: cloneValidatedWireResponse(response, wireOutputText),
       writable: true,
     });
     return detached;
@@ -688,7 +708,15 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
 
   return new Proxy(event, {
     get(target, property) {
-      return stableValues.has(property) ? stableValues.get(property) : Reflect.get(target, property, target);
+      if (stableValues.has(property)) {
+        return stableValues.get(property);
+      }
+
+      const value = Reflect.get(target, property, target);
+      if (property === 'sequence_number') {
+        stableValues.set(property, value);
+      }
+      return value;
     },
   });
 }
@@ -1297,20 +1325,28 @@ export function accumulateResponseWithContext(
         `When snapshot hasn't been set yet, expected 'response.created' event, got ${dispatchEvent.type}`,
       );
     }
-    return cloneValidatedResponse(context, dispatchEvent.response, undefined, (validatedResponse) =>
-      onSanitizedEvent?.(dispatchEvent, () =>
-        snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse),
-      ),
+    return cloneValidatedResponse(
+      context,
+      dispatchEvent.response,
+      undefined,
+      (validatedResponse, wireOutputText) =>
+        onSanitizedEvent?.(dispatchEvent, () =>
+          snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse, wireOutputText),
+        ),
     );
   }
 
   if (isResponseLifecycleEvent(dispatchEvent)) {
     const expectedResponseID = getResponseID(snapshot);
     const { response } = dispatchEvent;
-    return cloneValidatedResponse(context, response, expectedResponseID, (validatedResponse) =>
-      onSanitizedEvent?.(dispatchEvent, () =>
-        snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse),
-      ),
+    return cloneValidatedResponse(
+      context,
+      response,
+      expectedResponseID,
+      (validatedResponse, wireOutputText) =>
+        onSanitizedEvent?.(dispatchEvent, () =>
+          snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse, wireOutputText),
+        ),
     );
   }
 

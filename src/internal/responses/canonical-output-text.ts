@@ -51,11 +51,16 @@ export function ensureCanonicalOutputText(context: ResponseAccumulatorContext, s
   context.canonicalSnapshot = snapshot;
 }
 
-export function cloneResponse(context: ResponseAccumulatorContext, response: Response): Response {
+export function cloneResponse(
+  context: ResponseAccumulatorContext,
+  response: Response,
+  onClonedResponse?: (response: Response) => void,
+): Response {
   context.canonicalSnapshot = undefined;
   context.outputTextLengths = new WeakMap();
   context.outputTextIndex = new OutputTextIndex();
   const snapshot = structuredClone(response);
+  onClonedResponse?.(snapshot);
   if (
     !Object.getOwnPropertyDescriptor(snapshot, 'output_text') ||
     snapshot.output_text === null ||

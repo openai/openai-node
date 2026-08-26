@@ -152,35 +152,30 @@ export class ResponseStream<ParsedT = null>
       throw new APIError(undefined, error, event.message, undefined);
     }
 
-    let shouldEmit = true;
     let dispatchEvent: ResponseStreamEvent = event;
-    let emittedEvent: ResponseStreamEvent = event;
+    let materializeLifecycleEvent: (() => ResponseStreamEvent) | undefined;
     const response = accumulateResponseWithContext(
       event,
       this.#currentResponseSnapshot,
       this.#accumulatorContext,
       true,
-      (sanitizedEvent, materializeLifecycleEvent) => {
-        if (starting_after != null) {
-          try {
-            shouldEmit = sanitizedEvent.sequence_number > starting_after;
-          } catch {
-            throw new OpenAIError('Response event does not match the active response.');
-          }
-        }
-        if (!shouldEmit) {
-          return;
-        }
-
+      (sanitizedEvent, materializeEvent) => {
         dispatchEvent = sanitizedEvent;
-        emittedEvent = materializeLifecycleEvent?.() ?? event;
+        materializeLifecycleEvent = materializeEvent;
       },
     );
     this.#currentResponseSnapshot = response;
-    if (!shouldEmit) {
-      return;
+    if (starting_after != null) {
+      try {
+        if (!(dispatchEvent.sequence_number > starting_after)) {
+          return;
+        }
+      } catch {
+        throw new OpenAIError('Response event does not match the active response.');
+      }
     }
 
+    const emittedEvent = materializeLifecycleEvent?.() ?? event;
     emit('event', emittedEvent);
 
     switch (dispatchEvent.type) {

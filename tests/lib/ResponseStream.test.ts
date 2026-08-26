@@ -115,6 +115,361 @@ describe('.stream()', () => {
     expect(final.id).toBe('resp_123');
   });
 
+  it.each(['create', 'replay', 'readable'] as const)(
+    'preserves omitted lifecycle response fields for %s listeners and iterators',
+    async (mode) => {
+      const created = makeResponse({ output: [makeTextMessage('created wire text')] });
+      const completed = makeResponse({
+        status: 'completed',
+        output: [makeTextMessage('completed wire text')],
+      });
+      Reflect.deleteProperty(created, 'output_text');
+      Reflect.deleteProperty(completed, 'output_text');
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: created },
+        { type: 'response.completed', sequence_number: 1, response: completed },
+      ];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      const client = {
+        responses: { create: vi.fn(async () => transport), retrieve: vi.fn(async () => transport) },
+      } as unknown as OpenAI;
+      let stream: ResponseStream<null>;
+      if (mode === 'readable') {
+        stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      } else if (mode === 'replay') {
+        stream = ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: 0 });
+      } else {
+        stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'preserve wire shape' });
+      }
+      const generic: ResponseStreamEvent[] = [];
+      const typed: ResponseStreamEvent[] = [];
+      stream.on('event', (event) => {
+        if (event.type !== 'response.created' && event.type !== 'response.completed') {
+          return;
+        }
+        expect(Object.getOwnPropertyDescriptor(event.response, 'output_text')).toBeUndefined();
+        expect(JSON.stringify(event.response)).not.toContain('"output_text":');
+        generic.push(event);
+        if (event.type === 'response.completed') {
+          const item = event.response.output[0];
+          if (item?.type === 'message' && item.content[0]?.type === 'output_text') {
+            item.content[0].text = 'listener-only mutation';
+          }
+        }
+      });
+      stream.on('response.created', (event) => typed.push(event));
+      stream.on('response.completed', (event) => typed.push(event));
+      const iteration = (async () => {
+        const iterated: ResponseStreamEvent[] = [];
+        for await (const event of stream) {
+          iterated.push(event);
+        }
+        return iterated;
+      })();
+
+      const [final, iterated] = await Promise.all([stream.finalResponse(), iteration]);
+
+      expect(generic.map((event) => event.type)).toEqual(
+        mode === 'replay' ? ['response.completed'] : ['response.created', 'response.completed'],
+      );
+      expect(typed).toEqual(generic);
+      expect(iterated).toEqual(generic);
+      expect(final.output_text).toBe('completed wire text');
+      expect(final.output[0]).toMatchObject({ content: [{ text: 'completed wire text' }] });
+      expect(completed.output[0]).toMatchObject({ content: [{ text: 'completed wire text' }] });
+      expect(Object.getOwnPropertyDescriptor(completed, 'output_text')).toBeUndefined();
+    },
+  );
+
+  it.each(
+    (['create', 'replay'] as const).flatMap((mode) =>
+      ([null, undefined] as const).map((wireValue) => ({ mode, wireValue })),
+    ),
+  )(
+    'preserves a getter-returned $wireValue lifecycle wire field during $mode',
+    async ({ mode, wireValue }) => {
+      const response = makeResponse({
+        output: [makeTextMessage('canonical text')],
+      });
+      const readOutputText = vi.fn(() => wireValue);
+      Object.defineProperty(response, 'output_text', {
+        configurable: true,
+        enumerable: true,
+        get: readOutputText,
+      });
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield { type: 'response.created' as const, sequence_number: 0, response };
+        },
+      };
+      const client = {
+        responses: { create: vi.fn(async () => transport), retrieve: vi.fn(async () => transport) },
+      } as unknown as OpenAI;
+      const stream =
+        mode === 'replay'
+          ? ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: -1 })
+          : ResponseStream.createResponse(client, {
+              model: 'gpt-test',
+              input: 'preserve nullable wire field',
+            });
+      const generic = vi.fn();
+      const typed = vi.fn();
+      stream.on('event', generic);
+      stream.on('response.created', typed);
+
+      await expect(stream.finalResponse()).resolves.toMatchObject({ output_text: 'canonical text' });
+
+      expect(readOutputText).toHaveBeenCalledTimes(1);
+      expect(generic).toHaveBeenCalledTimes(1);
+      expect(typed).toHaveBeenCalledWith(generic.mock.calls[0]?.[0]);
+      const emitted = generic.mock.calls[0]?.[0];
+      expect(Object.getOwnPropertyDescriptor(emitted.response, 'output_text')).toBeDefined();
+      expect(emitted.response.output_text).toBe(wireValue);
+      expect(emitted.response).not.toBe(response);
+    },
+  );
+
+  it('stabilizes a replay lifecycle cursor without exposing later mutations to its wire response', async () => {
+    const response = makeResponse({ output: [makeTextMessage('validated wire text')] });
+    Reflect.deleteProperty(response, 'output_text');
+    const readSequence = vi.fn(() => {
+      response.id = 'resp_foreign';
+      const item = response.output[0];
+      if (item?.type === 'message' && item.content[0]?.type === 'output_text') {
+        item.content[0].text = 'synthetic-private-foreign-payload';
+      }
+      return readSequence.mock.calls.length === 1 ? 1 : 0;
+    });
+    const lifecycle = {
+      type: 'response.created' as const,
+      get sequence_number() {
+        return readSequence();
+      },
+      response,
+    };
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield lifecycle;
+      },
+    };
+    const client = { responses: { retrieve: vi.fn(async () => transport) } } as unknown as OpenAI;
+    const stream = ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: 0 });
+    const generic = vi.fn();
+    const typed = vi.fn();
+    stream.on('event', generic);
+    stream.on('response.created', typed);
+
+    await expect(stream.finalResponse()).resolves.toMatchObject({
+      id: 'resp_123',
+      output_text: 'validated wire text',
+    });
+
+    expect(readSequence).toHaveBeenCalledTimes(1);
+    expect(generic).toHaveBeenCalledTimes(1);
+    expect(typed).toHaveBeenCalledWith(generic.mock.calls[0]?.[0]);
+    const emitted = generic.mock.calls[0]?.[0];
+    expect(emitted.sequence_number).toBe(1);
+    expect(emitted.response.id).toBe('resp_123');
+    expect(emitted.response.output[0]).toMatchObject({ content: [{ text: 'validated wire text' }] });
+    expect(Object.getOwnPropertyDescriptor(emitted.response, 'output_text')).toBeUndefined();
+    expect(response.id).toBe('resp_foreign');
+  });
+
+  it.each(['text delta', 'output item'] as const)(
+    'accumulates a replayed %s before its cursor getter can mutate the payload',
+    async (kind) => {
+      const message = makeTextMessage('safe');
+      const initial = makeResponse({
+        output: kind === 'text delta' ? [message] : [],
+        output_text: kind === 'text delta' ? 'safe' : '',
+      });
+      const event: ResponseStreamEvent =
+        kind === 'text delta'
+          ? {
+              type: 'response.output_text.delta',
+              sequence_number: 1,
+              item_id: 'msg_123',
+              output_index: 0,
+              content_index: 0,
+              delta: ' original',
+              logprobs: [],
+            }
+          : {
+              type: 'response.output_item.added',
+              sequence_number: 1,
+              output_index: 0,
+              item: message,
+            };
+      const readSequence = vi.fn(() => {
+        if (event.type === 'response.output_text.delta') {
+          event.delta = ' corrupted';
+        } else if (event.type === 'response.output_item.added' && event.item.type === 'message') {
+          event.item.id = 'msg_corrupted';
+          const part = event.item.content[0];
+          if (part?.type === 'output_text') {
+            part.text = 'corrupted';
+          }
+        }
+        return 1;
+      });
+      Object.defineProperty(event, 'sequence_number', {
+        configurable: true,
+        enumerable: true,
+        get: readSequence,
+      });
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield { type: 'response.created' as const, sequence_number: 0, response: initial };
+          yield event;
+        },
+      };
+      const client = { responses: { retrieve: vi.fn(async () => transport) } } as unknown as OpenAI;
+      const stream = ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: 0 });
+      const generic = vi.fn();
+      const typed = vi.fn();
+      stream.on('event', generic);
+      if (kind === 'text delta') {
+        stream.on('response.output_text.delta', typed);
+      } else {
+        stream.on('response.output_item.added', typed);
+      }
+      const iteration = (async () => {
+        const iterated: ResponseStreamEvent[] = [];
+        for await (const emitted of stream) {
+          iterated.push(emitted);
+        }
+        return iterated;
+      })();
+
+      const [final, iterated] = await Promise.all([stream.finalResponse(), iteration]);
+
+      expect(readSequence).toHaveBeenCalledTimes(1);
+      expect(generic).toHaveBeenCalledTimes(1);
+      expect(typed).toHaveBeenCalledTimes(1);
+      expect(iterated).toEqual([event]);
+      expect(final.output[0]).toMatchObject({
+        id: 'msg_123',
+        content: [{ text: kind === 'text delta' ? 'safe original' : 'safe' }],
+      });
+      expect(final.output_text).toBe(kind === 'text delta' ? 'safe original' : 'safe');
+      if (kind === 'text delta') {
+        expect(typed).toHaveBeenCalledWith(expect.objectContaining({ snapshot: 'safe original' }));
+      }
+    },
+  );
+
+  it.each(['keepalive', 'response.audio.delta'] as const)(
+    'redacts a failing replay cursor getter on a supported %s event',
+    async (type) => {
+      const privateMessage = `synthetic-private-${type}-cursor-secret`;
+      const readSequence = vi.fn(() => {
+        throw new Error(privateMessage);
+      });
+      const event = {
+        type,
+        get sequence_number(): number {
+          return readSequence();
+        },
+        ...(type === 'response.audio.delta' ? { delta: 'synthetic-private-audio' } : {}),
+      };
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield { type: 'response.created' as const, sequence_number: 0, response: makeResponse() };
+          yield event;
+        },
+      };
+      const client = { responses: { retrieve: vi.fn(async () => transport) } } as unknown as OpenAI;
+      const stream = ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: 0 });
+      const emitted = vi.fn();
+      const errors: OpenAIError[] = [];
+      stream.on('event', emitted);
+      stream.on('error', (error) => errors.push(error));
+
+      await expect(stream.finalResponse()).rejects.toThrow(
+        'Response event does not match the active response.',
+      );
+
+      expect(readSequence).toHaveBeenCalledTimes(1);
+      expect(emitted).not.toHaveBeenCalled();
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toBeInstanceOf(OpenAIError);
+      expect(errors[0]?.message).not.toContain(privateMessage);
+      expect(errors[0]).not.toHaveProperty('cause');
+    },
+  );
+
+  it.each(['create', 'replay', 'readable'] as const)(
+    'applies the replay boundary consistently to %s keepalive listeners and iterators',
+    async (mode) => {
+      const events = [
+        { type: 'response.created' as const, sequence_number: 0, response: makeResponse() },
+        { type: 'keepalive' as const, sequence_number: 1 },
+        { type: 'response.audio.delta' as const, sequence_number: 2, delta: 'stale' },
+        { type: 'keepalive' as const, sequence_number: 3 },
+        { type: 'keepalive' as const, sequence_number: 4 },
+        { type: 'response.audio.delta' as const, sequence_number: 5, delta: 'live' },
+        {
+          type: 'response.completed' as const,
+          sequence_number: 6,
+          response: makeResponse({ status: 'completed' }),
+        },
+      ];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      const client = {
+        responses: { create: vi.fn(async () => transport), retrieve: vi.fn(async () => transport) },
+      } as unknown as OpenAI;
+      const encoder = new TextEncoder();
+      let stream: ResponseStream<null>;
+      if (mode === 'readable') {
+        stream = ResponseStream.fromReadableStream(
+          ReadableStreamFrom(events.map((event) => encoder.encode(`${JSON.stringify(event)}\n`))),
+        );
+      } else if (mode === 'replay') {
+        stream = ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: 3 });
+      } else {
+        stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'keepalive events' });
+      }
+      const generic: number[] = [];
+      const keepalives: number[] = [];
+      const audio: string[] = [];
+      stream.on('event', (event) => generic.push(event.sequence_number));
+      Reflect.apply(stream.on, stream, [
+        'keepalive',
+        (event: { sequence_number: number }) => keepalives.push(event.sequence_number),
+      ]);
+      stream.on('response.audio.delta', (event) => audio.push(event.delta));
+      const iteration = (async () => {
+        const iterated: number[] = [];
+        for await (const event of stream) {
+          iterated.push(event.sequence_number);
+        }
+        return iterated;
+      })();
+
+      const [final, iterated] = await Promise.all([stream.finalResponse(), iteration]);
+
+      expect(final.id).toBe('resp_123');
+      expect(generic).toEqual(mode === 'replay' ? [4, 5, 6] : [0, 1, 2, 3, 4, 5, 6]);
+      expect(iterated).toEqual(generic);
+      expect(keepalives).toEqual(mode === 'replay' ? [4] : [1, 3, 4]);
+      expect(audio).toEqual(mode === 'replay' ? ['live'] : ['stale', 'live']);
+    },
+  );
+
   it('does not detach lifecycle responses discarded while replaying prior events', async () => {
     const output = {
       id: 'msg_123',
@@ -2015,6 +2370,16 @@ describe('.stream()', () => {
 function readableStreamFromEvents(events: ResponseStreamEvent[]) {
   const encoder = new TextEncoder();
   return ReadableStreamFrom(events.map((event) => encoder.encode(JSON.stringify(event) + '\n')));
+}
+
+function makeTextMessage(text: string): Extract<Response['output'][number], { type: 'message' }> {
+  return {
+    id: 'msg_123',
+    type: 'message',
+    role: 'assistant',
+    status: 'in_progress',
+    content: [{ type: 'output_text', annotations: [], text }],
+  };
 }
 
 function makeResponse(overrides: Partial<Response> = {}): Response {
