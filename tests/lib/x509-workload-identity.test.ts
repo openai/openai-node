@@ -322,6 +322,11 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     'session_id',
     'id_token',
     'auth_token',
+    'X-API-Key',
+    'X-Session-Token',
+    'X-Session-Id',
+    'X-ID-Token',
+    'X-Auth-Token',
     'X-Amz-Security-Token',
     'X-Amz-Signature',
   ])('rejects caller-supplied %s query credentials before exchanging a workload credential', async (name) => {

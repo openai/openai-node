@@ -101,7 +101,8 @@ const sensitiveQueryNames = new Set([
 
 /** Recognizes credential-bearing query names across ordinary and provider authentication. */
 export function isSensitiveQueryParameter(name: string): boolean {
-  return sensitiveQueryNames.has(name.toLowerCase().replace(/[-_]/gu, ''));
+  const normalized = name.toLowerCase().replace(/[-_]/gu, '');
+  return sensitiveQueryNames.has(normalized) || sensitiveQueryNames.has(normalized.replace(/^x/u, ''));
 }
 
 const sensitiveHeaderNames = new Set([

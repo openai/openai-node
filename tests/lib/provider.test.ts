@@ -400,6 +400,19 @@ test('request logging redacts credentials in structured request-option queries',
   expect(details.options?.query).toEqual({ api_key: '***', Authorization: '***', view: 'public' });
 });
 
+test.each(['X-API-Key', 'X-Session-Token', 'X-Session-Id', 'X-Auth-Token', 'X-ID-Token'])(
+  'request logging redacts the %s authentication query from URLs and structured options',
+  (name) => {
+    const details = formatRequestDetails({
+      url: `https://provider.example/v1/models?${name}=synthetic-secret&view=public`,
+      options: { query: { [name]: 'synthetic-secret', view: 'public' } },
+    });
+
+    expect(details.url).toBe(`https://provider.example/v1/models?${name}=***&view=public`);
+    expect(details.options?.query).toEqual({ [name]: '***', view: 'public' });
+  },
+);
+
 test('provider origin changes require an explicitly replaced custom fetch transport', async () => {
   const inheritedFetch = vi.fn(async () => Response.json({}));
   const replacementFetch = vi.fn(async () => Response.json({}));
