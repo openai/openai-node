@@ -257,6 +257,39 @@ describe('Bedrock protected request-hook signal replacement', () => {
     expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
   });
 
+  test.each(['finalized request', 'original options'] as const)(
+    'preserves the first %s cancellation after bearer token settlement',
+    async (source) => {
+      const original = new AbortController();
+      const finalized = new AbortController();
+      const first = source === 'original options' ? original : finalized;
+      const second = first === original ? finalized : original;
+      const reason = new Error(`${source} cancelled first after token settlement`);
+      const tokenProvider: TokenProvider = () => {
+        const token = Promise.resolve('synthetic-late-resolved-credential');
+        void token.then(() => {
+          queueMicrotask(() => first.abort(reason));
+          queueMicrotask(() => second.abort(new Error('second cancellation must not replace the first')));
+        });
+        return token;
+      };
+      const { client, fetch } = createClient(
+        tokenProvider,
+        dependencyFreeProvider,
+        'mantle',
+        finalized.signal,
+      );
+
+      await expectImmediateCancellation(
+        observe(client.models.list({ signal: original.signal })),
+        first.signal,
+        fetch,
+      );
+      expect(getEventListeners(original.signal, 'abort')).toEqual([]);
+      expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
+    },
+  );
+
   test('removes both listeners when finalized signal registration installs and then throws', async () => {
     const original = new AbortController();
     const finalizedController = new AbortController();

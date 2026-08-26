@@ -292,6 +292,7 @@ export function assertValidBedrockBearerCredential(credential: string): void {
 
 interface BedrockBearerSignalFailure {
   error?: { value: unknown };
+  removeListeners?: () => void;
 }
 
 function createBedrockUserAbortError(signal: AbortSignal): Errors.APIUserAbortError {
@@ -330,22 +331,23 @@ function resolveAbortableBedrockBearerToken(
         }
       }
     };
+    failure.removeListeners = removeListeners;
 
     const settle = (result: { token: string } | { error: unknown }) => {
       if (settled) {
         return;
       }
       settled = true;
-      removeListeners();
       if ('token' in result) {
         resolve(result.token);
       } else {
+        removeListeners();
         reject(result.error);
       }
     };
 
     const rejectSignalFailure = (error: unknown) => {
-      if (settled) {
+      if (failure.error) {
         return;
       }
       failure.error = { value: error };
@@ -354,7 +356,7 @@ function resolveAbortableBedrockBearerToken(
 
     const registerAbortListener = (signal: AbortSignal): boolean => {
       const onAbort = () => {
-        if (settled) {
+        if (failure.error) {
           return;
         }
         try {
@@ -437,20 +439,27 @@ class BedrockBearerAuth implements BedrockRequestAuth {
     const signalFailure: BedrockBearerSignalFailure = {};
     let token: unknown;
     try {
-      token =
-        signals.length > 0
-          ? await resolveAbortableBedrockBearerToken(() => this.tokenProvider(), signals, signalFailure)
-          : await this.tokenProvider();
-    } catch (cause) {
-      if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
-        throw cause;
+      try {
+        token =
+          signals.length > 0
+            ? await resolveAbortableBedrockBearerToken(() => this.tokenProvider(), signals, signalFailure)
+            : await this.tokenProvider();
+      } catch (cause) {
+        if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
+          throw cause;
+        }
+        throw errorWithCause('Failed to resolve a bearer credential for Bedrock.', cause);
       }
-      throw errorWithCause('Failed to resolve a bearer credential for Bedrock.', cause);
-    }
-    for (const signal of signals) {
-      if (signal.aborted) {
-        throw createBedrockUserAbortError(signal);
+      if (signalFailure.error) {
+        throw signalFailure.error.value;
       }
+      for (const signal of signals) {
+        if (signal.aborted) {
+          throw createBedrockUserAbortError(signal);
+        }
+      }
+    } finally {
+      signalFailure.removeListeners?.();
     }
     if (typeof token !== 'string' || !token.trim()) {
       throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
