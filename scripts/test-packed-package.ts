@@ -268,6 +268,22 @@ const packedPackagePath = require('node:path');
       'assert.doesNotThrow(direct); assert.throws(httpConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u); assert.throws(httpsConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u);';
     const supportedTransports =
       'assert.doesNotThrow(direct); assert.doesNotThrow(httpConnect); assert.doesNotThrow(httpsConnect);';
+    const certificateFixture = JSON.parse(
+      run(
+        process.execPath,
+        [
+          '-r',
+          path.join(root, 'node_modules/ts-node/register/transpile-only'),
+          '-e',
+          [
+            `const { createX509TestLab } = require(${JSON.stringify(path.join(root, 'tests/utils/x509-test-lab.ts'))});`,
+            'const { firstClient } = createX509TestLab();',
+            'process.stdout.write(JSON.stringify({ certificateChain: firstClient.certificate.toString(), privateKey: firstClient.privateKey.toString() }));',
+          ].join(' '),
+        ],
+        { cwd: root },
+      ),
+    ) as { certificateChain: string; privateKey: string };
 
     for (const [undiciVersion, transportAssertions] of [
       ['5.1.1', unsupportedDispatcher],
@@ -326,11 +342,11 @@ const packedPackagePath = require('node:path');
       for (const [inputType, imports] of [
         [
           'commonjs',
-          "const assert = require('node:assert/strict'); const { Agent, ProxyAgent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+          "const assert = require('node:assert/strict'); const OpenAI = require('openai'); const { Agent, ProxyAgent } = require('undici'); const { createX509Transport, fromX509, workloadIdentity } = require('openai/auth/x509-transport');",
         ],
         [
           'module',
-          "import assert from 'node:assert/strict'; import { Agent, ProxyAgent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+          "import assert from 'node:assert/strict'; import OpenAI from 'openai'; import { Agent, ProxyAgent } from 'undici'; import { createX509Transport, fromX509, workloadIdentity } from 'openai/auth/x509-transport';",
         ],
       ]) {
         run(
@@ -347,6 +363,11 @@ const packedPackagePath = require('node:path');
               "const httpConnect = () => createX509Transport({ runtime: 'node', dispatcher: proxyDispatcher, certificateIdentity: 'static', proxy: 'http-connect' });",
               "const httpsConnect = () => createX509Transport({ runtime: 'node', dispatcher: secureProxyDispatcher, certificateIdentity: 'static', proxy: 'https-connect' });",
               transportAssertions,
+              'assert.equal(workloadIdentity.fromX509, fromX509);',
+              `const credentialOptions = { ...${JSON.stringify(certificateFixture)}, identityProviderId: 'synthetic-provider', serviceAccountId: 'synthetic-account' };`,
+              undiciVersion === '5.1.1'
+                ? 'assert.throws(() => fromX509(credentialOptions), /Undici 5\\.2\\.0 or later/u);'
+                : 'const credential = fromX509(credentialOptions); new OpenAI({ credential }); credential.close();',
               'dispatcher.close(); proxyDispatcher.close(); secureProxyDispatcher.close();',
             ].join(' '),
           ],
@@ -481,23 +502,6 @@ const packedPackagePath = require('node:path');
       "import OpenAI from 'openai'; new OpenAI({ apiKey: 'synthetic-browser-api-key', dangerouslyAllowBrowser: true });",
     ]);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
-    const certificateFixture = JSON.parse(
-      run(
-        process.execPath,
-        [
-          '-r',
-          path.join(root, 'node_modules/ts-node/register/transpile-only'),
-          '-e',
-          [
-            `const { createX509TestLab } = require(${JSON.stringify(path.join(root, 'tests/utils/x509-test-lab.ts'))});`,
-            'const { firstClient } = createX509TestLab();',
-            'process.stdout.write(JSON.stringify({ certificateChain: firstClient.certificate.toString(), privateKey: firstClient.privateKey.toString() }));',
-          ].join(' '),
-        ],
-        { cwd: root },
-      ),
-    ) as { certificateChain: string; privateKey: string };
-
     for (const [inputType, consumer] of [
       [
         'commonjs',

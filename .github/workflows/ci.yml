@@ -153,6 +153,19 @@ jobs:
           ./scripts/build
           node --experimental-strip-types scripts/test-packed-package.ts
 
+      - name: Prepare isolated minimum-runtime package and synthetic certificate
+        if: matrix.node-version == 22
+        run: |
+          package_tarball="$(npm pack "$GITHUB_WORKSPACE/dist" --ignore-scripts --silent --pack-destination "$RUNNER_TEMP")"
+          echo "X509_FLOOR_PACKAGE=${RUNNER_TEMP}/${package_tarball}" >> "$GITHUB_ENV"
+          node -r ts-node/register/transpile-only --eval '
+            const { writeFileSync } = require("node:fs");
+            const { join } = require("node:path");
+            const { createX509TestLab } = require("./tests/utils/x509-test-lab.ts");
+            const { firstClient } = createX509TestLab();
+            writeFileSync(join(process.env.RUNNER_TEMP, "openai-x509-minimum-fixture.json"), JSON.stringify({ certificateChain: firstClient.certificate.toString(), privateKey: firstClient.privateKey.toString() }));
+          '
+
       - name: Set up exact minimum supported Node.js runtime
         if: matrix.node-version == 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -163,13 +176,19 @@ jobs:
         if: matrix.node-version == 22
         run: |
           floor_consumer="${RUNNER_TEMP}/openai-node-minimum-runtime"
-          npm install --ignore-scripts --no-audit --no-fund --prefix "$floor_consumer" "$GITHUB_WORKSPACE/dist" 'undici@^7'
+          npm install --ignore-scripts --no-audit --no-fund --prefix "$floor_consumer" "$X509_FLOOR_PACKAGE" 'undici@^7'
           cd "$floor_consumer"
           node --input-type=module --eval '
+            import { readFileSync } from "node:fs";
+            import { join } from "node:path";
             import OpenAI from "openai";
             import { Agent, ProxyAgent } from "undici";
             import { createX509Transport, fromX509, workloadIdentity } from "openai/auth/x509-transport";
             if (process.version !== "v22.0.0" || workloadIdentity.fromX509 !== fromX509) throw new Error("Invalid minimum-runtime X.509 exports");
+            const material = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, "openai-x509-minimum-fixture.json"), "utf8"));
+            const credential = fromX509({ ...material, identityProviderId: "synthetic-provider", serviceAccountId: "synthetic-account" });
+            new OpenAI({ credential });
+            await credential.close();
             for (const [proxy, dispatcher] of [["direct", new Agent()], ["http-connect", new ProxyAgent({ uri: "http://127.0.0.1:1" })], ["https-connect", new ProxyAgent({ uri: "https://127.0.0.1:1" })]]) {
               const x509Transport = createX509Transport({ runtime: "node", dispatcher, certificateIdentity: "static", proxy });
               new OpenAI({ apiKey: null, workloadIdentity: { type: "x509", identityProviderId: "synthetic-provider", serviceAccountId: "synthetic-account" }, x509Transport });

@@ -9,6 +9,7 @@ import type { WorkloadIdentity, X509WorkloadIdentity } from 'openai/auth';
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
 import * as transportCapability from 'openai/internal/auth/x509-transport-capability';
+import { createProvider } from 'openai/internal/provider';
 
 import {
   closeObservedServers,
@@ -289,6 +290,23 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       defaultQuery: { api_key: 'synthetic-ordinary-query-secret' },
     });
     vi.stubEnv('OPENAI_API_KEY', 'synthetic-environment-api-key');
+    const switched = ordinary.withOptions({ workloadIdentity: identity(), x509Transport: transport });
+
+    expect(switched.baseURL).toBe('https://mtls.api.openai.com/v1');
+    expect(switched.apiKey).toBeNull();
+    expect(switched.buildURL('/models', null)).toBe('https://mtls.api.openai.com/v1/models');
+  });
+
+  test('switches a provider into caller-owned X.509 authentication without inheriting provider state', () => {
+    const provider = createProvider({
+      configure: () => ({ name: 'synthetic-provider', baseURL: 'https://provider.example/v1' }),
+    });
+    const ordinary = new OpenAI({
+      provider,
+      defaultHeaders: { 'x-provider-private': 'synthetic-provider-header-secret' },
+      defaultQuery: { api_key: 'synthetic-provider-query-secret' },
+    });
+
     const switched = ordinary.withOptions({ workloadIdentity: identity(), x509Transport: transport });
 
     expect(switched.baseURL).toBe('https://mtls.api.openai.com/v1');

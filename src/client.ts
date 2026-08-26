@@ -652,7 +652,11 @@ export class OpenAI {
   withOptions(options: Partial<ClientOptions>): this {
     const residencyBaseURL = resolveDataResidency(options);
     const inheritedProvider = this._options.provider;
-    const provider = options.provider ?? (options.credential === undefined ? inheritedProvider : undefined);
+    const provider =
+      options.provider ??
+      (options.credential === undefined && options.workloadIdentity === undefined
+        ? inheritedProvider
+        : undefined);
     const x509Authentication = this.#x509Authentication;
     const inheritedOptions: ClientOptions = {
       ...this._options,
