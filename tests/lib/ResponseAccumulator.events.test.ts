@@ -1116,6 +1116,31 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     expect(readResponse).toHaveBeenCalledTimes(1);
   });
 
+  test.each(['initial', 'subsequent'] as const)(
+    'accumulates the validated %s lifecycle response when its getter changes the raw event type',
+    (position) => {
+      const matching = makeResponse();
+      const foreign = { ...makeResponse(), id: 'resp_foreign' };
+      const readResponse = vi.fn(() => (readResponse.mock.calls.length === 1 ? matching : foreign));
+      const event: ResponseStreamEvent = {
+        type: position === 'initial' ? 'response.created' : 'response.completed',
+        sequence_number: position === 'initial' ? 0 : 1,
+        get response() {
+          const response = readResponse();
+          event.type = 'error';
+          return response;
+        },
+      };
+
+      const snapshot = accumulateResponse(event, position === 'initial' ? undefined : makeResponse());
+
+      expect(snapshot).toMatchObject({ id: 'resp_123' });
+      expect(snapshot).not.toBe(matching);
+      expect(readResponse).toHaveBeenCalledTimes(1);
+      expect(event.type).toBe('error');
+    },
+  );
+
   test('redacts caller-supplied snapshot ID descriptor-trap failures without reading payloads', () => {
     const readProperty = vi.fn();
     const snapshot = new Proxy(makeResponse(), {

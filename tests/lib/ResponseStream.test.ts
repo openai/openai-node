@@ -74,6 +74,112 @@ describe('.stream()', () => {
     expect(final.id).toBe('resp_123');
   });
 
+  it('does not detach lifecycle responses discarded while replaying prior events', async () => {
+    const output = {
+      id: 'msg_123',
+      type: 'message' as const,
+      role: 'assistant' as const,
+      status: 'in_progress' as const,
+      content: [{ type: 'output_text' as const, annotations: [], text: 'replayed' }],
+    };
+    const created = makeResponse({
+      metadata: { stage: 'created' },
+      output: [output],
+      output_text: 'replayed',
+    });
+    const inProgress = makeResponse({
+      metadata: { stage: 'replayed' },
+      output: [output],
+      output_text: 'replayed',
+    });
+    const completed = makeResponse({
+      status: 'completed',
+      metadata: { stage: 'completed' },
+      output: [
+        {
+          ...output,
+          status: 'completed',
+          content: [{ type: 'output_text', annotations: [], text: 'replayed live' }],
+        },
+      ],
+      output_text: 'replayed live',
+    });
+    const readCreated = vi.fn(() => created);
+    const readInProgress = vi.fn(() => inProgress);
+    const inspectReplayMetadata = vi.fn((target: object) => Reflect.ownKeys(target));
+    const replayLifecycle = (
+      type: 'response.created' | 'response.in_progress',
+      sequenceNumber: number,
+      readResponse: () => Response,
+    ): ResponseStreamEvent =>
+      new Proxy(
+        {
+          type,
+          sequence_number: sequenceNumber,
+          get response() {
+            return readResponse();
+          },
+        },
+        {
+          ownKeys(target) {
+            return inspectReplayMetadata(target);
+          },
+        },
+      );
+    const events: ResponseStreamEvent[] = [
+      replayLifecycle('response.created', 0, readCreated),
+      replayLifecycle('response.in_progress', 1, readInProgress),
+      {
+        type: 'response.output_text.delta',
+        sequence_number: 2,
+        item_id: 'msg_123',
+        output_index: 0,
+        content_index: 0,
+        delta: ' live',
+        logprobs: [],
+      },
+      { type: 'response.completed', sequence_number: 3, response: completed },
+    ];
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield* events;
+      },
+    };
+    const client = { responses: { retrieve: vi.fn(async () => transport) } } as unknown as OpenAI;
+    const clone = vi.spyOn(globalThis, 'structuredClone');
+
+    try {
+      const stream = ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: 1 });
+      const emitted: ResponseStreamEvent[] = [];
+      const snapshots: string[] = [];
+      const replayed = vi.fn();
+      stream.on('event', (event) => emitted.push(event));
+      stream.on('response.created', replayed);
+      stream.on('response.in_progress', replayed);
+      stream.on('response.output_text.delta', (event) => snapshots.push(event.snapshot));
+
+      await expect(stream.finalResponse()).resolves.toMatchObject({
+        id: 'resp_123',
+        metadata: { stage: 'completed' },
+        output_text: 'replayed live',
+      });
+
+      expect(readCreated).toHaveBeenCalledTimes(1);
+      expect(readInProgress).toHaveBeenCalledTimes(1);
+      expect(inspectReplayMetadata).not.toHaveBeenCalled();
+      expect(clone).toHaveBeenCalledTimes(4);
+      expect(clone.mock.calls[0]?.[0]).toBe(created);
+      expect(clone.mock.calls[1]?.[0]).toBe(inProgress);
+      expect(clone.mock.calls[2]?.[0]).toBe(completed);
+      expect(replayed).not.toHaveBeenCalled();
+      expect(snapshots).toEqual(['replayed live']);
+      expect(emitted.map((event) => event.sequence_number)).toEqual([2, 3]);
+    } finally {
+      clone.mockRestore();
+    }
+  });
+
   it('creates a response stream from a readable stream', async () => {
     const events: ResponseStreamEvent[] = [
       {
@@ -344,7 +450,7 @@ describe('.stream()', () => {
     'response.failed',
     'response.incomplete',
   ] as const)(
-    'emits the exact validated %s response when a transport getter changes identity',
+    'emits the validated %s response when a transport getter changes its identity and raw event type',
     async (type) => {
       const matching = makeResponse({ metadata: { source: 'validated' } });
       const foreign = makeResponse({ id: 'resp_foreign', metadata: { source: 'private foreign response' } });
@@ -353,7 +459,9 @@ describe('.stream()', () => {
         type,
         sequence_number: type === 'response.created' ? 0 : 1,
         get response() {
-          return readResponse();
+          const response = readResponse();
+          lifecycle.type = 'error';
+          return response;
         },
         provider_metadata: 'preserved',
       } as ResponseStreamEvent;
@@ -392,6 +500,8 @@ describe('.stream()', () => {
       expect(rawLifecycleResponses[0]).not.toBe(matching);
       expect(rawLifecycleResponses[0]).toMatchObject({ id: 'resp_123', metadata: { source: 'validated' } });
       expect(emittedEvents[0]).toMatchObject({ type, provider_metadata: 'preserved' });
+      expect(Object.getOwnPropertyDescriptor(emittedEvents[0] ?? {}, 'type')?.value).toBe(type);
+      expect(lifecycle.type).toBe('error');
       expect(final.id).toBe('resp_123');
     },
   );
@@ -435,6 +545,68 @@ describe('.stream()', () => {
     expect(raw).not.toBe(lifecycle);
     expect(raw && 'response' in raw ? raw.response : undefined).not.toBe(response);
     expect(Object.isFrozen(lifecycle)).toBe(true);
+  });
+
+  it.each(
+    (['initial', 'subsequent'] as const).flatMap((position) =>
+      (['own keys', 'descriptor', 'prototype'] as const).map((trap) => ({ position, trap })),
+    ),
+  )('redacts $position lifecycle event metadata failures from its $trap trap', async ({ position, trap }) => {
+    const privateMessage = `synthetic-private-lifecycle-${trap}-secret`;
+    const lifecycle = new Proxy(
+      {
+        type: position === 'initial' ? ('response.created' as const) : ('response.completed' as const),
+        sequence_number: position === 'initial' ? 0 : 1,
+        response: makeResponse(),
+        provider_metadata: 'preserved when valid',
+      },
+      {
+        ownKeys(target) {
+          if (trap === 'own keys') {
+            throw new Error(privateMessage);
+          }
+          return Reflect.ownKeys(target);
+        },
+        getOwnPropertyDescriptor(target, property) {
+          if (trap === 'descriptor' && property === 'provider_metadata') {
+            throw new Error(privateMessage);
+          }
+          return Reflect.getOwnPropertyDescriptor(target, property);
+        },
+        getPrototypeOf(target) {
+          if (trap === 'prototype') {
+            throw new Error(privateMessage);
+          }
+          return Reflect.getPrototypeOf(target);
+        },
+      },
+    );
+    const events: ResponseStreamEvent[] =
+      position === 'initial'
+        ? [lifecycle]
+        : [{ type: 'response.created', sequence_number: 0, response: makeResponse() }, lifecycle];
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield* events;
+      },
+    };
+    const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+    const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'redact metadata' });
+    const emitted = vi.fn();
+    const errors: OpenAIError[] = [];
+    stream.on('event', emitted);
+    stream.on('error', (error) => errors.push(error));
+
+    await expect(stream.finalResponse()).rejects.toThrow(
+      'Response event does not match the active response.',
+    );
+
+    expect(emitted).toHaveBeenCalledTimes(position === 'initial' ? 0 : 1);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(OpenAIError);
+    expect(errors[0]?.message).not.toContain(privateMessage);
+    expect(errors[0]).not.toHaveProperty('cause');
   });
 
   it.each(

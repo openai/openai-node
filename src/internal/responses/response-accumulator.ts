@@ -341,14 +341,19 @@ function snapshotResponseLifecycleEvent(
   event: ResponseLifecycleEvent,
   response: Response,
 ): ResponseLifecycleEvent {
-  const descriptors = Object.getOwnPropertyDescriptors(event);
-  descriptors.response = {
-    configurable: true,
-    enumerable: true,
-    value: structuredClone(response),
-    writable: true,
-  };
-  return Object.create(Object.getPrototypeOf(event), descriptors) as ResponseLifecycleEvent;
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(event);
+    descriptors.type.value = event.type;
+    descriptors.response = {
+      configurable: true,
+      enumerable: true,
+      value: structuredClone(response),
+      writable: true,
+    };
+    return Object.create(Object.getPrototypeOf(event), descriptors) as ResponseLifecycleEvent;
+  } catch {
+    throw new OpenAIError('Response event does not match the active response.');
+  }
 }
 
 const expectedOutputItemTypes = {
@@ -1193,7 +1198,7 @@ function accumulateImageAndMcpStatusEvent(
   }
 }
 
-function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is ResponseLifecycleEvent {
+export function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is ResponseLifecycleEvent {
   switch (event.type) {
     case 'response.created':
     case 'response.queued':

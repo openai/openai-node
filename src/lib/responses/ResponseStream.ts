@@ -16,6 +16,7 @@ import type { ResponseFunctionCallArgumentsDeltaEvent, ResponseTextDeltaEvent } 
 import {
   accumulateResponseWithContext,
   createResponseContext,
+  isResponseLifecycleEvent,
 } from '../../internal/responses/response-accumulator';
 import type { ParseableToolsParams } from '../ResponsesParser';
 import { maybeParseResponse } from '../ResponsesParser';
@@ -154,26 +155,25 @@ export class ResponseStream<ParsedT = null>
       throw new APIError(undefined, error, event.message, undefined);
     }
 
+    const shouldEmit = starting_after == null || event.sequence_number > starting_after;
     let dispatchEvent: ResponseStreamEvent = event;
     const response = accumulateResponseWithContext(
       event,
       this.#currentResponseSnapshot,
       this.#accumulatorContext,
       true,
-      (sanitizedEvent) => {
-        dispatchEvent = sanitizedEvent;
-      },
+      shouldEmit
+        ? (sanitizedEvent) => {
+            dispatchEvent = sanitizedEvent;
+          }
+        : undefined,
     );
     this.#currentResponseSnapshot = response;
-    const emittedEvent =
-      dispatchEvent.type === 'response.created' ||
-      dispatchEvent.type === 'response.queued' ||
-      dispatchEvent.type === 'response.in_progress' ||
-      dispatchEvent.type === 'response.completed' ||
-      dispatchEvent.type === 'response.failed' ||
-      dispatchEvent.type === 'response.incomplete'
-        ? dispatchEvent
-        : event;
+    if (!shouldEmit) {
+      return;
+    }
+
+    const emittedEvent = isResponseLifecycleEvent(dispatchEvent) ? dispatchEvent : event;
     maybeEmit('event', emittedEvent);
 
     switch (dispatchEvent.type) {
