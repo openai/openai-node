@@ -5,8 +5,11 @@ const errorFunctionSource = Function.prototype.toString;
 const nativeObjectSource = errorFunctionSource.call(Object);
 const nativeErrorSource = errorFunctionSource.call(Error);
 const nativeSyntaxErrorSource = errorFunctionSource.call(SyntaxError);
+const nativeTypeErrorSource = errorFunctionSource.call(TypeError);
 const nativeErrorBrandDescriptor = getErrorDescriptor(Error, 'isError');
 const nativeStructuredCloneDescriptor = getErrorDescriptor(globalThis, 'structuredClone');
+const nativeStackDescriptor = getErrorDescriptor(new Error('native stack descriptor validation'), 'stack');
+const nativeStackFormatterDescriptor = getErrorDescriptor(Error, 'prepareStackTrace');
 
 type ErrorBrand = (error: object) => boolean;
 
@@ -202,15 +205,109 @@ function getRuntimeErrorTypes(): RuntimeErrorTypes | undefined {
 }
 
 const runtimeErrorTypes = getRuntimeErrorTypes();
-const nativeErrorBrand =
-  nativeErrorBrandDescriptor &&
-  'value' in nativeErrorBrandDescriptor &&
-  typeof nativeErrorBrandDescriptor.value === 'function'
-    ? (nativeErrorBrandDescriptor.value.bind(Error) as ErrorBrand)
-    : runtimeErrorTypes?.isNativeError;
+
+function isError(_error: object): boolean {
+  return false;
+}
+
+function hasNativeErrorBrandDescriptors(candidate: ErrorBrand): boolean {
+  const name = getErrorDescriptor(candidate, 'name');
+  const length = getErrorDescriptor(candidate, 'length');
+  return Boolean(
+    name &&
+    'value' in name &&
+    name.value === 'isError' &&
+    name.configurable &&
+    !name.enumerable &&
+    !name.writable &&
+    length &&
+    'value' in length &&
+    length.value === 1 &&
+    length.configurable &&
+    !length.enumerable &&
+    !length.writable,
+  );
+}
+
+function hasNativeErrorBrandBehavior(candidate: ErrorBrand): boolean {
+  let proxyAccessed = false;
+  const rejectProxyAccess = (): undefined => {
+    proxyAccessed = true;
+    return undefined;
+  };
+  const proxy = new Proxy(new Error('native error brand validation'), {
+    get: rejectProxyAccess,
+    getOwnPropertyDescriptor: rejectProxyAccess,
+  });
+  return Boolean(
+    candidate(new Error('native error brand validation')) &&
+    candidate(new SyntaxError('native error brand validation')) &&
+    !candidate(Object.create(Error.prototype) as object) &&
+    !candidate(Object.create(SyntaxError.prototype) as object) &&
+    !candidate({}) &&
+    !candidate(proxy) &&
+    !proxyAccessed,
+  );
+}
+
+function getNativeErrorBrand(): ErrorBrand | undefined {
+  if (runtimeErrorTypes?.isNativeError) {
+    return runtimeErrorTypes.isNativeError;
+  }
+  if (
+    !nativeErrorBrandDescriptor ||
+    !('value' in nativeErrorBrandDescriptor) ||
+    typeof nativeErrorBrandDescriptor.value !== 'function'
+  ) {
+    return undefined;
+  }
+
+  try {
+    const candidate = nativeErrorBrandDescriptor.value as ErrorBrand;
+    const source = errorFunctionSource.call(candidate);
+    if (!/^function isError\(\)\s*\{\s*\[native code\]\s*\}$/u.test(source)) {
+      return undefined;
+    }
+
+    const boundProbe = Function.prototype.bind.call(isError, null) as ErrorBrand;
+    // JavaScriptCore exposes the same native-looking source for bound user functions.
+    if (source === errorFunctionSource.call(boundProbe)) {
+      return undefined;
+    }
+    return hasNativeErrorBrandDescriptors(candidate) && hasNativeErrorBrandBehavior(candidate)
+      ? candidate
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getNativeStackFormatter(): unknown {
+  if (
+    !nativeStackFormatterDescriptor ||
+    !('value' in nativeStackFormatterDescriptor) ||
+    typeof nativeStackFormatterDescriptor.value !== 'function'
+  ) {
+    return undefined;
+  }
+
+  try {
+    const formatter = nativeStackFormatterDescriptor.value as (...args: unknown[]) => unknown;
+    const source = errorFunctionSource.call(formatter);
+    const nativeSource = /^function ErrorPrepareStackTrace\([^)]*\)\s*\{\s*\[native code\]\s*\}$/u;
+    const nativeNodeSource =
+      /^function ErrorPrepareStackTrace\(error, trace\)\s*\{\s*return internalPrepareStackTrace\(error, trace\);\s*\}$/u;
+    return nativeSource.test(source) || nativeNodeSource.test(source) ? formatter : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const nativeErrorBrand = getNativeErrorBrand();
 const nativeProxyBrand = runtimeErrorTypes?.isProxy;
 const nativeStructuredCloneIntrinsics = getNativeStructuredClone();
 const nativeStructuredClone = nativeStructuredCloneIntrinsics?.clone;
+const nativeStackFormatter = getNativeStackFormatter();
 
 type JSONErrorKind = 'error' | 'syntax' | 'unknown' | 'unsafe';
 type JSONErrorBrand = 'native' | 'native-syntax' | 'proxy' | 'tagged-wrapper' | 'unknown' | 'unsafe';
@@ -451,7 +548,11 @@ function hasSafeClonePrototypeChain(error: object): boolean {
     if (source === nativeObjectSource) {
       return getErrorPrototype(prototype) === null;
     }
-    if (source !== nativeErrorSource && source !== nativeSyntaxErrorSource) {
+    if (
+      source !== nativeErrorSource &&
+      source !== nativeSyntaxErrorSource &&
+      source !== nativeTypeErrorSource
+    ) {
       return false;
     }
 
@@ -461,37 +562,130 @@ function hasSafeClonePrototypeChain(error: object): boolean {
   return false;
 }
 
-function hasSafeCloneDiagnostic(error: object, name: 'name' | 'message' | 'stack' | 'cause'): boolean {
+function hasSafeNativeStackAccessor(descriptor: PropertyDescriptor): boolean {
+  if (
+    'value' in descriptor ||
+    descriptor.enumerable ||
+    !nativeStackDescriptor ||
+    'value' in nativeStackDescriptor ||
+    descriptor.get !== nativeStackDescriptor.get ||
+    descriptor.set !== nativeStackDescriptor.set
+  ) {
+    return false;
+  }
+
+  const formatter = getErrorDescriptor(Error, 'prepareStackTrace');
+  return Boolean(
+    !formatter ||
+    ('value' in formatter &&
+      (formatter.value === undefined || (nativeStackFormatter && formatter.value === nativeStackFormatter))),
+  );
+}
+
+function classifyCloneDiagnostic(
+  error: object,
+  name: 'name' | 'message' | 'stack' | 'cause',
+  allowNativeStackAccessor = false,
+): 'safe' | 'unsafe' | object {
   let current: object | null = error;
 
   for (let depth = 0; current !== null; depth += 1) {
     if (depth >= MAX_JSON_ERROR_CAUSES) {
-      return false;
+      return 'unsafe';
     }
 
     const descriptor = getErrorDescriptor(current, name);
     if (descriptor) {
       if (!('value' in descriptor)) {
-        return false;
+        return name === 'stack' && allowNativeStackAccessor && hasSafeNativeStackAccessor(descriptor)
+          ? 'safe'
+          : 'unsafe';
       }
       if (name !== 'cause') {
-        return typeof descriptor.value === 'string';
+        return typeof descriptor.value === 'string' ? 'safe' : 'unsafe';
       }
       if (descriptor.value === null) {
-        return true;
+        return 'safe';
       }
 
       const kind = typeof descriptor.value;
-      return kind !== 'object' && kind !== 'function' && kind !== 'symbol';
+      if (kind === 'object') {
+        return descriptor.value as object;
+      }
+      return kind === 'function' || kind === 'symbol' ? 'unsafe' : 'safe';
     }
 
     current = getErrorPrototype(current) as object | null;
   }
 
+  return 'safe';
+}
+
+function hasSafeCloneCause(cause: object, visited: Set<object>): boolean {
+  if (visited.has(cause)) {
+    return true;
+  }
+  if (visited.size >= MAX_JSON_ERROR_CAUSES || !hasSafeClonePrototypeChain(cause)) {
+    return false;
+  }
+  visited.add(cause);
+
+  for (const name of ['name', 'message', 'stack', 'cause'] as const) {
+    const diagnostic = classifyCloneDiagnostic(cause, name, true);
+    if (
+      diagnostic === 'unsafe' ||
+      (typeof diagnostic === 'object' && !hasSafeCloneCause(diagnostic, visited))
+    ) {
+      return false;
+    }
+  }
+
+  const keys = Reflect.ownKeys(cause);
+  if (keys.length > MAX_JSON_ERROR_CAUSES) {
+    return false;
+  }
+  for (const key of keys) {
+    if (typeof key !== 'string') {
+      continue;
+    }
+    const descriptor = getErrorDescriptor(cause, key);
+    if (!descriptor) {
+      return false;
+    }
+    if (!descriptor.enumerable) {
+      continue;
+    }
+    if (!('value' in descriptor)) {
+      return false;
+    }
+    if (descriptor.value !== null) {
+      const kind = typeof descriptor.value;
+      if (
+        kind === 'function' ||
+        kind === 'symbol' ||
+        (kind === 'object' && !hasSafeCloneCause(descriptor.value as object, visited))
+      ) {
+        return false;
+      }
+    }
+  }
+
   return true;
 }
 
-function classifyCloneProperties(error: object): ClonePropertySafety {
+function hasSafeCloneDiagnostic(
+  error: object,
+  name: 'name' | 'message' | 'stack' | 'cause',
+  visited?: Set<object>,
+): boolean {
+  const diagnostic = classifyCloneDiagnostic(error, name);
+  return (
+    diagnostic === 'safe' ||
+    (typeof diagnostic === 'object' && hasSafeCloneCause(diagnostic, visited ?? new Set([error])))
+  );
+}
+
+function classifyCloneProperties(error: object, visited: Set<object>): ClonePropertySafety {
   const keys = Reflect.ownKeys(error);
   if (keys.length > MAX_JSON_ERROR_CAUSES) {
     return 'unavailable';
@@ -518,7 +712,11 @@ function classifyCloneProperties(error: object): ClonePropertySafety {
     }
     if (descriptor.value !== null) {
       const kind = typeof descriptor.value;
-      if (kind === 'object' || kind === 'function' || kind === 'symbol') {
+      if (
+        kind === 'function' ||
+        kind === 'symbol' ||
+        (kind === 'object' && !hasSafeCloneCause(descriptor.value as object, visited))
+      ) {
         return 'unavailable';
       }
     }
@@ -538,20 +736,36 @@ function hasAmbiguousSyntaxErrorName(name: PropertyDescriptor | undefined): bool
   );
 }
 
+function hasSafeCloneStackFormatters(visited: Set<object>): boolean {
+  const usesNativeStackAccessor = [...visited].some((value) => {
+    const stack = getErrorDescriptor(value, 'stack');
+    return Boolean(stack && !('value' in stack));
+  });
+  return (
+    !usesNativeStackAccessor ||
+    Boolean(nativeStackDescriptor && hasSafeNativeStackAccessor(nativeStackDescriptor))
+  );
+}
+
 function classifyStructuredError(target: object): ClonedErrorBrand {
   if (!nativeStructuredClone || !hasSafeClonePrototypeChain(target)) {
     return 'unavailable';
   }
 
+  const visited = new Set([target]);
   for (const name of ['name', 'message', 'stack', 'cause'] as const) {
-    if (!hasSafeCloneDiagnostic(target, name)) {
+    if (!hasSafeCloneDiagnostic(target, name, visited)) {
       return 'unavailable';
     }
   }
 
-  const properties = classifyCloneProperties(target);
+  const properties = classifyCloneProperties(target, visited);
   if (properties !== 'safe') {
     return properties;
+  }
+
+  if (!hasSafeCloneStackFormatters(visited)) {
+    return 'unavailable';
   }
 
   let clone: unknown;
