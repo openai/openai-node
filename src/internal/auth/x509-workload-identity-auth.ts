@@ -384,6 +384,7 @@ export class X509WorkloadIdentityAuth {
   authorizePlannedRequest(url: string, request: RequestInit, timeout: number): void {
     const scope = this.#scope();
     const headers = Object.getOwnPropertyDescriptor(request, 'headers');
+    const body = Object.getOwnPropertyDescriptor(request, 'body');
     const signal = Object.getOwnPropertyDescriptor(request, 'signal');
     const redirect = Object.getOwnPropertyDescriptor(request, 'redirect');
     if (
@@ -391,6 +392,8 @@ export class X509WorkloadIdentityAuth {
       !headers ||
       !('value' in headers) ||
       !(headers.value instanceof Headers) ||
+      (body && !('value' in body)) ||
+      (!body && 'body' in request) ||
       (signal && !('value' in signal)) ||
       (redirect && !('value' in redirect))
     ) {

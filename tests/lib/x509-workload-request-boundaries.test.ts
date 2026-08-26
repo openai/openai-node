@@ -124,6 +124,27 @@ describe('X.509 request ownership boundaries', () => {
     },
   );
 
+  test('rejects an accessor-backed final override body before certificate authentication', async () => {
+    const hiddenStream = new ReadableStream();
+    const getter = vi.fn(() => hiddenStream);
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockResolvedValue(new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } }));
+    const client = new OpenAI(options({ maxRetries: 1 }));
+    const original = client.buildRequest.bind(client);
+    Object.defineProperty(client, 'buildRequest', {
+      value: async (...args: Parameters<OpenAI['buildRequest']>) => {
+        const built = await original(...args);
+        Object.defineProperty(built.req, 'body', { configurable: true, enumerable: true, get: getter });
+        return built;
+      },
+    });
+
+    await expect(client.models.list()).rejects.toThrow(/approved final request/iu);
+    expect(getter).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   test('retires an unread error response when its headers exhaust the request deadline', async () => {
     let elapsed = 0;
     let apiSignal: AbortSignal | undefined;
