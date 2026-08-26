@@ -437,16 +437,69 @@ describe('.stream()', () => {
     expect(Object.isFrozen(lifecycle)).toBe(true);
   });
 
-  it.each(['initial', 'subsequent'] as const)(
-    'rejects an %s lifecycle response ID accessor before exposing private payloads or events',
-    async (position) => {
+  it.each(
+    (['initial', 'subsequent'] as const).flatMap((position) =>
+      (
+        [
+          'missing',
+          'inherited',
+          'polluted prototype',
+          'throwing accessor',
+          'non-enumerable',
+          'undefined',
+          'null',
+          'number',
+          'boolean',
+          'object',
+          'symbol',
+        ] as const
+      ).map((kind) => ({ position, kind })),
+    ),
+  )(
+    'rejects an $position lifecycle response with a $kind ID before exposing private payloads or events',
+    async ({ position, kind }) => {
       const response = makeResponse();
-      const readID = vi.fn(() => 'resp_123');
+      const readID = vi.fn(() => {
+        throw new Error('synthetic-private-stream-id');
+      });
       const readOutput = vi.fn(() => {
         throw new Error('synthetic-private-stream-output');
       });
-      Object.defineProperty(response, 'id', { configurable: true, enumerable: true, get: readID });
       Object.defineProperty(response, 'output', { configurable: true, enumerable: true, get: readOutput });
+
+      if (kind === 'missing' || kind === 'inherited' || kind === 'polluted prototype') {
+        Reflect.deleteProperty(response, 'id');
+        if (kind !== 'missing') {
+          const prototype = kind === 'inherited' ? { id: 'resp_123' } : Object.create(Object.prototype);
+          if (kind === 'polluted prototype') {
+            Object.defineProperty(prototype, 'id', {
+              configurable: true,
+              enumerable: true,
+              value: 'resp_123',
+            });
+          }
+          Object.setPrototypeOf(response, prototype);
+        }
+      } else if (kind === 'throwing accessor') {
+        Object.defineProperty(response, 'id', { configurable: true, enumerable: true, get: readID });
+      } else if (kind === 'non-enumerable') {
+        Object.defineProperty(response, 'id', { configurable: true, enumerable: false, value: 'resp_123' });
+      } else {
+        const invalidIDs = {
+          undefined,
+          null: null,
+          number: 123,
+          boolean: false,
+          object: {},
+          symbol: Symbol('invalid stream response ID'),
+        };
+        Object.defineProperty(response, 'id', {
+          configurable: true,
+          enumerable: true,
+          value: invalidIDs[kind],
+        });
+      }
+
       const lifecycle = {
         type: position === 'initial' ? ('response.created' as const) : ('response.completed' as const),
         sequence_number: position === 'initial' ? 0 : 1,
@@ -482,6 +535,58 @@ describe('.stream()', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0]).toBeInstanceOf(OpenAIError);
       expect(errors[0]?.message).not.toContain('synthetic-private-stream-output');
+    },
+  );
+
+  it.each(['changed', 'deleted', 'throwing accessor'] as const)(
+    'retains its canonical response identity when a listener leaves the emitted snapshot ID %s',
+    async (mutation) => {
+      const foreign = makeResponse({ id: 'resp_foreign' });
+      const readOutput = vi.fn(() => {
+        throw new Error('synthetic-private-foreign-stream-output');
+      });
+      Object.defineProperty(foreign, 'output', { configurable: true, enumerable: true, get: readOutput });
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.in_progress', sequence_number: 1, response: makeResponse() },
+        { type: 'response.completed', sequence_number: 2, response: foreign },
+      ];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+      const stream = ResponseStream.createResponse(client, {
+        model: 'gpt-test',
+        input: 'preserve canonical response identity',
+      });
+      const emitted: ResponseStreamEvent[] = [];
+      const readID = vi.fn(() => {
+        throw new Error('synthetic-private-mutated-stream-id');
+      });
+      stream.on('event', (event) => {
+        emitted.push(event);
+        if (event.type !== 'response.created') {
+          return;
+        }
+        if (mutation === 'changed') {
+          event.response.id = 'resp_foreign';
+        } else if (mutation === 'deleted') {
+          Reflect.deleteProperty(event.response, 'id');
+        } else {
+          Object.defineProperty(event.response, 'id', { configurable: true, enumerable: true, get: readID });
+        }
+      });
+
+      await expect(stream.finalResponse()).rejects.toThrow(
+        'Response event does not match the active response.',
+      );
+
+      expect(emitted.map((event) => event.type)).toEqual(['response.created', 'response.in_progress']);
+      expect(readID).not.toHaveBeenCalled();
+      expect(readOutput).not.toHaveBeenCalled();
     },
   );
 

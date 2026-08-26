@@ -761,6 +761,132 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     },
   );
 
+  test.each([
+    ['missing', undefined],
+    ['inherited', undefined],
+    ['throwing accessor', undefined],
+    ['non-enumerable', undefined],
+    ['undefined', undefined],
+    ['null', null],
+    ['number', 123],
+    ['boolean', false],
+    ['object', {}],
+    ['symbol', Symbol('invalid response ID')],
+  ] as const)(
+    'rejects a caller-supplied snapshot with a %s ID before inspecting private payloads',
+    (kind, invalidID) => {
+      const snapshot = makeResponse();
+      const readID = vi.fn(() => {
+        throw new Error('synthetic-private-snapshot-id');
+      });
+      const readSnapshotOutput = vi.fn(() => {
+        throw new Error('synthetic-private-snapshot-output');
+      });
+      const readResponseOutput = vi.fn(() => {
+        throw new Error('synthetic-private-response-output');
+      });
+      Object.defineProperty(snapshot, 'output', {
+        configurable: true,
+        enumerable: true,
+        get: readSnapshotOutput,
+      });
+
+      if (kind === 'missing' || kind === 'inherited') {
+        Reflect.deleteProperty(snapshot, 'id');
+        if (kind === 'inherited') {
+          Object.setPrototypeOf(snapshot, { id: 'resp_foreign' });
+        }
+      } else if (kind === 'throwing accessor') {
+        Object.defineProperty(snapshot, 'id', { configurable: true, enumerable: true, get: readID });
+      } else if (kind === 'non-enumerable') {
+        Object.defineProperty(snapshot, 'id', { configurable: true, enumerable: false, value: 'resp_123' });
+      } else {
+        Object.defineProperty(snapshot, 'id', {
+          configurable: true,
+          enumerable: true,
+          value: invalidID,
+        });
+      }
+
+      const response = { ...makeResponse(), id: kind === 'inherited' ? 'resp_foreign' : 'resp_123' };
+      Object.defineProperty(response, 'output', {
+        configurable: true,
+        enumerable: true,
+        get: readResponseOutput,
+      });
+      const readResponse = vi.fn(() => response);
+      const event: Extract<ResponseStreamEvent, { type: 'response.completed' }> = {
+        type: 'response.completed',
+        sequence_number: 1,
+        get response() {
+          return readResponse();
+        },
+      };
+
+      expect(() => accumulateResponse(event, snapshot)).toThrow(
+        new OpenAIError('Response event does not match the active response.'),
+      );
+      expect(readID).not.toHaveBeenCalled();
+      expect(readSnapshotOutput).not.toHaveBeenCalled();
+      expect(readResponse).not.toHaveBeenCalled();
+      expect(readResponseOutput).not.toHaveBeenCalled();
+
+      Object.defineProperty(snapshot, 'id', {
+        configurable: true,
+        enumerable: true,
+        value: 'resp_recovered',
+        writable: true,
+      });
+      expect(
+        accumulateResponse(
+          {
+            type: 'response.completed',
+            sequence_number: 2,
+            response: { ...makeResponse(), id: 'resp_recovered' },
+          },
+          snapshot,
+        ),
+      ).toMatchObject({ id: 'resp_recovered' });
+      expect(readSnapshotOutput).not.toHaveBeenCalled();
+    },
+  );
+
+  test('rejects a caller-supplied snapshot ID inherited from a polluted Object prototype', () => {
+    const snapshot = makeResponse();
+    Reflect.deleteProperty(snapshot, 'id');
+    const response = { ...makeResponse(), id: 'resp_foreign' };
+    const readOutput = vi.fn(() => {
+      throw new Error('synthetic-private-polluted-output');
+    });
+    Object.defineProperty(response, 'output', { configurable: true, enumerable: true, get: readOutput });
+    const originalID = Object.getOwnPropertyDescriptor(Object.prototype, 'id');
+    let failure: unknown;
+
+    try {
+      // oxlint-disable-next-line no-extend-native -- Reproduce actual prototype pollution and restore it immediately.
+      Object.defineProperty(Object.prototype, 'id', {
+        configurable: true,
+        enumerable: false,
+        value: 'resp_foreign',
+      });
+      try {
+        accumulateResponse({ type: 'response.completed', sequence_number: 1, response }, snapshot);
+      } catch (error) {
+        failure = error;
+      }
+    } finally {
+      if (originalID) {
+        // oxlint-disable-next-line no-extend-native -- Restore the original Object prototype after the regression.
+        Object.defineProperty(Object.prototype, 'id', originalID);
+      } else {
+        Reflect.deleteProperty(Object.prototype, 'id');
+      }
+    }
+
+    expect(failure).toEqual(new OpenAIError('Response event does not match the active response.'));
+    expect(readOutput).not.toHaveBeenCalled();
+  });
+
   test('rejects a proxy response without an own ID before invoking its get traps', () => {
     const response = makeResponse();
     Reflect.deleteProperty(response, 'id');
@@ -909,8 +1035,50 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
         snapshot,
       ),
     ).toMatchObject({ id: 'resp_123' });
-    expect(readID).toHaveBeenCalledTimes(1);
+    expect(readID).not.toHaveBeenCalled();
   });
+
+  test.each(['changed', 'deleted', 'throwing accessor'] as const)(
+    'preserves a caller-supplied snapshot identity after its own ID is %s',
+    (mutation) => {
+      const snapshot = makeResponse();
+
+      expect(
+        accumulateResponse(
+          { type: 'response.in_progress', sequence_number: 1, response: makeResponse() },
+          snapshot,
+        ),
+      ).toMatchObject({ id: 'resp_123' });
+
+      const readID = vi.fn(() => {
+        throw new Error('synthetic-private-mutated-caller-snapshot-id');
+      });
+      if (mutation === 'changed') {
+        snapshot.id = 'resp_foreign';
+      } else if (mutation === 'deleted') {
+        Reflect.deleteProperty(snapshot, 'id');
+      } else {
+        Object.defineProperty(snapshot, 'id', { configurable: true, enumerable: true, get: readID });
+      }
+
+      expect(
+        accumulateResponse(
+          { type: 'response.completed', sequence_number: 2, response: makeResponse() },
+          snapshot,
+        ),
+      ).toMatchObject({ id: 'resp_123' });
+
+      const foreign = { ...makeResponse(), id: 'resp_foreign' };
+      const readOutput = vi.fn(() => []);
+      Object.defineProperty(foreign, 'output', { configurable: true, enumerable: true, get: readOutput });
+
+      expect(() =>
+        accumulateResponse({ type: 'response.failed', sequence_number: 3, response: foreign }, snapshot),
+      ).toThrow(new OpenAIError('Response event does not match the active response.'));
+      expect(readID).not.toHaveBeenCalled();
+      expect(readOutput).not.toHaveBeenCalled();
+    },
+  );
 
   test('accepts matching lifecycle responses for frozen snapshots without mutating them', () => {
     const snapshot = Object.freeze(
@@ -928,10 +1096,11 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
 
   test('captures the active response ID before invoking the lifecycle response getter', () => {
     const foreign = { ...makeResponse(), id: 'resp_foreign' };
-    const readResponse = vi.fn(() => foreign);
     const snapshot = makeResponse();
-    const readSnapshotID = vi.fn(() => (readResponse.mock.calls.length === 0 ? 'resp_123' : 'resp_foreign'));
-    Object.defineProperty(snapshot, 'id', { configurable: true, enumerable: true, get: readSnapshotID });
+    const readResponse = vi.fn(() => {
+      snapshot.id = 'resp_foreign';
+      return foreign;
+    });
     const event: Extract<ResponseStreamEvent, { type: 'response.completed' }> = {
       type: 'response.completed',
       sequence_number: 1,
@@ -943,8 +1112,38 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     expect(() => accumulateResponse(event, snapshot)).toThrow(
       'Response event does not match the active response.',
     );
-    expect(readSnapshotID).toHaveBeenCalledTimes(1);
+    expect(snapshot.id).toBe('resp_foreign');
     expect(readResponse).toHaveBeenCalledTimes(1);
+  });
+
+  test('redacts caller-supplied snapshot ID descriptor-trap failures without reading payloads', () => {
+    const readProperty = vi.fn();
+    const snapshot = new Proxy(makeResponse(), {
+      get(target, property, receiver) {
+        readProperty();
+        return Reflect.get(target, property, receiver);
+      },
+      getOwnPropertyDescriptor(target, property) {
+        if (property === 'id') {
+          throw new Error('synthetic-private-snapshot-descriptor-secret');
+        }
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+    });
+    const readResponse = vi.fn(makeResponse);
+    const event: Extract<ResponseStreamEvent, { type: 'response.completed' }> = {
+      type: 'response.completed',
+      sequence_number: 1,
+      get response() {
+        return readResponse();
+      },
+    };
+
+    expect(() => accumulateResponse(event, snapshot)).toThrow(
+      new OpenAIError('Response event does not match the active response.'),
+    );
+    expect(readProperty).not.toHaveBeenCalled();
+    expect(readResponse).not.toHaveBeenCalled();
   });
 
   test('redacts response ID descriptor-trap failures before reading private output', () => {

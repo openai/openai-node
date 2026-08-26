@@ -280,17 +280,22 @@ function getResponseID(snapshot: Response): string {
     return activeResponseID;
   }
 
-  let id: string | undefined;
+  let responseID: PropertyDescriptor | undefined;
   try {
-    ({ id } = snapshot);
+    responseID = Object.getOwnPropertyDescriptor(snapshot, 'id');
   } catch {
     throw new OpenAIError('Response event does not match the active response.');
   }
-  if (typeof id !== 'string') {
+  if (
+    !responseID ||
+    !responseID.enumerable ||
+    !('value' in responseID) ||
+    typeof responseID.value !== 'string'
+  ) {
     throw new OpenAIError('Response event does not match the active response.');
   }
-  activeResponseIDs.set(snapshot, id);
-  return id;
+  activeResponseIDs.set(snapshot, responseID.value);
+  return responseID.value;
 }
 
 function cloneValidatedResponse(
