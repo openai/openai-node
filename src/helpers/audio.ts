@@ -110,6 +110,14 @@ type RecordAudioOptions = {
   timeout?: number;
 };
 
+function removeRecordingAbortListener(signal: AbortSignal | undefined, listener: () => void): void {
+  try {
+    signal?.removeEventListener('abort', listener);
+  } catch {
+    // A cleanup callback must not replace the recording's terminal outcome.
+  }
+}
+
 function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {}): Promise<File> {
   checkFileSupport();
   return new Promise((resolve, reject) => {
@@ -119,14 +127,31 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
     let internalSignal: AbortSignal | undefined;
     let wasStopped = false;
     let settled = false;
+    let callerAbortObserved = false;
+    let timeoutAbortObserved = false;
+    let rejectRecording: (error: unknown) => void = reject;
 
     const collectData = (chunk: Buffer) => {
-      data.push(chunk);
+      if (!settled) {
+        data.push(chunk);
+      }
     };
     const stopRecording = () => {
       if (!settled && ffmpeg) {
-        wasStopped ||= ffmpeg.kill('SIGTERM');
+        try {
+          wasStopped ||= ffmpeg.kill('SIGTERM');
+        } catch (error) {
+          rejectRecording(error);
+        }
       }
+    };
+    const stopCallerRecording = () => {
+      callerAbortObserved = true;
+      stopRecording();
+    };
+    const stopTimeoutRecording = () => {
+      timeoutAbortObserved = true;
+      stopRecording();
     };
     const cleanup = () => {
       if (settled) {
@@ -134,12 +159,16 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       }
 
       settled = true;
-      signal?.removeEventListener('abort', stopRecording);
-      internalSignal?.removeEventListener('abort', stopRecording);
-      ffmpeg?.stdout?.removeListener('data', collectData);
+      removeRecordingAbortListener(signal, stopCallerRecording);
+      removeRecordingAbortListener(internalSignal, stopTimeoutRecording);
+      try {
+        ffmpeg?.stdout?.removeListener('data', collectData);
+      } catch {
+        // Continue settling even when the output stream rejects cleanup.
+      }
       return true;
     };
-    const rejectRecording = (error: unknown) => {
+    rejectRecording = (error: unknown) => {
       if (cleanup()) {
         reject(error);
       }
@@ -152,6 +181,35 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       const audioBuffer = Buffer.concat(data);
       const audioFile = new File([audioBuffer], 'audio.wav', { type: 'audio/wav' });
       resolve(audioFile);
+    };
+
+    const observeTimeout = () => {
+      internalSignal?.addEventListener('abort', stopTimeoutRecording, { once: true });
+      if (settled) {
+        removeRecordingAbortListener(internalSignal, stopTimeoutRecording);
+        return false;
+      }
+
+      if (internalSignal && !timeoutAbortObserved && internalSignal.aborted) {
+        stopTimeoutRecording();
+      }
+      return !settled;
+    };
+    const observeCaller = () => {
+      if (!signal) {
+        return;
+      }
+      if (signal.aborted) {
+        stopRecording();
+        return;
+      }
+
+      signal.addEventListener('abort', stopCallerRecording, { once: true });
+      if (settled) {
+        removeRecordingAbortListener(signal, stopCallerRecording);
+      } else if (!callerAbortObserved && signal.aborted) {
+        stopCallerRecording();
+      }
     };
 
     try {
@@ -182,8 +240,16 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       ffmpeg.stdout?.on('data', collectData);
 
       ffmpeg.on('error', (error) => {
-        console.error(error);
-        rejectRecording(error);
+        if (!cleanup()) {
+          return;
+        }
+
+        try {
+          console.error(error);
+        } catch {
+          // A custom logger must not hide the original process failure.
+        }
+        reject(error);
       });
 
       ffmpeg.on('close', (code) => {
@@ -194,18 +260,23 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
         returnData();
       });
 
-      internalSignal?.addEventListener('abort', stopRecording, { once: true });
-
-      if (signal) {
-        if (signal.aborted) {
-          stopRecording();
-        } else {
-          signal.addEventListener('abort', stopRecording, { once: true });
-        }
+      if (settled || !observeTimeout()) {
+        return;
       }
+      observeCaller();
     } catch (error) {
-      stopRecording();
-      rejectRecording(error);
+      if (!cleanup()) {
+        return;
+      }
+
+      try {
+        if (!wasStopped) {
+          ffmpeg?.kill('SIGTERM');
+        }
+      } catch {
+        // Preserve the original setup error when process termination also fails.
+      }
+      reject(error);
     }
   });
 }
