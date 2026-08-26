@@ -576,10 +576,16 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     'x-api-key',
     'Proxy-Authorization',
     'Cookie',
+    'X-Access-Token',
+    'X-Refresh-Token',
     'X-Session-Token',
     'X-Session-Id',
     'X-Auth-Token',
     'X-ID-Token',
+    'Session-Token',
+    'Session-Id',
+    'Auth-Token',
+    'ID-Token',
     'Host',
   ])('rejects caller-supplied %s before exchanging a workload credential', async (header) => {
     const send = mockTransportRequests();

@@ -121,7 +121,7 @@ const sensitiveHeaderNames = new Set([
 
 /** Recognizes credential-bearing request headers across provider and workload authentication. */
 export function isSensitiveHeader(name: string): boolean {
-  return sensitiveHeaderNames.has(name.toLowerCase().replace(/_/gu, '-'));
+  return sensitiveHeaderNames.has(name.toLowerCase().replace(/_/gu, '-')) || isSensitiveQueryParameter(name);
 }
 
 /** Removes credential-valued query parameters before a request URL reaches any logger. */

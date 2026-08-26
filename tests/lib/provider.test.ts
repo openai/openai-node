@@ -433,13 +433,21 @@ test('provider origin changes require an explicitly replaced custom fetch transp
   }
 });
 
-test.each(['X-Session-Token', 'X-Session-Id', 'X-Auth-Token', 'X-ID-Token'])(
-  'request logging redacts the %s authentication header',
-  (header) => {
-    const details = formatRequestDetails({
-      headers: new Headers({ [header]: 'synthetic-provider-authentication-secret' }),
-    });
+test.each([
+  'X-Access-Token',
+  'X-Refresh-Token',
+  'X-Session-Token',
+  'X-Session-Id',
+  'X-Auth-Token',
+  'X-ID-Token',
+  'Session-Token',
+  'Session-Id',
+  'Auth-Token',
+  'ID-Token',
+])('request logging redacts the %s authentication header', (header) => {
+  const details = formatRequestDetails({
+    headers: new Headers({ [header]: 'synthetic-provider-authentication-secret' }),
+  });
 
-    expect(details.headers).toEqual({ [header.toLowerCase()]: '***' });
-  },
-);
+  expect(details.headers).toEqual({ [header.toLowerCase()]: '***' });
+});
