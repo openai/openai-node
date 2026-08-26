@@ -12,6 +12,9 @@ type ErrorBrandCandidate = (value: object) => boolean;
 const publicSurfaces: readonly PublicSurface[] = ['azure-provider', 'public-workload'];
 const runtimeErrorBrands: readonly RuntimeErrorBrand[] = ['native intrinsics', 'fallback'];
 const proxyIntrinsicTest = typeof process.getBuiltinModule === 'function' ? it : it.skip;
+const originalRuntimeLoader = Object.getOwnPropertyDescriptor(process, 'getBuiltinModule')?.value as
+  | ((name: string) => unknown)
+  | undefined;
 const originalErrorBrand = Object.getOwnPropertyDescriptor(Error, 'isError')?.value as
   | ErrorBrandCandidate
   | undefined;
@@ -21,6 +24,22 @@ const errorBrandProbe = {
     return false;
   },
 };
+const runtimeLoaderProbe = {
+  getBuiltinModule(_name: string): unknown {
+    return undefined;
+  },
+};
+const spoofableBoundRuntimeLoaderTest =
+  typeof originalRuntimeLoader === 'function' &&
+  Function.prototype.toString.call(originalRuntimeLoader) ===
+    Function.prototype.toString.call(Function.prototype.bind.call(runtimeLoaderProbe.getBuiltinModule, null))
+    ? it
+    : it.skip;
+const sourceIdenticalRuntimeLoaderTest =
+  typeof originalRuntimeLoader === 'function' &&
+  !Function.prototype.toString.call(originalRuntimeLoader).includes('[native code]')
+    ? it
+    : it.skip;
 const boundErrorBrandSource = Function.prototype.toString.call(
   Function.prototype.bind.call(errorBrandProbe.isError, null),
 );
@@ -39,6 +58,37 @@ async function importPublicSDK() {
   const [{ default: OpenAI, SubjectTokenProviderError }, { azureManagedIdentityTokenProvider }] =
     await Promise.all([import('openai'), import('openai/auth/subject-token-providers')]);
   return { OpenAI, SubjectTokenProviderError, azureManagedIdentityTokenProvider };
+}
+
+async function withPatchedRuntimeIntrinsic<T>(
+  target: object,
+  property: string,
+  replacement: unknown,
+  run: () => Promise<T>,
+): Promise<T> {
+  const original = Object.getOwnPropertyDescriptor(target, property);
+  Object.defineProperty(target, property, { configurable: true, value: replacement, writable: true });
+
+  try {
+    return await run();
+  } finally {
+    if (original) {
+      Object.defineProperty(target, property, original);
+    } else {
+      Reflect.deleteProperty(target, property);
+    }
+  }
+}
+
+async function capturePatchedRuntimeIntrinsic(
+  target: object,
+  property: string,
+  replacement: unknown,
+): Promise<void> {
+  vi.resetModules();
+  await withPatchedRuntimeIntrinsic(target, property, replacement, async () => {
+    await import('../../src/internal/auth/malformed-json-error');
+  });
 }
 
 async function importWithoutNativeErrorBrand(
@@ -91,8 +141,9 @@ async function publicParserRejection(
   structuredClonePolyfill?: (value: object) => unknown,
   errorBrandPolyfill?: ErrorBrandCandidate,
   preserveRuntimeIntrinsics = false,
+  preserveImportedModules = false,
 ) {
-  if (runtimeErrorBrand === 'native intrinsics') {
+  if (runtimeErrorBrand === 'native intrinsics' && !preserveImportedModules) {
     vi.resetModules();
   }
   const { OpenAI, SubjectTokenProviderError, azureManagedIdentityTokenProvider } =
@@ -133,6 +184,7 @@ async function expectOriginalPublicFailure(
   runtimeErrorBrand: RuntimeErrorBrand,
   errorBrandPolyfill?: ErrorBrandCandidate,
   preserveRuntimeIntrinsics = false,
+  preserveImportedModules = false,
 ) {
   const { run, fetch, SubjectTokenProviderError } = await publicParserRejection(
     surface,
@@ -141,6 +193,7 @@ async function expectOriginalPublicFailure(
     undefined,
     errorBrandPolyfill,
     preserveRuntimeIntrinsics,
+    preserveImportedModules,
   );
   let failure: unknown;
   try {
@@ -169,6 +222,7 @@ async function expectSanitizedPublicFailure(
   structuredClonePolyfill?: (value: object) => unknown,
   errorBrandPolyfill?: ErrorBrandCandidate,
   preserveRuntimeIntrinsics = false,
+  preserveImportedModules = false,
 ) {
   const { run, fetch, SubjectTokenProviderError } = await publicParserRejection(
     surface,
@@ -177,6 +231,7 @@ async function expectSanitizedPublicFailure(
     structuredClonePolyfill,
     errorBrandPolyfill,
     preserveRuntimeIntrinsics,
+    preserveImportedModules,
   );
   let failure: unknown;
   try {
@@ -454,6 +509,324 @@ describe('malformed JSON runtime compatibility', () => {
       await expectOriginalPublicFailure(surface, transport, 'native intrinsics');
       await expectOriginalPublicFailure(surface, concealed, 'native intrinsics');
       expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    publicSurfaces.flatMap((surface) =>
+      (['Error', 'SyntaxError'] as const).map((prototype) => ({ surface, prototype })),
+    ),
+  )(
+    'rejects a pre-import process loader shim for a forged $prototype through $surface',
+    async ({ surface, prototype }) => {
+      const rejected = Object.create(
+        prototype === 'Error' ? Error.prototype : SyntaxError.prototype,
+      ) as object;
+      Object.defineProperty(rejected, 'message', {
+        configurable: true,
+        value: 'safe custom parser rejection',
+      });
+      if (prototype === 'Error') {
+        Object.defineProperty(rejected, 'type', {
+          configurable: true,
+          enumerable: true,
+          value: 'invalid-json',
+        });
+      }
+
+      const fakeBrand = vi.fn((value: object) => value instanceof Error);
+      const fakeLoader = vi.fn(() => ({ types: { isNativeError: fakeBrand, isProxy: () => false } }));
+
+      await capturePatchedRuntimeIntrinsic(process, 'getBuiltinModule', fakeLoader);
+      await expectOriginalPublicFailure(surface, rejected, 'native intrinsics', undefined, false, true);
+      expect(fakeLoader).not.toHaveBeenCalled();
+      expect(fakeBrand).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(publicSurfaces)(
+    'rejects a callable-proxy process loader without invoking its traps through %s',
+    async (surface) => {
+      const readLoader = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted process loader trap`);
+      });
+      const fakeLoader = new Proxy(() => null, { apply: readLoader, get: readLoader });
+      const readRejection = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted parser rejection getter`);
+      });
+      const rejected = new Proxy(new SyntaxError(PRIVATE_VALUE), { get: readRejection });
+
+      await capturePatchedRuntimeIntrinsic(process, 'getBuiltinModule', fakeLoader);
+      await expectSanitizedPublicFailure(
+        surface,
+        rejected,
+        'native intrinsics',
+        undefined,
+        undefined,
+        false,
+        true,
+      );
+      expect(readLoader).not.toHaveBeenCalled();
+      expect(readRejection).not.toHaveBeenCalled();
+    },
+  );
+
+  sourceIdenticalRuntimeLoaderTest.each(publicSurfaces)(
+    'rejects fake error predicates behind a source-identical JavaScript process loader through %s',
+    async (surface) => {
+      if (!originalRuntimeLoader) {
+        throw new Error('The source-identical loader fixture requires a native runtime loader.');
+      }
+
+      const rejected = Object.create(Error.prototype) as object;
+      Object.defineProperties(rejected, {
+        message: { configurable: true, value: 'safe custom parser rejection' },
+        type: { configurable: true, enumerable: true, value: 'invalid-json' },
+      });
+      const fakeBrand = vi.fn((value: object) => value instanceof Error);
+      const validateString = vi.fn((_id: string, _name: string) => null);
+      const BuiltinModule = { normalizeRequirableId: (id: string): string => id };
+      const require = vi.fn((_id: string) => ({
+        types: { isNativeError: fakeBrand, isProxy: () => false },
+      }));
+      const getBuiltinModule = runInNewContext(
+        `(${Function.prototype.toString.call(originalRuntimeLoader)})`,
+        { validateString, BuiltinModule, require },
+      ) as (id: string) => unknown;
+
+      expect(Function.prototype.toString.call(getBuiltinModule)).toBe(
+        Function.prototype.toString.call(originalRuntimeLoader),
+      );
+      await capturePatchedRuntimeIntrinsic(process, 'getBuiltinModule', getBuiltinModule);
+      await expectOriginalPublicFailure(surface, rejected, 'native intrinsics', undefined, false, true);
+      expect(validateString).toHaveBeenCalledTimes(1);
+      expect(require).toHaveBeenCalledWith('node:util');
+      expect(fakeBrand).not.toHaveBeenCalled();
+    },
+  );
+
+  spoofableBoundRuntimeLoaderTest.each(publicSurfaces)(
+    'rejects fake error predicates behind a source-identical bound process loader through %s',
+    async (surface) => {
+      if (!originalRuntimeLoader) {
+        throw new Error('The bound process loader fixture requires a native runtime loader.');
+      }
+
+      const readRejection = vi.fn((_target: SyntaxError, property: PropertyKey) => {
+        throw new Error(`${PRIVATE_VALUE} escaped through the ${String(property)} bound-loader getter`);
+      });
+      const rejected = new Proxy(new SyntaxError(PRIVATE_VALUE), { get: readRejection });
+      const fakeBrand = vi.fn((value: object) => Reflect.get(value, 'privateDiagnostic') === true);
+      const fakeLoaders = {
+        getBuiltinModule(_name: string) {
+          return { types: { isNativeError: fakeBrand, isProxy: fakeBrand } };
+        },
+      };
+      const spoof = Function.prototype.bind.call(fakeLoaders.getBuiltinModule, null);
+      for (const property of ['name', 'length'] as const) {
+        const descriptor = Object.getOwnPropertyDescriptor(originalRuntimeLoader, property);
+        if (descriptor) {
+          Object.defineProperty(spoof, property, descriptor);
+        }
+      }
+
+      expect(Function.prototype.toString.call(spoof)).toBe(
+        Function.prototype.toString.call(originalRuntimeLoader),
+      );
+      await capturePatchedRuntimeIntrinsic(process, 'getBuiltinModule', spoof);
+      await expectSanitizedPublicFailure(
+        surface,
+        rejected,
+        'native intrinsics',
+        undefined,
+        undefined,
+        false,
+        true,
+      );
+      expect(fakeBrand).not.toHaveBeenCalled();
+      expect(readRejection).not.toHaveBeenCalled();
+    },
+  );
+
+  proxyIntrinsicTest.each(
+    publicSurfaces.flatMap((surface) =>
+      (['Error', 'SyntaxError'] as const).map((prototype) => ({ surface, prototype })),
+    ),
+  )(
+    'rejects a pre-import instanceof util native-error brand for a forged $prototype through $surface',
+    async ({ surface, prototype }) => {
+      const rejected = Object.create(
+        prototype === 'Error' ? Error.prototype : SyntaxError.prototype,
+      ) as object;
+      Object.defineProperty(rejected, 'message', {
+        configurable: true,
+        value: 'safe custom parser rejection',
+      });
+      if (prototype === 'Error') {
+        Object.defineProperty(rejected, 'type', {
+          configurable: true,
+          enumerable: true,
+          value: 'invalid-json',
+        });
+      }
+      const fakeBrand = vi.fn((value: object) => value instanceof Error);
+
+      await capturePatchedRuntimeIntrinsic(types, 'isNativeError', fakeBrand);
+      await expectOriginalPublicFailure(surface, rejected, 'native intrinsics', undefined, false, true);
+      expect(fakeBrand).not.toHaveBeenCalled();
+    },
+  );
+
+  proxyIntrinsicTest.each(publicSurfaces)(
+    'rejects simultaneous runtime and global error-brand replacements without reading a hostile %s rejection',
+    async (surface) => {
+      const readRejection = vi.fn((_target: SyntaxError, property: PropertyKey) => {
+        throw new Error(`${PRIVATE_VALUE} escaped through the ${String(property)} combined-brand getter`);
+      });
+      const rejected = new Proxy(new SyntaxError(PRIVATE_VALUE), { get: readRejection });
+      const fakeBrand = vi.fn((value: object) => Reflect.get(value, 'privateDiagnostic') === true);
+
+      vi.resetModules();
+      await withPatchedRuntimeIntrinsic(types, 'isNativeError', fakeBrand, async () => {
+        await withPatchedRuntimeIntrinsic(types, 'isProxy', fakeBrand, async () => {
+          await withPatchedRuntimeIntrinsic(Error, 'isError', fakeBrand, async () => {
+            await import('../../src/internal/auth/malformed-json-error');
+          });
+        });
+      });
+      await expectSanitizedPublicFailure(
+        surface,
+        rejected,
+        'native intrinsics',
+        undefined,
+        undefined,
+        false,
+        true,
+      );
+      expect(fakeBrand).not.toHaveBeenCalled();
+      expect(readRejection).not.toHaveBeenCalled();
+    },
+  );
+
+  proxyIntrinsicTest.each(
+    publicSurfaces.flatMap((surface) =>
+      (['isNativeError', 'isProxy'] as const).flatMap((intrinsic) =>
+        (['getter-reading function', 'callable proxy', 'constructible callable proxy'] as const).map(
+          (candidate) => ({
+            surface,
+            intrinsic,
+            candidate,
+          }),
+        ),
+      ),
+    ),
+  )(
+    'rejects a $candidate util $intrinsic replacement without invoking hostile hooks through $surface',
+    async ({ surface, intrinsic, candidate }) => {
+      const readRejection = vi.fn((_target: SyntaxError, property: PropertyKey) => {
+        throw new Error(`${PRIVATE_VALUE} escaped through the ${String(property)} runtime-brand getter`);
+      });
+      const rejected = new Proxy(new SyntaxError(PRIVATE_VALUE), { get: readRejection });
+      const invokeCandidate = vi.fn();
+      const readCandidate = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through an untrusted runtime callable proxy trap`);
+      });
+      function constructibleRuntimeIntrinsic(_value: object): boolean {
+        invokeCandidate();
+        return false;
+      }
+      const nonconstructibleRuntimeIntrinsic = (_value: object): boolean => {
+        invokeCandidate();
+        return false;
+      };
+      const replacement =
+        candidate === 'getter-reading function'
+          ? (value: object): boolean => {
+              invokeCandidate();
+              return Reflect.get(value, 'privateDiagnostic') === true;
+            }
+          : new Proxy(
+              candidate === 'constructible callable proxy'
+                ? constructibleRuntimeIntrinsic
+                : nonconstructibleRuntimeIntrinsic,
+              { apply: readCandidate, construct: readCandidate, get: readCandidate },
+            );
+
+      await capturePatchedRuntimeIntrinsic(types, intrinsic, replacement);
+      await expectSanitizedPublicFailure(
+        surface,
+        rejected,
+        'native intrinsics',
+        undefined,
+        undefined,
+        false,
+        true,
+      );
+      expect(invokeCandidate).not.toHaveBeenCalled();
+      expect(readCandidate).not.toHaveBeenCalled();
+      expect(readRejection).not.toHaveBeenCalled();
+    },
+  );
+
+  proxyIntrinsicTest.each(
+    publicSurfaces.flatMap((surface) =>
+      (['isNativeError', 'isProxy'] as const).flatMap((intrinsic) =>
+        (['nonconstructible', 'constructible'] as const).map((kind) => ({ surface, intrinsic, kind })),
+      ),
+    ),
+  )(
+    'rejects a $kind source-identical bound util $intrinsic spoof through $surface',
+    async ({ surface, intrinsic, kind }) => {
+      const original = Object.getOwnPropertyDescriptor(types, intrinsic)?.value as ErrorBrandCandidate;
+      const readRejection = vi.fn((_target: SyntaxError, property: PropertyKey) => {
+        throw new Error(`${PRIVATE_VALUE} escaped through the ${String(property)} bound-runtime getter`);
+      });
+      const rejected = new Proxy(new SyntaxError(PRIVATE_VALUE), { get: readRejection });
+      const invokeSpoof = vi.fn((_value: object) => null);
+      const candidates = {
+        isNativeError(value: object): boolean {
+          invokeSpoof(value);
+          return value === rejected ? Reflect.get(value, 'privateDiagnostic') === true : original(value);
+        },
+        isProxy(value: object): boolean {
+          invokeSpoof(value);
+          return value === rejected ? Reflect.get(value, 'privateDiagnostic') === true : original(value);
+        },
+      };
+      function isNativeError(value: object): boolean {
+        return candidates.isNativeError(value);
+      }
+      function isProxy(value: object): boolean {
+        return candidates.isProxy(value);
+      }
+      let unbound = candidates[intrinsic];
+      if (kind === 'constructible') {
+        unbound = intrinsic === 'isNativeError' ? isNativeError : isProxy;
+      }
+      const spoof = Function.prototype.bind.call(unbound, null) as ErrorBrandCandidate;
+      for (const property of ['name', 'length'] as const) {
+        const descriptor = Object.getOwnPropertyDescriptor(original, property);
+        if (descriptor) {
+          Object.defineProperty(spoof, property, descriptor);
+        }
+      }
+
+      expect(Function.prototype.toString.call(spoof)).toBe(Function.prototype.toString.call(original));
+      await capturePatchedRuntimeIntrinsic(types, intrinsic, spoof);
+      await expectSanitizedPublicFailure(
+        surface,
+        rejected,
+        'native intrinsics',
+        undefined,
+        undefined,
+        false,
+        true,
+      );
+      expect(invokeSpoof.mock.calls.every(([value]) => value !== rejected)).toBe(true);
+      if (kind === 'nonconstructible') {
+        expect(invokeSpoof).not.toHaveBeenCalled();
+      }
+      expect(readRejection).not.toHaveBeenCalled();
     },
   );
 

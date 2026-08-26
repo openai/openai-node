@@ -157,12 +157,87 @@ function getNativeStructuredClone(): StructuredCloneIntrinsics | undefined {
   }
 }
 
+const runtimeIntrinsicProbes = {
+  isNativeError(_error: object): boolean {
+    return false;
+  },
+  isProxy(_error: object): boolean {
+    return false;
+  },
+};
+
+function hasNativeRuntimeIntrinsicBehavior(
+  candidate: ErrorBrand,
+  name: 'isNativeError' | 'isProxy',
+): boolean {
+  let proxyAccessed = false;
+  const rejectProxyAccess = (): undefined => {
+    proxyAccessed = true;
+    return undefined;
+  };
+  const proxy = new Proxy(new Error('runtime error intrinsic validation'), {
+    get: rejectProxyAccess,
+    getOwnPropertyDescriptor: rejectProxyAccess,
+  });
+  const nativeError = new Error('runtime error intrinsic validation');
+  const syntaxError = new SyntaxError('runtime error intrinsic validation');
+  const expectedNativeBrand = name === 'isNativeError';
+
+  return Boolean(
+    candidate(nativeError) === expectedNativeBrand &&
+    candidate(syntaxError) === expectedNativeBrand &&
+    !candidate(Object.create(Error.prototype) as object) &&
+    !candidate(Object.create(SyntaxError.prototype) as object) &&
+    !candidate({}) &&
+    candidate(proxy) === !expectedNativeBrand &&
+    !proxyAccessed,
+  );
+}
+
 function getRuntimeErrorIntrinsic(types: object, name: 'isNativeError' | 'isProxy'): ErrorBrand | undefined {
   const descriptor = getErrorDescriptor(types, name);
   if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
     return undefined;
   }
-  return descriptor.value.bind(types) as ErrorBrand;
+
+  const candidate = descriptor.value as ErrorBrand;
+  const source = errorFunctionSource.call(candidate);
+  const nativeSource = new RegExp(`^function(?: ${name})?\\(\\)\\s*\\{\\s*\\[native code\\]\\s*\\}$`, 'u');
+  if (!nativeSource.test(source)) {
+    return undefined;
+  }
+
+  const boundProbe = Function.prototype.bind.call(runtimeIntrinsicProbes[name], null) as ErrorBrand;
+  if (source === errorFunctionSource.call(boundProbe)) {
+    if (!source.startsWith(`function ${name}(`)) {
+      return undefined;
+    }
+
+    // JavaScript constructors cannot return a primitive, unlike Bun's native type predicates.
+    try {
+      const probe = new Error('runtime error intrinsic constructor validation');
+      if (Reflect.construct(candidate, [probe]) !== (name === 'isNativeError')) {
+        return undefined;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+
+  return hasNativeRuntimeIntrinsicBehavior(candidate, name)
+    ? (Function.prototype.bind.call(candidate, types) as ErrorBrand)
+    : undefined;
+}
+
+function getUtilityErrorTypes(utility: unknown): object | undefined {
+  if (typeof utility !== 'object' || utility === null) {
+    return undefined;
+  }
+
+  const types = getErrorDescriptor(utility, 'types');
+  return types && 'value' in types && typeof types.value === 'object' && types.value !== null
+    ? types.value
+    : undefined;
 }
 
 function getBuiltinErrorTypes(runtimeProcess: object): object | undefined {
@@ -171,16 +246,18 @@ function getBuiltinErrorTypes(runtimeProcess: object): object | undefined {
     return undefined;
   }
 
-  const utility: unknown = loader.value.call(runtimeProcess, 'node:util');
-  if (typeof utility !== 'object' || utility === null) {
+  const candidate = loader.value as (name: string) => unknown;
+  const source = errorFunctionSource.call(candidate);
+  const nativeSource = /^function getBuiltinModule\([^)]*\)\s*\{\s*\[native code\]\s*\}$/u;
+  const nodeSource =
+    source ===
+    "function getBuiltinModule(id) {\n  validateString(id, 'id');\n  const normalizedId = BuiltinModule.normalizeRequirableId(id);\n  return normalizedId ? require(normalizedId) : undefined;\n}";
+  if (!nativeSource.test(source) && !nodeSource) {
     return undefined;
   }
 
-  const types = getErrorDescriptor(utility, 'types');
-  if (!types || !('value' in types) || typeof types.value !== 'object' || types.value === null) {
-    return undefined;
-  }
-  return types.value;
+  // A source-identical loader can still be forged; authenticate its returned predicates independently.
+  return getUtilityErrorTypes(Function.prototype.call.call(candidate, runtimeProcess, 'node:util'));
 }
 
 function getRuntimeErrorTypes(): RuntimeErrorTypes | undefined {
@@ -562,7 +639,7 @@ function hasSafeClonePrototypeChain(error: object): boolean {
   return false;
 }
 
-function hasSafeNativeStackAccessor(descriptor: PropertyDescriptor): boolean {
+function hasSafeNativeStackAccessor(descriptor: PropertyDescriptor, ignoreStackFormatter = false): boolean {
   if (
     'value' in descriptor ||
     descriptor.enumerable ||
@@ -573,12 +650,20 @@ function hasSafeNativeStackAccessor(descriptor: PropertyDescriptor): boolean {
   ) {
     return false;
   }
+  if (ignoreStackFormatter) {
+    return true;
+  }
 
   const formatter = getErrorDescriptor(Error, 'prepareStackTrace');
   return Boolean(
     !formatter ||
     ('value' in formatter &&
-      (formatter.value === undefined || (nativeStackFormatter && formatter.value === nativeStackFormatter))),
+      (formatter.value === undefined ||
+        (nativeStackFormatter && formatter.value === nativeStackFormatter) ||
+        (runtimeErrorTypes &&
+          !nativeErrorBrand &&
+          !nativeProxyBrand &&
+          (formatter.writable || formatter.configurable)))),
   );
 }
 
@@ -586,6 +671,7 @@ function classifyCloneDiagnostic(
   error: object,
   name: 'name' | 'message' | 'stack' | 'cause',
   allowNativeStackAccessor = false,
+  ignoreStackFormatter = false,
 ): 'safe' | 'unsafe' | object {
   let current: object | null = error;
 
@@ -597,7 +683,9 @@ function classifyCloneDiagnostic(
     const descriptor = getErrorDescriptor(current, name);
     if (descriptor) {
       if (!('value' in descriptor)) {
-        return name === 'stack' && allowNativeStackAccessor && hasSafeNativeStackAccessor(descriptor)
+        return name === 'stack' &&
+          allowNativeStackAccessor &&
+          hasSafeNativeStackAccessor(descriptor, ignoreStackFormatter)
           ? 'safe'
           : 'unsafe';
       }
@@ -677,8 +765,10 @@ function hasSafeCloneDiagnostic(
   error: object,
   name: 'name' | 'message' | 'stack' | 'cause',
   visited?: Set<object>,
+  allowNativeStackAccessor = false,
+  ignoreStackFormatter = false,
 ): boolean {
-  const diagnostic = classifyCloneDiagnostic(error, name);
+  const diagnostic = classifyCloneDiagnostic(error, name, allowNativeStackAccessor, ignoreStackFormatter);
   return (
     diagnostic === 'safe' ||
     (typeof diagnostic === 'object' && hasSafeCloneCause(diagnostic, visited ?? new Set([error])))
@@ -736,8 +826,11 @@ function hasAmbiguousSyntaxErrorName(name: PropertyDescriptor | undefined): bool
   );
 }
 
-function hasSafeCloneStackFormatters(visited: Set<object>): boolean {
+function hasSafeCloneStackFormatters(visited: Set<object>, unbrandedTarget?: object): boolean {
   const usesNativeStackAccessor = [...visited].some((value) => {
+    if (value === unbrandedTarget) {
+      return false;
+    }
     const stack = getErrorDescriptor(value, 'stack');
     return Boolean(stack && !('value' in stack));
   });
@@ -747,30 +840,77 @@ function hasSafeCloneStackFormatters(visited: Set<object>): boolean {
   );
 }
 
-function classifyStructuredError(target: object): ClonedErrorBrand {
-  if (!nativeStructuredClone || !hasSafeClonePrototypeChain(target)) {
-    return 'unavailable';
+function cloneWithSafeStackFormatter(target: object): unknown {
+  if (!nativeStructuredClone) {
+    return undefined;
   }
 
-  const visited = new Set([target]);
+  const formatter = getErrorDescriptor(Error, 'prepareStackTrace');
+  if (
+    !runtimeErrorTypes ||
+    nativeErrorBrand ||
+    nativeProxyBrand ||
+    !formatter ||
+    !('value' in formatter) ||
+    formatter.value === undefined ||
+    (nativeStackFormatter && formatter.value === nativeStackFormatter)
+  ) {
+    return nativeStructuredClone(target);
+  }
+
+  Object.defineProperty(Error, 'prepareStackTrace', { ...formatter, value: undefined });
+  try {
+    return nativeStructuredClone(target);
+  } finally {
+    Object.defineProperty(Error, 'prepareStackTrace', formatter);
+  }
+}
+
+function hasSafeStructuredCloneDiagnostics(
+  target: object,
+  unbranded: boolean,
+  visited: Set<object>,
+): boolean {
   for (const name of ['name', 'message', 'stack', 'cause'] as const) {
-    if (!hasSafeCloneDiagnostic(target, name, visited)) {
-      return 'unavailable';
+    const own = unbranded ? getErrorDescriptor(target, name) : undefined;
+    if (own && !own.enumerable) {
+      continue;
+    }
+    if (!hasSafeCloneDiagnostic(target, name, visited, true, unbranded)) {
+      return false;
     }
   }
+  return true;
+}
 
-  const properties = classifyCloneProperties(target, visited);
-  if (properties !== 'safe') {
-    return properties;
+function classifyStructuredErrorCause(
+  target: object,
+  inspectedCauses: Set<object>,
+  classifyCause: (cause: object, unbranded: boolean, inspected: Set<object>) => ClonedErrorBrand,
+): ClonedErrorBrand | undefined {
+  if (!runtimeErrorTypes || nativeErrorBrand || nativeProxyBrand) {
+    return undefined;
   }
 
-  if (!hasSafeCloneStackFormatters(visited)) {
+  const cause = getErrorDescriptor(target, 'cause');
+  if (!cause || !('value' in cause) || typeof cause.value !== 'object' || cause.value === null) {
+    return undefined;
+  }
+
+  const nested = classifyCause(cause.value as object, false, inspectedCauses);
+  if (nested === 'parser-proxy' || nested === 'native-syntax') {
+    return 'parser-proxy';
+  }
+  if (nested === 'unknown' || nested === 'proxy' || nested === 'unavailable') {
     return 'unavailable';
   }
+  return undefined;
+}
 
+function classifyStructuredClone(target: object): ClonedErrorBrand {
   let clone: unknown;
   try {
-    clone = nativeStructuredClone(target);
+    clone = cloneWithSafeStackFormatter(target);
   } catch (error) {
     // Structured cloning rejects proxies before invoking their getters or traps.
     const kind = classifyProxyCloneFailure(target, error);
@@ -799,6 +939,45 @@ function classifyStructuredError(target: object): ClonedErrorBrand {
     : 'native-syntax';
 }
 
+function classifyStructuredError(
+  target: object,
+  unbranded = false,
+  inspectedCauses = new Set<object>(),
+): ClonedErrorBrand {
+  if (inspectedCauses.has(target) || inspectedCauses.size >= MAX_JSON_ERROR_CAUSES) {
+    return 'unavailable';
+  }
+  inspectedCauses.add(target);
+
+  if (!nativeStructuredClone || !hasSafeClonePrototypeChain(target)) {
+    return 'unavailable';
+  }
+
+  const visited = new Set([target]);
+  if (!hasSafeStructuredCloneDiagnostics(target, unbranded, visited)) {
+    return 'unavailable';
+  }
+
+  const properties = classifyCloneProperties(target, visited);
+  if (properties !== 'safe') {
+    return properties;
+  }
+  if (!hasSafeCloneStackFormatters(visited, unbranded ? target : undefined)) {
+    return 'unavailable';
+  }
+
+  const nested = classifyStructuredErrorCause(target, inspectedCauses, classifyStructuredError);
+  return nested ?? classifyStructuredClone(target);
+}
+
+function classifyUnknownStructuredError(error: object, unbranded = false): JSONErrorBrand {
+  const clone = classifyStructuredError(error, unbranded);
+  if (clone === 'parser-proxy') {
+    return 'unsafe';
+  }
+  return clone === 'proxy' ? 'proxy' : 'unknown';
+}
+
 function classifyUnbrandedError(error: object): JSONErrorBrand {
   if (nativeProxyBrand) {
     if (!nativeProxyBrand(error)) {
@@ -821,15 +1000,21 @@ function classifyUnbrandedError(error: object): JSONErrorBrand {
     return 'unsafe';
   }
   if (kind === 'unknown') {
-    return classifyStructuredError(error) === 'parser-proxy' ? 'unsafe' : 'unknown';
+    return classifyUnknownStructuredError(error, true);
   }
 
-  const clone = classifyStructuredError(error);
+  const clone = classifyStructuredError(error, true);
   if (clone === 'parser-proxy') {
     return 'unsafe';
   }
   if (clone !== 'unavailable') {
     return clone;
+  }
+
+  const name = getErrorDescriptor(error, 'name');
+  const message = getErrorDescriptor(error, 'message');
+  if (name && !('value' in name) && (!message || 'value' in message)) {
+    return 'unsafe';
   }
 
   if (hasNativeErrorDescriptors(error) || hasNativeProxyErrorDescriptors(error)) {
@@ -843,6 +1028,35 @@ function classifyBrandedNativeError(error: object): JSONErrorBrand {
   return hasAmbiguousSyntaxErrorName(getErrorDescriptor(error, 'name')) ? 'native-syntax' : 'native';
 }
 
+function classifyFallbackErrorBrand(error: object, kind: JSONErrorKind): JSONErrorBrand {
+  const clone = classifyStructuredError(error);
+  if (clone === 'parser-proxy') {
+    return 'unsafe';
+  }
+  if (clone !== 'unavailable') {
+    return clone;
+  }
+
+  const name = getErrorDescriptor(error, 'name');
+  const message = getErrorDescriptor(error, 'message');
+  if (name && !('value' in name) && (!message || 'value' in message)) {
+    return 'unsafe';
+  }
+
+  if (kind === 'syntax' && message && !('value' in message)) {
+    return 'unsafe';
+  }
+  if (hasNativeErrorDescriptors(error) || hasNativeProxyErrorDescriptors(error)) {
+    return 'native';
+  }
+  if (kind === 'syntax') {
+    return hasSafeCloneDiagnostic(error, 'message') ? 'unknown' : 'unsafe';
+  }
+
+  const cause = getErrorDescriptor(error, 'cause');
+  return kind === 'error' && cause && 'value' in cause ? 'tagged-wrapper' : 'unknown';
+}
+
 function classifyErrorBrand(error: object): JSONErrorBrand {
   try {
     if (nativeErrorBrand) {
@@ -854,30 +1068,10 @@ function classifyErrorBrand(error: object): JSONErrorBrand {
       return 'unsafe';
     }
     if (kind === 'unknown') {
-      return classifyStructuredError(error) === 'parser-proxy' ? 'unsafe' : 'unknown';
+      return classifyUnknownStructuredError(error);
     }
 
-    const clone = classifyStructuredError(error);
-    if (clone === 'parser-proxy') {
-      return 'unsafe';
-    }
-    if (clone !== 'unavailable') {
-      return clone;
-    }
-
-    const message = getErrorDescriptor(error, 'message');
-    if (kind === 'syntax' && message && !('value' in message)) {
-      return 'unsafe';
-    }
-    if (hasNativeErrorDescriptors(error) || hasNativeProxyErrorDescriptors(error)) {
-      return 'native';
-    }
-    if (kind === 'syntax') {
-      return hasSafeCloneDiagnostic(error, 'message') ? 'unknown' : 'unsafe';
-    }
-
-    const cause = getErrorDescriptor(error, 'cause');
-    return kind === 'error' && cause && 'value' in cause ? 'tagged-wrapper' : 'unknown';
+    return classifyFallbackErrorBrand(error, kind);
   } catch {
     return 'unsafe';
   }
