@@ -2,7 +2,7 @@
 
 import { APIResource } from '../../core/resource';
 import { buildHeaders, HeadersLike } from '../../internal/headers';
-import { verifyWebhookSignature } from '../../lib/webhook-signature';
+import { verifyWebhookSignature, webhookSignatureRequiresSigning } from '../../lib/webhook-signature';
 
 export class Webhooks extends APIResource {
   /**
@@ -37,7 +37,7 @@ export class Webhooks extends APIResource {
   ): Promise<void> {
     if (
       typeof crypto === 'undefined' ||
-      typeof crypto.subtle.importKey !== 'function' ||
+      typeof crypto.subtle?.importKey !== 'function' ||
       typeof crypto.subtle.verify !== 'function'
     ) {
       throw new Error('Webhook signature verification is only supported when the `crypto` global is defined');
@@ -49,6 +49,10 @@ export class Webhooks extends APIResource {
     const signatureHeader = this.#getRequiredHeader(headersObj, 'webhook-signature');
     const timestamp = this.#getRequiredHeader(headersObj, 'webhook-timestamp');
     const webhookId = this.#getRequiredHeader(headersObj, 'webhook-id');
+
+    if (webhookSignatureRequiresSigning(signatureHeader) && typeof crypto.subtle.sign !== 'function') {
+      throw new Error('Webhook signature verification is only supported when the `crypto` global is defined');
+    }
 
     return await verifyWebhookSignature(payload, signatureHeader, timestamp, webhookId, secret, tolerance);
   }
