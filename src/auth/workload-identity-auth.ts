@@ -2,7 +2,7 @@ import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { APIError, OAuthError, OpenAIError } from '../core/error';
-import { isMalformedJSONError } from '../internal/auth/malformed-json-error';
+import { hasOwn } from '../internal/utils/values';
 
 interface CachedToken {
   token: string;
@@ -17,13 +17,16 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 
 async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
-  try {
+  if (hasOwn(response, 'json')) {
+    // Explicit custom parsers own their results and failures; rejection provenance cannot be inferred.
     return await response.json();
-  } catch (error) {
-    if (isMalformedJSONError(error)) {
-      throw new SyntaxError('Token exchange response contains invalid JSON');
-    }
-    throw error;
+  }
+
+  const body = await response.text();
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new SyntaxError('Token exchange response contains invalid JSON');
   }
 }
 

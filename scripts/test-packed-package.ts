@@ -41,17 +41,6 @@ const packedPackagePath = require('node:path');
     'OAuthError',
     'SubjectTokenProviderError',
   ];
-  const privateMalformedJSONClassifierModules = [
-    'openai/internal/auth/malformed-json-error',
-    'openai/internal/auth/malformed-json-error.js',
-    'openai/internal/auth/malformed-json-error.mjs',
-  ];
-  const privateMalformedJSONClassifierTypeImports = privateMalformedJSONClassifierModules.flatMap(
-    (moduleName, index) => [
-      `// @ts-expect-error Private malformed JSON classifier is not an exported package subpath: ${moduleName}`,
-      `import { isMalformedJSONError as privateMalformedJSONError${index} } from '${moduleName}';`,
-    ],
-  );
   const run = (command: string, args: string[], options: RunOptions = {}): string =>
     childProcess.execFileSync(command, args, {
       cwd: temporaryDirectory,
@@ -121,7 +110,6 @@ const packedPackagePath = require('node:path');
           (name) =>
             `if (typeof auth.${name} !== 'function') throw new Error('CommonJS auth export ${name} is unavailable');`,
         ),
-        "try { require.resolve('openai/auth/malformed-json-error'); throw new Error('Private malformed JSON classifier is exposed as a CommonJS auth export'); } catch (error) { if (error.code !== 'MODULE_NOT_FOUND' && error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; }",
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
     );
@@ -137,7 +125,6 @@ const packedPackagePath = require('node:path');
           (name) =>
             `if (typeof ${name} !== 'function') throw new Error('ESM auth export ${name} is unavailable');`,
         ),
-        "try { await import('openai/auth/malformed-json-error'); throw new Error('Private malformed JSON classifier is exposed as an ESM auth export'); } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND' && error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; }",
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
     );
@@ -151,7 +138,6 @@ const packedPackagePath = require('node:path');
         "import type { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';",
         "import type { OpenAIRealtimeWS as RealtimeWS } from 'openai/realtime/ws';",
         "import type { OpenAIRealtimeWS as BetaRealtimeWS } from 'openai/beta/realtime/ws';",
-        ...privateMalformedJSONClassifierTypeImports,
         "new OpenAI({ apiKey: 'test', dangerouslyAllowBrowser: true });",
         'void AzureOpenAI;',
         ...authExportNames.map((name) => `void ${name};`),
@@ -164,7 +150,6 @@ const packedPackagePath = require('node:path');
       [
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
         "import type { WorkloadIdentity } from 'openai/auth';",
-        ...privateMalformedJSONClassifierTypeImports,
         ...authExportNames.map((name) => `void ${name};`),
         'void (null as unknown as WorkloadIdentity);',
       ].join('\n'),
@@ -232,19 +217,7 @@ const packedPackagePath = require('node:path');
       tarball,
     ]);
 
-    const publicAuthClassifier = path.join(
-      temporaryDirectory,
-      'node_modules/openai/auth/malformed-json-error',
-    );
-    for (const extension of ['.js', '.mjs', '.d.ts', '.d.mts']) {
-      assert(
-        !fs.existsSync(`${publicAuthClassifier}${extension}`),
-        `Private malformed JSON classifier is published under auth/malformed-json-error${extension}`,
-      );
-    }
-
-    const privateAuthModules = [
-      ...privateMalformedJSONClassifierModules,
+    const privateX509Modules = [
       'openai/internal/auth/x509-transport-capability',
       'openai/internal/auth/x509-transport-capability.js',
       'openai/internal/auth/x509-transport-capability.mjs',
@@ -257,7 +230,7 @@ const packedPackagePath = require('node:path');
       'openai/internal/auth/x509-transport-state-browser.js',
       'openai/internal/auth/x509-transport-state-browser.mjs',
     ];
-    const moduleNames = JSON.stringify(privateAuthModules);
+    const moduleNames = JSON.stringify(privateX509Modules);
     run(process.execPath, [
       '--input-type=commonjs',
       '--eval',

@@ -3,11 +3,152 @@ import type { SubjectTokenProvider } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { SubjectTokenProviderError } from '../core/error';
-import { isMalformedJSONError } from '../internal/auth/malformed-json-error';
 
 const DEFAULT_RESOURCE = 'https://management.azure.com/';
 const DEFAULT_AZURE_API_VERSION = '2018-02-01';
 const AZURE_IMDS_BASE_URL = 'http://169.254.169.254/metadata/identity/oauth2/token';
+const MAX_AZURE_IMDS_JSON_ERROR_CAUSES = 32;
+const getOwnErrorDescriptor = Object.getOwnPropertyDescriptor;
+const getErrorPrototype = Object.getPrototypeOf;
+const errorObjectToString = Object.prototype.toString;
+const errorFunctionToString = Function.prototype.toString;
+const nativeErrorSource = errorFunctionToString.call(Error);
+const nativeSyntaxErrorSource = errorFunctionToString.call(SyntaxError);
+const nativeErrorBrandDescriptor = getOwnErrorDescriptor(Error, 'isError');
+const nativeErrorBrand =
+  nativeErrorBrandDescriptor &&
+  'value' in nativeErrorBrandDescriptor &&
+  typeof nativeErrorBrandDescriptor.value === 'function'
+    ? (nativeErrorBrandDescriptor.value as (error: object) => boolean)
+    : undefined;
+
+type AzureJSONErrorKind = 'error' | 'syntax' | 'tagged-wrapper' | 'unknown' | 'unsafe';
+
+function hasNativeErrorPrototype(prototype: object, kind: 'Error' | 'SyntaxError'): boolean {
+  const name = getOwnErrorDescriptor(prototype, 'name');
+  const constructor = getOwnErrorDescriptor(prototype, 'constructor');
+  if (
+    !name ||
+    !('value' in name) ||
+    name.value !== kind ||
+    !constructor ||
+    !('value' in constructor) ||
+    typeof constructor.value !== 'function'
+  ) {
+    return false;
+  }
+
+  const originalPrototype = getOwnErrorDescriptor(constructor.value, 'prototype');
+  const nativeSource = kind === 'Error' ? nativeErrorSource : nativeSyntaxErrorSource;
+  return Boolean(
+    originalPrototype &&
+    'value' in originalPrototype &&
+    originalPrototype.value === prototype &&
+    errorFunctionToString.call(constructor.value) === nativeSource,
+  );
+}
+
+function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
+  try {
+    const prototypes: object[] = [];
+    let tagged = false;
+    for (
+      let prototype: object | null = error;
+      prototype !== null;
+      prototype = getErrorPrototype(prototype) as object | null
+    ) {
+      if (prototypes.length >= MAX_AZURE_IMDS_JSON_ERROR_CAUSES) {
+        return 'unsafe';
+      }
+      prototypes.push(prototype);
+      if (!nativeErrorBrand && getOwnErrorDescriptor(prototype, Symbol.toStringTag)) {
+        tagged = true;
+      }
+    }
+
+    if (
+      nativeErrorBrand
+        ? !nativeErrorBrand(error)
+        : !tagged && errorObjectToString.call(error) !== '[object Error]'
+    ) {
+      return 'unknown';
+    }
+
+    let genericErrorPrototype = false;
+    for (let index = 1; index < prototypes.length; index += 1) {
+      const prototype = prototypes[index];
+      if (!prototype) {
+        return 'unsafe';
+      }
+      if (hasNativeErrorPrototype(prototype, 'SyntaxError')) {
+        return tagged ? 'unsafe' : 'syntax';
+      }
+      if (tagged && hasNativeErrorPrototype(prototype, 'Error')) {
+        genericErrorPrototype = true;
+      }
+    }
+
+    if (!tagged) {
+      return 'error';
+    }
+    return genericErrorPrototype ? 'tagged-wrapper' : 'unknown';
+  } catch {
+    return 'unsafe';
+  }
+}
+
+function inspectAzureJSONErrorCause(error: unknown): boolean {
+  const visited = new Set<object>();
+  let current = error;
+
+  for (let depth = 0; depth < MAX_AZURE_IMDS_JSON_ERROR_CAUSES; depth += 1) {
+    if (current instanceof SyntaxError) {
+      return true;
+    }
+    if (typeof current !== 'object' || current === null) {
+      return false;
+    }
+    const kind = current instanceof Error ? 'error' : classifyCrossRealmAzureError(current);
+    if (kind === 'syntax' || kind === 'unsafe') {
+      return true;
+    }
+    if (kind !== 'error' && kind !== 'tagged-wrapper') {
+      return false;
+    }
+    if (kind === 'error') {
+      const parserType = getOwnErrorDescriptor(current, 'type');
+      if (parserType && 'value' in parserType && parserType.value === 'invalid-json') {
+        return true;
+      }
+    }
+    if (visited.has(current)) {
+      return true;
+    }
+    visited.add(current);
+
+    let cause: PropertyDescriptor | undefined;
+    try {
+      cause = getOwnErrorDescriptor(current, 'cause');
+    } catch {
+      return true;
+    }
+    if (!cause || !('value' in cause)) {
+      return false;
+    }
+    current = cause.value;
+  }
+
+  return true;
+}
+
+function isMalformedAzureJSONError(error: unknown): boolean {
+  try {
+    return inspectAzureJSONErrorCause(error);
+  } catch {
+    return true;
+  }
+}
+
 /** Reads the UTF-8 contents of a Kubernetes service-account token file. */
 type ReadFile = (path: string) => Promise<string>;
 
@@ -179,7 +320,7 @@ export function azureManagedIdentityTokenProvider(
         try {
           data = (await response.json()) as { access_token?: string };
         } catch (error) {
-          if (isMalformedJSONError(error, { preserveAccessors: true })) {
+          if (isMalformedAzureJSONError(error)) {
             throw new SyntaxError('IMDS response contains invalid JSON');
           }
           throw error;
