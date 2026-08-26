@@ -38,6 +38,116 @@ Object.defineProperty(CustomResponse.prototype, Symbol.toStringTag, {
   value: 'Response',
 });
 
+// oxlint-disable-next-line max-classes-per-file -- Both node-fetch layouts require distinct Body and Response prototypes.
+const NodeFetchBody = class Body {
+  readonly nativeResponse: Response;
+  readonly nodeFetchVersion: 'v2' | 'v3';
+
+  constructor(body: string, version: 'v2' | 'v3' = 'v3') {
+    this.nativeResponse = new globalThis.Response(body, { status: 200 });
+    this.nodeFetchVersion = version;
+  }
+
+  get body(): ReadableStream<Uint8Array> | null {
+    return this.nativeResponse.body;
+  }
+
+  get bodyUsed(): boolean {
+    return this.nativeResponse.bodyUsed;
+  }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    return await this.nativeResponse.arrayBuffer();
+  }
+
+  async blob(): Promise<Blob> {
+    return await this.nativeResponse.blob();
+  }
+
+  async json(): Promise<unknown> {
+    const body = await this.text();
+    if (this.nodeFetchVersion === 'v2') {
+      try {
+        return JSON.parse(body) as unknown;
+      } catch {
+        throw new Error(`invalid json response body at ${OAUTH_URL}: ${body}`);
+      }
+    }
+
+    return JSON.parse(body) as unknown;
+  }
+
+  async text(): Promise<string> {
+    const body = await this.nativeResponse.arrayBuffer();
+    return this.nodeFetchVersion === 'v2' ? Buffer.from(body).toString() : new TextDecoder().decode(body);
+  }
+};
+
+const NodeFetch2Response = class Response {
+  readonly nativeResponse: globalThis.Response;
+  readonly nodeFetchVersion = 'v2';
+
+  constructor(body: string) {
+    this.nativeResponse = new globalThis.Response(body, { status: 200 });
+  }
+
+  get headers(): Headers {
+    return this.nativeResponse.headers;
+  }
+
+  get ok(): boolean {
+    return this.nativeResponse.ok;
+  }
+
+  get status(): number {
+    return this.nativeResponse.status;
+  }
+};
+
+for (const property of ['arrayBuffer', 'blob', 'body', 'bodyUsed', 'json', 'text']) {
+  const descriptor = Object.getOwnPropertyDescriptor(NodeFetchBody.prototype, property);
+  if (descriptor) {
+    Object.defineProperty(NodeFetch2Response.prototype, property, descriptor);
+  }
+}
+Object.defineProperty(NodeFetch2Response.prototype, Symbol.toStringTag, {
+  configurable: true,
+  value: 'Response',
+});
+
+const NodeFetch3Response = class Response extends NodeFetchBody {
+  get headers(): Headers {
+    return this.nativeResponse.headers;
+  }
+
+  get ok(): boolean {
+    return this.nativeResponse.ok;
+  }
+
+  get status(): number {
+    return this.nativeResponse.status;
+  }
+
+  get [Symbol.toStringTag](): string {
+    return this.nativeResponse.constructor.name;
+  }
+};
+
+const nodeFetchTransports = [
+  {
+    name: 'node-fetch v2 mixed-in Body',
+    Response: NodeFetch2Response,
+    parserPrototype: NodeFetch2Response.prototype as unknown as typeof NodeFetchBody.prototype,
+    preservesBOM: true,
+  },
+  {
+    name: 'node-fetch v3 inherited Body',
+    Response: NodeFetch3Response,
+    parserPrototype: NodeFetchBody.prototype,
+    preservesBOM: false,
+  },
+] as const;
+
 function withPrototypeTextOverride(response: Response, readText: () => Promise<string>): Response {
   const prototype = Object.create(Object.getPrototypeOf(response));
   Object.defineProperty(prototype, 'text', { configurable: true, value: readText });
@@ -164,6 +274,105 @@ describe('successful workload OAuth response JSON privacy', () => {
       await expectPrivateFailure(operationFor(surface, harness), harness);
 
       expect(readJSON).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(surfaces)(
+    'preserves the actual native token when Response.prototype.text is globally patched on %s',
+    async (surface) => {
+      const response = Response.json({ access_token: 'safe-body-token', expires_in: 3600 });
+      const originalText = Response.prototype.text;
+      const readOAuthText = vi.fn(async () =>
+        JSON.stringify({ access_token: 'safe-overridden-token', expires_in: 3600 }),
+      );
+      vi.spyOn(Response.prototype, 'text').mockImplementation(async function patchedText(this: Response) {
+        return this === response ? await readOAuthText() : await originalText.call(this);
+      });
+      const harness = createHarness(async () => response);
+      const run = operationFor(surface, harness);
+
+      await expect(run()).resolves.toEqual(
+        surface === 'direct-auth' ? 'safe-body-token' : expect.objectContaining({ data: [] }),
+      );
+      await expect(run()).resolves.toBeDefined();
+
+      expect(readOAuthText).not.toHaveBeenCalled();
+      expect(response.bodyUsed).toBe(true);
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(surfaces)(
+    'sanitizes malformed native bodies without calling a leaking global text override on %s',
+    async (surface) => {
+      const readText = vi
+        .spyOn(Response.prototype, 'text')
+        .mockRejectedValue(new SyntaxError(`patched OAuth reader disclosed ${PRIVATE_TOKEN}`));
+      const response = new Response(`${PRIVATE_TOKEN} customer-private-record`);
+      const harness = createHarness(async () => response);
+
+      await expectPrivateFailure(operationFor(surface, harness), harness);
+
+      expect(readText).not.toHaveBeenCalled();
+      expect(response.bodyUsed).toBe(true);
+    },
+  );
+
+  it.each(surfaces.flatMap((surface) => nodeFetchTransports.map((transport) => ({ surface, transport }))))(
+    'sanitizes malformed $transport.name successful OAuth bodies on $surface',
+    async ({ surface, transport }) => {
+      const readJSON = vi.spyOn(transport.parserPrototype, 'json');
+      const response = new transport.Response(
+        `${PRIVATE_TOKEN} customer-private-record`,
+      ) as unknown as Response;
+      const harness = createHarness(async () => response);
+
+      expect(Object.getOwnPropertyDescriptor(transport.Response, 'json')).toBeUndefined();
+      await expectPrivateFailure(operationFor(surface, harness), harness);
+
+      expect(readJSON).not.toHaveBeenCalled();
+      expect(response.bodyUsed).toBe(true);
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(surfaces.flatMap((surface) => nodeFetchTransports.map((transport) => ({ surface, transport }))))(
+    'preserves $transport.name tokens, body consumption, and caching on $surface',
+    async ({ surface, transport }) => {
+      const readJSON = vi.spyOn(transport.parserPrototype, 'json');
+      const response = new transport.Response(
+        JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 }),
+      ) as unknown as Response;
+      const harness = createHarness(async () => response);
+      const run = operationFor(surface, harness);
+
+      await expect(run()).resolves.toEqual(
+        surface === 'direct-auth' ? 'safe-body-token' : expect.objectContaining({ data: [] }),
+      );
+      await expect(run()).resolves.toBeDefined();
+
+      expect(readJSON).not.toHaveBeenCalled();
+      expect(response.bodyUsed).toBe(true);
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(surfaces.flatMap((surface) => nodeFetchTransports.map((transport) => ({ surface, transport }))))(
+    'preserves $transport.name UTF-8 BOM decoding behavior on $surface',
+    async ({ surface, transport }) => {
+      const body = `\uFEFF${JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 })}`;
+      const response = new transport.Response(body) as unknown as Response;
+      const harness = createHarness(async () => response);
+      const run = operationFor(surface, harness);
+
+      await (transport.preservesBOM
+        ? expectPrivateFailure(run, harness)
+        : expect(run()).resolves.toEqual(
+            surface === 'direct-auth' ? 'safe-body-token' : expect.objectContaining({ data: [] }),
+          ));
+
+      expect(response.bodyUsed).toBe(true);
+      expect(harness.exchange).toHaveBeenCalledTimes(1);
     },
   );
 
