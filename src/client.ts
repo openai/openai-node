@@ -1090,9 +1090,6 @@ export class OpenAI {
     try {
       const remaining = authentication.remainingTimeout(options, timeout);
       const expiration = authentication.waitForRetry(remaining, deadline.signal).then(() => {
-        timedOut = true;
-        controller.abort();
-        void Shims.CancelReadableStream(response.body).catch(() => undefined);
         throw new Errors.APIConnectionTimeoutError();
       });
       const body = await Promise.race([
@@ -1104,6 +1101,11 @@ export class OpenAI {
       }
       return body;
     } catch (error) {
+      if (error instanceof Errors.APIConnectionTimeoutError) {
+        timedOut = true;
+        controller.abort();
+        void Shims.CancelReadableStream(response.body).catch(() => undefined);
+      }
       if (callerSignal.aborted && !timedOut) {
         throw this._makeUserAbortError(callerSignal);
       }

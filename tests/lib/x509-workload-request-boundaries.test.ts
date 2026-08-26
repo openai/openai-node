@@ -71,6 +71,30 @@ describe('X.509 request ownership boundaries', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  test('retires an unread error response when its headers exhaust the request deadline', async () => {
+    let elapsed = 0;
+    let apiSignal: AbortSignal | undefined;
+    const canceled = vi.fn();
+    vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          return Response.json(tokenResponse);
+        }
+        apiSignal = request.signal ?? undefined;
+        elapsed = 51;
+        return new Response(new ReadableStream({ cancel: canceled }), { status: 403 });
+      });
+
+    await expect(new OpenAI(options({ timeout: 50 })).models.list()).rejects.toBeInstanceOf(
+      APIConnectionTimeoutError,
+    );
+    expect(apiSignal?.aborted).toBe(true);
+    expect(canceled).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   test('retires an SDK-materialized one-shot iterator when certificate authentication fails', async () => {
     let finalized = false;
     const body = {

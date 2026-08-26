@@ -1,5 +1,6 @@
 import { OpenAIError } from '../../core/error';
 import type { NullableHeaders } from '../headers';
+import type { ReadableStream } from '../shim-types';
 import type { MergedRequestInit } from '../types';
 import { findRegisteredX509Transport } from '#x509-transport-state';
 
