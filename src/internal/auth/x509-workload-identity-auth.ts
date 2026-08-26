@@ -235,6 +235,7 @@ export class X509WorkloadIdentityAuth {
   readonly #identityProviderId: string;
   readonly #serviceAccountId: string;
   readonly #configuredRefreshBufferMs: number | undefined;
+  readonly #configuredRefreshBufferSeconds: number | undefined;
   readonly #organization: string | null;
   readonly #project: string | null;
   readonly #transport: RegisteredX509Transport;
@@ -254,15 +255,32 @@ export class X509WorkloadIdentityAuth {
     this.#identityProviderId = identity.identityProviderId;
     this.#serviceAccountId = identity.serviceAccountId;
     this.#configuredRefreshBufferMs = identity.refreshBufferMs;
+    this.#configuredRefreshBufferSeconds = identity.refreshBufferSeconds;
     this.#organization = organization;
     this.#project = project;
+    if (this.#configuredRefreshBufferMs !== undefined && this.#configuredRefreshBufferSeconds !== undefined) {
+      throw new OpenAIError(
+        'X.509 workload identity cannot combine refreshBufferSeconds and refreshBufferMs.',
+      );
+    }
     if (
       this.#configuredRefreshBufferMs !== undefined &&
       (!Number.isSafeInteger(this.#configuredRefreshBufferMs) || this.#configuredRefreshBufferMs < 0)
     ) {
       throw new OpenAIError('X.509 workload identity requires a nonnegative integer refreshBufferMs.');
     }
-    this.#refreshBufferMs = this.#configuredRefreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS;
+    if (
+      this.#configuredRefreshBufferSeconds !== undefined &&
+      (!Number.isSafeInteger(this.#configuredRefreshBufferSeconds) ||
+        this.#configuredRefreshBufferSeconds < 0 ||
+        !Number.isSafeInteger(this.#configuredRefreshBufferSeconds * 1000))
+    ) {
+      throw new OpenAIError('X.509 workload identity requires a nonnegative integer refreshBufferSeconds.');
+    }
+    this.#refreshBufferMs =
+      this.#configuredRefreshBufferSeconds === undefined
+        ? (this.#configuredRefreshBufferMs ?? DEFAULT_REFRESH_BUFFER_MS)
+        : this.#configuredRefreshBufferSeconds * 1000;
   }
 
   /** Reconstructs the immutable selectors captured before caller-owned identity mutation. */
@@ -274,6 +292,9 @@ export class X509WorkloadIdentityAuth {
       ...(this.#configuredRefreshBufferMs === undefined
         ? {}
         : { refreshBufferMs: this.#configuredRefreshBufferMs }),
+      ...(this.#configuredRefreshBufferSeconds === undefined
+        ? {}
+        : { refreshBufferSeconds: this.#configuredRefreshBufferSeconds }),
     };
   }
 
@@ -365,6 +386,15 @@ export class X509WorkloadIdentityAuth {
     return request;
   }
 
+  /** Suspends an already-running network budget during retry-local asynchronous preparation. */
+  beginRequestPreparation(): void {
+    const scope = this.#scope();
+    if (scope.deadlineArmed && scope.preparationStartedAt === undefined) {
+      scope.preparationStartedAt = performance.now();
+      scope.preparationWallStartedAt = Date.now();
+    }
+  }
+
   /** Begins local request construction without charging protected hook latency to the network. */
   beginRequestPlanning(): void {
     this.#scope().phase = 'planning';
@@ -377,6 +407,11 @@ export class X509WorkloadIdentityAuth {
       scope.wallStartedAt = Date.now();
       scope.monotonicStartedAt = performance.now();
       scope.deadlineArmed = true;
+    } else if (scope.preparationStartedAt !== undefined) {
+      scope.monotonicStartedAt += performance.now() - scope.preparationStartedAt;
+      scope.wallStartedAt += Date.now() - (scope.preparationWallStartedAt ?? Date.now());
+      delete scope.preparationStartedAt;
+      delete scope.preparationWallStartedAt;
     }
   }
 
@@ -550,6 +585,8 @@ export class X509WorkloadIdentityAuth {
     delete scope.request;
     delete scope.phase;
     delete scope.deadlineArmed;
+    delete scope.preparationStartedAt;
+    delete scope.preparationWallStartedAt;
     delete scope.effectiveSignal;
     delete scope.materializedBody;
     delete scope.apiURL;

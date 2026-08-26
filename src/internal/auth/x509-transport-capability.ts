@@ -27,19 +27,26 @@ export interface X509TransportOptions {
 
 const allowedOptionNames = new Set(['runtime', 'dispatcher', 'certificateIdentity', 'proxy']);
 const transportBrand: typeof x509TransportBrand = x509TransportBrand;
+let originalAgentFactory: unknown;
 
 class NodeX509Transport implements X509Transport {
   declare readonly [transportBrand]: true;
 
   readonly #dispatcher: Agent | ProxyAgent;
+  readonly #proxy: X509ProxyMode;
 
-  constructor(dispatcher: Agent | ProxyAgent) {
+  constructor(dispatcher: Agent | ProxyAgent, proxy: X509ProxyMode) {
     this.#dispatcher = dispatcher;
+    this.#proxy = proxy;
     Object.freeze(this);
   }
 
   static dispatcher(value: object): Agent | ProxyAgent | undefined {
     return #dispatcher in value ? value.#dispatcher : undefined;
+  }
+
+  static proxy(value: object): X509ProxyMode | undefined {
+    return #proxy in value ? value.#proxy : undefined;
   }
 }
 
@@ -80,6 +87,74 @@ function assertNodeRuntime(): void {
   }
 }
 
+function undiciState(dispatcher: Agent | ProxyAgent, name: string): unknown {
+  const symbol = Object.getOwnPropertySymbols(dispatcher).find((candidate) => candidate.description === name);
+  return symbol ? Object.getOwnPropertyDescriptor(dispatcher, symbol)?.value : undefined;
+}
+
+function assertVerifiedTLS(value: unknown): void {
+  if (value === undefined || value === null) {
+    if (process.env['NODE_TLS_REJECT_UNAUTHORIZED'] === '0') {
+      throw new Error('X.509 transport requires explicit TLS server certificate verification.');
+    }
+    return;
+  }
+  if (typeof value !== 'object' || types.isProxy(value)) {
+    throw new Error('X.509 transport requires inspectable TLS server-verification settings.');
+  }
+  const verification = Object.getOwnPropertyDescriptor(value, 'rejectUnauthorized');
+  if (
+    (verification && (!('value' in verification) || verification.value === false)) ||
+    (process.env['NODE_TLS_REJECT_UNAUTHORIZED'] === '0' && verification?.value !== true)
+  ) {
+    throw new Error('X.509 transport requires TLS server certificate verification.');
+  }
+}
+
+function assertDispatcherTrust(dispatcher: Agent | ProxyAgent, proxy: X509ProxyMode): void {
+  if (dispatcher instanceof ProxyAgent) {
+    const configuration = undiciState(dispatcher, 'proxy agent options');
+    if (!configuration || typeof configuration !== 'object') {
+      throw new Error('X.509 transport requires inspectable CONNECT proxy configuration.');
+    }
+    const uri: unknown =
+      configuration instanceof URL
+        ? URL.prototype.toString.call(configuration)
+        : Object.getOwnPropertyDescriptor(configuration, 'uri')?.value;
+    let protocol: string;
+    try {
+      if (typeof uri !== 'string' && !(uri instanceof URL)) {
+        throw new Error('Invalid proxy URI');
+      }
+      ({ protocol } = new URL(typeof uri === 'string' ? uri : URL.prototype.toString.call(uri)));
+    } catch {
+      throw new Error('X.509 transport requires an approved CONNECT proxy endpoint.');
+    }
+    if (protocol !== (proxy === 'https-connect' ? 'https:' : 'http:')) {
+      throw new Error('X.509 CONNECT proxy protocol must match its configured proxy mode.');
+    }
+    assertVerifiedTLS(undiciState(dispatcher, 'request tls settings'));
+    if (proxy === 'https-connect') {
+      assertVerifiedTLS(undiciState(dispatcher, 'proxy tls settings'));
+    }
+    return;
+  }
+
+  const configuration = undiciState(dispatcher, 'options');
+  if (!configuration || typeof configuration !== 'object') {
+    throw new Error('X.509 transport requires inspectable certificate transport configuration.');
+  }
+  if (originalAgentFactory === undefined) {
+    const baseline = new Agent();
+    originalAgentFactory = undiciState(baseline, 'factory');
+    void baseline.close();
+  }
+  if (originalAgentFactory === undefined || undiciState(dispatcher, 'factory') !== originalAgentFactory) {
+    throw new Error('X.509 transport does not support a custom dispatcher factory.');
+  }
+  assertVerifiedTLS(Object.getOwnPropertyDescriptor(configuration, 'connect')?.value);
+}
+
 function attestedDispatcher(options: X509TransportOptions): Agent | ProxyAgent {
   const dispatcher = dataOption(options, 'dispatcher');
   if (!dispatcher || typeof dispatcher !== 'object') {
@@ -102,6 +177,8 @@ function attestedDispatcher(options: X509TransportOptions): Agent | ProxyAgent {
   if ((proxy === 'direct') !== isDirect) {
     throw new Error('An X.509 CONNECT proxy requires an Undici ProxyAgent.');
   }
+
+  assertDispatcherTrust(dispatcher, proxy);
 
   return dispatcher;
 }
@@ -147,13 +224,12 @@ function assertConnectProxySupport(): void {
 /**
  * Creates a frozen, opaque capability for one caller-owned Undici transport.
  *
- * `certificateIdentity: 'static'` is an application attestation: the SDK does
- * not inspect certificates, private dispatcher internals, callbacks, or TLS
- * options and cannot cryptographically prove certificate selection. Configure
- * one static identity without custom dispatcher factories. For HTTPS CONNECT,
- * independently configure `proxyTls` and `requestTls` so workload credentials
- * never reach the proxy. Rotation requires creating a fresh dispatcher and
- * capability; the application remains responsible for draining the old one.
+ * Existing caller-owned dispatchers remain supported only when their effective
+ * TLS settings preserve server verification and their actual CONNECT protocol
+ * matches the declared mode. Prefer the SDK-owned `fromX509` credential, which
+ * constructs verified target and proxy TLS settings from explicit configuration.
+ * Rotation requires creating a fresh dispatcher and capability; the caller
+ * remains responsible for draining caller-owned dispatchers.
  *
  * This Node-only preview entrypoint requires the optional `undici` peer at
  * version 5.2.0 or later. CONNECT proxy modes require version 5.5.1 or
@@ -185,7 +261,7 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
   if (dispatcher instanceof ProxyAgent) {
     assertConnectProxySupport();
   }
-  return new NodeX509Transport(dispatcher);
+  return new NodeX509Transport(dispatcher, dataOption(options, 'proxy') as X509ProxyMode);
 }
 
 /** Dispatches through the opaque attested transport without accepting replacement dispatchers. */
@@ -202,6 +278,11 @@ export async function sendX509Request(
   if (!dispatcher) {
     throw new Error('Invalid X.509 transport capability.');
   }
+  const proxy = NodeX509Transport.proxy(transport);
+  if (!proxy) {
+    throw new Error('Invalid X.509 transport capability.');
+  }
+  assertDispatcherTrust(dispatcher, proxy);
 
   const normalizedTarget = new URL(target.href);
   if (normalizedTarget.protocol !== 'https:') {

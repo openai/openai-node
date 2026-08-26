@@ -100,53 +100,37 @@ console.log(response.output_text);
 
 ### X.509 client certificates
 
-Enrolled Node.js applications can authenticate using a caller-owned, static
-client certificate instead of a subject-token provider. Install the optional
-Undici transport peer with `npm install openai "undici@^7"`, provide the full
-PEM certificate chain and private key, and create an explicitly attested
-transport:
+Enrolled Node.js applications can authenticate using an SDK-owned certificate
+credential instead of a subject-token provider. Install the optional Undici peer
+with `npm install openai "undici@^7"` and provide the full PEM certificate chain,
+matching private key, and enrolled account selectors:
 
 ```ts
 import OpenAI from 'openai';
-import { createX509Transport } from 'openai/auth/x509-transport';
-import { Agent } from 'undici';
+import { workloadIdentity } from 'openai/auth/x509-transport';
 
-const dispatcher = new Agent({
-  connect: {
-    cert: process.env['OPENAI_X509_CLIENT_CERTIFICATE_CHAIN_PEM'],
-    key: process.env['OPENAI_X509_CLIENT_PRIVATE_KEY_PEM'],
-  },
+const credential = workloadIdentity.fromX509({
+  certificateChain: process.env['OPENAI_X509_CLIENT_CERTIFICATE_CHAIN_PEM']!,
+  privateKey: process.env['OPENAI_X509_CLIENT_PRIVATE_KEY_PEM']!,
+  identityProviderId: process.env['OPENAI_X509_IDENTITY_PROVIDER_ID']!,
+  serviceAccountId: process.env['OPENAI_X509_SERVICE_ACCOUNT_ID']!,
 });
 
 try {
   const client = new OpenAI({
-    apiKey: null,
-    adminAPIKey: null,
-    baseURL: null,
-    organization: null,
+    credential,
     project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
-    workloadIdentity: {
-      type: 'x509',
-      identityProviderId: process.env['OPENAI_X509_IDENTITY_PROVIDER_ID']!,
-      serviceAccountId: process.env['OPENAI_X509_SERVICE_ACCOUNT_ID']!,
-    },
-    x509Transport: createX509Transport({
-      runtime: 'node',
-      dispatcher,
-      certificateIdentity: 'static',
-      proxy: 'direct',
-    }),
   });
 
   console.log((await client.models.list()).data.length);
 } finally {
-  await dispatcher.close();
+  await credential.close();
 }
 ```
 
 X.509 authentication supports only `https://mtls.api.openai.com/v1`. Azure,
 Bedrock, custom gateways, data-residency overrides, browsers, and WebSocket
-transports are unsupported. The application owns and closes its dispatcher.
+transports are unsupported. Call `credential.close()` when requests have drained.
 
 ### Kubernetes
 

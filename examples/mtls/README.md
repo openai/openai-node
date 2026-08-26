@@ -52,7 +52,7 @@ Because the SDK does not own the mTLS transport, applications can use runtime-na
 
 ## X.509 workload identity (Node.js)
 
-X.509 workload identity is separate from API-key + HTTP mTLS: an enrolled client certificate authenticates a workload-identity token exchange, and the resulting short-lived bearer authenticates requests through the same caller-owned certificate transport. The resulting access token is an ordinary bearer credential, so protect it like any other secret; reusing the approved certificate transport does not cryptographically bind the token to that certificate. Only `https://mtls.api.openai.com/v1` is approved; EU, Azure, Bedrock, custom gateways, and data-residency overrides are not supported.
+X.509 workload identity is separate from API-key + HTTP mTLS: an enrolled client certificate authenticates a workload-identity token exchange, and the resulting short-lived bearer authenticates requests through the same SDK-owned, verified certificate transport. Create the credential with `workloadIdentity.fromX509({ certificateChain, privateKey, identityProviderId, serviceAccountId })` and pass it to `new OpenAI({ credential })`. The resulting access token is an ordinary bearer credential, so protect it like any other secret; mTLS does not cryptographically bind the token to its certificate. Only `https://mtls.api.openai.com/v1` is approved; EU, Azure, Bedrock, custom gateways, and data-residency overrides are not supported.
 
 Install the SDK and its optional Node.js transport peer:
 
@@ -77,7 +77,7 @@ node examples/mtls/x509-workload-identity.mjs
 
 Set `OPENAI_X509_CLIENT_KEY_PASSPHRASE` when the PEM private key is encrypted. Existing local fixtures can instead provide certificate and key paths through `OPENAI_MTLS_CERT_CHAIN` and `OPENAI_MTLS_KEY`, identity selectors through `OPENAI_IDENTITY_PROVIDER_ID` and `OPENAI_SERVICE_ACCOUNT_ID`, and an optional tenant through `OPENAI_X509_PROJECT_ID`. The example ignores ambient API keys, admin keys, base URLs, organizations, and ordinary API-key projects so only the selected X.509 identity and tenant determine the request. Keep private-key files readable only by their owner, use managed secret injection where available, and never log PEM contents, passphrases, issued bearer tokens, or proxy credentials.
 
-Proxying is always explicit: set `OPENAI_X509_PROXY_MODE=http_connect` or `OPENAI_X509_PROXY_MODE=https_connect` together with a matching `HTTPS_PROXY` URL. The default `direct` mode ignores ambient proxy variables. The workload certificate is configured only for target TLS, never proxy TLS. The example closes its caller-owned dispatcher after the request.
+Proxying is always explicit: set `OPENAI_X509_PROXY_MODE=http_connect` or `OPENAI_X509_PROXY_MODE=https_connect` together with a matching `HTTPS_PROXY` URL. The default `direct` mode ignores ambient proxy variables. The SDK requires verified target and proxy TLS, validates the proxy protocol, and configures the workload certificate only for target TLS. The example closes its SDK-owned credential after the request.
 
 From a repository checkout, the following command builds the SDK first and then runs the same explicit live-service check:
 
@@ -85,4 +85,4 @@ From a repository checkout, the following command builds the SDK first and then 
 pnpm test:live:x509
 ```
 
-This check fails without owner-provisioned, enrolled credentials. Rotate a certificate by constructing a new Undici dispatcher and `createX509Transport` capability, then creating or cloning the client with that new top-level `x509Transport`; close the previous dispatcher after in-flight requests finish.
+This check fails without owner-provisioned, enrolled credentials. Rotate a certificate by constructing a new `workloadIdentity.fromX509` credential and creating or cloning the client with it; close the previous credential after in-flight requests finish.

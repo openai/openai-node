@@ -1,6 +1,7 @@
 export type {
   WorkloadIdentity,
   X509WorkloadIdentity,
+  X509Credential,
   SubjectTokenProvider,
   TokenExchangeResponse,
 } from './types';

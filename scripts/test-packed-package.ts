@@ -217,6 +217,20 @@ const packedPackagePath = require('node:path');
       tarball,
     ]);
 
+    const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
+    assert(!fs.existsSync(optionalUndici), 'Public authentication helpers must not require optional Undici');
+    for (const [inputType, authenticationImport] of [
+      ['commonjs', "const auth = require('openai/auth');"],
+      ['module', "import * as auth from 'openai/auth';"],
+    ] as const) {
+      run(process.execPath, [
+        `--input-type=${inputType}`,
+        '--eval',
+        `${authenticationImport} if (typeof auth.k8sServiceAccountTokenProvider !== 'function') throw new Error('Public authentication exports are unavailable');`,
+      ]);
+    }
+    assert(!fs.existsSync(optionalUndici), 'Importing public authentication helpers must not install Undici');
+
     const privateX509Modules = [
       'openai/internal/auth/x509-transport-capability',
       'openai/internal/auth/x509-transport-capability.js',
@@ -224,6 +238,9 @@ const packedPackagePath = require('node:path');
       'openai/internal/auth/x509-transport-registry',
       'openai/internal/auth/x509-transport-registry.js',
       'openai/internal/auth/x509-transport-registry.mjs',
+      'openai/internal/auth/x509-credential-options',
+      'openai/internal/auth/x509-credential-options.js',
+      'openai/internal/auth/x509-credential-options.mjs',
       'openai/internal/auth/x509-transport-state',
       'openai/internal/auth/x509-transport-state.cjs',
       'openai/internal/auth/x509-transport-state-browser',
@@ -359,6 +376,11 @@ const packedPackagePath = require('node:path');
               'const dispatcher = new Agent();',
               "const proxyDispatcher = new ProxyAgent({ uri: 'http://127.0.0.1:1' });",
               "const secureProxyDispatcher = new ProxyAgent({ uri: 'https://127.0.0.1:1' });",
+              ...(undiciVersion === '5.5.1'
+                ? [
+                    "for (const proxy of [proxyDispatcher, secureProxyDispatcher]) { const state = Object.getOwnPropertySymbols(proxy).find((symbol) => symbol.description === 'proxy agent options'); assert(state); proxy[state] = new URL(proxy[state].uri); }",
+                  ]
+                : []),
               "const direct = () => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' });",
               "const httpConnect = () => createX509Transport({ runtime: 'node', dispatcher: proxyDispatcher, certificateIdentity: 'static', proxy: 'http-connect' });",
               "const httpsConnect = () => createX509Transport({ runtime: 'node', dispatcher: secureProxyDispatcher, certificateIdentity: 'static', proxy: 'https-connect' });",
@@ -489,7 +511,6 @@ const packedPackagePath = require('node:path');
     );
     assert.equal(installedPackage.peerDependencies?.['undici'], '>=5 <9');
     assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
-    const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
     assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
     run(process.execPath, [
       '--conditions=browser',

@@ -1,10 +1,11 @@
 import { X509Certificate } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
+import { inspect } from 'node:util';
 import { Agent, ProxyAgent, fetch } from 'undici';
 import { vi } from 'vitest';
 
-import { createX509Transport } from 'openai/auth/x509-transport';
+import { createX509Transport, fromX509, workloadIdentity } from 'openai/auth/x509-transport';
 import type { X509Transport, X509TransportOptions } from 'openai/auth/x509-transport';
 import { registerX509Transport, sendX509Request } from 'openai/internal/auth/x509-transport-capability';
 
@@ -24,6 +25,181 @@ function directOptions(dispatcher: Agent): X509TransportOptions {
     proxy: 'direct',
   };
 }
+
+function credentialOptions() {
+  const lab = createX509TestLab();
+  return {
+    certificateChain: lab.firstClient.certificate.toString(),
+    privateKey: lab.firstClient.privateKey.toString(),
+    identityProviderId: 'synthetic-identity-provider',
+    serviceAccountId: 'synthetic-service-account',
+    ca: lab.certificateAuthority.toString(),
+  };
+}
+
+describe('SDK-owned X.509 credential transport', () => {
+  test('exports its first-class factory through a frozen workload identity namespace', () => {
+    expect(Object.isFrozen(workloadIdentity)).toBe(true);
+    expect(workloadIdentity.fromX509).toBe(fromX509);
+  });
+
+  test('returns an opaque, frozen credential whose owned transport closes exactly once', async () => {
+    const credential = workloadIdentity.fromX509(credentialOptions());
+
+    expect(Object.isFrozen(credential)).toBe(true);
+    expect(Reflect.ownKeys(credential)).toEqual([]);
+    const firstClose = credential.close();
+    expect(credential.close()).toBe(firstClose);
+    await firstClose;
+  });
+
+  test('rejects a caller attempt to disable TLS server verification', () => {
+    const options = { ...credentialOptions(), rejectUnauthorized: false };
+
+    expect(() => fromX509(options)).toThrow(/rejectUnauthorized|unsupported|TLS/iu);
+  });
+
+  test('rejects a caller-supplied dispatcher that disables TLS server verification', async () => {
+    const dispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+
+    try {
+      const options = { ...credentialOptions(), dispatcher };
+
+      expect(() => fromX509(options)).toThrow(/dispatcher|unsupported/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test.each([
+    { url: 'http://127.0.0.1:1', mode: 'https-connect' },
+    { url: 'https://127.0.0.1:1', mode: 'http-connect' },
+  ] as const)('rejects proxy protocol mismatches for $mode', ({ url, mode }) => {
+    expect(() => fromX509({ ...credentialOptions(), proxy: { url, mode } })).toThrow(
+      /proxy|protocol|HTTPS/iu,
+    );
+  });
+
+  test('never exposes proxy credentials when rejecting a malformed proxy URL', () => {
+    const secret = 'synthetic-private-proxy-password';
+    const options = {
+      ...credentialOptions(),
+      proxy: {
+        url: `https://synthetic-user:${secret}@invalid host`,
+        mode: 'https-connect' as const,
+      },
+    };
+    let failure: unknown;
+
+    try {
+      fromX509(options);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(inspect(failure)).not.toContain(secret);
+    expect(JSON.stringify(failure)).not.toContain(secret);
+  });
+
+  test('rejects inherited certificate material without invoking its accessor', () => {
+    const { privateKey, ...ownOptions } = credentialOptions();
+    const getter = vi.fn(() => privateKey);
+    const options = Object.assign(
+      Object.create({
+        get privateKey() {
+          return getter();
+        },
+      }) as { privateKey: string },
+      ownOptions,
+    );
+
+    expect(() => fromX509(options)).toThrow(/privateKey|own|plain/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  test('rejects executable credential prototype traps without invoking them', () => {
+    const trap = vi.fn(() => {
+      throw new Error('attacker-controlled credential prototype trap');
+    });
+    const prototype = new Proxy({}, { has: trap });
+    const options = Object.assign(Object.create(prototype) as object, credentialOptions());
+
+    expect(() => fromX509(options)).toThrow(/prototype|plain|proxy/iu);
+    expect(trap).not.toHaveBeenCalled();
+  });
+
+  test.each(['ca', 'passphrase'] as const)(
+    'rejects an inherited optional $0 accessor before touching private material',
+    (name) => {
+      const { ca, ...ownOptions } = credentialOptions();
+      const getter = vi.fn(() => ca);
+      const options = Object.assign(
+        Object.create({
+          get [name]() {
+            return getter();
+          },
+        }) as Record<string, string>,
+        ownOptions,
+      );
+
+      expect(() => fromX509(options)).toThrow(/own|plain|inherited|credential/iu);
+      expect(getter).not.toHaveBeenCalled();
+    },
+  );
+
+  test('rejects inherited proxy configuration without invoking its accessor', () => {
+    const getter = vi.fn(() => 'http://127.0.0.1:1');
+    const proxy = Object.assign(
+      Object.create({
+        get url() {
+          return getter();
+        },
+      }) as { url: string },
+      { mode: 'http-connect' as const },
+    );
+
+    expect(() => fromX509({ ...credentialOptions(), proxy })).toThrow(/proxy|own|plain/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  test('rejects executable trust-root array entries without invoking them', () => {
+    const root = credentialOptions().ca;
+    const ca = [root];
+    const getter = vi.fn(() => root);
+    Object.defineProperty(ca, 0, { get: getter });
+
+    expect(() => fromX509({ ...credentialOptions(), ca })).toThrow(/trust|authorit|certificate|plain/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  test('never sends HTTPS CONNECT proxy credentials to a plaintext proxy', async () => {
+    const requests = vi.fn();
+    const proxy = createServer();
+    proxy.on('connect', requests);
+    const listening = once(proxy, 'listening');
+    proxy.listen(0, '127.0.0.1');
+    await listening;
+
+    try {
+      const address = proxy.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected a loopback TCP server address');
+      }
+      const url = `http://synthetic-user:synthetic-secret@127.0.0.1:${address.port}`;
+
+      expect(() => fromX509({ ...credentialOptions(), proxy: { url, mode: 'https-connect' } })).toThrow(
+        /proxy|protocol|HTTPS/iu,
+      );
+      expect(requests).not.toHaveBeenCalled();
+    } finally {
+      proxy.closeAllConnections();
+      const closed = once(proxy, 'close');
+      proxy.close();
+      await closed;
+    }
+  });
+});
 
 describe('explicit X.509 transport capability', () => {
   test('rejects Undici without per-request dispatcher support before creating a capability', async () => {
@@ -278,6 +454,125 @@ describe('explicit X.509 transport capability', () => {
     try {
       expect(() => createX509Transport({ ...directOptions(dispatcher), proxy: 'http-connect' })).toThrow(
         /proxy.*ProxyAgent/iu,
+      );
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects an externally supplied Agent that disables TLS server verification', async () => {
+    const dispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).toThrow(
+        /rejectUnauthorized|server verification|TLS/iu,
+      );
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects an externally supplied Agent with a custom dispatcher factory', async () => {
+    const factory = vi.fn(() => new Agent());
+    const dispatcher = new Agent({ factory });
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/factory|trusted|transport/iu);
+      expect(factory).not.toHaveBeenCalled();
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects globally disabled TLS verification unless the dispatcher explicitly enables it', async () => {
+    vi.stubEnv('NODE_TLS_REJECT_UNAUTHORIZED', '0');
+    const inherited = new Agent();
+    const explicit = new Agent({ connect: { rejectUnauthorized: true } });
+    let credential: ReturnType<typeof fromX509> | undefined;
+
+    try {
+      expect(() => createX509Transport(directOptions(inherited))).toThrow(
+        /rejectUnauthorized|server verification|TLS/iu,
+      );
+      expect(() => createX509Transport(directOptions(explicit))).not.toThrow();
+      credential = fromX509({
+        ...credentialOptions(),
+        proxy: { url: 'http://127.0.0.1:1', mode: 'http-connect' },
+      });
+    } finally {
+      vi.unstubAllEnvs();
+      await credential?.close();
+      await Promise.all([inherited.close(), explicit.close()]);
+    }
+  });
+
+  test.each([
+    { url: 'http://127.0.0.1:1', mode: 'https-connect' },
+    { url: 'https://127.0.0.1:1', mode: 'http-connect' },
+  ] as const)('rejects an external ProxyAgent whose protocol contradicts $mode', async ({ url, mode }) => {
+    const dispatcher = new ProxyAgent({ uri: url });
+
+    try {
+      expect(() =>
+        createX509Transport({
+          runtime: 'node',
+          dispatcher,
+          certificateIdentity: 'static',
+          proxy: mode,
+        }),
+      ).toThrow(/proxy|protocol|HTTPS/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test.each([
+    {
+      label: 'target',
+      options: { uri: 'http://127.0.0.1:1', requestTls: { rejectUnauthorized: false } },
+      mode: 'http-connect',
+    },
+    {
+      label: 'proxy',
+      options: { uri: 'https://127.0.0.1:1', proxyTls: { rejectUnauthorized: false } },
+      mode: 'https-connect',
+    },
+  ] as const)(
+    'rejects an external ProxyAgent with disabled $label TLS verification',
+    async ({ options, mode }) => {
+      const dispatcher = new ProxyAgent(options);
+
+      try {
+        expect(() =>
+          createX509Transport({
+            runtime: 'node',
+            dispatcher,
+            certificateIdentity: 'static',
+            proxy: mode,
+          }),
+        ).toThrow(/rejectUnauthorized|server verification|TLS/iu);
+      } finally {
+        await dispatcher.close();
+      }
+    },
+  );
+
+  test('revalidates external TLS verification immediately before dispatch', async () => {
+    const dispatcher = new Agent({ connect: { rejectUnauthorized: true } });
+
+    try {
+      const capability = createX509Transport(directOptions(dispatcher));
+      const stateKey = Object.getOwnPropertySymbols(dispatcher).find(
+        (symbol) => symbol.description === 'options',
+      );
+      const state = stateKey ? Object.getOwnPropertyDescriptor(dispatcher, stateKey)?.value : undefined;
+      if (!state || typeof state !== 'object' || !state.connect || typeof state.connect !== 'object') {
+        throw new Error('Expected genuine Undici Agent connection settings');
+      }
+      state.connect.rejectUnauthorized = false;
+
+      await expect(sendX509Request(capability, new URL('https://example.invalid'), {})).rejects.toThrow(
+        /rejectUnauthorized|server verification|TLS/iu,
       );
     } finally {
       await dispatcher.close();

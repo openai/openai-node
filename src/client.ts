@@ -17,7 +17,7 @@ import { resolveDataResidency, type DataResidency } from './internal/data-reside
 export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
-import type { WorkloadIdentity, X509WorkloadIdentity } from './auth/types';
+import type { WorkloadIdentity, X509Credential, X509WorkloadIdentity } from './auth/types';
 import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
 import {
   X509_API_BASE_URL,
@@ -28,6 +28,10 @@ import {
   snapshotX509RequestOptions,
 } from './internal/auth/x509-workload-identity-auth';
 import type { X509Transport } from './internal/auth/x509-transport-registry';
+import {
+  normalizeX509CredentialOptions,
+  prepareX509ClientClone,
+} from './internal/auth/x509-credential-options';
 import { isTransientX509ConnectionError, markApprovedX509Client } from '#x509-transport-state';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
@@ -430,6 +434,9 @@ export interface ClientOptions {
   /** Approved, frozen Node.js certificate transport required only for X.509 workload identity. */
   x509Transport?: X509Transport | undefined;
 
+  /** First-class certificate credential created with `fromX509` from `openai/auth/x509-transport`. */
+  credential?: X509Credential | undefined;
+
   /**
    * Configure this client to use a third-party API provider.
    * Mutually exclusive with top-level authentication and `baseURL` options.
@@ -457,6 +464,7 @@ export class OpenAI {
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
   #x509Authentication: X509WorkloadIdentityAuth | undefined;
+  #x509Credential: X509Credential | undefined;
   #x509Fetch: Fetch | undefined;
   // Preserve an explicit global selection without storing a second routing URL.
   #explicitDataResidency = false;
@@ -495,6 +503,8 @@ export class OpenAI {
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
   constructor(clientOptions: ClientOptions = {}) {
+    const { credential, options: normalizedOptions } = normalizeX509CredentialOptions(clientOptions);
+    clientOptions = normalizedOptions;
     const residencyBaseURL = resolveDataResidency(clientOptions);
     const provider = clientOptions.provider;
     const {
@@ -508,6 +518,7 @@ export class OpenAI {
       webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
       workloadIdentity,
       x509Transport,
+      credential: _credential,
       ...opts
     } = clientOptions as InternalClientOptions;
     if (provider) {
@@ -601,7 +612,7 @@ export class OpenAI {
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
-    const customHeadersEnv = provider ? undefined : readEnv('OPENAI_CUSTOM_HEADERS');
+    const customHeadersEnv = provider || credential ? undefined : readEnv('OPENAI_CUSTOM_HEADERS');
     if (customHeadersEnv) {
       const parsed: Record<string, string> = {};
       for (const line of customHeadersEnv.split('\n')) {
@@ -620,6 +631,7 @@ export class OpenAI {
       const authentication = new X509WorkloadIdentityAuth(x509Identity, x509Transport, organization, project);
       this._workloadIdentityAuth = authentication;
       this.#x509Authentication = authentication;
+      this.#x509Credential = credential;
       this.#x509Fetch = authentication.fetch();
       this.fetch = this.#x509Fetch;
       markApprovedX509Client(this);
@@ -640,7 +652,7 @@ export class OpenAI {
   withOptions(options: Partial<ClientOptions>): this {
     const residencyBaseURL = resolveDataResidency(options);
     const inheritedProvider = this._options.provider;
-    const provider = options.provider ?? inheritedProvider;
+    const provider = options.provider ?? (options.credential === undefined ? inheritedProvider : undefined);
     const x509Authentication = this.#x509Authentication;
     const inheritedOptions: ClientOptions = {
       ...this._options,
@@ -659,26 +671,14 @@ export class OpenAI {
       project: this.project,
       webhookSecret: this.webhookSecret,
     };
-    const currentlyX509 = x509Authentication !== undefined;
-    const nextIdentity = hasOwn(options, 'workloadIdentity')
-      ? options.workloadIdentity
-      : inheritedOptions.workloadIdentity;
-    const nextX509 = isX509WorkloadIdentity(nextIdentity);
-    if (currentlyX509 !== nextX509) {
-      delete inheritedOptions.fetch;
-      delete inheritedOptions.baseURL;
-      if (nextX509) {
-        inheritedOptions.apiKey = null;
-      } else {
-        delete inheritedOptions.x509Transport;
-      }
-    }
+    prepareX509ClientClone(inheritedOptions, options, this.#x509Credential, x509Authentication !== undefined);
     if (residencyBaseURL !== undefined) {
       delete inheritedOptions.baseURL;
     }
     if (provider) {
       delete inheritedOptions.apiKey;
       delete inheritedOptions.adminAPIKey;
+      delete inheritedOptions.credential;
       delete inheritedOptions.workloadIdentity;
       delete inheritedOptions.x509Transport;
       delete inheritedOptions.baseURL;
@@ -697,6 +697,7 @@ export class OpenAI {
         this.#explicitDataResidency &&
         residencyBaseURL === undefined &&
         !hasOwn(options, 'baseURL') &&
+        options.credential === undefined &&
         !provider,
     };
     const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
@@ -1151,9 +1152,10 @@ export class OpenAI {
       retriesRemaining = maxRetries;
     }
 
+    const x509Authentication = this.#x509Authentication;
+    x509Authentication?.beginRequestPreparation();
     await this.prepareOptions(options);
 
-    const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     try {

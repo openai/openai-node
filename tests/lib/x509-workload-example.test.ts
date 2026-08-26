@@ -47,10 +47,8 @@ describe('X.509 workload-identity runnable example', () => {
     ['runnable', example],
     ['documented', packageDocumentation],
   ])('keeps the %s X.509 example isolated from ambient credentials and routing', (_name, source) => {
-    expect(source).toContain('apiKey: null');
-    expect(source).toContain('adminAPIKey: null');
-    expect(source).toContain('baseURL: null');
-    expect(source).toContain('organization: null');
+    expect(source).toContain('workloadIdentity.fromX509');
+    expect(source).toContain('credential,');
     expect(source).toContain("project: process.env['OPENAI_X509_PROJECT_ID'] ?? null");
   });
 
