@@ -3,7 +3,7 @@ import { setImmediate as nextTurn } from 'node:timers/promises';
 import { vi } from 'vitest';
 
 import OpenAI, { APIUserAbortError } from 'openai';
-import type { Fetch } from 'openai/internal/builtin-types';
+import type { Fetch, RequestInit } from 'openai/internal/builtin-types';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
 import { bedrock as awsBedrock } from 'openai/providers/bedrock/aws';
 
@@ -11,6 +11,19 @@ type TokenProvider = () => Promise<string>;
 type Endpoint = 'mantle' | 'runtime';
 type ProviderFactory = (endpoint: Endpoint, tokenProvider: TokenProvider) => ReturnType<typeof bearerBedrock>;
 type FetchMock = ReturnType<typeof vi.fn<Fetch>>;
+
+class SignalReplacingOpenAI extends OpenAI {
+  private readonly replacementSignal: AbortSignal;
+
+  constructor(options: ConstructorParameters<typeof OpenAI>[0], replacementSignal: AbortSignal) {
+    super(options);
+    this.replacementSignal = replacementSignal;
+  }
+
+  protected override async prepareRequest(request: RequestInit): Promise<void> {
+    request.signal = this.replacementSignal;
+  }
+}
 
 const dependencyFreeProvider: ProviderFactory = (endpoint, tokenProvider) =>
   bearerBedrock({ endpoint, region: 'us-east-1', tokenProvider });
@@ -35,10 +48,12 @@ function createClient(
   tokenProvider: TokenProvider,
   create: ProviderFactory = dependencyFreeProvider,
   endpoint: Endpoint = 'mantle',
+  requestSignal?: AbortSignal,
 ): { client: OpenAI; fetch: FetchMock } {
   const fetch = vi.fn<Fetch>(async () => Response.json({ object: 'list', data: [], has_more: false }));
+  const options = { provider: create(endpoint, tokenProvider), fetch, maxRetries: 0 };
   return {
-    client: new OpenAI({ provider: create(endpoint, tokenProvider), fetch, maxRetries: 0 }),
+    client: requestSignal ? new SignalReplacingOpenAI(options, requestSignal) : new OpenAI(options),
     fetch,
   };
 }
@@ -127,6 +142,231 @@ describe.each(providerCases)('%s %s bearer credentials', (_name, endpoint, creat
     await expectImmediateCancellation(pending, controller.signal, fetch);
     expect(tokenProvider).not.toHaveBeenCalled();
     expect(getEventListeners(controller.signal, 'abort')).toEqual([]);
+  });
+
+  test('cancels a finalized request signal supplied by the protected request hook', async () => {
+    const finalized = new AbortController();
+    const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+    const { client, fetch } = createClient(tokenProvider, create, endpoint, finalized.signal);
+    const pending = observe(client.models.list());
+
+    await waitForProvider(tokenProvider);
+    finalized.abort(new Error('protected hook cancelled the finalized request'));
+
+    await expectImmediateCancellation(pending, finalized.signal, fetch);
+    expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
+  });
+
+  test.each(['original options', 'finalized request'] as const)(
+    'cancels from the %s signal when the protected request hook replaces it',
+    async (source) => {
+      const original = new AbortController();
+      const finalized = new AbortController();
+      const cancelled = source === 'original options' ? original : finalized;
+      const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+      const { client, fetch } = createClient(tokenProvider, create, endpoint, finalized.signal);
+      const pending = observe(client.models.list({ signal: original.signal }));
+
+      await waitForProvider(tokenProvider);
+      cancelled.abort(new Error(`${source} cancelled credential resolution`));
+
+      await expectImmediateCancellation(pending, cancelled.signal, fetch);
+      expect(getEventListeners(original.signal, 'abort')).toEqual([]);
+      expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
+    },
+  );
+
+  test('rejects a pre-aborted replacement signal without invoking the credential provider', async () => {
+    const original = new AbortController();
+    const finalized = new AbortController();
+    finalized.abort(new Error('protected hook supplied an already-cancelled signal'));
+    const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+    const { client, fetch } = createClient(tokenProvider, create, endpoint, finalized.signal);
+
+    await expectImmediateCancellation(
+      observe(client.models.list({ signal: original.signal })),
+      finalized.signal,
+      fetch,
+    );
+    expect(tokenProvider).not.toHaveBeenCalled();
+    expect(getEventListeners(original.signal, 'abort')).toEqual([]);
+    expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
+  });
+});
+
+describe('Bedrock protected request-hook signal replacement', () => {
+  test('registers a shared options and finalized request signal only once', async () => {
+    const controller = new AbortController();
+    const addListener = vi.spyOn(controller.signal, 'addEventListener');
+    const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+    const { client, fetch } = createClient(
+      tokenProvider,
+      dependencyFreeProvider,
+      'mantle',
+      controller.signal,
+    );
+    const pending = observe(client.models.list({ signal: controller.signal }));
+
+    await waitForProvider(tokenProvider);
+    expect(addListener).toHaveBeenCalledTimes(1);
+    controller.abort(new Error('the shared caller signal cancelled once'));
+
+    await expectImmediateCancellation(pending, controller.signal, fetch);
+    expect(getEventListeners(controller.signal, 'abort')).toEqual([]);
+  });
+
+  test('accepts a structural finalized request signal alongside the original native signal', async () => {
+    const original = new AbortController();
+    const finalized = new AbortController();
+    const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+    const { client, fetch } = createClient(
+      tokenProvider,
+      dependencyFreeProvider,
+      'mantle',
+      structuralSignal(finalized),
+    );
+    const pending = observe(client.models.list({ signal: original.signal }));
+
+    await waitForProvider(tokenProvider);
+    finalized.abort(new Error('structural finalized request cancelled'));
+
+    await expectImmediateCancellation(pending, finalized.signal, fetch);
+    expect(getEventListeners(original.signal, 'abort')).toEqual([]);
+    expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
+  });
+
+  test('never attaches a credential when the finalized signal aborts after token settlement', async () => {
+    const original = new AbortController();
+    const finalized = new AbortController();
+    const secret = 'synthetic-late-resolved-credential';
+    const tokenProvider: TokenProvider = () => {
+      const token = Promise.resolve(secret);
+      void token.then(() => queueMicrotask(() => finalized.abort(new Error('finalized signal won'))));
+      return token;
+    };
+    const headersSet = vi.spyOn(Headers.prototype, 'set');
+    const { client, fetch } = createClient(tokenProvider, dependencyFreeProvider, 'mantle', finalized.signal);
+
+    await expectImmediateCancellation(
+      observe(client.models.list({ signal: original.signal })),
+      finalized.signal,
+      fetch,
+    );
+    expect(headersSet.mock.calls).not.toContainEqual(['authorization', `Bearer ${secret}`]);
+    expect(getEventListeners(original.signal, 'abort')).toEqual([]);
+    expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
+  });
+
+  test('removes both listeners when finalized signal registration installs and then throws', async () => {
+    const original = new AbortController();
+    const finalizedController = new AbortController();
+    const finalized = structuralSignal(finalizedController);
+    const failure = new Error('finalized signal registration failed');
+    const add = finalized.addEventListener.bind(finalized);
+    vi.spyOn(finalized, 'addEventListener').mockImplementationOnce((type, listener, options) => {
+      add(type, listener, options);
+      throw failure;
+    });
+    const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+    const { client, fetch } = createClient(tokenProvider, dependencyFreeProvider, 'mantle', finalized);
+    const pending = observe(client.models.list({ signal: original.signal }));
+
+    await nextTurn();
+    const waiting = Symbol('finalized signal registration failure did not settle');
+    expect(await Promise.race([pending, Promise.resolve(waiting)])).toBe(failure);
+    expect(tokenProvider).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(getEventListeners(original.signal, 'abort')).toEqual([]);
+    expect(getEventListeners(finalizedController.signal, 'abort')).toEqual([]);
+  });
+
+  test('keeps the first cancellation and removes a finalized listener installed after it', async () => {
+    const original = new AbortController();
+    const finalizedController = new AbortController();
+    const finalized = structuralSignal(finalizedController);
+    const reason = new Error('original cancellation beat finalized registration');
+    const add = finalized.addEventListener.bind(finalized);
+    vi.spyOn(finalized, 'addEventListener').mockImplementationOnce((type, listener, options) => {
+      original.abort(reason);
+      add(type, listener, options);
+      throw new Error('late finalized registration failure');
+    });
+    const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+    const { client, fetch } = createClient(tokenProvider, dependencyFreeProvider, 'mantle', finalized);
+
+    await expectImmediateCancellation(
+      observe(client.models.list({ signal: original.signal })),
+      original.signal,
+      fetch,
+    );
+    expect(tokenProvider).not.toHaveBeenCalled();
+    expect(getEventListeners(original.signal, 'abort')).toEqual([]);
+    expect(getEventListeners(finalizedController.signal, 'abort')).toEqual([]);
+  });
+
+  test.each(['original options', 'finalized request'] as const)(
+    'removes both structural listeners when %s cancellation cleanup throws',
+    async (source) => {
+      const originalController = new AbortController();
+      const finalizedController = new AbortController();
+      const original = structuralSignal(originalController);
+      const finalized = structuralSignal(finalizedController);
+      const cancelled = source === 'original options' ? originalController : finalizedController;
+      throwAfterRemovingOnce(original);
+      throwAfterRemovingOnce(finalized);
+      const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
+      const { client, fetch } = createClient(tokenProvider, dependencyFreeProvider, 'mantle', finalized);
+      const pending = observe(client.models.list({ signal: original }));
+
+      await waitForProvider(tokenProvider);
+      cancelled.abort(new Error(`${source} cancellation survived cleanup failures`));
+
+      await expectImmediateCancellation(pending, cancelled.signal, fetch);
+      expect(getEventListeners(originalController.signal, 'abort')).toEqual([]);
+      expect(getEventListeners(finalizedController.signal, 'abort')).toEqual([]);
+    },
+  );
+
+  test('preserves a successful credential while both structural cleanup methods throw', async () => {
+    const originalController = new AbortController();
+    const finalizedController = new AbortController();
+    const original = structuralSignal(originalController);
+    const finalized = structuralSignal(finalizedController);
+    throwAfterRemovingOnce(original);
+    throwAfterRemovingOnce(finalized);
+    const tokenProvider = vi.fn<TokenProvider>(async () => 'valid-bearer-token');
+    const { client, fetch } = createClient(tokenProvider, dependencyFreeProvider, 'mantle', finalized);
+
+    await expect(client.models.list({ signal: original })).resolves.toBeDefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(getEventListeners(originalController.signal, 'abort')).toEqual([]);
+    const finalizedProviderListener = vi.mocked(finalized.removeEventListener).mock.calls[0]?.[1];
+    expect(finalizedProviderListener).toBeDefined();
+    expect(getEventListeners(finalizedController.signal, 'abort')).not.toContain(finalizedProviderListener);
+    finalizedController.abort();
+    expect(getEventListeners(finalizedController.signal, 'abort')).toEqual([]);
+  });
+
+  test('preserves a provider failure while both structural cleanup methods throw', async () => {
+    const originalController = new AbortController();
+    const finalizedController = new AbortController();
+    const original = structuralSignal(originalController);
+    const finalized = structuralSignal(finalizedController);
+    throwAfterRemovingOnce(original);
+    throwAfterRemovingOnce(finalized);
+    const failure = new Error('private token service unavailable');
+    const tokenProvider: TokenProvider = async () => {
+      throw failure;
+    };
+    const { client, fetch } = createClient(tokenProvider, dependencyFreeProvider, 'mantle', finalized);
+
+    await expect(client.models.list({ signal: original })).rejects.toMatchObject({
+      message: 'Failed to resolve a bearer credential for Bedrock.',
+      cause: failure,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(getEventListeners(originalController.signal, 'abort')).toEqual([]);
+    expect(getEventListeners(finalizedController.signal, 'abort')).toEqual([]);
   });
 });
 
