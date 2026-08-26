@@ -487,8 +487,18 @@ const packedPackagePath = require('node:path');
       sourcePackage.engines,
       'Packed package engine metadata differs from package.json',
     );
+    assert.equal(
+      fs.readFileSync(
+        path.join(temporaryDirectory, 'node_modules/openai/src/_vendor/partial-json-parser/LICENSE'),
+        'utf-8',
+      ),
+      fs.readFileSync(path.join(root, 'src/_vendor/partial-json-parser/LICENSE'), 'utf-8'),
+      'Packed package must preserve the vendored partial-json license',
+    );
     assert.equal(installedPackage.peerDependencies?.['undici'], '>=5 <9');
     assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
+    assert.equal(installedPackage.peerDependencies?.['ws'], '^8.21.0');
+    assert.equal(installedPackage.peerDependenciesMeta?.['ws']?.optional, true);
     const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
     assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
     run(process.execPath, [
