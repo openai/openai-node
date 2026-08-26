@@ -351,8 +351,11 @@ function snapshotResponseLifecycleEvent(
       source !== null && source !== Object.prototype;
       source = Object.getPrototypeOf(source) as object | null
     ) {
-      if (visited.has(source) || visited.size >= MAX_RESPONSE_LIFECYCLE_PROTOTYPE_DEPTH) {
+      if (visited.has(source)) {
         throw new OpenAIError('Response event does not match the active response.');
+      }
+      if (visited.size >= MAX_RESPONSE_LIFECYCLE_PROTOTYPE_DEPTH) {
+        break;
       }
       visited.add(source);
 
@@ -1278,7 +1281,10 @@ export function accumulateResponseWithContext(
   snapshot: Response | undefined,
   context: ResponseAccumulatorContext,
   rejectInvalidShellTargets = false,
-  onSanitizedEvent?: (event: ResponseStreamEvent, emittedEvent?: ResponseStreamEvent) => void,
+  onSanitizedEvent?: (
+    event: ResponseStreamEvent,
+    materializeLifecycleEvent?: () => ResponseStreamEvent,
+  ) => void,
 ): Response {
   const dispatchEvent = sanitizeResponseEvent(event);
 
@@ -1292,7 +1298,9 @@ export function accumulateResponseWithContext(
       );
     }
     return cloneValidatedResponse(context, dispatchEvent.response, undefined, (validatedResponse) =>
-      onSanitizedEvent?.(dispatchEvent, snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
+      onSanitizedEvent?.(dispatchEvent, () =>
+        snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse),
+      ),
     );
   }
 
@@ -1300,7 +1308,9 @@ export function accumulateResponseWithContext(
     const expectedResponseID = getResponseID(snapshot);
     const { response } = dispatchEvent;
     return cloneValidatedResponse(context, response, expectedResponseID, (validatedResponse) =>
-      onSanitizedEvent?.(dispatchEvent, snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse)),
+      onSanitizedEvent?.(dispatchEvent, () =>
+        snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse),
+      ),
     );
   }
 
