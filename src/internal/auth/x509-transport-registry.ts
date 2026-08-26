@@ -62,6 +62,7 @@ export interface X509ExchangedToken {
 export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
+  deadlineArmed?: boolean;
   request?: { signal: AbortSignal | null | undefined; timeout: number; fetchOptions: MergedRequestInit };
   phase?: 'planning' | 'authorizing';
   effectiveSignal?: AbortSignal;

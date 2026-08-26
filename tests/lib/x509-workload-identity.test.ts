@@ -616,8 +616,8 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       },
     });
 
-    await expect(client.models.list()).rejects.toThrow(/issued workload authorization/iu);
-    expect(send).toHaveBeenCalledTimes(1);
+    await expect(client.models.list()).rejects.toThrow(/caller-supplied.*authorization/iu);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test.each([401, 503])(
@@ -662,8 +662,8 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       },
     });
 
-    await expect(client.models.list()).rejects.toThrow(/issued workload authorization/iu);
-    expect(send).toHaveBeenCalledTimes(1);
+    await expect(client.models.list()).rejects.toThrow(/caller-supplied.*authorization/iu);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('rejects forbidden proxy credentials before they can reach an enabled debug logger', async () => {
@@ -679,9 +679,9 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       },
     });
 
-    await expect(client.models.list()).rejects.toThrow(/conflicting authentication/iu);
+    await expect(client.models.list()).rejects.toThrow(/caller-supplied.*authentication/iu);
     expect(JSON.stringify(logger.debug.mock.calls)).not.toContain(secret);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test.each(['fetchWithAuth', 'fetchWithTimeout'])(

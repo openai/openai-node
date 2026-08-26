@@ -365,14 +365,19 @@ export class X509WorkloadIdentityAuth {
     return request;
   }
 
-  /** Arms one logical network deadline only after protected option preparation completes. */
+  /** Begins local request construction without charging protected hook latency to the network. */
   beginRequestPlanning(): void {
+    this.#scope().phase = 'planning';
+  }
+
+  /** Arms one absolute network deadline only after all local request preparation completes. */
+  beginRequestNetwork(): void {
     const scope = this.#scope();
-    if (!scope.request) {
+    if (!scope.deadlineArmed) {
       scope.wallStartedAt = Date.now();
       scope.monotonicStartedAt = performance.now();
+      scope.deadlineArmed = true;
     }
-    scope.phase = 'planning';
   }
 
   /** Keeps certificate authentication outside overridable request construction. */
@@ -381,7 +386,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Approves the final overridden destination and transport before minting a bearer. */
-  authorizePlannedRequest(url: string, request: RequestInit, timeout: number): void {
+  authorizePlannedRequest(url: string, request: RequestInit, timeout: number, allowHookSignal = false): void {
     const scope = this.#scope();
     const headers = Object.getOwnPropertyDescriptor(request, 'headers');
     const body = Object.getOwnPropertyDescriptor(request, 'body');
@@ -390,12 +395,9 @@ export class X509WorkloadIdentityAuth {
     if (
       scope.phase !== 'planning' ||
       !headers ||
-      !('value' in headers) ||
       !(headers.value instanceof Headers) ||
-      (body && !('value' in body)) ||
       (!body && 'body' in request) ||
-      (signal && !('value' in signal)) ||
-      (redirect && !('value' in redirect))
+      [body, signal, redirect].some((descriptor) => descriptor && !('value' in descriptor))
     ) {
       throw new OpenAIError('X.509 workload identity requires an approved final request.');
     }
@@ -410,7 +412,7 @@ export class X509WorkloadIdentityAuth {
       throw new OpenAIError('X.509 workload identity cannot use caller-supplied authorization credentials.');
     }
     this.#assertTenantHeaders(headers.value);
-    if ((signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
+    if (!allowHookSignal && (signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
       throw new OpenAIError('X.509 workload identity must preserve its approved request signal.');
     }
     const approved = this.requestSnapshot();
@@ -519,11 +521,13 @@ export class X509WorkloadIdentityAuth {
 
   /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
   continuation(): <T>(operation: () => Promise<T>) => Promise<T> {
-    const { wallStartedAt, monotonicStartedAt, request, requestOwner, effectiveSignal } = this.#scope();
+    const { wallStartedAt, monotonicStartedAt, deadlineArmed, request, requestOwner, effectiveSignal } =
+      this.#scope();
     const scope: X509RequestScope = {
       wallStartedAt,
       monotonicStartedAt,
       owner: this,
+      ...(deadlineArmed ? { deadlineArmed } : {}),
       ...(request ? { request } : {}),
       ...(effectiveSignal ? { effectiveSignal } : {}),
       ...(requestOwner ? { requestOwner } : {}),
@@ -545,6 +549,7 @@ export class X509WorkloadIdentityAuth {
     const scope = this.#scope();
     delete scope.request;
     delete scope.phase;
+    delete scope.deadlineArmed;
     delete scope.effectiveSignal;
     delete scope.materializedBody;
     delete scope.apiURL;

@@ -465,6 +465,8 @@ export class OpenAI {
       timeout: number;
       retriesRemaining: number;
       hasStreamingBody: boolean;
+      authentication?: X509WorkloadIdentityAuth;
+      helperMethod?: unknown;
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
@@ -753,32 +755,37 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
+    authentication: WorkloadIdentityAuth | X509WorkloadIdentityAuth | undefined = this._workloadIdentityAuth,
   ): Promise<NullableHeaders | undefined> {
     if (
-      this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
+      authentication instanceof X509WorkloadIdentityAuth &&
       schemes.adminAPIKeyAuth &&
       this.adminAPIKey !== null
     ) {
       return await this.adminAPIKeyAuth(opts);
     }
     return buildHeaders([
-      schemes.bearerAuth ? await this.bearerAuth(opts) : null,
+      schemes.bearerAuth ? await this.bearerAuth(opts, authentication) : null,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
     ]);
   }
 
-  protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    if (this._workloadIdentityAuth) {
-      if (this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth) {
+  protected async bearerAuth(
+    opts: FinalRequestOptions,
+    authentication: WorkloadIdentityAuth | X509WorkloadIdentityAuth | undefined = this._workloadIdentityAuth,
+  ): Promise<NullableHeaders | undefined> {
+    if (authentication) {
+      if (authentication instanceof X509WorkloadIdentityAuth) {
         if (
-          this.fetchWithAuth !== OpenAI.prototype.fetchWithAuth ||
-          this.fetchWithTimeout !== OpenAI.prototype.fetchWithTimeout
+          authentication === this._workloadIdentityAuth &&
+          (this.fetchWithAuth !== OpenAI.prototype.fetchWithAuth ||
+            this.fetchWithTimeout !== OpenAI.prototype.fetchWithTimeout)
         ) {
           throw new Errors.OpenAIError(
             'X.509 workload identity does not support overridden fetch dispatch hooks.',
           );
         }
-        const snapshots = this._workloadIdentityAuth.headerSnapshots();
+        const snapshots = authentication.headerSnapshots();
         if (
           !X509WorkloadIdentityAuth.shouldAuthenticate(
             opts,
@@ -790,15 +797,15 @@ export class OpenAI {
         }
       }
       const token =
-        this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth
-          ? await this._workloadIdentityAuth.getToken(opts, {
-              apiURL: this._workloadIdentityAuth.requestAPIURL(),
-              ...this._workloadIdentityAuth.headerSnapshots(),
-              ...this._workloadIdentityAuth.requestSnapshot(),
-              signal: this._workloadIdentityAuth.effectiveSignal(),
-              ...this._workloadIdentityAuth.tenantSnapshot(),
+        authentication instanceof X509WorkloadIdentityAuth
+          ? await authentication.getToken(opts, {
+              apiURL: authentication.requestAPIURL(),
+              ...authentication.headerSnapshots(),
+              ...authentication.requestSnapshot(),
+              signal: authentication.effectiveSignal(),
+              ...authentication.tenantSnapshot(),
             })
-          : await this._workloadIdentityAuth.getToken();
+          : await authentication.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
     if (this.apiKey == null) {
@@ -994,10 +1001,7 @@ export class OpenAI {
     while (true) {
       const attempt = this.#responseAttempts.get(props.controller);
       const timeout = attempt?.timeout ?? props.options.timeout ?? this.timeout;
-      const x509Authentication =
-        this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth
-          ? this._workloadIdentityAuth
-          : undefined;
+      const x509Authentication = attempt?.authentication;
       const callerSignal = x509Authentication ? props.controller.signal : props.options.signal;
       const abortError = () =>
         x509Authentication && callerSignal
@@ -1020,7 +1024,7 @@ export class OpenAI {
 
       try {
         // Tool runners preserve a completed buffered turn before cancellation stops the next request.
-        if (callerSignal?.aborted && props.options.__metadata?.['helperMethod'] !== 'runTools') {
+        if (callerSignal?.aborted && attempt?.helperMethod !== 'runTools') {
           throw abortError();
         }
 
@@ -1164,8 +1168,25 @@ export class OpenAI {
         if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
           options.__metadata = { ...options.__metadata, hasStreamingBody: true };
         }
+        await this.prepareRequest(built.req, { url: built.url, options });
+        await this._provider?.prepareRequest?.(built.req, { url: built.url, options });
+        x509Authentication.beginRequestPlanning();
+        x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout, true);
+        if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
+          options.__metadata = { ...options.__metadata, hasStreamingBody: true };
+        }
+        const callerSignal = x509Authentication.requestSnapshot().signal;
+        if (callerSignal?.aborted || built.req.signal?.aborted) {
+          throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : built.req.signal!);
+        }
+        x509Authentication.setEffectiveSignal(
+          built.req.signal || callerSignal
+            ? createRequestController(built.req.signal ?? callerSignal, callerSignal).signal
+            : undefined,
+        );
+        x509Authentication.beginRequestNetwork();
         const security = options.__security ?? { bearerAuth: true };
-        const authenticationHeaders = await this.authHeaders(options, security);
+        const authenticationHeaders = await this.authHeaders(options, security, x509Authentication);
         const suppliedHeaders = x509Authentication.headerSnapshots();
         const supplied = buildHeaders([suppliedHeaders.defaultHeaders, suppliedHeaders.requestHeaders]);
         for (const [name, value] of authenticationHeaders?.values ?? []) {
@@ -1199,8 +1220,10 @@ export class OpenAI {
     x509Authentication?.bindRequest(options, req, this.adminAPIKey);
     let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
-    await this.prepareRequest(req, { url, options });
-    await this._provider?.prepareRequest?.(req, { url, options });
+    if (!x509Authentication) {
+      await this.prepareRequest(req, { url, options });
+      await this._provider?.prepareRequest?.(req, { url, options });
+    }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
       hasStreamingBody = true;
@@ -1226,18 +1249,10 @@ export class OpenAI {
     if (callerSignal?.aborted || req.signal?.aborted) {
       throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
     }
-    if (x509Authentication) {
-      x509Authentication.setEffectiveSignal(
-        req.signal || callerSignal
-          ? createRequestController(req.signal ?? callerSignal, callerSignal).signal
-          : undefined,
-      );
-    }
-
     const security = options.__security ?? { bearerAuth: true };
     // Request hooks may replace the caller signal before it reaches fetch.
     const controller =
-      this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
+      x509Authentication || this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
         ? createRequestController(
             req.signal ?? (x509Authentication ? callerSignal : undefined),
             x509Authentication ? callerSignal : undefined,
@@ -1455,6 +1470,8 @@ export class OpenAI {
       timeout,
       retriesRemaining,
       hasStreamingBody,
+      ...(x509Authentication ? { authentication: x509Authentication } : {}),
+      helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
     });
     return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };

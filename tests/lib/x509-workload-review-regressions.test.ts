@@ -752,7 +752,7 @@ describe('X.509 review regressions', () => {
     });
 
     await expect(client.models.list()).rejects.toThrow(/authorization|authentication/iu);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('clears authenticated request credentials when a protected request hook fails', async () => {
