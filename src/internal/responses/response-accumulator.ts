@@ -17,6 +17,10 @@ interface ResponseKeepAliveEvent {
 }
 
 type ResponseAccumulatorEvent = ResponseStreamEvent | ResponseKeepAliveEvent;
+interface ValidatedResponseEvent {
+  event: ResponseAccumulatorEvent;
+  typeDescriptor: PropertyDescriptor;
+}
 type ResponseItemScopedEvent = Extract<ResponseAccumulatorEvent, { item_id: string; output_index: number }>;
 type ResponseOutputItemEvent = Extract<
   ResponseAccumulatorEvent,
@@ -359,12 +363,21 @@ function cloneValidatedWireResponse(
 
 function snapshotResponseLifecycleEvent(
   event: ResponseLifecycleEvent,
+  typeDescriptor: PropertyDescriptor,
   response: Response,
   wireOutputText: PropertyDescriptor | undefined,
 ): ResponseLifecycleEvent {
   try {
+    const { type, sequence_number: sequenceNumber } = event;
     const detached = Object.create(Object.prototype) as ResponseLifecycleEvent;
     const visited = new Set<object>();
+
+    Object.defineProperty(detached, 'type', {
+      configurable: Boolean(typeDescriptor.configurable),
+      enumerable: Boolean(typeDescriptor.enumerable),
+      value: type,
+      writable: Boolean(typeDescriptor.writable),
+    });
 
     for (
       let source = event as object | null;
@@ -392,11 +405,14 @@ function snapshotResponseLifecycleEvent(
           continue;
         }
 
-        const value = 'value' in descriptor ? descriptor.value : Reflect.get(event, key, event);
+        let value: unknown = sequenceNumber;
+        if (key !== 'sequence_number') {
+          value = 'value' in descriptor ? descriptor.value : Reflect.get(event, key, event);
+        }
         Object.defineProperty(detached, key, {
           configurable: Boolean(descriptor.configurable),
           enumerable: Boolean(descriptor.enumerable),
-          value: key === 'type' ? event.type : value,
+          value,
           writable: 'writable' in descriptor ? Boolean(descriptor.writable) : true,
         });
       }
@@ -662,7 +678,7 @@ const responseEventRoutingFields = [
   'summary_index',
 ] as const;
 
-function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumulatorEvent {
+function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ValidatedResponseEvent {
   let descriptor: PropertyDescriptor | undefined;
   try {
     descriptor = Object.getOwnPropertyDescriptor(event, 'type');
@@ -672,6 +688,7 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
 
   const type: unknown = descriptor?.value;
   if (
+    !descriptor ||
     typeof type !== 'string' ||
     !supportedResponseEventTypes.has(type as ResponseAccumulatorEvent['type'])
   ) {
@@ -706,19 +723,22 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
     }
   }
 
-  return new Proxy(event, {
-    get(target, property) {
-      if (stableValues.has(property)) {
-        return stableValues.get(property);
-      }
+  return {
+    event: new Proxy(event, {
+      get(target, property) {
+        if (stableValues.has(property)) {
+          return stableValues.get(property);
+        }
 
-      const value = Reflect.get(target, property, target);
-      if (property === 'sequence_number') {
-        stableValues.set(property, value);
-      }
-      return value;
-    },
-  });
+        const value = Reflect.get(target, property, target);
+        if (property === 'sequence_number') {
+          stableValues.set(property, value);
+        }
+        return value;
+      },
+    }),
+    typeDescriptor: descriptor,
+  };
 }
 
 function accumulateOutputItemEvent(
@@ -1314,7 +1334,7 @@ export function accumulateResponseWithContext(
     materializeLifecycleEvent?: () => ResponseStreamEvent,
   ) => void,
 ): Response {
-  const dispatchEvent = sanitizeResponseEvent(event);
+  const { event: dispatchEvent, typeDescriptor } = sanitizeResponseEvent(event);
 
   if (!snapshot) {
     if (dispatchEvent.type !== 'response.created') {
@@ -1331,7 +1351,7 @@ export function accumulateResponseWithContext(
       undefined,
       (validatedResponse, wireOutputText) =>
         onSanitizedEvent?.(dispatchEvent, () =>
-          snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse, wireOutputText),
+          snapshotResponseLifecycleEvent(dispatchEvent, typeDescriptor, validatedResponse, wireOutputText),
         ),
     );
   }
@@ -1345,7 +1365,7 @@ export function accumulateResponseWithContext(
       expectedResponseID,
       (validatedResponse, wireOutputText) =>
         onSanitizedEvent?.(dispatchEvent, () =>
-          snapshotResponseLifecycleEvent(dispatchEvent, validatedResponse, wireOutputText),
+          snapshotResponseLifecycleEvent(dispatchEvent, typeDescriptor, validatedResponse, wireOutputText),
         ),
     );
   }

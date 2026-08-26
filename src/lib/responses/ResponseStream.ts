@@ -175,7 +175,10 @@ export class ResponseStream<ParsedT = null>
       }
     }
 
-    const emittedEvent = materializeLifecycleEvent?.() ?? event;
+    const emittedEvent =
+      materializeLifecycleEvent && (this._hasListeners('event') || this._hasListeners(dispatchEvent.type))
+        ? materializeLifecycleEvent()
+        : event;
     emit('event', emittedEvent);
 
     switch (dispatchEvent.type) {
