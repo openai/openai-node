@@ -151,6 +151,108 @@ describe('provider', () => {
     expect(requestedHeaders?.get('x-provider-custom')).toBe('preserve-me');
   });
 
+  test('clears provider-owned routing before installing workload identity', async () => {
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
+    delete process.env['OPENAI_BASE_URL'];
+    delete process.env['OPENAI_ORG_ID'];
+    delete process.env['OPENAI_PROJECT_ID'];
+
+    const accessToken = 'synthetic-openai-workload-access-token';
+    const respond = async (url: string | URL | Request) =>
+      String(url).includes('/oauth/token')
+        ? Response.json({ access_token: accessToken, token_type: 'Bearer', expires_in: 3600 })
+        : Response.json({ data: [] });
+    const inheritedFetch = vi.fn(respond);
+    const replacementFetch = vi.spyOn(globalThis, 'fetch').mockImplementation(respond);
+
+    try {
+      const original = new OpenAI({
+        provider: provider(),
+        organization: 'synthetic-provider-organization',
+        project: 'synthetic-provider-project',
+        defaultHeaders: { 'x-provider-private': 'synthetic-provider-private-header' },
+        defaultQuery: { api_key: 'synthetic-provider-private-api-key' },
+        fetchOptions: { credentials: 'include' },
+        fetch: inheritedFetch,
+      });
+      const replacement = original.withOptions({
+        workloadIdentity: {
+          identityProviderId: 'synthetic-identity-provider',
+          serviceAccountId: 'synthetic-service-account',
+          provider: { tokenType: 'jwt', getToken: async () => 'synthetic-subject-token' },
+        },
+      });
+
+      await replacement.models.list();
+
+      expect(replacement.baseURL).toBe('https://api.openai.com/v1');
+      expect(replacement.organization).toBeNull();
+      expect(replacement.project).toBeNull();
+      expect(replacement.fetchOptions).toBeUndefined();
+      expect(inheritedFetch).not.toHaveBeenCalled();
+      expect(replacementFetch).toHaveBeenCalledTimes(2);
+      expect(String(replacementFetch.mock.calls[0]?.[0])).toBe('https://auth.openai.com/oauth/token');
+      expect(String(replacementFetch.mock.calls[1]?.[0])).toBe('https://api.openai.com/v1/models');
+      const requestHeaders = new Headers(replacementFetch.mock.calls[1]?.[1]?.headers);
+      expect(requestHeaders.get('authorization')).toBe(`Bearer ${accessToken}`);
+      expect(requestHeaders.has('x-provider-private')).toBe(false);
+    } finally {
+      replacementFetch.mockRestore();
+    }
+  });
+
+  test('preserves explicit workload-identity routing when replacing a provider', async () => {
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
+
+    const inheritedFetch = vi.fn(async () => Response.json({ data: [] }));
+    const replacementFetch = vi.fn(async (url: string | URL | Request, _init?: RequestInit) =>
+      String(url).includes('/oauth/token')
+        ? Response.json({
+            access_token: 'synthetic-openai-workload-access-token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          })
+        : Response.json({ data: [] }),
+    );
+    const replacementFetchOptions = { cache: 'no-store' as const };
+    const original = new OpenAI({
+      provider: provider(),
+      defaultHeaders: { 'x-provider-private': 'synthetic-provider-private-header' },
+      defaultQuery: { api_key: 'synthetic-provider-private-api-key' },
+      fetchOptions: { credentials: 'include' },
+      fetch: inheritedFetch,
+    });
+    const replacement = original.withOptions({
+      workloadIdentity: {
+        identityProviderId: 'synthetic-identity-provider',
+        serviceAccountId: 'synthetic-service-account',
+        provider: { tokenType: 'jwt', getToken: async () => 'synthetic-subject-token' },
+      },
+      baseURL: 'https://openai.example/v1',
+      organization: 'synthetic-openai-organization',
+      project: 'synthetic-openai-project',
+      defaultHeaders: { 'x-workload-custom': 'synthetic-workload-header' },
+      defaultQuery: { page: '1' },
+      fetchOptions: replacementFetchOptions,
+      fetch: replacementFetch,
+    });
+
+    await replacement.models.list();
+
+    expect(replacement.baseURL).toBe('https://openai.example/v1');
+    expect(replacement.organization).toBe('synthetic-openai-organization');
+    expect(replacement.project).toBe('synthetic-openai-project');
+    expect(replacement.fetchOptions).toBe(replacementFetchOptions);
+    expect(inheritedFetch).not.toHaveBeenCalled();
+    expect(replacementFetch).toHaveBeenCalledTimes(2);
+    expect(String(replacementFetch.mock.calls[1]?.[0])).toBe('https://openai.example/v1/models?page=1');
+    const requestHeaders = new Headers(replacementFetch.mock.calls[1]?.[1]?.headers);
+    expect(requestHeaders.get('x-workload-custom')).toBe('synthetic-workload-header');
+    expect(requestHeaders.has('x-provider-private')).toBe(false);
+  });
+
   test('does not let a request-level default base URL replace the provider base URL', () => {
     const client = new OpenAI({
       provider: provider({ baseURL: 'https://api.openai.com/v1' }),

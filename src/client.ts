@@ -681,6 +681,15 @@ export class OpenAI {
     if (residencyBaseURL !== undefined) {
       delete inheritedOptions.baseURL;
     }
+    if (provider !== inheritedProvider) {
+      delete inheritedOptions.baseURL;
+      delete inheritedOptions.organization;
+      delete inheritedOptions.project;
+      delete inheritedOptions.defaultHeaders;
+      delete inheritedOptions.defaultQuery;
+      delete inheritedOptions.fetchOptions;
+      delete inheritedOptions.fetch;
+    }
     if (provider) {
       delete inheritedOptions.apiKey;
       delete inheritedOptions.adminAPIKey;
@@ -688,14 +697,6 @@ export class OpenAI {
       delete inheritedOptions.workloadIdentity;
       delete inheritedOptions.x509Transport;
       delete inheritedOptions.baseURL;
-      if (provider !== inheritedProvider) {
-        delete inheritedOptions.organization;
-        delete inheritedOptions.project;
-        delete inheritedOptions.defaultHeaders;
-        delete inheritedOptions.defaultQuery;
-        delete inheritedOptions.fetchOptions;
-        delete inheritedOptions.fetch;
-      }
     }
 
     const clientOptions: InternalClientOptions = {

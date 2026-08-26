@@ -45,11 +45,15 @@ export class WorkloadIdentityAuth {
    * @param fetch Optional fetch implementation for calls to the OpenAI token endpoint.
    */
   constructor(config: WorkloadIdentity, fetch?: Fetch) {
+    const { identityProviderId, serviceAccountId, clientId, refreshBufferSeconds, provider } = config;
     this.config = {
-      ...config,
+      identityProviderId,
+      serviceAccountId,
+      ...(clientId === undefined ? {} : { clientId }),
+      ...(refreshBufferSeconds === undefined ? {} : { refreshBufferSeconds }),
       provider: {
-        tokenType: config.provider.tokenType,
-        getToken: config.provider.getToken.bind(config.provider),
+        tokenType: provider.tokenType,
+        getToken: provider.getToken.bind(provider),
       },
     };
     this.fetch = fetch ?? Shims.getDefaultFetch();

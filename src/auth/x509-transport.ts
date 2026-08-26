@@ -223,6 +223,17 @@ function proxyAuthentication(url: URL): string | undefined {
   return Buffer.from(`${username}:${password}`, 'utf-8').toString('base64');
 }
 
+function normalizeProxyURL(value: unknown): URL {
+  if (typeof value !== 'string' && (typeof value !== 'object' || value === null || types.isProxy(value))) {
+    throw new Error('X.509 CONNECT proxy requires an own URL string or URL value.');
+  }
+  try {
+    return new URL(typeof value === 'string' ? value : URL.prototype.toString.call(value));
+  } catch {
+    throw new Error('X.509 CONNECT proxy requires a valid proxy URL.');
+  }
+}
+
 function credentialDispatcher(
   proxyOptionsInput: unknown,
   requestTls: VerifiedX509TLSOptions,
@@ -232,16 +243,7 @@ function credentialDispatcher(
   }
 
   const proxyOptions = safeOptionRecord(proxyOptionsInput, proxyOptionNames, 'proxy');
-  const proxyURL = proxyOptions['url'];
-  if (typeof proxyURL !== 'string' && !(proxyURL instanceof URL)) {
-    throw new Error('X.509 CONNECT proxy requires an own URL string or URL value.');
-  }
-  let url: URL;
-  try {
-    url = new URL(typeof proxyURL === 'string' ? proxyURL : URL.prototype.toString.call(proxyURL));
-  } catch {
-    throw new Error('X.509 CONNECT proxy requires a valid proxy URL.');
-  }
+  const url = normalizeProxyURL(proxyOptions['url']);
   const selected = proxyOptions['mode'];
   const proxy: X509ProxyMode =
     selected === 'http-connect' || selected === 'https-connect' ? selected : 'direct';
