@@ -238,7 +238,19 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Check out trusted workflow commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Preserve workflow-version publisher
+        run: |
+          cp ./bin/publish-npm "${RUNNER_TEMP}/openai-publish-npm"
+          chmod 500 "${RUNNER_TEMP}/openai-publish-npm"
+
+      - name: Check out release commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ needs.publication-check.outputs.release_sha }}
           persist-credentials: false
@@ -267,4 +279,4 @@ jobs:
 
       - name: Publish to NPM
         run: |
-          bash ./bin/publish-npm
+          bash "${RUNNER_TEMP}/openai-publish-npm"

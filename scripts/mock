@@ -31,9 +31,9 @@ echo "==> Starting mock server with URL ${URL}"
 # Run steady mock on the given spec
 if [ "$1" == "--daemon" ]; then
   # Verify the locked local binary is available before the startup timeout.
-  pnpm exec steady --version
+  ./node_modules/.bin/steady --version
 
-  pnpm exec steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL" &> .stdy.log &
+  ./node_modules/.bin/steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL" &> .stdy.log &
 
   # Wait for server to come online via health endpoint (max 30s)
   echo -n "Waiting for server"
@@ -57,5 +57,5 @@ if [ "$1" == "--daemon" ]; then
 
   echo
 else
-  pnpm exec steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL"
+  ./node_modules/.bin/steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL"
 fi
