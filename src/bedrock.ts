@@ -20,7 +20,7 @@ import type * as ResponsesAPI from './resources/responses/responses';
 /** Configures Amazon Bedrock's OpenAI-compatible endpoint and bearer-token authentication. */
 export interface BedrockClientOptions extends Omit<
   ClientOptions,
-  'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity' | 'dataResidency'
+  'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity' | 'x509Transport' | 'dataResidency'
 > {
   /**
    * Bedrock bearer token used for authentication.
@@ -50,6 +50,9 @@ export interface BedrockClientOptions extends Omit<
    * BedrockOpenAI only supports Bedrock bearer token authentication.
    */
   workloadIdentity?: never;
+
+  /** Bedrock cannot receive OpenAI X.509 workload-identity certificate transports. */
+  x509Transport?: never;
 
   /**
    * AWS region used to derive the default Bedrock Mantle endpoint.
@@ -142,11 +145,12 @@ export class BedrockOpenAI extends OpenAI {
     bedrockTokenProvider,
     adminAPIKey,
     workloadIdentity,
+    x509Transport,
     dataResidency,
     ...opts
   }: BedrockClientOptions = {}) {
     assertNoDataResidency(dataResidency, 'BedrockOpenAI');
-    if (adminAPIKey || workloadIdentity) {
+    if (adminAPIKey || workloadIdentity || x509Transport) {
       throw new Errors.OpenAIError('BedrockOpenAI only supports Bedrock bearer token authentication.');
     }
 
