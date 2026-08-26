@@ -682,8 +682,8 @@ describe('X.509 review regressions', () => {
     await first.models.list();
 
     expect(exchangedAccounts).toEqual([
-      'synthetic-review-account',
       'synthetic-other-account',
+      'synthetic-review-account',
       'synthetic-review-account',
     ]);
   });

@@ -580,7 +580,42 @@ describe('X.509 request ownership boundaries', () => {
 
     await expect(client.models.list()).resolves.toMatchObject({ data: [] });
     expect(apiCalls).toBe(2);
-    expect(send).toHaveBeenCalledTimes(4);
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  test('isolates a same-client request built from inside a protected request hook', async () => {
+    let nestedHeaders: Headers | undefined;
+    let dispatchedHeaders: Headers | undefined;
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          return Response.json(tokenResponse);
+        }
+        dispatchedHeaders = new Headers(request.headers);
+        return Response.json({ data: [] });
+      });
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async () => {
+        const nested = await client.buildRequest({
+          path: '/models',
+          method: 'get',
+          headers: { 'X-Synthetic-Nested': 'nested' },
+        });
+        nestedHeaders = nested.req.headers;
+      },
+    });
+
+    await client.request({ path: '/models', method: 'get', headers: { 'X-Synthetic-Outer': 'outer' } });
+
+    expect(nestedHeaders?.get('X-Synthetic-Nested')).toBe('nested');
+    expect(nestedHeaders?.get('X-Synthetic-Outer')).toBeNull();
+    expect(dispatchedHeaders?.get('X-Synthetic-Outer')).toBe('outer');
+    expect(dispatchedHeaders?.get('X-Synthetic-Nested')).toBeNull();
+    expect(send.mock.calls.filter((call) => call[1].origin === 'https://mtls.auth.openai.com')).toHaveLength(
+      1,
+    );
   });
 
   test('cancels retry backoff promptly through the effective protected-hook signal', async () => {

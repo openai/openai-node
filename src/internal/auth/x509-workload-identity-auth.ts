@@ -504,7 +504,7 @@ export class X509WorkloadIdentityAuth {
   /** Reports whether a public request-building call already belongs to an active logical operation. */
   inRequest(requestOwner: object): boolean {
     const scope = this.#transport.current();
-    return scope?.owner === this && scope.requestOwner === requestOwner;
+    return scope?.owner === this && scope.requestOwner === requestOwner && scope.phase !== 'authorizing';
   }
 
   /** Shares a cache only when the complete, privately snapshotted credential identity matches. */

@@ -539,7 +539,7 @@ describe('X.509 workload credential lifecycle', () => {
       });
 
       await expect(client.models.list()).rejects.toThrow(/organization or project/iu);
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(send).not.toHaveBeenCalled();
     },
   );
 
