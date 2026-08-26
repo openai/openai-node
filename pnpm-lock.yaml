@@ -138,6 +138,9 @@ importers:
       undici:
         specifier: ^8.9.0
         version: 8.9.0
+      zod:
+        specifier: ^3.25 || ^4.0
+        version: 4.4.3
     devDependencies:
       '@types/express':
         specifier: ^4.17.19
