@@ -325,7 +325,11 @@ function hasCapturedNativeDiagnosticKeys(keys: readonly PropertyKey[]): boolean 
 
 function classifyGenericProxyCloneFailure(target: object): JSONErrorKind {
   const name = getErrorDescriptor(target, 'name');
-  if (name && !('value' in name)) {
+  if (
+    name &&
+    (!('value' in name) || typeof name.value !== 'string' || !/^[A-Za-z]*Error$/u.test(name.value))
+  ) {
+    // A diagnostic-free clone cannot distinguish custom-named parser and transport proxies.
     return 'unsafe';
   }
   if (!hasNativeProxyErrorDescriptors(target)) {
@@ -732,7 +736,8 @@ export function isMalformedJSONError(error: unknown, options?: MalformedJSONErro
 
       const cause = getErrorDescriptor(current, 'cause');
       if (!cause) {
-        return false;
+        // A proxy can hide a configurable parser cause from descriptors while retaining its own key.
+        return Reflect.ownKeys(current).includes('cause');
       }
       if (!('value' in cause)) {
         return !options?.preserveAccessors;

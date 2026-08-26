@@ -176,6 +176,19 @@ async function withNativeCloneFailureMessage<T>(message: string, run: () => Prom
   }
 }
 
+function nativeCloneFailureMessage(value: object): string {
+  try {
+    structuredClone(value);
+  } catch (error) {
+    if (!(error instanceof DOMException)) {
+      throw error;
+    }
+    expect(error.name).toBe('DataCloneError');
+    return error.message;
+  }
+  throw new Error('Expected native structured cloning to reject an error proxy.');
+}
+
 describe('malformed JSON runtime compatibility', () => {
   it.each(
     publicSurfaces.flatMap((surface) =>
@@ -262,6 +275,64 @@ describe('malformed JSON runtime compatibility', () => {
       const rejected = new Proxy(parserFailure, { get: readProxy });
 
       await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readProxy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    [...runtimeErrorBrands, 'fallback without structuredClone' as const].flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['Error', 'TypeError'] as const).flatMap((constructor) =>
+          (['direct', 'nested'] as const).map((placement) => ({
+            runtimeErrorBrand,
+            surface,
+            constructor,
+            placement,
+          })),
+        ),
+      ),
+    ),
+  )(
+    'sanitizes a $placement $constructor proxy concealing a native parser cause through $surface using $runtimeErrorBrand',
+    async ({ runtimeErrorBrand, surface, constructor, placement }) => {
+      const target =
+        constructor === 'Error'
+          ? new Error('safe custom response body parser wrapper')
+          : new TypeError('safe custom response body parser wrapper');
+      Object.defineProperty(target, 'cause', {
+        configurable: true,
+        value: new SyntaxError(PRIVATE_VALUE),
+      });
+      const readHook = vi.fn(() => {
+        throw new Error(`${PRIVATE_VALUE} escaped through a concealed parser cause hook`);
+      });
+      Object.defineProperties(target, {
+        toJSON: { configurable: true, get: readHook },
+        [Symbol.toStringTag]: { configurable: true, get: readHook },
+      });
+      const readProxy = vi.fn((_target: Error, property: PropertyKey) => {
+        throw new Error(
+          `${PRIVATE_VALUE} escaped through the ${String(property)} concealed parser cause getter`,
+        );
+      });
+      const proxy = new Proxy(target, {
+        get: readProxy,
+        getOwnPropertyDescriptor(value, property) {
+          return property === 'cause' ? undefined : Reflect.getOwnPropertyDescriptor(value, property);
+        },
+      });
+      const rejected =
+        placement === 'direct'
+          ? proxy
+          : Object.defineProperty(new Error('safe custom outer response body parser wrapper'), 'cause', {
+              configurable: true,
+              value: proxy,
+            });
+
+      expect(Object.getOwnPropertyDescriptor(proxy, 'cause')).toBeUndefined();
+      expect(Reflect.ownKeys(proxy)).toContain('cause');
+      await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
+      expect(readHook).not.toHaveBeenCalled();
       expect(readProxy).not.toHaveBeenCalled();
     },
   );
@@ -694,6 +765,58 @@ describe('malformed JSON runtime compatibility', () => {
 
       await expectSanitizedPublicFailure(surface, rejected, runtimeErrorBrand);
       expect(readHook).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    runtimeErrorBrands.flatMap((runtimeErrorBrand) =>
+      publicSurfaces.flatMap((surface) =>
+        (['runtime-native', 'Bun-compatible'] as const).map((cloneDiagnostic) => ({
+          runtimeErrorBrand,
+          surface,
+          cloneDiagnostic,
+        })),
+      ),
+    ),
+  )(
+    'fails closed for indistinguishable custom-named transport and native parser proxies through $surface using $runtimeErrorBrand and a $cloneDiagnostic clone failure',
+    async ({ runtimeErrorBrand, surface, cloneDiagnostic }) => {
+      const readProxy = vi.fn((_target: Error, property: PropertyKey) => {
+        throw new Error(
+          `${PRIVATE_VALUE} escaped through the ${String(property)} custom-named parser proxy getter`,
+        );
+      });
+      const createProxy = (constructor: ErrorConstructor | SyntaxErrorConstructor): Error => {
+        const target = new constructor(PRIVATE_VALUE);
+        Object.setPrototypeOf(target, Error.prototype);
+        target.name = 'NetworkFailure';
+        Object.defineProperty(target, 'stack', {
+          configurable: true,
+          value: `NetworkFailure: ${PRIVATE_VALUE}\n    at syntheticProxyFixture`,
+          writable: true,
+        });
+        return new Proxy(target, { get: readProxy });
+      };
+      const transport = createProxy(Error);
+      const parser = createProxy(SyntaxError);
+
+      expect(Object.getPrototypeOf(transport)).toBe(Error.prototype);
+      expect(Object.getPrototypeOf(parser)).toBe(Error.prototype);
+      expect(Object.getOwnPropertyDescriptors(transport)).toEqual(Object.getOwnPropertyDescriptors(parser));
+      expect(types.isNativeError(transport)).toBe(false);
+      expect(types.isNativeError(parser)).toBe(false);
+      expect(types.isProxy(transport)).toBe(true);
+      expect(types.isProxy(parser)).toBe(true);
+      expect(nativeCloneFailureMessage(transport)).toBe(nativeCloneFailureMessage(parser));
+
+      const assertBothSanitized = async () => {
+        await expectSanitizedPublicFailure(surface, parser, runtimeErrorBrand);
+        await expectSanitizedPublicFailure(surface, transport, runtimeErrorBrand);
+      };
+      await (cloneDiagnostic === 'Bun-compatible'
+        ? withNativeCloneFailureMessage('The object can not be cloned.', assertBothSanitized)
+        : assertBothSanitized());
+      expect(readProxy).not.toHaveBeenCalled();
     },
   );
 
