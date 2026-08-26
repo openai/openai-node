@@ -21,7 +21,7 @@ export interface WorkloadIdentity {
   /** Provider that obtains the external subject token for each token exchange. */
   provider: SubjectTokenProvider;
 
-  /** Seconds before expiration when access-token refresh begins; defaults to 1,200 seconds. */
+  /** Seconds before expiration when access-token refresh begins; defaults to 1,200 seconds and is capped at half of the actual token lifetime. */
   refreshBufferSeconds?: number;
 }
 

@@ -184,7 +184,7 @@ const client = new OpenAI({
 });
 ```
 
-You can also customize the subject-token refresh buffer (default is 1200 seconds (20 minutes) before expiration):
+You can also customize the subject-token refresh buffer (default is 1200 seconds (20 minutes) before expiration; the effective buffer is capped at half of the actual token lifetime):
 
 ```ts
 import OpenAI from 'openai';

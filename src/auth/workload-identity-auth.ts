@@ -6,6 +6,7 @@ import { APIError, OAuthError, OpenAIError } from '../core/error';
 interface CachedToken {
   token: string;
   expiresAt: number;
+  refreshAt: number;
 }
 
 const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], string> = {
@@ -14,6 +15,20 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 };
 
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+// Cap the refresh buffer at half the actual token lifetime, matching the X.509
+// workload-identity path, so short-lived tokens keep a usable cache window.
+const MAX_REFRESH_BUFFER_FRACTION = 0.5;
+
+function calculateRefreshAt(
+  expiresAt: number,
+  now: number,
+  refreshBufferSeconds: number | undefined,
+): number {
+  const configuredBufferMs = (refreshBufferSeconds ?? 1200) * 1000;
+  const effectiveBufferMs = Math.min(configuredBufferMs, (expiresAt - now) * MAX_REFRESH_BUFFER_FRACTION);
+  return expiresAt - effectiveBufferMs;
+}
+
 const NATIVE_RESPONSE_PROTOTYPE = Response.prototype;
 const READ_NATIVE_RESPONSE_BODY = NATIVE_RESPONSE_PROTOTYPE.arrayBuffer;
 
@@ -165,7 +180,7 @@ export class WorkloadIdentityAuth {
       }
     }
 
-    if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
+    if (WorkloadIdentityAuth.needsRefresh(this.cachedToken) && !this.refreshPromise) {
       const refreshPromise = this.refreshToken(this.tokenGeneration).finally(() => {
         if (this.refreshPromise === refreshPromise) {
           this.refreshPromise = null;
@@ -250,6 +265,7 @@ export class WorkloadIdentityAuth {
       this.cachedToken = {
         token: accessToken,
         expiresAt,
+        refreshAt: calculateRefreshAt(expiresAt, now, this.config.refreshBufferSeconds),
       };
     }
 
@@ -260,10 +276,8 @@ export class WorkloadIdentityAuth {
     return Date.now() >= cachedToken.expiresAt;
   }
 
-  private needsRefresh(cachedToken: CachedToken): boolean {
-    const bufferSeconds = this.config.refreshBufferSeconds ?? 1200;
-    const bufferMs = bufferSeconds * 1000;
-    return Date.now() >= cachedToken.expiresAt - bufferMs;
+  private static needsRefresh(cachedToken: CachedToken): boolean {
+    return Date.now() >= cachedToken.refreshAt;
   }
 
   /** Discards the cached access token so the next request performs a fresh exchange. */
