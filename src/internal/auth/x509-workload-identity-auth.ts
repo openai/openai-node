@@ -260,6 +260,67 @@ export class X509WorkloadIdentityAuth {
     return request;
   }
 
+  /** Arms one logical network deadline only after protected option preparation completes. */
+  beginRequestPlanning(): void {
+    const scope = this.#scope();
+    if (!scope.request) {
+      scope.wallStartedAt = Date.now();
+      scope.monotonicStartedAt = performance.now();
+    }
+    scope.phase = 'planning';
+    delete scope.effectiveSignal;
+  }
+
+  /** Keeps certificate authentication outside overridable request construction. */
+  isPlanningRequest(): boolean {
+    return this.#scope().phase === 'planning';
+  }
+
+  /** Approves the final overridden destination and transport before minting a bearer. */
+  authorizePlannedRequest(url: string, request: RequestInit): void {
+    const scope = this.#scope();
+    const headers = Object.getOwnPropertyDescriptor(request, 'headers');
+    const signal = Object.getOwnPropertyDescriptor(request, 'signal');
+    const redirect = Object.getOwnPropertyDescriptor(request, 'redirect');
+    if (
+      scope.phase !== 'planning' ||
+      !headers ||
+      !('value' in headers) ||
+      !(headers.value instanceof Headers) ||
+      (signal && !('value' in signal)) ||
+      (redirect && !('value' in redirect))
+    ) {
+      throw new OpenAIError('X.509 workload identity requires an approved final request.');
+    }
+    this.snapshotAPIURL(url);
+    assertX509FetchOptions(request);
+    try {
+      assertSafeHeaders(headers.value);
+    } catch {
+      throw new OpenAIError('X.509 workload identity cannot use caller-supplied authentication credentials.');
+    }
+    if (headerValue(headers.value, 'Authorization') !== null) {
+      throw new OpenAIError('X.509 workload identity cannot use caller-supplied authorization credentials.');
+    }
+    if ((signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
+      throw new OpenAIError('X.509 workload identity must preserve its approved request signal.');
+    }
+    scope.phase = 'authorizing';
+  }
+
+  /** Retains caller-only cancellation separately from SDK-created deadline controllers. */
+  setEffectiveSignal(signal: AbortSignal | undefined): void {
+    if (signal) {
+      this.#scope().effectiveSignal = signal;
+    }
+  }
+
+  /** Uses protected-hook cancellation when an authenticated attempt enters retry backoff. */
+  effectiveSignal(): AbortSignal | null | undefined {
+    const scope = this.#scope();
+    return scope.effectiveSignal ?? scope.request?.signal;
+  }
+
   /** Establishes an independent scope even when concurrent requests share caller options. */
   runRequest<T>(operation: () => Promise<T>): Promise<T> {
     return this.#transport.run(async () => {
@@ -278,11 +339,12 @@ export class X509WorkloadIdentityAuth {
 
   /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
   continuation(): <T>(operation: () => Promise<T>) => Promise<T> {
-    const { wallStartedAt, monotonicStartedAt, request } = this.#scope();
+    const { wallStartedAt, monotonicStartedAt, request, effectiveSignal } = this.#scope();
     const scope: X509RequestScope = {
       wallStartedAt,
       monotonicStartedAt,
       ...(request ? { request } : {}),
+      ...(effectiveSignal ? { effectiveSignal } : {}),
     };
     return (operation) =>
       this.#transport.resume(scope, async () => {
@@ -298,6 +360,8 @@ export class X509WorkloadIdentityAuth {
   releaseRequestCredentials(): void {
     const scope = this.#scope();
     delete scope.request;
+    delete scope.phase;
+    delete scope.effectiveSignal;
     delete scope.apiURL;
     delete scope.token;
     delete scope.defaultHeaders;

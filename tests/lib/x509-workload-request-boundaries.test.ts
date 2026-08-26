@@ -48,6 +48,114 @@ afterEach(async () => {
 });
 
 describe('X.509 request ownership boundaries', () => {
+  test('validates the final overridden destination before presenting a certificate', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockResolvedValue(Response.json(tokenResponse));
+    const client = new OpenAI(options());
+    const original = client.buildRequest.bind(client);
+    Object.defineProperty(client, 'buildRequest', {
+      value: async (...args: Parameters<OpenAI['buildRequest']>) => ({
+        ...(await original(...args)),
+        url: 'https://untrusted.invalid/v1/models',
+      }),
+    });
+
+    await expect(client.models.list()).rejects.toThrow(/origin|endpoint|URL/iu);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test('uses one immutable accessor-backed override destination for authentication and dispatch', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(tokenResponse)
+          : Response.json({ data: [] }),
+      );
+    const client = new OpenAI(options());
+    const original = client.buildRequest.bind(client);
+    const getter = vi.fn(() =>
+      getter.mock.calls.length === 1
+        ? 'https://mtls.api.openai.com/v1/models'
+        : 'https://untrusted.invalid/v1/models',
+    );
+    Object.defineProperty(client, 'buildRequest', {
+      value: async (...args: Parameters<OpenAI['buildRequest']>) =>
+        Object.defineProperty(await original(...args), 'url', { get: getter }),
+    });
+
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+    expect(getter).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[1]?.[1].origin).toBe('https://mtls.api.openai.com');
+  });
+
+  test.each(['Authorization', 'Proxy-Authorization', 'Host'])(
+    'rejects overridden final %s before certificate exchange',
+    async (name) => {
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockResolvedValue(Response.json(tokenResponse));
+      const client = new OpenAI(options());
+      const original = client.buildRequest.bind(client);
+      Object.defineProperty(client, 'buildRequest', {
+        value: async (...args: Parameters<OpenAI['buildRequest']>) => {
+          const built = await original(...args);
+          built.req.headers.set(name, 'synthetic-unapproved-credential');
+          return built;
+        },
+      });
+
+      await expect(client.models.list()).rejects.toThrow(/caller-supplied.*credentials/iu);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  test('starts its network deadline only after asynchronous request preparation completes', async () => {
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(tokenResponse)
+          : Response.json({ data: [] }),
+      );
+    const client = new OpenAI(options({ timeout: 45 }));
+    Object.defineProperty(client, 'prepareOptions', {
+      value: async () => await delay(90),
+    });
+
+    await expect(client.models.list()).resolves.toMatchObject({
+      data: [],
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  test('cancels retry backoff promptly through the effective protected-hook signal', async () => {
+    const hookController = new AbortController();
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(tokenResponse)
+          : new Response(null, { status: 503, headers: { 'retry-after-ms': '500' } }),
+      );
+    const client = new OpenAI(options({ maxRetries: 1, timeout: 2000 }));
+    Object.defineProperty(client, 'prepareRequest', {
+      value: async (request: RequestInit) => {
+        request.signal = hookController.signal;
+      },
+    });
+    const pending = client.models.list();
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    const reason = new Error('synthetic-hook-retry-cancellation');
+    const canceledAt = performance.now();
+    hookController.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({ constructor: APIUserAbortError, cause: reason });
+    expect(performance.now() - canceledAt).toBeLessThan(250);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   test('keeps the captured accessor-backed signal during successful response parsing', async () => {
     const captured = new AbortController();
     const reason = new Error('synthetic-success-body-cancellation');

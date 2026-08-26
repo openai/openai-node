@@ -62,6 +62,8 @@ export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
   request?: { signal: AbortSignal | null | undefined; timeout: number; fetchOptions: MergedRequestInit };
+  phase?: 'planning' | 'authorizing';
+  effectiveSignal?: AbortSignal;
   apiURL?: string;
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;

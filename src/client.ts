@@ -1128,11 +1128,27 @@ export class OpenAI {
 
     const x509Authentication =
       this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth ? this._workloadIdentityAuth : undefined;
+    x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     try {
-      built = await this.buildRequest(options, {
+      const candidate = await this.buildRequest(options, {
         retryCount: maxRetries - retriesRemaining,
       });
+      built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
+      if (x509Authentication) {
+        validatePositiveInteger('timeout', built.timeout);
+        x509Authentication.authorizePlannedRequest(built.url, built.req);
+        const security = options.__security ?? { bearerAuth: true };
+        const authenticationHeaders = await this.authHeaders(options, security);
+        const suppliedHeaders = x509Authentication.headerSnapshots();
+        const supplied = buildHeaders([suppliedHeaders.defaultHeaders, suppliedHeaders.requestHeaders]);
+        for (const [name, value] of authenticationHeaders?.values ?? []) {
+          if (!supplied.nulls.has(name) && !built.req.headers.has(name)) {
+            built.req.headers.set(name, value);
+          }
+        }
+        this.validateHeaders(buildHeaders([supplied, built.req.headers]), security);
+      }
     } catch (error) {
       if (
         x509Authentication &&
@@ -1189,6 +1205,11 @@ export class OpenAI {
     const callerSignal = x509Authentication ? x509Authentication.requestSnapshot().signal : options.signal;
     if (callerSignal?.aborted || req.signal?.aborted) {
       throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
+    }
+    if (x509Authentication && (req.signal || callerSignal)) {
+      x509Authentication.setEffectiveSignal(
+        createRequestController(req.signal ?? callerSignal, callerSignal).signal,
+      );
     }
 
     const security = options.__security ?? { bearerAuth: true };
@@ -1574,7 +1595,7 @@ export class OpenAI {
       }
     }
     if (x509Authentication) {
-      await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.requestSnapshot().signal);
+      await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
     } else {
       await sleep(timeoutMillis);
     }
@@ -1708,7 +1729,9 @@ export class OpenAI {
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      this._provider
+      this._provider ||
+      (this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
+        this._workloadIdentityAuth.isPlanningRequest())
         ? undefined
         : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
       x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
@@ -1716,7 +1739,13 @@ export class OpenAI {
       x509Headers?.requestHeaders ?? options.headers,
     ]);
 
-    if (!this._provider) {
+    if (
+      !this._provider &&
+      !(
+        this._workloadIdentityAuth instanceof X509WorkloadIdentityAuth &&
+        this._workloadIdentityAuth.isPlanningRequest()
+      )
+    ) {
       this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
     }
 
