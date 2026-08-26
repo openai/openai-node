@@ -16,6 +16,7 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 
 async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
+  let readText = Response.prototype.text;
   for (
     let depth = 0, prototype: object | null = response;
     prototype !== null && depth < 16;
@@ -30,11 +31,23 @@ async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
       continue;
     }
 
+    if (typeof parser.value !== 'function') {
+      break;
+    }
+
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    const bodyReader = Object.getOwnPropertyDescriptor(prototype, 'text')?.value;
+    // Native Response constructors own their static factory; ordinary subclasses inherit it.
     if (
-      typeof parser.value !== 'function' ||
-      (prototype !== response &&
-        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Response')
+      prototype !== response &&
+      typeof constructor === 'function' &&
+      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Response' &&
+      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+      typeof Object.getOwnPropertyDescriptor(constructor, 'json')?.value === 'function' &&
+      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Response' &&
+      typeof bodyReader === 'function'
     ) {
+      readText = bodyReader;
       break;
     }
 
@@ -42,7 +55,7 @@ async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
     return parser.value.call(response);
   }
 
-  const body = await response.text();
+  const body = await readText.call(response);
   try {
     return JSON.parse(body);
   } catch {

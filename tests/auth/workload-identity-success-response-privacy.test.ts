@@ -33,6 +33,17 @@ Object.defineProperty(CustomResponse.prototype, 'json', {
     return this.readJSON();
   },
 });
+Object.defineProperty(CustomResponse.prototype, Symbol.toStringTag, {
+  configurable: true,
+  value: 'Response',
+});
+
+function withPrototypeTextOverride(response: Response, readText: () => Promise<string>): Response {
+  const prototype = Object.create(Object.getPrototypeOf(response));
+  Object.defineProperty(prototype, 'text', { configurable: true, value: readText });
+  Object.setPrototypeOf(response, prototype);
+  return response;
+}
 
 function createHarness(
   response: (url: RequestInfo, init?: RequestInit) => Promise<Response> | Response,
@@ -195,7 +206,51 @@ describe('successful workload OAuth response JSON privacy', () => {
     );
     await expect(run()).resolves.toBeDefined();
 
-    expect(readText).toHaveBeenCalledTimes(1);
+    expect(readText).not.toHaveBeenCalled();
+    expect(response.bodyUsed).toBe(true);
+    expect(harness.exchange).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(
+    surfaces.flatMap((surface) =>
+      [
+        {
+          name: 'native subclass',
+          response: (body: string, readText: () => Promise<string>) =>
+            withPrototypeTextOverride(new Response(body), readText),
+        },
+        {
+          name: 'cross-realm subclass',
+          response: (body: string, readText: () => Promise<string>) =>
+            withPrototypeTextOverride(new UndiciResponse(body), readText),
+        },
+        {
+          name: 'native instance',
+          response: (body: string, readText: () => Promise<string>) => {
+            const response = new Response(body);
+            Object.defineProperty(response, 'text', { configurable: true, value: readText });
+            return response;
+          },
+        },
+      ].map((override) => ({ surface, ...override })),
+    ),
+  )('parses the actual $name body without calling overridden text on $surface', async (override) => {
+    const readText = vi.fn(async () =>
+      JSON.stringify({ access_token: 'safe-overridden-token', expires_in: 3600 }),
+    );
+    const response = override.response(
+      JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 }),
+      readText,
+    );
+    const harness = createHarness(async () => response);
+    const run = operationFor(override.surface, harness);
+
+    await expect(run()).resolves.toEqual(
+      override.surface === 'direct-auth' ? 'safe-body-token' : expect.objectContaining({ data: [] }),
+    );
+    await expect(run()).resolves.toBeDefined();
+
+    expect(readText).not.toHaveBeenCalled();
     expect(response.bodyUsed).toBe(true);
     expect(harness.exchange).toHaveBeenCalledTimes(1);
   });
@@ -240,7 +295,7 @@ describe('successful workload OAuth response JSON privacy', () => {
   );
 
   it.each(surfaces)(
-    'preserves prototype-defined successful JSON parsers and token caching on %s',
+    'preserves tagged prototype-defined successful JSON parsers and token caching on %s',
     async (surface) => {
       const readJSON = vi.fn(async () => ({ access_token: 'safe-override-token', expires_in: 3600 }));
       const response = new CustomResponse(readJSON);
@@ -333,8 +388,13 @@ describe('successful workload OAuth response JSON privacy', () => {
       ].map((failure) => ({ surface, ...failure })),
     ),
   )('preserves the original $name from the response-body read on $surface', async (failure) => {
-    const response = Response.json({ access_token: 'unreachable-token' });
-    vi.spyOn(response, 'text').mockRejectedValue(failure.original);
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.error(failure.original);
+        },
+      }),
+    );
     const harness = createHarness(async () => response);
 
     await expect(operationFor(failure.surface, harness)()).rejects.toBe(failure.original);
