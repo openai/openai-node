@@ -732,6 +732,128 @@ describe('.stream()', () => {
   });
 
   it.each(
+    (['create', 'replay'] as const).flatMap((mode) =>
+      (['initial', 'subsequent'] as const).flatMap((position) =>
+        (['self cycle', 'multi-node cycle', 'unbounded chain'] as const).map((chain) => ({
+          mode,
+          position,
+          chain,
+        })),
+      ),
+    ),
+  )(
+    'rejects an $position $chain lifecycle prototype chain during $mode',
+    async ({ mode, position, chain }) => {
+      const privateMessage = 'synthetic-private-unbounded-prototype-secret';
+      const stopUnsafeFixture = vi.fn(() => {
+        throw new Error(privateMessage);
+      });
+      const inspectPrototype = vi.fn(() => {
+        if (inspectPrototype.mock.calls.length > 512) {
+          stopUnsafeFixture();
+        }
+      });
+      const cyclicPrototype: { root?: ResponseStreamEvent } = {};
+      const createPrototype = (cycleDepth = 2): object =>
+        new Proxy(Object.create(null) as object, {
+          getPrototypeOf() {
+            inspectPrototype();
+            if (chain === 'multi-node cycle' && cycleDepth === 1) {
+              return cyclicPrototype.root ?? null;
+            }
+            return createPrototype(cycleDepth - 1);
+          },
+        });
+
+      const lifecycle: ResponseStreamEvent = new Proxy(
+        {
+          type: position === 'initial' ? ('response.created' as const) : ('response.completed' as const),
+          sequence_number: position === 'initial' ? 0 : 1,
+          response: makeResponse(),
+        },
+        {
+          getPrototypeOf() {
+            inspectPrototype();
+            return chain === 'self cycle' ? (cyclicPrototype.root ?? null) : createPrototype();
+          },
+        },
+      );
+      cyclicPrototype.root = lifecycle;
+      const events: ResponseStreamEvent[] =
+        position === 'initial'
+          ? [lifecycle]
+          : [{ type: 'response.created', sequence_number: 0, response: makeResponse() }, lifecycle];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      const client = {
+        responses: { create: vi.fn(async () => transport), retrieve: vi.fn(async () => transport) },
+      } as unknown as OpenAI;
+      const stream =
+        mode === 'replay'
+          ? ResponseStream.createResponse(client, { response_id: 'resp_123', starting_after: -1 })
+          : ResponseStream.createResponse(client, {
+              model: 'gpt-test',
+              input: 'reject malformed prototypes',
+            });
+      const emitted = vi.fn();
+      const errors: OpenAIError[] = [];
+      stream.on('event', emitted);
+      stream.on('error', (error) => errors.push(error));
+
+      await expect(stream.finalResponse()).rejects.toThrow(
+        'Response event does not match the active response.',
+      );
+
+      expect(stopUnsafeFixture).not.toHaveBeenCalled();
+      const expectedPrototypeReads = { 'self cycle': 2, 'multi-node cycle': 6, 'unbounded chain': 128 };
+      expect(inspectPrototype).toHaveBeenCalledTimes(expectedPrototypeReads[chain]);
+      expect(emitted).toHaveBeenCalledTimes(position === 'initial' ? 0 : 1);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toBeInstanceOf(OpenAIError);
+      expect(errors[0]?.message).not.toContain(privateMessage);
+      expect(errors[0]).not.toHaveProperty('cause');
+    },
+  );
+
+  it('preserves metadata from ordinary multi-level lifecycle prototype chains', async () => {
+    const providerPrototype = Object.assign(
+      Object.create({ provider_region: 'synthetic-region' }) as object,
+      {
+        provider_metadata: 'inherited metadata',
+      },
+    );
+    const lifecycle = Object.assign(Object.create(providerPrototype) as object, {
+      type: 'response.created' as const,
+      sequence_number: 0,
+      response: makeResponse(),
+    });
+
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield lifecycle;
+      },
+    };
+    const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+    const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'normal prototypes' });
+    const emitted = vi.fn();
+    stream.on('response.created', emitted);
+
+    await expect(stream.finalResponse()).resolves.toMatchObject({ id: 'resp_123' });
+
+    expect(emitted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider_metadata: 'inherited metadata',
+        provider_region: 'synthetic-region',
+      }),
+    );
+  });
+
+  it.each(
     (['initial', 'subsequent'] as const).flatMap((position) =>
       (['own keys', 'descriptor', 'prototype'] as const).map((trap) => ({ position, trap })),
     ),

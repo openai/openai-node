@@ -146,6 +146,7 @@ interface ResponseOutputIdentityIndex {
 
 const responseOutputIdentityIndexes = new WeakMap<ResponseAccumulatorContext, ResponseOutputIdentityIndex>();
 const activeResponseIDs = new WeakMap<Response, string>();
+const MAX_RESPONSE_LIFECYCLE_PROTOTYPE_DEPTH = 128;
 
 function validateArrayIndex(
   collection: readonly unknown[],
@@ -343,12 +344,18 @@ function snapshotResponseLifecycleEvent(
 ): ResponseLifecycleEvent {
   try {
     const detached = Object.create(Object.prototype) as ResponseLifecycleEvent;
+    const visited = new Set<object>();
 
     for (
       let source = event as object | null;
       source !== null && source !== Object.prototype;
       source = Object.getPrototypeOf(source) as object | null
     ) {
+      if (visited.has(source) || visited.size >= MAX_RESPONSE_LIFECYCLE_PROTOTYPE_DEPTH) {
+        throw new OpenAIError('Response event does not match the active response.');
+      }
+      visited.add(source);
+
       for (const key of Reflect.ownKeys(source)) {
         if (key === 'response' || hasOwn(detached, key) || (source !== event && key === 'constructor')) {
           continue;
