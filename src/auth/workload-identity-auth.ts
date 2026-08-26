@@ -14,6 +14,94 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 };
 
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+const NATIVE_RESPONSE_PROTOTYPE = Response.prototype;
+const READ_NATIVE_RESPONSE_BODY = NATIVE_RESPONSE_PROTOTYPE.arrayBuffer;
+
+function isResponsePrototype(response: Response, prototype: object): boolean {
+  const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+  if (
+    prototype === response ||
+    typeof constructor !== 'function' ||
+    Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Response' ||
+    Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
+  ) {
+    return false;
+  }
+
+  const tag = Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag);
+  return (
+    (tag?.value === 'Response' || typeof tag?.get === 'function') &&
+    typeof Object.getOwnPropertyDescriptor(prototype, 'headers')?.get === 'function' &&
+    typeof Object.getOwnPropertyDescriptor(prototype, 'ok')?.get === 'function' &&
+    typeof Object.getOwnPropertyDescriptor(prototype, 'status')?.get === 'function'
+  );
+}
+
+function isResponseBodyPrototype(prototype: object, responsePrototype: object | null): boolean {
+  if (prototype === responsePrototype) {
+    return true;
+  }
+
+  const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+  return (
+    responsePrototype !== null &&
+    Object.getPrototypeOf(responsePrototype) === prototype &&
+    typeof constructor === 'function' &&
+    Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Body' &&
+    Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype
+  );
+}
+
+function decodeNativeResponseBody(body: ArrayBuffer): string {
+  const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
+  return new TextDecoder('utf-8', { ignoreBOM: typeof scope.Bun?.version === 'string' }).decode(body);
+}
+
+async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
+  let readText: ((this: Response) => Promise<string>) | undefined;
+  let responsePrototype: object | null = null;
+  for (
+    let depth = 0, prototype: object | null = response;
+    prototype !== null && depth < 16;
+    prototype = Object.getPrototypeOf(prototype), depth += 1
+  ) {
+    if (prototype === NATIVE_RESPONSE_PROTOTYPE) {
+      break;
+    }
+
+    if (isResponsePrototype(response, prototype)) {
+      responsePrototype = prototype;
+    }
+
+    const parser = Object.getOwnPropertyDescriptor(prototype, 'json');
+    if (!parser) {
+      continue;
+    }
+
+    if (typeof parser.value !== 'function') {
+      break;
+    }
+
+    const bodyReader = Object.getOwnPropertyDescriptor(prototype, 'text')?.value;
+    if (typeof bodyReader === 'function' && isResponseBodyPrototype(prototype, responsePrototype)) {
+      readText = bodyReader;
+      break;
+    }
+
+    // Custom parsers own their results and failures; rejection provenance cannot be inferred.
+    return parser.value.call(response);
+  }
+
+  const body =
+    readText === undefined
+      ? decodeNativeResponseBody(await READ_NATIVE_RESPONSE_BODY.call(response))
+      : await readText.call(response);
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new SyntaxError('Token exchange response contains invalid JSON');
+  }
+}
 
 function isUnsafeAccessToken(accessToken: string): boolean {
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
@@ -144,7 +232,7 @@ export class WorkloadIdentityAuth {
       );
     }
 
-    const tokenResponse: unknown = await response.json();
+    const tokenResponse: unknown = await parseOAuthTokenResponse(response);
     const accessToken =
       typeof tokenResponse === 'object' && tokenResponse !== null && 'access_token' in tokenResponse
         ? tokenResponse.access_token

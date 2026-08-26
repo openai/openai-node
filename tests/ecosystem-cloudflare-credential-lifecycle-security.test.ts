@@ -134,7 +134,7 @@ function withFixture(run: (fixture: Fixture) => void) {
       '    }',
       '  }',
       "  if (failure === 'capture-original' || failure === 'edit-original') {",
-      "    const held = '/proc/' + process.ppid + '/fd/' + process.env.CLOUDFLARE_HELD_FD;",
+      '    const held = process.env.CLOUDFLARE_HELD_LINK;',
       "    if (failure === 'capture-original') {",
       '      fs.writeFileSync(process.env.CLOUDFLARE_HELD_CAPTURE, fs.readFileSync(held), { mode: 0o600 });',
       '    } else {',
@@ -176,18 +176,29 @@ function setExistingCredentials(fixture: Fixture, state: CredentialState) {
 
 function holdOriginalCredentialDescriptor(fixture: Fixture): string {
   const preload = path.join(fixture.directory, 'hold-original-credential.cjs');
+  const heldLink = path.join(fixture.directory, 'held-original-credential');
   writeFileSync(
     preload,
     [
       "const fs = require('node:fs');",
       "const promises = require('node:fs/promises');",
+      `const heldLink = ${JSON.stringify(heldLink)};`,
       'const originalOpen = promises.open;',
+      'const originalLink = promises.link;',
       'promises.open = async (...args) => {',
       '  const file = await originalOpen(...args);',
       "  if (args[0] === '.dev.vars' && !process.env.CLOUDFLARE_HELD_FD) {",
       "    process.env.CLOUDFLARE_HELD_FD = String(fs.openSync(args[0], 'r+'));",
       '  }',
       '  return file;',
+      '};',
+      'promises.link = async (...args) => {',
+      '  const result = await originalLink(...args);',
+      "  if (args[0] === '.dev.vars' && !process.env.CLOUDFLARE_HELD_LINK) {",
+      '    fs.linkSync(args[0], heldLink);',
+      '    process.env.CLOUDFLARE_HELD_LINK = heldLink;',
+      '  }',
+      '  return result;',
       '};',
     ].join('\n'),
   );
