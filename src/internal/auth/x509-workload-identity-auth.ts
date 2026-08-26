@@ -6,7 +6,9 @@ import type { HeadersLike, NullableHeaders } from '../headers';
 import type { FinalRequestOptions } from '../request-options';
 import { CancelReadableStream } from '../shims';
 import type { MergedRequestInit } from '../types';
+import { isSensitiveHeader } from '../utils/log';
 import { hasOwn } from '../utils/values';
+import { assertX509APIOrigin } from './x509-api-origin';
 import { resolveX509Transport } from './x509-transport-registry';
 import {
   isApprovedX509Client,
@@ -21,10 +23,6 @@ import type {
   X509Transport,
 } from './x509-transport-registry';
 
-/** Sole API authority approved for OpenAI X.509 workload-identity federation. */
-export const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
-
-const X509_API_ORIGIN = 'https://mtls.api.openai.com';
 const FORBIDDEN_TRANSPORT_OPTIONS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'];
 const headerValue = (headers: Headers, name: string): string | null =>
   Headers.prototype.get.call(headers, name);
@@ -39,12 +37,7 @@ const userAbortError = (signal: AbortSignal): APIUserAbortError => {
 function assertSafeHeaders(headers: Headers): void {
   for (const name of Headers.prototype.keys.call(headers)) {
     const canonical = name.toLowerCase().split('_').join('-');
-    if (
-      canonical === 'api-key' ||
-      canonical === 'x-api-key' ||
-      canonical === 'proxy-authorization' ||
-      canonical === 'host'
-    ) {
+    if ((canonical !== 'authorization' && isSensitiveHeader(canonical)) || canonical === 'host') {
       throw new OpenAIError('X.509 workload identity cannot send conflicting authentication credentials.');
     }
   }
@@ -178,21 +171,6 @@ export function assertX509WebSocketSupported(client: unknown): void {
   if (isApprovedX509Client(client)) {
     throw new OpenAIError('X.509 workload identity does not support WebSocket connections.');
   }
-}
-
-/** Rejects every destination outside the sole enrolled, global X.509 API authority. */
-export function assertX509APIOrigin(value: string | URL): URL {
-  let target: URL;
-  try {
-    target = new URL(value);
-  } catch {
-    throw new OpenAIError('X.509 workload identity requires the approved global mTLS API origin.');
-  }
-
-  if (target.origin !== X509_API_ORIGIN || target.username || target.password) {
-    throw new OpenAIError('X.509 workload identity requires the approved global mTLS API origin.');
-  }
-  return target;
 }
 
 /** Prevents caller options from replacing the immutable transport selected at construction. */
@@ -857,13 +835,7 @@ export class X509WorkloadIdentityAuth {
           'X.509 workload identity cannot override its enrolled organization or project.',
         );
       }
-      if (
-        canonical === 'authorization' ||
-        canonical === 'api-key' ||
-        canonical === 'x-api-key' ||
-        canonical === 'proxy-authorization' ||
-        canonical === 'host'
-      ) {
+      if (isSensitiveHeader(canonical) || canonical === 'host') {
         throw new OpenAIError(
           'X.509 workload identity cannot use caller-supplied authentication credentials.',
         );

@@ -241,6 +241,9 @@ const packedPackagePath = require('node:path');
       'openai/internal/auth/x509-credential-options',
       'openai/internal/auth/x509-credential-options.js',
       'openai/internal/auth/x509-credential-options.mjs',
+      'openai/internal/auth/x509-api-origin',
+      'openai/internal/auth/x509-api-origin.js',
+      'openai/internal/auth/x509-api-origin.mjs',
       'openai/internal/auth/x509-transport-state',
       'openai/internal/auth/x509-transport-state.cjs',
       'openai/internal/auth/x509-transport-state-browser',
@@ -266,66 +269,30 @@ const packedPackagePath = require('node:path');
     const supportedTransports =
       'assert.doesNotThrow(direct); assert.doesNotThrow(httpConnect); assert.doesNotThrow(httpsConnect);';
 
-    for (const [undiciVersion, forwardsProxyRequests, transportAssertions] of [
-      ['5.1.1', false, unsupportedDispatcher],
-      ['5.2.0', true, unsupportedProxy],
-      ['5.5.0', true, unsupportedProxy],
-      ['5.5.1', false, supportedTransports],
-      ['6.29.0', false, supportedTransports],
-      ['7.0.0', false, supportedTransports],
+    for (const [undiciVersion, transportAssertions] of [
+      ['5.1.1', unsupportedDispatcher],
+      ['5.2.0', unsupportedProxy],
+      ['5.5.0', unsupportedProxy],
+      ['5.5.1', supportedTransports],
+      ['6.28.0', supportedTransports],
+      ['7.0.0', supportedTransports],
     ] as const) {
-      const undiciFixture = path.join(temporaryDirectory, `undici-${undiciVersion}`);
       const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
-      fs.mkdirSync(undiciFixture);
       fs.mkdirSync(consumer);
-      fs.writeFileSync(
-        path.join(undiciFixture, 'package.json'),
-        JSON.stringify({ name: 'undici', version: undiciVersion, main: 'index.js' }),
-      );
-      fs.writeFileSync(
-        path.join(undiciFixture, 'index.js'),
-        [
-          `const undici = require(${JSON.stringify(path.join(root, 'node_modules/undici'))});`,
-          'exports.Agent = undici.Agent;',
-          forwardsProxyRequests
-            ? [
-                'exports.ProxyAgent = class ForwardingProxyAgent extends undici.ProxyAgent {',
-                '  #proxyOrigin;',
-                '  constructor(options) {',
-                '    super(options);',
-                '    this.#proxyOrigin = new URL(options.uri).origin;',
-                '  }',
-                '  dispatch(options, handler) {',
-                '    return super.dispatch({',
-                '      ...options,',
-                '      origin: this.#proxyOrigin,',
-                '      path: options.origin + options.path,',
-                '    }, handler);',
-                '  }',
-                '};',
-              ].join('\n')
-            : 'exports.ProxyAgent = undici.ProxyAgent;',
-          'exports.Request = undici.Request;',
-          undiciVersion === '5.1.1'
-            ? [
-                'exports.fetch = async function fetch(resource) {',
-                '  const options = Object.create(arguments[1] ?? null);',
-                "  Object.defineProperty(options, 'dispatcher', { value: undici.getGlobalDispatcher() });",
-                '  return undici.fetch(resource, options);',
-                '};',
-              ].join('\n')
-            : 'exports.fetch = undici.fetch;',
-        ].join('\n'),
-      );
-      const packedUndici = run(
-        'npm',
-        ['pack', '--silent', '--cache', npmCache, '--pack-destination', temporaryDirectory],
-        { cwd: undiciFixture },
-      )
+      const packedUndici = run('npm', [
+        'pack',
+        '--silent',
+        '--ignore-scripts',
+        '--cache',
+        npmCache,
+        '--pack-destination',
+        temporaryDirectory,
+        `undici@${undiciVersion}`,
+      ])
         .trim()
         .split(/\r?\n/)
         .pop();
-      assert(packedUndici, `npm pack did not report the Undici ${undiciVersion} fixture`);
+      assert(packedUndici, `npm pack did not report the genuine Undici ${undiciVersion} release`);
       fs.writeFileSync(
         path.join(consumer, 'package.json'),
         JSON.stringify({ name: `legacy-undici-${undiciVersion}-consumer`, private: true }),
@@ -376,11 +343,6 @@ const packedPackagePath = require('node:path');
               'const dispatcher = new Agent();',
               "const proxyDispatcher = new ProxyAgent({ uri: 'http://127.0.0.1:1' });",
               "const secureProxyDispatcher = new ProxyAgent({ uri: 'https://127.0.0.1:1' });",
-              ...(undiciVersion === '5.5.1'
-                ? [
-                    "for (const proxy of [proxyDispatcher, secureProxyDispatcher]) { const state = Object.getOwnPropertySymbols(proxy).find((symbol) => symbol.description === 'proxy agent options'); assert(state); proxy[state] = new URL(proxy[state].uri); }",
-                  ]
-                : []),
               "const direct = () => createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' });",
               "const httpConnect = () => createX509Transport({ runtime: 'node', dispatcher: proxyDispatcher, certificateIdentity: 'static', proxy: 'http-connect' });",
               "const httpsConnect = () => createX509Transport({ runtime: 'node', dispatcher: secureProxyDispatcher, certificateIdentity: 'static', proxy: 'https-connect' });",
@@ -519,29 +481,45 @@ const packedPackagePath = require('node:path');
       "import OpenAI from 'openai'; new OpenAI({ apiKey: 'synthetic-browser-api-key', dangerouslyAllowBrowser: true });",
     ]);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
+    const certificateFixture = JSON.parse(
+      run(
+        process.execPath,
+        [
+          '-r',
+          path.join(root, 'node_modules/ts-node/register/transpile-only'),
+          '-e',
+          [
+            `const { createX509TestLab } = require(${JSON.stringify(path.join(root, 'tests/utils/x509-test-lab.ts'))});`,
+            'const { firstClient } = createX509TestLab();',
+            'process.stdout.write(JSON.stringify({ certificateChain: firstClient.certificate.toString(), privateKey: firstClient.privateKey.toString() }));',
+          ].join(' '),
+        ],
+        { cwd: root },
+      ),
+    ) as { certificateChain: string; privateKey: string };
 
     for (const [inputType, consumer] of [
       [
         'commonjs',
-        "const OpenAI = require('openai'); const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+        "const OpenAI = require('openai'); const { Agent } = require('undici'); const { createX509Transport, fromX509, workloadIdentity } = require('openai/auth/x509-transport');",
       ],
       [
         'module',
-        "import OpenAI from 'openai'; import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport';",
+        "import OpenAI from 'openai'; import { Agent } from 'undici'; import { createX509Transport, fromX509, workloadIdentity } from 'openai/auth/x509-transport';",
       ],
       [
         'module',
-        "import OpenAI from 'openai'; import { createRequire } from 'node:module'; const require = createRequire(import.meta.url); const { Agent } = require('undici'); const { createX509Transport } = require('openai/auth/x509-transport');",
+        "import OpenAI from 'openai'; import { createRequire } from 'node:module'; const require = createRequire(import.meta.url); const { Agent } = require('undici'); const { createX509Transport, fromX509, workloadIdentity } = require('openai/auth/x509-transport');",
       ],
       [
         'module',
-        "import { createRequire } from 'node:module'; import { Agent } from 'undici'; import { createX509Transport } from 'openai/auth/x509-transport'; const OpenAI = createRequire(import.meta.url)('openai');",
+        "import { createRequire } from 'node:module'; import { Agent } from 'undici'; import { createX509Transport, fromX509, workloadIdentity } from 'openai/auth/x509-transport'; const OpenAI = createRequire(import.meta.url)('openai');",
       ],
     ]) {
       run(process.execPath, [
         `--input-type=${inputType}`,
         '-e',
-        `${consumer} const dispatcher = new Agent(); const transport = createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); if (!Object.isFrozen(transport)) throw new Error('X.509 transport capability is not frozen'); new OpenAI({ apiKey: null, workloadIdentity: { type: 'x509', identityProviderId: 'synthetic-provider', serviceAccountId: 'synthetic-account' }, x509Transport: transport }); dispatcher.close();`,
+        `${consumer} if (workloadIdentity.fromX509 !== fromX509) throw new Error('First-class X.509 factory is unavailable'); const credential = fromX509({ ...${JSON.stringify(certificateFixture)}, identityProviderId: 'synthetic-provider', serviceAccountId: 'synthetic-account' }); new OpenAI({ credential }); credential.close(); const dispatcher = new Agent(); const transport = createX509Transport({ runtime: 'node', dispatcher, certificateIdentity: 'static', proxy: 'direct' }); if (!Object.isFrozen(transport)) throw new Error('X.509 transport capability is not frozen'); new OpenAI({ apiKey: null, workloadIdentity: { type: 'x509', identityProviderId: 'synthetic-provider', serviceAccountId: 'synthetic-account' }, x509Transport: transport }); dispatcher.close();`,
       ]);
     }
 

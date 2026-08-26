@@ -19,10 +19,9 @@ import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import type { WorkloadIdentity, X509Credential, X509WorkloadIdentity } from './auth/types';
 import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
+import { X509_API_BASE_URL, assertX509APIOrigin } from './internal/auth/x509-api-origin';
 import {
-  X509_API_BASE_URL,
   X509WorkloadIdentityAuth,
-  assertX509APIOrigin,
   assertX509RequestOptions,
   isX509WorkloadIdentity,
   snapshotX509RequestOptions,
@@ -262,6 +261,7 @@ import {
   formatRequestDetails,
   loggerFor,
   parseLogLevel,
+  redactURL,
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
@@ -691,6 +691,9 @@ export class OpenAI {
         delete inheritedOptions.organization;
         delete inheritedOptions.project;
         delete inheritedOptions.defaultHeaders;
+        delete inheritedOptions.defaultQuery;
+        delete inheritedOptions.fetchOptions;
+        delete inheritedOptions.fetch;
       }
     }
 
@@ -707,6 +710,18 @@ export class OpenAI {
         !provider,
     };
     const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    if (provider && new URL(client.baseURL).origin !== new URL(this.baseURL).origin) {
+      Object.assign(client._options, {
+        defaultHeaders: options.defaultHeaders,
+        defaultQuery: options.defaultQuery,
+        fetchOptions: options.fetchOptions,
+        fetch: options.fetch,
+      });
+      client.fetchOptions = options.fetchOptions;
+      client.fetch = options.fetch ?? Shims.getDefaultFetch();
+      client.organization = options.organization ?? null;
+      client.project = options.project ?? null;
+    }
     if (
       this.#x509Authentication &&
       client.#x509Authentication &&
@@ -1354,7 +1369,7 @@ export class OpenAI {
       .filter(([name]) => name === 'x-request-id')
       .map(([name, value]) => ', ' + name + ': ' + JSON.stringify(value))
       .join('');
-    const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${url} ${
+    const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${redactURL(url)} ${
       response.ok ? 'succeeded' : 'failed'
     } with status ${response.status} in ${headersTime - startTime}ms`;
 

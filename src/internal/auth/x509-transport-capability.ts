@@ -103,15 +103,30 @@ function assertVerifiedTLS(value: unknown): void {
     throw new Error('X.509 transport requires inspectable TLS server-verification settings.');
   }
   const verification = Object.getOwnPropertyDescriptor(value, 'rejectUnauthorized');
+  const hostnameVerification = Object.getOwnPropertyDescriptor(value, 'checkServerIdentity');
   if (
     (verification && (!('value' in verification) || verification.value === false)) ||
+    (hostnameVerification &&
+      (!('value' in hostnameVerification) || hostnameVerification.value !== undefined)) ||
     (process.env['NODE_TLS_REJECT_UNAUTHORIZED'] === '0' && verification?.value !== true)
   ) {
-    throw new Error('X.509 transport requires TLS server certificate verification.');
+    throw new Error('X.509 transport requires TLS server certificate and hostname verification.');
+  }
+}
+
+function assertDispatcherIntegrity(dispatcher: Agent | ProxyAgent): void {
+  const trustedPrototype = dispatcher instanceof ProxyAgent ? ProxyAgent.prototype : Agent.prototype;
+  if (
+    Object.getPrototypeOf(dispatcher) !== trustedPrototype ||
+    Object.getOwnPropertyDescriptor(dispatcher, 'dispatch') ||
+    Object.getOwnPropertySymbols(dispatcher).some((symbol) => symbol.description === 'dispatch')
+  ) {
+    throw new Error('X.509 transport requires an unmodified, trusted Undici dispatcher.');
   }
 }
 
 function assertDispatcherTrust(dispatcher: Agent | ProxyAgent, proxy: X509ProxyMode): void {
+  assertDispatcherIntegrity(dispatcher);
   if (dispatcher instanceof ProxyAgent) {
     const configuration = undiciState(dispatcher, 'proxy agent options');
     if (!configuration || typeof configuration !== 'object') {

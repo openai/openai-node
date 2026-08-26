@@ -82,6 +82,61 @@ export function loggerFor(client: OpenAI): Logger {
   return levelLogger;
 }
 
+const sensitiveQueryNames = new Set([
+  'apikey',
+  'accesstoken',
+  'refreshtoken',
+  'sessiontoken',
+  'sessionid',
+  'idtoken',
+  'authtoken',
+  'authorization',
+  'token',
+  'password',
+  'clientsecret',
+  'xamzsecuritytoken',
+  'xamzsignature',
+  'xamzcredential',
+]);
+
+/** Recognizes credential-bearing query names across ordinary and provider authentication. */
+export function isSensitiveQueryParameter(name: string): boolean {
+  return sensitiveQueryNames.has(name.toLowerCase().replace(/[-_]/gu, ''));
+}
+
+const sensitiveHeaderNames = new Set([
+  'authorization',
+  'proxy-authorization',
+  'api-key',
+  'x-api-key',
+  'x-amz-security-token',
+  'cookie',
+  'set-cookie',
+  'x-session-token',
+  'x-session-id',
+  'x-auth-token',
+  'x-id-token',
+]);
+
+/** Recognizes credential-bearing request headers across provider and workload authentication. */
+export function isSensitiveHeader(name: string): boolean {
+  return sensitiveHeaderNames.has(name.toLowerCase().replace(/_/gu, '-'));
+}
+
+/** Removes credential-valued query parameters before a request URL reaches any logger. */
+export function redactURL(value: string): string {
+  const url = new URL(value);
+  url.username = '';
+  url.password = '';
+  url.hash = '';
+  for (const name of url.searchParams.keys()) {
+    if (isSensitiveQueryParameter(name)) {
+      url.searchParams.set(name, '***');
+    }
+  }
+  return url.href;
+}
+
 export const formatRequestDetails = (details: {
   options?: RequestOptions | undefined;
   headers?: Headers | Record<string, string> | undefined;
@@ -97,21 +152,22 @@ export const formatRequestDetails = (details: {
   if (details.options) {
     details.options = { ...details.options };
     delete details.options['headers']; // redundant + leaks internals
+    if (details.options.query) {
+      details.options.query = Object.fromEntries(
+        Object.entries(details.options.query).map(([name, value]) => [
+          name,
+          isSensitiveQueryParameter(name) ? '***' : value,
+        ]),
+      );
+    }
+  }
+  if (details.url) {
+    details.url = redactURL(details.url);
   }
   if (details.headers) {
     details.headers = Object.fromEntries(
       (details.headers instanceof Headers ? [...details.headers] : Object.entries(details.headers)).map(
-        ([name, value]) => [
-          name,
-          name.toLowerCase() === 'authorization' ||
-          name.toLowerCase() === 'api-key' ||
-          name.toLowerCase() === 'x-api-key' ||
-          name.toLowerCase() === 'x-amz-security-token' ||
-          name.toLowerCase() === 'cookie' ||
-          name.toLowerCase() === 'set-cookie'
-            ? '***'
-            : value,
-        ],
+        ([name, value]) => [name, isSensitiveHeader(name) ? '***' : value],
       ),
     );
   }

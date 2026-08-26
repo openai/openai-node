@@ -102,6 +102,38 @@ describe('WorkloadIdentityAuth', () => {
     expect(fetchCallCount).toBe(1);
   });
 
+  test('binds cached exchanges to an immutable workload identity and provider snapshot', async () => {
+    const originalProvider = vi.fn(async () => 'synthetic-original-subject-token');
+    const replacementProvider = vi.fn(async () => 'synthetic-replacement-subject-token');
+    const observedBodies: Record<string, string>[] = [];
+    const config: WorkloadIdentity = {
+      identityProviderId: 'synthetic-original-identity-provider',
+      serviceAccountId: 'synthetic-original-service-account',
+      provider: { tokenType: 'jwt', getToken: originalProvider },
+    };
+    const auth = new WorkloadIdentityAuth(config, async (_url, init) => {
+      observedBodies.push(JSON.parse(String(init?.body)) as Record<string, string>);
+      return tokenExchangeResponse('synthetic-original-access-token', 3600);
+    });
+
+    config.identityProviderId = 'synthetic-replacement-identity-provider';
+    config.serviceAccountId = 'synthetic-replacement-service-account';
+    config.provider.tokenType = 'id';
+    config.provider.getToken = replacementProvider;
+
+    await expect(auth.getToken()).resolves.toBe('synthetic-original-access-token');
+    expect(originalProvider).toHaveBeenCalledOnce();
+    expect(replacementProvider).not.toHaveBeenCalled();
+    expect(observedBodies).toEqual([
+      expect.objectContaining({
+        identity_provider_id: 'synthetic-original-identity-provider',
+        service_account_id: 'synthetic-original-service-account',
+        subject_token: 'synthetic-original-subject-token',
+        subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+      }),
+    ]);
+  });
+
   test('refreshes expired tokens', async () => {
     let providerCallCount = 0;
     let fetchCallCount = 0;

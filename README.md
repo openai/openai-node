@@ -215,12 +215,12 @@ const credential = workloadIdentity.fromX509({
   serviceAccountId: process.env['OPENAI_X509_SERVICE_ACCOUNT_ID']!,
 });
 
-const client = new OpenAI({
-  credential,
-  project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
-});
-
 try {
+  const client = new OpenAI({
+    credential,
+    project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
+  });
+
   console.log((await client.models.list()).data.length);
 } finally {
   await credential.close();

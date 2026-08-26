@@ -83,6 +83,11 @@ export function prepareX509ClientClone(
   if (currentlyX509 !== nextX509) {
     delete inherited.fetch;
     delete inherited.baseURL;
+    delete inherited.organization;
+    delete inherited.project;
+    delete inherited.defaultHeaders;
+    delete inherited.defaultQuery;
+    delete inherited.fetchOptions;
     if (nextX509) {
       inherited.apiKey = null;
     } else {

@@ -251,13 +251,14 @@ describe('explicit X.509 transport capability', () => {
           },
         }),
       ]);
+      expect(dispatch).not.toHaveBeenCalled();
+      dispatch.mockRestore();
 
       if (observesRequestDispatcher) {
         expect(() => createX509Transport(directOptions(dispatcher))).not.toThrow();
       } else {
         expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/Undici 5\.2\.0 or later/u);
       }
-      expect(dispatch).not.toHaveBeenCalled();
     } finally {
       await dispatcher.close();
     }
@@ -502,6 +503,58 @@ describe('explicit X.509 transport capability', () => {
       expect(() => createX509Transport(directOptions(dispatcher))).toThrow(
         /rejectUnauthorized|server verification|TLS/iu,
       );
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects a dispatcher that disables TLS hostname verification', async () => {
+    const dispatcher = new Agent({
+      connect: { checkServerIdentity: () => new Error('synthetic custom hostname verifier') },
+    });
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/hostname|identity|TLS/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects a dispatcher subclass that can intercept certificate-bearing requests', async () => {
+    const dispatcher = new Agent();
+    Object.setPrototypeOf(dispatcher, Object.create(Agent.prototype));
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/dispatcher|trusted|subclass/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects an own dispatcher override before it can observe authentication', async () => {
+    const dispatcher = new Agent();
+    const originalDispatch = dispatcher.dispatch.bind(dispatcher);
+    Object.defineProperty(dispatcher, 'dispatch', { value: originalDispatch, configurable: true });
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/dispatcher|dispatch|trusted/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('rejects an own Undici symbol-dispatch override before it can observe authentication', async () => {
+    const dispatcher = new Agent();
+    const symbol = Object.getOwnPropertySymbols(Agent.prototype).find(
+      (candidate) => candidate.description === 'dispatch',
+    );
+    if (!symbol) {
+      throw new Error('Undici Agent does not expose its symbol-keyed dispatch method.');
+    }
+    Object.defineProperty(dispatcher, symbol, { value: vi.fn(), configurable: true });
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/dispatcher|dispatch|trusted/iu);
     } finally {
       await dispatcher.close();
     }

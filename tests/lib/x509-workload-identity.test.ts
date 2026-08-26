@@ -283,12 +283,45 @@ describe('OpenAI X.509 workload-identity client integration', () => {
   });
 
   test('switches an ordinary API-key client into approved X.509 workload identity', () => {
-    const ordinary = new OpenAI({ apiKey: 'synthetic-api-key' });
+    const ordinary = new OpenAI({
+      apiKey: 'synthetic-api-key',
+      defaultHeaders: { 'x-origin-private': 'synthetic-ordinary-header-secret' },
+      defaultQuery: { api_key: 'synthetic-ordinary-query-secret' },
+    });
     vi.stubEnv('OPENAI_API_KEY', 'synthetic-environment-api-key');
     const switched = ordinary.withOptions({ workloadIdentity: identity(), x509Transport: transport });
 
     expect(switched.baseURL).toBe('https://mtls.api.openai.com/v1');
     expect(switched.apiKey).toBeNull();
+    expect(switched.buildURL('/models', null)).toBe('https://mtls.api.openai.com/v1/models');
+  });
+
+  test.each([
+    'api_key',
+    'Authorization',
+    'access_token',
+    'session_token',
+    'session_id',
+    'id_token',
+    'auth_token',
+    'X-Amz-Security-Token',
+    'X-Amz-Signature',
+  ])('rejects caller-supplied %s query credentials before exchanging a workload credential', async (name) => {
+    const send = mockTransportRequests();
+    const client = new OpenAI(options({ defaultQuery: { [name]: 'synthetic-conflicting-query-secret' } }));
+
+    await expect(client.models.list()).rejects.toThrow(/query|credential|authentication/iu);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test('rejects request-level query credentials before contacting the issuer', async () => {
+    const send = mockTransportRequests();
+    const client = new OpenAI(options());
+
+    await expect(
+      client.request({ method: 'get', path: '/models', query: { access_token: 'synthetic-request-secret' } }),
+    ).rejects.toThrow(/query|credential|authentication/iu);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('rejects pre-aborted API requests before presenting a certificate to the issuer', async () => {
@@ -514,16 +547,24 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     },
   );
 
-  test.each(['Authorization', 'api-key', 'x-api-key', 'Proxy-Authorization', 'Host'])(
-    'rejects caller-supplied %s before exchanging a workload credential',
-    async (header) => {
-      const send = mockTransportRequests();
-      const client = new OpenAI(options({ defaultHeaders: { [header]: 'synthetic-conflicting-secret' } }));
+  test.each([
+    'Authorization',
+    'api-key',
+    'x-api-key',
+    'Proxy-Authorization',
+    'Cookie',
+    'X-Session-Token',
+    'X-Session-Id',
+    'X-Auth-Token',
+    'X-ID-Token',
+    'Host',
+  ])('rejects caller-supplied %s before exchanging a workload credential', async (header) => {
+    const send = mockTransportRequests();
+    const client = new OpenAI(options({ defaultHeaders: { [header]: 'synthetic-conflicting-secret' } }));
 
-      await expect(client.models.list()).rejects.toThrow(/caller-supplied.*credentials/iu);
-      expect(send).not.toHaveBeenCalled();
-    },
-  );
+    await expect(client.models.list()).rejects.toThrow(/caller-supplied.*credentials/iu);
+    expect(send).not.toHaveBeenCalled();
+  });
 
   test('rejects a public API-origin mutation before presenting a certificate to the issuer', async () => {
     const send = mockTransportRequests();

@@ -1,7 +1,8 @@
 import { Agent } from 'undici';
-import { vi } from 'vitest';
+import { expectTypeOf, vi } from 'vitest';
 
 import OpenAI from 'openai';
+import type { AzureClientOptions, AzureOpenAI, BedrockClientOptions, BedrockOpenAI } from 'openai';
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
 import * as transportCapability from 'openai/internal/auth/x509-transport-capability';
@@ -61,6 +62,19 @@ afterEach(async () => {
 });
 
 describe('X.509 workload credential refresh configuration', () => {
+  test('excludes X.509 credentials from provider constructors and client clones', () => {
+    expectTypeOf<AzureClientOptions['credential']>().toEqualTypeOf<undefined>();
+    expectTypeOf<BedrockClientOptions['credential']>().toEqualTypeOf<undefined>();
+    expectTypeOf<
+      NonNullable<ConstructorParameters<typeof AzureOpenAI>[0]>['credential']
+    >().toEqualTypeOf<undefined>();
+    expectTypeOf<
+      NonNullable<ConstructorParameters<typeof BedrockOpenAI>[0]>['credential']
+    >().toEqualTypeOf<undefined>();
+    expectTypeOf<Parameters<AzureOpenAI['withOptions']>[0]['credential']>().toEqualTypeOf<undefined>();
+    expectTypeOf<Parameters<BedrockOpenAI['withOptions']>[0]['credential']>().toEqualTypeOf<undefined>();
+  });
+
   test.each([null, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     'rejects invalid refreshBufferSeconds %s before certificate presentation',
     (refreshBufferSeconds) => {
