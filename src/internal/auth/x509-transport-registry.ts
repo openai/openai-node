@@ -1,10 +1,14 @@
 import { OpenAIError } from '../../core/error';
 import type { NullableHeaders } from '../headers';
+import type { MergedRequestInit } from '../types';
 import { findRegisteredX509Transport } from '#x509-transport-state';
 
 const transientX509TransportCodes = new Set([
   'ECONNRESET',
   'ECONNREFUSED',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ENETDOWN',
   'EPIPE',
   'ETIMEDOUT',
   'EAI_AGAIN',
@@ -57,7 +61,7 @@ export interface X509ExchangedToken {
 export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
-  request?: { signal: AbortSignal | null | undefined; timeout: number };
+  request?: { signal: AbortSignal | null | undefined; timeout: number; fetchOptions: MergedRequestInit };
   apiURL?: string;
   defaultHeaders?: NullableHeaders;
   requestHeaders?: NullableHeaders;

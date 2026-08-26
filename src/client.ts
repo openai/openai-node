@@ -996,7 +996,7 @@ export class OpenAI {
         void Shims.CancelReadableStream(props.response.body).catch(() => undefined);
         throw error;
       }
-      const callerSignal = props.options.signal;
+      const callerSignal = x509Authentication ? props.controller.signal : props.options.signal;
       const abortError = () =>
         x509Authentication && callerSignal
           ? this._makeUserAbortError(callerSignal)
@@ -1019,14 +1019,16 @@ export class OpenAI {
           }, remaining);
 
           if (callerSignal) {
-            abortListener = () => reject(abortError());
+            abortListener = () => {
+              if (!timedOut) reject(abortError());
+            };
             callerSignal.addEventListener('abort', abortListener, { once: true });
           }
         });
 
         return await Promise.race([defaultParseResponse<Rsp>(client, props), timeoutPromise]);
       } catch (error) {
-        if (callerSignal?.aborted) {
+        if (callerSignal?.aborted && !timedOut) {
           throw abortError();
         }
         if (!timedOut) {
@@ -1147,7 +1149,10 @@ export class OpenAI {
       }
       throw error;
     }
-    const { req, url, timeout } = built;
+    const { req, url } = built;
+    const timeout = x509Authentication
+      ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
+      : built.timeout;
     x509Authentication?.bindRequest(options, req, this.adminAPIKey);
     let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
@@ -1176,7 +1181,7 @@ export class OpenAI {
         retryOfRequestLogID,
         method: options.method,
         url,
-        options,
+        options: x509Authentication ? { body: req.body, ...x509Authentication.requestSnapshot() } : options,
         headers: req.headers,
       }),
     );
@@ -1624,7 +1629,9 @@ export class OpenAI {
     const explicitTimeout = 'timeout' in options;
     if (explicitTimeout) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
-    x509Authentication?.snapshotRequest(options.signal, options.timeout);
+    if (x509Authentication && x509RequestFetchOptions) {
+      x509Authentication.snapshotRequest(options.signal, options.timeout, x509RequestFetchOptions);
+    }
     if (x509Authentication) {
       const snapshot = x509Authentication.requestSnapshot();
       options.timeout = snapshot.timeout;

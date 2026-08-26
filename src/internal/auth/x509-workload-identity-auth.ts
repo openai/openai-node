@@ -238,13 +238,21 @@ export class X509WorkloadIdentityAuth {
     return apiURL;
   }
 
-  /** Captures the exact caller signal and deadline approved for authenticated dispatch. */
-  snapshotRequest(signal: AbortSignal | null | undefined, timeout: number): void {
-    this.#scope().request ??= { signal, timeout };
+  /** Captures the exact caller settings approved for authenticated dispatch. */
+  snapshotRequest(
+    signal: AbortSignal | null | undefined,
+    timeout: number,
+    fetchOptions: MergedRequestInit,
+  ): void {
+    this.#scope().request ??= { signal, timeout, fetchOptions };
   }
 
   /** Returns immutable request settings without invoking caller-owned accessors again. */
-  requestSnapshot(): { signal: AbortSignal | null | undefined; timeout: number } {
+  requestSnapshot(): {
+    signal: AbortSignal | null | undefined;
+    timeout: number;
+    fetchOptions: MergedRequestInit;
+  } {
     const { request } = this.#scope();
     if (!request) {
       throw new OpenAIError('X.509 workload identity requires snapshotted request settings.');
@@ -360,6 +368,7 @@ export class X509WorkloadIdentityAuth {
       requestHeaders: HeadersLike;
       signal: AbortSignal | null | undefined;
       timeout: number;
+      fetchOptions: MergedRequestInit;
     },
   ): Promise<string> {
     const callerSignal = context ? context.signal : options?.signal;
@@ -411,11 +420,12 @@ export class X509WorkloadIdentityAuth {
           defaultHeaders: HeadersLike | undefined;
           requestHeaders: HeadersLike;
           timeout: number;
+          fetchOptions: MergedRequestInit;
         }
       | undefined,
   ): void {
     if (options) {
-      assertX509RequestOptions(options.fetchOptions);
+      assertX509RequestOptions(context ? context.fetchOptions : options.fetchOptions);
     }
     if (!context) {
       return;

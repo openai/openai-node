@@ -332,7 +332,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       enumerable: true,
       get: () => {
         reads += 1;
-        if (reads === 2) {
+        if (reads === 1) {
           caller.abort(reason);
         }
         return {};
@@ -343,6 +343,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       constructor: APIUserAbortError,
       cause: reason,
     });
+    expect(reads).toBe(1);
     expect(send).not.toHaveBeenCalled();
   });
 
