@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.8.0](https://github.com/openai/openai-node/compare/v7.7.0...v7.8.0) (2026-08-27)
+
+
+### Features
+
+* **api:** add compute_units to Responses and Chat Completions usage ([#2505](https://github.com/openai/openai-node/issues/2505)) ([f9b1313](https://github.com/openai/openai-node/commit/f9b131388a270451eec7242aa0d302e2135b1d3e))
+* **api:** add default WebSocket User-Agent and audit log events ([#2504](https://github.com/openai/openai-node/issues/2504)) ([9b2f089](https://github.com/openai/openai-node/commit/9b2f0892c9fde399163bea59d4aa9bc4ba0ae03e))
+
+
+### Bug Fixes
+
+* **auth:** clamp the workload-identity refresh buffer to the token lifetime ([#2490](https://github.com/openai/openai-node/issues/2490)) ([76b73a9](https://github.com/openai/openai-node/commit/76b73a9c73aafe11c60a425a82898705f1db966d))
+* **auth:** secure first-class X.509 workload credentials ([#2479](https://github.com/openai/openai-node/issues/2479)) ([1b36c19](https://github.com/openai/openai-node/commit/1b36c19c011bcb9775a5cecb0d8a1bd072b74cd6))
+* **deps:** harden dependency and release boundaries ([#2484](https://github.com/openai/openai-node/issues/2484)) ([b21ff45](https://github.com/openai/openai-node/commit/b21ff456e7bd578547c456e5f7abd1d494a02090))
+* **events:** settle WebSocket waiters when listeners throw ([#2491](https://github.com/openai/openai-node/issues/2491)) ([b5a13a7](https://github.com/openai/openai-node/commit/b5a13a7dc8c95669440ec87662bcae8227b398d9))
+* restore native browser ESM imports ([#2495](https://github.com/openai/openai-node/issues/2495)) ([c8cab1e](https://github.com/openai/openai-node/commit/c8cab1e90eb5daf05d17d5c90492e6728afa91b7))
+* **uploads:** detect multipart bodies from own properties only ([#2492](https://github.com/openai/openai-node/issues/2492)) ([559ffc8](https://github.com/openai/openai-node/commit/559ffc8079d0ae716bbf7915305e7db6ecc016a1))
+
 ## [7.7.0](https://github.com/openai/openai-node/compare/v7.6.0...v7.7.0) (2026-08-26)
 
 
