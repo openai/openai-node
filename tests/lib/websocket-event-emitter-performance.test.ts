@@ -32,6 +32,7 @@ interface FakeBrowserSocket {
 }
 
 interface PublicWebSocket {
+  on: (event: string, listener: Listener) => unknown;
   emitted: (event: string) => Promise<unknown>;
   socket: unknown;
 }
@@ -279,12 +280,118 @@ describe.each(websocketVariants)('$name event waiters', ({ event, create, dispat
       expect(spliceCalls).toBe(0);
     },
   );
+
+  test.each(['success', 'error'] as const)(
+    'settles the current %s event after an earlier public listener throws',
+    async (mode) => {
+      const client = new OpenAI({ apiKey: 'synthetic-api-key', baseURL: 'https://example.test/v1' });
+      const connection = create(client);
+      const failure = new Error('synthetic listener failure');
+      const settled = vi.fn();
+      connection.on(mode === 'success' ? event : 'error', () => {
+        throw failure;
+      });
+      void connection.emitted(event).then(settled, settled);
+      const payload =
+        mode === 'success'
+          ? { type: event, response: { id: 'current_response' } }
+          : {
+              type: 'error',
+              error: { message: 'current failure', code: 'synthetic', type: 'invalid_request_error' },
+            };
+
+      expect(() => dispatch(connection, payload)).toThrow(failure);
+      if (mode === 'error') {
+        dispatch(connection, { type: event, response: { id: 'PRIVATE_FUTURE_EVENT' } });
+      }
+      await Promise.resolve();
+
+      const expectedError = expect.objectContaining({ message: expect.stringContaining('current failure') });
+      expect(settled.mock.calls).toEqual([[mode === 'success' ? payload : expectedError]]);
+    },
+  );
+});
+
+test.each([
+  ['stable', StableResponsesWS],
+  ['beta', BetaResponsesWS],
+] as const)('%s Responses close settles after a listener throws', async (_version, WebSocket) => {
+  const client = new OpenAI({ apiKey: 'synthetic-api-key', baseURL: 'https://example.test/v1' });
+  const connection: {
+    on: (event: 'close', listener: () => void) => unknown;
+    emitted: (event: 'close') => Promise<unknown>;
+    socket: StableResponsesWS['socket'];
+  } = new WebSocket(client);
+  const failure = new Error('synthetic close listener failure');
+  const settled = vi.fn();
+  connection.on('close', () => {
+    throw failure;
+  });
+  void connection.emitted('close').then(settled, settled);
+  const socket = connection.socket.platformSocket;
+
+  expect(() => socket.emit('close', 1000, Buffer.from('complete'))).toThrow(failure);
+  await Promise.resolve();
+
+  expect(settled.mock.calls).toEqual([[[1000, 'complete', []]]]);
 });
 
 describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
   function createEmitter(): AuditedEmitter {
     return create() as unknown as AuditedEmitter;
   }
+
+  test.each([undefined, false, new Error('first listener failure')] as const)(
+    'preserves the first thrown value %s while settling later one-time listeners',
+    async (firstFailure) => {
+      const emitter = createEmitter();
+      const laterFailure = new Error('later listener failure');
+      const once = vi.fn();
+      const settled = vi.fn();
+      emitter.once('value', () => {
+        throw firstFailure;
+      });
+      emitter.on('value', () => {
+        throw laterFailure;
+      });
+      emitter.once('value', once);
+      void emitter.emitted('value').then(settled, settled);
+      let didThrow = false;
+      let thrown: unknown = laterFailure;
+
+      try {
+        emit(emitter, 'value', 7);
+      } catch (error) {
+        didThrow = true;
+        thrown = error;
+      }
+      await Promise.resolve();
+
+      expect(didThrow).toBe(true);
+      expect(thrown).toBe(firstFailure);
+      expect(() => emit(emitter, 'value', 8)).toThrow(laterFailure);
+      expect(once.mock.calls).toEqual([[7]]);
+      expect(settled.mock.calls).toEqual([[7]]);
+      expect(hasListener(emitter, 'error')).toBe(false);
+    },
+  );
+
+  test('retains outer one-time listeners during nested same-event dispatch', () => {
+    const emitter = createEmitter();
+    const once = vi.fn();
+    const failure = new Error('nested listener failure');
+    emitter.on('value', (value: number) => {
+      if (value === 1) {
+        emit(emitter, 'value', 2);
+        throw failure;
+      }
+    });
+    emitter.once('value', once);
+
+    expect(() => emit(emitter, 'value', 1)).toThrow(failure);
+
+    expect(once.mock.calls).toEqual([[1]]);
+  });
 
   test('retains observable public once and off hooks and immediate listener visibility', async () => {
     const emitter = createEmitter();
