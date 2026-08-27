@@ -20,7 +20,7 @@ import type {
 } from '../resources/beta/threads/runs/runs';
 import type { ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
-import { APIUserAbortError, OpenAIError } from '../error';
+import { APIError, APIUserAbortError, OpenAIError } from '../error';
 import type {
   AssistantStreamEvent,
   MessageStreamEvent,
@@ -491,10 +491,7 @@ export class AssistantStream
       }
 
       case 'error': {
-        //This is included for completeness, but errors are processed in the SSE event processing so this should not occur
-        throw new Error(
-          'Encountered an error event in event processing - errors should be processed earlier',
-        );
+        throw new APIError(undefined, stableEvent.data, undefined, undefined);
       }
       default: {
         assertNever(stableEvent);

@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type OpenAI from 'openai';
-import { OpenAIError } from 'openai/error';
+import { APIError, OpenAIError } from 'openai/error';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import type { ChatCompletionSnapshot } from 'openai/lib/ChatCompletionStream';
@@ -1061,6 +1061,33 @@ describe('.stream()', () => {
     expect(collected).toHaveLength(chunks.length);
     expect(caught).toBeInstanceOf(OpenAIError);
     expect((caught as OpenAIError).message).toBe('network boom');
+  });
+
+  it('surfaces a server error frame from a readable stream as an APIError', async () => {
+    const errorBody = {
+      message: 'upstream exploded',
+      type: 'server_error',
+      code: 'server_error',
+      param: 'messages',
+    };
+    const readable = new Stream(async function* errorFrames() {
+      yield { error: errorBody };
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    const failure = await stream.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(APIError);
+    expect(failure).toMatchObject({
+      message: 'upstream exploded',
+      code: 'server_error',
+      param: 'messages',
+      type: 'server_error',
+      error: errorBody,
+    });
   });
 
   it('rejects a pending read exactly once when the stream errors while a reader is waiting', async () => {

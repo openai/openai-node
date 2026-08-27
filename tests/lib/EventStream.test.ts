@@ -48,8 +48,38 @@ class TestStream extends EventStream<TestEvents> {
     this._emit('abort', error);
   }
 
+  runFoo(value: string, index: number) {
+    this._run(async () => this._emit('foo', value, index));
+  }
+
   end() {
     this._emit('end');
+  }
+}
+
+function settledWithin(promise: Promise<unknown>, ticks = 50): Promise<'settled' | 'pending'> {
+  let settled = false;
+  void promise.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  let chain: Promise<unknown> = Promise.resolve();
+  for (let i = 0; i < ticks; i += 1) {
+    chain = chain.then(() => null);
+  }
+  return chain.then(() => (settled ? 'settled' : 'pending'));
+}
+
+async function captureFailure(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+    return null;
+  } catch (error) {
+    return error;
   }
 }
 
@@ -85,6 +115,89 @@ describe('EventStream listeners', () => {
       expect(once).toHaveBeenCalledWith('first', 1);
     },
   );
+});
+
+describe('EventStream terminal lifecycle', () => {
+  test.each([
+    ['error', new OpenAIError('stream failed')],
+    ['abort', new APIUserAbortError()],
+  ] as const)(
+    'settles done after a throwing %s listener while preserving the listener failure',
+    async (event, terminalFailure) => {
+      const stream = new TestStream();
+      const listenerFailure = new Error('listener failed');
+      const endListener = vi.fn();
+      const doneFailure = captureFailure(stream.done());
+      stream.on(event, () => {
+        throw listenerFailure;
+      });
+      stream.on('end', endListener);
+
+      let thrown: unknown;
+      try {
+        if (event === 'error') {
+          stream.emitError(terminalFailure);
+        } else {
+          stream.emitAbort(terminalFailure);
+        }
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBe(listenerFailure);
+      expect(await settledWithin(doneFailure)).toBe('settled');
+      await expect(doneFailure).resolves.toBe(terminalFailure);
+      expect(stream.ended).toBe(true);
+      expect(endListener).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('skips later error listeners after a throw yet still fires end', async () => {
+    const stream = new TestStream();
+    const listenerFailure = new Error('listener failed');
+    const terminalFailure = new OpenAIError('stream failed');
+    const laterErrorListener = vi.fn();
+    const endListener = vi.fn();
+    const doneFailure = captureFailure(stream.done());
+    stream.on('error', () => {
+      throw listenerFailure;
+    });
+    stream.on('error', laterErrorListener);
+    stream.on('end', endListener);
+
+    let thrown: unknown;
+    try {
+      stream.emitError(terminalFailure);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBe(listenerFailure);
+    expect(laterErrorListener).not.toHaveBeenCalled();
+    expect(endListener).toHaveBeenCalledTimes(1);
+    await expect(doneFailure).resolves.toBe(terminalFailure);
+    expect(stream.ended).toBe(true);
+  });
+
+  test('keeps later value listeners skipped while settling the failed run', async () => {
+    const stream = new TestStream();
+    const listenerFailure = new Error('listener failed');
+    const laterListener = vi.fn();
+    stream.on('foo', () => {
+      throw listenerFailure;
+    });
+    stream.on('foo', laterListener);
+
+    const doneFailure = captureFailure(stream.done());
+    stream.runFoo('payload', 1);
+
+    const failure = await doneFailure;
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError).message).toBe('listener failed');
+    expect((failure as Error & { cause?: unknown }).cause).toBe(listenerFailure);
+    expect(laterListener).not.toHaveBeenCalled();
+    expect(stream.ended).toBe(true);
+  });
 });
 
 describe('EventStream.emitted', () => {
