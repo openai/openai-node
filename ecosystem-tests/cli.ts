@@ -418,6 +418,7 @@ const projectRunners = {
 
     await run('npm', ['run', 'tsc']);
     await run('npm', ['run', 'build']);
+    await run('npm', ['run', 'test:bundle']);
 
     if (state.live) {
       await run('npm', ['run', 'test:ci']);

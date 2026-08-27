@@ -227,4 +227,21 @@ describe('toFile', () => {
   });
 });
 
-runTests();
+const bundleOnly = (
+  globalThis as typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_BUNDLE_ONLY__?: boolean }
+).__OPENAI_ECOSYSTEM_TEST_BUNDLE_ONLY__;
+
+if (bundleOnly) {
+  try {
+    const unprotectedClient = new OpenAI({ apiKey });
+    throw new Error(`Unexpected unprotected browser client: ${unprotectedClient.constructor.name}`);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes('running in a browser-like environment')) {
+      throw error;
+    }
+  }
+
+  document.querySelector('#running')?.remove();
+} else {
+  runTests();
+}
