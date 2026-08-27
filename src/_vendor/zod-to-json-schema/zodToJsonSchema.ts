@@ -126,6 +126,13 @@ const SCHEMA_CHILDREN = new Map<string, 'schema' | 'list' | 'map'>([
   ['properties', 'map'],
   ['patternProperties', 'map'],
   ['dependentSchemas', 'map'],
+  // Draft-7 `dependencies` also carries property-dependency arrays, which are
+  // not schemas; `schemaChildren` skips those. Both keywords are recognized by
+  // the canonical traversal in `src/lib/transform.ts`, and
+  // `tests/helpers/zod-shared-optional-definitions.test.ts` asserts this map
+  // stays a superset of it so the two cannot drift apart.
+  ['dependencies', 'map'],
+  ['contentSchema', 'schema'],
   ['definitions', 'map'],
   ['$defs', 'map'],
 ]);
@@ -154,6 +161,30 @@ const hasAccessor = (value: Record<string, unknown>): boolean =>
   });
 
 /**
+ * The same guard for array entries. `override` can hand back an array whose
+ * indices are accessors; indexing it would run caller code, and a throwing
+ * getter would take the conversion down on a schema the base revision returns
+ * untouched.
+ */
+const hasArrayAccessor = (values: unknown[]): boolean => {
+  // By index rather than `some`, which reads each element to hand it to the
+  // callback -- the very thing being guarded against.
+  for (let index = 0; index < values.length; index++) {
+    const descriptor = Object.getOwnPropertyDescriptor(values, index);
+    if (!descriptor || !('value' in descriptor)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/** The value of an own data element, or `undefined` for an accessor. */
+const elementValue = (values: unknown[], index: number): unknown => {
+  const descriptor = Object.getOwnPropertyDescriptor(values, index);
+  return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+};
+
+/**
  * `anyOf: [{ not: {} }, X]` collapsed to `X`, with annotation siblings kept.
  *
  * The first branch matches nothing, so the union is exactly `X` -- an identity in
@@ -172,14 +203,14 @@ const hasAccessor = (value: Record<string, unknown>): boolean =>
  * arbitrary container whose entries are positional or alternative.
  */
 const nullableBranchIndex = (branches: unknown[]): number => {
-  if (branches.length !== 2) {
+  if (branches.length !== 2 || hasArrayAccessor(branches)) {
     return -1;
   }
   for (const [nullIndex, otherIndex] of [
     [1, 0],
     [0, 1],
   ]) {
-    const candidate = branches[nullIndex as number];
+    const candidate = elementValue(branches, nullIndex as number);
     if (
       isPlainObject(candidate) &&
       !hasAccessor(candidate) &&
@@ -201,12 +232,14 @@ const collapseNeverBranch = (
     return schema;
   }
   const branches = dataValue(schema, 'anyOf');
-  if (!Array.isArray(branches) || branches.length !== 2) {
+  // Accessor entries are left untouched: every read below -- destructuring
+  // included -- would otherwise run caller code from `override`.
+  if (!Array.isArray(branches) || branches.length !== 2 || hasArrayAccessor(branches)) {
     return schema;
   }
   const throughNullable = nullableBranchIndex(branches);
   if (throughNullable !== -1) {
-    const inner = branches[throughNullable];
+    const inner = elementValue(branches, throughNullable);
     if (!isPlainObject(inner)) {
       return schema;
     }
@@ -254,29 +287,55 @@ const collapseNeverBranch = (
  * `$ref` does not. Literal payloads are not searched -- a reference-shaped string
  * inside a `default` is data, not a reference.
  */
-const referencesWrapperPath = (value: unknown, wrapperPath: string): boolean => {
+const someRef = (value: unknown, matches: (ref: string) => boolean): boolean => {
   if (Array.isArray(value)) {
-    return value.some((item) => referencesWrapperPath(item, wrapperPath));
+    // By index: an `override` can hand back an array of accessor entries, and
+    // both indexing and `some` would run caller code during what is only an
+    // inspection.
+    for (let index = 0; index < value.length; index++) {
+      if (someRef(elementValue(value, index), matches)) {
+        return true;
+      }
+    }
+    return false;
   }
   if (!isPlainObject(value)) {
     return false;
   }
   const ref = dataValue(value, '$ref');
-  if (typeof ref === 'string' && ref.includes(wrapperPath)) {
+  if (typeof ref === 'string' && matches(ref)) {
     return true;
   }
   for (const [key, kind] of SCHEMA_CHILDREN) {
     const child = dataValue(value, key);
     if (kind === 'map' && isPlainObject(child)) {
-      if (Object.keys(child).some((name) => referencesWrapperPath(dataValue(child, name), wrapperPath))) {
+      const entries = Object.keys(child).map((name) => dataValue(child, name));
+      // Draft-7 `dependencies` also holds property-dependency arrays. They are
+      // lists of property names rather than schemas, so they are not walked.
+      const schemas = key === 'dependencies' ? entries.filter(isPlainObject) : entries;
+      if (schemas.some((entry) => someRef(entry, matches))) {
         return true;
       }
-    } else if (referencesWrapperPath(child, wrapperPath)) {
+    } else if (someRef(child, matches)) {
       return true;
     }
   }
   return false;
 };
+
+const referencesWrapperPath = (value: unknown, wrapperPath: string): boolean =>
+  someRef(value, (ref) => ref.includes(wrapperPath));
+
+/**
+ * Any reference that is not an absolute local pointer.
+ *
+ * `$refStrategy: 'relative'` spells a reference as a hop count from where it
+ * sits, so both the string and its meaning depend on the depth of the node
+ * holding it. Moving a schema out of its wrapper changes that depth, and the
+ * stored string no longer resolves. Rather than rebase every such reference,
+ * the wrappers are left standing -- exactly what the base revision does.
+ */
+const hasRelativeRef = (value: unknown): boolean => someRef(value, (ref) => !ref.startsWith('#'));
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   schema: ZodSchema<any>,
@@ -396,14 +455,21 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       }
     }
 
+    // A relative reference anywhere in the document makes every wrapper move
+    // unsafe, not just the ones named by a pointer: the reference's own depth is
+    // part of its meaning.
+    const relativeRefs = hasRelativeRef(main) || hasRelativeRef({ definitions });
+
     for (const { key, collapsed, wrapperPaths } of pendingCollapses) {
-      const stranded = wrapperPaths.some(
-        (wrapperPath) =>
-          referencesWrapperPath(main, wrapperPath) ||
-          // Wrapped so the walk recognises `definitions` as a map of schemas;
-          // its own keys are names, not keywords.
-          referencesWrapperPath({ definitions }, wrapperPath),
-      );
+      const stranded =
+        relativeRefs ||
+        wrapperPaths.some(
+          (wrapperPath) =>
+            referencesWrapperPath(main, wrapperPath) ||
+            // Wrapped so the walk recognises `definitions` as a map of schemas;
+            // its own keys are names, not keywords.
+            referencesWrapperPath({ definitions }, wrapperPath),
+        );
       if (!stranded) {
         definitions[key] = collapsed;
       }

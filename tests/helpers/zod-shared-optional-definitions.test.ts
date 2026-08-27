@@ -665,4 +665,67 @@ describe('a definition keeps the context it was referenced from', () => {
 
     expect(definitionNamed(schema, 'p_properties_a')).toEqual({ type: 'string', nullable: true });
   });
+
+  describe('references the converter must not strand', () => {
+    // Each of these is a schema the base revision converts correctly. The
+    // collapse must leave them exactly as they were rather than move a node out
+    // from under a reference that names it.
+
+    test('a relative reference keeps its wrapper', () => {
+      const leaf = zv3.string().min(2);
+      const maybe = zv3.object({ value: leaf }).optional();
+
+      const schema = zodToJsonSchema(zv3.object({ first: leaf, second: maybe }), {
+        $refStrategy: 'relative',
+        definitions: { Maybe: maybe },
+      }) as { definitions: Record<string, JsonSchema> };
+
+      // The reference inside `Maybe` counts hops from where it sits, so moving
+      // the node it sits under would silently change what it resolves to.
+      expect(definitionNamed(schema, 'Maybe')).toHaveProperty('anyOf');
+    });
+
+    test('a reference under `dependencies` keeps its target', () => {
+      const maybe = zv3.object({ value: zv3.string() }).optional();
+      const other = zv3.number();
+
+      const schema = zodToJsonSchema(zv3.object({ first: maybe, second: other }), {
+        definitions: { Maybe: maybe },
+        // A later Draft-7 shape the converter has to look inside: the reference
+        // lives under `dependencies`, which the scan has to reach.
+        override: (def, _refs, _seen, _force) =>
+          def === (other as any)._def
+            ? ({
+                type: 'object',
+                dependencies: {
+                  whenPresent: { $ref: '#/definitions/Maybe/anyOf/1/properties/value' },
+                },
+              } as any)
+            : ignoreOverride,
+      }) as { definitions: Record<string, JsonSchema> };
+
+      expect(definitionNamed(schema, 'Maybe')).toHaveProperty('anyOf');
+    });
+
+    test('an accessor-backed array entry is left alone', () => {
+      const shared = zv3.string().nullable().optional();
+      const branches: unknown[] = [{ not: {} }];
+      Object.defineProperty(branches, '1', {
+        enumerable: true,
+        get() {
+          throw new Error('boom');
+        },
+      });
+
+      expect(() =>
+        zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+          name: 'p',
+          nameStrategy: 'duplicate-ref',
+          $refStrategy: 'extract-to-root',
+          override: (def, _refs, _seen, forceResolution) =>
+            forceResolution && def === (shared as any)._def ? ({ anyOf: branches } as any) : ignoreOverride,
+        }),
+      ).not.toThrow();
+    });
+  });
 });
