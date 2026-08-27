@@ -31,6 +31,10 @@ export type NullableHeaders = {
 
 type AzureAuthenticationValues = ReadonlyArray<HeadersLike>;
 type AzureAuthenticationLayer = ReadonlyArray<readonly [string, string | null]>;
+type AzureAuthenticationRecordSnapshot = {
+  descriptors: Record<string, PropertyDescriptor>;
+  keys: readonly string[];
+};
 type AzureAuthenticationHeaderMutation = {
   kind: 'append' | 'replace' | 'delete';
   values: string[];
@@ -44,9 +48,9 @@ type AzureRequestHeaderMarker = {
 };
 type AzureRequestHeaderRegistration = {
   carrier: NullableHeaders;
-  credentialSnapshots: WeakMap<object, Map<string, string>>;
   headers: object;
   owner: object | undefined;
+  record: AzureAuthenticationRecordSnapshot | undefined;
 };
 type AzureRequestHeaderRegistrations = {
   references: number;
@@ -81,6 +85,10 @@ const azureAuthenticationHeaderSnapshots = new WeakMap<
   NullableHeaders,
   ReadonlyArray<AzureAuthenticationLayer>
 >();
+const azureAuthenticationHeaderRecordSnapshots = new WeakMap<
+  NullableHeaders,
+  WeakMap<object, AzureAuthenticationRecordSnapshot>
+>();
 const azureAuthenticationHeaderMutations = new WeakMap<
   Headers,
   Map<string, AzureAuthenticationHeaderMutation>
@@ -106,24 +114,26 @@ const snapshotAzureAuthenticationHeaders = (
 ): ReadonlyArray<AzureAuthenticationLayer> | undefined => {
   const headers = azureAuthenticationHeaders.get(carrier);
   if (headers === undefined) return undefined;
+  const records = azureAuthenticationHeaderRecordSnapshots.get(carrier);
 
   let layers = azureAuthenticationHeaderSnapshots.get(carrier);
   if (!layers) {
     layers = Object.freeze(
-      headers.map((layer) =>
-        Object.freeze(
-          Array.from(iterateHeaders(layer), ([name, value]) => {
+      headers.map((layer) => {
+        const record = layer !== null && typeof layer === 'object' ? records?.get(layer) : undefined;
+        return Object.freeze(
+          Array.from(iterateHeaders(layer, registration, record), ([name, value]) => {
             const normalized = name.toLowerCase();
             return registration !== undefined &&
               value !== null &&
               typeof value !== 'string' &&
               isAzureAuthenticationHeader(normalized) &&
-              !hasRemainingAzureAuthenticationOverride(layer, name, normalized)
-              ? ([name, snapshotAzureRequestCredentialHeaderValue(registration, normalized, value)] as const)
+              !hasRemainingAzureAuthenticationOverride(layer, name, normalized, registration, record)
+              ? ([name, coerceAzureCredentialHeaderValue(value)] as const)
               : ([name, value] as const);
           }),
-        ),
-      ),
+        );
+      }),
     );
     azureAuthenticationHeaderSnapshots.set(carrier, layers);
   }
@@ -136,28 +146,6 @@ const coerceAzureCredentialHeaderValue = (value: unknown): string => {
   } catch {
     throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
   }
-};
-
-const snapshotAzureRequestCredentialHeaderValue = (
-  registration: AzureRequestHeaderRegistration,
-  name: string,
-  value: unknown,
-): string => {
-  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
-    return coerceAzureCredentialHeaderValue(value);
-  }
-
-  let snapshots = registration.credentialSnapshots.get(value);
-  if (snapshots === undefined) {
-    snapshots = new Map<string, string>();
-    registration.credentialSnapshots.set(value, snapshots);
-  }
-  let snapshot = snapshots.get(name);
-  if (snapshot === undefined) {
-    snapshot = coerceAzureCredentialHeaderValue(value);
-    snapshots.set(name, snapshot);
-  }
-  return snapshot;
 };
 
 const invalidateAzureAuthenticationHeaderIterators = (headers: Headers): void => {
@@ -523,16 +511,36 @@ class DeferredAzureAuthenticationNulls extends Set<string> {
     };
   }
 
-  private initialize(): void {
-    if (this.initialized) return;
-    this.initialized = true;
+  seedInherited(name: string, present: boolean): void {
+    if (present) {
+      Set.prototype.add.call(this, name);
+      this.inherited.add(name);
+    } else {
+      Set.prototype.delete.call(this, name);
+      this.inherited.delete(name);
+    }
+  }
 
+  private initialize(): void {
     const carrier = azureAuthenticationNullCarriers.get(this);
     if (!carrier) return;
+    const removed = new Set<string>();
+    for (const name of this.inherited) {
+      if (!Set.prototype.has.call(this, name)) {
+        this.inherited.delete(name);
+        removed.add(name);
+        if (azureAuthenticationHeaderMutations.get(carrier.values)?.get(name) === undefined) {
+          carrier.values.delete(name);
+        }
+      }
+    }
+    if (this.initialized) return;
+    this.initialized = true;
 
     for (const layer of snapshotAzureAuthenticationHeaders(carrier) ?? []) {
       for (const [name, value] of layer) {
         const normalized = name.toLowerCase();
+        if (removed.has(normalized)) continue;
         if (value === null) {
           super.add(normalized);
           this.inherited.add(normalized);
@@ -619,14 +627,73 @@ class DeferredAzureAuthenticationNulls extends Set<string> {
  * credential to native Headers, where rejected values appear in diagnostics.
  */
 export const buildAzureAuthenticationHeaders = (...headers: AzureAuthenticationValues): NullableHeaders => {
+  const nulls = new DeferredAzureAuthenticationNulls();
   const carrier: NullableHeaders = {
     [brand_privateNullableHeaders]: true,
     values: new DeferredAzureAuthenticationHeaders(),
-    nulls: new DeferredAzureAuthenticationNulls(),
+    nulls,
   };
   azureAuthenticationHeaders.set(carrier, headers);
   azureAuthenticationHeaderCarriers.set(carrier.values, carrier);
   azureAuthenticationNullCarriers.set(carrier.nulls, carrier);
+  const records = new WeakMap<object, AzureAuthenticationRecordSnapshot>();
+  azureAuthenticationHeaderRecordSnapshots.set(carrier, records);
+
+  try {
+    for (const layer of headers) {
+      if (layer === undefined || layer === null) continue;
+      if (brand_privateNullableHeaders in layer) {
+        for (const name of ['api-key', 'authorization']) {
+          if (Set.prototype.has.call(layer.nulls, name)) {
+            nulls.seedInherited(name, true);
+          } else if (Headers.prototype.has.call(layer.values, name)) {
+            nulls.seedInherited(name, false);
+          }
+        }
+        continue;
+      }
+      if (layer instanceof Headers) {
+        for (const name of ['api-key', 'authorization']) {
+          if (Headers.prototype.has.call(layer, name)) {
+            nulls.seedInherited(name, false);
+          }
+        }
+        continue;
+      }
+      if (isReadonlyArray(layer)) {
+        for (const row of layer) {
+          const name = row[0];
+          if (typeof name !== 'string' || !isAzureAuthenticationHeader(name)) continue;
+          const value = row[1];
+          const values = isReadonlyArray(value) ? value : [value];
+          for (const candidate of values) {
+            if (candidate !== undefined) {
+              nulls.seedInherited(name.toLowerCase(), candidate === null);
+            }
+          }
+        }
+        continue;
+      }
+
+      const descriptors = Object.getOwnPropertyDescriptors(layer);
+      const keys = Object.keys(descriptors).filter((name) => descriptors[name]?.enumerable === true);
+      records.set(layer, { descriptors, keys });
+      for (const name of keys) {
+        if (!isAzureAuthenticationHeader(name)) continue;
+        const descriptor = descriptors[name];
+        if (descriptor === undefined || !('value' in descriptor)) continue;
+        const value: unknown = descriptor.value;
+        const values = isReadonlyArray(value) ? value : [value];
+        for (const candidate of values) {
+          if (candidate !== undefined) {
+            nulls.seedInherited(name.toLowerCase(), candidate === null);
+          }
+        }
+      }
+    }
+  } catch {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
   return carrier;
 };
 
@@ -709,12 +776,14 @@ export const protectAzureRequestHeaders = (
     azureRequestHeaders.set(headers, registrations);
   }
   const activeRegistrations = registrations;
+  const carrier = buildAzureAuthenticationHeaders(headers);
   const activeRegistration: AzureRequestHeaderRegistration = {
-    carrier: buildAzureAuthenticationHeaders(headers),
-    credentialSnapshots: new WeakMap(),
+    carrier,
     headers,
     owner,
+    record: azureAuthenticationHeaderRecordSnapshots.get(carrier)?.get(headers),
   };
+  azureRequestAuthenticationHeaders.set(carrier, activeRegistration);
   activeRegistrations.references += 1;
   activeRegistrations.registrations.add(activeRegistration);
   const marker: AzureRequestHeaderMarker = {
@@ -762,8 +831,8 @@ export const protectAzureRequestHeaders = (
     release,
     snapshot: () => {
       if (
-        overridesAzureAuthenticationHeader(headers, 'api-key') ||
-        overridesAzureAuthenticationHeader(headers, 'authorization')
+        overridesAzureAuthenticationHeader(headers, 'api-key', activeRegistration) ||
+        overridesAzureAuthenticationHeader(headers, 'authorization', activeRegistration)
       ) {
         const effective = new Map<string, string[]>();
         for (const layer of snapshotAzureAuthenticationHeaders(
@@ -788,7 +857,7 @@ export const protectAzureRequestHeaders = (
         for (const [name, values] of effective) {
           for (const value of values) {
             if (typeof value !== 'string') {
-              snapshotAzureRequestCredentialHeaderValue(activeRegistration, name, value);
+              coerceAzureCredentialHeaderValue(value);
             }
           }
         }
@@ -866,8 +935,9 @@ const matchesAzureRequestHeaders = (
 
 function* iterateHeaderRecord(
   headers: Record<string, HeaderValue | readonly HeaderValue[]>,
+  record?: AzureAuthenticationRecordSnapshot,
 ): IterableIterator<readonly [string, HeaderValue | readonly HeaderValue[]]> {
-  for (const name of Object.keys(headers)) {
+  for (const name of record?.keys ?? Object.keys(headers)) {
     let value: HeaderValue | readonly HeaderValue[];
     try {
       value = headers[name];
@@ -881,7 +951,11 @@ function* iterateHeaderRecord(
   }
 }
 
-function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [string, string | null]> {
+function* iterateHeaders(
+  headers: HeadersLike,
+  registration?: AzureRequestHeaderRegistration,
+  record?: AzureAuthenticationRecordSnapshot,
+): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
   if (brand_privateNullableHeaders in headers) {
@@ -893,13 +967,17 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
     const mutations = azureAuthenticationHeaderMutations.get(values);
     const materialized = azureAuthenticationMaterializedHeaders.get(values);
     const nativeMutationValues = azureAuthenticationMutationNativeValues.get(values);
-    const layers = snapshotAzureAuthenticationHeaders(
-      azureAuthenticationHeaderCarriers.get(values) ?? headers,
-    );
+    const carrier = azureAuthenticationHeaderCarriers.get(values) ?? headers;
+    const activeRegistration = registration ?? azureRequestAuthenticationHeaders.get(carrier);
+    const sources = azureAuthenticationHeaders.get(carrier);
+    const layers = snapshotAzureAuthenticationHeaders(carrier, activeRegistration);
     if (layers !== undefined) {
-      for (const layer of layers) {
+      for (let index = 0; index < layers.length; index += 1) {
+        const layer = layers[index];
+        if (layer === undefined) continue;
         const seen = new Set<string>();
-        for (const [name, value] of layer) {
+        const refreshed = new Set<string>();
+        for (const [name, snapshot] of layer) {
           const normalized = name.toLowerCase();
           const mutation = mutations?.get(normalized);
           if (
@@ -915,7 +993,25 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
             seen.add(normalized);
             yield [name, null];
           }
-          yield [name, value];
+          if (
+            !isAzureAuthenticationHeader(normalized) &&
+            activeRegistration?.record !== undefined &&
+            sources?.[index] === activeRegistration.headers
+          ) {
+            if (refreshed.has(name)) continue;
+            refreshed.add(name);
+            const current = (
+              activeRegistration.headers as Record<string, HeaderValue | readonly HeaderValue[]>
+            )[name];
+            if (current === undefined) continue;
+            yield [name, null];
+            const currentValues = isReadonlyArray(current) ? current : [current];
+            for (const value of currentValues) {
+              if (value !== undefined) yield [name, value];
+            }
+            continue;
+          }
+          yield [name, snapshot];
         }
       }
     }
@@ -977,7 +1073,10 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
     iter = headers;
   } else {
     shouldClear = true;
-    iter = iterateHeaderRecord(headers as Record<string, HeaderValue | readonly HeaderValue[]>);
+    iter = iterateHeaderRecord(
+      headers as Record<string, HeaderValue | readonly HeaderValue[]>,
+      record ?? (registration?.headers === headers ? registration.record : undefined),
+    );
   }
   for (let row of iter) {
     const name = row[0];
@@ -1015,8 +1114,12 @@ const assertNoUnboundAzureRequestRegistration = (headers: HeadersLike[]): void =
   }
 };
 
-const overridesAzureAuthenticationRecordValue = (headers: object, key: string): boolean => {
-  const descriptor = Object.getOwnPropertyDescriptor(headers, key);
+const overridesAzureAuthenticationRecordValue = (
+  headers: object,
+  key: string,
+  record?: AzureAuthenticationRecordSnapshot,
+): boolean => {
+  const descriptor = record?.descriptors[key] ?? Object.getOwnPropertyDescriptor(headers, key);
   if (descriptor === undefined) {
     return false;
   }
@@ -1027,7 +1130,28 @@ const overridesAzureAuthenticationRecordValue = (headers: object, key: string): 
   return Array.isArray(value) ? value.some((candidate) => candidate !== undefined) : value !== undefined;
 };
 
-const overridesAzureAuthenticationHeader = (headers: HeadersLike, name: string): boolean => {
+const azureAuthenticationTupleValueDescriptor = (
+  value: object,
+  index: number,
+): PropertyDescriptor | undefined => {
+  let owner: object | null = value;
+  for (let depth = 0; owner !== null && depth < 32; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(owner, index);
+    if (descriptor !== undefined) return descriptor;
+    owner = Object.getPrototypeOf(owner) as object | null;
+  }
+  if (owner !== null) {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+  return undefined;
+};
+
+const overridesAzureAuthenticationHeader = (
+  headers: HeadersLike,
+  name: string,
+  registration?: AzureRequestHeaderRegistration,
+  record?: AzureAuthenticationRecordSnapshot,
+): boolean => {
   if (headers === undefined || headers === null || typeof headers !== 'object') {
     return false;
   }
@@ -1037,6 +1161,8 @@ const overridesAzureAuthenticationHeader = (headers: HeadersLike, name: string):
       ? (headers as NullableHeaders)
       : azureAuthenticationHeaderCarriers.get((headers as NullableHeaders).values);
     if (carrier !== undefined) {
+      const activeRegistration = registration ?? azureRequestAuthenticationHeaders.get(carrier);
+      const records = azureAuthenticationHeaderRecordSnapshots.get(carrier);
       const mutations = azureAuthenticationHeaderMutations.get(carrier.values);
       const mutation = mutations?.get(name);
       const materialized = azureAuthenticationMaterializedHeaders.get(carrier.values)?.has(name);
@@ -1064,7 +1190,14 @@ const overridesAzureAuthenticationHeader = (headers: HeadersLike, name: string):
         );
       }
       for (const layer of azureAuthenticationHeaders.get(carrier) ?? []) {
-        if (overridesAzureAuthenticationHeader(layer, name)) {
+        if (
+          overridesAzureAuthenticationHeader(
+            layer,
+            name,
+            activeRegistration,
+            layer !== null && typeof layer === 'object' ? records?.get(layer) : undefined,
+          )
+        ) {
           return true;
         }
       }
@@ -1080,20 +1213,47 @@ const overridesAzureAuthenticationHeader = (headers: HeadersLike, name: string):
   }
 
   if (isReadonlyArray(headers)) {
-    return headers.some((entry) => {
-      const value = entry[1];
-      return (
-        typeof entry[0] === 'string' &&
-        entry[0].toLowerCase() === name &&
-        (isReadonlyArray(value) ? value.some((candidate) => candidate !== undefined) : value !== undefined)
-      );
-    });
+    try {
+      return headers.some((entry) => {
+        const candidate = entry[0];
+        if (typeof candidate !== 'string' || candidate.toLowerCase() !== name) {
+          return false;
+        }
+
+        const descriptor = azureAuthenticationTupleValueDescriptor(entry, 1);
+        if (descriptor === undefined) {
+          return false;
+        }
+        if (!('value' in descriptor)) {
+          return true;
+        }
+
+        const value: unknown = descriptor.value;
+        if (!isReadonlyArray(value)) {
+          return value !== undefined;
+        }
+        for (let index = 0; index < value.length; index += 1) {
+          const element = azureAuthenticationTupleValueDescriptor(value, index);
+          if (element !== undefined && (!('value' in element) || element.value !== undefined)) {
+            return true;
+          }
+        }
+        return false;
+      });
+    } catch {
+      throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+    }
   }
 
-  for (const key of Object.keys(headers)) {
-    if (key.toLowerCase() === name && overridesAzureAuthenticationRecordValue(headers, key)) {
-      return true;
+  const snapshot = record ?? (registration?.headers === headers ? registration.record : undefined);
+  try {
+    for (const key of snapshot?.keys ?? Object.keys(headers)) {
+      if (key.toLowerCase() === name && overridesAzureAuthenticationRecordValue(headers, key, snapshot)) {
+        return true;
+      }
     }
+  } catch {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
   }
   return false;
 };
@@ -1102,6 +1262,8 @@ const hasRemainingAzureAuthenticationOverride = (
   headers: HeadersLike,
   current: string,
   name: string,
+  registration?: AzureRequestHeaderRegistration,
+  record?: AzureAuthenticationRecordSnapshot,
 ): boolean => {
   if (
     headers === undefined ||
@@ -1115,12 +1277,13 @@ const hasRemainingAzureAuthenticationOverride = (
   }
 
   let found = false;
-  for (const key of Object.keys(headers)) {
+  const snapshot = record ?? (registration?.headers === headers ? registration.record : undefined);
+  for (const key of snapshot?.keys ?? Object.keys(headers)) {
     if (!found) {
       found = key === current;
       continue;
     }
-    if (key.toLowerCase() === name && overridesAzureAuthenticationRecordValue(headers, key)) {
+    if (key.toLowerCase() === name && overridesAzureAuthenticationRecordValue(headers, key, snapshot)) {
       return true;
     }
   }
@@ -1131,9 +1294,10 @@ const hasLaterAzureAuthenticationOverride = (
   sources: HeadersLike[],
   index: number,
   name: string,
+  registration?: AzureRequestHeaderRegistration,
 ): boolean => {
   for (let candidate = index + 1; candidate < sources.length; candidate += 1) {
-    if (overridesAzureAuthenticationHeader(sources[candidate], name)) {
+    if (overridesAzureAuthenticationHeader(sources[candidate], name, registration)) {
       return true;
     }
   }
@@ -1187,14 +1351,14 @@ const buildHeadersWithRegistration = (
     const unprovenAuthenticationHeaders = new Map<string, string[]>();
     for (const [name, values] of pendingAuthenticationHeaders) {
       const mutable = values.filter((value) => typeof value !== 'string');
-      if (mutable.length > 0 && overridesAzureAuthenticationHeader(headers, name)) {
+      if (mutable.length > 0 && overridesAzureAuthenticationHeader(headers, name, requestRegistration)) {
         unprovenAuthenticationHeaders.set(name, mutable);
       }
     }
     if (requestRegistration !== undefined && headers === requestRegistration.carrier) {
       snapshotAzureAuthenticationHeaders(headers, requestRegistration);
     }
-    for (const [name, value] of iterateHeaders(headers)) {
+    for (const [name, value] of iterateHeaders(headers, requestRegistration)) {
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
       }
@@ -1221,17 +1385,18 @@ const buildHeadersWithRegistration = (
               headers === requestRegistration?.carrier ? source : headers,
               name,
               lowerName,
+              requestRegistration,
             );
             if (shadowedHere) {
               const uncertain = unprovenAuthenticationHeaders.get(lowerName) ?? [];
               uncertain.push(value);
               unprovenAuthenticationHeaders.set(lowerName, uncertain);
             }
-            if (!shadowedHere && !hasLaterAzureAuthenticationOverride(newHeaders, sourceIndex, lowerName)) {
-              snapshot =
-                requestRegistration !== undefined && headers === requestRegistration.carrier
-                  ? snapshotAzureRequestCredentialHeaderValue(requestRegistration, lowerName, value)
-                  : coerceAzureCredentialHeaderValue(value);
+            if (
+              !shadowedHere &&
+              !hasLaterAzureAuthenticationOverride(newHeaders, sourceIndex, lowerName, requestRegistration)
+            ) {
+              snapshot = coerceAzureCredentialHeaderValue(value);
             }
           }
           const pending = pendingAuthenticationHeaders.get(lowerName);

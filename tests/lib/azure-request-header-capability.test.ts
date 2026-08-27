@@ -511,7 +511,7 @@ describe('Azure request-local authentication header capabilities', () => {
     },
   );
 
-  test('isolates concurrent public requests sharing virtualized configurable data options', async () => {
+  test('fails closed for an untrackable concurrent virtualized configurable data snapshot', async () => {
     const { client, fetch } = createClient();
     const tenants = [
       { 'api-key': 'first-tenant-token', 'x-tenant': 'first' },
@@ -550,18 +550,15 @@ describe('Azure request-local authentication header capabilities', () => {
     expect(reads).toBe(2);
 
     gates[1]?.abort();
-    await second;
+    await expectSanitizedFailure(second);
     gates[0]?.abort();
     await first;
 
-    const secondHeaders = new Headers(fetch.mock.calls[0]?.[1]?.headers);
-    const firstHeaders = new Headers(fetch.mock.calls[1]?.[1]?.headers);
-    expect(secondHeaders.get('api-key')).toBe('second-tenant-token');
-    expect(secondHeaders.get('x-tenant')).toBe('second');
+    const firstHeaders = new Headers(fetch.mock.calls[0]?.[1]?.headers);
     expect(firstHeaders.get('api-key')).toBe('first-tenant-token');
     expect(firstHeaders.get('x-tenant')).toBe('first');
     expect(reads).toBe(2);
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   test('snapshots conflicting shared GET credentials before asynchronous authentication interleaves', async () => {

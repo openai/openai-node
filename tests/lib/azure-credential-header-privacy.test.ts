@@ -1006,7 +1006,7 @@ describe('Azure credential header diagnostic privacy', () => {
 
       await expectPrivateCredentialFailure(() => client.request(options), credential);
 
-      expect(reads).toBe(depth === 'deep' ? 2 : 0);
+      expect(reads).toBe(0);
       expect(fetch).not.toHaveBeenCalled();
       expect(provider).toHaveBeenCalledTimes(authentication === 'rotating-entra-token' ? 1 : 0);
     },

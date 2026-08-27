@@ -208,7 +208,24 @@ export class AzureOpenAI extends OpenAI {
             return resolve();
           }
           if (accessorEntry !== undefined) {
-            return accessorEntry.headers;
+            try {
+              if (accessorSnapshot?.invalidated) {
+                throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+              }
+              const descriptor = Object.getOwnPropertyDescriptor(options, 'headers');
+              if (descriptor?.get === accessorSnapshot?.getter) {
+                return accessorEntry.headers;
+              }
+              if (accessorSnapshot !== undefined && accessorSnapshot.snapshots.length !== 1) {
+                accessorSnapshot.invalidated = true;
+              }
+              if (accessorSnapshot?.snapshots.length === 1 && descriptor && 'value' in descriptor) {
+                return descriptor.value;
+              }
+            } catch {
+              // A replaced snapshot is untrusted when its effective descriptor cannot be inspected.
+            }
+            throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
           }
           if (requestOptions === options) {
             return options.headers;
@@ -353,10 +370,11 @@ function shouldProtectAzureRequestHeaders(options: FinalRequestOptions): boolean
     if (typeof descriptor?.get === 'function') {
       return true;
     }
+    if (descriptor === undefined && owner !== null) {
+      return true;
+    }
     const { body } = options;
-    return (
-      (descriptor === undefined && owner !== null) || (body === undefined ? 'body' in options : Boolean(body))
-    );
+    return body === undefined ? 'body' in options : Boolean(body);
   } catch {
     throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
   }
@@ -418,6 +436,7 @@ interface AzureRequestHeadersAccessorSnapshot {
   descriptor: PropertyDescriptor;
   getter: () => FinalRequestOptions['headers'];
   inherited: boolean;
+  invalidated: boolean;
   snapshots: { copied: boolean; headers: FinalRequestOptions['headers'] }[];
 }
 
@@ -529,7 +548,7 @@ function snapshotAzureRequestDataHeaders(
   const { headers } = options;
   const copied = { value: false };
   const requestOptions = snapshotAzureRequestOptions(options, headers, copied);
-  const stable = descriptor === undefined || descriptor.value === headers;
+  const stable = descriptor === undefined ? headers === undefined : descriptor.value === headers;
 
   return {
     ...(descriptor?.enumerable && !inherited ? { copied } : {}),
@@ -537,7 +556,7 @@ function snapshotAzureRequestDataHeaders(
     options: requestOptions,
     resolve: () => {
       if (!stable) {
-        return headers;
+        throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
       }
       try {
         const current = Object.getOwnPropertyDescriptor(options, 'headers');
@@ -592,11 +611,12 @@ function snapshotAzureImmutableRequestHeaders(
 
   return {
     resolve: () => {
-      if (snapshot.contended) {
-        throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
-      }
       try {
-        return descriptor.get === undefined ? headers : descriptor.get.call(options);
+        const current = descriptor.get === undefined ? headers : descriptor.get.call(options);
+        if (snapshot.contended && current !== headers) {
+          throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+        }
+        return current;
       } catch {
         throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
       }
@@ -648,7 +668,7 @@ function snapshotAzureRequestHeadersAccessor(
               }
             }
           };
-    snapshot = { descriptor, getter, inherited, snapshots };
+    snapshot = { descriptor, getter, inherited, invalidated: false, snapshots };
     azureRequestHeadersAccessorSnapshots.set(options, snapshot);
     try {
       Object.defineProperty(options, 'headers', {
