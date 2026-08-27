@@ -7699,6 +7699,11 @@ export interface ResponseUsage {
    * The total number of tokens used.
    */
   total_tokens: number;
+
+  /**
+   * Compute units for the request. Currently null when available.
+   */
+  compute_units?: number | null;
 }
 
 export namespace ResponseUsage {
