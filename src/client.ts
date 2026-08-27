@@ -251,7 +251,12 @@ import {
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
-import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
+import {
+  HeadersLike,
+  NullableHeaders,
+  buildHeaders,
+  captureAzureRequestHeaderSnapshot,
+} from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
@@ -1686,6 +1691,7 @@ export class OpenAI {
     inputOptions: FinalRequestOptions,
     { retryCount = 0 }: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
+    const azureRequestHeaders = captureAzureRequestHeaderSnapshot(this, inputOptions);
     if (this.#x509Authentication && !this.#x509Authentication.inRequest(this)) {
       const authentication = this.#x509Authentication;
       return await authentication.runRequest(async () => {
@@ -1741,6 +1747,7 @@ export class OpenAI {
       method,
       bodyHeaders,
       retryCount,
+      azureRequestHeaders,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
       x509Tenant,
@@ -1765,6 +1772,7 @@ export class OpenAI {
     method,
     bodyHeaders,
     retryCount,
+    azureRequestHeaders,
     x509Headers,
     x509Timeout,
     x509Tenant,
@@ -1773,6 +1781,7 @@ export class OpenAI {
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
     retryCount: number;
+    azureRequestHeaders: ReturnType<typeof captureAzureRequestHeaderSnapshot>;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
     x509Tenant?: { organization: string | null; project: string | null } | undefined;
@@ -1799,10 +1808,21 @@ export class OpenAI {
       },
       this._provider || this.#x509Authentication?.isPlanningRequest()
         ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+        : azureRequestHeaders
+          ? azureRequestHeaders.bindAuthentication(
+              await this.authHeaders(
+                azureRequestHeaders.authenticationOptions,
+                options.__security ?? { bearerAuth: true },
+              ),
+            )
+          : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
       x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       bodyHeaders,
-      x509Headers?.requestHeaders ?? options.headers,
+      x509Headers
+        ? x509Headers.requestHeaders
+        : azureRequestHeaders
+          ? azureRequestHeaders.headers()
+          : options.headers,
     ]);
 
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {

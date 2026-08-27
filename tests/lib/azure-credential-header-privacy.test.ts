@@ -5111,7 +5111,7 @@ describe('Azure deferred credential and request registration regressions', () =>
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  test('fails closed for concurrent nonextensible requests sharing tenant headers', async () => {
+  test('isolates concurrent nonextensible requests sharing tenant headers', async () => {
     const releases: (() => void)[] = [];
     const client = new ProtectedHookAzure({
       baseURL: BASE_URL,
@@ -5139,10 +5139,12 @@ describe('Azure deferred credential and request registration regressions', () =>
     expect(releases).toHaveLength(2);
 
     releases[0]?.();
-    await expect(first).rejects.toEqual(new TypeError(SAFE_ERROR));
+    const firstBuilt = await first;
     releases[1]?.();
     const secondBuilt = await second;
+    expect(firstBuilt.req.headers.get('api-key')).toBe('tenant-a-token');
     expect(secondBuilt.req.headers.get('api-key')).toBe('tenant-b-token');
+    expect(Object.getOwnPropertyDescriptor(client, 'authHeaders')).toBeUndefined();
   });
 
   test('preserves more than 1,024 genuine cross-realm undici header fields', async () => {
