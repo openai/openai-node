@@ -3,6 +3,7 @@ import type { NullableHeaders } from './internal/headers';
 import {
   buildAzureAuthenticationHeaders,
   buildHeaders,
+  materializeAzureAuthenticationHeaders,
   protectAzureRequestHeaders,
   withAzureRequestHeaderSnapshot,
 } from './internal/headers';
@@ -185,6 +186,7 @@ export class AzureOpenAI extends OpenAI {
       copied,
       headers,
       options: requestOptions = options,
+      resolve,
       restore,
     } = snapshotAzureRequestOptionsHeaders(options);
     const accessorSnapshot = azureRequestHeadersAccessorSnapshots.get(options);
@@ -193,12 +195,18 @@ export class AzureOpenAI extends OpenAI {
     let protection: ReturnType<typeof protectAzureRequestHeaders>;
 
     try {
-      protection = preprocessesHeaders ? protectAzureRequestHeaders(headers, options) : undefined;
+      protection = protectAzureRequestHeaders(headers, options);
+      if (!preprocessesHeaders) {
+        protection?.deactivate();
+      }
       let pending: ReturnType<OpenAI['buildRequest']>;
       let restoreBody: (() => void) | undefined;
       try {
         restoreBody = snapshotAzureRequestBodyAccessor(options);
         const requestHeaders = (): FinalRequestOptions['headers'] => {
+          if (resolve !== undefined) {
+            return resolve();
+          }
           if (accessorEntry !== undefined) {
             return accessorEntry.headers;
           }
@@ -268,12 +276,16 @@ export class AzureOpenAI extends OpenAI {
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
-      return buildAzureAuthenticationHeaders([['api-key', this.apiKey]]);
+      return materializeAzureAuthenticationHeaders(
+        buildAzureAuthenticationHeaders([['api-key', this.apiKey]]),
+      );
     }
 
-    return buildAzureAuthenticationHeaders(
-      security.bearerAuth ? await this.bearerAuth(opts) : undefined,
-      security.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : undefined,
+    return materializeAzureAuthenticationHeaders(
+      buildAzureAuthenticationHeaders(
+        security.bearerAuth ? await this.bearerAuth(opts) : undefined,
+        security.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : undefined,
+      ),
     );
   }
 
@@ -281,14 +293,18 @@ export class AzureOpenAI extends OpenAI {
     if (this.apiKey === null || this.apiKey === undefined) {
       return undefined;
     }
-    return buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.apiKey}`]]);
+    return materializeAzureAuthenticationHeaders(
+      buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.apiKey}`]]),
+    );
   }
 
   protected override async adminAPIKeyAuth(_opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
     if (this.adminAPIKey === null || this.adminAPIKey === undefined) {
       return undefined;
     }
-    return buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.adminAPIKey}`]]);
+    return materializeAzureAuthenticationHeaders(
+      buildAzureAuthenticationHeaders([['Authorization', `Bearer ${this.adminAPIKey}`]]),
+    );
   }
 }
 
@@ -405,9 +421,25 @@ interface AzureRequestHeadersAccessorSnapshot {
   snapshots: { copied: boolean; headers: FinalRequestOptions['headers'] }[];
 }
 
+interface AzureImmutableRequestHeadersSnapshot {
+  contended: boolean;
+}
+
+interface AzureRequestOptionsHeadersSnapshot {
+  copied?: { value: boolean };
+  headers: FinalRequestOptions['headers'];
+  options?: FinalRequestOptions;
+  resolve?: () => FinalRequestOptions['headers'];
+  restore?: () => void;
+}
+
 const azureRequestHeadersAccessorSnapshots = new WeakMap<
   FinalRequestOptions,
   AzureRequestHeadersAccessorSnapshot
+>();
+const azureImmutableRequestHeadersSnapshots = new WeakMap<
+  FinalRequestOptions,
+  Set<AzureImmutableRequestHeadersSnapshot>
 >();
 
 function restoreAzureRequestHeadersAccessor(
@@ -448,12 +480,9 @@ function findAzureRequestHeadersDescriptor(options: FinalRequestOptions):
   return undefined;
 }
 
-function snapshotAzureRequestOptionsHeaders(options: FinalRequestOptions): {
-  copied?: { value: boolean };
-  headers: FinalRequestOptions['headers'];
-  options?: FinalRequestOptions;
-  restore?: () => void;
-} {
+function snapshotAzureRequestOptionsHeaders(
+  options: FinalRequestOptions,
+): AzureRequestOptionsHeadersSnapshot {
   try {
     let active = azureRequestHeadersAccessorSnapshots.get(options);
     if (
@@ -467,27 +496,21 @@ function snapshotAzureRequestOptionsHeaders(options: FinalRequestOptions): {
     const found = active ?? findAzureRequestHeadersDescriptor(options);
     const descriptor = found?.descriptor;
     if (descriptor === undefined || 'value' in descriptor) {
-      return { headers: options.headers };
+      return snapshotAzureRequestDataHeaders(options, descriptor, found?.inherited === true);
     }
     if (found?.inherited ? !Object.isExtensible(options) : !descriptor.configurable) {
       const { headers } = options;
       const copied = { value: false };
-      const requestOptions = new Proxy(options, {
-        get(target, property) {
-          if (property === 'headers') {
-            copied.value = true;
-            return headers;
-          }
-          return Reflect.get(target, property, target);
-        },
-        set(target, property, value) {
-          return Reflect.set(target, property, value, target);
-        },
-      });
+      const requestOptions = snapshotAzureRequestOptions(options, headers, copied);
+      const immutable =
+        typeof descriptor.set === 'function'
+          ? snapshotAzureImmutableRequestHeaders(options, descriptor, headers)
+          : undefined;
       return {
         ...(descriptor.enumerable ? { copied } : {}),
         headers,
         options: requestOptions,
+        ...(immutable === undefined ? {} : { resolve: immutable.resolve, restore: immutable.restore }),
       };
     }
 
@@ -496,6 +519,95 @@ function snapshotAzureRequestOptionsHeaders(options: FinalRequestOptions): {
   } catch {
     throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
   }
+}
+
+function snapshotAzureRequestDataHeaders(
+  options: FinalRequestOptions,
+  descriptor: PropertyDescriptor | undefined,
+  inherited: boolean,
+): AzureRequestOptionsHeadersSnapshot {
+  const { headers } = options;
+  const copied = { value: false };
+  const requestOptions = snapshotAzureRequestOptions(options, headers, copied);
+  const stable = descriptor === undefined || descriptor.value === headers;
+
+  return {
+    ...(descriptor?.enumerable && !inherited ? { copied } : {}),
+    headers,
+    options: requestOptions,
+    resolve: () => {
+      if (!stable) {
+        return headers;
+      }
+      try {
+        const current = Object.getOwnPropertyDescriptor(options, 'headers');
+        return current !== undefined && 'value' in current ? current.value : headers;
+      } catch {
+        throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+      }
+    },
+  };
+}
+
+function snapshotAzureRequestOptions(
+  options: FinalRequestOptions,
+  headers: FinalRequestOptions['headers'],
+  copied: { value: boolean },
+): FinalRequestOptions {
+  return new Proxy(options, {
+    get(target, property) {
+      if (property === 'headers') {
+        copied.value = true;
+        return headers;
+      }
+      return Reflect.get(target, property, target);
+    },
+    set(target, property, value) {
+      return Reflect.set(target, property, value, target);
+    },
+  });
+}
+
+function snapshotAzureImmutableRequestHeaders(
+  options: FinalRequestOptions,
+  descriptor: PropertyDescriptor,
+  headers: FinalRequestOptions['headers'],
+): {
+  resolve: () => FinalRequestOptions['headers'];
+  restore: () => void;
+} {
+  let snapshots = azureImmutableRequestHeadersSnapshots.get(options);
+  if (snapshots === undefined) {
+    snapshots = new Set();
+    azureImmutableRequestHeadersSnapshots.set(options, snapshots);
+  }
+  const active = snapshots;
+  const snapshot = { contended: active.size !== 0 };
+  if (snapshot.contended) {
+    for (const current of active) {
+      current.contended = true;
+    }
+  }
+  active.add(snapshot);
+
+  return {
+    resolve: () => {
+      if (snapshot.contended) {
+        throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+      }
+      try {
+        return descriptor.get === undefined ? headers : descriptor.get.call(options);
+      } catch {
+        throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+      }
+    },
+    restore: () => {
+      active.delete(snapshot);
+      if (active.size === 0) {
+        azureImmutableRequestHeadersSnapshots.delete(options);
+      }
+    },
+  };
 }
 
 function snapshotAzureRequestHeadersAccessor(
@@ -523,8 +635,11 @@ function snapshotAzureRequestHeadersAccessor(
       originalSetter === undefined
         ? undefined
         : function setHeaders(this: FinalRequestOptions, value: FinalRequestOptions['headers']): void {
+            if (snapshots.length !== 1) {
+              throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+            }
+            const [current] = snapshots;
             originalSetter.call(this, value);
-            const current = latestSnapshot();
             if (current !== undefined) {
               try {
                 current.headers = descriptor.get?.call(this);
