@@ -1,4 +1,10 @@
-export type { WorkloadIdentity, SubjectTokenProvider, TokenExchangeResponse } from './types';
+export type {
+  WorkloadIdentity,
+  X509WorkloadIdentity,
+  X509Credential,
+  SubjectTokenProvider,
+  TokenExchangeResponse,
+} from './types';
 
 export {
   k8sServiceAccountTokenProvider,

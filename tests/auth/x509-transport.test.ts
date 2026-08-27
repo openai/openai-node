@@ -1,12 +1,13 @@
 import { X509Certificate } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { Agent, ProxyAgent, fetch } from 'undici';
+import { inspect } from 'node:util';
+import { Agent, Pool, ProxyAgent, fetch } from 'undici';
 import { vi } from 'vitest';
 
-import { createX509Transport } from 'openai/auth/x509-transport';
+import { createX509Transport, fromX509, workloadIdentity } from 'openai/auth/x509-transport';
 import type { X509Transport, X509TransportOptions } from 'openai/auth/x509-transport';
-import { sendX509Request } from 'openai/internal/auth/x509-transport-capability';
+import { registerX509Transport, sendX509Request } from 'openai/internal/auth/x509-transport-capability';
 
 import {
   closeObservedServers,
@@ -25,6 +26,243 @@ function directOptions(dispatcher: Agent): X509TransportOptions {
   };
 }
 
+function credentialOptions() {
+  const lab = createX509TestLab();
+  return {
+    certificateChain: lab.firstClient.certificate.toString(),
+    privateKey: lab.firstClient.privateKey.toString(),
+    identityProviderId: 'synthetic-identity-provider',
+    serviceAccountId: 'synthetic-service-account',
+    ca: lab.certificateAuthority.toString(),
+  };
+}
+
+describe('SDK-owned X.509 credential transport', () => {
+  test('exports its first-class factory through a frozen workload identity namespace', () => {
+    expect(Object.isFrozen(workloadIdentity)).toBe(true);
+    expect(workloadIdentity.fromX509).toBe(fromX509);
+  });
+
+  test('returns an opaque, frozen credential whose owned transport closes exactly once', async () => {
+    const credential = workloadIdentity.fromX509(credentialOptions());
+
+    expect(Object.isFrozen(credential)).toBe(true);
+    expect(Reflect.ownKeys(credential)).toEqual([]);
+    const firstClose = credential.close();
+    expect(credential.close()).toBe(firstClose);
+    await firstClose;
+  });
+
+  test('rejects a caller attempt to disable TLS server verification', () => {
+    const options = { ...credentialOptions(), rejectUnauthorized: false };
+
+    expect(() => fromX509(options)).toThrow(/rejectUnauthorized|unsupported|TLS/iu);
+  });
+
+  test('rejects a caller-supplied dispatcher that disables TLS server verification', async () => {
+    const dispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+
+    try {
+      const options = { ...credentialOptions(), dispatcher };
+
+      expect(() => fromX509(options)).toThrow(/dispatcher|unsupported/iu);
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test.each([
+    { url: 'http://127.0.0.1:1', mode: 'https-connect' },
+    { url: 'https://127.0.0.1:1', mode: 'http-connect' },
+  ] as const)('rejects proxy protocol mismatches for $mode', ({ url, mode }) => {
+    expect(() => fromX509({ ...credentialOptions(), proxy: { url, mode } })).toThrow(
+      /proxy|protocol|HTTPS/iu,
+    );
+  });
+
+  test('rejects proxied CONNECT URLs without invoking attacker-controlled traps', () => {
+    const trap = vi.fn(() => {
+      throw new Error('synthetic attacker-controlled URL prototype trap');
+    });
+    const url = new Proxy(new URL('http://127.0.0.1:1'), { getPrototypeOf: trap, get: trap });
+
+    expect(() => fromX509({ ...credentialOptions(), proxy: { url, mode: 'http-connect' } })).toThrow(
+      /proxy|URL/iu,
+    );
+    expect(trap).not.toHaveBeenCalled();
+  });
+
+  test('normalizes genuine CONNECT URLs without inspecting their prototype chains', async () => {
+    const trap = vi.fn(() => {
+      throw new Error('synthetic attacker-controlled URL prototype trap');
+    });
+    const url = new URL('http://127.0.0.1:1');
+    Object.setPrototypeOf(url, new Proxy(URL.prototype, { getPrototypeOf: trap, get: trap }));
+    const credential = fromX509({ ...credentialOptions(), proxy: { url, mode: 'http-connect' } });
+
+    try {
+      expect(trap).not.toHaveBeenCalled();
+    } finally {
+      await credential.close();
+    }
+  });
+
+  test('never exposes proxy credentials when rejecting a malformed proxy URL', () => {
+    const secret = 'synthetic-private-proxy-password';
+    const options = {
+      ...credentialOptions(),
+      proxy: {
+        url: `https://synthetic-user:${secret}@invalid host`,
+        mode: 'https-connect' as const,
+      },
+    };
+    let failure: unknown;
+
+    try {
+      fromX509(options);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(inspect(failure)).not.toContain(secret);
+    expect(JSON.stringify(failure)).not.toContain(secret);
+  });
+
+  test('rejects malformed encoded proxy credentials without exposing their contents', () => {
+    const secret = 'synthetic-private-proxy-username';
+    const options = {
+      ...credentialOptions(),
+      proxy: {
+        url: `http://${secret}%E0%A4%A@127.0.0.1:1`,
+        mode: 'http-connect' as const,
+      },
+    };
+    let failure: unknown;
+
+    try {
+      fromX509(options);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).toMatch(/proxy.*credential|authentication/iu);
+    expect(inspect(failure)).not.toContain(secret);
+    expect(JSON.stringify(failure)).not.toContain(secret);
+  });
+
+  test('rejects ambiguous proxy Basic usernames containing an encoded colon', () => {
+    const options = {
+      ...credentialOptions(),
+      proxy: {
+        url: 'http://synthetic%3Auser:password@127.0.0.1:1',
+        mode: 'http-connect' as const,
+      },
+    };
+
+    expect(() => fromX509(options)).toThrow(/proxy.*username|credential/iu);
+  });
+
+  test('rejects inherited certificate material without invoking its accessor', () => {
+    const { privateKey, ...ownOptions } = credentialOptions();
+    const getter = vi.fn(() => privateKey);
+    const options = Object.assign(
+      Object.create({
+        get privateKey() {
+          return getter();
+        },
+      }) as { privateKey: string },
+      ownOptions,
+    );
+
+    expect(() => fromX509(options)).toThrow(/privateKey|own|plain/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  test('rejects executable credential prototype traps without invoking them', () => {
+    const trap = vi.fn(() => {
+      throw new Error('attacker-controlled credential prototype trap');
+    });
+    const prototype = new Proxy({}, { has: trap });
+    const options = Object.assign(Object.create(prototype) as object, credentialOptions());
+
+    expect(() => fromX509(options)).toThrow(/prototype|plain|proxy/iu);
+    expect(trap).not.toHaveBeenCalled();
+  });
+
+  test.each(['ca', 'passphrase'] as const)(
+    'rejects an inherited optional $0 accessor before touching private material',
+    (name) => {
+      const { ca, ...ownOptions } = credentialOptions();
+      const getter = vi.fn(() => ca);
+      const options = Object.assign(
+        Object.create({
+          get [name]() {
+            return getter();
+          },
+        }) as Record<string, string>,
+        ownOptions,
+      );
+
+      expect(() => fromX509(options)).toThrow(/own|plain|inherited|credential/iu);
+      expect(getter).not.toHaveBeenCalled();
+    },
+  );
+
+  test('rejects inherited proxy configuration without invoking its accessor', () => {
+    const getter = vi.fn(() => 'http://127.0.0.1:1');
+    const proxy = Object.assign(
+      Object.create({
+        get url() {
+          return getter();
+        },
+      }) as { url: string },
+      { mode: 'http-connect' as const },
+    );
+
+    expect(() => fromX509({ ...credentialOptions(), proxy })).toThrow(/proxy|own|plain/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  test('rejects executable trust-root array entries without invoking them', () => {
+    const root = credentialOptions().ca;
+    const ca = [root];
+    const getter = vi.fn(() => root);
+    Object.defineProperty(ca, 0, { get: getter });
+
+    expect(() => fromX509({ ...credentialOptions(), ca })).toThrow(/trust|authorit|certificate|plain/iu);
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  test('never sends HTTPS CONNECT proxy credentials to a plaintext proxy', async () => {
+    const requests = vi.fn();
+    const proxy = createServer();
+    proxy.on('connect', requests);
+    const listening = once(proxy, 'listening');
+    proxy.listen(0, '127.0.0.1');
+    await listening;
+
+    try {
+      const address = proxy.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected a loopback TCP server address');
+      }
+      const url = `http://synthetic-user:synthetic-secret@127.0.0.1:${address.port}`;
+
+      expect(() => fromX509({ ...credentialOptions(), proxy: { url, mode: 'https-connect' } })).toThrow(
+        /proxy|protocol|HTTPS/iu,
+      );
+      expect(requests).not.toHaveBeenCalled();
+    } finally {
+      proxy.closeAllConnections();
+      const closed = once(proxy, 'close');
+      proxy.close();
+      await closed;
+    }
+  });
+});
+
 describe('explicit X.509 transport capability', () => {
   test('rejects Undici without per-request dispatcher support before creating a capability', async () => {
     const dispatcher = new Agent();
@@ -40,7 +278,6 @@ describe('explicit X.509 transport capability', () => {
           },
         }),
       ]);
-
       if (observesRequestDispatcher) {
         expect(() => createX509Transport(directOptions(dispatcher))).not.toThrow();
       } else {
@@ -59,12 +296,81 @@ describe('explicit X.509 transport capability', () => {
     try {
       const first = createX509Transport(directOptions(dispatcher));
       const rotated = createX509Transport(directOptions(rotatedDispatcher));
+      const exposesNoStringKeys: Extract<keyof X509Transport, string> extends never ? true : false = true;
 
       expect(Object.isFrozen(first)).toBe(true);
       expect(Reflect.ownKeys(first)).toEqual([]);
+      expect(exposesNoStringKeys).toBe(true);
       expect(rotated).not.toBe(first);
     } finally {
       await Promise.all([dispatcher.close(), rotatedDispatcher.close()]);
+    }
+  });
+
+  test('rejects counterfeit capability registration before attacker callbacks can be installed', () => {
+    const dispatch = vi.fn(async () => Response.json({ data: [] }));
+    const exchange = vi.fn(async () => ({ accessToken: 'synthetic-forged-token', expiresIn: 3600 }));
+
+    expect(() =>
+      registerX509Transport(Object.freeze({}) as X509Transport, {
+        dispatch,
+        exchange,
+        run: (operation) => operation(),
+        current: vi.fn(),
+        resume: (_scope, operation) => operation(),
+        sleep: vi.fn(),
+      }),
+    ).toThrow(/genuine.*capability/iu);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(exchange).not.toHaveBeenCalled();
+  });
+
+  test('rejects replacement callbacks for an already-approved transport capability', async () => {
+    const ownedDispatcher = new Agent();
+    const dispatch = vi.fn(async () => Response.json({ data: [] }));
+    const exchange = vi.fn(async () => ({ accessToken: 'synthetic-stolen-token', expiresIn: 3600 }));
+
+    try {
+      const approved = createX509Transport(directOptions(ownedDispatcher));
+      expect(() =>
+        registerX509Transport(approved, {
+          dispatch,
+          exchange,
+          run: (operation) => operation(),
+          current: vi.fn(),
+          resume: (_scope, operation) => operation(),
+          sleep: vi.fn(),
+        }),
+      ).toThrow(/more than once/iu);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(exchange).not.toHaveBeenCalled();
+    } finally {
+      await ownedDispatcher.close();
+    }
+  });
+
+  test('rejects a counterfeit that copies a genuine transport prototype without its private dispatcher', async () => {
+    const ownedDispatcher = new Agent();
+    const dispatch = vi.fn(async () => Response.json({ data: [] }));
+    const exchange = vi.fn(async () => ({ accessToken: 'synthetic-forged-token', expiresIn: 3600 }));
+
+    try {
+      const approved = createX509Transport(directOptions(ownedDispatcher));
+      const counterfeit = Object.freeze(Object.create(Object.getPrototypeOf(approved))) as X509Transport;
+      expect(() =>
+        registerX509Transport(counterfeit, {
+          dispatch,
+          exchange,
+          run: (operation) => operation(),
+          current: vi.fn(),
+          resume: (_scope, operation) => operation(),
+          sleep: vi.fn(),
+        }),
+      ).toThrow(/genuine.*capability/iu);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(exchange).not.toHaveBeenCalled();
+    } finally {
+      await ownedDispatcher.close();
     }
   });
 
@@ -210,6 +516,76 @@ describe('explicit X.509 transport capability', () => {
       expect(() => createX509Transport({ ...directOptions(dispatcher), proxy: 'http-connect' })).toThrow(
         /proxy.*ProxyAgent/iu,
       );
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('preserves a caller-attested Agent with an application-owned dispatcher factory', async () => {
+    const factory = vi.fn(() => new Agent());
+    const dispatcher = new Agent({ factory });
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).not.toThrow();
+      expect(factory).not.toHaveBeenCalled();
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test('preserves application-owned dispatcher instrumentation', async () => {
+    const dispatcher = new Agent();
+    const dispatch = vi.spyOn(dispatcher, 'dispatch');
+
+    try {
+      expect(() => createX509Transport(directOptions(dispatcher))).not.toThrow();
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      dispatch.mockRestore();
+      await dispatcher.close();
+    }
+  });
+
+  test.each([
+    { url: 'http://127.0.0.1:1', mode: 'http-connect' },
+    { url: 'https://127.0.0.1:1', mode: 'https-connect' },
+  ] as const)('preserves caller-attested $mode target factories', async ({ url, mode }) => {
+    const factory = vi.fn(() => new Agent());
+    const dispatcher = new ProxyAgent({ uri: url, factory });
+
+    try {
+      expect(() =>
+        createX509Transport({
+          runtime: 'node',
+          dispatcher,
+          certificateIdentity: 'static',
+          proxy: mode,
+        }),
+      ).not.toThrow();
+      expect(factory).not.toHaveBeenCalled();
+    } finally {
+      await dispatcher.close();
+    }
+  });
+
+  test.each([
+    { url: 'http://127.0.0.1:1', mode: 'http-connect' },
+    { url: 'https://127.0.0.1:1', mode: 'https-connect' },
+  ] as const)('preserves caller-attested $mode proxy-client factories', async ({ url, mode }) => {
+    const proxyClient = new Pool(url);
+    const clientFactory = vi.fn(() => proxyClient);
+    const dispatcher = new ProxyAgent({ uri: url, clientFactory });
+
+    try {
+      expect(() =>
+        createX509Transport({
+          runtime: 'node',
+          dispatcher,
+          certificateIdentity: 'static',
+          proxy: mode,
+        }),
+      ).not.toThrow();
+      expect(clientFactory).toHaveBeenCalledTimes(1);
     } finally {
       await dispatcher.close();
     }

@@ -58,14 +58,6 @@ const noopLogger = {
 
 let cachedLoggers = /* @__PURE__ */ new WeakMap<Logger, [LogLevel, Logger]>();
 const intrinsicHeadersEntries = Headers.prototype.entries;
-const redactedHeaderNames = new Set([
-  'authorization',
-  'api-key',
-  'x-api-key',
-  'x-amz-security-token',
-  'cookie',
-  'set-cookie',
-]);
 
 export function loggerFor(client: OpenAI): Logger {
   const logger = client.logger;
@@ -91,6 +83,62 @@ export function loggerFor(client: OpenAI): Logger {
   return levelLogger;
 }
 
+const sensitiveQueryNames = new Set([
+  'apikey',
+  'accesstoken',
+  'refreshtoken',
+  'sessiontoken',
+  'sessionid',
+  'idtoken',
+  'authtoken',
+  'authorization',
+  'token',
+  'password',
+  'clientsecret',
+  'xamzsecuritytoken',
+  'xamzsignature',
+  'xamzcredential',
+]);
+
+/** Recognizes credential-bearing query names across ordinary and provider authentication. */
+export function isSensitiveQueryParameter(name: string): boolean {
+  const normalized = name.toLowerCase().replace(/[-_]/gu, '');
+  return sensitiveQueryNames.has(normalized) || sensitiveQueryNames.has(normalized.replace(/^x/u, ''));
+}
+
+const sensitiveHeaderNames = new Set([
+  'authorization',
+  'proxy-authorization',
+  'api-key',
+  'x-api-key',
+  'x-amz-security-token',
+  'cookie',
+  'set-cookie',
+  'x-session-token',
+  'x-session-id',
+  'x-auth-token',
+  'x-id-token',
+]);
+
+/** Recognizes credential-bearing request headers across provider and workload authentication. */
+export function isSensitiveHeader(name: string): boolean {
+  return sensitiveHeaderNames.has(name.toLowerCase().replace(/_/gu, '-')) || isSensitiveQueryParameter(name);
+}
+
+/** Removes credential-valued query parameters before a request URL reaches any logger. */
+export function redactURL(value: string): string {
+  const url = new URL(value);
+  url.username = '';
+  url.password = '';
+  url.hash = '';
+  for (const name of url.searchParams.keys()) {
+    if (isSensitiveQueryParameter(name)) {
+      url.searchParams.set(name, '***');
+    }
+  }
+  return url.href;
+}
+
 export const formatRequestDetails = (details: {
   options?: RequestOptions | undefined;
   headers?: Headers | Record<string, string> | [string, string][] | undefined;
@@ -112,6 +160,25 @@ export const formatRequestDetails = (details: {
           : [[key, Reflect.get(options, key)]],
       ),
     );
+    if (details.options.path) {
+      const path = details.options.path;
+      const redacted = new URL(redactURL(new URL(path, 'https://redacted.invalid').href));
+      details.options.path =
+        redacted.origin === 'https://redacted.invalid'
+          ? `${path.startsWith('/') ? '/' : ''}${redacted.pathname.slice(1)}${redacted.search}`
+          : redacted.href;
+    }
+    if (details.options.query) {
+      details.options.query = Object.fromEntries(
+        Object.entries(details.options.query).map(([name, value]) => [
+          name,
+          isSensitiveQueryParameter(name) ? '***' : value,
+        ]),
+      );
+    }
+  }
+  if (details.url) {
+    details.url = redactURL(details.url);
   }
   if (details.headers) {
     const headers = details.headers;
@@ -120,16 +187,16 @@ export const formatRequestDetails = (details: {
         headers instanceof Headers
           ? Array.from(intrinsicHeadersEntries.call(headers), ([name, value]) => [
               name,
-              redactedHeaderNames.has(name.toLowerCase()) ? '***' : value,
+              isSensitiveHeader(name) ? '***' : value,
             ])
           : Array.isArray(headers)
             ? headers.map((entry) => {
                 const name = entry[0];
-                return [name, redactedHeaderNames.has(name.toLowerCase()) ? '***' : entry[1]];
+                return [name, isSensitiveHeader(name) ? '***' : entry[1]];
               })
             : Object.keys(headers).map((name) => [
                 name,
-                redactedHeaderNames.has(name.toLowerCase()) ? '***' : (Reflect.get(headers, name) as string),
+                isSensitiveHeader(name) ? '***' : (Reflect.get(headers, name) as string),
               ]),
       );
     } catch {

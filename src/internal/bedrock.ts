@@ -290,6 +290,135 @@ export function assertValidBedrockBearerCredential(credential: string): void {
   }
 }
 
+interface BedrockBearerSignalFailure {
+  error?: { value: unknown };
+  removeListeners?: () => void;
+}
+
+function createBedrockUserAbortError(signal: AbortSignal): Errors.APIUserAbortError {
+  const error = new Errors.APIUserAbortError();
+  Object.defineProperty(error, 'cause', {
+    value: signal.reason,
+    writable: true,
+    configurable: true,
+  });
+  return error;
+}
+
+function removeBedrockAbortListener(signal: AbortSignal, listener: () => void): void {
+  try {
+    signal.removeEventListener('abort', listener);
+  } catch {
+    // A nonstandard AbortSignal must not replace the actual request outcome.
+  }
+}
+
+function resolveAbortableBedrockBearerToken(
+  tokenProvider: ApiKeySetter,
+  signals: readonly AbortSignal[],
+  failure: BedrockBearerSignalFailure,
+): Promise<string> {
+  // oxlint-disable-next-line promise/avoid-new -- AbortSignal events require a Promise callback bridge.
+  return new Promise<string>((resolve, reject) => {
+    let settled = false;
+    const listeners: { signal: AbortSignal; listener: () => void }[] = [];
+
+    const removeListeners = () => {
+      while (listeners.length > 0) {
+        const registered = listeners.pop();
+        if (registered) {
+          removeBedrockAbortListener(registered.signal, registered.listener);
+        }
+      }
+    };
+    failure.removeListeners = removeListeners;
+
+    const settle = (result: { token: string } | { error: unknown }) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if ('token' in result) {
+        resolve(result.token);
+      } else {
+        removeListeners();
+        reject(result.error);
+      }
+    };
+
+    const rejectSignalFailure = (error: unknown) => {
+      if (failure.error) {
+        return;
+      }
+      failure.error = { value: error };
+      settle({ error });
+    };
+
+    const registerAbortListener = (signal: AbortSignal): boolean => {
+      const onAbort = () => {
+        if (failure.error) {
+          return;
+        }
+        try {
+          rejectSignalFailure(createBedrockUserAbortError(signal));
+        } catch (error) {
+          rejectSignalFailure(error);
+        }
+      };
+
+      try {
+        if (signal.aborted) {
+          onAbort();
+          return false;
+        }
+        listeners.push({ signal, listener: onAbort });
+        signal.addEventListener('abort', onAbort, { once: true });
+        if (settled) {
+          removeBedrockAbortListener(signal, onAbort);
+          return false;
+        }
+        if (signal.aborted) {
+          onAbort();
+          return false;
+        }
+      } catch (error) {
+        if (settled) {
+          removeBedrockAbortListener(signal, onAbort);
+        } else {
+          rejectSignalFailure(error);
+        }
+        return false;
+      }
+
+      return true;
+    };
+
+    for (const signal of signals) {
+      if (!registerAbortListener(signal)) {
+        return;
+      }
+    }
+
+    let token: Promise<string>;
+    try {
+      token = tokenProvider();
+    } catch (error) {
+      settle({ error });
+      return;
+    }
+
+    const observeToken = async () => {
+      try {
+        settle({ token: await token });
+      } catch (error) {
+        settle({ error });
+      }
+    };
+    // Observe the result even if the provider synchronously triggered cancellation.
+    void observeToken();
+  });
+}
+
 class BedrockBearerAuth implements BedrockRequestAuth {
   private readonly tokenProvider: ApiKeySetter;
 
@@ -297,15 +426,40 @@ class BedrockBearerAuth implements BedrockRequestAuth {
     this.tokenProvider = tokenProvider;
   }
 
-  async prepareRequest(request: FinalizedRequestInit, _context: ProviderRequestContext): Promise<void> {
+  async prepareRequest(request: FinalizedRequestInit, context: ProviderRequestContext): Promise<void> {
     const headers = new Headers(request.headers);
     assertProviderOwnsAuthorization(headers);
 
+    const signals: AbortSignal[] = [];
+    for (const signal of [context.options.signal, request.signal]) {
+      if (signal != null && !signals.includes(signal)) {
+        signals.push(signal);
+      }
+    }
+    const signalFailure: BedrockBearerSignalFailure = {};
     let token: unknown;
     try {
-      token = await this.tokenProvider();
-    } catch (cause) {
-      throw errorWithCause('Failed to resolve a bearer credential for Bedrock.', cause);
+      try {
+        token =
+          signals.length > 0
+            ? await resolveAbortableBedrockBearerToken(() => this.tokenProvider(), signals, signalFailure)
+            : await this.tokenProvider();
+      } catch (cause) {
+        if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
+          throw cause;
+        }
+        throw errorWithCause('Failed to resolve a bearer credential for Bedrock.', cause);
+      }
+      if (signalFailure.error) {
+        throw signalFailure.error.value;
+      }
+      for (const signal of signals) {
+        if (signal.aborted) {
+          throw createBedrockUserAbortError(signal);
+        }
+      }
+    } finally {
+      signalFailure.removeListeners?.();
     }
     if (typeof token !== 'string' || !token.trim()) {
       throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');

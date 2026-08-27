@@ -121,7 +121,7 @@ export const checkFileSupport = () => {
 /**
  * Values accepted by SDK methods that upload multipart files.
  *
- * Supports native files, fetch responses, named blobs, Node.js filesystem read
+ * Supports native files, fetch responses, blobs, Node.js filesystem read
  * streams, async byte sources, web readable streams, and files created with
  * {@link toStreamingFile}. Use {@link toFile} to materialize compatible content
  * as a native `File` when buffering the complete upload is acceptable.
@@ -203,7 +203,7 @@ export const isAsyncIterable = (value: any): value is AsyncIterable<any> =>
 /**
  * Converts a request to multipart form data when its body contains an upload.
  *
- * Uploads include files, named blobs, responses, async iterables, readable
+ * Uploads include files, blobs, responses, async iterables, readable
  * streams, and {@link StreamingFile} values anywhere in a nested body. Bodies
  * containing streaming values are encoded lazily; other uploads use `FormData`.
  * Requests without uploads are returned unchanged.
@@ -295,7 +295,7 @@ export type CreateFormOptions = {
 /**
  * Materializes an object into platform `FormData` after verifying fetch support.
  *
- * Strings, numbers, and booleans become text fields; responses, named blobs,
+ * Strings, numbers, and booleans become text fields; responses, blobs,
  * and async byte sources become file fields. Arrays and nested objects use
  * bracketed field names, while `undefined` values are omitted.
  *
@@ -319,9 +319,8 @@ export const createForm = async <T = Record<string, unknown>>(
   return form;
 };
 
-// We check for Blob not File because Bun.File doesn't inherit from File,
-// but they both inherit from Blob and have a `name` property at runtime.
-const isNamedBlob = (value: unknown): value is NamedBlob => value instanceof Blob && 'name' in value;
+// Native files, Bun files, and unnamed upload values all inherit from Blob.
+const isBlob = (value: unknown): value is Blob => value instanceof Blob;
 
 const isReadableStream = (value: unknown): value is ReadableStream<BlobPart> =>
   typeof value === 'object' &&
@@ -339,7 +338,7 @@ const isUploadable = (value: unknown): value is Uploadable =>
     isAsyncIterable(value) ||
     isReadableStream(value) ||
     isStreamingFile(value) ||
-    isNamedBlob(value));
+    isBlob(value));
 
 const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
@@ -348,7 +347,7 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (Array.isArray(value)) {
     return value.some(hasStreamingUploadableValue);
   }
-  if (value && typeof value === 'object' && !isNamedBlob(value) && !(value instanceof Response)) {
+  if (value && typeof value === 'object' && !isBlob(value) && !(value instanceof Response)) {
     for (const k in value) {
       if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) {
         return true;
@@ -501,7 +500,7 @@ function getStreamingFileName(value: Uploadable, options: CreateFormOptions): st
 function getStreamingFileType(value: Uploadable): string {
   let type: string | undefined;
 
-  if (isStreamingFile(value) || isNamedBlob(value)) {
+  if (isStreamingFile(value) || isBlob(value)) {
     ({ type } = value);
   } else if (value instanceof Response) {
     type = value.headers.get('content-type') ?? undefined;
@@ -588,9 +587,10 @@ const addFormValue = async (
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     form.append(key, String(value));
   } else if (value instanceof Response) {
+    const blob = await value.blob();
     form.append(
       key,
-      makeFile([await value.blob()], getName(value, { stripFilename: options.stripFilenames })),
+      makeFile([blob], getName(value, { stripFilename: options.stripFilenames }), { type: blob.type }),
     );
   } else if (isAsyncIterable(value)) {
     form.append(
@@ -600,8 +600,13 @@ const addFormValue = async (
         getName(value, { stripFilename: options.stripFilenames }),
       ),
     );
-  } else if (isNamedBlob(value)) {
-    form.append(key, value, getName(value, { stripFilename: options.stripFilenames }));
+  } else if (isBlob(value)) {
+    const filename = getName(value, { stripFilename: options.stripFilenames });
+    if (filename === undefined) {
+      form.append(key, value);
+    } else {
+      form.append(key, value, filename);
+    }
   } else if (Array.isArray(value)) {
     // Prepare array elements concurrently, then preserve their repeated-field order.
     const entries = await Promise.all(

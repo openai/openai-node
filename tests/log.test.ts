@@ -61,25 +61,68 @@ describe('formatRequestDetails()', () => {
     expect(Object.getOwnPropertyDescriptor(loggedOptions, 'inherited')).toBeUndefined();
   });
 
-  test.each(['Authorization', 'API-Key', 'X-API-Key', 'X-Amz-Security-Token', 'Cookie', 'Set-Cookie'])(
-    'redacts the %s header without invoking its accessor',
-    (name) => {
-      const secret = 'private-header-credential';
-      const readSecret = vi.fn(() => {
-        throw new Error(secret);
-      });
-      const readVisible = vi.fn(() => 'preserved');
-      const headers: Record<string, string> = {};
-      Object.defineProperties(headers, {
-        [name]: { enumerable: true, get: readSecret },
-        'x-visible': { enumerable: true, get: readVisible },
-      });
+  test('redacts request paths, queries, and URLs without invoking original header accessors', () => {
+    const readHeaders = vi.fn(() => {
+      throw new Error('synthetic-private-header-credential');
+    });
+    const query = {
+      X_Access_Token: 'synthetic-query-secret',
+      visible: 'preserved',
+    };
+    const options = Object.defineProperty(
+      {
+        path: '/models?api_key=synthetic-path-secret&visible=preserved#synthetic-private-fragment',
+        query,
+      },
+      'headers',
+      { enumerable: true, get: readHeaders },
+    ) as RequestOptions;
 
-      expect(formatRequestDetails({ headers }).headers).toEqual({ [name]: '***', 'x-visible': 'preserved' });
-      expect(readSecret).not.toHaveBeenCalled();
-      expect(readVisible).toHaveBeenCalledTimes(1);
-    },
-  );
+    const details = formatRequestDetails({
+      options,
+      url: 'https://synthetic-user:synthetic-password@example.test/models?client_secret=synthetic-url-secret&visible=preserved#synthetic-private-fragment',
+    });
+
+    expect(details.options).toEqual({
+      path: '/models?api_key=***&visible=preserved',
+      query: { X_Access_Token: '***', visible: 'preserved' },
+    });
+    expect(details.url).toBe('https://example.test/models?client_secret=***&visible=preserved');
+    expect(readHeaders).not.toHaveBeenCalled();
+    expect(query.X_Access_Token).toBe('synthetic-query-secret');
+  });
+
+  test.each([
+    'Authorization',
+    'Proxy-Authorization',
+    'API-Key',
+    'X-API-Key',
+    'X-Amz-Security-Token',
+    'X-Session-Token',
+    'X-Session-Id',
+    'X-Auth-Token',
+    'X-ID-Token',
+    'Client-Secret',
+    'X_Access_Token',
+    'Password',
+    'Cookie',
+    'Set-Cookie',
+  ])('redacts the %s header without invoking its accessor', (name) => {
+    const secret = 'private-header-credential';
+    const readSecret = vi.fn(() => {
+      throw new Error(secret);
+    });
+    const readVisible = vi.fn(() => 'preserved');
+    const headers: Record<string, string> = {};
+    Object.defineProperties(headers, {
+      [name]: { enumerable: true, get: readSecret },
+      'x-visible': { enumerable: true, get: readVisible },
+    });
+
+    expect(formatRequestDetails({ headers }).headers).toEqual({ [name]: '***', 'x-visible': 'preserved' });
+    expect(readSecret).not.toHaveBeenCalled();
+    expect(readVisible).toHaveBeenCalledTimes(1);
+  });
 
   test('formats Headers subclasses without invoking an overridden iterator', () => {
     const iterate = vi.fn(() => {
@@ -93,20 +136,32 @@ describe('formatRequestDetails()', () => {
     expect(iterate).not.toHaveBeenCalled();
   });
 
-  test.each(['Authorization', 'API-Key', 'X-API-Key', 'X-Amz-Security-Token', 'Cookie', 'Set-Cookie'])(
-    'redacts tuple-array %s headers without invoking their value accessors',
-    (name) => {
-      const readSecret = vi.fn(() => {
-        throw new Error('private-header-credential');
-      });
-      const sensitive: [string, string] = [name, 'unused'];
-      Object.defineProperty(sensitive, 1, { get: readSecret });
-      const headers: [string, string][] = [sensitive, ['x-visible', 'preserved']];
+  test.each([
+    'Authorization',
+    'Proxy-Authorization',
+    'API-Key',
+    'X-API-Key',
+    'X-Amz-Security-Token',
+    'X-Session-Token',
+    'X-Session-Id',
+    'X-Auth-Token',
+    'X-ID-Token',
+    'Client-Secret',
+    'X_Access_Token',
+    'Password',
+    'Cookie',
+    'Set-Cookie',
+  ])('redacts tuple-array %s headers without invoking their value accessors', (name) => {
+    const readSecret = vi.fn(() => {
+      throw new Error('private-header-credential');
+    });
+    const sensitive: [string, string] = [name, 'unused'];
+    Object.defineProperty(sensitive, 1, { get: readSecret });
+    const headers: [string, string][] = [sensitive, ['x-visible', 'preserved']];
 
-      expect(formatRequestDetails({ headers }).headers).toEqual({ [name]: '***', 'x-visible': 'preserved' });
-      expect(readSecret).not.toHaveBeenCalled();
-    },
-  );
+    expect(formatRequestDetails({ headers }).headers).toEqual({ [name]: '***', 'x-visible': 'preserved' });
+    expect(readSecret).not.toHaveBeenCalled();
+  });
 
   test.each(['ownKeys', 'getOwnPropertyDescriptor', 'getPrototypeOf'] as const)(
     'omits headers when a hostile proxy %s trap prevents safe inspection',

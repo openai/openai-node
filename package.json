@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "7.5.0",
+  "version": "7.7.0",
   "description": "The official TypeScript library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
@@ -24,6 +24,7 @@
     "test:unit": "vitest run --config vitest.config.mts",
     "test:generated": "OPENAI_TEST_SUITE=generated ./scripts/test",
     "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
+    "test:live:x509": "pnpm build && node --input-type=module < examples/mtls/x509-workload-identity.mjs",
     "bench": "vitest bench --run --config vitest.bench.config.mts",
     "bench:json": "vitest bench --run --config vitest.bench.config.mts --outputJson benchmark-results.json",
     "build": "./scripts/build",
@@ -73,11 +74,40 @@
   "overrides": {
     "minimatch": "^9.0.5"
   },
+  "imports": {
+    "#x509-transport-state": {
+      "types": "./src/internal/auth/x509-transport-state.cts",
+      "browser": "./src/internal/auth/x509-transport-state-browser.ts",
+      "node": "./src/internal/auth/x509-transport-state.cts",
+      "default": "./src/internal/auth/x509-transport-state-browser.ts"
+    }
+  },
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
+    "./auth": {
+      "import": "./dist/auth/index.mjs",
+      "require": "./dist/auth/index.js"
+    },
+    "./internal/auth/x509-transport-capability": null,
+    "./internal/auth/x509-transport-capability.js": null,
+    "./internal/auth/x509-transport-capability.mjs": null,
+    "./internal/auth/x509-transport-registry": null,
+    "./internal/auth/x509-transport-registry.js": null,
+    "./internal/auth/x509-transport-registry.mjs": null,
+    "./internal/auth/x509-credential-options": null,
+    "./internal/auth/x509-credential-options.js": null,
+    "./internal/auth/x509-credential-options.mjs": null,
+    "./internal/auth/x509-api-origin": null,
+    "./internal/auth/x509-api-origin.js": null,
+    "./internal/auth/x509-api-origin.mjs": null,
+    "./internal/auth/x509-transport-state": null,
+    "./internal/auth/x509-transport-state.cjs": null,
+    "./internal/auth/x509-transport-state-browser": null,
+    "./internal/auth/x509-transport-state-browser.js": null,
+    "./internal/auth/x509-transport-state-browser.mjs": null,
     "./*.mjs": {
       "default": "./dist/*.mjs"
     },

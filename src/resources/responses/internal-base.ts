@@ -4,6 +4,7 @@ import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
 import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
+import { assertX509WebSocketSupported } from '../../internal/auth/x509-workload-identity-auth';
 
 import type { RawWebSocketData, ReconnectingEvent, UnsentMessage } from '../../internal/ws';
 
@@ -96,6 +97,7 @@ export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
 }
 
 export function buildURL(client: OpenAI, parameters: Record<string, unknown>): URL {
+  assertX509WebSocketSupported(client);
   const { ...query } = parameters;
   const endpoint = '/responses';
   const url = new URL(client.buildURL(endpoint, query, undefined));
