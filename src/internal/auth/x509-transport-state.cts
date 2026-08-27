@@ -4,6 +4,7 @@ const transientX509ConnectionErrors = new WeakSet();
 const retryableX509IssuerErrors = new WeakSet();
 const approvedX509Clients = new WeakSet();
 const approvedX509OAuthErrors = new WeakMap();
+const approvedX509Credentials = new WeakMap();
 
 /** Looks up an opaque capability without exposing the registry itself. */
 export const findRegisteredX509Transport = WeakMap.prototype.get.bind(registeredX509Transports);
@@ -34,3 +35,9 @@ export const rememberX509OAuthError = WeakMap.prototype.set.bind(approvedX509OAu
 
 /** Retrieves trusted OAuth metadata for public cross-module error normalization. */
 export const findX509OAuthError = WeakMap.prototype.get.bind(approvedX509OAuthErrors);
+
+/** Privately binds SDK-owned credentials to their immutable identity and approved transport. */
+export const rememberX509Credential = WeakMap.prototype.set.bind(approvedX509Credentials);
+
+/** Resolves only first-class credentials created by the optional Node transport helper. */
+export const findX509Credential = WeakMap.prototype.get.bind(approvedX509Credentials);

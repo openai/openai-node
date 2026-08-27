@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "7.5.0",
+  "version": "7.7.0",
   "description": "The official TypeScript library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
@@ -87,12 +87,22 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
+    "./auth": {
+      "import": "./dist/auth/index.mjs",
+      "require": "./dist/auth/index.js"
+    },
     "./internal/auth/x509-transport-capability": null,
     "./internal/auth/x509-transport-capability.js": null,
     "./internal/auth/x509-transport-capability.mjs": null,
     "./internal/auth/x509-transport-registry": null,
     "./internal/auth/x509-transport-registry.js": null,
     "./internal/auth/x509-transport-registry.mjs": null,
+    "./internal/auth/x509-credential-options": null,
+    "./internal/auth/x509-credential-options.js": null,
+    "./internal/auth/x509-credential-options.mjs": null,
+    "./internal/auth/x509-api-origin": null,
+    "./internal/auth/x509-api-origin.js": null,
+    "./internal/auth/x509-api-origin.mjs": null,
     "./internal/auth/x509-transport-state": null,
     "./internal/auth/x509-transport-state.cjs": null,
     "./internal/auth/x509-transport-state-browser": null,

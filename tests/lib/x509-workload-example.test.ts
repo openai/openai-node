@@ -11,6 +11,7 @@ const packageDocumentation = readFileSync(path.resolve(process.cwd(), 'README.md
 const packageScripts = JSON.parse(readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8')) as {
   scripts: Record<string, string>;
 };
+const mtlsBaseURLModule = path.resolve(process.cwd(), 'examples/mtls/base-url.mjs');
 
 function runExample(environment: Record<string, string>) {
   return spawnSync(process.execPath, ['--input-type=module'], {
@@ -27,12 +28,36 @@ function runExample(environment: Record<string, string>) {
 }
 
 describe('X.509 workload-identity runnable example', () => {
+  test.each([
+    'http://mtls.api.openai.com/v1',
+    'https://attacker.example/v1',
+    'https://mtls.api.openai.com.attacker.example/v1',
+    'https://mtls.api.openai.com/v1?api_key=synthetic-secret',
+  ])('rejects unsafe API-key mTLS example endpoint %s', async (configured) => {
+    const { mtlsBaseURL } = (await import(mtlsBaseURLModule)) as {
+      mtlsBaseURL: (configured: string) => string;
+    };
+
+    expect(() => mtlsBaseURL(configured)).toThrow(/documented.*HTTPS.*mTLS/iu);
+  });
+
+  test.each(['https://mtls.api.openai.com/v1', 'https://mtls-eu.api.openai.com/v1'])(
+    'preserves documented API-key mTLS endpoint %s',
+    async (configured) => {
+      const { mtlsBaseURL } = (await import(mtlsBaseURLModule)) as {
+        mtlsBaseURL: (configured: string) => string;
+      };
+
+      expect(mtlsBaseURL(configured)).toBe(configured);
+    },
+  );
+
   test('builds the SDK before running its clean-checkout live validation command', () => {
     expect(packageScripts.scripts['test:live:x509']).toMatch(/^pnpm build && node /u);
   });
 
   test('documents an Undici version compatible with the complete supported Node 22 range', () => {
-    expect(exampleDocumentation).toContain('npm install openai "undici@^7"');
+    expect(exampleDocumentation.match(/npm install openai "undici@\^7"/gu)).toHaveLength(2);
   });
 
   test('builds repository self-imports before documenting the direct example command', () => {
@@ -41,16 +66,17 @@ describe('X.509 workload-identity runnable example', () => {
 
   test('preserves an explicitly empty encrypted-key passphrase', () => {
     expect(example).toContain('passphrase === undefined ? {} : { passphrase }');
+    expect(readFileSync(path.resolve(process.cwd(), 'examples/mtls/node.mjs'), 'utf-8')).toContain(
+      'passphrase === undefined ? {} : { passphrase }',
+    );
   });
 
   test.each([
     ['runnable', example],
     ['documented', packageDocumentation],
   ])('keeps the %s X.509 example isolated from ambient credentials and routing', (_name, source) => {
-    expect(source).toContain('apiKey: null');
-    expect(source).toContain('adminAPIKey: null');
-    expect(source).toContain('baseURL: null');
-    expect(source).toContain('organization: null');
+    expect(source).toContain('workloadIdentity.fromX509');
+    expect(source).toContain('credential,');
     expect(source).toContain("project: process.env['OPENAI_X509_PROJECT_ID'] ?? null");
   });
 

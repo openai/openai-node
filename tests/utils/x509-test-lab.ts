@@ -211,6 +211,7 @@ export function createConnectProxy(
   encrypted: boolean,
   serverCertificate: TestCertificate = lab.proxyServer,
   routes?: ReadonlyMap<string, URL>,
+  requireClientCertificate = encrypted,
 ): ObservedServer {
   const requests: ObservedRequest[] = [];
   const connections = new Set<Duplex>();
@@ -219,8 +220,8 @@ export function createConnectProxy(
         ca: lab.proxyCertificateAuthority,
         cert: serverCertificate.certificate,
         key: serverCertificate.privateKey,
-        requestCert: true,
-        rejectUnauthorized: true,
+        requestCert: requireClientCertificate,
+        rejectUnauthorized: requireClientCertificate,
       })
     : createHTTPServer();
 
@@ -252,9 +253,13 @@ export function createConnectProxy(
   return { server, requests, connections };
 }
 
-export async function listenLoopback(observed: ObservedServer, encrypted = true): Promise<URL> {
+export async function listenLoopback(
+  observed: ObservedServer,
+  encrypted = true,
+  host = '127.0.0.1',
+): Promise<URL> {
   const listening = once(observed.server, 'listening');
-  observed.server.listen(0, '127.0.0.1');
+  observed.server.listen(0, host);
   await listening;
 
   const address = observed.server.address();
@@ -262,7 +267,7 @@ export async function listenLoopback(observed: ObservedServer, encrypted = true)
     throw new Error('Expected a loopback TCP server address');
   }
 
-  return new URL(`${encrypted ? 'https' : 'http'}://127.0.0.1:${address.port}`);
+  return new URL(`${encrypted ? 'https' : 'http'}://${host}:${address.port}`);
 }
 
 export async function closeObservedServers(...observedServers: ObservedServer[]): Promise<void> {

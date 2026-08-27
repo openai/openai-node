@@ -63,8 +63,8 @@ describe('X.509 review regressions', () => {
   test('documents the public X.509 authentication flow alongside workload-identity guidance', () => {
     const authenticationGuide = readFileSync('docs/authentication.md', 'utf-8');
 
-    expect(authenticationGuide).toContain("import { createX509Transport } from 'openai/auth/x509-transport'");
-    expect(authenticationGuide).toContain("certificateIdentity: 'static'");
+    expect(authenticationGuide).toContain("import { workloadIdentity } from 'openai/auth/x509-transport'");
+    expect(authenticationGuide).toContain('workloadIdentity.fromX509');
     expect(authenticationGuide).toContain('https://mtls.api.openai.com/v1');
     expect(authenticationGuide).toContain('WebSocket');
   });
