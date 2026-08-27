@@ -9,6 +9,9 @@ const API_VERSION = '2024-02-15-preview';
 const SAFE_ERROR = 'Azure OpenAI credential contains an invalid HTTP header value.';
 
 describe('Azure authentication header occurrence snapshots', () => {
+  const requestCredentialCases = (['get', 'post'] as const).flatMap((method) =>
+    (['api-key', 'Authorization'] as const).map((name) => ({ method, name })),
+  );
   const repeatedCredentialCases = (['get', 'post'] as const).flatMap((method) =>
     (['api-key', 'Authorization'] as const).flatMap((name) =>
       (['tuple entries', 'record array'] as const).map((representation) => ({
@@ -119,6 +122,114 @@ describe('Azure authentication header occurrence snapshots', () => {
       expect(sent.get('x-metadata')).toBe('preserved');
       expect(coercions).toBe(1);
       expect(metadataReads).toBeGreaterThan(0);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(requestCredentialCases)(
+    'rejects a $method tuple-name accessor before it can mutate an earlier $name credential',
+    async ({ method, name }) => {
+      let effective = 'tenant-a-token';
+      let coercions = 0;
+      let nameReads = 0;
+      const defaults: Record<string, string> = {};
+      Object.defineProperty(defaults, name, {
+        enumerable: true,
+        value: {
+          toString(): string {
+            coercions += 1;
+            return effective;
+          },
+        },
+      });
+
+      const metadata: [string, string] = ['placeholder', 'preserved'];
+      Object.defineProperty(metadata, 0, {
+        configurable: true,
+        enumerable: true,
+        get(): string {
+          nameReads += 1;
+          effective = 'tenant-b-token';
+          return 'x-metadata';
+        },
+      });
+
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-tenant-token',
+        defaultHeaders: defaults,
+        fetch,
+        maxRetries: 0,
+      });
+
+      let failure: unknown;
+      try {
+        await client.request({
+          method,
+          path: '/models',
+          ...(method === 'post' ? { body: { safe: true } } : {}),
+          headers: [metadata],
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(name)).not.toBe('tenant-b-token');
+      expect(failure).toBeInstanceOf(TypeError);
+      if (!(failure instanceof TypeError)) {
+        throw new Error('Expected a sanitized Azure credential failure.');
+      }
+      expect(failure.message).toBe(SAFE_ERROR);
+      expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
+      expect(nameReads).toBe(0);
+      expect(coercions).toBe(0);
+      expect(effective).toBe('tenant-a-token');
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(requestCredentialCases)(
+    'does not coerce a $method $name credential shadowed by a tuple with an own data name',
+    async ({ method, name }) => {
+      let coercions = 0;
+      const defaults: Record<string, string> = {};
+      Object.defineProperty(defaults, name, {
+        enumerable: true,
+        value: {
+          toString(): string {
+            coercions += 1;
+            throw new Error('private-shadowed-tenant-token');
+          },
+        },
+      });
+
+      const replacement: [string, string] = [name.toUpperCase(), 'placeholder'];
+      Object.defineProperty(replacement, 1, {
+        configurable: true,
+        enumerable: true,
+        get: () => 'effective-tenant-token',
+      });
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-tenant-token',
+        defaultHeaders: defaults,
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client.request({
+        method,
+        path: '/models',
+        ...(method === 'post' ? { body: { safe: true } } : {}),
+        headers: [replacement],
+      });
+
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(name)).toBe('effective-tenant-token');
+      expect(coercions).toBe(0);
       expect(fetch).toHaveBeenCalledTimes(1);
     },
   );
@@ -298,6 +409,63 @@ describe('Azure authentication header occurrence snapshots', () => {
       expect(failure.message).toBe(SAFE_ERROR);
       expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
       expect(failure.stack).not.toContain(privateCredential);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(requestCredentialCases)(
+    'sanitizes a $method tuple-name descriptor trap before inspecting an earlier $name credential',
+    async ({ method, name }) => {
+      const privateCredential = 'private-proxy-name-descriptor-tenant-token';
+      let coercions = 0;
+      const defaults: Record<string, string> = {};
+      Object.defineProperty(defaults, name, {
+        enumerable: true,
+        value: {
+          toString(): string {
+            coercions += 1;
+            return 'tenant-a-token';
+          },
+        },
+      });
+      const entry = new Proxy<[string, string]>(['x-metadata', 'preserved'], {
+        getOwnPropertyDescriptor(tuple, property) {
+          if (property === '0') {
+            throw new Error(privateCredential);
+          }
+          return Reflect.getOwnPropertyDescriptor(tuple, property);
+        },
+      });
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-tenant-token',
+        defaultHeaders: defaults,
+        fetch,
+        maxRetries: 0,
+      });
+
+      let failure: unknown;
+      try {
+        await client.request({
+          method,
+          path: '/models',
+          ...(method === 'post' ? { body: { safe: true } } : {}),
+          headers: [entry],
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(TypeError);
+      if (!(failure instanceof TypeError)) {
+        throw new Error('Expected a sanitized Azure credential failure.');
+      }
+      expect(failure.message).toBe(SAFE_ERROR);
+      expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
+      expect(failure.stack).not.toContain(privateCredential);
+      expect(coercions).toBe(0);
       expect(fetch).not.toHaveBeenCalled();
     },
   );

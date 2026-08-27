@@ -148,6 +148,14 @@ const coerceAzureCredentialHeaderValue = (value: unknown): string => {
   }
 };
 
+const azureAuthenticationTupleName = (entry: object): unknown => {
+  const descriptor = Object.getOwnPropertyDescriptor(entry, 0);
+  if (descriptor === undefined || !('value' in descriptor)) {
+    throw new TypeError('Azure OpenAI credential contains an invalid HTTP header value.');
+  }
+  return descriptor.value;
+};
+
 const invalidateAzureAuthenticationHeaderIterators = (headers: Headers): void => {
   const version = azureAuthenticationHeaderMutationVersions.get(headers) ?? 0;
   azureAuthenticationHeaderMutationVersions.set(headers, version + 1);
@@ -662,7 +670,7 @@ export const buildAzureAuthenticationHeaders = (...headers: AzureAuthenticationV
       }
       if (isReadonlyArray(layer)) {
         for (const row of layer) {
-          const name = row[0];
+          const name = azureAuthenticationTupleName(row);
           if (typeof name !== 'string' || !isAzureAuthenticationHeader(name)) continue;
           const value = row[1];
           const values = isReadonlyArray(value) ? value : [value];
@@ -1215,7 +1223,7 @@ const overridesAzureAuthenticationHeader = (
   if (isReadonlyArray(headers)) {
     try {
       return headers.some((entry) => {
-        const candidate = entry[0];
+        const candidate = azureAuthenticationTupleName(entry);
         if (typeof candidate !== 'string' || candidate.toLowerCase() !== name) {
           return false;
         }
