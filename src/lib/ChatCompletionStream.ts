@@ -1772,7 +1772,7 @@ export class ChatCompletionStream<ParsedT = null>
     );
     let chatId;
     for await (const item of stream) {
-      if ('error' in item && typeof item.error === 'object' && item.error !== null) {
+      if ('error' in item && hasOwn(item, 'error') && typeof item.error === 'object' && item.error !== null) {
         throw new APIError(undefined, item.error, undefined, undefined);
       }
 

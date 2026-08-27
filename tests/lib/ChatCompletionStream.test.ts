@@ -1090,6 +1090,39 @@ describe('.stream()', () => {
     });
   });
 
+  it('ignores an inherited error property when reading stream items', async () => {
+    // eslint-disable-next-line no-extend-native -- deliberately simulates prototype pollution; removed in finally
+    Object.defineProperty(Object.prototype, 'error', {
+      value: { message: 'polluted', type: 'server_error' },
+      configurable: true,
+      enumerable: false,
+      writable: true,
+    });
+    try {
+      const readable = new Stream(async function* chunks() {
+        yield {
+          id: 'chatcmpl-own',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'gpt-test',
+          choices: [{ index: 0, delta: { role: 'assistant', content: 'ok' }, finish_reason: null }],
+        };
+        yield {
+          id: 'chatcmpl-own',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'gpt-test',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        };
+      }, new AbortController()).toReadableStream();
+
+      const stream = ChatCompletionStream.fromReadableStream(readable);
+      await expect(stream.finalContent()).resolves.toBe('ok');
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)['error'];
+    }
+  });
+
   it('rejects a pending read exactly once when the stream errors while a reader is waiting', async () => {
     const chunks = [
       {
