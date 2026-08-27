@@ -152,6 +152,47 @@ describe('EventStream terminal lifecycle', () => {
     },
   );
 
+  test('rejects a pending events() iterator when a throwing error listener starves its failure listener', async () => {
+    const stream = new TestStream();
+    const terminalFailure = new OpenAIError('stream failed');
+    stream.on('error', () => {
+      throw new Error('listener failed');
+    });
+    const iterator = stream.events('foo');
+    const pending = iterator.next();
+
+    expect(() => stream.emitError(terminalFailure)).toThrow('listener failed');
+    await expect(pending).rejects.toBe(terminalFailure);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  test('drains buffered events then surfaces the terminal error past a throwing error listener', async () => {
+    const stream = new TestStream();
+    const terminalFailure = new OpenAIError('stream failed');
+    stream.on('error', () => {
+      throw new Error('listener failed');
+    });
+    const iterator = stream.events('foo');
+    stream.emitFoo('first', 1);
+    expect(() => stream.emitError(terminalFailure)).toThrow('listener failed');
+
+    await expect(iterator.next()).resolves.toEqual({ value: ['first', 1], done: false });
+    await expect(iterator.next()).rejects.toBe(terminalFailure);
+  });
+
+  test('rejects a pending events() iterator when a throwing abort listener starves its failure listener', async () => {
+    const stream = new TestStream();
+    const abortError = new APIUserAbortError();
+    stream.on('abort', () => {
+      throw new Error('listener failed');
+    });
+    const iterator = stream.events('foo');
+    const pending = iterator.next();
+
+    expect(() => stream.emitAbort(abortError)).toThrow('listener failed');
+    await expect(pending).rejects.toBe(abortError);
+  });
+
   test('skips later error listeners after a throw yet still fires end', async () => {
     const stream = new TestStream();
     const listenerFailure = new Error('listener failed');
