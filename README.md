@@ -202,47 +202,32 @@ const client = new OpenAI({
 
 ### X.509 client certificates
 
-Applications enrolled for X.509 workload identity can authenticate using a caller-owned, static client certificate instead of a subject-token provider or API key. This Node.js-only integration requires the optional `undici` peer and currently supports only the global `https://mtls.api.openai.com/v1` API endpoint.
+Applications enrolled for X.509 workload identity can authenticate using a certificate-backed credential instead of a subject-token provider or API key. This Node.js-only integration requires the optional `undici` peer and currently supports only the global `https://mtls.api.openai.com/v1` API endpoint.
 
 ```ts
 import OpenAI from 'openai';
-import { createX509Transport } from 'openai/auth/x509-transport';
-import { Agent } from 'undici';
+import { workloadIdentity } from 'openai/auth/x509-transport';
 
-const dispatcher = new Agent({
-  connect: {
-    cert: process.env['OPENAI_X509_CLIENT_CERTIFICATE_CHAIN_PEM'],
-    key: process.env['OPENAI_X509_CLIENT_PRIVATE_KEY_PEM'],
-  },
-});
-
-const client = new OpenAI({
-  apiKey: null,
-  adminAPIKey: null,
-  baseURL: null,
-  organization: null,
-  project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
-  workloadIdentity: {
-    type: 'x509',
-    identityProviderId: process.env['OPENAI_X509_IDENTITY_PROVIDER_ID']!,
-    serviceAccountId: process.env['OPENAI_X509_SERVICE_ACCOUNT_ID']!,
-  },
-  x509Transport: createX509Transport({
-    runtime: 'node',
-    dispatcher,
-    certificateIdentity: 'static',
-    proxy: 'direct',
-  }),
+const credential = workloadIdentity.fromX509({
+  certificateChain: process.env['OPENAI_X509_CLIENT_CERTIFICATE_CHAIN_PEM']!,
+  privateKey: process.env['OPENAI_X509_CLIENT_PRIVATE_KEY_PEM']!,
+  identityProviderId: process.env['OPENAI_X509_IDENTITY_PROVIDER_ID']!,
+  serviceAccountId: process.env['OPENAI_X509_SERVICE_ACCOUNT_ID']!,
 });
 
 try {
+  const client = new OpenAI({
+    credential,
+    project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
+  });
+
   console.log((await client.models.list()).data.length);
 } finally {
-  await dispatcher.close();
+  await credential.close();
 }
 ```
 
-The SDK caches short-lived credentials in memory, isolates certificate generations, bounds retries and cancellation, and never closes the caller-owned dispatcher. Configure proactive refresh with optional `workloadIdentity.refreshBufferMs`; it defaults to 1,200,000 milliseconds (20 minutes) and is capped at half of the actual token lifetime. For CONNECT proxies, encrypted private keys, live verification, and certificate rotation, see the [X.509 workload-identity example](./examples/mtls/README.md#x509-workload-identity-nodejs).
+The SDK owns the credential's verified TLS transport, caches short-lived tokens in memory, isolates certificate generations, and bounds retries and cancellation. Set `refreshBufferSeconds` on the credential to configure proactive refresh; it defaults to 1,200 seconds (20 minutes) and is capped at half of the token's lifetime. For CONNECT proxies, encrypted private keys, live verification, and certificate rotation, see the [X.509 workload-identity example](./examples/mtls/README.md#x509-workload-identity-nodejs).
 
 ## Streaming responses
 

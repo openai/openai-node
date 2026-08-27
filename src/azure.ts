@@ -13,13 +13,16 @@ import { assertNoDataResidency } from './internal/data-residency';
 /** API Client for interfacing with the Azure OpenAI API. */
 export interface AzureClientOptions extends Omit<
   ClientOptions,
-  'provider' | 'dataResidency' | 'workloadIdentity' | 'x509Transport'
+  'provider' | 'dataResidency' | 'credential' | 'workloadIdentity' | 'x509Transport'
 > {
   /** AzureOpenAI does not support third-party provider configuration. */
   provider?: never;
 
   /** OpenAI data residency cannot be combined with Azure routing. */
   dataResidency?: never;
+
+  /** Azure cannot receive an SDK-owned OpenAI X.509 certificate credential. */
+  credential?: never;
 
   /** Azure cannot receive OpenAI X.509 workload-identity certificate transports. */
   x509Transport?: never;

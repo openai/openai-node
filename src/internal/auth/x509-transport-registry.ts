@@ -1,5 +1,6 @@
 import { OpenAIError } from '../../core/error';
 import type { NullableHeaders } from '../headers';
+import type { X509WorkloadIdentity } from '../../auth/types';
 import type { ReadableStream } from '../shim-types';
 import type { MergedRequestInit } from '../types';
 import { findRegisteredX509Transport } from '#x509-transport-state';
@@ -49,6 +50,12 @@ export interface X509Transport {
   readonly [x509TransportBrand]: true;
 }
 
+/** Immutable selectors and transport privately registered for an SDK-owned credential. */
+export interface RegisteredX509Credential {
+  readonly identity: X509WorkloadIdentity;
+  readonly transport: X509Transport;
+}
+
 /** Validated short-lived token exchanged using a registered certificate identity. */
 export interface X509ExchangedToken {
   /** Header-safe, in-memory OpenAI bearer credential. */
@@ -63,6 +70,8 @@ export interface X509RequestScope {
   wallStartedAt: number;
   monotonicStartedAt: number;
   deadlineArmed?: boolean;
+  preparationStartedAt?: number;
+  preparationWallStartedAt?: number;
   request?: { signal: AbortSignal | null | undefined; timeout: number; fetchOptions: MergedRequestInit };
   phase?: 'planning' | 'authorizing';
   effectiveSignal?: AbortSignal;

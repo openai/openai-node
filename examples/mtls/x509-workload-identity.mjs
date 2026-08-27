@@ -2,12 +2,10 @@
 
 // Uses one caller-owned static client certificate for both OpenAI's issuer and API.
 import { readFile } from 'node:fs/promises';
-import { Agent, ProxyAgent } from 'undici';
 
 const cert = await requiredPem('OPENAI_X509_CLIENT_CERTIFICATE_CHAIN_PEM', 'OPENAI_MTLS_CERT_CHAIN');
 const key = await requiredPem('OPENAI_X509_CLIENT_PRIVATE_KEY_PEM', 'OPENAI_MTLS_KEY');
 const passphrase = process.env['OPENAI_X509_CLIENT_KEY_PASSPHRASE'];
-const requestTls = { cert, key, ...(passphrase === undefined ? {} : { passphrase }) };
 const proxyMode = process.env['OPENAI_X509_PROXY_MODE'] ?? 'direct';
 const proxy = new Map([
   ['direct', 'direct'],
@@ -23,36 +21,28 @@ if (proxyURL && proxyURL.protocol !== (proxy === 'https-connect' ? 'https:' : 'h
 }
 const identityProviderId = requiredEnv('OPENAI_X509_IDENTITY_PROVIDER_ID', 'OPENAI_IDENTITY_PROVIDER_ID');
 const serviceAccountId = requiredEnv('OPENAI_X509_SERVICE_ACCOUNT_ID', 'OPENAI_SERVICE_ACCOUNT_ID');
-const [{ default: OpenAI }, { createX509Transport }] = await Promise.all([
+const [{ default: OpenAI }, { workloadIdentity }] = await Promise.all([
   import('openai'),
   import('openai/auth/x509-transport'),
 ]);
-const dispatcher = createDispatcher(proxyURL, requestTls);
+const credential = workloadIdentity.fromX509({
+  certificateChain: cert,
+  privateKey: key,
+  identityProviderId,
+  serviceAccountId,
+  ...(passphrase === undefined ? {} : { passphrase }),
+  ...(proxyURL ? { proxy: { url: proxyURL, mode: proxy } } : {}),
+});
 try {
-  const x509Transport = createX509Transport({
-    runtime: 'node',
-    dispatcher,
-    certificateIdentity: 'static',
-    proxy,
-  });
   const client = new OpenAI({
-    apiKey: null,
-    adminAPIKey: null,
-    baseURL: null,
-    organization: null,
+    credential,
     project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
-    workloadIdentity: {
-      type: 'x509',
-      identityProviderId,
-      serviceAccountId,
-    },
-    x509Transport,
   });
 
   const models = await client.models.list();
   console.log(`X.509 workload identity succeeded; received ${models.data.length} models.`);
 } finally {
-  await dispatcher.close();
+  await credential.close();
 }
 
 function requiredEnv(name, alternative) {
@@ -88,15 +78,4 @@ function approvedProxyURL(value) {
     throw new Error('HTTPS_PROXY must not contain a path, query, or fragment.');
   }
   return url;
-}
-
-function createDispatcher(approvedURL, targetTls) {
-  if (!approvedURL) {
-    return new Agent({ connect: targetTls });
-  }
-  try {
-    return new ProxyAgent({ uri: approvedURL.href, requestTls: targetTls });
-  } catch {
-    throw new Error('Unable to initialize the approved X.509 CONNECT proxy.');
-  }
 }
