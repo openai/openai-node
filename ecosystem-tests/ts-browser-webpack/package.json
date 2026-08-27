@@ -8,6 +8,7 @@
     "serve": "webpack serve",
     "build": "webpack",
     "test": "ts-node src/test.ts",
+    "test:bundle": "ts-node src/test-bundle.ts",
     "test:ci": "start-server-and-test serve http://localhost:8080 test"
   },
   "devDependencies": {

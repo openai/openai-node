@@ -79,17 +79,6 @@ jobs:
           manifest-file: .release-please-manifest.json
           target-branch: main
 
-      - name: Re-draft the updated release PR
-        if: steps.release.outputs.prs_created == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
-        run: |
-          RELEASE_PR="$(jq -er '.number' <<< "${RELEASE_PR_JSON}")"
-          if [[ "$(gh pr view "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')" == 'false' ]]; then
-            gh pr ready "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --undo
-          fi
-
   publication-check:
     name: check publication state
     if: >-
@@ -174,6 +163,80 @@ jobs:
             exit "${version_status}"
           fi
 
+  browser-compatibility:
+    name: check browser compatibility before publication
+    if: needs.publication-check.outputs.should_publish == 'true'
+    needs: publication-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.publication-check.outputs.release_sha }}
+          persist-credentials: false
+
+      - name: Verify release commit
+        env:
+          RELEASE_SHA: ${{ needs.publication-check.outputs.release_sha }}
+        run: |
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_SHA}" ]]
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - name: Set up Node
+        uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack the immutable release artifact
+        run: |
+          pnpm build
+          package_tarball="$(npm pack ./dist --ignore-scripts --silent --pack-destination "${RUNNER_TEMP}")"
+          package_root="$(mktemp -d "${RUNNER_TEMP}/openai-browser-package.XXXXXX")"
+          tar -xzf "${RUNNER_TEMP}/${package_tarball}" -C "${package_root}"
+          echo "BROWSER_PACKAGE_ROOT=${package_root}/package" >> "${GITHUB_ENV}"
+
+      - name: Check native-browser imports from the packed artifact
+        run: |
+          node --experimental-vm-modules --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile, realpath } from 'node:fs/promises';
+          import { join, sep } from 'node:path';
+          import { fileURLToPath, pathToFileURL } from 'node:url';
+          import { SourceTextModule } from 'node:vm';
+
+          const packageRoot = await realpath(process.env.BROWSER_PACKAGE_ROOT);
+          const modules = new Map();
+
+          async function load(url) {
+            let module = modules.get(url.href);
+            if (!module) {
+              const path = await realpath(fileURLToPath(url));
+              assert(path.startsWith(`${packageRoot}${sep}`), `Module escapes packed artifact: ${path}`);
+              module = new SourceTextModule(await readFile(path, 'utf8'), { identifier: url.href });
+              modules.set(url.href, module);
+            }
+            return module;
+          }
+
+          const entrypoint = await load(pathToFileURL(join(packageRoot, 'index.mjs')));
+          await entrypoint.link((specifier, parent) => {
+            assert(
+              specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/'),
+              `Native browsers cannot resolve module specifier ${JSON.stringify(specifier)} from ${parent.identifier}`,
+            );
+            return load(new URL(specifier, parent.identifier));
+          });
+
+          console.log(`Native-browser entrypoint linked ${modules.size} packed modules.`);
+          NODE
+
   build-package:
     name: build release package
     if: needs.publication-check.outputs.should_publish == 'true'
@@ -227,6 +290,7 @@ jobs:
     if: needs.publication-check.outputs.should_publish == 'true'
     needs:
       - publication-check
+      - browser-compatibility
       - build-package
     runs-on: ubuntu-latest
     concurrency:

@@ -537,9 +537,12 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
       .mockResolvedValueOnce(oauthResponse('still-valid-cached-token', 60))
       .mockResolvedValueOnce(oauthResponse(token))
       .mockResolvedValueOnce(oauthResponse('refreshed-safe-token'));
+    const now = Date.now();
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(now);
     const auth = new WorkloadIdentityAuth(harness.config, harness.fetch);
 
     await expect(auth.getToken()).resolves.toBe('still-valid-cached-token');
+    dateNow.mockReturnValue(now + 30_000);
     await expect(auth.getToken()).resolves.toBe('still-valid-cached-token');
     await vi.waitFor(() => expect(harness.exchange).toHaveBeenCalledTimes(2));
     await vi.waitFor(() => expect(harness.subjectToken).toHaveBeenCalledTimes(2));

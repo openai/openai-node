@@ -348,7 +348,8 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
     return value.some(hasStreamingUploadableValue);
   }
   if (value && typeof value === 'object' && !isBlob(value) && !(value instanceof Response)) {
-    for (const k in value) {
+    // Own properties only, matching what form encoding serializes; inherited values are never encoded.
+    for (const k of Object.keys(value)) {
       if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) {
         return true;
       }
@@ -365,7 +366,8 @@ const hasUploadableValue = (value: unknown): boolean => {
     return value.some(hasUploadableValue);
   }
   if (value && typeof value === 'object') {
-    for (const k in value) {
+    // Own properties only, matching what form encoding serializes; inherited values are never encoded.
+    for (const k of Object.keys(value)) {
       if (hasUploadableValue((value as any)[k])) {
         return true;
       }

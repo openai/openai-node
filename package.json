@@ -105,6 +105,8 @@
     "./internal/auth/x509-api-origin.mjs": null,
     "./internal/auth/x509-transport-state": null,
     "./internal/auth/x509-transport-state.cjs": null,
+    "./internal/auth/x509-transport-state.js": null,
+    "./internal/auth/x509-transport-state.mjs": null,
     "./internal/auth/x509-transport-state-browser": null,
     "./internal/auth/x509-transport-state-browser.js": null,
     "./internal/auth/x509-transport-state-browser.mjs": null,
