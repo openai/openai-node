@@ -21,7 +21,7 @@ async function defaultNodeRunner() {
   await installPackage();
   await run('npm', ['run', 'tsc']);
   if (state.live) {
-    await run('npm', ['test']);
+    await run('npm', ['test'], { allowApiKey: true });
   }
 }
 
@@ -421,7 +421,7 @@ const projectRunners = {
     await run('npm', ['run', 'test:bundle']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await run('npm', ['run', 'test:ci'], { allowApiKey: true });
     }
   },
   'browser-direct-import': async () => {
@@ -432,6 +432,7 @@ const projectRunners = {
 
     await run('npm', ['run', 'tsc']);
     await run('npm', ['run', 'test:ci'], {
+      allowApiKey: state.live,
       env: { OPENAI_ECOSYSTEM_TEST_LIVE: String(state.live) },
     });
   },
@@ -439,15 +440,15 @@ const projectRunners = {
     await installPackage();
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci:dev']);
+      await run('npm', ['run', 'test:ci:dev'], { allowApiKey: true });
     }
     await run('npm', ['run', 'build']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await run('npm', ['run', 'test:ci'], { allowApiKey: true });
     }
     if (state.deploy) {
-      await run('npm', ['run', 'vercel', 'deploy', '--prod', '--force']);
+      await run('npm', ['run', 'vercel', 'deploy', '--prod', '--force'], { allowApiKey: true });
     }
   },
   'cloudflare-worker': async () => {
@@ -458,11 +459,11 @@ const projectRunners = {
       const apiKey = process.env['OPENAI_API_KEY'];
       assert.ok(apiKey);
       await withCloudflareCredentials(apiKey, async () => {
-        await run('npm', ['run', 'test:ci']);
+        await run('npm', ['run', 'test:ci'], { allowApiKey: true });
       });
     }
     if (state.deploy) {
-      await run('npm', ['run', 'deploy']);
+      await run('npm', ['run', 'deploy'], { allowApiKey: true });
     }
   },
   bun: async () => {
@@ -477,7 +478,9 @@ const projectRunners = {
 
     await run('npm', ['run', 'tsc']);
 
-    await run('bun', state.live ? ['test'] : ['test', 'workload-identity-access-token.test.ts']);
+    await run('bun', state.live ? ['test'] : ['test', 'workload-identity-access-token.test.ts'], {
+      allowApiKey: state.live,
+    });
   },
   deno: async () => {
     const packageJson = {
@@ -522,7 +525,7 @@ const projectRunners = {
     await run('deno', ['task', 'check']);
 
     if (state.live) {
-      await run('deno', ['task', 'test']);
+      await run('deno', ['task', 'test'], { allowApiKey: true });
     }
   },
 };
@@ -1053,16 +1056,24 @@ function getPackFile() {
 
 interface RunOpts extends execa.Options {
   alwaysPipe?: boolean;
+  allowApiKey?: boolean;
 }
 
 async function run(command: string, args: string[], config?: RunOpts): Promise<execa.ExecaReturnValue> {
-  if (state.verbose && !config?.alwaysPipe) {
-    config = { ...config, stdio: 'inherit' };
+  const { allowApiKey = false, alwaysPipe = false, ...options } = config ?? {};
+  const env = Object.fromEntries(
+    Object.entries({ ...process.env, ...options.env }).filter(
+      ([name]) => allowApiKey || name.toLowerCase() !== 'openai_api_key',
+    ),
+  );
+
+  if (state.verbose && !alwaysPipe) {
+    options.stdio = 'inherit';
   }
 
   console.debug('[run]:', command, ...args);
   try {
-    return await execa(command, args, config);
+    return await execa(command, args, { ...options, env, extendEnv: false });
   } catch (error) {
     if (error instanceof Object && !state.verbose) {
       const { stderr, stdout } = error as any;

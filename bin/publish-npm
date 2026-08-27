@@ -18,12 +18,22 @@ if [[ ${GITHUB_ACTIONS:-} != true || -z ${ACTIONS_ID_TOKEN_REQUEST_URL:-} ||
   exit 1
 fi
 
-pnpm build
+SOURCE_PACKAGE_NAME="$(jq -r -e '.name' package.json)"
+SOURCE_VERSION="$(jq -r -e '.version' package.json)"
+if [[ ! -f dist/package.json ]]; then
+  echo "ERROR: the prebuilt release package is missing" >&2
+  exit 1
+fi
+
 cd dist
 
 # Get package name and version from package.json
 PACKAGE_NAME="$(jq -r -e '.name' ./package.json)"
 VERSION="$(jq -r -e '.version' ./package.json)"
+if [[ "$PACKAGE_NAME" != "$SOURCE_PACKAGE_NAME" || "$VERSION" != "$SOURCE_VERSION" ]]; then
+  echo "ERROR: the release package does not match the checked-out release commit" >&2
+  exit 1
+fi
 
 # Get latest version from npm
 #
@@ -72,9 +82,6 @@ else
   TAG="latest"
 fi
 
-# Install OIDC compatible npm version
-npm install --prefix ../oidc/ npm@11.6.2
-
 # Publish with the appropriate tag
 export npm_config_registry='https://registry.npmjs.org'
-../oidc/node_modules/.bin/npm publish --tag "$TAG"
+npm publish --ignore-scripts --tag "$TAG"
