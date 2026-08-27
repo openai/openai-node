@@ -651,9 +651,6 @@ export class OpenAI {
    */
   withOptions(options: Partial<ClientOptions>): this {
     const residencyBaseURL = resolveDataResidency(options);
-    const inheritedProvider = this._options.provider;
-    const replacingProvider = options.credential ?? options.workloadIdentity;
-    const provider = options.provider ?? (replacingProvider ? undefined : inheritedProvider);
     const x509Authentication = this.#x509Authentication;
     const inheritedOptions: ClientOptions = {
       ...this._options,
@@ -672,30 +669,13 @@ export class OpenAI {
       project: this.project,
       webhookSecret: this.webhookSecret,
     };
-    const credential = prepareX509ClientClone(
+    const { credential, provider } = prepareX509ClientClone(
       inheritedOptions,
       options,
       this.#x509Credential,
       x509Authentication !== undefined,
     );
     if (residencyBaseURL !== undefined) {
-      delete inheritedOptions.baseURL;
-    }
-    if (provider !== inheritedProvider) {
-      delete inheritedOptions.baseURL;
-      delete inheritedOptions.organization;
-      delete inheritedOptions.project;
-      delete inheritedOptions.defaultHeaders;
-      delete inheritedOptions.defaultQuery;
-      delete inheritedOptions.fetchOptions;
-      delete inheritedOptions.fetch;
-    }
-    if (provider) {
-      delete inheritedOptions.apiKey;
-      delete inheritedOptions.adminAPIKey;
-      delete inheritedOptions.credential;
-      delete inheritedOptions.workloadIdentity;
-      delete inheritedOptions.x509Transport;
       delete inheritedOptions.baseURL;
     }
 

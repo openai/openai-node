@@ -52,13 +52,42 @@ function overridesOrdinaryAuthentication({ apiKey, adminAPIKey }: Partial<Client
   return (apiKey !== null && apiKey !== undefined) || (adminAPIKey !== null && adminAPIKey !== undefined);
 }
 
-/** Returns the effective credential after reconciling one client's authentication transition. */
+/** Keeps origin-bound configuration with its owning provider during a client clone. */
+function prepareProviderClone(
+  inherited: ClientOptions,
+  overrides: Partial<ClientOptions>,
+): ClientOptions['provider'] {
+  const inheritedProvider = inherited.provider;
+  const replacingProvider = overrides.credential ?? overrides.workloadIdentity;
+  const provider = overrides.provider ?? (replacingProvider ? undefined : inheritedProvider);
+
+  if (provider !== inheritedProvider) {
+    delete inherited.baseURL;
+    delete inherited.organization;
+    delete inherited.project;
+    delete inherited.defaultHeaders;
+    delete inherited.defaultQuery;
+    delete inherited.fetchOptions;
+    delete inherited.fetch;
+  }
+  if (provider) {
+    delete inherited.apiKey;
+    delete inherited.adminAPIKey;
+    delete inherited.credential;
+    delete inherited.workloadIdentity;
+    delete inherited.x509Transport;
+    delete inherited.baseURL;
+  }
+  return provider;
+}
+
+/** Reconciles one client's credential and provider ownership before cloning its options. */
 export function prepareX509ClientClone(
   inherited: ClientOptions,
   overrides: Partial<ClientOptions>,
   credential: X509Credential | undefined,
   currentlyX509: boolean,
-): X509Credential | undefined {
+): { credential: X509Credential | undefined; provider: ClientOptions['provider'] } {
   const nextIdentity = hasOwn(overrides, 'workloadIdentity')
     ? overrides.workloadIdentity
     : inherited.workloadIdentity;
@@ -98,20 +127,20 @@ export function prepareX509ClientClone(
     }
   }
 
-  if (nextCredential === undefined) {
-    return undefined;
+  if (nextCredential !== undefined) {
+    delete inherited.apiKey;
+    delete inherited.adminAPIKey;
+    delete inherited.workloadIdentity;
+    delete inherited.x509Transport;
+    inherited.credential = nextCredential;
+    if (overrides.credential !== undefined) {
+      delete inherited.organization;
+      delete inherited.project;
+      delete inherited.defaultHeaders;
+      delete inherited.defaultQuery;
+      delete inherited.fetchOptions;
+    }
   }
-  delete inherited.apiKey;
-  delete inherited.adminAPIKey;
-  delete inherited.workloadIdentity;
-  delete inherited.x509Transport;
-  inherited.credential = nextCredential;
-  if (overrides.credential !== undefined) {
-    delete inherited.organization;
-    delete inherited.project;
-    delete inherited.defaultHeaders;
-    delete inherited.defaultQuery;
-    delete inherited.fetchOptions;
-  }
-  return nextCredential;
+
+  return { credential: nextCredential, provider: prepareProviderClone(inherited, overrides) };
 }
