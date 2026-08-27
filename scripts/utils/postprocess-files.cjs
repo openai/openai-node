@@ -18,12 +18,42 @@ async function* walk(dir) {
 }
 
 async function postprocess() {
+  const stateDirectory = path.join(distDir, 'internal/auth');
+  const canonicalState = await fs.promises.readFile(
+    path.join(stateDirectory, 'x509-transport-state.cjs'),
+    'utf-8',
+  );
+  const strictDirective = '"use strict";';
+  const sourceMapComment = '//# sourceMappingURL=';
+  if (!canonicalState.startsWith(strictDirective) || !canonicalState.includes(sourceMapComment)) {
+    throw new Error('The generated X.509 transport state no longer has its expected CommonJS format.');
+  }
+  const browserCompatibleState = canonicalState
+    .replace(
+      strictDirective,
+      `${strictDirective} if (typeof module !== 'undefined' && module !== globalThis.module && typeof exports !== 'undefined' && module.exports === exports) {`,
+    )
+    .replace(sourceMapComment, `}\n${sourceMapComment}`);
+  await fs.promises.writeFile(path.join(stateDirectory, 'x509-transport-state.js'), browserCompatibleState);
+
   for await (const file of walk(distDir)) {
-    if (!/(\.d)?[cm]?ts$/.test(file)) {
+    if (!/(\.d)?[cm]?ts$|\.mjs$/.test(file)) {
       continue;
     }
 
     const code = await fs.promises.readFile(file, 'utf-8');
+
+    if (file.endsWith('.mjs')) {
+      const statePath = path.join(distDir, 'internal/auth/x509-transport-state.mjs');
+      const relativeStatePath = path.relative(path.dirname(file), statePath).split(path.sep).join('/');
+      const stateSpecifier = relativeStatePath.startsWith('.') ? relativeStatePath : `./${relativeStatePath}`;
+      const transformed = code.replaceAll(/from (['"])#x509-transport-state\1/g, `from '${stateSpecifier}'`);
+
+      if (transformed !== code) {
+        await fs.promises.writeFile(file, transformed, 'utf-8');
+      }
+      continue;
+    }
 
     // strip out lib="dom", types="node", and types="react" references; these
     // are needed at build time, but would pollute the user's TS environment

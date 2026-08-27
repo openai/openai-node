@@ -22,9 +22,13 @@ if (pkgJson.imports?.['#x509-transport-state']) {
     if (condition === 'types') {
       continue;
     }
+    if (condition === 'browser') {
+      state[condition] = './internal/auth/x509-transport-state.mjs';
+      continue;
+    }
     state[condition] = state[condition]
       .replace(/^\.\/src\//, './')
-      .replace(/\.cts$/, '.cjs')
+      .replace(/\.cts$/, condition === 'node' ? '.js' : '.cjs')
       .replace(/\.ts$/, '.mjs');
   }
 }
