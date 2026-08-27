@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.7.0](https://github.com/openai/openai-node/compare/v7.6.0...v7.7.0) (2026-08-26)
+
+
+### Features
+
+* **api:** make function call output call IDs optional ([#2488](https://github.com/openai/openai-node/issues/2488)) ([b932ae6](https://github.com/openai/openai-node/commit/b932ae62bc4054da760c1f82329b1cc24bc05fbe))
+
+
+### Bug Fixes
+
+* **streaming:** honor cancellation while decoding SSE responses ([#2487](https://github.com/openai/openai-node/issues/2487)) ([ababe12](https://github.com/openai/openai-node/commit/ababe129507a48d6c4d2be12bbef2ae442c1632f))
+
 ## [7.6.0](https://github.com/openai/openai-node/compare/v7.5.0...v7.6.0) (2026-08-26)
 
 
