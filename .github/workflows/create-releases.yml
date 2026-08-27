@@ -79,17 +79,6 @@ jobs:
           manifest-file: .release-please-manifest.json
           target-branch: main
 
-      - name: Re-draft the updated release PR
-        if: steps.release.outputs.prs_created == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
-        run: |
-          RELEASE_PR="$(jq -er '.number' <<< "${RELEASE_PR_JSON}")"
-          if [[ "$(gh pr view "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')" == 'false' ]]; then
-            gh pr ready "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --undo
-          fi
-
   publication-check:
     name: check publication state
     if: >-
