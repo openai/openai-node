@@ -102,6 +102,79 @@ describe('WorkloadIdentityAuth', () => {
     expect(fetchCallCount).toBe(1);
   });
 
+  test('clamps the refresh buffer to half the lifetime of short-lived tokens', async () => {
+    let exchangeCount = 0;
+    const config: WorkloadIdentity = {
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+    const customFetch = vi.fn(async () => {
+      exchangeCount += 1;
+      return tokenExchangeResponse(`access-token-${exchangeCount}`, 600);
+    });
+    const initialTime = Date.now();
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(initialTime);
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    try {
+      await expect(auth.getToken()).resolves.toBe('access-token-1');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      dateNow.mockReturnValue(initialTime + 299_999);
+      await expect(auth.getToken()).resolves.toBe('access-token-1');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(customFetch).toHaveBeenCalledTimes(1);
+
+      dateNow.mockReturnValue(initialTime + 300_000);
+      await expect(auth.getToken()).resolves.toBe('access-token-1');
+      await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
+    } finally {
+      dateNow.mockRestore();
+    }
+  });
+
+  test('keeps the configured refresh buffer for normal-lifetime tokens', async () => {
+    const initialTime = Date.now();
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(initialTime);
+    const backgroundExchange = pendingTokenExchange();
+    const config: WorkloadIdentity = {
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      refreshBufferSeconds: 1200,
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(tokenExchangeResponse('cached-token', 3600))
+      .mockReturnValueOnce(backgroundExchange.response);
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+
+    try {
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+
+      dateNow.mockReturnValue(initialTime + 2_399_999);
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+      expect(customFetch).toHaveBeenCalledTimes(1);
+
+      dateNow.mockReturnValue(initialTime + 2_400_000);
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+      await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
+
+      backgroundExchange.resolve(tokenExchangeResponse('refreshed-token', 3600));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await expect(auth.getToken()).resolves.toBe('refreshed-token');
+    } finally {
+      dateNow.mockRestore();
+    }
+  });
+
   test('binds cached exchanges to an immutable workload identity and provider snapshot', async () => {
     const originalProvider = vi.fn(async () => 'synthetic-original-subject-token');
     const replacementProvider = vi.fn(async () => 'synthetic-replacement-subject-token');
@@ -297,17 +370,24 @@ describe('WorkloadIdentityAuth', () => {
       .mockRejectedValueOnce(new Error('temporary refresh failure'))
       .mockResolvedValueOnce(tokenExchangeResponse('refreshed-token', 3600));
     const auth = new WorkloadIdentityAuth(config, customFetch);
+    const initialTime = Date.now();
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(initialTime);
 
-    await expect(auth.getToken()).resolves.toBe('cached-token');
-    await expect(auth.getToken()).resolves.toBe('cached-token');
-    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+      dateNow.mockReturnValue(initialTime + 30_000);
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+      await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await expect(auth.getToken()).resolves.toBe('cached-token');
-    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(3));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+      await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(3));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await expect(auth.getToken()).resolves.toBe('refreshed-token');
+      await expect(auth.getToken()).resolves.toBe('refreshed-token');
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 
   test('sends correct OAuth2 token exchange request', async () => {
@@ -671,6 +751,7 @@ describe('WorkloadIdentityAuth', () => {
 
     try {
       await expect(auth.getToken()).resolves.toBe('cached-token');
+      dateNow.mockReturnValue(initialTime + 30_000);
       await expect(auth.getToken()).resolves.toBe('cached-token');
       await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
 

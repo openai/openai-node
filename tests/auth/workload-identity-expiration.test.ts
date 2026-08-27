@@ -156,6 +156,7 @@ describe('workload-identity access-token expiration', () => {
     const auth = new WorkloadIdentityAuth({ ...workloadIdentity, refreshBufferSeconds: 1200 }, customFetch);
 
     await expect(auth.getToken()).resolves.toBe('cached-token');
+    currentTime += 30_000;
     await expect(auth.getToken()).resolves.toBe('cached-token');
     await delay(0);
     expect(customFetch).toHaveBeenCalledTimes(2);
