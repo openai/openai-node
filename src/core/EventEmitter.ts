@@ -186,11 +186,20 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         }
         return !listener.once && !listener.removed;
       }) as any;
+      let listenerThrew = false;
+      let firstListenerError: unknown;
       this.#listenerDispatchDepth += 1;
       try {
         for (const registration of listeners as any) {
           if (!registration.removed) {
-            registration.listener(...(args as any));
+            try {
+              registration.listener(...(args as any));
+            } catch (error) {
+              if (!listenerThrew) {
+                listenerThrew = true;
+                firstListenerError = error;
+              }
+            }
           }
         }
       } finally {
@@ -198,6 +207,9 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         if (this.#listenerDispatchDepth === 0) {
           this.#cleanupEmittedListeners();
         }
+      }
+      if (listenerThrew) {
+        throw firstListenerError;
       }
     }
   }
