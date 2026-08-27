@@ -3,6 +3,7 @@ import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { protectWebSocketOptionsFromCredentialRedirects } from '../internal/ws';
 import type { AzureOpenAI } from '../index';
 import { OpenAI } from '../index';
+import { VERSION } from '../version';
 import type { RealtimeClientEvent } from '../resources/realtime/realtime';
 import {
   OpenAIRealtimeEmitter,
@@ -62,6 +63,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     this.url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, this.url);
     const headers = {
+      'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
       ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${client.apiKey}` }),
     };

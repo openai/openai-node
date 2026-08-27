@@ -6,6 +6,7 @@ import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtim
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaBrowserRealtime } from 'openai/beta/realtime/websocket';
 import { OpenAIRealtimeWS as BetaNodeRealtime } from 'openai/beta/realtime/ws';
+import { VERSION } from 'openai/version';
 import * as WS from 'ws';
 
 type Listener = (event: any) => void;
@@ -148,6 +149,7 @@ describe.each([
       'openai-insecure-api-key.test-key',
       ...(beta ? ['openai-beta.realtime-v1'] : []),
     ]);
+    expect(lastBrowserSocket().headers).not.toHaveProperty('User-Agent');
 
     const sideband = new Realtime({ callID: 'call-123' }, client);
     expect(sideband.url.searchParams.get('call_id')).toBe('call-123');
@@ -477,12 +479,25 @@ describe.each([
     expect(model.url.toString()).toBe('wss://example.com/v1/realtime?model=gpt-realtime');
     expect(lastNodeSocket().options.headers).toMatchObject({
       Authorization: 'Bearer test-key',
+      'User-Agent': `OpenAI/JS ${VERSION}`,
       'X-Custom': 'value',
       ...(beta ? { 'OpenAI-Beta': 'realtime=v1' } : {}),
     });
 
     const sideband = new Realtime({ callID: 'call-123' }, client);
     expect(sideband.url.searchParams.get('call_id')).toBe('call-123');
+  });
+
+  test('allows callers to override the SDK user agent', () => {
+    const realtime = new Realtime(
+      { model: 'gpt-realtime', options: { headers: { 'User-Agent': 'custom-client/1.0.0' } } },
+      createClient(),
+    );
+
+    expect(realtime.socket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options.headers).toMatchObject({
+      'User-Agent': 'custom-client/1.0.0',
+    });
   });
 
   test('requires function-based credentials to be resolved with create', async () => {
