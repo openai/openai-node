@@ -1,5 +1,8 @@
 import type { Dirent } from 'node:fs';
 
+const packedPackageAcorn: {
+  parse: (source: string, options: { ecmaVersion: 2020; sourceType: 'module' }) => unknown;
+} = require(require.resolve('acorn', { paths: [require.resolve('ts-node/package.json')] }));
 const packedPackageAssert = require('node:assert/strict');
 const packedPackageChildProcess = require('node:child_process');
 const packedPackageFs = require('node:fs');
@@ -219,6 +222,60 @@ const packedPackagePath = require('node:path');
 
     const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
     assert(!fs.existsSync(optionalUndici), 'Public authentication helpers must not require optional Undici');
+
+    const isolatedEnvironment = { ...process.env };
+    delete isolatedEnvironment['NODE_PATH'];
+    const browserConsumer = path.join(temporaryDirectory, 'browser-consumer.mjs');
+    fs.writeFileSync(browserConsumer, "import OpenAI from 'openai';\nexport default OpenAI;\n");
+    const browserConfig = path.join(temporaryDirectory, 'browser.vite.config.mjs');
+    fs.writeFileSync(
+      browserConfig,
+      [
+        "import { isBuiltin } from 'node:module';",
+        'export default {',
+        '  plugins: [{',
+        "    name: 'reject-node-builtins',",
+        "    enforce: 'pre',",
+        '    resolveId(source) {',
+        '      if (isBuiltin(source)) {',
+        '        this.error("Node-only dependency " + source + " reached the browser bundle");',
+        '      }',
+        '    },',
+        '  }],',
+        '  build: {',
+        "    target: 'es2020',",
+        '    minify: false,',
+        "    lib: { entry: './browser-consumer.mjs', formats: ['es'], fileName: () => 'browser-bundle.mjs' },",
+        '  },',
+        '};',
+      ].join('\n'),
+    );
+    const vitePackage = require.resolve('vite/package.json', {
+      paths: [require.resolve('vitest/package.json')],
+    });
+    run(
+      process.execPath,
+      [
+        path.join(path.dirname(vitePackage), 'bin/vite.js'),
+        'build',
+        '--config',
+        browserConfig,
+        '--logLevel',
+        'error',
+      ],
+      { env: isolatedEnvironment },
+    );
+    const browserBundle = path.join(temporaryDirectory, 'dist/browser-bundle.mjs');
+    assert(fs.existsSync(browserBundle), 'Packed browser consumer did not produce an ES2020 ESM bundle');
+    assert.doesNotThrow(
+      () =>
+        packedPackageAcorn.parse(fs.readFileSync(browserBundle, 'utf-8'), {
+          ecmaVersion: 2020,
+          sourceType: 'module',
+        }),
+      'Packed browser bundle contains syntax unsupported by ES2020, including top-level await',
+    );
+
     for (const [inputType, authenticationImport] of [
       ['commonjs', "const auth = require('openai/auth');"],
       ['module', "import * as auth from 'openai/auth';"],
@@ -380,8 +437,6 @@ const packedPackagePath = require('node:path');
     const installedSourceRoot = path.join(installedPackageRoot, 'src');
     const installedSourceConfig = path.join(installedSourceRoot, 'tsconfig.json');
     const installedSourceShim = path.join(installedSourceRoot, 'tsconfig.dist-src.d.ts');
-    const isolatedEnvironment = { ...process.env };
-    delete isolatedEnvironment['NODE_PATH'];
 
     assert(
       !fs.existsSync(path.join(temporaryDirectory, 'node_modules/@types/node')),
@@ -528,7 +583,7 @@ const packedPackagePath = require('node:path');
     }
 
     console.log(
-      `Packed npm artifact passed CommonJS, ESM, and ${browserSafeSources.length}/${mappedSources.size} source checks across ${sourceMaps.length} source maps on ${process.version}.`,
+      `Packed npm artifact passed CommonJS, ESM, ES2020 browser bundling, and ${browserSafeSources.length}/${mappedSources.size} source checks across ${sourceMaps.length} source maps on ${process.version}.`,
     );
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
