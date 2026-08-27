@@ -505,12 +505,30 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
   return normalizedSchema;
 }
 
+type StandardSchemaBinding<Schema extends StandardSchemaLike> = {
+  standard: Schema['~standard'];
+  validate: Schema['~standard']['validate'];
+};
+
+function bindStandardSchema<Schema extends StandardSchemaLike>(standardSchema: Schema) {
+  let binding: StandardSchemaBinding<Schema> | undefined;
+
+  return (): StandardSchemaBinding<Schema> => {
+    if (!binding) {
+      const standard = standardSchema['~standard'];
+      binding = { standard, validate: standard.validate };
+    }
+    return binding;
+  };
+}
+
 function parseStandardSchema<Schema extends StandardSchemaLike>(
-  standardSchema: Schema,
+  getBinding: () => StandardSchemaBinding<Schema>,
   content: string,
 ): InferStandardOutput<Schema> {
   const parsed = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
-  const result = standardSchema['~standard'].validate(parsed);
+  const { standard, validate } = getBinding();
+  const result = Reflect.apply(validate, standard, [parsed]);
 
   if (isPromiseLike(result)) {
     void Promise.resolve(result).catch(() => undefined);
@@ -526,11 +544,11 @@ function parseStandardSchema<Schema extends StandardSchemaLike>(
   return result.value as InferStandardOutput<Schema>;
 }
 
-function resolveStandardJSONSchema(
-  standardSchema: StandardSchemaLike,
+function resolveStandardJSONSchema<Schema extends StandardSchemaLike>(
+  getBinding: () => StandardSchemaBinding<Schema>,
   schemaOverride?: JSONSchema | Record<string, unknown> | undefined,
 ): Record<string, unknown> {
-  const schema = (schemaOverride ?? standardSchema['~standard'].jsonSchema?.input({ target: 'draft-07' })) as
+  const schema = (schemaOverride ?? getBinding().standard.jsonSchema?.input({ target: 'draft-07' })) as
     | JSONSchema
     | undefined;
 
@@ -570,6 +588,7 @@ export function standardResponseFormat<Schema extends StandardSchemaLike>(
   props?: StandardResponseFormatProps,
 ): AutoParseableResponseFormat<InferStandardOutput<Schema>> {
   const { schema, ...formatProps } = props ?? {};
+  const getBinding = bindStandardSchema(standardSchema);
 
   return makeParseableResponseFormat<InferStandardOutput<Schema>>(
     {
@@ -578,10 +597,10 @@ export function standardResponseFormat<Schema extends StandardSchemaLike>(
         ...formatProps,
         name,
         strict: true,
-        schema: resolveStandardJSONSchema(standardSchema, schema),
+        schema: resolveStandardJSONSchema(getBinding, schema),
       },
     },
-    (content) => parseStandardSchema(standardSchema, content),
+    (content) => parseStandardSchema(getBinding, content),
   );
 }
 
@@ -608,6 +627,7 @@ export function standardTextFormat<Schema extends StandardSchemaLike>(
   props?: StandardTextFormatProps,
 ): AutoParseableTextFormat<InferStandardOutput<Schema>> {
   const { schema, ...formatProps } = props ?? {};
+  const getBinding = bindStandardSchema(standardSchema);
 
   return makeParseableTextFormat<InferStandardOutput<Schema>>(
     {
@@ -615,9 +635,9 @@ export function standardTextFormat<Schema extends StandardSchemaLike>(
       ...formatProps,
       name,
       strict: true,
-      schema: resolveStandardJSONSchema(standardSchema, schema),
+      schema: resolveStandardJSONSchema(getBinding, schema),
     },
-    (content) => parseStandardSchema(standardSchema, content),
+    (content) => parseStandardSchema(getBinding, content),
   );
 }
 
@@ -684,19 +704,23 @@ export function standardFunction<Parameters extends StandardSchemaLike>(
 export function standardFunction<Parameters extends StandardSchemaLike>(
   options: StandardToolOptions<Parameters>,
 ) {
+  const name = options.name;
+  const parameters = options.parameters;
+  const getBinding = bindStandardSchema(parameters);
+
   return makeParseableTool<any>(
     {
       type: 'function',
       function: {
-        name: options.name,
-        parameters: resolveStandardJSONSchema(options.parameters, options.schema),
+        name,
+        parameters: resolveStandardJSONSchema(getBinding, options.schema),
         strict: true,
         ...(options.description ? { description: options.description } : undefined),
       },
     },
     {
       callback: options.function,
-      parser: (args) => parseStandardSchema(options.parameters, args),
+      parser: (args) => parseStandardSchema(getBinding, args),
     },
   );
 }
@@ -763,17 +787,21 @@ export function standardResponsesFunction<Parameters extends StandardSchemaLike>
 export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
   options: StandardToolOptions<Parameters>,
 ) {
+  const name = options.name;
+  const parameters = options.parameters;
+  const getBinding = bindStandardSchema(parameters);
+
   return makeParseableResponseTool<any>(
     {
       type: 'function',
-      name: options.name,
-      parameters: resolveStandardJSONSchema(options.parameters, options.schema),
+      name,
+      parameters: resolveStandardJSONSchema(getBinding, options.schema),
       strict: true,
       ...(options.description ? { description: options.description } : undefined),
     },
     {
       callback: options.function,
-      parser: (args) => parseStandardSchema(options.parameters, args),
+      parser: (args) => parseStandardSchema(getBinding, args),
     },
   );
 }

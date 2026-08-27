@@ -334,6 +334,128 @@ export class Stream<Item> implements AsyncIterable<Item> {
   }
 }
 
+function createAbortableSSESource(body: NonNullable<Response['body']>, signal: AbortSignal) {
+  const reader = typeof body.getReader === 'function' ? body.getReader() : undefined;
+  const source = reader
+    ? {
+        next: () => reader.read(),
+        return: () => reader.cancel(),
+      }
+    : ReadableStreamToAsyncIterable<Bytes>(body)[Symbol.asyncIterator]();
+  const ended: IteratorResult<Bytes> = { value: undefined, done: true };
+  let closed = false;
+  let canceled = false;
+  let cancellation: Promise<unknown> | undefined;
+  let interrupt: (() => void) | undefined;
+
+  const waitForAbort = () =>
+    // oxlint-disable-next-line promise/avoid-new -- AbortSignal callbacks need a portable Promise bridge.
+    new Promise<void>((resolve) => {
+      interrupt = resolve;
+    });
+
+  const cancel = () => {
+    if (canceled || closed) {
+      return cancellation;
+    }
+    canceled = true;
+    try {
+      cancellation = Promise.resolve(source.return?.());
+    } catch (error) {
+      cancellation = Promise.reject(error);
+    }
+    cancellation.catch(() => undefined);
+    return cancellation;
+  };
+  const abort = () => {
+    queueMicrotask(() => {
+      interrupt?.();
+      cancel();
+    });
+  };
+  const iterator: AsyncIterableIterator<Bytes> = {
+    async next() {
+      if (signal.aborted) {
+        return ended;
+      }
+      const aborted = waitForAbort().then(() => ended);
+      try {
+        const result = await Promise.race([source.next(), aborted]);
+        if (signal.aborted) {
+          return ended;
+        }
+        if (result.done) {
+          closed = true;
+          return ended;
+        }
+        return { value: result.value, done: false };
+      } catch (error) {
+        if (signal.aborted && (isAbortError(error) || error === signal.reason)) {
+          return ended;
+        }
+        throw error;
+      } finally {
+        interrupt = undefined;
+      }
+    },
+    async return() {
+      const pending = cancel();
+      if (pending && !signal.aborted) {
+        const aborted = waitForAbort();
+        try {
+          if (!signal.aborted) {
+            await Promise.race([pending, aborted]);
+          }
+        } finally {
+          interrupt = undefined;
+        }
+      }
+      return ended;
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
+
+  return {
+    iterator,
+    start() {
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) {
+        abort();
+      }
+    },
+    async cleanup(failed: boolean) {
+      let cleanupError: unknown;
+      try {
+        signal.removeEventListener('abort', abort);
+      } catch (error) {
+        cleanupError = error;
+      }
+      if (!closed) {
+        const pending = cancel();
+        if (pending && !failed && !signal.aborted) {
+          try {
+            await pending;
+          } catch (error) {
+            cleanupError ??= error;
+          }
+        }
+      }
+      if (reader) {
+        try {
+          reader.releaseLock();
+        } catch (error) {
+          cleanupError ??= error;
+        }
+      }
+      if (cleanupError !== undefined && !failed && !signal.aborted) {
+        throw cleanupError;
+      }
+    },
+  };
+}
+
 /**
  * Decodes complete SSE records from a response and aborts when its body is absent.
  * Complete events are decoded on demand without imposing a line or event size limit.
@@ -359,22 +481,45 @@ export async function* _iterSSEMessages(
 
   const sseDecoder = new SSEDecoder();
   const lineDecoder = new LineDecoder();
+  const { signal } = controller;
+  const source = createAbortableSSESource(response.body, signal);
+  let failed = false;
 
-  const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
-  for await (const sseChunk of iterSSEChunks(iter)) {
-    for (const line of lineDecoder.decode(sseChunk)) {
+  try {
+    source.start();
+    for await (const sseChunk of iterSSEChunks(source.iterator)) {
+      if (signal.aborted) {
+        return;
+      }
+      for (const line of lineDecoder.decode(sseChunk)) {
+        if (signal.aborted) {
+          return;
+        }
+        const sse = sseDecoder.decode(line);
+        if (sse) {
+          yield sse;
+        }
+      }
+    }
+    if (signal.aborted) {
+      return;
+    }
+    for (const line of lineDecoder.flush()) {
+      if (signal.aborted) {
+        return;
+      }
       const sse = sseDecoder.decode(line);
       if (sse) {
         yield sse;
       }
     }
-  }
-
-  for (const line of lineDecoder.flush()) {
-    const sse = sseDecoder.decode(line);
-    if (sse) {
-      yield sse;
+  } catch (error) {
+    failed = true;
+    if (!signal.aborted || (!isAbortError(error) && error !== signal.reason)) {
+      throw error;
     }
+  } finally {
+    await source.cleanup(failed);
   }
 }
 

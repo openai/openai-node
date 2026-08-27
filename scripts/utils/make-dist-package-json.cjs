@@ -16,6 +16,19 @@ function processExportMap(m) {
 }
 processExportMap(pkgJson.exports);
 
+if (pkgJson.imports?.['#x509-transport-state']) {
+  const state = pkgJson.imports['#x509-transport-state'];
+  for (const condition of Object.keys(state)) {
+    if (condition === 'types') {
+      continue;
+    }
+    state[condition] = state[condition]
+      .replace(/^\.\/src\//, './')
+      .replace(/\.cts$/, '.cjs')
+      .replace(/\.ts$/, '.mjs');
+  }
+}
+
 for (const key of ['types', 'main', 'module']) {
   if (typeof pkgJson[key] === 'string') {
     pkgJson[key] = pkgJson[key].replace(/^(\.\/)?dist\//, './');

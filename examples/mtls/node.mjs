@@ -6,7 +6,9 @@
 import { readFile } from 'node:fs/promises';
 import OpenAI from 'openai';
 import { Agent, fetch as undiciFetch } from 'undici';
+import { mtlsBaseURL } from './base-url.mjs';
 
+const baseURL = mtlsBaseURL(process.env['OPENAI_BASE_URL']);
 const cert = await readFile(requiredEnv('OPENAI_MTLS_CERT_PATH'));
 const key = await readFile(requiredEnv('OPENAI_MTLS_KEY_PATH'));
 const passphrase = process.env['OPENAI_MTLS_KEY_PASSPHRASE'];
@@ -15,21 +17,21 @@ const dispatcher = new Agent({
   connect: {
     cert,
     key,
-    ...(passphrase ? { passphrase } : {}),
-  },
-});
-
-const client = new OpenAI({
-  apiKey: requiredEnv('OPENAI_API_KEY'),
-  baseURL: process.env['OPENAI_BASE_URL'] ?? 'https://mtls.api.openai.com/v1',
-  fetch: undiciFetch,
-  fetchOptions: {
-    dispatcher,
-    redirect: 'manual',
+    ...(passphrase === undefined ? {} : { passphrase }),
   },
 });
 
 try {
+  const client = new OpenAI({
+    apiKey: requiredEnv('OPENAI_API_KEY'),
+    baseURL,
+    fetch: undiciFetch,
+    fetchOptions: {
+      dispatcher,
+      redirect: 'manual',
+    },
+  });
+
   const models = await client.models.list();
   console.log('mTLS request succeeded; received ' + models.data.length + ' models.');
 } finally {

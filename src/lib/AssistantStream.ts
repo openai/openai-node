@@ -113,7 +113,14 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     eventType === 'thread.message.in_progress' ||
     eventType === 'thread.message.delta' ||
     eventType === 'thread.message.completed' ||
-    eventType === 'thread.message.incomplete'
+    eventType === 'thread.message.incomplete' ||
+    eventType === 'thread.run.step.created' ||
+    eventType === 'thread.run.step.in_progress' ||
+    eventType === 'thread.run.step.delta' ||
+    eventType === 'thread.run.step.completed' ||
+    eventType === 'thread.run.step.failed' ||
+    eventType === 'thread.run.step.cancelled' ||
+    eventType === 'thread.run.step.expired'
   ) {
     const messageID = Object.getOwnPropertyDescriptor(data, 'id');
     if (messageID && 'value' in messageID && Reflect.get(data, 'id', data) !== messageID.value) {
@@ -149,6 +156,8 @@ export class AssistantStream
   //Used to accumulate deltas
   //We are accumulating many types so the value here is not strict
   #runStepSnapshots: Record<string, Runs.RunStep> = Object.create(null);
+  #runStepIDOwners = new Map<string, string>();
+  #activeRunStepID: string | undefined;
   #messageSnapshots: Record<string, Message> = Object.create(null);
   #messageIDOwners = new Map<string, string>();
   #messageSnapshot: Message | undefined;
@@ -384,6 +393,8 @@ export class AssistantStream
 
     let messageID: string | undefined;
     let messageData: MessageStreamEvent['data'] | undefined;
+    let runStepID: string | undefined;
+    let runStepData: RunStepStreamEvent['data'] | undefined;
     switch (stableEvent.event) {
       case 'thread.message.created':
       case 'thread.message.in_progress':
@@ -394,6 +405,17 @@ export class AssistantStream
         messageData = stableEvent.data;
         break;
       }
+      case 'thread.run.step.created':
+      case 'thread.run.step.in_progress':
+      case 'thread.run.step.delta':
+      case 'thread.run.step.completed':
+      case 'thread.run.step.failed':
+      case 'thread.run.step.cancelled':
+      case 'thread.run.step.expired': {
+        runStepID = this.#validateRunStepEvent(stableEvent);
+        runStepData = stableEvent.data;
+        break;
+      }
     }
 
     this.#currentEvent = exposedEvent;
@@ -401,6 +423,12 @@ export class AssistantStream
     this.#handleEvent(exposedEvent);
     if (messageID !== undefined && messageData !== undefined) {
       this.#reserveMessageAlias(messageData, messageID);
+    }
+    if (runStepID !== undefined && runStepData !== undefined) {
+      this.#reserveRunStepAlias(runStepData, runStepID);
+    }
+    if (runStepID === undefined && this.#activeRunStepID !== undefined && this.#currentRunStepSnapshot) {
+      this.#reserveRunStepAlias(this.#currentRunStepSnapshot, this.#activeRunStepID);
     }
 
     switch (stableEvent.event) {
@@ -430,7 +458,19 @@ export class AssistantStream
       case 'thread.run.step.failed':
       case 'thread.run.step.cancelled':
       case 'thread.run.step.expired': {
-        this.#handleRunStep(stableEvent);
+        if (runStepID === undefined) {
+          throw new OpenAIError('Received assistant run-step event without a canonical run-step ID');
+        }
+        const activeRunStep = this.#runStepSnapshots[runStepID];
+        if (activeRunStep) {
+          this.#reserveRunStepAlias(activeRunStep, runStepID);
+        }
+        this.#handleRunStep(stableEvent, runStepID);
+        this.#reserveRunStepAlias(stableEvent.data, runStepID);
+        const retainedRunStep = this.#runStepSnapshots[runStepID];
+        if (retainedRunStep) {
+          this.#reserveRunStepAlias(retainedRunStep, runStepID);
+        }
         break;
       }
 
@@ -472,6 +512,76 @@ export class AssistantStream
     }
 
     return this.#finalRun;
+  }
+
+  #validateRunStepEvent(event: RunStepStreamEvent): string {
+    const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
+    const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+
+    if (typeof runStepID !== 'string' || runStepID.length === 0) {
+      throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
+    }
+
+    if (event.event === 'thread.run.step.created') {
+      if (this.#activeRunStepID !== undefined) {
+        throw new OpenAIError(
+          `Received run-step creation for "${runStepID}" before the active run step "${this.#activeRunStepID}" reached a terminal state`,
+        );
+      }
+
+      if (hasOwn(this.#runStepSnapshots, runStepID) || this.#runStepIDOwners.has(runStepID)) {
+        throw new OpenAIError(
+          `Received run-step creation for run step "${runStepID}", which has already been created`,
+        );
+      }
+
+      this.#activeRunStepID = runStepID;
+      this.#runStepIDOwners.set(runStepID, runStepID);
+      return runStepID;
+    }
+
+    if (this.#activeRunStepID !== undefined) {
+      if (runStepID !== this.#activeRunStepID) {
+        throw new OpenAIError(
+          `Received ${event.event} for run step "${runStepID}", which does not match the active run step "${this.#activeRunStepID}"`,
+        );
+      }
+      return runStepID;
+    }
+
+    if (event.event === 'thread.run.step.delta') {
+      if (!hasOwn(this.#runStepSnapshots, runStepID)) {
+        throw new OpenAIError('Received a RunStepDelta before creation of a snapshot');
+      }
+      throw new OpenAIError(`Received run-step delta for "${runStepID}" with no active run step`);
+    }
+
+    if (hasOwn(this.#runStepSnapshots, runStepID) || this.#runStepIDOwners.has(runStepID)) {
+      throw new OpenAIError(
+        `Received run-step event for run step "${runStepID}", which has already been created`,
+      );
+    }
+
+    this.#runStepIDOwners.set(runStepID, runStepID);
+    if (event.event === 'thread.run.step.in_progress') {
+      this.#activeRunStepID = runStepID;
+    }
+    return runStepID;
+  }
+
+  #reserveRunStepAlias(data: RunStepStreamEvent['data'], canonicalID: string): void {
+    const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
+    const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof runStepID !== 'string' || runStepID.length === 0) {
+      throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
+    }
+    const owner = this.#runStepIDOwners.get(runStepID);
+    if (owner !== undefined && owner !== canonicalID) {
+      throw new OpenAIError(
+        `Received run-step creation for run step "${runStepID}", which has already been created`,
+      );
+    }
+    this.#runStepIDOwners.set(runStepID, canonicalID);
   }
 
   #validateMessageEvent(event: MessageStreamEvent): string {
@@ -636,8 +746,8 @@ export class AssistantStream
     }
   }
 
-  #handleRunStep(this: AssistantStream, event: RunStepStreamEvent) {
-    const accumulatedRunStep = this.#accumulateRunStep(event);
+  #handleRunStep(this: AssistantStream, event: RunStepStreamEvent, runStepID: string) {
+    const accumulatedRunStep = this.#accumulateRunStep(event, runStepID);
     this.#currentRunStepSnapshot = accumulatedRunStep;
 
     switch (event.event) {
@@ -684,6 +794,7 @@ export class AssistantStream
       case 'thread.run.step.cancelled':
       case 'thread.run.step.expired': {
         this.#currentRunStepSnapshot = undefined;
+        this.#activeRunStepID = undefined;
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
           this.#emitExposed('toolCallDone', this.#currentToolCall as ToolCall);
@@ -715,15 +826,15 @@ export class AssistantStream
     this.#emitExposed('event', event);
   }
 
-  #accumulateRunStep(event: RunStepStreamEvent): Runs.RunStep {
+  #accumulateRunStep(event: RunStepStreamEvent, runStepID: string): Runs.RunStep {
     switch (event.event) {
       case 'thread.run.step.created': {
-        this.#runStepSnapshots[event.data.id] = event.data;
+        this.#runStepSnapshots[runStepID] = event.data;
         return event.data;
       }
 
       case 'thread.run.step.delta': {
-        const snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+        const snapshot = this.#runStepSnapshots[runStepID] as Runs.RunStep;
         if (!snapshot) {
           throw new Error('Received a RunStepDelta before creation of a snapshot');
         }
@@ -732,10 +843,10 @@ export class AssistantStream
 
         if (data.delta) {
           const accumulated = accumulateAssistantStreamDelta(snapshot, data.delta, true) as Runs.RunStep;
-          this.#runStepSnapshots[event.data.id] = accumulated;
+          this.#runStepSnapshots[runStepID] = accumulated;
         }
 
-        return this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+        return this.#runStepSnapshots[runStepID] as Runs.RunStep;
       }
 
       case 'thread.run.step.completed':
@@ -743,13 +854,13 @@ export class AssistantStream
       case 'thread.run.step.cancelled':
       case 'thread.run.step.expired':
       case 'thread.run.step.in_progress': {
-        this.#runStepSnapshots[event.data.id] = event.data;
+        this.#runStepSnapshots[runStepID] = event.data;
         break;
       }
     }
 
-    if (this.#runStepSnapshots[event.data.id]) {
-      return this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+    if (this.#runStepSnapshots[runStepID]) {
+      return this.#runStepSnapshots[runStepID] as Runs.RunStep;
     }
     throw new Error('No snapshot available');
   }

@@ -312,6 +312,8 @@ class StatusPublisherTests(unittest.TestCase):
         event_name: str = "pull_request",
         head_changed: bool = False,
         base_changed: bool = False,
+        pull_base_behind: bool = False,
+        main_advanced: bool = False,
         no_result: bool = False,
         failed_budget: bool = False,
         head_repository: str = "openai/example",
@@ -352,6 +354,7 @@ class StatusPublisherTests(unittest.TestCase):
             "run": run,
             "associations": associations,
             "association_repository": head_repository,
+            "main_sha": "d" * 40 if main_advanced else ("c" * 40 if base_changed else base),
             "current": {
                 "state": "open",
                 "head": {
@@ -359,7 +362,7 @@ class StatusPublisherTests(unittest.TestCase):
                     "repo": {"full_name": pull_repository or head_repository},
                 },
                 "base": {
-                    "sha": "c" * 40 if base_changed else base,
+                    "sha": "c" * 40 if base_changed or pull_base_behind else base,
                     "ref": "main",
                     "repo": {"full_name": "openai/example"},
                 },
@@ -384,7 +387,7 @@ class StatusPublisherTests(unittest.TestCase):
             rest: {
               pulls: {get: async options => ({data: {...data.current, number: options.pull_number}})},
               actions: {getWorkflowRun: async () => ({data: data.run})},
-              git: {getRef: async () => ({data: {object: {sha: data.current.base.sha}}})},
+              git: {getRef: async () => ({data: {object: {sha: data.main_sha}}})},
               repos: {
                 listPullRequestsAssociatedWithCommit: async () => {},
                 createCommitStatus: async value => published.push(value),
@@ -497,6 +500,27 @@ class StatusPublisherTests(unittest.TestCase):
 
     def test_stale_pr_head_is_not_published(self) -> None:
         self.assertEqual(self.publish(head_changed=True), [])
+
+    def test_behind_main_pr_publishes_current_main_results(self) -> None:
+        results = self.publish(pull_base_behind=True)
+        self.assertEqual(
+            [result["context"] for result in results],
+            ["Castiron / budget-only change", "Castiron / custom-code budget"],
+        )
+        self.assertTrue(
+            all(result["sha"] == "b" * 40 and result["state"] == "success" for result in results)
+        )
+
+    def test_behind_main_pr_fails_closed_if_main_advances_after_evaluation(self) -> None:
+        results = self.publish(pull_base_behind=True, main_advanced=True)
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(result["state"] == "failure" for result in results))
+        self.assertTrue(
+            all(
+                "base changed; rerun against current main" in result["description"]
+                for result in results
+            )
+        )
 
     def test_stale_base_and_missing_evaluation_cannot_publish_success(self) -> None:
         for event in ("pull_request", "merge_group"):
@@ -708,6 +732,70 @@ class GitHubBudgetTests(unittest.TestCase):
                         )
                         git.assert_called_once_with(repo, "rev-parse", "--is-bare-repository")
 
+    def test_behind_main_pr_recomputes_report_against_current_main(self) -> None:
+        main, pull_base, head = "a" * 40, "c" * 40, "b" * 40
+        run = source_run(head)
+        event = {"repository": {"full_name": "openai/example"}, "workflow_run": run}
+        pull = {
+            "number": 3,
+            "state": "open",
+            "head": {"sha": head, "repo": {"full_name": "openai/example"}},
+            "base": {
+                "sha": pull_base,
+                "ref": "main",
+                "repo": {"full_name": "openai/example"},
+            },
+        }
+        for matches_pull in (True, False):
+            with self.subTest(matches_pull=matches_pull), tempfile.TemporaryDirectory() as temp:
+                trusted = Path(temp)
+                measured = {
+                    "target_base_sha": pull_base if matches_pull else main,
+                    "head_sha": head,
+                }
+                (trusted / "report.json").write_text(json.dumps(measured))
+                (trusted / "custom-code.patch").write_bytes(b"verified patch")
+                repo = trusted / "objects.git"
+                repo.mkdir()
+                with (
+                    mock.patch.object(
+                        budget.report,
+                        "api",
+                        side_effect=[
+                            {"default_branch": "main", "private": False},
+                            {"object": {"sha": main}},
+                            run,
+                            pull,
+                            [{"type": "merge_queue"}],
+                        ],
+                    ),
+                    mock.patch.object(budget.report, "git", return_value=b"true\n") as git,
+                    mock.patch.object(budget, "evaluate", return_value=({}, b"")) as evaluate,
+                ):
+                    if not matches_pull:
+                        with self.assertRaisesRegex(ValueError, "trusted report is stale"):
+                            budget.github_evaluate(repo, "openai/example", event, main, trusted)
+                        evaluate.assert_not_called()
+                        git.assert_not_called()
+                        continue
+
+                    budget.github_evaluate(repo, "openai/example", event, main, trusted)
+                    git.assert_has_calls(
+                        [
+                            mock.call(repo, "rev-parse", "--is-bare-repository"),
+                            mock.call(repo, "fetch", "--quiet", "--no-tags", "origin", main),
+                        ]
+                    )
+                    evaluate.assert_called_once_with(
+                        repo,
+                        main,
+                        head,
+                        public=True,
+                        fetch=True,
+                        pull_heads=None,
+                        measurement=None,
+                    )
+
     def test_queue_pagination(self) -> None:
         pages = [
             {
@@ -791,7 +879,7 @@ class GitHubBudgetTests(unittest.TestCase):
             )
 
     def test_stale_pull_and_wrong_target_fail_before_objects_created(self) -> None:
-        for kind in ("head", "source_repository", "base", "repository", "branch", "closed"):
+        for kind in ("head", "source_repository", "repository", "branch", "closed"):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
                 base, head = "a" * 40, "b" * 40
                 event = {
@@ -808,8 +896,6 @@ class GitHubBudgetTests(unittest.TestCase):
                     pull["head"]["sha"] = "c" * 40
                 elif kind == "source_repository":
                     pull["head"]["repo"]["full_name"] = "someone-else/example"
-                elif kind == "base":
-                    pull["base"]["sha"] = "c" * 40
                 elif kind == "repository":
                     pull["base"]["repo"]["full_name"] = "wrong/repo"
                 elif kind == "branch":

@@ -1,23 +1,27 @@
 import { types } from 'node:util';
 import { Agent, ProxyAgent, Request, fetch } from 'undici';
+import { OpenAIError } from '../../core/error';
+import { x509TransportBrand } from './x509-transport-registry';
+import type { RegisteredX509Transport, X509Transport } from './x509-transport-registry';
+import { findRegisteredX509Transport, rememberRegisteredX509Transport } from '#x509-transport-state';
 
-declare const x509TransportBrand: unique symbol;
+export type { X509Transport } from './x509-transport-registry';
 
 /** Explicitly supported, application-owned Undici proxy configurations. */
 export type X509ProxyMode = 'direct' | 'http-connect' | 'https-connect';
-
-/** An opaque, immutable X.509 transport identity created by {@link createX509Transport}. */
-export interface X509Transport {
-  /** Prevents ordinary objects from being accepted as X.509 transport capabilities. */
-  readonly [x509TransportBrand]: true;
-}
 
 /** Application attestation for one caller-owned static-certificate Undici transport. */
 export interface X509TransportOptions {
   /** X.509 transport currently supports genuine Node.js runtimes only. */
   runtime: 'node';
 
-  /** Caller-owned Undici Agent or ProxyAgent; the SDK never closes or inspects it. */
+  /**
+   * Caller-owned Undici Agent or ProxyAgent; the SDK never closes or inspects it.
+   *
+   * The application attests that its dispatcher, factories, TLS verification,
+   * certificate selection, and CONNECT proxy configuration are trustworthy.
+   * Use `fromX509` when the SDK should own and enforce transport configuration.
+   */
   dispatcher: Agent | ProxyAgent;
 
   /** Attests that the dispatcher uses one static workload-certificate identity. */
@@ -28,9 +32,10 @@ export interface X509TransportOptions {
 }
 
 const allowedOptionNames = new Set(['runtime', 'dispatcher', 'certificateIdentity', 'proxy']);
+const transportBrand: typeof x509TransportBrand = x509TransportBrand;
 
 class NodeX509Transport implements X509Transport {
-  declare readonly [x509TransportBrand]: true;
+  declare readonly [transportBrand]: true;
 
   readonly #dispatcher: Agent | ProxyAgent;
 
@@ -42,6 +47,23 @@ class NodeX509Transport implements X509Transport {
   static dispatcher(value: object): Agent | ProxyAgent | undefined {
     return #dispatcher in value ? value.#dispatcher : undefined;
   }
+}
+
+/** Registers only a genuine frozen capability whose JavaScript private dispatcher cannot be forged. */
+export function registerX509Transport(transport: X509Transport, registered: RegisteredX509Transport): void {
+  if (
+    !transport ||
+    typeof transport !== 'object' ||
+    types.isProxy(transport) ||
+    !Object.isFrozen(transport) ||
+    !NodeX509Transport.dispatcher(transport)
+  ) {
+    throw new OpenAIError('Only a genuine frozen X.509 transport capability can be registered.');
+  }
+  if (findRegisteredX509Transport(transport)) {
+    throw new OpenAIError('An approved X.509 transport capability cannot be registered more than once.');
+  }
+  rememberRegisteredX509Transport(transport, Object.freeze(registered));
 }
 
 function dataOption(options: X509TransportOptions, name: keyof X509TransportOptions): unknown {
@@ -134,10 +156,11 @@ function assertConnectProxySupport(): void {
  * `certificateIdentity: 'static'` is an application attestation: the SDK does
  * not inspect certificates, private dispatcher internals, callbacks, or TLS
  * options and cannot cryptographically prove certificate selection. Configure
- * one static identity without custom dispatcher factories. For HTTPS CONNECT,
- * independently configure `proxyTls` and `requestTls` so workload credentials
- * never reach the proxy. Rotation requires creating a fresh dispatcher and
- * capability; the application remains responsible for draining the old one.
+ * trusted dispatcher factories, verified target and proxy TLS, one static
+ * certificate identity, and independently scoped CONNECT credentials.
+ * Prefer the SDK-owned `fromX509` credential when these guarantees should be
+ * enforced at construction. Rotation requires a fresh caller-owned dispatcher
+ * and capability; the application remains responsible for draining it.
  *
  * This Node-only preview entrypoint requires the optional `undici` peer at
  * version 5.2.0 or later. CONNECT proxy modes require version 5.5.1 or
