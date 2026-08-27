@@ -190,6 +190,154 @@ describe('Azure authentication header occurrence snapshots', () => {
     },
   );
 
+  test.each(
+    requestCredentialCases.flatMap(({ method, name }) =>
+      (['custom prototype', 'array subclass'] as const).map((representation) => ({
+        method,
+        name,
+        representation,
+      })),
+    ),
+  )(
+    'accepts a safe inherited $method $name tuple data descriptor on an $representation',
+    async ({ method, name, representation }) => {
+      let coercions = 0;
+      const defaults: Record<string, string> = {};
+      Object.defineProperty(defaults, name, {
+        enumerable: true,
+        value: {
+          toString(): string {
+            coercions += 1;
+            throw new Error('private-shadowed-tenant-token');
+          },
+        },
+      });
+      class TupleRow extends Array<string> {}
+      const row =
+        representation === 'array subclass'
+          ? new TupleRow(name, 'effective-tenant-token')
+          : [name, 'effective-tenant-token'];
+      Reflect.deleteProperty(row, 0);
+      const prototype =
+        representation === 'array subclass' ? TupleRow.prototype : Object.create(Array.prototype);
+      Object.defineProperty(prototype, 0, { configurable: true, value: name.toUpperCase() });
+      if (representation === 'custom prototype') {
+        Object.setPrototypeOf(row, prototype);
+      }
+
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-tenant-token',
+        defaultHeaders: defaults,
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client.request({
+        method,
+        path: '/models',
+        ...(method === 'post' ? { body: { safe: true } } : {}),
+        headers: [row] as [string, string][],
+      });
+
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get(name)).toBe('effective-tenant-token');
+      expect(coercions).toBe(0);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(requestCredentialCases)(
+    'rejects an inherited $method $name tuple-name accessor without invoking it',
+    async ({ method, name }) => {
+      let nameReads = 0;
+      const row = [name, 'effective-tenant-token'];
+      Reflect.deleteProperty(row, 0);
+      const prototype = Object.create(Array.prototype) as object;
+      Object.defineProperty(prototype, 0, {
+        configurable: true,
+        get(): string {
+          nameReads += 1;
+          throw new Error('private-inherited-tuple-name-token');
+        },
+      });
+      Object.setPrototypeOf(row, prototype);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-tenant-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      await expect(
+        client.request({
+          method,
+          path: '/models',
+          ...(method === 'post' ? { body: { safe: true } } : {}),
+          headers: [row] as [string, string][],
+        }),
+      ).rejects.toThrow(SAFE_ERROR);
+
+      expect(nameReads).toBe(0);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(['deep', 'cyclic', 'throwing proxy'] as const)(
+    'sanitizes and bounds an untrusted %s inherited tuple-name prototype path',
+    async (representation) => {
+      const privateCredential = 'private-inherited-prototype-token';
+      const row = ['api-key', 'effective-tenant-token'];
+      Reflect.deleteProperty(row, 0);
+      let reads = 0;
+      let prototype: object = Object.create(Array.prototype) as object;
+      if (representation === 'deep') {
+        for (let depth = 0; depth < 40; depth += 1) {
+          prototype = Object.create(prototype) as object;
+        }
+      } else {
+        prototype = new Proxy(prototype, {
+          getPrototypeOf(target) {
+            reads += 1;
+            if (representation === 'throwing proxy') {
+              throw new Error(privateCredential);
+            }
+            return reads === 1 ? target : prototype;
+          },
+        });
+      }
+      Object.setPrototypeOf(row, prototype);
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+      const client = new AzureOpenAI({
+        baseURL: BASE_URL,
+        apiVersion: API_VERSION,
+        apiKey: 'configured-tenant-token',
+        fetch,
+        maxRetries: 0,
+      });
+
+      let failure: unknown;
+      try {
+        await client.request({ method: 'get', path: '/models', headers: [row] as [string, string][] });
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(TypeError);
+      if (!(failure instanceof TypeError)) {
+        throw new Error('Expected a sanitized Azure credential failure.');
+      }
+      expect(failure.message).toBe(SAFE_ERROR);
+      expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
+      expect(failure.stack).not.toContain(privateCredential);
+      expect(reads).toBeLessThanOrEqual(32);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   test.each(requestCredentialCases)(
     'does not coerce a $method $name credential shadowed by a tuple with an own data name',
     async ({ method, name }) => {
