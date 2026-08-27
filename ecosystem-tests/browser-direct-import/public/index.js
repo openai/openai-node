@@ -22,6 +22,9 @@ async function runTests() {
     pre.textContent = JSON.stringify(results, null, 2);
   }
   for (const { path, run, timeout } of tests) {
+    if (!live && path[0] !== 'browser API-key protection remains enabled by default') {
+      continue;
+    }
     console.log('running', ...path);
     try {
       await Promise.race([
@@ -110,8 +113,28 @@ const model = 'whisper-1';
 const apiKey = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_API_KEY__?: string }} */ (
   globalThis
 ).__OPENAI_ECOSYSTEM_TEST_API_KEY__;
+const live = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_LIVE__?: boolean }} */ (
+  globalThis
+).__OPENAI_ECOSYSTEM_TEST_LIVE__ === true;
 
 const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+it('browser API-key protection remains enabled by default', () => {
+  let browserError;
+  try {
+    browserError = new OpenAI({ apiKey: 'synthetic-browser-api-key' });
+  } catch (error) {
+    browserError = error;
+  }
+
+  if (
+    !(browserError instanceof Error) ||
+    !browserError.message.includes('disabled by default') ||
+    !browserError.message.includes('dangerouslyAllowBrowser')
+  ) {
+    throw new Error('Expected API-key use to be disabled in browsers by default.');
+  }
+});
 
 async function typeTests() {
   // @ts-expect-error this should error if the `Uploadable` type was resolved correctly

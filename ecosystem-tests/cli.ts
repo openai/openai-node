@@ -431,10 +431,10 @@ const projectRunners = {
     await fs.symlink('../node_modules', 'public/node_modules');
 
     await run('npm', ['run', 'tsc']);
-
-    if (state.live) {
-      await run('npm', ['run', 'test:ci'], { allowApiKey: true });
-    }
+    await run('npm', ['run', 'test:ci'], {
+      allowApiKey: state.live,
+      env: { OPENAI_ECOSYSTEM_TEST_LIVE: String(state.live) },
+    });
   },
   'vercel-edge': async () => {
     await installPackage();
