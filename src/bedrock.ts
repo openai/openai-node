@@ -20,7 +20,7 @@ import type * as ResponsesAPI from './resources/responses/responses';
 /** Configures Amazon Bedrock's OpenAI-compatible endpoint and bearer-token authentication. */
 export interface BedrockClientOptions extends Omit<
   ClientOptions,
-  'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity' | 'x509Transport' | 'dataResidency'
+  'apiKey' | 'adminAPIKey' | 'baseURL' | 'credential' | 'workloadIdentity' | 'x509Transport' | 'dataResidency'
 > {
   /**
    * Bedrock bearer token used for authentication.
@@ -45,6 +45,9 @@ export interface BedrockClientOptions extends Omit<
 
   /** OpenAI data residency cannot be combined with Bedrock routing. */
   dataResidency?: never;
+
+  /** Bedrock cannot receive an SDK-owned OpenAI X.509 certificate credential. */
+  credential?: never;
 
   /**
    * BedrockOpenAI only supports Bedrock bearer token authentication.

@@ -4,9 +4,11 @@ import { vi } from 'vitest';
 
 import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
 import type { ClientOptions } from 'openai';
-import { createX509Transport } from 'openai/auth/x509-transport';
+import { createX509Transport, fromX509 } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
 import * as transportCapability from 'openai/internal/auth/x509-transport-capability';
+
+import { createX509TestLab } from '../utils/x509-test-lab';
 
 const tokenResponse = {
   access_token: 'synthetic-request-boundary-bearer',
@@ -32,6 +34,16 @@ function options(overrides: Partial<ClientOptions> = {}): ClientOptions {
   };
 }
 
+function ownedCredential() {
+  const lab = createX509TestLab();
+  return fromX509({
+    certificateChain: lab.firstClient.certificate.toString(),
+    privateKey: lab.firstClient.privateKey.toString(),
+    identityProviderId: 'synthetic-boundary-provider',
+    serviceAccountId: 'synthetic-boundary-account',
+  });
+}
+
 beforeEach(() => {
   dispatcher = new Agent();
   transport = createX509Transport({
@@ -48,6 +60,119 @@ afterEach(async () => {
 });
 
 describe('X.509 request ownership boundaries', () => {
+  test('safely replaces an API-key client with an SDK-owned X.509 credential when cloning', async () => {
+    const credential = ownedCredential();
+
+    try {
+      const original = new OpenAI({ apiKey: 'synthetic-existing-api-key' });
+      const clone = original.withOptions({
+        credential,
+        organization: 'synthetic-explicit-organization',
+        project: 'synthetic-explicit-project',
+      });
+
+      expect(clone.baseURL).toBe('https://mtls.api.openai.com/v1');
+      expect(clone.apiKey).toBeNull();
+      expect(clone.organization).toBe('synthetic-explicit-organization');
+      expect(clone.project).toBe('synthetic-explicit-project');
+    } finally {
+      await credential.close();
+    }
+  });
+
+  test('safely replaces an SDK-owned X.509 credential with an API key when cloning', async () => {
+    const credential = ownedCredential();
+
+    try {
+      const original = new OpenAI({ credential });
+      const clone = original.withOptions({ apiKey: 'synthetic-replacement-api-key' });
+
+      expect(clone.baseURL).toBe('https://api.openai.com/v1');
+      expect(clone.apiKey).toBe('synthetic-replacement-api-key');
+    } finally {
+      await credential.close();
+    }
+  });
+
+  test('shares one SDK-owned credential token across equivalent cloned clients', async () => {
+    const credential = ownedCredential();
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url) =>
+        url.origin === 'https://mtls.auth.openai.com'
+          ? Response.json(tokenResponse)
+          : Response.json({ data: [] }),
+      );
+
+    try {
+      const original = new OpenAI({ credential });
+      await original.models.list();
+      vi.stubEnv('OPENAI_CUSTOM_HEADERS', 'OpenAI-Organization: synthetic-ambient-header-organization');
+      const clone = original.withOptions({ timeout: 1000 });
+      await clone.models.list();
+      const converted = clone.withOptions({ apiKey: 'synthetic-cloned-replacement-api-key' });
+
+      expect(send).toHaveBeenCalledTimes(3);
+      expect(
+        send.mock.calls.filter((call) => call[1].origin === 'https://mtls.auth.openai.com'),
+      ).toHaveLength(1);
+      expect(converted.baseURL).toBe('https://api.openai.com/v1');
+      expect(converted.apiKey).toBe('synthetic-cloned-replacement-api-key');
+    } finally {
+      vi.unstubAllEnvs();
+      await credential.close();
+    }
+  });
+
+  test('isolates an SDK-owned credential clone from stale client and ambient authentication settings', async () => {
+    const credential = ownedCredential();
+    vi.stubEnv('OPENAI_API_KEY', 'synthetic-ambient-api-key');
+    vi.stubEnv('OPENAI_ADMIN_KEY', 'synthetic-ambient-admin-key');
+    vi.stubEnv('OPENAI_BASE_URL', 'https://synthetic.invalid/v1');
+    vi.stubEnv('OPENAI_ORG_ID', 'synthetic-ambient-organization');
+    vi.stubEnv('OPENAI_PROJECT_ID', 'synthetic-ambient-project');
+    vi.stubEnv('OPENAI_CUSTOM_HEADERS', 'OpenAI-Organization: synthetic-ambient-header-organization');
+    let dispatchedHeaders: Headers | undefined;
+    let dispatchedURL: URL | undefined;
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async (_transport, url, request) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          return Response.json(tokenResponse);
+        }
+        dispatchedURL = url;
+        dispatchedHeaders = new Headers(request.headers);
+        return Response.json({ data: [] });
+      });
+
+    try {
+      const original = new OpenAI({
+        apiKey: 'synthetic-original-api-key',
+        adminAPIKey: null,
+        organization: 'synthetic-original-organization',
+        project: 'synthetic-original-project',
+        defaultHeaders: { 'X-Synthetic-Original': 'must-not-cross' },
+        defaultQuery: { api_key: 'synthetic-original-private-api-key' },
+      });
+      const clone = original.withOptions({ credential });
+
+      await clone.models.list();
+
+      expect(clone.baseURL).toBe('https://mtls.api.openai.com/v1');
+      expect(clone.apiKey).toBeNull();
+      expect(clone.adminAPIKey).toBeNull();
+      expect(clone.organization).toBeNull();
+      expect(clone.project).toBeNull();
+      expect(dispatchedHeaders?.get('X-Synthetic-Original')).toBeNull();
+      expect(dispatchedHeaders?.get('OpenAI-Organization')).toBeNull();
+      expect(dispatchedURL?.href).toBe('https://mtls.api.openai.com/v1/models');
+      expect(send).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllEnvs();
+      await credential.close();
+    }
+  });
+
   test('applies a lowered final override deadline before certificate authentication', async () => {
     let minted = false;
     const send = vi
@@ -500,6 +625,73 @@ describe('X.509 request ownership boundaries', () => {
     await expect(client.models.list()).resolves.toMatchObject({ data: [] });
     expect(send).toHaveBeenCalledTimes(2);
   });
+
+  test.each(['prepareOptions', 'prepareRequest'] as const)(
+    'excludes asynchronous retry-local %s preparation from the network budget',
+    async (hook) => {
+      let preparations = 0;
+      let attempts = 0;
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockImplementation(async (_transport, url) => {
+          if (url.origin === 'https://mtls.auth.openai.com') {
+            return Response.json(tokenResponse);
+          }
+          attempts += 1;
+          return attempts === 1
+            ? new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } })
+            : Response.json({ data: [] });
+        });
+      const client = new OpenAI(options({ maxRetries: 1, timeout: 50 }));
+      Object.defineProperty(client, hook, {
+        value: async () => {
+          preparations += 1;
+          if (preparations === 2) {
+            await delay(90);
+          }
+        },
+      });
+
+      await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+      expect(preparations).toBe(2);
+      expect(attempts).toBe(2);
+      expect(send).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  test.each(['prepareOptions', 'prepareRequest'] as const)(
+    'preserves elapsed network time while excluding retry-local %s preparation',
+    async (hook) => {
+      let preparations = 0;
+      let attempts = 0;
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockImplementation(async (_transport, url, request) => {
+          if (url.origin === 'https://mtls.auth.openai.com') {
+            return Response.json(tokenResponse);
+          }
+          attempts += 1;
+          await delay(35, undefined, { signal: request.signal ?? undefined });
+          return attempts === 1
+            ? new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } })
+            : Response.json({ data: [] });
+        });
+      const client = new OpenAI(options({ maxRetries: 1, timeout: 55 }));
+      Object.defineProperty(client, hook, {
+        value: async () => {
+          preparations += 1;
+          if (preparations === 2) {
+            await delay(90);
+          }
+        },
+      });
+
+      await expect(client.models.list()).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+      expect(preparations).toBe(2);
+      expect(attempts).toBe(2);
+      expect(send).toHaveBeenCalledTimes(3);
+    },
+  );
 
   test.each(['dispatcher', 'redirect', 'authorization', 'failure'] as const)(
     'rejects a protected request hook %s before presenting a certificate',
