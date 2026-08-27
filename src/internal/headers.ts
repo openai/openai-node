@@ -854,7 +854,7 @@ export const protectAzureRequestHeaders = (
             }
           }
         }
-        for (const [name, values] of effective) {
+        for (const values of effective.values()) {
           for (const value of values) {
             if (typeof value !== 'string') {
               coerceAzureCredentialHeaderValue(value);
