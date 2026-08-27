@@ -199,7 +199,7 @@ jobs:
   test_matrix:
     name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
     if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
-    needs: [test, benchmarks]
+    needs: [test, benchmarks, ecosystem_tests]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -207,6 +207,7 @@ jobs:
         env:
           TEST_RESULT: ${{ needs.test.result }}
           BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}
+          ECOSYSTEM_RESULT: ${{ needs.ecosystem_tests.result }}
         run: |
           if [ "$TEST_RESULT" != "success" ]; then
             echo "::error::Node.js test matrix result: $TEST_RESULT"
@@ -214,6 +215,10 @@ jobs:
           fi
           if [ "$BENCHMARKS_RESULT" != "success" ]; then
             echo "::error::Performance benchmarks result: $BENCHMARKS_RESULT"
+            exit 1
+          fi
+          if [ "$ECOSYSTEM_RESULT" != "success" ]; then
+            echo "::error::Ecosystem tests result: $ECOSYSTEM_RESULT"
             exit 1
           fi
 
@@ -311,11 +316,6 @@ jobs:
     name: ecosystem tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: >-
-      ${{
-        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
-        github.head_ref != 'release-please--branches--main--components--openai'
-      }}
     permissions:
       contents: read
 
