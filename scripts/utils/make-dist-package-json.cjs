@@ -23,7 +23,15 @@ if (pkgJson.imports?.['#x509-transport-state']) {
       continue;
     }
     if (condition === 'browser') {
-      state[condition] = './internal/auth/x509-transport-state.mjs';
+      state[condition] = {
+        import: './internal/auth/x509-transport-state.mjs',
+        require: './internal/auth/x509-transport-state.js',
+        default: './internal/auth/x509-transport-state.mjs',
+      };
+      continue;
+    }
+    if (condition === 'default') {
+      state[condition] = './internal/auth/x509-transport-state.js';
       continue;
     }
     state[condition] = state[condition]
