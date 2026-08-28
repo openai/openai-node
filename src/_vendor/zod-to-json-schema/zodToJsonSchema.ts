@@ -232,7 +232,14 @@ const carriedSiblings = (
     if (!ANNOTATION_KEYWORDS.has(key) && !isOpenApiNullable) {
       return null;
     }
-    carried[key] = dataValue(schema, key);
+    const value = dataValue(schema, key);
+    // `undefined` is not a value JSON has. The wrapper's own key would have
+    // been dropped on serialization, so carrying it would delete a value the
+    // branch does state rather than move one the wrapper stated.
+    if (value === undefined) {
+      continue;
+    }
+    carried[key] = value;
   }
   return carried;
 };

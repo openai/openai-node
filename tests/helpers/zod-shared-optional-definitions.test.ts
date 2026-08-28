@@ -881,6 +881,27 @@ describe('a definition keeps the context it was referenced from', () => {
       expect(out.definitions.p_properties_a).not.toHaveProperty('not');
     });
 
+    test('an omitted wrapper annotation does not erase the branch value', () => {
+      // `description: undefined` would have been dropped on serialization, so
+      // the wrapper never stated it. Carrying it onto the branch would delete
+      // a description the branch does state.
+      const shared = zv3.string().nullable().optional();
+      const supplied: any = {
+        anyOf: [{ not: {} }, { type: 'string', description: 'inner' }],
+        description: undefined,
+      };
+
+      const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+        override: (def, _refs, _seen, forceResolution) =>
+          forceResolution && def === (shared as any)._def ? supplied : ignoreOverride,
+      });
+
+      expect(out.definitions.p_properties_a).toEqual({ type: 'string', description: 'inner' });
+    });
+
     test('112 branch order changes the result', () => {
       // Referenced from a property in one branch and from an array in the
       // other, so neither encoding is owed to every reference. Which branch
