@@ -2,7 +2,6 @@ import type { ZodSchema } from 'zod/v3';
 import type { Options, Targets } from './Options';
 import type { JsonSchema7Type } from './parseDef';
 import { parseDef } from './parseDef';
-import type { Seen } from './Refs';
 import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
@@ -70,24 +69,6 @@ function ownStrictRootSchema(
 
   return owned as JsonSchema7Type;
 }
-
-/**
- * Whether the def was first reached from inside an object property.
- *
- * `Seen.propertyPath` is the nearest enclosing property at the reference site, and
- * `Seen.path` is where the def itself sat. The def is inside that property when its path
- * starts with it -- the same test `parseOptionalDef` applies.
- */
-const originatedInsideProperty = (seen: Seen | undefined): boolean => {
-  const propertyPath = seen?.propertyPath;
-  if (!seen || !propertyPath) {
-    return false;
-  }
-  // `referencePath` is set for a def pre-seeded from `definitions`, where `path`
-  // points at the definition rather than the place it was referenced from.
-  const from = seen.referencePath ?? seen.path;
-  return from.slice(0, propertyPath.length).toString() === propertyPath.toString();
-};
 
 /**
  * Keywords that describe a schema without constraining what it accepts. JSON
@@ -257,25 +238,6 @@ const carriedSiblings = (
 };
 
 /**
- * Whether this definition name is the one the reference context belongs to.
- *
- * `refs.seen` is keyed by the Zod def, so the same schema registered under
- * several definition names shares one context. When that context names a
- * sibling alias, this one was not the alias anything reached: it is a
- * standalone definition the caller asked for by name, and rewriting it would
- * change a schema nothing referenced.
- */
-const aliasWasReferenced = (seen: Seen | undefined, definitionPath: string[]): boolean => {
-  const seenPath = seen?.path;
-  return (
-    !seenPath ||
-    seenPath.length !== definitionPath.length ||
-    seenPath.toString() === definitionPath.toString() ||
-    seenPath.slice(0, -1).toString() !== definitionPath.slice(0, -1).toString()
-  );
-};
-
-/**
  * `anyOf: [X, { type: 'null' }]` -- how `parseNullableDef` spells a nullable in
  * this target. Returns the index of the non-null branch, or -1.
  *
@@ -358,6 +320,89 @@ const collapseNeverBranch = (
 };
 
 /**
+ * A reference as its pointer, not as the caller happened to spell it.
+ *
+ * `$ref` is a URI reference, so `#%2Fdefinitions%2FA` and `#/definitions/A`
+ * name the same place. `resolveLocalRef` in `lib/transform` decodes before
+ * splitting the pointer, and comparing raw strings here would miss the encoded
+ * spelling of a reference into a wrapper about to be removed.
+ */
+const normalizedRef = (ref: string): string => {
+  try {
+    return decodeURIComponent(ref);
+  } catch {
+    return ref;
+  }
+};
+
+/**
+ * Every reference the document emits, with whether it sits inside an object
+ * property.
+ *
+ * Both questions the collapse has to answer are about the emitted document
+ * rather than about how a def was reached: a definition is only the encoding a
+ * property asked for if a property actually references it, and a wrapper is
+ * only stranded if a reference names something inside it. Reading the output
+ * answers both without inferring either.
+ */
+const collectRefs = (value: unknown): { ref: string; insideProperty: boolean }[] => {
+  const found: { ref: string; insideProperty: boolean }[] = [];
+  const pending: { value: unknown; insideProperty: boolean }[] = [{ value, insideProperty: false }];
+  // Keyed by context as well as identity: a subtree shared between a property
+  // and something else has to be walked once for each, or whichever the stack
+  // reached first would decide the answer for both.
+  const seen = { true: new Set<unknown>(), false: new Set<unknown>() };
+
+  while (pending.length > 0) {
+    const next = pending.pop();
+    if (next === undefined) {
+      break;
+    }
+    const { value: current, insideProperty } = next;
+    const visited = seen[insideProperty ? 'true' : 'false'];
+    if (typeof current !== 'object' || current === null || visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      for (let index = 0; index < current.length; index++) {
+        pending.push({ value: elementValue(current, index), insideProperty });
+      }
+      continue;
+    }
+    if (!isPlainObject(current)) {
+      continue;
+    }
+
+    const ref = dataValue(current, '$ref');
+    if (typeof ref === 'string') {
+      found.push({ ref: normalizedRef(ref), insideProperty });
+    }
+
+    for (const [key, kind] of SCHEMA_CHILDREN) {
+      const child = dataValue(current, key);
+      // Anything below `properties` was reached through one, which is the
+      // context `parseOptionalDef` encodes for.
+      const nested = insideProperty || key === 'properties';
+      if (kind === 'map' && isPlainObject(child)) {
+        for (const name of Object.keys(child)) {
+          const entry = dataValue(child, name);
+          if (key === 'dependencies' && !isPlainObject(entry)) {
+            continue;
+          }
+          pending.push({ value: entry, insideProperty: nested });
+        }
+      } else {
+        pending.push({ value: child, insideProperty: nested });
+      }
+    }
+  }
+
+  return found;
+};
+
+/**
  * Whether anything reachable through JSON Schema keywords points at a path that
  * only exists while the wrapper is in place.
  *
@@ -420,28 +465,6 @@ const someSchemaNode = (value: unknown, matches: (node: Record<string, unknown>)
   }
 
   return false;
-};
-
-const someRef = (value: unknown, matches: (ref: string) => boolean): boolean =>
-  someSchemaNode(value, (node) => {
-    const ref = dataValue(node, '$ref');
-    return typeof ref === 'string' && matches(ref);
-  });
-
-/**
- * A reference as its pointer, not as the caller happened to spell it.
- *
- * `$ref` is a URI reference, so `#%2Fdefinitions%2FA` and `#/definitions/A`
- * name the same place. `resolveLocalRef` in `lib/transform` decodes before
- * splitting the pointer, and comparing raw strings here would miss the encoded
- * spelling of a reference into a wrapper about to be removed.
- */
-const normalizedRef = (ref: string): string => {
-  try {
-    return decodeURIComponent(ref);
-  } catch {
-    return ref;
-  }
 };
 
 /**
@@ -540,12 +563,11 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
 
     const definitions: Record<string, any> = {};
     const processedDefinitions = new Set();
-    // A collapse cannot be committed while definitions are still being built:
-    // a later one can add a `$ref` into a branch an earlier collapse removed.
-    const pendingCollapses: { key: string; collapsed: JsonSchema7Type; wrapperPaths: string[] }[] = [];
+    // Nothing is collapsed while definitions are still being built: a later one
+    // can add a `$ref` into a branch an earlier collapse removed, so each is
+    // held here and decided once the document is complete.
     const materializedDefinitions: {
       key: string;
-      def: unknown;
       definitionPath: string[];
       materialized: JsonSchema7Type;
     }[] = [];
@@ -599,67 +621,84 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // references it may live in a definition materialized later, and the
         // reference context only exists once that has happened. Definition
         // insertion order would otherwise decide the output.
-        materializedDefinitions.push({ key, def, definitionPath, materialized });
+        materializedDefinitions.push({ key, definitionPath, materialized });
         definitions[key] = materialized;
         processedDefinitions.add(key);
       }
+    }
+
+    // Which definitions a collapse could apply to at all. Computed before any
+    // reference scan because an ordinary schema has none, and the scans below
+    // walk the whole document -- including a schema an `override` supplied,
+    // which can be arbitrarily deep.
+    const candidates: {
+      key: string;
+      path: string;
+      collapsed: JsonSchema7Type;
+      wrapperPaths: string[];
+    }[] = [];
+    for (const { key, definitionPath, materialized } of materializedDefinitions) {
+      if (!isPlainObject(materialized)) {
+        continue;
+      }
+      const removedWrappers: string[][] = [];
+      const collapsed = collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type;
+      if (collapsed !== materialized) {
+        candidates.push({
+          key,
+          path: definitionPath.join('/'),
+          collapsed,
+          wrapperPaths: removedWrappers.map((segments) => [...definitionPath, ...segments].join('/')),
+        });
+      }
+    }
+    if (candidates.length === 0) {
+      return definitions;
+    }
+
+    // Every reference the document actually emits, gathered once, now that
+    // every definition exists and each one's reference context is final.
+    // `refs.seen` answers which Zod defs were reached and in what context,
+    // which is not the same question: it is keyed by def, so aliases share one
+    // entry, definition order decides which context is recorded, and a read
+    // that emitted no `$ref` counts the same as one that did. The finished
+    // document answers it directly.
+    // Wrapped so the walk reads `definitions` as a map of schemas; its own keys
+    // are names, not keywords.
+    const emitted = [...collectRefs(main), ...collectRefs({ definitions })];
+    const referencedFromProperty = new Set<string>();
+    const referencedElsewhere = new Set<string>();
+    // A wrapper is stranded when a pointer names it or anything under it, so
+    // the prefixes are indexed rather than re-scanned per candidate -- that
+    // scan is O(references) inside a loop over candidates, and both grow with
+    // the number of shared optionals.
+    const referencedPrefixes = new Set<string>();
+    for (const { ref, insideProperty } of emitted) {
+      (insideProperty ? referencedFromProperty : referencedElsewhere).add(ref);
+      const segments = ref.split('/');
+      for (let end = 1; end <= segments.length; end++) {
+        referencedPrefixes.add(segments.slice(0, end).join('/'));
+      }
+    }
+
+    // Only when every reference to a definition came from a property is the
+    // property encoding the one it owes all of them.
+    const pendingCollapses = candidates.filter(
+      ({ path }) => referencedFromProperty.has(path) && !referencedElsewhere.has(path),
+    );
+    if (pendingCollapses.length === 0) {
+      return definitions;
     }
 
     // Two things make every wrapper move unsafe rather than only the ones a
     // pointer names: a relative reference, whose depth is part of its meaning,
     // and a serialization hook, which can produce a reference the scan cannot
     // see without running caller code.
-    // Now that every definition exists, each one's reference context is final.
-    for (const { key, def, definitionPath, materialized } of materializedDefinitions) {
-      const seen = refs.seen.get(def as never);
-      // `refs.seen` is keyed by the Zod def, so the same schema registered under
-      // several definition names shares one context. When that context names a
-      // sibling alias, this one was not the alias anything reached: it is a
-      // standalone definition the caller asked for by name, and rewriting it
-      // would change a schema nothing referenced.
-      if (
-        !aliasWasReferenced(seen, definitionPath) ||
-        !originatedInsideProperty(seen) ||
-        !isPlainObject(materialized)
-      ) {
-        continue;
-      }
-      const removedWrappers: string[][] = [];
-      const collapsed = collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type;
-      if (collapsed !== materialized) {
-        pendingCollapses.push({
-          key,
-          collapsed,
-          wrapperPaths: removedWrappers.map((segments) => [...definitionPath, ...segments].join('/')),
-        });
-      }
-    }
-
-    // Nothing to rewrite means nothing to check. The scans below walk the whole
-    // document, and a schema an `override` supplied can be arbitrarily deep, so
-    // they only run once there is a decision that depends on them.
-    const unsafeToMove =
-      pendingCollapses.length > 0 && (wrappersMustStay(main) || wrappersMustStay({ definitions }));
-
-    // Every emitted reference gathered once. A traversal per pending collapse
-    // walked the definitions map each time, and that map is itself O(N), so an
-    // ordinary schema with many shared optionals converted in quadratic time.
-    const emittedRefs: string[] = [];
-    if (!unsafeToMove && pendingCollapses.length > 0) {
-      const collect = (ref: string) => {
-        emittedRefs.push(normalizedRef(ref));
-        return false;
-      };
-      someRef(main, collect);
-      // Wrapped so the walk recognises `definitions` as a map of schemas; its
-      // own keys are names, not keywords.
-      someRef({ definitions }, collect);
-    }
+    const unsafeToMove = wrappersMustStay(main) || wrappersMustStay({ definitions });
 
     for (const { key, collapsed, wrapperPaths } of pendingCollapses) {
       const stranded =
-        unsafeToMove ||
-        wrapperPaths.some((wrapperPath) => emittedRefs.some((ref) => ref.includes(wrapperPath)));
+        unsafeToMove || wrapperPaths.some((wrapperPath) => referencedPrefixes.has(wrapperPath));
       if (!stranded) {
         definitions[key] = collapsed;
       }

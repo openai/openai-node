@@ -885,6 +885,50 @@ describe('a definition keeps the context it was referenced from', () => {
       expect(out.definitions.p_properties_a).toEqual(out.definitions.p.properties.a);
     });
 
+    test('112 branch order changes the result', () => {
+      // Referenced from a property in one branch and from an array in the
+      // other, so neither encoding is owed to every reference. Which branch
+      // came first decided the answer while it was read off the first
+      // recorded context.
+      const shared = zv3.string().optional();
+      const propertyFirst: any = zodToJsonSchema(
+        zv3.union([zv3.object({ value: shared }), zv3.array(shared)]),
+        { definitions: { shared } },
+      );
+      const arrayFirst: any = zodToJsonSchema(zv3.union([zv3.array(shared), zv3.object({ value: shared })]), {
+        definitions: { shared },
+      });
+      expect(propertyFirst.definitions.shared).toEqual(arrayFirst.definitions.shared);
+      expect(propertyFirst.definitions.shared).toEqual({
+        anyOf: [{ not: {} }, { type: 'string' }],
+      });
+    });
+
+    test('621 a strategy that emits no reference collapses nothing', () => {
+      // `'none'` inlines every occurrence, so the definition is reached by the
+      // conversion but pointed at by nothing. There is no property that owes
+      // it the property encoding.
+      const shared = zv3.string().optional();
+      const out: any = zodToJsonSchema(zv3.object({ a: shared }), {
+        $refStrategy: 'none',
+        definitions: { shared },
+      });
+      expect(out.definitions.shared).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
+    });
+
+    test('the alias a property points at is the one that collapses', () => {
+      // One Zod def under two names. The property references exactly one of
+      // them; the other is a standalone definition nothing reached, and
+      // rewriting it would change a schema no reference names.
+      const shared = zv3.string().optional();
+      const out: any = zodToJsonSchema(zv3.object({ a: shared }), {
+        definitions: { First: shared, Second: shared },
+      });
+      expect(out.properties.a).toEqual({ $ref: '#/definitions/Second' });
+      expect(out.definitions.Second).toEqual({ type: 'string' });
+      expect(out.definitions.First).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
+    });
+
     test('553 definition order changes the result', () => {
       const leaf = zv3.string().optional();
       const container = zv3.object({ inner: leaf });
