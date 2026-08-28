@@ -842,4 +842,59 @@ describe('a definition keeps the context it was referenced from', () => {
       expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
     });
   });
+
+  describe('what the collapse removes, and when it may decide', () => {
+    test('317 reference into the discarded branch', () => {
+      const shared = zv3.string().nullable().optional();
+      const marker = zv3.number();
+      const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared, c: marker }), {
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+        override: (def, _r, _s, _f) =>
+          def === (marker as any)._def
+            ? ({ type: 'object', properties: { x: { $ref: '#/definitions/p_properties_a/anyOf/0' } } } as any)
+            : ignoreOverride,
+      });
+      expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
+    });
+
+    test('332 array-level toJSON', () => {
+      const shared = zv3.string().nullable().optional();
+      const marker = zv3.number();
+      const list: any[] = [{ type: 'string' }];
+      (list as any).toJSON = () => [{ $ref: '#/definitions/p_properties_a/anyOf/1' }];
+      const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared, c: marker }), {
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+        override: (def, _r, _s, _f) =>
+          def === (marker as any)._def ? ({ type: 'object', allOf: list } as any) : ignoreOverride,
+      });
+      expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
+    });
+
+    test('312 duplicate openApi3 nullable', () => {
+      const shared = zv3.string().nullable().optional().nullable();
+      const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+        target: 'openApi3',
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+      });
+      expect(out.definitions.p_properties_a).toEqual(out.definitions.p.properties.a);
+    });
+
+    test('553 definition order changes the result', () => {
+      const leaf = zv3.string().optional();
+      const container = zv3.object({ inner: leaf });
+      const first: any = zodToJsonSchema(zv3.object({ z: container }), {
+        definitions: { Leaf: leaf, Container: container },
+      });
+      const second: any = zodToJsonSchema(zv3.object({ z: container }), {
+        definitions: { Container: container, Leaf: leaf },
+      });
+      expect(first.definitions.Leaf).toEqual(second.definitions.Leaf);
+    });
+  });
 });

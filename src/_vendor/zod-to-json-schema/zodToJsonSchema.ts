@@ -225,6 +225,57 @@ const isInspectableBranchList = (branches: unknown): branches is unknown[] =>
   !hasCustomIterator(branches);
 
 /**
+ * The siblings of the union that may move onto the surviving branch, or `null`
+ * when one of them cannot.
+ */
+const carriedSiblings = (
+  schema: Record<string, unknown>,
+  second: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const carried: Record<string, unknown> = {};
+  for (const key of Object.keys(schema)) {
+    if (key === 'anyOf') {
+      continue;
+    }
+    // `nullable` is how the OpenAPI targets spell a nullable, and
+    // `parseNullableDef` writes it beside the union rather than as a branch.
+    // The union is an identity, so moving the sibling onto the branch is the
+    // encoding the same schema gets inline. A branch that already says the same
+    // thing is the redundant-wrapper case and coalesces; one that disagrees is
+    // two claims, and choosing between them is not this function's business.
+    const branchNullable = dataValue(second, 'nullable');
+    const isOpenApiNullable =
+      key === 'nullable' &&
+      (Object.getOwnPropertyDescriptor(second, 'nullable') === undefined ||
+        branchNullable === dataValue(schema, 'nullable'));
+    if (!ANNOTATION_KEYWORDS.has(key) && !isOpenApiNullable) {
+      return null;
+    }
+    carried[key] = dataValue(schema, key);
+  }
+  return carried;
+};
+
+/**
+ * Whether this definition name is the one the reference context belongs to.
+ *
+ * `refs.seen` is keyed by the Zod def, so the same schema registered under
+ * several definition names shares one context. When that context names a
+ * sibling alias, this one was not the alias anything reached: it is a
+ * standalone definition the caller asked for by name, and rewriting it would
+ * change a schema nothing referenced.
+ */
+const aliasWasReferenced = (seen: Seen | undefined, definitionPath: string[]): boolean => {
+  const seenPath = seen?.path;
+  return (
+    !seenPath ||
+    seenPath.length !== definitionPath.length ||
+    seenPath.toString() === definitionPath.toString() ||
+    seenPath.slice(0, -1).toString() !== definitionPath.slice(0, -1).toString()
+  );
+};
+
+/**
  * `anyOf: [X, { type: 'null' }]` -- how `parseNullableDef` spells a nullable in
  * this target. Returns the index of the non-null branch, or -1.
  *
@@ -296,24 +347,13 @@ const collapseNeverBranch = (
   if (Object.keys(first).length !== 1 || !isPlainObject(not) || Object.keys(not).length > 0) {
     return schema;
   }
-  const carried: Record<string, unknown> = {};
-  for (const key of Object.keys(schema)) {
-    if (key === 'anyOf') {
-      continue;
-    }
-    // `nullable` is how the OpenAPI targets spell a nullable, and
-    // `parseNullableDef` writes it beside the union rather than as a branch.
-    // The union is an identity, so moving the sibling onto the branch is the
-    // encoding the same schema gets inline -- unless the branch already says
-    // something about it, where merging would decide which one wins.
-    const isOpenApiNullable =
-      key === 'nullable' && Object.getOwnPropertyDescriptor(second, 'nullable') === undefined;
-    if (!ANNOTATION_KEYWORDS.has(key) && !isOpenApiNullable) {
-      return schema;
-    }
-    carried[key] = dataValue(schema, key);
+  const carried = carriedSiblings(schema, second);
+  if (!carried) {
+    return schema;
   }
-  wrapperSegments.push([...prefix, 'anyOf', '1']);
+  // Both branches leave their old paths, so a reference into either one is a
+  // reference into something the collapse removes.
+  wrapperSegments.push([...prefix, 'anyOf', '0'], [...prefix, 'anyOf', '1']);
   return { ...second, ...carried };
 };
 
@@ -329,6 +369,11 @@ const collapseNeverBranch = (
  */
 const someSchemaNode = (value: unknown, matches: (node: Record<string, unknown>) => boolean): boolean => {
   if (Array.isArray(value)) {
+    // `JSON.stringify` calls `toJSON` on an array too, so the list itself has
+    // to be offered to the predicate before its entries are walked.
+    if (matches(value as unknown as Record<string, unknown>)) {
+      return true;
+    }
     // By index: an `override` can hand back an array of accessor entries, and
     // both indexing and `some` would run caller code during what is only an
     // inspection.
@@ -483,6 +528,12 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     // A collapse cannot be committed while definitions are still being built:
     // a later one can add a `$ref` into a branch an earlier collapse removed.
     const pendingCollapses: { key: string; collapsed: JsonSchema7Type; wrapperPaths: string[] }[] = [];
+    const materializedDefinitions: {
+      key: string;
+      def: unknown;
+      definitionPath: string[];
+      materialized: JsonSchema7Type;
+    }[] = [];
 
     // the call to `parseDef()` here might itself add more entries to `.definitions`
     // so we need to continually evaluate definitions until we've resolved all of them
@@ -529,35 +580,11 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // pointer generated against the uncollapsed shape.
         // Collapse decided below, once every definition exists: a definition
         // materialized later can add a reference into a branch removed here.
-        const removedWrappers: string[][] = [];
-        const seen = refs.seen.get(def);
-        // `refs.seen` is keyed by the Zod def, but the same schema can be
-        // registered under several definition names. Only the alias the
-        // property actually reached carries that context; the others are
-        // standalone definitions the caller asked for by name, and rewriting
-        // them would change a schema nothing referenced.
-        // `refs.seen` is keyed by the Zod def, so the same schema registered
-        // under several definition names shares one context. When that context
-        // names a sibling alias, this one was not the alias anything reached:
-        // it is a standalone definition the caller asked for by name, and
-        // rewriting it would change a schema nothing referenced.
-        const seenPath = seen?.path;
-        const aliasWasReferenced =
-          !seenPath ||
-          seenPath.length !== definitionPath.length ||
-          seenPath.toString() === definitionPath.toString() ||
-          seenPath.slice(0, -1).toString() !== definitionPath.slice(0, -1).toString();
-        const collapsed =
-          aliasWasReferenced && originatedInsideProperty(seen) && isPlainObject(materialized)
-            ? (collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type)
-            : materialized;
-        if (collapsed !== materialized) {
-          pendingCollapses.push({
-            key,
-            collapsed,
-            wrapperPaths: removedWrappers.map((segments) => [...definitionPath, ...segments].join('/')),
-          });
-        }
+        // Whether this one collapses cannot be answered yet: the property that
+        // references it may live in a definition materialized later, and the
+        // reference context only exists once that has happened. Definition
+        // insertion order would otherwise decide the output.
+        materializedDefinitions.push({ key, def, definitionPath, materialized });
         definitions[key] = materialized;
         processedDefinitions.add(key);
       }
@@ -568,6 +595,32 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     // and a serialization hook, which can produce a reference the scan cannot
     // see without running caller code.
     const unsafeToMove = wrappersMustStay(main) || wrappersMustStay({ definitions });
+
+    // Now that every definition exists, each one's reference context is final.
+    for (const { key, def, definitionPath, materialized } of materializedDefinitions) {
+      const seen = refs.seen.get(def as never);
+      // `refs.seen` is keyed by the Zod def, so the same schema registered under
+      // several definition names shares one context. When that context names a
+      // sibling alias, this one was not the alias anything reached: it is a
+      // standalone definition the caller asked for by name, and rewriting it
+      // would change a schema nothing referenced.
+      if (
+        !aliasWasReferenced(seen, definitionPath) ||
+        !originatedInsideProperty(seen) ||
+        !isPlainObject(materialized)
+      ) {
+        continue;
+      }
+      const removedWrappers: string[][] = [];
+      const collapsed = collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type;
+      if (collapsed !== materialized) {
+        pendingCollapses.push({
+          key,
+          collapsed,
+          wrapperPaths: removedWrappers.map((segments) => [...definitionPath, ...segments].join('/')),
+        });
+      }
+    }
 
     // Every emitted reference gathered once. A traversal per pending collapse
     // walked the definitions map each time, and that map is itself O(N), so an
