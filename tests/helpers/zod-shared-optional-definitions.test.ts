@@ -787,6 +787,22 @@ describe('a definition keeps the context it was referenced from', () => {
     });
   });
 
+  test('an openApi3 nullable optional reuses one encoding', () => {
+    // The OpenAPI targets spell a nullable as a `nullable` sibling rather than
+    // an `anyOf` branch, so the shared definition has to reach the same shape
+    // the inline occurrence gets.
+    const shared = zv3.string().optional().nullable();
+    const out = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+      target: 'openApi3',
+      name: 'p',
+      nameStrategy: 'duplicate-ref',
+      $refStrategy: 'extract-to-root',
+    }) as any;
+
+    expect(out.definitions.p_properties_a).toEqual({ type: 'string', nullable: true });
+    expect(out.definitions.p.properties.a).toEqual({ type: 'string', nullable: true });
+  });
+
   describe('a reference the scan cannot read is still a reference', () => {
     test('361 accessor-backed $ref', () => {
       const marker = zv3.number();

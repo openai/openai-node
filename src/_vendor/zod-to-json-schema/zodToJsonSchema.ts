@@ -301,7 +301,14 @@ const collapseNeverBranch = (
     if (key === 'anyOf') {
       continue;
     }
-    if (!ANNOTATION_KEYWORDS.has(key)) {
+    // `nullable` is how the OpenAPI targets spell a nullable, and
+    // `parseNullableDef` writes it beside the union rather than as a branch.
+    // The union is an identity, so moving the sibling onto the branch is the
+    // encoding the same schema gets inline -- unless the branch already says
+    // something about it, where merging would decide which one wins.
+    const isOpenApiNullable =
+      key === 'nullable' && Object.getOwnPropertyDescriptor(second, 'nullable') === undefined;
+    if (!ANNOTATION_KEYWORDS.has(key) && !isOpenApiNullable) {
       return schema;
     }
     carried[key] = dataValue(schema, key);
