@@ -593,6 +593,30 @@ For Bedrock API key authentication, import `bedrock` from `openai/providers/bedr
 
 For more information on support for Amazon Bedrock, see [docs/bedrock.md](docs/bedrock.md).
 
+## OrcaRouter
+
+To use this library with [OrcaRouter](https://www.orcarouter.ai), an OpenAI-compatible gateway for models and AI agents, configure the standard `OpenAI` client with the OrcaRouter provider:
+
+```ts
+import OpenAI from 'openai';
+import { orcarouter } from 'openai/providers/orcarouter';
+
+const client = new OpenAI({
+  provider: orcarouter(),
+});
+
+const response = await client.responses.create({
+  model: 'openai/gpt-4o-mini',
+  input: 'Say hello!',
+});
+
+console.log(response.output_text);
+```
+
+This uses the `https://api.orcarouter.ai/v1` endpoint by default. Like OpenRouter, OrcaRouter exposes a provider/model namespace across many models — but it also combines adaptive routing, automatic failover, zero-markup inference, observability, guardrails, and agent-tool governance behind the same endpoint. It also runs gateway-level, zero-trust security for AI agents on the same endpoint — screening every prompt/response and governing every tool call on a default-deny basis, with no application code changes.
+
+Authentication defaults to `ORCAROUTER_API_KEY`. You can also pass `apiKey` or `tokenProvider` to `orcarouter(...)`, and override the endpoint with `baseURL` or `ORCAROUTER_BASE_URL`.
+
 ## Advanced Usage
 
 ### Accessing raw Response data (e.g., headers)

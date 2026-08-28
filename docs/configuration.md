@@ -17,8 +17,8 @@ const client = new OpenAI({
 
 `OPENAI_API_KEY`, `OPENAI_ADMIN_KEY`, `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`, `OPENAI_BASE_URL`, and
 `OPENAI_WEBHOOK_SECRET` provide defaults for their corresponding client options. For workload identity
-or provider-specific credentials, see [Authentication](authentication.md), [Azure](azure.md), and
-[Amazon Bedrock](bedrock.md).
+or provider-specific credentials, see [Authentication](authentication.md), [Azure](azure.md),
+[Amazon Bedrock](bedrock.md), and [OrcaRouter](https://www.orcarouter.ai).
 
 ## Request options
 
