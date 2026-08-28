@@ -152,7 +152,22 @@ export class AzureOpenAI extends OpenAI {
 
   /** Clones this client with Azure options; OpenAI data residency remains unsupported. */
   override withOptions(options: Partial<AzureClientOptions>): this {
-    return super.withOptions(options);
+    // `OpenAI.withOptions` rebuilds the clone from `this._options`, which never holds the
+    // Azure-only construction options, so they are re-injected here the same way the Bedrock
+    // client re-injects its own subclass-only field.
+    const azureOptions: Partial<AzureClientOptions> = {
+      apiVersion: this.apiVersion,
+      deployment: this.deploymentName,
+      ...options,
+    };
+
+    // The inherited base URL is always carried into the clone, so an `endpoint` override would
+    // otherwise collide with it; let the endpoint rebuild the base URL instead.
+    if (options.endpoint !== undefined && options.baseURL === undefined) {
+      azureOptions.baseURL = undefined;
+    }
+
+    return super.withOptions(azureOptions);
   }
 
   /** Builds an Azure request and inserts its deployment into model-scoped endpoint paths. */
@@ -178,7 +193,7 @@ export class AzureOpenAI extends OpenAI {
         throw new Error('Expected request body to be an object');
       }
       const model = this.deploymentName || options.body['model'] || options.__metadata?.['model'];
-      if (model !== undefined && !this.baseURL.includes('/deployments')) {
+      if (model !== undefined && !hasDeploymentPathSegment(this.baseURL)) {
         options.path = path`/deployments/${model}` + options.path;
       }
     }
@@ -213,6 +228,15 @@ export class AzureOpenAI extends OpenAI {
     }
     return super.authHeaders(opts, security);
   }
+}
+
+/**
+ * Reports whether the base URL already routes through a `/deployments` path segment, so the
+ * deployment must not be inserted again. A substring test would also match an unrelated segment
+ * such as `/deployments-proxy/`, or a host like `deployments.example.com`.
+ */
+function hasDeploymentPathSegment(baseURL: string): boolean {
+  return new URL(baseURL).pathname.split('/').includes('deployments');
 }
 
 const _deployments_endpoints = new Set([

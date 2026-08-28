@@ -138,6 +138,61 @@ describe('deployment path safety', () => {
     expect(req.headers.get('api-key')).toBe(apiKey);
   });
 
+  test('does not replace a deployment whose base URL path ends at the deployments segment', async () => {
+    const client = new AzureOpenAI({
+      baseURL: `${endpoint}/openai/deployments`,
+      apiKey,
+      apiVersion,
+      deployment: 'configured-deployment',
+    });
+
+    const { url } = await client.buildRequest({
+      method: 'post',
+      path: '/chat/completions',
+      body: { model: 'ignored-request-model', messages: [] },
+    });
+
+    expect(url).toBe(`${endpoint}/openai/deployments/chat/completions?api-version=${apiVersion}`);
+  });
+
+  test('inserts a deployment when deployments is only part of a base URL path segment', async () => {
+    const client = new AzureOpenAI({
+      baseURL: 'https://gateway.example.com/azure/deployments-proxy/openai',
+      apiKey,
+      apiVersion,
+      deployment: 'configured-deployment',
+    });
+
+    const { url } = await client.buildRequest({
+      method: 'post',
+      path: '/chat/completions',
+      body: { model: 'ignored-request-model', messages: [] },
+    });
+
+    expect(url).toBe(
+      `https://gateway.example.com/azure/deployments-proxy/openai/deployments/configured-deployment/chat/completions?api-version=${apiVersion}`,
+    );
+  });
+
+  test('inserts a deployment when deployments only appears in the base URL host', async () => {
+    const client = new AzureOpenAI({
+      baseURL: 'https://deployments.example.com/openai',
+      apiKey,
+      apiVersion,
+      deployment: 'configured-deployment',
+    });
+
+    const { url } = await client.buildRequest({
+      method: 'post',
+      path: '/chat/completions',
+      body: { model: 'ignored-request-model', messages: [] },
+    });
+
+    expect(url).toBe(
+      `https://deployments.example.com/openai/deployments/configured-deployment/chat/completions?api-version=${apiVersion}`,
+    );
+  });
+
   test('does not insert a deployment into non-POST requests', async () => {
     const { url } = await requestClient.buildRequest({
       method: 'get',
