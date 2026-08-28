@@ -225,6 +225,38 @@ const packedPackagePath = require('node:path');
 
     const isolatedEnvironment = { ...process.env };
     delete isolatedEnvironment['NODE_PATH'];
+    const browserConditionTest = path.join(temporaryDirectory, 'browser-condition.test.cjs');
+    fs.writeFileSync(
+      browserConditionTest,
+      [
+        "const OpenAI = require('openai');",
+        "test('loads the CommonJS entrypoint with browser export conditions', () => {",
+        "  expect(typeof OpenAI).toBe('function');",
+        "  expect(() => new OpenAI({ apiKey: 'test', dangerouslyAllowBrowser: true })).not.toThrow();",
+        '});',
+      ].join('\n'),
+    );
+    const browserConditionConfig = path.join(temporaryDirectory, 'jest-browser-condition.config.cjs');
+    fs.writeFileSync(
+      browserConditionConfig,
+      `module.exports = ${JSON.stringify({
+        testEnvironment: 'node',
+        testEnvironmentOptions: { customExportConditions: ['browser'] },
+        testMatch: ['<rootDir>/browser-condition.test.cjs'],
+        transform: {},
+      })};\n`,
+    );
+    const jestPackage = require.resolve('jest/package.json');
+    run(
+      process.execPath,
+      [
+        path.join(path.dirname(jestPackage), 'bin/jest.js'),
+        '--config',
+        browserConditionConfig,
+        '--runInBand',
+      ],
+      { env: isolatedEnvironment },
+    );
     const browserConsumer = path.join(temporaryDirectory, 'browser-consumer.mjs');
     fs.writeFileSync(browserConsumer, "import OpenAI from 'openai';\nexport default OpenAI;\n");
     const browserConfig = path.join(temporaryDirectory, 'browser.vite.config.mjs');
