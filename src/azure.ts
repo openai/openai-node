@@ -3,7 +3,7 @@ import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
-import { isObj, readEnv } from './internal/utils';
+import { hasOwn, isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
 import type { ClientOptions } from './client';
@@ -162,8 +162,9 @@ export class AzureOpenAI extends OpenAI {
     };
 
     // The inherited base URL is always carried into the clone, so an `endpoint` override would
-    // otherwise collide with it; let the endpoint rebuild the base URL instead.
-    if (options.endpoint !== undefined && options.baseURL === undefined) {
+    // otherwise collide with it; let the endpoint rebuild the base URL instead. Both tests read
+    // own properties, so an option bag that passed neither field keeps the inherited base URL.
+    if (hasOwn(options, 'endpoint') && options.endpoint !== undefined && !hasOwn(options, 'baseURL')) {
       azureOptions.baseURL = undefined;
     }
 
@@ -236,7 +237,13 @@ export class AzureOpenAI extends OpenAI {
  * such as `/deployments-proxy/`, or a host like `deployments.example.com`.
  */
 function hasDeploymentPathSegment(baseURL: string): boolean {
-  return new URL(baseURL).pathname.split('/').includes('deployments');
+  try {
+    return new URL(baseURL).pathname.split('/').includes('deployments');
+  } catch {
+    // A base URL that is not an absolute URL has no path segments to read. Report none, the way
+    // the previous substring test did, and let joining the request path reject it as it did before.
+    return false;
+  }
 }
 
 const _deployments_endpoints = new Set([
