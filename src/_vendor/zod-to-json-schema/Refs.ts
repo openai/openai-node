@@ -20,18 +20,6 @@ export type Seen = {
   def: ZodTypeDef;
   path: string[];
   jsonSchema: JsonSchema7Type | undefined;
-  /**
-   * `propertyPath` at the place this def was first reached. A definition that
-   * is materialized later has to be encoded the way its reference site was, and
-   * only the reference site knows whether that was inside a property.
-   */
-  propertyPath?: string[] | undefined;
-  /**
-   * `currentPath` at that same place. For a def pre-seeded from `definitions`,
-   * `path` is where the definition lives rather than where it was referenced
-   * from, and the two have to be compared against each other.
-   */
-  referencePath?: string[] | undefined;
 };
 
 export const getRefs = (options?: string | Partial<Options<Targets>>): Refs => {

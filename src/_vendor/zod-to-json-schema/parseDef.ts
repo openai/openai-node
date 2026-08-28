@@ -109,16 +109,6 @@ export function parseDef(
   }
 
   if (seenItem && !forceResolution) {
-    if (seenItem.referencePath === undefined) {
-      // A definition supplied through `definitions` is pre-seeded before anything
-      // has been parsed, so it carries no context. This is the first place it is
-      // actually referenced from, and that is the context its materialization has
-      // to be encoded for. `referencePath` is the sentinel rather than
-      // `propertyPath`, which is legitimately undefined for a first reference
-      // that was not inside a property and would let a later one overwrite it.
-      seenItem.propertyPath = refs.propertyPath;
-      seenItem.referencePath = refs.currentPath;
-    }
     const seenSchema = get$ref(seenItem, refs);
 
     if (seenSchema !== undefined) {
@@ -130,12 +120,7 @@ export function parseDef(
     }
   }
 
-  const newItem: Seen = {
-    def,
-    path: refs.currentPath,
-    jsonSchema: undefined,
-    propertyPath: refs.propertyPath,
-  };
+  const newItem: Seen = { def, path: refs.currentPath, jsonSchema: undefined };
 
   refs.seen.set(def, newItem);
 

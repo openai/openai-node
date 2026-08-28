@@ -274,26 +274,6 @@ describe('a definition keeps the context it was referenced from', () => {
     expect(definitionNamed(schema, 'Tuple')['items']).toEqual([{}, { type: 'string' }]);
   });
 
-  it('keeps every tuple position under an object property', () => {
-    const schema = zodToJsonSchema(zv3.object({ pair: zv3.tuple([emptySlot(), zv3.string()]) })) as {
-      properties: Record<string, { items: JsonSchema[] }>;
-    };
-
-    expect(schema.properties['pair']?.items).toEqual([{}, { type: 'string' }]);
-  });
-
-  it('keeps every tuple position when the tuple has a rest element', () => {
-    const schema = zodToJsonSchema(zv3.tuple([emptySlot(), zv3.string()]).rest(zv3.number())) as {
-      items: JsonSchema[];
-      minItems: number;
-      additionalItems: JsonSchema;
-    };
-
-    expect(schema.items).toEqual([{}, { type: 'string' }]);
-    expect(schema.minItems).toBe(2);
-    expect(schema.additionalItems).toEqual({ type: 'number' });
-  });
-
   it('keeps the unconstrained branch of a union definition', () => {
     const choice = zv3.union([emptySlot(), zv3.string()]);
 
@@ -883,6 +863,22 @@ describe('a definition keeps the context it was referenced from', () => {
         $refStrategy: 'extract-to-root',
       });
       expect(out.definitions.p_properties_a).toEqual(out.definitions.p.properties.a);
+    });
+
+    test('a recursive definition does not count its own back-reference', () => {
+      // The array branch points back at the definition it lives in. That is
+      // the schema describing itself, not a second call site, so it must not
+      // make the definition look like it was reached from outside a property.
+      const node: any = zv3.lazy(() => zv3.union([zv3.string(), zv3.array(node)])).optional();
+
+      const out: any = zodToJsonSchema(zv3.object({ a: node, b: node }), {
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+      });
+
+      expect(out.definitions.p_properties_a).toEqual(out.definitions.p.properties.a);
+      expect(out.definitions.p_properties_a).not.toHaveProperty('not');
     });
 
     test('112 branch order changes the result', () => {

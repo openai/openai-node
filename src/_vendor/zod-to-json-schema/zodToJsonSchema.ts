@@ -403,6 +403,60 @@ const collectRefs = (value: unknown): { ref: string; insideProperty: boolean }[]
 };
 
 /**
+ * The emitted references, indexed for the two questions the collapse asks: which
+ * definitions a property points at, and which paths a pointer would be left
+ * dangling by.
+ *
+ * Definitions are walked one at a time rather than as a single map so that each
+ * reference knows which definition it lives in.
+ */
+const indexReferences = (
+  main: JsonSchema7Type,
+  definitions: Record<string, unknown>,
+  pathOf: (key: string) => string,
+): {
+  referencedFromProperty: Set<string>;
+  referencedElsewhere: Set<string>;
+  referencedPrefixes: Set<string>;
+} => {
+  const referencedFromProperty = new Set<string>();
+  const referencedElsewhere = new Set<string>();
+  // A wrapper is stranded when a pointer names it or anything under it, so the
+  // prefixes are indexed rather than re-scanned per candidate -- that scan is
+  // O(references) inside a loop over candidates, and both grow with the number
+  // of shared optionals.
+  const referencedPrefixes = new Set<string>();
+
+  const add = (ref: string, insideProperty: boolean, ownerPath: string | undefined) => {
+    // A recursive schema points back at its own definition. That is the
+    // definition describing itself rather than a second call site asking for a
+    // different encoding, so it does not decide which encoding is owed. It
+    // still counts as a pointer below: removing a wrapper strands a
+    // self-reference into it exactly as it would an external one.
+    const isSelf = ownerPath !== undefined && (ref === ownerPath || ref.startsWith(`${ownerPath}/`));
+    if (!isSelf) {
+      (insideProperty ? referencedFromProperty : referencedElsewhere).add(ref);
+    }
+    const segments = ref.split('/');
+    for (let end = 1; end <= segments.length; end++) {
+      referencedPrefixes.add(segments.slice(0, end).join('/'));
+    }
+  };
+
+  for (const { ref, insideProperty } of collectRefs(main)) {
+    add(ref, insideProperty, undefined);
+  }
+  for (const key of Object.keys(definitions)) {
+    const ownerPath = pathOf(key);
+    for (const { ref, insideProperty } of collectRefs(definitions[key])) {
+      add(ref, insideProperty, ownerPath);
+    }
+  }
+
+  return { referencedFromProperty, referencedElsewhere, referencedPrefixes };
+};
+
+/**
  * Whether anything reachable through JSON Schema keywords points at a path that
  * only exists while the wrapper is in place.
  *
@@ -665,21 +719,11 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     // document answers it directly.
     // Wrapped so the walk reads `definitions` as a map of schemas; its own keys
     // are names, not keywords.
-    const emitted = [...collectRefs(main), ...collectRefs({ definitions })];
-    const referencedFromProperty = new Set<string>();
-    const referencedElsewhere = new Set<string>();
-    // A wrapper is stranded when a pointer names it or anything under it, so
-    // the prefixes are indexed rather than re-scanned per candidate -- that
-    // scan is O(references) inside a loop over candidates, and both grow with
-    // the number of shared optionals.
-    const referencedPrefixes = new Set<string>();
-    for (const { ref, insideProperty } of emitted) {
-      (insideProperty ? referencedFromProperty : referencedElsewhere).add(ref);
-      const segments = ref.split('/');
-      for (let end = 1; end <= segments.length; end++) {
-        referencedPrefixes.add(segments.slice(0, end).join('/'));
-      }
-    }
+    const { referencedFromProperty, referencedElsewhere, referencedPrefixes } = indexReferences(
+      main,
+      definitions,
+      (key) => [...refs.basePath, refs.definitionPath, key].join('/'),
+    );
 
     // Only when every reference to a definition came from a property is the
     // property encoding the one it owes all of them.
