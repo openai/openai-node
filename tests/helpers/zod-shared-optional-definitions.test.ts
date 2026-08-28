@@ -897,4 +897,37 @@ describe('a definition keeps the context it was referenced from', () => {
       expect(first.definitions.Leaf).toEqual(second.definitions.Leaf);
     });
   });
+
+  describe('a schema an override supplied can be any depth', () => {
+    test('597 deep override schema does not blow the stack', () => {
+      let deep: any = { type: 'string' };
+      for (let i = 0; i < 20_000; i += 1) {
+        deep = { not: deep };
+      }
+      const marker = zv3.number();
+      expect(() =>
+        zodToJsonSchema(zv3.object({ c: marker }), {
+          definitions: { Deep: marker },
+          override: (def, _r, _s, _f) => (def === (marker as any)._def ? deep : ignoreOverride),
+        }),
+      ).not.toThrow();
+    });
+
+    test('597b deep schema alongside a pending collapse', () => {
+      let deep: any = { type: 'string' };
+      for (let i = 0; i < 20_000; i += 1) {
+        deep = { not: deep };
+      }
+      const shared = zv3.string().nullable().optional();
+      const marker = zv3.number();
+      expect(() =>
+        zodToJsonSchema(zv3.object({ a: shared, b: shared, c: marker }), {
+          name: 'p',
+          nameStrategy: 'duplicate-ref',
+          $refStrategy: 'extract-to-root',
+          override: (def, _r, _s, _f) => (def === (marker as any)._def ? deep : ignoreOverride),
+        }),
+      ).not.toThrow();
+    });
+  });
 });

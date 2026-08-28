@@ -368,42 +368,57 @@ const collapseNeverBranch = (
  * inside a `default` is data, not a reference.
  */
 const someSchemaNode = (value: unknown, matches: (node: Record<string, unknown>) => boolean): boolean => {
-  if (Array.isArray(value)) {
-    // `JSON.stringify` calls `toJSON` on an array too, so the list itself has
-    // to be offered to the predicate before its entries are walked.
-    if (matches(value as unknown as Record<string, unknown>)) {
-      return true;
+  // An explicit stack rather than recursion: an `override` can hand back a
+  // schema of any depth, and this walks the whole document.
+  const pending: unknown[] = [value];
+  const seen = new Set<unknown>();
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (typeof current !== 'object' || current === null || seen.has(current)) {
+      continue;
     }
-    // By index: an `override` can hand back an array of accessor entries, and
-    // both indexing and `some` would run caller code during what is only an
-    // inspection.
-    for (let index = 0; index < value.length; index++) {
-      if (someSchemaNode(elementValue(value, index), matches)) {
+    seen.add(current);
+
+    if (Array.isArray(current)) {
+      // `JSON.stringify` calls `toJSON` on an array too, so the list itself is
+      // offered to the predicate before its entries are walked. By index: an
+      // `override` can hand back accessor entries, and both indexing and `some`
+      // would run caller code during what is only an inspection.
+      if (matches(current as unknown as Record<string, unknown>)) {
         return true;
       }
-    }
-    return false;
-  }
-  if (!isPlainObject(value)) {
-    return false;
-  }
-  if (matches(value)) {
-    return true;
-  }
-  for (const [key, kind] of SCHEMA_CHILDREN) {
-    const child = dataValue(value, key);
-    if (kind === 'map' && isPlainObject(child)) {
-      const entries = Object.keys(child).map((name) => dataValue(child, name));
-      // Draft-7 `dependencies` also holds property-dependency arrays. They are
-      // lists of property names rather than schemas, so they are not walked.
-      const schemas = key === 'dependencies' ? entries.filter(isPlainObject) : entries;
-      if (schemas.some((entry) => someSchemaNode(entry, matches))) {
-        return true;
+      for (let index = 0; index < current.length; index++) {
+        pending.push(elementValue(current, index));
       }
-    } else if (someSchemaNode(child, matches)) {
+      continue;
+    }
+
+    if (!isPlainObject(current)) {
+      continue;
+    }
+    if (matches(current)) {
       return true;
     }
+    for (const [key, kind] of SCHEMA_CHILDREN) {
+      const child = dataValue(current, key);
+      if (kind === 'map' && isPlainObject(child)) {
+        for (const name of Object.keys(child)) {
+          const entry = dataValue(child, name);
+          // Draft-7 `dependencies` also holds property-dependency arrays. They
+          // are lists of property names rather than schemas, so they are not
+          // walked.
+          if (key === 'dependencies' && !isPlainObject(entry)) {
+            continue;
+          }
+          pending.push(entry);
+        }
+      } else {
+        pending.push(child);
+      }
+    }
   }
+
   return false;
 };
 
@@ -594,8 +609,6 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     // pointer names: a relative reference, whose depth is part of its meaning,
     // and a serialization hook, which can produce a reference the scan cannot
     // see without running caller code.
-    const unsafeToMove = wrappersMustStay(main) || wrappersMustStay({ definitions });
-
     // Now that every definition exists, each one's reference context is final.
     for (const { key, def, definitionPath, materialized } of materializedDefinitions) {
       const seen = refs.seen.get(def as never);
@@ -621,6 +634,12 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         });
       }
     }
+
+    // Nothing to rewrite means nothing to check. The scans below walk the whole
+    // document, and a schema an `override` supplied can be arbitrarily deep, so
+    // they only run once there is a decision that depends on them.
+    const unsafeToMove =
+      pendingCollapses.length > 0 && (wrappersMustStay(main) || wrappersMustStay({ definitions }));
 
     // Every emitted reference gathered once. A traversal per pending collapse
     // walked the definitions map each time, and that map is itself O(N), so an
