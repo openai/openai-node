@@ -35,6 +35,7 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
         ...authHeaders,
         ...this._wsOptions?.headers,
       },
+      followRedirects: false,
     });
     return new NodeWebSocket(ws);
   }
