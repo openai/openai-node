@@ -103,6 +103,16 @@ const emptySlot = () =>
     .transform(() => 0)
     .optional();
 
+const withOverride = (marker: any, node: any) => {
+  const shared = zv3.string().nullable().optional();
+  return zodToJsonSchema(zv3.object({ a: shared, b: shared, c: marker }), {
+    name: 'p',
+    nameStrategy: 'duplicate-ref',
+    $refStrategy: 'extract-to-root',
+    override: (def, _r, _s, _f) => (def === (marker as any)._def ? node : ignoreOverride),
+  }) as any;
+};
+
 describe('Zod v3 optional schemas extracted into definitions', () => {
   it.each(strictHelpers)('reuses one encoding for a shared optional string in $name', ({ convert }) => {
     const schema = convert(sharedStringSchema);
@@ -774,6 +784,35 @@ describe('a definition keeps the context it was referenced from', () => {
       }) as any;
       // `First` is never referenced from a property; it must keep the standalone spelling.
       expect(out.definitions.First).toHaveProperty('anyOf');
+    });
+  });
+
+  describe('a reference the scan cannot read is still a reference', () => {
+    test('361 accessor-backed $ref', () => {
+      const marker = zv3.number();
+      const node: any = { type: 'object' };
+      Object.defineProperty(node, '$ref', {
+        enumerable: true,
+        get: () => '#/definitions/p_properties_a/anyOf/1',
+      });
+      const out = withOverride(marker, node);
+      expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
+    });
+
+    test('377 inherited toJSON', () => {
+      const marker = zv3.number();
+      const proto = { toJSON: () => ({ $ref: '#/definitions/p_properties_a/anyOf/1' }) };
+      const node = Object.create(proto);
+      node.type = 'object';
+      const out = withOverride(marker, node);
+      expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
+    });
+
+    test('365 URI-encoded reference', () => {
+      const marker = zv3.number();
+      const node = { type: 'object', $ref: '#%2Fdefinitions%2Fp_properties_a%2FanyOf%2F1' };
+      const out = withOverride(marker, node);
+      expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
     });
   });
 });

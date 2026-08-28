@@ -361,8 +361,21 @@ const someRef = (value: unknown, matches: (ref: string) => boolean): boolean =>
     return typeof ref === 'string' && matches(ref);
   });
 
-const referencesWrapperPath = (value: unknown, wrapperPath: string): boolean =>
-  someRef(value, (ref) => ref.includes(wrapperPath));
+/**
+ * A reference as its pointer, not as the caller happened to spell it.
+ *
+ * `$ref` is a URI reference, so `#%2Fdefinitions%2FA` and `#/definitions/A`
+ * name the same place. `resolveLocalRef` in `lib/transform` decodes before
+ * splitting the pointer, and comparing raw strings here would miss the encoded
+ * spelling of a reference into a wrapper about to be removed.
+ */
+const normalizedRef = (ref: string): string => {
+  try {
+    return decodeURIComponent(ref);
+  } catch {
+    return ref;
+  }
+};
 
 /**
  * A `toJSON` anywhere below the root.
@@ -373,8 +386,21 @@ const referencesWrapperPath = (value: unknown, wrapperPath: string): boolean =>
  * rejects a callable `toJSON` on the root only; nested ones reach here, and the
  * safe answer for them is to leave the wrappers standing.
  */
-const hasSerializationHook = (value: unknown): boolean =>
-  someSchemaNode(value, (node) => Object.getOwnPropertyDescriptor(node, 'toJSON') !== undefined);
+const hasSerializationHook = (value: unknown): boolean => someSchemaNode(value, (node) => 'toJSON' in node);
+
+/**
+ * A `$ref` this cannot read without running caller code.
+ *
+ * `dataValue` reports an accessor as absent, which is right for reading and
+ * wrong for deciding: `JSON.stringify` will call the getter, and what it
+ * returns can be a pointer into a wrapper being removed. The getter is never
+ * invoked -- its presence alone is enough to leave the wrappers standing.
+ */
+const hasAccessorRef = (value: unknown): boolean =>
+  someSchemaNode(value, (node) => {
+    const descriptor = Object.getOwnPropertyDescriptor(node, '$ref');
+    return descriptor !== undefined && !('value' in descriptor);
+  });
 
 /**
  * Any reference that is not an absolute local pointer.
@@ -386,6 +412,18 @@ const hasSerializationHook = (value: unknown): boolean =>
  * the wrappers are left standing -- exactly what the base revision does.
  */
 const hasRelativeRef = (value: unknown): boolean => someRef(value, (ref) => !ref.startsWith('#'));
+
+/**
+ * Whether anything in this document makes moving a wrapper unsafe.
+ *
+ * Each of these is a reference the scan cannot follow to a pointer it can
+ * compare: one whose meaning depends on where it sits, one that only exists
+ * once `JSON.stringify` asks, and one behind a getter this deliberately does
+ * not call. None can be ruled out without running caller code, so the wrappers
+ * stay -- which is what the base revision does anyway.
+ */
+const wrappersMustStay = (value: unknown): boolean =>
+  hasRelativeRef(value) || hasSerializationHook(value) || hasAccessorRef(value);
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   schema: ZodSchema<any>,
@@ -526,22 +564,27 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     // pointer names: a relative reference, whose depth is part of its meaning,
     // and a serialization hook, which can produce a reference the scan cannot
     // see without running caller code.
-    const unsafeToMove =
-      hasRelativeRef(main) ||
-      hasRelativeRef({ definitions }) ||
-      hasSerializationHook(main) ||
-      hasSerializationHook({ definitions });
+    const unsafeToMove = wrappersMustStay(main) || wrappersMustStay({ definitions });
+
+    // Every emitted reference gathered once. A traversal per pending collapse
+    // walked the definitions map each time, and that map is itself O(N), so an
+    // ordinary schema with many shared optionals converted in quadratic time.
+    const emittedRefs: string[] = [];
+    if (!unsafeToMove && pendingCollapses.length > 0) {
+      const collect = (ref: string) => {
+        emittedRefs.push(normalizedRef(ref));
+        return false;
+      };
+      someRef(main, collect);
+      // Wrapped so the walk recognises `definitions` as a map of schemas; its
+      // own keys are names, not keywords.
+      someRef({ definitions }, collect);
+    }
 
     for (const { key, collapsed, wrapperPaths } of pendingCollapses) {
       const stranded =
         unsafeToMove ||
-        wrapperPaths.some(
-          (wrapperPath) =>
-            referencesWrapperPath(main, wrapperPath) ||
-            // Wrapped so the walk recognises `definitions` as a map of schemas;
-            // its own keys are names, not keywords.
-            referencesWrapperPath({ definitions }, wrapperPath),
-        );
+        wrapperPaths.some((wrapperPath) => emittedRefs.some((ref) => ref.includes(wrapperPath)));
       if (!stranded) {
         definitions[key] = collapsed;
       }
