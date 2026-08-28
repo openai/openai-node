@@ -378,40 +378,29 @@ const normalizedRef = (ref: string): string => {
 };
 
 /**
- * A `toJSON` anywhere below the root.
- *
- * The scan reads the properties an object has now, but `JSON.stringify` asks
- * `toJSON` what the object actually is. A hook can produce a `$ref` the scan
- * never saw, so a wrapper it names would be removed under it. `ownStrictRootSchema`
- * rejects a callable `toJSON` on the root only; nested ones reach here, and the
- * safe answer for them is to leave the wrappers standing.
- */
-const hasSerializationHook = (value: unknown): boolean => someSchemaNode(value, (node) => 'toJSON' in node);
-
-/**
- * A `$ref` this cannot read without running caller code.
+ * A reference this cannot read without running caller code.
  *
  * `dataValue` reports an accessor as absent, which is right for reading and
  * wrong for deciding: `JSON.stringify` will call the getter, and what it
- * returns can be a pointer into a wrapper being removed. The getter is never
- * invoked -- its presence alone is enough to leave the wrappers standing.
+ * returns can be a pointer into a wrapper being removed. That applies to
+ * `$ref` itself and equally to any keyword carrying schemas, since a hidden
+ * subtree hides every reference inside it. The getters are never invoked --
+ * their presence alone is enough to leave the wrappers standing.
  */
-const hasAccessorRef = (value: unknown): boolean =>
-  someSchemaNode(value, (node) => {
-    const descriptor = Object.getOwnPropertyDescriptor(node, '$ref');
-    return descriptor !== undefined && !('value' in descriptor);
-  });
-
-/**
- * Any reference that is not an absolute local pointer.
- *
- * `$refStrategy: 'relative'` spells a reference as a hop count from where it
- * sits, so both the string and its meaning depend on the depth of the node
- * holding it. Moving a schema out of its wrapper changes that depth, and the
- * stored string no longer resolves. Rather than rebase every such reference,
- * the wrappers are left standing -- exactly what the base revision does.
- */
-const hasRelativeRef = (value: unknown): boolean => someRef(value, (ref) => !ref.startsWith('#'));
+const hasHiddenReference = (node: Record<string, unknown>): boolean => {
+  // Over the keys the node has rather than every keyword it could have: this
+  // runs on every node of every definition.
+  for (const key of Object.keys(node)) {
+    if (key !== '$ref' && !SCHEMA_CHILDREN.has(key)) {
+      continue;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(node, key);
+    if (descriptor !== undefined && !('value' in descriptor)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /**
  * Whether anything in this document makes moving a wrapper unsafe.
@@ -423,7 +412,14 @@ const hasRelativeRef = (value: unknown): boolean => someRef(value, (ref) => !ref
  * stay -- which is what the base revision does anyway.
  */
 const wrappersMustStay = (value: unknown): boolean =>
-  hasRelativeRef(value) || hasSerializationHook(value) || hasAccessorRef(value);
+  // One traversal rather than three: this runs over the whole definitions map.
+  someSchemaNode(value, (node) => {
+    if ('toJSON' in node || hasHiddenReference(node)) {
+      return true;
+    }
+    const ref = dataValue(node, '$ref');
+    return typeof ref === 'string' && !ref.startsWith('#');
+  });
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   schema: ZodSchema<any>,

@@ -808,6 +808,17 @@ describe('a definition keeps the context it was referenced from', () => {
       expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
     });
 
+    test('an accessor-backed schema child hides everything under it', () => {
+      const marker = zv3.number();
+      const node: any = { type: 'object' };
+      Object.defineProperty(node, 'properties', {
+        enumerable: true,
+        get: () => ({ inner: { $ref: '#/definitions/p_properties_a/anyOf/1' } }),
+      });
+      const out = withOverride(marker, node);
+      expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
+    });
+
     test('365 URI-encoded reference', () => {
       const marker = zv3.number();
       const node = { type: 'object', $ref: '#%2Fdefinitions%2Fp_properties_a%2FanyOf%2F1' };
