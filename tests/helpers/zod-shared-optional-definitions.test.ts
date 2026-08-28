@@ -728,4 +728,52 @@ describe('a definition keeps the context it was referenced from', () => {
       ).not.toThrow();
     });
   });
+
+  describe('inspection must not run caller code or rewrite an unreferenced alias', () => {
+    test('1. custom Symbol.iterator is not invoked', () => {
+      const shared = zv3.string().nullable().optional();
+      const branches: unknown[] = [{ not: {} }, { type: ['string', 'null'] }];
+      Object.defineProperty(branches, Symbol.iterator, {
+        get() {
+          throw new Error('iterator ran');
+        },
+      });
+      expect(() =>
+        zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+          name: 'p',
+          nameStrategy: 'duplicate-ref',
+          $refStrategy: 'extract-to-root',
+          override: (def, _r, _s, force) =>
+            force && def === (shared as any)._def ? ({ anyOf: branches } as any) : ignoreOverride,
+        }),
+      ).not.toThrow();
+    });
+
+    test('2. a nested toJSON that emits a $ref keeps the wrapper', () => {
+      const shared = zv3.string().nullable().optional();
+      const sneaky = { type: 'object', toJSON: () => ({ $ref: '#/definitions/p_properties_a/anyOf/1' }) };
+      const marker = zv3.number();
+      const out = zodToJsonSchema(zv3.object({ a: shared, b: shared, c: marker }), {
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+        override: (def, _r, _s, _f) => (def === (marker as any)._def ? (sneaky as any) : ignoreOverride),
+      }) as any;
+      // Through the wire, so `toJSON` runs exactly as it would for a request.
+      const wire = JSON.stringify(out);
+      const serialized = JSON.parse(wire) as any;
+      const target = serialized?.definitions?.p_properties_a;
+      expect(target).toBeDefined();
+      expect(target).toHaveProperty('anyOf');
+    });
+
+    test('3. an unreferenced alias keeps its standalone form', () => {
+      const shared = zv3.string().nullable().optional();
+      const out = zodToJsonSchema(zv3.object({ used: shared }), {
+        definitions: { First: shared, Second: shared },
+      }) as any;
+      // `First` is never referenced from a property; it must keep the standalone spelling.
+      expect(out.definitions.First).toHaveProperty('anyOf');
+    });
+  });
 });

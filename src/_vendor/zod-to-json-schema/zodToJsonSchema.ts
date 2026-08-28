@@ -185,6 +185,25 @@ const elementValue = (values: unknown[], index: number): unknown => {
 };
 
 /**
+ * A plain copy, built without iterating the original.
+ *
+ * Spreading or destructuring consults `Symbol.iterator`, which an `override`
+ * can define; serialization ignores it, so running it would be a side effect of
+ * inspection alone.
+ */
+const elementsOf = (values: unknown[]): unknown[] => {
+  const copy: unknown[] = [];
+  for (let index = 0; index < values.length; index++) {
+    copy[index] = elementValue(values, index);
+  }
+  return copy;
+};
+
+/** Whether an array carries a caller-defined iterator hook. */
+const hasCustomIterator = (values: unknown[]): boolean =>
+  Object.getOwnPropertyDescriptor(values, Symbol.iterator) !== undefined;
+
+/**
  * `anyOf: [{ not: {} }, X]` collapsed to `X`, with annotation siblings kept.
  *
  * The first branch matches nothing, so the union is exactly `X` -- an identity in
@@ -192,6 +211,19 @@ const elementValue = (values: unknown[], index: number): unknown => {
  * branch, so a schema carrying one is left standing rather than merged: spreading
  * it over the branch would widen what the document accepts.
  */
+/**
+ * A two-branch `anyOf` this can read without running caller code.
+ *
+ * Everything below reads entries by descriptor, but the array itself still has
+ * to be safe to walk: an `override` can define accessors on the indices or an
+ * iterator hook, neither of which serialization consults.
+ */
+const isInspectableBranchList = (branches: unknown): branches is unknown[] =>
+  Array.isArray(branches) &&
+  branches.length === 2 &&
+  !hasArrayAccessor(branches) &&
+  !hasCustomIterator(branches);
+
 /**
  * `anyOf: [X, { type: 'null' }]` -- how `parseNullableDef` spells a nullable in
  * this target. Returns the index of the non-null branch, or -1.
@@ -203,7 +235,7 @@ const elementValue = (values: unknown[], index: number): unknown => {
  * arbitrary container whose entries are positional or alternative.
  */
 const nullableBranchIndex = (branches: unknown[]): number => {
-  if (branches.length !== 2 || hasArrayAccessor(branches)) {
+  if (!isInspectableBranchList(branches)) {
     return -1;
   }
   for (const [nullIndex, otherIndex] of [
@@ -234,7 +266,7 @@ const collapseNeverBranch = (
   const branches = dataValue(schema, 'anyOf');
   // Accessor entries are left untouched: every read below -- destructuring
   // included -- would otherwise run caller code from `override`.
-  if (!Array.isArray(branches) || branches.length !== 2 || hasArrayAccessor(branches)) {
+  if (!isInspectableBranchList(branches)) {
     return schema;
   }
   const throughNullable = nullableBranchIndex(branches);
@@ -251,11 +283,12 @@ const collapseNeverBranch = (
     if (collapsedInner === inner) {
       return schema;
     }
-    const rebuilt = [...branches];
+    const rebuilt = elementsOf(branches);
     rebuilt[throughNullable] = collapsedInner;
     return { ...schema, anyOf: rebuilt };
   }
-  const [first, second] = branches as [unknown, unknown];
+  const first = elementValue(branches, 0);
+  const second = elementValue(branches, 1);
   if (!isPlainObject(first) || !isPlainObject(second) || hasAccessor(first) || hasAccessor(second)) {
     return schema;
   }
@@ -287,13 +320,13 @@ const collapseNeverBranch = (
  * `$ref` does not. Literal payloads are not searched -- a reference-shaped string
  * inside a `default` is data, not a reference.
  */
-const someRef = (value: unknown, matches: (ref: string) => boolean): boolean => {
+const someSchemaNode = (value: unknown, matches: (node: Record<string, unknown>) => boolean): boolean => {
   if (Array.isArray(value)) {
     // By index: an `override` can hand back an array of accessor entries, and
     // both indexing and `some` would run caller code during what is only an
     // inspection.
     for (let index = 0; index < value.length; index++) {
-      if (someRef(elementValue(value, index), matches)) {
+      if (someSchemaNode(elementValue(value, index), matches)) {
         return true;
       }
     }
@@ -302,8 +335,7 @@ const someRef = (value: unknown, matches: (ref: string) => boolean): boolean => 
   if (!isPlainObject(value)) {
     return false;
   }
-  const ref = dataValue(value, '$ref');
-  if (typeof ref === 'string' && matches(ref)) {
+  if (matches(value)) {
     return true;
   }
   for (const [key, kind] of SCHEMA_CHILDREN) {
@@ -313,18 +345,36 @@ const someRef = (value: unknown, matches: (ref: string) => boolean): boolean => 
       // Draft-7 `dependencies` also holds property-dependency arrays. They are
       // lists of property names rather than schemas, so they are not walked.
       const schemas = key === 'dependencies' ? entries.filter(isPlainObject) : entries;
-      if (schemas.some((entry) => someRef(entry, matches))) {
+      if (schemas.some((entry) => someSchemaNode(entry, matches))) {
         return true;
       }
-    } else if (someRef(child, matches)) {
+    } else if (someSchemaNode(child, matches)) {
       return true;
     }
   }
   return false;
 };
 
+const someRef = (value: unknown, matches: (ref: string) => boolean): boolean =>
+  someSchemaNode(value, (node) => {
+    const ref = dataValue(node, '$ref');
+    return typeof ref === 'string' && matches(ref);
+  });
+
 const referencesWrapperPath = (value: unknown, wrapperPath: string): boolean =>
   someRef(value, (ref) => ref.includes(wrapperPath));
+
+/**
+ * A `toJSON` anywhere below the root.
+ *
+ * The scan reads the properties an object has now, but `JSON.stringify` asks
+ * `toJSON` what the object actually is. A hook can produce a `$ref` the scan
+ * never saw, so a wrapper it names would be removed under it. `ownStrictRootSchema`
+ * rejects a callable `toJSON` on the root only; nested ones reach here, and the
+ * safe answer for them is to leave the wrappers standing.
+ */
+const hasSerializationHook = (value: unknown): boolean =>
+  someSchemaNode(value, (node) => Object.getOwnPropertyDescriptor(node, 'toJSON') !== undefined);
 
 /**
  * Any reference that is not an absolute local pointer.
@@ -439,8 +489,25 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // Collapse decided below, once every definition exists: a definition
         // materialized later can add a reference into a branch removed here.
         const removedWrappers: string[][] = [];
+        const seen = refs.seen.get(def);
+        // `refs.seen` is keyed by the Zod def, but the same schema can be
+        // registered under several definition names. Only the alias the
+        // property actually reached carries that context; the others are
+        // standalone definitions the caller asked for by name, and rewriting
+        // them would change a schema nothing referenced.
+        // `refs.seen` is keyed by the Zod def, so the same schema registered
+        // under several definition names shares one context. When that context
+        // names a sibling alias, this one was not the alias anything reached:
+        // it is a standalone definition the caller asked for by name, and
+        // rewriting it would change a schema nothing referenced.
+        const seenPath = seen?.path;
+        const aliasWasReferenced =
+          !seenPath ||
+          seenPath.length !== definitionPath.length ||
+          seenPath.toString() === definitionPath.toString() ||
+          seenPath.slice(0, -1).toString() !== definitionPath.slice(0, -1).toString();
         const collapsed =
-          originatedInsideProperty(refs.seen.get(def)) && isPlainObject(materialized)
+          aliasWasReferenced && originatedInsideProperty(seen) && isPlainObject(materialized)
             ? (collapseNeverBranch(materialized, removedWrappers) as JsonSchema7Type)
             : materialized;
         if (collapsed !== materialized) {
@@ -455,14 +522,19 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       }
     }
 
-    // A relative reference anywhere in the document makes every wrapper move
-    // unsafe, not just the ones named by a pointer: the reference's own depth is
-    // part of its meaning.
-    const relativeRefs = hasRelativeRef(main) || hasRelativeRef({ definitions });
+    // Two things make every wrapper move unsafe rather than only the ones a
+    // pointer names: a relative reference, whose depth is part of its meaning,
+    // and a serialization hook, which can produce a reference the scan cannot
+    // see without running caller code.
+    const unsafeToMove =
+      hasRelativeRef(main) ||
+      hasRelativeRef({ definitions }) ||
+      hasSerializationHook(main) ||
+      hasSerializationHook({ definitions });
 
     for (const { key, collapsed, wrapperPaths } of pendingCollapses) {
       const stranded =
-        relativeRefs ||
+        unsafeToMove ||
         wrapperPaths.some(
           (wrapperPath) =>
             referencesWrapperPath(main, wrapperPath) ||
