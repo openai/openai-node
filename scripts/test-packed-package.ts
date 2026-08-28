@@ -163,6 +163,7 @@ const packedPackagePath = require('node:path');
       [
         "declare module 'ws' {",
         '  export interface ClientOptions {',
+        '    followRedirects?: boolean | undefined;',
         '    headers?: Record<string, string> | undefined;',
         '  }',
         '  export class WebSocket {',
