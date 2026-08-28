@@ -25,6 +25,13 @@ async function defaultNodeRunner() {
   }
 }
 
+async function commonJSEcosystemRunner() {
+  await defaultNodeRunner();
+  if (!state.live) {
+    await run('npm', ['test', '--', '--runInBand', 'tests/import.test.ts']);
+  }
+}
+
 async function writeCloudflareCredentialFile(
   file: Awaited<ReturnType<typeof fs.open>>,
   contents: Buffer,
@@ -402,10 +409,10 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
 }
 
 const projectRunners = {
-  'node-ts-cjs': defaultNodeRunner,
-  'node-ts-cjs-web': defaultNodeRunner,
-  'node-ts-cjs-auto': defaultNodeRunner,
-  'node-ts4.5-jest28': defaultNodeRunner,
+  'node-ts-cjs': commonJSEcosystemRunner,
+  'node-ts-cjs-web': commonJSEcosystemRunner,
+  'node-ts-cjs-auto': commonJSEcosystemRunner,
+  'node-ts4.5-jest28': commonJSEcosystemRunner,
   'node-ts-esm': defaultNodeRunner,
   'node-ts-esm-web': defaultNodeRunner,
   'node-ts-esm-auto': defaultNodeRunner,
