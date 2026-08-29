@@ -14,6 +14,17 @@ function spawnPnpmScript(script: 'format' | 'lint') {
   return spawnSync(command, args, { cwd: repoRoot, encoding: 'utf-8' });
 }
 
+test('keeps formatter inputs on LF across Git checkout configurations', () => {
+  const paths = ['AGENTS.md', '.github/workflows/ci.yml', 'package.json', 'src/index.ts'];
+  const checked = spawnSync('git', ['check-attr', 'eol', '--', ...paths], {
+    cwd: repoRoot,
+    encoding: 'utf-8',
+  });
+
+  expect(checked.status).toBe(0);
+  expect(checked.stdout.trim().split(/\r?\n/u)).toEqual(paths.map((filePath) => `${filePath}: eol: lf`));
+});
+
 test('inherits Ultracite native plugins and enforces their rules', () => {
   const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
     cwd: repoRoot,
