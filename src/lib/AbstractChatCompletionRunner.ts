@@ -150,9 +150,9 @@ export class AbstractChatCompletionRunner<
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
     message: ChatCompletionMessageParam,
     emit = true,
+    normalizeContent = true,
   ) {
-    // Initial history belongs to the caller and may contain frozen messages.
-    if (emit && !('content' in message)) {
+    if (normalizeContent && !('content' in message)) {
       message.content = null;
     }
 
@@ -364,7 +364,7 @@ export class AbstractChatCompletionRunner<
     options?: RequestOptions,
   ): Promise<ChatCompletion> {
     for (const message of params.messages) {
-      this._addMessage(message, false);
+      this._addMessage(message, false, false);
     }
     return await this._createChatCompletion(client, params, options);
   }
@@ -434,7 +434,7 @@ export class AbstractChatCompletionRunner<
         : (undefined as any);
 
     for (const message of params.messages) {
-      this._addMessage(message, false);
+      this._addMessage(message, false, false);
     }
 
     type ToolCallResult = {

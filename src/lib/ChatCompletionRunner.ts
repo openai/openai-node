@@ -88,13 +88,17 @@ export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletion
     return runner;
   }
 
-  /** Appends a conversation message and emits text content for assistant replies. */
+  /**
+   * Appends a conversation message and emits text content for assistant replies.
+   * @param normalizeContent Defaults to true; initial history passes false to preserve caller-owned messages.
+   */
   override _addMessage(
     this: ChatCompletionRunner<ParsedT>,
     message: ChatCompletionMessageParam,
     emit = true,
+    normalizeContent = true,
   ) {
-    super._addMessage(message, emit);
+    super._addMessage(message, emit, normalizeContent);
     if (isAssistantMessage(message) && message.content) {
       this._emit('content', message.content as string);
     }

@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import OpenAI from 'openai';
 import type { Fetch } from 'openai/internal/builtin-types';
+import { ChatCompletionRunner } from 'openai/lib/ChatCompletionRunner';
 import type {
   ChatCompletionAssistantMessageParam,
   ChatCompletionMessageParam,
@@ -125,4 +126,29 @@ it('still normalizes omitted content in newly emitted messages', async () => {
   expect(onMessage).toHaveBeenCalledTimes(1);
   expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({ role: 'assistant', content: null }));
   expect(runner.messages[1]).toHaveProperty('content', null);
+});
+
+it.each([false, true])('preserves two-argument message-hook normalization (emit: %s)', (emit) => {
+  class CustomRunner extends ChatCompletionRunner {
+    override _addMessage(message: ChatCompletionMessageParam, emitMessage = true) {
+      super._addMessage(message, emitMessage);
+    }
+
+    append(message: ChatCompletionMessageParam) {
+      this._addMessage(message, emit);
+    }
+  }
+  const runner = new CustomRunner();
+  const message: ChatCompletionAssistantMessageParam = {
+    role: 'assistant',
+    function_call: { name: 'lookup', arguments: '{}' },
+  };
+  const onMessage = vi.fn();
+  runner.on('message', onMessage);
+
+  runner.append(message);
+
+  expect(message).toHaveProperty('content', null);
+  expect(runner.messages[0]).toBe(message);
+  expect(onMessage).toHaveBeenCalledTimes(emit ? 1 : 0);
 });
