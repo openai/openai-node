@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+: "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
+
+RELEASE_SHA="${1:?release commit SHA is required}"
+MAX_ATTEMPTS="${RELEASE_CI_MAX_ATTEMPTS:-240}"
+POLL_INTERVAL_SECONDS="${RELEASE_CI_POLL_INTERVAL_SECONDS:-10}"
+
+if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Release commit must be an immutable 40-character lowercase SHA: ${RELEASE_SHA}" >&2
+  exit 1
+fi
+if [[ ! "$MAX_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "RELEASE_CI_MAX_ATTEMPTS must be a positive integer." >&2
+  exit 1
+fi
+if [[ ! "$POLL_INTERVAL_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "RELEASE_CI_POLL_INTERVAL_SECONDS must be a non-negative integer." >&2
+  exit 1
+fi
+
+for ((ATTEMPT = 1; ATTEMPT <= MAX_ATTEMPTS; ATTEMPT++)); do
+  WORKFLOW_RUNS="$(
+    gh api --method GET \
+      "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+      -f "head_sha=${RELEASE_SHA}" \
+      -f 'event=push' \
+      -f 'per_page=100'
+  )"
+  WORKFLOW_RUN="$(
+    jq -c --arg RELEASE_SHA "$RELEASE_SHA" '
+      [
+        .workflow_runs[]
+        | select(
+            .head_sha == $RELEASE_SHA and
+            .event == "push" and
+            .head_branch == "main"
+          )
+      ]
+      | sort_by(.run_attempt // 0, .created_at // "", .id)
+      | last // empty
+    ' <<< "$WORKFLOW_RUNS"
+  )"
+
+  if [[ -n "$WORKFLOW_RUN" ]]; then
+    RUN_ID="$(jq -r -e '.id' <<< "$WORKFLOW_RUN")"
+    RUN_STATUS="$(jq -r -e '.status' <<< "$WORKFLOW_RUN")"
+    RUN_URL="$(jq -r -e '.html_url' <<< "$WORKFLOW_RUN")"
+
+    if [[ "$RUN_STATUS" == 'completed' ]]; then
+      RUN_CONCLUSION="$(jq -r -e '.conclusion' <<< "$WORKFLOW_RUN")"
+      if [[ "$RUN_CONCLUSION" == 'success' ]]; then
+        echo "CI for release commit ${RELEASE_SHA} passed: ${RUN_URL}"
+        exit 0
+      fi
+
+      echo "CI for release commit ${RELEASE_SHA} concluded ${RUN_CONCLUSION}: ${RUN_URL}" >&2
+      exit 1
+    fi
+
+    echo "Waiting for CI run ${RUN_ID} for release commit ${RELEASE_SHA} (${RUN_STATUS})."
+  else
+    echo "Waiting for a main push CI run for release commit ${RELEASE_SHA}."
+  fi
+
+  if [[ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]]; then
+    sleep "$POLL_INTERVAL_SECONDS"
+  fi
+done
+
+echo "No successful CI run completed for release commit ${RELEASE_SHA} within the polling window." >&2
+exit 1
