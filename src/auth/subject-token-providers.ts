@@ -149,6 +149,15 @@ function isMalformedAzureJSONError(error: unknown): boolean {
   }
 }
 
+function readAzureAccessToken(data: unknown): string {
+  const token =
+    typeof data === 'object' && data !== null && 'access_token' in data ? data.access_token : undefined;
+  if (typeof token !== 'string' || token.trim().length === 0) {
+    throw new SubjectTokenProviderError("IMDS response missing 'access_token' field", 'azure-imds');
+  }
+  return token;
+}
+
 /** Reads the UTF-8 contents of a Kubernetes service-account token file. */
 type ReadFile = (path: string) => Promise<string>;
 
@@ -316,9 +325,9 @@ export function azureManagedIdentityTokenProvider(
           );
         }
 
-        let data: { access_token?: string };
+        let data: unknown;
         try {
-          data = (await response.json()) as { access_token?: string };
+          data = await response.json();
         } catch (error) {
           if (isMalformedAzureJSONError(error)) {
             throw new SyntaxError('IMDS response contains invalid JSON');
@@ -326,11 +335,7 @@ export function azureManagedIdentityTokenProvider(
           throw error;
         }
 
-        if (!data.access_token) {
-          throw new SubjectTokenProviderError("IMDS response missing 'access_token' field", 'azure-imds');
-        }
-
-        return data.access_token;
+        return readAzureAccessToken(data);
       } catch (error) {
         if (error instanceof SubjectTokenProviderError) {
           throw error;
