@@ -3,6 +3,7 @@ import type { SubjectTokenProvider } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { SubjectTokenProviderError } from '../core/error';
+import { hasOwn, isObj } from '../internal/utils/values';
 
 const DEFAULT_RESOURCE = 'https://management.azure.com/';
 const DEFAULT_AZURE_API_VERSION = '2018-02-01';
@@ -150,8 +151,7 @@ function isMalformedAzureJSONError(error: unknown): boolean {
 }
 
 function readAzureAccessToken(data: unknown): string {
-  const token =
-    typeof data === 'object' && data !== null && 'access_token' in data ? data.access_token : undefined;
+  const token = isObj(data) && hasOwn(data, 'access_token') ? data['access_token'] : undefined;
   if (typeof token !== 'string' || token.trim().length === 0) {
     throw new SubjectTokenProviderError("IMDS response missing 'access_token' field", 'azure-imds');
   }

@@ -881,15 +881,42 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     },
   );
 
-  it.each([false, true])('reads a custom parsed token only once (inherited: %s)', async (inherited) => {
+  it('reads an own custom parsed token only once', async () => {
     const readToken = vi.fn<() => unknown>().mockReturnValueOnce(VALID_SUBJECT_TOKEN).mockReturnValue(42);
     const data = Object.defineProperty({}, 'access_token', { get: readToken });
     const response = new Response(null);
-    vi.spyOn(response, 'json').mockResolvedValue(inherited ? Object.create(data) : data);
+    vi.spyOn(response, 'json').mockResolvedValue(data);
     const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
 
     await expect(provider.getToken()).resolves.toBe(VALID_SUBJECT_TOKEN);
     expect(readToken).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['data', 'accessor'] as const)('rejects inherited token %s before exchange', async (shape) => {
+    vi.useFakeTimers();
+    const readToken = vi.fn(() => VALID_SUBJECT_TOKEN);
+    const prototype = Object.defineProperty(
+      {},
+      'access_token',
+      shape === 'data' ? { value: VALID_SUBJECT_TOKEN } : { get: readToken },
+    );
+    const response = new Response(null);
+    vi.spyOn(response, 'json').mockResolvedValue(Object.create(prototype));
+    const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = createWorkloadClient(
+      azureManagedIdentityTokenProvider(undefined, { fetch: async () => response }),
+      apiFetch,
+    );
+
+    const result = client.models.list();
+    await expect(result).rejects.toBeInstanceOf(SubjectTokenProviderError);
+    await expect(result).rejects.toMatchObject({
+      message: "IMDS response missing 'access_token' field",
+      provider: 'azure-imds',
+    });
+    expect(readToken).not.toHaveBeenCalled();
+    expect(apiFetch).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('rejects malformed token values before exchange and allows a subsequent valid request', async () => {
