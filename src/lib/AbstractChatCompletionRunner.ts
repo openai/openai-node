@@ -151,7 +151,8 @@ export class AbstractChatCompletionRunner<
     message: ChatCompletionMessageParam,
     emit = true,
   ) {
-    if (!('content' in message)) {
+    // Initial history belongs to the caller and may contain frozen messages.
+    if (emit && !('content' in message)) {
       message.content = null;
     }
 
