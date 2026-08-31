@@ -24,8 +24,17 @@ const recordingProviders: Record<NodeJS.Platform, string> = {
 };
 
 function isResponse(stream: NodeJS.ReadableStream | Response | File): stream is Response {
-  // Node readable streams can also carry unrelated body metadata.
-  return !('pipe' in stream && typeof stream.pipe === 'function') && (stream as any).body !== undefined;
+  // Readables have event and flow-control methods, even after they have ended.
+  const nodeReadable =
+    'pipe' in stream &&
+    typeof stream.pipe === 'function' &&
+    'on' in stream &&
+    typeof stream.on === 'function' &&
+    'pause' in stream &&
+    typeof stream.pause === 'function' &&
+    'resume' in stream &&
+    typeof stream.resume === 'function';
+  return !nodeReadable && 'body' in stream && stream.body !== undefined;
 }
 
 function isFile(stream: NodeJS.ReadableStream | Response | File): stream is File {
