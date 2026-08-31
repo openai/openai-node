@@ -42,6 +42,7 @@ test('formats an existing CRLF checkout after the LF policy is pulled', () => {
     runGit(['config', 'user.email', 'line-endings@example.com']);
     runGit(['config', 'user.name', 'Line Endings Test']);
     runGit(['config', 'core.autocrlf', 'true']);
+    runGit(['config', 'core.safecrlf', 'false']);
 
     writeFileSync(fixturePath, 'export const value = 1;\n');
     runGit(['add', 'fixture.ts']);
