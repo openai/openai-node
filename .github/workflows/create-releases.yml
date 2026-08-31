@@ -171,6 +171,7 @@ jobs:
     timeout-minutes: 35
     permissions:
       actions: read
+      checks: read
 
     steps:
       - name: Wait for CI on the immutable release commit
