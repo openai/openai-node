@@ -163,6 +163,48 @@ jobs:
             exit "${version_status}"
           fi
 
+  release-ci:
+    name: check release CI before publication
+    if: needs.publication-check.outputs.should_publish == 'true'
+    needs: publication-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      actions: read
+
+    steps:
+      - name: Wait for CI on the immutable release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.publication-check.outputs.release_sha }}
+        run: |
+          run_id=''
+          for attempt in {1..30}; do
+            run_id="$(gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+              -f event=push \
+              -f head_sha="${RELEASE_SHA}" \
+              -f per_page=100 \
+              --jq '.workflow_runs | map(select(.head_branch == "main")) | first | .id // empty')"
+            if [[ -n "${run_id}" ]]; then
+              break
+            fi
+            sleep 2
+          done
+
+          if [[ -z "${run_id}" ]]; then
+            echo "::error::No CI push workflow found for release commit ${RELEASE_SHA}."
+            exit 1
+          fi
+
+          run_sha="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.head_sha')"
+          if [[ "${run_sha}" != "${RELEASE_SHA}" ]]; then
+            echo "::error::CI run ${run_id} targets ${run_sha}, expected ${RELEASE_SHA}."
+            exit 1
+          fi
+
+          gh run watch "${run_id}" --repo "${GITHUB_REPOSITORY}" --exit-status
+
   browser-compatibility:
     name: check browser compatibility before publication
     if: needs.publication-check.outputs.should_publish == 'true'
@@ -290,6 +332,7 @@ jobs:
     if: needs.publication-check.outputs.should_publish == 'true'
     needs:
       - publication-check
+      - release-ci
       - browser-compatibility
       - build-package
     runs-on: ubuntu-latest
