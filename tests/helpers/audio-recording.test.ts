@@ -404,6 +404,23 @@ describe('playAudio input and process errors', () => {
     expect(Buffer.concat(chunks).toString()).toBe('node audio');
   });
 
+  test.each([
+    { name: 'null', body: null },
+    { name: 'Buffer', body: Buffer.from('body metadata') },
+    { name: 'another readable', body: Readable.from(['body metadata']) },
+  ])('plays the outer Node readable with $name body metadata', async ({ body }) => {
+    const { chunks } = mockFfplay();
+    const source = Object.assign(Readable.from(['node audio']), { body });
+
+    await playAudio(source);
+
+    expect(Buffer.concat(chunks).toString()).toBe('node audio');
+    expect(source.body).toBe(body);
+    if (body instanceof Readable) {
+      expect(body.readableEnded).toBe(false);
+    }
+  });
+
   test('drains ffplay output without changing its spawn arguments', async () => {
     const { ffplay } = mockFfplay();
 
