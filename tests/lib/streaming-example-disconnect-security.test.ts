@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import type { ServerResponse } from 'node:http';
 import { runInNewContext } from 'node:vm';
 
 import ts from 'typescript';
@@ -50,30 +51,45 @@ function createResponse() {
   const response = Object.assign(createNodeHTTPEmitter(), {
     body: '',
     destroyed: false,
+    headersSent: false,
+    statusCode: 200,
     writableEnded: false,
     onWrite: null as (() => void) | null,
   });
 
   return Object.assign(response, {
     header: vi.fn((_name: string, _value: string) => response),
+    status: vi.fn((code: number) => {
+      response.statusCode = code;
+      return response;
+    }),
 
     write: vi.fn((chunk: unknown) => {
       if (response.destroyed) {
         throw new Error('Attempted to write to a destroyed socket');
       }
 
+      response.headersSent = true;
       response.body += String(chunk);
       response.onWrite?.();
       return true;
     }),
 
-    end: vi.fn(() => {
+    end: vi.fn((chunk?: string) => {
       if (response.destroyed) {
         throw new Error('Attempted to end a destroyed socket');
       }
 
+      response.body += chunk ?? '';
+      response.headersSent = true;
       response.writableEnded = true;
       response.emit('finish');
+      return response;
+    }),
+
+    destroy: vi.fn(() => {
+      response.destroyed = true;
+      response.emit('close');
       return response;
     }),
   });
@@ -275,7 +291,10 @@ function invoke(runtime: ExampleRuntime, request: unknown, response: unknown): P
   return runtime.handler(request, response);
 }
 
-async function loadPublicExample(filename: Example, mode: 'pending' | 'complete' | 'failure' = 'pending') {
+async function loadPublicExample(
+  filename: Example,
+  mode: 'pending' | 'complete' | 'failure' | 'partial' = 'pending',
+) {
   const upstreamClosed: Promise<unknown[]>[] = [];
   const upstream = createServer((_request, response) => {
     upstreamClosed.push(once(response, 'close'));
@@ -293,7 +312,7 @@ async function loadPublicExample(filename: Example, mode: 'pending' | 'complete'
     response.writeHead(200, { 'Content-Type': 'text/event-stream' });
     response.flushHeaders();
 
-    if (mode === 'complete') {
+    if (mode === 'complete' || mode === 'partial') {
       const base = {
         id: 'chatcmpl-public-loopback',
         object: 'chat.completion.chunk',
@@ -310,6 +329,10 @@ async function loadPublicExample(filename: Example, mode: 'pending' | 'complete'
         ...base,
         choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
       };
+      if (mode === 'partial') {
+        response.write(`data: ${JSON.stringify(content)}\n\n`);
+        return;
+      }
       response.end(
         `data: ${JSON.stringify(content)}\n\ndata: ${JSON.stringify(finished)}\n\ndata: [DONE]\n\n`,
       );
@@ -478,6 +501,24 @@ describe.each(examples)('%s upstream disconnect lifecycle', (filename) => {
   });
 });
 
+test.each(examples)('%s does not rewrite an already-ended response after an error', async (filename) => {
+  const providerError = new Error('upstream failed after the response ended');
+  const runtime = loadExample(filename);
+  const request = createRequest();
+  const response = createResponse();
+  runtime.onProvider = () => {
+    response.end();
+    throw providerError;
+  };
+
+  await invoke(runtime, request, response);
+
+  expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(response.status).not.toHaveBeenCalled();
+  expect(response.end).toHaveBeenCalledOnce();
+  expect(response.destroy).not.toHaveBeenCalled();
+});
+
 test.each([
   ['stream-to-client-express.ts', 'response close'],
   ['stream-to-client-express.ts', 'request abort'],
@@ -559,13 +600,94 @@ test.each(examples)('the public SDK still reports genuine upstream failures from
     expect(String(client.runtime.consoleError.mock.calls[0]?.[0])).toContain(
       'intentional public upstream failure',
     );
-    expect(response.end).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledExactlyOnceWith(500);
+    expect(response.end).toHaveBeenCalledExactlyOnceWith('Internal Server Error');
+    expect(response.body).toBe('Internal Server Error');
+    expect(response.destroy).not.toHaveBeenCalled();
     expect(request.listenerCount('aborted')).toBe(0);
     expect(response.listenerCount('close')).toBe(0);
   } finally {
     await closePublicExample(client.upstream);
   }
 });
+
+test.each(
+  examples.flatMap((filename) => [
+    { filename, mode: 'failure' as const },
+    { filename, mode: 'partial' as const },
+  ]),
+)(
+  '$filename finishes the real downstream HTTP connection after an upstream $mode',
+  async ({ filename, mode }) => {
+    const client = await loadPublicExample(filename, mode);
+    let outgoing: ServerResponse | undefined;
+    let routeFinished = false;
+    const downstream = createServer(async (request, response) => {
+      let body = '';
+      for await (const chunk of request) {
+        body += String(chunk);
+      }
+      outgoing = response;
+      const adaptedResponse = Object.assign(response, {
+        header(name: string, value: string) {
+          response.setHeader(name, value);
+          return response;
+        },
+        status(code: number) {
+          response.statusCode = code;
+          return response;
+        },
+      });
+      await invoke(client.runtime, Object.assign(request, { body }), adaptedResponse);
+      routeFinished = true;
+    });
+    const listening = once(downstream, 'listening');
+    downstream.listen(0, '127.0.0.1');
+    await listening;
+    const address = downstream.address();
+    if (address === null || typeof address === 'string') {
+      throw new Error('The downstream server has no local port');
+    }
+
+    const controller = new AbortController();
+    let receivedStatus: number | undefined;
+    const result = (async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:${address.port}`, {
+          method: 'POST',
+          body: 'A synthetic prompt',
+          signal: controller.signal,
+        });
+        receivedStatus = response.status;
+        return { status: response.status, body: await response.text() };
+      } catch (error) {
+        return { error };
+      }
+    })();
+
+    try {
+      if (mode === 'partial') {
+        await vi.waitFor(() => expect(receivedStatus).toBe(200));
+        client.upstream.closeAllConnections();
+      }
+      await vi.waitFor(() => expect(routeFinished).toBe(true));
+      expect(client.runtime.consoleError).toHaveBeenCalledOnce();
+      if (mode === 'failure') {
+        expect(outgoing?.writableEnded).toBe(true);
+        expect(await result).toEqual({ status: 500, body: 'Internal Server Error' });
+      } else {
+        expect(outgoing?.destroyed).toBe(true);
+        expect(outgoing?.writableEnded).toBe(false);
+        expect(await result).toHaveProperty('error');
+      }
+    } finally {
+      controller.abort();
+      await result;
+      await closePublicExample(downstream);
+      await closePublicExample(client.upstream);
+    }
+  },
+);
 
 test.each(['response close', 'request abort'] as const)(
   'the Express example silently handles an SDK iterator abort after %s',
@@ -613,6 +735,9 @@ test('the Express example still reports a genuine iterator error after a client 
 
   expect(runtime.signal?.aborted).toBe(true);
   expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(response.status).not.toHaveBeenCalled();
+  expect(response.end).not.toHaveBeenCalled();
+  expect(response.destroy).not.toHaveBeenCalled();
   expect(request.listenerCount('aborted')).toBe(0);
   expect(response.listenerCount('close')).toBe(0);
 });
@@ -683,6 +808,9 @@ test('the raw example still reports a genuine provider error after a client disc
 
   expect(runtime.signal?.aborted).toBe(true);
   expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(response.status).not.toHaveBeenCalled();
+  expect(response.end).not.toHaveBeenCalled();
+  expect(response.destroy).not.toHaveBeenCalled();
   expect(request.listenerCount('aborted')).toBe(0);
   expect(response.listenerCount('close')).toBe(0);
 });
