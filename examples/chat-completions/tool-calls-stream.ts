@@ -209,6 +209,11 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
 function lineRewriter() {
   let lastMessageLines = 0;
   return function write(value: any) {
+    if (!process.stdout.isTTY) {
+      console.log(formatWithOptions({ colors: false, breakLength: Infinity, depth: 4 }, value));
+      return;
+    }
+
     process.stdout.cursorTo(0);
     process.stdout.moveCursor(0, -lastMessageLines);
 

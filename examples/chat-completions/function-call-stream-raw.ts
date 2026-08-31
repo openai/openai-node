@@ -144,6 +144,11 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
 function lineRewriter() {
   let lastMessageLength = 0;
   return function write(value: any) {
+    if (!process.stdout.isTTY) {
+      console.log(formatWithOptions({ colors: false, breakLength: Infinity }, value));
+      return;
+    }
+
     process.stdout.cursorTo(0);
     process.stdout.moveCursor(0, -Math.floor((lastMessageLength - 1) / process.stdout.columns));
     lastMessageLength = formatWithOptions({ colors: false, breakLength: Infinity }, value).length;
