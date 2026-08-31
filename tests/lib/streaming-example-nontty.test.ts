@@ -105,6 +105,7 @@ test.each(examples)('%s completes a tool round trip with redirected stdout', asy
     expect(stderr).toBe('');
     expect(exitCode).toBe(0);
     expect(stdout).toContain('Synthetic recommendation.');
+    expect(stdout.match(/Synthetic /gu)).toHaveLength(1);
     expect(stdout).not.toContain('\u001B[');
     expect(stdout).not.toContain('synthetic-example-key');
     expect(requests).toHaveLength(2);

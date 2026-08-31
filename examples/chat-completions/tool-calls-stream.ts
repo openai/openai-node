@@ -133,10 +133,15 @@ async function main() {
     let message = {} as ChatCompletionMessage;
     for await (const chunk of stream) {
       message = messageReducer(message, chunk);
-      writeLine(message);
+      if (process.stdout.isTTY) {
+        writeLine(message);
+      }
 
       // Add a small delay so that the chunks coming in are noticeable
       await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
+    }
+    if (!process.stdout.isTTY) {
+      writeLine(message);
     }
     console.log();
     messages.push(message);

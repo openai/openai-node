@@ -99,6 +99,11 @@ async function main() {
     let message = {} as ChatCompletionMessage;
     for await (const chunk of stream) {
       message = messageReducer(message, chunk);
+      if (process.stdout.isTTY) {
+        writeLine(message);
+      }
+    }
+    if (!process.stdout.isTTY) {
       writeLine(message);
     }
     console.log();
