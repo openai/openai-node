@@ -359,6 +359,10 @@ const runResponse = async ({
       fail(error);
     };
 
+    const onSocketClose = (): void => {
+      fail(new Error('WebSocket closed before the response completed.'));
+    };
+
     const onEvent = (event: ResponsesServerEvent): void => {
       try {
         if (event.type === 'response.output_text.delta') {
@@ -403,10 +407,12 @@ const runResponse = async ({
     const cleanup = (): void => {
       ws.off('event', onEvent);
       ws.off('error', onSocketError);
+      ws.off('close', onSocketClose);
     };
 
     ws.on('event', onEvent);
     ws.on('error', onSocketError);
+    ws.on('close', onSocketClose);
 
     const createEvent: ResponsesClientEvent = {
       type: 'response.create',
