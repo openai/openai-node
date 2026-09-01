@@ -1,5 +1,6 @@
 import { once } from 'node:events';
-import { createServer, type IncomingHttpHeaders } from 'node:http';
+import { createServer } from 'node:http';
+import type { IncomingHttpHeaders } from 'node:http';
 import OpenAI from 'openai';
 import type { NextCursorPageResponse } from 'openai/core/pagination';
 import type { Group } from 'openai/resources/admin/organization/groups/groups';
@@ -13,7 +14,7 @@ const firstGroup: Group = {
 };
 const secondGroup: Group = { ...firstGroup, id: 'group_second', name: 'Second group' };
 
-const cases: Array<{ name: string; pages: NextCursorPageResponse<Group>[] }> = [
+const cases: { name: string; pages: NextCursorPageResponse<Group>[] }[] = [
   {
     name: 'empty first page with a continuation cursor',
     pages: [
@@ -44,13 +45,12 @@ const cases: Array<{ name: string; pages: NextCursorPageResponse<Group>[] }> = [
 
 describe.each(['items', 'pages'] as const)('NextCursorPage %s iteration', (mode) => {
   test.each(cases)('$name', async ({ pages }) => {
-    const requests: Array<{ method: string | undefined; url: URL; headers: IncomingHttpHeaders }> = [];
+    const requests: { method: string | undefined; url: URL; headers: IncomingHttpHeaders }[] = [];
     const server = createServer((request, response) => {
-      const url = new URL(request.url!, 'http://127.0.0.1');
+      const url = new URL(request.url ?? '/', 'http://127.0.0.1');
       requests.push({ method: request.method, url, headers: request.headers });
       const pageIndex = pages.findIndex(
-        (_, index) =>
-          url.searchParams.get('after') === (index === 0 ? null : pages[index - 1]!.next),
+        (_, index) => url.searchParams.get('after') === (index === 0 ? null : pages[index - 1]?.next),
       );
       if (pageIndex === -1 || requests.length > pages.length) {
         response.writeHead(400, { 'content-type': 'application/json' });
@@ -92,7 +92,8 @@ describe.each(['items', 'pages'] as const)('NextCursorPage %s iteration', (mode)
           items.push(group);
         }
       } else {
-        for await (const page of (await result).iterPages()) {
+        const firstPage = await result;
+        for await (const page of firstPage.iterPages()) {
           receivedPages.push(page.data);
           items.push(...page.data);
         }
@@ -109,7 +110,7 @@ describe.each(['items', 'pages'] as const)('NextCursorPage %s iteration', (mode)
         expect(Object.fromEntries(request.url.searchParams)).toEqual({
           limit: '1',
           order: 'asc',
-          ...(index === 0 ? {} : { after: pages[index - 1]!.next }),
+          ...(index === 0 ? {} : { after: pages[index - 1]?.next }),
         });
         expect(request.headers.authorization).toBe('Bearer synthetic-admin-key');
         expect(request.headers['x-pagination-test']).toBe('synthetic');
