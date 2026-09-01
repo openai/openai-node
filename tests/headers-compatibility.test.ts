@@ -75,8 +75,7 @@ test.each(cases)('sends $name from $location over HTTP', async ({ name, create, 
           : { 'x-override': 'from-defaults', 'x-retained': 'retained' },
     });
     const result = await client.models.list({
-      headers:
-        location === 'request options' ? headers : { 'x-override': 'from-request', 'x-remove': null },
+      headers: location === 'request options' ? headers : { 'x-override': 'from-request', 'x-remove': null },
     });
 
     expect(result.data).toEqual([]);
