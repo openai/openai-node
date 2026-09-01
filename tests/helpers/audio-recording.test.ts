@@ -8,6 +8,7 @@ import { playAudio, recordAudio } from 'openai/helpers/audio';
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 const spawnMock = spawn as MockedFunction<typeof spawn>;
+const devicePrefix = ['darwin', 'win32', 'cygwin'].includes(process.platform) ? '' : 'hw';
 
 function mockFfmpeg() {
   const ffmpeg = Object.assign(new EventEmitter(), {
@@ -59,7 +60,7 @@ describe('recordAudio', () => {
     expect(Buffer.from(await file.arrayBuffer()).toString()).toBe('first second');
     expect(spawnMock).toHaveBeenCalledWith(
       'ffmpeg',
-      expect.arrayContaining(['-i', ':0', '-ar', '24000', '-ac', '1', '-f', 'wav', 'pipe:1']),
+      expect.arrayContaining(['-i', `${devicePrefix}:0`, '-ar', '24000', '-ac', '1', '-f', 'wav', 'pipe:1']),
       { stdio: ['ignore', 'pipe', 'ignore'] },
     );
   });
@@ -73,7 +74,7 @@ describe('recordAudio', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'ffmpeg',
-      expect.arrayContaining(['-i', ':3']),
+      expect.arrayContaining(['-i', `${devicePrefix}:3`]),
       expect.any(Object),
     );
   });
