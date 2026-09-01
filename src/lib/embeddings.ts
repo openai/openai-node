@@ -28,17 +28,17 @@ export function createEmbedding(
     loggerFor(client).debug('embeddings/user defined encoding_format:', body.encoding_format);
   }
 
-  const response: APIPromise<CreateEmbeddingResponse> = client.post('/embeddings', {
-    body: {
-      ...body,
-      encoding_format: encodingFormat,
-    },
+  const optimizedBody = { ...body, encoding_format: encodingFormat };
+  const requestOptions: RequestOptions = {
+    body: optimizedBody,
     ...options,
     __security: { bearerAuth: true },
-  });
+  };
+  const shouldDecode = !hasUserProvidedEncodingFormat && requestOptions.body === optimizedBody;
+  const response: APIPromise<CreateEmbeddingResponse> = client.post('/embeddings', requestOptions);
 
-  // Explicit encodings return the original response promise unchanged.
-  if (hasUserProvidedEncodingFormat) {
+  // Only decode the optimized body we supplied, not a caller's body override.
+  if (!shouldDecode) {
     return response;
   }
 
