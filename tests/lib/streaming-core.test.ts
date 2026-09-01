@@ -394,6 +394,33 @@ describe('Stream.toReadableStream', () => {
     reader.releaseLock();
   });
 
+  test('reads an iterator return hook once and preserves its receiver', async () => {
+    const returned = vi.fn().mockResolvedValue({ done: true, value: undefined });
+    let returnReads = 0;
+    const iterator = {
+      next: vi.fn().mockResolvedValue({ done: false, value: { id: 1 } }),
+      get return() {
+        returnReads += 1;
+        if (returnReads > 1) {
+          throw new OpenAIError('return hook was read more than once');
+        }
+        return returned;
+      },
+    };
+    const source = new Stream(() => iterator, new AbortController());
+    const reader = source.toReadableStream().getReader();
+
+    try {
+      await reader.read();
+      await expect(reader.cancel()).resolves.toBeUndefined();
+      expect(returnReads).toBe(1);
+      expect(returned).toHaveBeenCalledTimes(1);
+      expect(returned.mock.contexts[0]).toBe(iterator);
+    } finally {
+      reader.releaseLock();
+    }
+  });
+
   test.each([
     ['SSE', false],
     ['SSE', true],
