@@ -34,12 +34,21 @@ if [ "$1" == "--daemon" ]; then
   ./node_modules/.bin/steady --version
 
   ./node_modules/.bin/steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL" &> .stdy.log &
+  steady_pid=$!
+
+  cleanup_steady() {
+    if kill -0 "$steady_pid" 2>/dev/null; then
+      kill "$steady_pid" 2>/dev/null || true
+    fi
+    wait "$steady_pid" 2>/dev/null || true
+  }
+  trap cleanup_steady EXIT
 
   # Wait for server to come online via health endpoint (max 30s)
   echo -n "Waiting for server"
   attempts=0
   while ! curl --silent --fail "http://127.0.0.1:4010/_x-steady/health" >/dev/null 2>&1; do
-    if ! kill -0 $! 2>/dev/null; then
+    if ! kill -0 "$steady_pid" 2>/dev/null; then
       echo
       cat .stdy.log
       exit 1
@@ -55,6 +64,7 @@ if [ "$1" == "--daemon" ]; then
     sleep 0.1
   done
 
+  trap - EXIT
   echo
 else
   ./node_modules/.bin/steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL"
