@@ -331,10 +331,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
         }
       },
       async cancel() {
+        const returnMethod = iter.return;
         // Tee iterators have no return method and must not abort their siblings.
-        if (iter.return) {
+        if (returnMethod) {
           controller.abort();
-          await iter.return();
+          await Reflect.apply(returnMethod, iter, []);
         }
       },
     });
