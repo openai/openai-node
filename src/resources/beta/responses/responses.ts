@@ -1122,9 +1122,9 @@ export interface BetaResponse {
   metadata: { [key: string]: string } | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
+   * Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
@@ -1398,8 +1398,6 @@ export interface BetaResponse {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -1501,7 +1499,7 @@ export namespace BetaResponse {
     /**
      * The reason why the response is incomplete.
      */
-    reason?: 'max_output_tokens' | 'content_filter';
+    reason?: 'max_output_tokens' | 'max_messages' | 'content_filter';
   }
 
   export interface BetaSpecificProgrammaticToolCallingParam {
@@ -1671,8 +1669,6 @@ export namespace BetaResponse {
   }
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -10525,11 +10521,6 @@ export interface BetaResponseUsage {
    * The total number of tokens used.
    */
   total_tokens: number;
-
-  /**
-   * Compute units for the request. Currently null when available.
-   */
-  compute_units?: number | null;
 }
 
 export namespace BetaResponseUsage {
@@ -10798,9 +10789,9 @@ export namespace BetaResponsesClientEvent {
     metadata?: { [key: string]: string } | null;
 
     /**
-     * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-     * wide range of models with different capabilities, performance characteristics,
-     * and price points. Refer to the
+     * Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI offers a wide
+     * range of models with different capabilities, performance characteristics, and
+     * price points. Refer to the
      * [model guide](https://platform.openai.com/docs/models) to browse and compare
      * available models.
      */
@@ -10980,8 +10971,6 @@ export namespace BetaResponsesClientEvent {
     prompt_cache_retention?: 'in_memory' | '24h' | null;
 
     /**
-     * **gpt-5 and o-series models only**
-     *
      * Configuration options for
      * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
      */
@@ -11261,8 +11250,6 @@ export namespace BetaResponsesClientEvent {
     }
 
     /**
-     * **gpt-5 and o-series models only**
-     *
      * Configuration options for
      * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
      */
@@ -12949,8 +12936,8 @@ export interface ResponseCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
-   * Body param: Model ID used to generate the response, like `gpt-4o` or `o3`.
-   * OpenAI offers a wide range of models with different capabilities, performance
+   * Body param: Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI
+   * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
@@ -13133,9 +13120,7 @@ export interface ResponseCreateParamsBase {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * Body param: **gpt-5 and o-series models only**
-   *
-   * Configuration options for
+   * Body param: Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: ResponseCreateParams.Reasoning | null;
@@ -13414,8 +13399,6 @@ export namespace ResponseCreateParams {
   }
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -13603,7 +13586,7 @@ export interface ResponseCancelParams {
 
 export interface ResponseCompactParams {
   /**
-   * Body param: Model ID used to generate the response, like `gpt-5` or `o3`. OpenAI
+   * Body param: Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
