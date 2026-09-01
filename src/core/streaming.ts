@@ -305,8 +305,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * Converts this stream to a newline-separated ReadableStream of
    * JSON stringified values in the stream
    * which can be turned back into a Stream with `Stream.fromReadableStream()`.
+   * Canceling a response-backed readable aborts its request. Tee branches
+   * instead leave sibling consumers running.
    */
   toReadableStream(): ReadableStream {
+    const { controller } = this;
     let iter: AsyncIterator<Item>;
 
     return makeReadableStream({
@@ -328,7 +331,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
         }
       },
       async cancel() {
-        await iter.return?.();
+        // Tee iterators have no return method and must not abort their siblings.
+        if (iter.return) {
+          controller.abort();
+          await iter.return();
+        }
       },
     });
   }

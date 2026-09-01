@@ -4,6 +4,7 @@ import { APIError, APIUserAbortError, OpenAIError } from 'openai/core/error';
 import { Stream, _iterSSEMessages } from 'openai/core/streaming';
 import * as lineDecoders from 'openai/internal/decoders/line';
 import { ReadableStreamFrom } from 'openai/internal/shims';
+import type { ResponseTextDeltaEvent } from 'openai/resources/responses/responses';
 
 const encoder = new TextEncoder();
 
@@ -344,6 +345,16 @@ describe('Stream.tee', () => {
 });
 
 describe('Stream.toReadableStream', () => {
+  const event: ResponseTextDeltaEvent = {
+    type: 'response.output_text.delta',
+    sequence_number: 0,
+    item_id: 'msg_test',
+    output_index: 0,
+    content_index: 0,
+    delta: 'hello',
+    logprobs: [],
+  };
+
   test('round-trips structured values as newline-delimited JSON', async () => {
     const original = new Stream(
       () =>
@@ -361,8 +372,12 @@ describe('Stream.toReadableStream', () => {
     await expect(collect(roundTripped)).resolves.toEqual([{ id: 1 }, { id: 2 }]);
   });
 
-  test('closes the source iterator when the readable stream is canceled', async () => {
+  test.each([false, true])('closes the source iterator (return rejects: %s)', async (rejects) => {
+    const failure = new OpenAIError('source cleanup failed');
     const returned = vi.fn().mockResolvedValue({ done: true, value: undefined });
+    if (rejects) {
+      returned.mockRejectedValue(failure);
+    }
     const source = new Stream(
       () => ({
         next: vi.fn().mockResolvedValue({ done: false, value: { id: 1 } }),
@@ -373,9 +388,104 @@ describe('Stream.toReadableStream', () => {
     const reader = source.toReadableStream().getReader();
 
     await reader.read();
-    await reader.cancel();
+    await (rejects ? expect(reader.cancel()).rejects.toBe(failure) : reader.cancel());
 
     expect(returned).toHaveBeenCalledTimes(1);
+    reader.releaseLock();
+  });
+
+  test.each([
+    ['SSE', false],
+    ['SSE', true],
+    ['NDJSON', false],
+    ['NDJSON', true],
+  ] as const)('cancels a pending %s read (after one event: %s)', async (format, afterEvent) => {
+    const cancel = vi.fn();
+    const pull = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      if (afterEvent && pull.mock.calls.length === 1) {
+        const json = JSON.stringify(event);
+        controller.enqueue(encoder.encode(format === 'SSE' ? `data: ${json}\n\n` : `${json}\n`));
+      }
+    });
+    const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+    const fetch = vi.fn(async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }));
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch });
+    const stream =
+      format === 'SSE'
+        ? await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true })
+        : Stream.fromReadableStream(body, new AbortController());
+    const reader = stream.toReadableStream().getReader();
+    let pending: ReturnType<typeof reader.read> | undefined;
+    let cancellation: Promise<void> | undefined;
+
+    try {
+      if (afterEvent) {
+        const first = await reader.read();
+        expect(new TextDecoder().decode(first.value)).toBe(`${JSON.stringify(event)}\n`);
+      }
+      pending = reader.read();
+      await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(afterEvent ? 2 : 1));
+      cancellation = reader.cancel();
+
+      await expect(settlesSoon(cancellation)).resolves.toBeUndefined();
+      await expect(pending).resolves.toEqual({ done: true, value: undefined });
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(body.locked).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(format === 'SSE' ? 1 : 0);
+    } finally {
+      stream.controller.abort();
+      await (cancellation ?? reader.cancel());
+      await pending;
+      reader.releaseLock();
+    }
+  });
+
+  test('canceling a pending tee branch leaves its sibling usable', async () => {
+    const cancel = vi.fn();
+    const pull = vi.fn();
+    let sendEvent = () => {};
+    const body = new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          sendEvent = () => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            controller.close();
+          };
+        },
+        pull,
+        cancel,
+      },
+      { highWaterMark: 0 },
+    );
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      maxRetries: 0,
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    });
+    const stream = await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true });
+    const [left, right] = stream.tee();
+    const reader = left.toReadableStream().getReader();
+    const sibling = right[Symbol.asyncIterator]();
+    const pending = reader.read();
+
+    try {
+      await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(1));
+      await expect(settlesSoon(reader.cancel())).resolves.toBeUndefined();
+      expect(stream.controller.signal.aborted).toBe(false);
+      expect(cancel).not.toHaveBeenCalled();
+
+      sendEvent();
+      await expect(settlesSoon(sibling.next())).resolves.toEqual({ done: false, value: event });
+      await expect(settlesSoon(sibling.next())).resolves.toEqual({ done: true, value: undefined });
+      expect(stream.controller.signal.aborted).toBe(false);
+      expect(body.locked).toBe(false);
+    } finally {
+      stream.controller.abort();
+      await reader.cancel();
+      await pending;
+      reader.releaseLock();
+    }
   });
 
   test('propagates iterator failures through the readable stream', async () => {
