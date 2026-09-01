@@ -76,12 +76,40 @@ function responseEvents(chunks: readonly string[]): ResponseStreamEvent[] {
   return events;
 }
 
-test.each([false, true])('background example completes (interrupted: %s)', async (interrupted) => {
-  const chunks = interrupted
-    ? ['Synthetic ', 'background ', 'response ', 'resumed ', 'after ', 'the ', 'demo ', 'break.']
-    : ['Synthetic completion.'];
+const scenarios = [
+  {
+    name: 'completion before the cutoff',
+    chunks: ['Synthetic completion.'],
+    resumed: false,
+    partial: false,
+  },
+  {
+    name: 'completion at the cutoff',
+    chunks: ['Synthetic ', 'response ', 'completed ', 'exactly ', 'at ', 'the ', 'cutoff.'],
+    resumed: false,
+    partial: false,
+  },
+  {
+    name: 'explicit interruption',
+    chunks: ['Synthetic ', 'background ', 'response ', 'resumed ', 'after ', 'the ', 'demo ', 'break.'],
+    resumed: true,
+    partial: false,
+  },
+  {
+    name: 'clean EOF before completion',
+    chunks: ['Synthetic completion.'],
+    resumed: true,
+    partial: true,
+  },
+] as const;
+
+test.each(scenarios)('background example: $name', async ({ chunks, resumed, partial }) => {
   const events = responseEvents(chunks);
   const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\ndata: [DONE]\n\n`;
+  const partialBody = `${events
+    .slice(0, -1)
+    .map((event) => `data: ${JSON.stringify(event)}`)
+    .join('\n\n')}\n\n`;
   const requests: { method: string | undefined; url: string | undefined; body: unknown }[] = [];
   const server = createServer((request, response) => {
     let requestBody = '';
@@ -95,7 +123,7 @@ test.each([false, true])('background example completes (interrupted: %s)', async
         body: requestBody ? JSON.parse(requestBody) : null,
       });
       response.writeHead(200, { 'content-type': 'text/event-stream' });
-      response.end(body);
+      response.end(partial && requests.length === 1 ? partialBody : body);
     });
   });
   server.listen(0, '127.0.0.1');
@@ -143,15 +171,15 @@ test.each([false, true])('background example completes (interrupted: %s)', async
     expect(stderr).toBe('');
     expect(exitCode).toBe(0);
     expect(stdout).toContain(chunks.join(''));
-    expect(stdout.includes('Interrupted. Continuing...')).toBe(interrupted);
+    expect(stdout.includes('Interrupted. Continuing...')).toBe(resumed);
     expect(stdout).not.toContain('synthetic-example-key');
-    expect(requests).toHaveLength(interrupted ? 2 : 1);
+    expect(requests).toHaveLength(resumed ? 2 : 1);
     expect(requests[0]).toMatchObject({
       method: 'POST',
       url: '/v1/responses',
       body: { background: true, stream: true },
     });
-    if (interrupted) {
+    if (resumed) {
       expect(requests[1]).toMatchObject({
         method: 'GET',
         url: '/v1/responses/resp_background_example?stream=true',
