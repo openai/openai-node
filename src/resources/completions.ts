@@ -141,11 +141,6 @@ export interface CompletionUsage {
   completion_tokens_details?: CompletionUsage.CompletionTokensDetails;
 
   /**
-   * Compute units for the request. Currently null when available.
-   */
-  compute_units?: number | null;
-
-  /**
    * Breakdown of tokens used in the prompt.
    */
   prompt_tokens_details?: CompletionUsage.PromptTokensDetails;
