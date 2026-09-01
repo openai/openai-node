@@ -67,7 +67,7 @@ test.each(cases)('sends $name from $location over HTTP', async ({ name, create, 
       project: null,
       baseURL: `http://127.0.0.1:${address.port}/v1`,
       maxRetries: 0,
-      timeout: 5_000,
+      timeout: 5000,
       logLevel: 'off',
       defaultHeaders:
         location === 'client defaults'
@@ -89,9 +89,7 @@ test.each(cases)('sends $name from $location over HTTP', async ({ name, create, 
       entries: 'literal-entries',
       get: 'literal-get',
     });
-    expect(requests[0]?.headers['x-remove']).toBe(
-      location === 'client defaults' ? undefined : 'from-input',
-    );
+    expect(requests[0]?.headers['x-remove']).toBe(location === 'client defaults' ? undefined : 'from-input');
     if (location === 'request options') {
       expect(requests[0]?.headers['x-retained']).toBe('retained');
     }

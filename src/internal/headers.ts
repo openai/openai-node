@@ -40,9 +40,8 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
 
   let shouldClear = false;
   let iter: Iterable<readonly (HeaderValue | readonly HeaderValue[])[]>;
-  if (headers instanceof Headers) {
-    iter = headers.entries();
-  } else if (isReadonlyArray(headers)) {
+  // Headers from other realms and fetch libraries use the same iteration protocol.
+  if (Symbol.iterator in headers) {
     iter = headers;
   } else {
     shouldClear = true;
