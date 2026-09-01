@@ -78,10 +78,12 @@ describe('Steady mock launcher', () => {
           "const fs = require('node:fs');",
           'const args = process.argv.slice(2);',
           'const observation = { args, cwd: process.cwd(), node: process.version };',
+          "if (args[0] !== '--version' && process.env.STEADY_DAEMON === 'true') {",
+          '  fs.writeFileSync(process.env.STEADY_PID_FILE, String(process.pid));',
+          '}',
           "fs.appendFileSync(process.env.STEADY_OBSERVATIONS, JSON.stringify(observation) + '\\n');",
           "if (args[0] === '--version') process.stdout.write('0.22.2\\n');",
           "else if (process.env.STEADY_DAEMON === 'true') {",
-          '  fs.writeFileSync(process.env.STEADY_PID_FILE, String(process.pid));',
           "  process.on('SIGTERM', () => process.exit(0));",
           '  setInterval(() => {}, 1000);',
           '}',
@@ -100,7 +102,8 @@ describe('Steady mock launcher', () => {
         [
           "const fs = require('node:fs');",
           "const observations = fs.existsSync(process.env.STEADY_OBSERVATIONS) ? fs.readFileSync(process.env.STEADY_OBSERVATIONS, 'utf8').trim().split('\\n') : [];",
-          "process.exit(observations.some((line) => JSON.parse(line).args[0] !== '--version') ? 0 : 1);",
+          "const daemonStarted = observations.some((line) => JSON.parse(line).args[0] !== '--version');",
+          'process.exit(daemonStarted && fs.existsSync(process.env.STEADY_PID_FILE) ? 0 : 1);',
         ].join('\n'),
       );
 
@@ -176,13 +179,7 @@ fi
 echo "synthetic startup failure" >&2
 exit 23`,
       );
-      writeShellExecutable(
-        path.join(executableDirectory, 'curl'),
-        `while [[ ! -s .stdy.log ]]; do
-  :
-done
-exit 1`,
-      );
+      writeShellExecutable(path.join(executableDirectory, 'curl'), 'exit 1');
 
       const result = spawnSync('bash', [path.join(checkout, 'scripts/mock'), 'synthetic.yml', '--daemon'], {
         cwd: fixture,
@@ -227,12 +224,21 @@ exit 1`,
       );
       writeShellExecutable(
         path.join(executableDirectory, 'curl'),
-        `while [[ ! -s "$STEADY_PID_FILE" ]]; do
+        `attempts=0
+while [[ ! -s "$STEADY_PID_FILE" && "$attempts" -lt 1000 ]]; do
+  attempts=$((attempts + 1))
   :
 done
 exit 1`,
       );
       writeShellExecutable(path.join(executableDirectory, 'sleep'), 'exit 0');
+
+      const curlWithoutPid = spawnSync('bash', [path.join(executableDirectory, 'curl')], {
+        env: { ...process.env, STEADY_PID_FILE: steadyPidFile },
+        timeout: 1000,
+      });
+      expect(curlWithoutPid.error).toBeUndefined();
+      expect(curlWithoutPid.status).toBe(1);
 
       const result = spawnSync('bash', [path.join(checkout, 'scripts/mock'), 'synthetic.yml', '--daemon'], {
         cwd: fixture,
