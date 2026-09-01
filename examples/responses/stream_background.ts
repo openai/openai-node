@@ -12,6 +12,7 @@ async function main() {
   });
 
   let id: string | null = null;
+  let interrupted = false;
 
   for await (const event of runner) {
     if (event.type === 'response.created') {
@@ -20,8 +21,14 @@ async function main() {
 
     console.log('event', event);
     if (event.sequence_number === 10) {
+      interrupted = true;
       break;
     }
+  }
+
+  if (!interrupted) {
+    console.log(await runner.finalResponse());
+    return;
   }
 
   console.log('Interrupted. Continuing...');

@@ -133,6 +133,7 @@ const initial = client.responses.stream({
 
 let responseId: string | undefined;
 let lastSequenceNumber = -1;
+let interrupted = false;
 
 for await (const event of initial) {
   lastSequenceNumber = event.sequence_number;
@@ -142,6 +143,7 @@ for await (const event of initial) {
   }
 
   if (event.sequence_number === 10) {
+    interrupted = true;
     break;
   }
 }
@@ -150,20 +152,26 @@ if (!responseId) {
   throw new Error('The response ID was not received.');
 }
 
-const resumed = client.responses.stream({
-  response_id: responseId,
-  starting_after: lastSequenceNumber,
-});
+let finalStream = initial;
+if (interrupted) {
+  finalStream = client.responses.stream({
+    response_id: responseId,
+    starting_after: lastSequenceNumber,
+  });
 
-for await (const event of resumed) {
-  if (event.type === 'response.output_text.delta') {
-    process.stdout.write(event.delta);
+  for await (const event of finalStream) {
+    if (event.type === 'response.output_text.delta') {
+      process.stdout.write(event.delta);
+    }
   }
 }
 
-const completed = await resumed.finalResponse();
+const completed = await finalStream.finalResponse();
 console.log(completed.output_text);
 ```
+
+If the initial iteration completes without the deliberate interruption, reuse its final response without making
+another retrieval request.
 
 `starting_after` suppresses events that the application has already handled. The helper still replays earlier events
 internally so snapshots and `finalResponse()` include the entire response. When resuming a response that used parsed
