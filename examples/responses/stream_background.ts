@@ -12,7 +12,7 @@ async function main() {
   });
 
   let id: string | null = null;
-  let interrupted = false;
+  let completed = false;
 
   for await (const event of runner) {
     if (event.type === 'response.created') {
@@ -20,13 +20,16 @@ async function main() {
     }
 
     console.log('event', event);
-    if (event.sequence_number === 10) {
-      interrupted = true;
+    if (event.type === 'response.completed') {
+      completed = true;
+    }
+    if (event.sequence_number === 10 && !completed) {
       break;
     }
   }
 
-  if (!interrupted) {
+  // A clean EOF alone does not mean the background response has completed.
+  if (completed) {
     console.log(await runner.finalResponse());
     return;
   }
