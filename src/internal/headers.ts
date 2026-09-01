@@ -40,9 +40,10 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
 
   let shouldClear = false;
   let iter: Iterable<readonly (HeaderValue | readonly HeaderValue[])[]>;
-  // Headers from other realms and fetch libraries use the same iteration protocol.
-  if (Symbol.iterator in headers) {
-    iter = headers;
+  // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
+  const iterator = Symbol.iterator in headers ? headers[Symbol.iterator] : undefined;
+  if (typeof iterator === 'function') {
+    iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
     shouldClear = true;
     iter = Object.entries(headers ?? {});
