@@ -1068,9 +1068,9 @@ export interface Response {
   metadata: Shared.Metadata | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
+   * Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
@@ -1233,8 +1233,6 @@ export interface Response {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -1335,7 +1333,7 @@ export namespace Response {
     /**
      * The reason why the response is incomplete.
      */
-    reason?: 'max_output_tokens' | 'content_filter';
+    reason?: 'max_output_tokens' | 'max_messages' | 'content_filter';
   }
 
   export interface SpecificProgrammaticToolCallingParam {
@@ -7699,11 +7697,6 @@ export interface ResponseUsage {
    * The total number of tokens used.
    */
   total_tokens: number;
-
-  /**
-   * Compute units for the request. Currently null when available.
-   */
-  compute_units?: number | null;
 }
 
 export namespace ResponseUsage {
@@ -7904,9 +7897,9 @@ export interface ResponsesClientEvent {
   metadata?: Shared.Metadata | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
+   * Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
@@ -7978,8 +7971,6 @@ export interface ResponsesClientEvent {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -9855,9 +9846,9 @@ export interface ResponseCreateParamsBase {
   metadata?: Shared.Metadata | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
+   * Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
@@ -9929,8 +9920,6 @@ export interface ResponseCreateParamsBase {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -10295,9 +10284,9 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
 
 export interface ResponseCompactParams {
   /**
-   * Model ID used to generate the response, like `gpt-5` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
+   * Model ID used to generate the response, like `gpt-5.6-sol`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */

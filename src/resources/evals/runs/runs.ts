@@ -196,7 +196,7 @@ export namespace CreateEvalCompletionsRunDataSource {
     metadata?: Shared.Metadata | null;
 
     /**
-     * An optional model to filter by (e.g., 'gpt-4o').
+     * An optional model to filter by (e.g., 'gpt-5.6-sol').
      */
     model?: string | null;
   }
