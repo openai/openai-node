@@ -276,10 +276,10 @@ test.each(['omitted', 'undefined', 'null', 'empty'] as const)(
 );
 
 test('preserves the selected branded parser failure', () => {
-  const error = new Error('Synthetic parser failure');
+  const parserFailure = new Error('Synthetic parser failure');
   const tool = makeParseableResponseTool(strictTool, {
     parser: () => {
-      throw error;
+      throw parserFailure;
     },
     callback: undefined,
   });
@@ -292,5 +292,5 @@ test('preserves the selected branded parser failure', () => {
   } catch (error) {
     caught = error;
   }
-  expect(caught).toBe(error);
+  expect(caught).toBe(parserFailure);
 });
