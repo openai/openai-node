@@ -293,7 +293,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * Splits the stream into two streams which can be
    * independently read from at different speeds.
    * Closing a branch discards its buffered events without stopping its sibling.
-   * Closing both branches cancels the underlying stream.
+   * Future reads on that branch finish immediately; previously issued `next()`
+   * promises remain shared with its sibling and may still resolve with events.
+   * Closing both branches invokes the source iterator's `return()` when available.
+   * For {@link Stream.fromReadableStream}, closing both branches before iteration
+   * starts does not cancel the supplied readable; cancel that readable directly.
    */
   tee(): [Stream<Item>, Stream<Item>] {
     const { controller } = this;
