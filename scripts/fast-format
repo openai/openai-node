@@ -28,12 +28,14 @@ echo "==> Fixing generated lint issues"
 node ./scripts/lint-generated.cjs --fix --file-list "$FILE_LIST"
 
 echo "==> Running oxlint --fix"
-LINT_FILES="$(grep -E '\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$' "$FILE_LIST" || true)"
+# Match the generated linter's line-based input, without letting xargs split paths.
+FILES="$(sed -e $'s/\r$//' -e '/^$/d' "$FILE_LIST")"
+LINT_FILES="$(printf '%s\n' "$FILES" | grep -E '\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$' || true)"
 if [ -n "$LINT_FILES" ]; then
-   echo "$LINT_FILES" | xargs ./node_modules/.bin/oxlint --fix --no-error-on-unmatched-pattern
+   printf '%s\n' "$LINT_FILES" | tr '\n' '\0' | xargs -0 ./node_modules/.bin/oxlint --fix --no-error-on-unmatched-pattern --
 fi
 
 echo "==> Running oxfmt --write"
-if [ -s "$FILE_LIST" ]; then
-   xargs ./node_modules/.bin/oxfmt --write --no-error-on-unmatched-pattern < "$FILE_LIST"
+if [ -n "$FILES" ]; then
+   printf '%s\n' "$FILES" | tr '\n' '\0' | xargs -0 ./node_modules/.bin/oxfmt --write --no-error-on-unmatched-pattern --
 fi
