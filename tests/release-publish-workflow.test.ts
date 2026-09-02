@@ -13,6 +13,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const workflow = readFileSync(path.join(root, '.github/workflows/create-releases.yml'), 'utf-8');
+const releaseCIJob = workflow.split('\n  release-ci:\n')[1]?.split('\n  browser-compatibility:\n')[0] ?? '';
 const publishJob = workflow.split('\n  publish:\n')[1] ?? '';
 
 function workflowRunStep(name: string): string {
@@ -184,6 +185,78 @@ describe('trusted npm release publication', () => {
             registryToken: false,
           });
         }
+      } finally {
+        rmSync(fixture, { recursive: true, force: true });
+      }
+    },
+  );
+});
+
+describe('release CI gate', () => {
+  test('binds publication to successful CI for the immutable release commit', () => {
+    expect(releaseCIJob).toContain('      actions: read');
+    expect(releaseCIJob).toMatch(/ref: \$\{\{ github\.sha \}\}/u);
+    expect(releaseCIJob).toMatch(/RELEASE_SHA: \$\{\{ needs\.publication-check\.outputs\.release_sha \}\}/u);
+    expect(releaseCIJob).toMatch(/bash \.\/bin\/check-release-ci "\$\{RELEASE_SHA\}"/u);
+    expect(publishJob).toContain('      - release-ci');
+  });
+
+  test.each([
+    ['success', 'success', 0, 'passed'],
+    ['failure', 'failure', 1, 'concluded failure'],
+  ])(
+    'requires the exact release SHA CI run to conclude %s',
+    (_case, conclusion, expectedStatus, expectedMessage) => {
+      const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-release-ci-'));
+      const executableDirectory = path.join(fixture, 'executables');
+      const observations = path.join(fixture, 'gh.json');
+      const releaseSHA = 'a'.repeat(40);
+
+      try {
+        mkdirSync(executableDirectory);
+        writeExecutable(
+          path.join(executableDirectory, 'gh'),
+          [
+            "const fs = require('node:fs');",
+            'fs.writeFileSync(process.env.GH_OBSERVATIONS, JSON.stringify(process.argv.slice(2)));',
+            'process.stdout.write(process.env.GH_RESPONSE);',
+          ].join('\n'),
+        );
+
+        const result = spawnSync('bash', [path.join(root, 'bin/check-release-ci'), releaseSHA], {
+          cwd: root,
+          encoding: 'utf-8',
+          env: {
+            ...process.env,
+            PATH: `${executableDirectory}${path.delimiter}${process.env['PATH']}`,
+            GH_OBSERVATIONS: observations,
+            GH_RESPONSE: JSON.stringify({
+              workflow_runs: [
+                {
+                  id: 123,
+                  event: 'push',
+                  head_branch: 'main',
+                  head_sha: releaseSHA,
+                  status: 'completed',
+                  conclusion,
+                  html_url: 'https://github.example.test/actions/runs/123',
+                },
+              ],
+            }),
+            GITHUB_REPOSITORY: 'openai/openai-node',
+            RELEASE_CI_MAX_ATTEMPTS: '1',
+            RELEASE_CI_POLL_INTERVAL_SECONDS: '0',
+          },
+        });
+        const output = `${result.stdout}${result.stderr}`;
+        const args = JSON.parse(readFileSync(observations, 'utf-8')) as string[];
+
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(expectedStatus);
+        expect(output).toContain(expectedMessage);
+        expect(args).toContain('repos/openai/openai-node/actions/workflows/ci.yml/runs');
+        expect(args).toContain(`head_sha=${releaseSHA}`);
+        expect(args).toContain('event=push');
       } finally {
         rmSync(fixture, { recursive: true, force: true });
       }

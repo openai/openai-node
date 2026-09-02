@@ -163,6 +163,29 @@ jobs:
             exit "${version_status}"
           fi
 
+  release-ci:
+    name: require successful CI for release commit
+    if: needs.publication-check.outputs.should_publish == 'true'
+    needs: publication-check
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Wait for CI on the immutable release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.publication-check.outputs.release_sha }}
+        run: |
+          bash ./bin/check-release-ci "${RELEASE_SHA}"
+
   browser-compatibility:
     name: check browser compatibility before publication
     if: needs.publication-check.outputs.should_publish == 'true'
@@ -290,6 +313,7 @@ jobs:
     if: needs.publication-check.outputs.should_publish == 'true'
     needs:
       - publication-check
+      - release-ci
       - browser-compatibility
       - build-package
     runs-on: ubuntu-latest
