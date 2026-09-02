@@ -2,6 +2,7 @@ import { OpenAIError } from '../error';
 import type { ChatCompletionTool } from '../resources/chat/completions';
 import type {
   FunctionTool,
+  NamespaceTool,
   ParsedContent,
   ParsedResponse,
   ParsedResponseFunctionToolCall,
@@ -97,7 +98,8 @@ export function maybeParseResponse<
 }
 
 /**
- * Parses completed response text and strict function-tool arguments.
+ * Parses completed response text and strict function-tool arguments, matching
+ * namespaced functions by both namespace and name.
  *
  * Incomplete or nonterminal responses keep their parsed values as `null`, and
  * `output_parsed` returns the first successfully parsed output-text item.
@@ -177,7 +179,13 @@ export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): bo
   return (
     Array.isArray(params.tools) &&
     params.tools.some(
-      (tool) => isAutoParsableTool(tool) || (tool.type === 'function' && tool.strict === true),
+      (tool) =>
+        isAutoParsableTool(tool) ||
+        (tool.type === 'function' && tool.strict === true) ||
+        (tool.type === 'namespace' &&
+          tool.tools.some(
+            (nested) => nested.type === 'function' && (isAutoParsableTool(nested) || nested.strict === true),
+          )),
     )
   );
 }
@@ -248,17 +256,30 @@ export function isAutoParsableTool(tool: any): tool is AutoParseableResponseTool
   return tool?.['$brand'] === 'auto-parseable-tool';
 }
 
-function getInputToolByName(input_tools: Tool[], name: string): FunctionTool | undefined {
-  return input_tools.find((tool) => tool.type === 'function' && tool.name === name) as
-    | FunctionTool
-    | undefined;
+function getInputToolByName(
+  input_tools: Tool[],
+  name: string,
+  namespace?: string,
+): FunctionTool | NamespaceTool.Function | undefined {
+  for (const tool of input_tools) {
+    if (namespace == null) {
+      if (tool.type === 'function' && tool.name === name) {
+        return tool;
+      }
+    } else if (tool.type === 'namespace' && tool.name === namespace) {
+      return tool.tools.find(
+        (nested): nested is NamespaceTool.Function => nested.type === 'function' && nested.name === name,
+      );
+    }
+  }
+  return undefined;
 }
 
 function parseToolCall<Params extends ResponseCreateParamsBase>(
   params: Params,
   toolCall: ResponseFunctionToolCall,
 ): ParsedResponseFunctionToolCall {
-  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name);
+  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
 
   let parsedArguments: unknown = null;
   if (isAutoParsableTool(inputTool)) {
@@ -276,7 +297,7 @@ function parseToolCall<Params extends ResponseCreateParamsBase>(
   };
 }
 
-/** Returns whether a response function call matches a strict or auto-parseable request tool. */
+/** Matches a response function call to a strict or auto-parseable tool by namespace and name. */
 export function shouldParseToolCall(
   params: ResponseCreateParamsNonStreaming | null | undefined,
   toolCall: ResponseFunctionToolCall,
@@ -285,7 +306,7 @@ export function shouldParseToolCall(
     return false;
   }
 
-  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name);
+  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
   return isAutoParsableTool(inputTool) || inputTool?.strict || false;
 }
 
