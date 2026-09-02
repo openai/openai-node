@@ -281,19 +281,17 @@ export function buildRealtimeURL(
     return url;
   }
 
-  let url: URL;
+  const url = new URL(baseURL);
   if (azure) {
-    url = new URL(baseURL);
     const basePath = url.pathname.replace(/\/+/g, '/').replace(/\/+$/, '');
     const versionedPath = basePath.endsWith('/v1') ? basePath : `${basePath}/v1`;
     url.pathname = `${versionedPath}/realtime`;
     url.search = '';
-    url.hash = '';
   } else {
-    const path = '/realtime';
-    url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+    url.pathname += url.pathname.endsWith('/') ? 'realtime' : '/realtime';
   }
 
+  url.hash = '';
   url.protocol = 'wss';
   // Sideband control connections attach to an existing call via `call_id`.
   if (hasCallID) {
