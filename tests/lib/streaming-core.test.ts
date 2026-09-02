@@ -515,6 +515,105 @@ describe('Stream.toReadableStream', () => {
     }
   });
 
+  test.each([false, true])(
+    'keeps a long-running sibling usable after tee cancellation (nested: %s)',
+    async (nested) => {
+      const cancel = vi.fn();
+      let sequence = 0;
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ ...event, sequence_number: sequence })}\n\n`),
+            );
+            sequence += 1;
+          },
+          cancel,
+        },
+        { highWaterMark: 0 },
+      );
+      const client = new OpenAI({
+        apiKey: 'test-key',
+        maxRetries: 0,
+        fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+      });
+      const stream = await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true });
+      const [left, right] = stream.tee();
+      const branches = nested ? left.tee() : [left];
+      const readers = branches.map((branch) => branch.toReadableStream().getReader());
+      const sibling = right[Symbol.asyncIterator]();
+
+      try {
+        await Promise.all(readers.map((reader) => reader.read()));
+        await Promise.all(readers.map((reader) => reader.cancel()));
+
+        const results = await Promise.all(Array.from({ length: 2048 }, () => sibling.next()));
+        expect(results.every((result) => !result.done)).toBe(true);
+        expect(results.map((result) => result.value.sequence_number)).toEqual(
+          Array.from({ length: 2048 }, (_, index) => index),
+        );
+        await expect(Promise.all(readers.map((reader) => reader.read()))).resolves.toEqual(
+          readers.map(() => ({ done: true, value: undefined })),
+        );
+        expect(stream.controller.signal.aborted).toBe(false);
+        expect(cancel).not.toHaveBeenCalled();
+        await expect(sibling.next()).resolves.toMatchObject({
+          done: false,
+          value: { sequence_number: 2048 },
+        });
+      } finally {
+        stream.controller.abort();
+        await sibling.next();
+        await Promise.all(readers.map((reader) => reader.cancel()));
+        for (const reader of readers) {
+          reader.releaseLock();
+        }
+      }
+    },
+  );
+
+  test('canceling both pending tee branches closes their response once', async () => {
+    const cancel = vi.fn();
+    const pull = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      maxRetries: 0,
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    });
+    const stream = await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true });
+    const [left, right] = stream.tee();
+    const first = left.toReadableStream().getReader();
+    const second = right.toReadableStream().getReader();
+    const readers = [first, second];
+    const pending = readers.map((reader) => reader.read());
+
+    try {
+      await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(1));
+      await expect(settlesSoon(first.cancel())).resolves.toBeUndefined();
+      expect(stream.controller.signal.aborted).toBe(false);
+      expect(cancel).not.toHaveBeenCalled();
+      await expect(settlesSoon(second.cancel())).resolves.toBeUndefined();
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(body.locked).toBe(false);
+      await expect(Promise.all(pending)).resolves.toEqual([
+        { done: true, value: undefined },
+        { done: true, value: undefined },
+      ]);
+      await Promise.all(readers.map((reader) => reader.cancel()));
+      expect(cancel).toHaveBeenCalledTimes(1);
+    } finally {
+      stream.controller.abort();
+      await Promise.all(readers.map((reader) => reader.cancel()));
+      await Promise.all(pending);
+      for (const reader of readers) {
+        reader.releaseLock();
+      }
+    }
+  });
+
   test('propagates iterator failures through the readable stream', async () => {
     const failure = new OpenAIError('source failed');
     const source = new Stream(() => ({ next: vi.fn().mockRejectedValue(failure) }), new AbortController());

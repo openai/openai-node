@@ -11,20 +11,28 @@ type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
 type StreamTeeQueue<Item> = {
   readonly length: number;
+  readonly canceled: boolean;
   enqueue: (value: Promise<IteratorResult<Item>>) => void;
   dequeue: () => Promise<IteratorResult<Item>> | undefined;
+  cancel: () => void;
 };
 
 function createStreamTeeQueue<Item>(): StreamTeeQueue<Item> {
   let entries: (Promise<IteratorResult<Item>> | undefined)[] = [];
   let head = 0;
+  let canceled = false;
 
   return {
     get length() {
       return entries.length - head;
     },
+    get canceled() {
+      return canceled;
+    },
     enqueue(value) {
-      entries.push(value);
+      if (!canceled) {
+        entries.push(value);
+      }
     },
     dequeue() {
       if (head === entries.length) {
@@ -44,6 +52,11 @@ function createStreamTeeQueue<Item>(): StreamTeeQueue<Item> {
       }
 
       return value;
+    },
+    cancel() {
+      canceled = true;
+      entries.length = 0;
+      head = 0;
     },
   };
 }
@@ -69,6 +82,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
   /** Abort controller for the underlying request and all branches created with `tee()`. */
   controller: AbortController;
   #client: OpenAI | undefined;
+  #isTeeBranch = false;
   private iterator: () => AsyncIterator<Item>;
 
   /** Wraps an asynchronous event iterator and the controller that owns its request. */
@@ -278,14 +292,20 @@ export class Stream<Item> implements AsyncIterable<Item> {
   /**
    * Splits the stream into two streams which can be
    * independently read from at different speeds.
+   * Closing a branch discards its buffered events without stopping its sibling.
+   * Closing both branches cancels the underlying stream.
    */
   tee(): [Stream<Item>, Stream<Item>] {
+    const { controller } = this;
     const left = createStreamTeeQueue<Item>();
     const right = createStreamTeeQueue<Item>();
     const iterator = this.iterator();
 
     const teeIterator = (queue: StreamTeeQueue<Item>): AsyncIterator<Item> => ({
       next: () => {
+        if (queue.canceled) {
+          return Promise.resolve({ value: undefined, done: true });
+        }
         if (queue.length === 0) {
           const result = iterator.next();
           left.enqueue(result);
@@ -293,20 +313,31 @@ export class Stream<Item> implements AsyncIterable<Item> {
         }
         return queue.dequeue()!;
       },
+      return: async () => {
+        if (!queue.canceled) {
+          queue.cancel();
+          if (left.canceled && right.canceled) {
+            await this.#cancelIterator(iterator, controller);
+          }
+        }
+        return { value: undefined, done: true };
+      },
     });
 
-    return [
-      new Stream(() => teeIterator(left), this.controller, this.#client),
-      new Stream(() => teeIterator(right), this.controller, this.#client),
-    ];
+    const branch = (queue: StreamTeeQueue<Item>) => {
+      const stream = new Stream(() => teeIterator(queue), controller, this.#client);
+      stream.#isTeeBranch = true;
+      return stream;
+    };
+    return [branch(left), branch(right)];
   }
 
   /**
    * Converts this stream to a newline-separated ReadableStream of
    * JSON stringified values in the stream
    * which can be turned back into a Stream with `Stream.fromReadableStream()`.
-   * Canceling a response-backed readable aborts its request. Tee branches
-   * instead leave sibling consumers running.
+   * Canceling a response-backed readable aborts its request. Canceling a tee
+   * branch discards its buffered events and leaves sibling consumers running.
    */
   toReadableStream(): ReadableStream {
     const { controller } = this;
@@ -330,15 +361,18 @@ export class Stream<Item> implements AsyncIterable<Item> {
           ctrl.error(err);
         }
       },
-      async cancel() {
-        const returnMethod = iter.return;
-        // Tee iterators have no return method and must not abort their siblings.
-        if (returnMethod) {
-          controller.abort();
-          await Reflect.apply(returnMethod, iter, []);
-        }
-      },
+      cancel: () => this.#cancelIterator(iter, controller),
     });
+  }
+
+  async #cancelIterator(iterator: AsyncIterator<Item>, controller: AbortController): Promise<void> {
+    const returnMethod = iterator.return;
+    if (returnMethod) {
+      if (!this.#isTeeBranch) {
+        controller.abort();
+      }
+      await Reflect.apply(returnMethod, iterator, []);
+    }
   }
 }
 
