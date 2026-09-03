@@ -195,6 +195,8 @@ describe('ecosystem test CLI', () => {
         path.join(fixture, 'tsn.cjs'),
         `require(${JSON.stringify(path.join(root, 'node_modules/ts-node/dist/bin.js'))}).main();\n`,
       );
+      // The fixture uses the repository's installed ts-node; parallel workers need no root install.
+      writeFileSync(path.join(fixture, 'pnpm-workspace.yaml'), 'verifyDepsBeforeRun: false\n');
 
       for (const name of projects) {
         const project = path.join(fixture, 'ecosystem-tests', name);
