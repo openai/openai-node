@@ -34,16 +34,16 @@ export function createEmbedding(
     ...options,
     __security: { bearerAuth: true },
   };
-  const shouldDecode = !hasUserProvidedEncodingFormat && requestOptions.body === optimizedBody;
+  const hasBodyOverride = requestOptions.body !== optimizedBody;
   const response: APIPromise<CreateEmbeddingResponse> = client.post('/embeddings', requestOptions);
 
-  // Only decode the optimized body we supplied, not a caller's body override.
-  if (!shouldDecode) {
+  // Explicit encodings return the original response promise unchanged.
+  if (hasUserProvidedEncodingFormat) {
     return response;
   }
 
-  // The default request uses base64 on the wire, but returns the API's default
-  // numeric embedding representation to the caller.
+  // Preserve numeric output for default requests, including body overrides that
+  // change the encoding used on the wire.
   loggerFor(client).debug('embeddings/decoding base64 embeddings from base64');
 
   return response._thenUnwrap((data) => {
@@ -54,8 +54,12 @@ export function createEmbedding(
       for (let index = 0; index < length; index += 1) {
         if (index in embeddings) {
           const embeddingBase64Obj = embeddings[index] as Embedding;
-          const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
-          embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
+          const { embedding } = embeddingBase64Obj;
+          // A body override can request float embeddings or omit the format.
+          if (hasBodyOverride && Array.isArray(embedding)) {
+            continue;
+          }
+          embeddingBase64Obj.embedding = toFloat32Array(embedding as unknown as string);
         }
       }
     }

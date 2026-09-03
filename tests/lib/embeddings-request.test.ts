@@ -4,6 +4,7 @@ import { APIPromise } from 'openai/api-promise';
 import type { Fetch } from 'openai/internal/builtin-types';
 import type { RequestOptions } from 'openai/internal/request-options';
 import type { PromiseOrValue } from 'openai/internal/types';
+import { compareType } from '../utils/typing';
 
 const vector = [1.25, -2.5];
 const encodedVector = Buffer.from(new Float32Array(vector).buffer).toString('base64');
@@ -144,7 +145,7 @@ describe('embedding request compatibility', () => {
   });
 
   test.each([undefined, 'float', 'base64'] as const)(
-    'preserves a request-body override with %s encoding',
+    'preserves numeric output for a request-body override with %s encoding',
     async (format) => {
       const body = Object.freeze({ ...request });
       const overrideBody = Object.freeze({
@@ -177,9 +178,11 @@ describe('embedding request compatibility', () => {
         data: [{ embedding: expectedEmbedding }],
       });
       const response = await promise;
-      expect(response.data[0]?.embedding).toEqual(expectedEmbedding);
+      compareType<(typeof response.data)[number]['embedding'], number[]>(true);
+      expect(response.data[0]?.embedding.map((value) => value * 2)).toEqual([2.5, -5]);
+      expect(response.data[0]?.embedding).toEqual(vector);
       const dataAndResponse = await promise.withResponse();
-      expect(promise).toBe(call?.response);
+      expect(promise).not.toBe(call?.response);
       expect(dataAndResponse.data).toBe(response);
       expect(dataAndResponse.response).toBe(rawResponse);
       expect(dataAndResponse.request_id).toBe('req_embeddings');
