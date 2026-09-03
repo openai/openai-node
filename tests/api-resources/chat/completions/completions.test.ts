@@ -12,7 +12,7 @@ describe('resource completions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.chat.completions.create({
       messages: [{ content: 'string', role: 'developer' }],
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6-astra',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -32,7 +32,7 @@ describe('resource completions', () => {
           name: 'name',
         },
       ],
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6-astra',
       audio: { format: 'wav', voice: 'alloy' },
       frequency_penalty: -2,
       function_call: 'none',
