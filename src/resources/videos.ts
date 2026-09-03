@@ -240,6 +240,44 @@ export interface VideoCreateError {
    * A human-readable description of the error that was returned.
    */
   message: string;
+
+  misalignment?: VideoCreateError.Misalignment;
+}
+
+export namespace VideoCreateError {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 export type VideoModel =

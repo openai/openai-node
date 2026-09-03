@@ -106,7 +106,9 @@ jobs:
 
       - name: Read policy matrix
         id: policy
-        run: echo "matrix=$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)" >> "$GITHUB_OUTPUT"
+        run: |
+          matrix="$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   test:
     name: test (${{ matrix.node-version }})

@@ -844,7 +844,7 @@ async function main() {
                       ...(args.live ? ['--live'] : []),
                       ...(args.verbose ? ['--verbose'] : []),
                       ...(args.deploy ? ['--deploy'] : []),
-                      ...(args.fromNpm ? ['--from-npm'] : []),
+                      ...(args.fromNpm ? [`--from-npm=${args.fromNpm}`] : []),
                     ],
                     {
                       stdio: 'pipe',
