@@ -113,7 +113,7 @@ type RecordAudioOptions = {
   /** Stops recording when aborted; successful termination returns the captured audio. */
   signal?: AbortSignal;
 
-  /** Zero-based audio-input device number passed to FFmpeg; defaults to `0`. */
+  /** Zero-based audio-input index (ALSA card number on Linux); defaults to `0`. */
   device?: number;
 
   /** Positive recording duration in milliseconds; nonpositive values disable the timeout. */
@@ -233,7 +233,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
           '-f',
           provider,
           '-i',
-          `:${device ?? 0}`, // default audio input device; adjust as needed
+          provider === 'alsa' ? `hw:${device ?? 0}` : `:${device ?? 0}`,
           '-ar',
           DEFAULT_SAMPLE_RATE.toString(),
           '-ac',
