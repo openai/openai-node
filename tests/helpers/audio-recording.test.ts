@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { MockedFunction } from 'vitest';
 import { spawn } from 'node:child_process';
-import { EventEmitter, getEventListeners } from 'node:events';
+import { EventEmitter, getEventListeners, once } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
 
@@ -388,6 +388,17 @@ describe('recordAudio', () => {
 });
 
 describe('playAudio input and process errors', () => {
+  test('plays a Response body even when the response has a callable pipe property', async () => {
+    const { chunks } = mockFfplay();
+    const pipe = vi.fn();
+    const response = Object.assign(new Response('response audio'), { pipe });
+
+    await playAudio(response);
+
+    expect(Buffer.concat(chunks).toString()).toBe('response audio');
+    expect(pipe).not.toHaveBeenCalled();
+  });
+
   test('plays File inputs through their readable stream', async () => {
     const { chunks } = mockFfplay();
 
@@ -402,6 +413,36 @@ describe('playAudio input and process errors', () => {
     await playAudio(Readable.from(['node audio']));
 
     expect(Buffer.concat(chunks).toString()).toBe('node audio');
+  });
+
+  test.each([
+    { name: 'null', body: null },
+    { name: 'Buffer', body: Buffer.from('body metadata') },
+    { name: 'another readable', body: Readable.from(['body metadata']) },
+  ])('plays the outer Node readable with $name body metadata', async ({ body }) => {
+    const { chunks } = mockFfplay();
+    const source = Object.assign(Readable.from(['node audio']), { body });
+
+    await playAudio(source);
+
+    expect(Buffer.concat(chunks).toString()).toBe('node audio');
+    expect(source.body).toBe(body);
+    if (body instanceof Readable) {
+      expect(body.readableEnded).toBe(false);
+    }
+  });
+
+  test('keeps ended Node readable inputs on the stream path despite body metadata', async () => {
+    const { chunks } = mockFfplay();
+    const source = Object.assign(Readable.from([]), { body: null });
+    const ended = once(source, 'end');
+    source.resume();
+    await ended;
+
+    await playAudio(source);
+
+    expect(Buffer.concat(chunks).length).toBe(0);
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 
   test('drains ffplay output without changing its spawn arguments', async () => {
