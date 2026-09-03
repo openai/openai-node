@@ -136,7 +136,11 @@ test.each(['clean', 'abrupt'] as const)('reports a %s close before the response 
 test('completes all turns and closes normally without reporting an unfinished response', async () => {
   const result = await runExample((request, index) => {
     const responseID = `resp_${index}`;
-    if (typeof request.tool_choice === 'object' && request.tool_choice?.type === 'function') {
+    if (
+      request.type === 'response.create' &&
+      typeof request.tool_choice === 'object' &&
+      request.tool_choice?.type === 'function'
+    ) {
       const call: ResponseFunctionToolCall = {
         id: `fc_${index}`,
         type: 'function_call',
