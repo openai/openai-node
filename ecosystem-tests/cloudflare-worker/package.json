@@ -8,7 +8,7 @@
 		"deploy": "wrangler deploy",
 		"start": "wrangler dev",
 		"test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-		"test:smoke": "start-server-and-test \"npm run start -- --local --ip 127.0.0.1 --port 8787 --inspector-port 0 --log-level error\" http://127.0.0.1:8787 \"node --test tests/startup.test.mjs\"",
+		"test:smoke": "start-server-and-test \"node --import ./tests/startup-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --env-file tests/startup.vars --local --ip 127.0.0.1 --port 8787 --inspector-port 0 --log-level error\" http://127.0.0.1:8787 \"node --test tests/startup.test.mjs\"",
 		"test:ci": "start-server-and-test start http://localhost:8787 test"
 	},
 	"devDependencies": {
