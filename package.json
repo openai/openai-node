@@ -53,7 +53,7 @@
     "iconv-lite": "^0.7.3",
     "jest": "^30.4.2",
     "oxfmt": "0.62.0",
-    "oxlint": "1.76.0",
+    "oxlint": "1.79.0",
     "p-all": "^3.0.0",
     "publint": "^0.3.22",
     "signal-exit": "^4.1.0",
