@@ -41,7 +41,9 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile
+          ./scripts/steady/install
 
       - name: Ask Codex to review Node.js support
         id: codex

@@ -155,7 +155,6 @@ Steady, review the fork commit and change `STEADY_REVISION`; review the release
 checksums when changing Deno. Run `node scripts/steady/test.cjs` to check the
 installation, integrity checks, and mock-server lifecycle.
 
-
 The test suite is split between handwritten unit tests, which run with Vitest,
 and generated API-resource tests, which remain on Jest. Generated tests have a
 generator comment at the top of the file and primarily
