@@ -99,6 +99,7 @@ export type ConversationItem =
   | ResponsesAPI.ResponseToolSearchCall
   | ResponsesAPI.ResponseToolSearchOutputItem
   | ConversationItem.AdditionalTools
+  | ResponsesAPI.ResponseConfigurationUpdateItem
   | ResponsesAPI.ResponseReasoningItem
   | ConversationItem.Program
   | ConversationItem.ProgramOutput

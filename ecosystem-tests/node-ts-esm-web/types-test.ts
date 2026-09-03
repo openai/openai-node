@@ -5,5 +5,5 @@ async function typeTests(client: OpenAI) {
   const url: string = response.url;
 }
 
-// oxlint-disable-next-line unicorn/require-module-specifiers -- keep this type-test file a module
+// oxlint-disable-next-line unicorn/require-module-specifiers, typescript/no-useless-empty-export -- preserve the intentional module marker in this type-only fixture
 export {};

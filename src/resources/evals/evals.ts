@@ -136,7 +136,7 @@ export interface EvalStoredCompletionsDataSourceConfig {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalCreateResponse {
   /**
@@ -257,7 +257,7 @@ export namespace EvalCreateResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalRetrieveResponse {
   /**
@@ -378,7 +378,7 @@ export namespace EvalRetrieveResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalUpdateResponse {
   /**
@@ -499,7 +499,7 @@ export namespace EvalUpdateResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalListResponse {
   /**

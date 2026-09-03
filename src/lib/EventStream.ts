@@ -18,6 +18,7 @@ import {
   SubjectTokenProviderError,
   UnprocessableEntityError,
 } from '../error';
+import type { EmittedEventResult } from './EventEmitter';
 
 const MAX_BUFFERED_ITERATOR_EVENTS = 4096;
 const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
@@ -1577,13 +1578,7 @@ export class EventStream<EventTypes extends BaseEvents> {
    */
   emitted<Event extends keyof EventTypes>(
     event: Event,
-  ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param]
-      ? Param
-      : EventParameters<EventTypes, Event> extends []
-        ? void
-        : EventParameters<EventTypes, Event>
-  > {
+  ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;
       const onError = (error: OpenAIError) => {

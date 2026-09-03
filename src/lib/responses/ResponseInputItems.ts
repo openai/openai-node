@@ -84,6 +84,7 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
     case 'compaction':
     case 'compaction_trigger':
     case 'computer_call':
+    case 'configuration_update':
     case 'custom_tool_call':
     case 'file_search_call':
     case 'function_call':
