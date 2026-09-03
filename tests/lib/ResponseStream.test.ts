@@ -1,9 +1,34 @@
-import { vi } from 'vitest';
+import { expectTypeOf, vi } from 'vitest';
 import OpenAI, { APIError, APIUserAbortError, OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
+import type {
+  ParsedResponseStreamEvent,
+  ResponseFunctionCallArgumentsDeltaEvent,
+  ResponseTextDeltaEvent,
+} from 'openai/lib/responses/EventTypes';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
+
+test('parsed response events include every API event with unchanged non-delta shapes', () => {
+  type SnapshotDelta = ResponseTextDeltaEvent | ResponseFunctionCallArgumentsDeltaEvent;
+
+  expectTypeOf<ParsedResponseStreamEvent['type']>().toEqualTypeOf<ResponseStreamEvent['type']>();
+  expectTypeOf<Exclude<ParsedResponseStreamEvent, { type: SnapshotDelta['type'] }>>().toEqualTypeOf<
+    Exclude<ResponseStreamEvent, { type: SnapshotDelta['type'] }>
+  >();
+});
+
+test('parsed response deltas retain their required snapshots', () => {
+  expectTypeOf<ResponseTextDeltaEvent['snapshot']>().toEqualTypeOf<string>();
+  expectTypeOf<ResponseFunctionCallArgumentsDeltaEvent['snapshot']>().toEqualTypeOf<string>();
+  expectTypeOf<
+    Extract<ParsedResponseStreamEvent, { type: 'response.output_text.delta' }>
+  >().toEqualTypeOf<ResponseTextDeltaEvent>();
+  expectTypeOf<
+    Extract<ParsedResponseStreamEvent, { type: 'response.function_call_arguments.delta' }>
+  >().toEqualTypeOf<ResponseFunctionCallArgumentsDeltaEvent>();
+});
 
 describe('.stream()', () => {
   it('replays prior events when resuming by ID so snapshots stay complete', async () => {
