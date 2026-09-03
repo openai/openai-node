@@ -1395,10 +1395,38 @@ export class OpenAI {
         );
       }
 
-      const shouldRetry =
+      let shouldRetry =
         rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
           ? false
           : await this.shouldRetry(response);
+      if (
+        retriesRemaining &&
+        shouldRetry &&
+        !hasStreamingBody &&
+        (this.parseRetryAfterMillis(response.headers) ?? 0) > 60 * 1000
+      ) {
+        // Preserve the existing deadline error before refusing an excessive server delay.
+        if (x509Authentication) {
+          try {
+            const remaining = x509Authentication.remainingTimeout(
+              options,
+              x509Authentication.requestSnapshot().timeout,
+            );
+            const fallbackDelay = this.calculateDefaultRetryTimeoutMillis(
+              retriesRemaining,
+              options.maxRetries ?? this.maxRetries,
+            );
+            if (fallbackDelay >= remaining) {
+              throw new Errors.APIConnectionTimeoutError();
+            }
+          } catch (error) {
+            void Shims.CancelReadableStream(response.body).catch(() => undefined);
+            throw error;
+          }
+        }
+        // Keep the response body available for the original status error below.
+        shouldRetry = false;
+      }
       if (retriesRemaining && shouldRetry && !hasStreamingBody) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 
@@ -1610,12 +1638,7 @@ export class OpenAI {
     return false;
   }
 
-  private async retryRequest(
-    options: FinalRequestOptions,
-    retriesRemaining: number,
-    requestLogID: string,
-    responseHeaders?: Headers | undefined,
-  ): Promise<APIResponseProps> {
+  private parseRetryAfterMillis(responseHeaders?: Headers): number | undefined {
     let timeoutMillis: number | undefined;
 
     // Note the `retry-after-ms` header may not be standard, but is a good idea and we'd like proactive support for it.
@@ -1638,14 +1661,22 @@ export class OpenAI {
       }
     }
 
+    return timeoutMillis !== undefined && Number.isFinite(timeoutMillis) && timeoutMillis >= 0
+      ? timeoutMillis
+      : undefined;
+  }
+
+  private async retryRequest(
+    options: FinalRequestOptions,
+    retriesRemaining: number,
+    requestLogID: string,
+    responseHeaders?: Headers | undefined,
+  ): Promise<APIResponseProps> {
+    let timeoutMillis = this.parseRetryAfterMillis(responseHeaders);
+
     // If the API asks us to wait a certain amount of time, just do what it
     // says, but otherwise calculate a default
-    if (
-      timeoutMillis === undefined ||
-      !Number.isFinite(timeoutMillis) ||
-      timeoutMillis < 0 ||
-      timeoutMillis > 60 * 1000
-    ) {
+    if (timeoutMillis === undefined) {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }

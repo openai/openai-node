@@ -3,7 +3,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { Agent, ProxyAgent } from 'undici';
 import { vi } from 'vitest';
 
-import OpenAI, { APIUserAbortError, AzureOpenAI, BedrockOpenAI } from 'openai';
+import OpenAI, {
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  AzureOpenAI,
+  BedrockOpenAI,
+  RateLimitError,
+} from 'openai';
 import type { ClientOptions } from 'openai';
 import type { WorkloadIdentity, X509WorkloadIdentity } from 'openai/auth';
 import { createX509Transport } from 'openai/auth/x509-transport';
@@ -815,6 +821,29 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     await expect(client.models.list()).rejects.toThrow(/timed out/iu);
     expect(send).toHaveBeenCalledTimes(2);
   });
+
+  test.each([
+    [100, APIConnectionTimeoutError],
+    [2000, RateLimitError],
+  ] as const)(
+    'preserves certificate request errors with an excessive retry hint and %i ms timeout',
+    async (timeout, ErrorClass) => {
+      const response = Response.json(
+        { error: { message: 'Retry later.', type: 'rate_limit_error', code: 'slow_down' } },
+        { status: 429, headers: { 'retry-after': '90' } },
+      );
+      const send = vi
+        .spyOn(transportCapability, 'sendX509Request')
+        .mockImplementation(async (_transport, target) =>
+          target.origin === 'https://mtls.auth.openai.com' ? Response.json(TOKEN_RESPONSE) : response,
+        );
+      const client = new OpenAI(options({ timeout, maxRetries: 1 }));
+
+      await expect(client.models.list()).rejects.toBeInstanceOf(ErrorClass);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(response.bodyUsed).toBe(true);
+    },
+  );
 
   test('retains its request scope and original deadline while consuming a delayed response body', async () => {
     const send = vi

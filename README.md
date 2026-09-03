@@ -417,6 +417,10 @@ Certain errors will be automatically retried 2 times by default, with a short ex
 Connection errors (for example, due to a network connectivity problem), 408 Request Timeout, 409 Conflict,
 429 Rate Limit, and >=500 Internal errors will all be retried by default.
 
+The SDK honors valid `Retry-After` delays of up to 60 seconds (`retry-after-ms` takes precedence when
+provided). If the server requests a longer delay, the SDK returns the original status error, including
+its response headers, without retrying. Missing or invalid retry hints use exponential backoff.
+
 You can use the `maxRetries` option to configure or disable this:
 
 <!-- prettier-ignore -->

@@ -4,7 +4,9 @@ import OpenAI from 'openai';
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
+  InternalServerError,
   OAuthError,
+  RateLimitError,
   SubjectTokenProviderError,
 } from 'openai/core/error';
 import { CursorPage } from 'openai/core/pagination';
@@ -126,6 +128,47 @@ describe('OpenAI client request behavior', () => {
     }
   });
 
+  test.each([
+    [429, 'rate_limit_error', 'slow_down', RateLimitError],
+    [503, 'service_unavailable_error', 'server_is_overloaded', InternalServerError],
+  ] as const)(
+    'preserves HTTP %i errors when Retry-After exceeds the supported wait',
+    async (status, type, code, ErrorClass) => {
+      vi.useFakeTimers();
+      const startedAt = Date.now();
+      const body = { message: 'Retry later.', type, code, param: null };
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(
+            { error: body },
+            { status, headers: { 'retry-after': '90', 'x-request-id': 'req_retry_after' } },
+          ),
+        )
+        .mockResolvedValueOnce(jsonResponse({ id: 'unexpected_retry' }));
+      const client = new OpenAI({ apiKey: 'test-key', fetch });
+
+      try {
+        const result = Promise.allSettled([
+          client.responses.create({ model: 'test-model', input: 'Hello.' }),
+        ]);
+        await vi.runAllTimersAsync();
+        const [outcome] = await result;
+        if (outcome.status !== 'rejected') {
+          throw new Error('Expected the original status error.');
+        }
+        const error = outcome.reason;
+        expect(error).toBeInstanceOf(ErrorClass);
+        expect(error).toMatchObject({ status, type, code, error: body, requestID: 'req_retry_after' });
+        expect(error.headers.get('retry-after')).toBe('90');
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(Date.now()).toBe(startedAt);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   test('prefers retry-after-ms over retry-after even when retry-after-ms is zero', async () => {
     const parseDate = vi.spyOn(Date, 'parse');
     const fetch = vi
@@ -151,6 +194,50 @@ describe('OpenAI client request behavior', () => {
       expect(parseDate).not.toHaveBeenCalled();
     } finally {
       parseDate.mockRestore();
+    }
+  });
+
+  test.each([
+    ['seconds at the limit', { 'retry-after': '60' }, 60_000, true],
+    ['seconds above the limit', { 'retry-after': '61' }, 0, false],
+    ['milliseconds at the limit', { 'retry-after-ms': '60000' }, 60_000, true],
+    ['milliseconds above the limit', { 'retry-after-ms': '60001' }, 0, false],
+    ['date at the limit', { 'retry-after': 'Thu, 03 Sep 2026 12:01:00 GMT' }, 60_000, true],
+    ['date above the limit', { 'retry-after': 'Thu, 03 Sep 2026 12:01:01 GMT' }, 0, false],
+    ['long milliseconds take precedence', { 'retry-after-ms': '90000', 'retry-after': '1' }, 0, false],
+    ['zero milliseconds take precedence', { 'retry-after-ms': '0', 'retry-after': '90' }, 0, true],
+    ['explicit retry cannot exceed the limit', { 'retry-after': '90', 'x-should-retry': 'true' }, 0, false],
+    ['explicit retry opt-out', { 'retry-after': '1', 'x-should-retry': 'false' }, 0, false],
+    ['invalid hint uses backoff', { 'retry-after': 'invalid' }, 500, true],
+    ['nonfinite hint uses backoff', { 'retry-after-ms': 'Infinity', 'retry-after': '90' }, 500, true],
+    ['negative hint uses backoff', { 'retry-after': '-1' }, 500, true],
+    ['missing hint uses backoff', {}, 500, true],
+  ] as const)('schedules retries correctly: %s', async (_name, headers, elapsedMillis, retried) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-03T12:00:00Z'));
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const startedAt = Date.now();
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'Retry later.' } }, { status: 503, headers }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'recovered' }));
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+
+    try {
+      const result = Promise.allSettled([client.responses.create({ model: 'test-model', input: 'Hello.' })]);
+      await vi.runAllTimersAsync();
+      const [outcome] = await result;
+      expect(outcome.status).toBe(retried ? 'fulfilled' : 'rejected');
+      if (outcome.status === 'fulfilled') {
+        expect(outcome.value).toMatchObject({ id: 'recovered' });
+      } else {
+        expect(outcome.reason).toBeInstanceOf(InternalServerError);
+      }
+      expect(fetch).toHaveBeenCalledTimes(retried ? 2 : 1);
+      expect(Date.now() - startedAt).toBe(elapsedMillis);
+    } finally {
+      random.mockRestore();
+      vi.useRealTimers();
     }
   });
 
