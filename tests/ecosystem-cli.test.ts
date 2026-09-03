@@ -208,7 +208,10 @@ describe('ecosystem test CLI', () => {
         );
         writeFileSync(
           path.join(project, 'package.json'),
-          JSON.stringify({ private: true, scripts: { tsc: 'node test.js' } }),
+          JSON.stringify({
+            private: true,
+            scripts: { tsc: 'node test.js', 'test:smoke': 'node test.js' },
+          }),
         );
         writeFileSync(
           path.join(project, 'test.js'),
