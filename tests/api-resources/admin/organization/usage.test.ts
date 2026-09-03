@@ -130,6 +130,7 @@ describe('resource usage', () => {
       end_time: 0,
       group_by: ['project_id'],
       limit: 0,
+      line_items: ['string'],
       page: 'page',
       project_ids: ['string'],
     });

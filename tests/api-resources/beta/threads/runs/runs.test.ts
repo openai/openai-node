@@ -37,7 +37,7 @@ describe('resource runs', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6-astra',
       parallel_tool_calls: true,
       reasoning_effort: 'none',
       response_format: 'auto',

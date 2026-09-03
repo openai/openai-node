@@ -11,7 +11,7 @@ import type {
 import { ResponsesWS } from 'openai/resources/responses/ws';
 
 type ToolName = 'get_sku_inventory' | 'get_supplier_eta' | 'get_quality_alerts';
-type ToolChoice = NonNullable<ResponsesClientEvent['tool_choice']>;
+type ToolChoice = NonNullable<ResponsesClientEvent.ResponseCreate['tool_choice']>;
 
 type DemoTurn = {
   tool_name: ToolName;
