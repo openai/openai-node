@@ -56,7 +56,7 @@ describe('Steady mock launcher', () => {
   test.each([
     ['foreground', false],
     ['daemon', true],
-  ])('runs the locked local binary without pnpm in %s mode', (_mode, daemon) => {
+  ])('runs the pinned local launcher without pnpm in %s mode', (_mode, daemon) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-mock-launcher-'));
     const checkout = path.join(fixture, 'checkout');
     const executableDirectory = path.join(fixture, 'executables');
@@ -68,12 +68,11 @@ describe('Steady mock launcher', () => {
 
     try {
       mkdirSync(path.join(checkout, 'scripts'), { recursive: true });
-      mkdirSync(path.join(checkout, 'node_modules/.bin'), { recursive: true });
       mkdirSync(executableDirectory);
       writeFileSync(path.join(checkout, 'scripts/mock'), readFileSync(path.join(root, 'scripts/mock')));
 
       writeExecutable(
-        path.join(checkout, 'node_modules/.bin/steady'),
+        path.join(checkout, 'scripts/run-steady'),
         [
           "const fs = require('node:fs');",
           'const args = process.argv.slice(2);',
@@ -166,12 +165,11 @@ describe('Steady mock launcher', () => {
 
     try {
       mkdirSync(path.join(checkout, 'scripts'), { recursive: true });
-      mkdirSync(path.join(checkout, 'node_modules/.bin'), { recursive: true });
       mkdirSync(executableDirectory);
       writeFileSync(path.join(checkout, 'scripts/mock'), readFileSync(path.join(root, 'scripts/mock')));
 
       writeShellExecutable(
-        path.join(checkout, 'node_modules/.bin/steady'),
+        path.join(checkout, 'scripts/run-steady'),
         `if [[ "\${1-}" == "--version" ]]; then
   echo "0.22.2"
   exit 0
@@ -208,12 +206,11 @@ exit 23`,
 
     try {
       mkdirSync(path.join(checkout, 'scripts'), { recursive: true });
-      mkdirSync(path.join(checkout, 'node_modules/.bin'), { recursive: true });
       mkdirSync(executableDirectory);
       writeFileSync(path.join(checkout, 'scripts/mock'), readFileSync(path.join(root, 'scripts/mock')));
 
       writeExecutable(
-        path.join(checkout, 'node_modules/.bin/steady'),
+        path.join(checkout, 'scripts/run-steady'),
         [
           "const fs = require('node:fs');",
           "if (process.argv[2] === '--version') { console.log('0.22.2'); process.exit(0); }",

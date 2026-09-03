@@ -142,6 +142,20 @@ $ pnpm link --global openai
 
 ## Running tests
 
+The mock server uses [the OpenAI Steady fork](https://github.com/openai-oss-forks/steady).
+`scripts/steady/settings` pins its full Git commit and Deno 2.7.11 runtime
+checksums. `./scripts/steady/install` fetches that source, verifies the runtime,
+and caches dependencies using the fork's frozen Deno lockfile. It requires
+Git, Node.js, curl, unzip, and sha256sum or shasum. The installation supports
+macOS and Linux on x64/ARM64, and Windows x64 through Git Bash.
+
+`./scripts/run-steady` verifies the local source and runtime, then runs without
+downloading dependencies. Pass a local OpenAPI specification path. To update
+Steady, review the fork commit and change `STEADY_REVISION`; review the release
+checksums when changing Deno. Run `node scripts/steady/test.cjs` to check the
+installation, integrity checks, and mock-server lifecycle.
+
+
 The test suite is split between handwritten unit tests, which run with Vitest,
 and generated API-resource tests, which remain on Jest. Generated tests have a
 generator comment at the top of the file and primarily
@@ -162,7 +176,7 @@ its corresponding runner, for example `./scripts/test tests/lib/parser.test.ts`
 or `./scripts/test tests/api-resources/models.test.ts`.
 
 The generated portion of the full and generated suites automatically
-starts a [Steady mock server](https://github.com/dgellow/steady) against the
+starts a [Steady mock server](https://github.com/openai-oss-forks/steady) against the
 OpenAPI spec when one is not already running. To manage that server yourself,
 run `./scripts/mock` in a separate terminal.
 

@@ -27,9 +27,6 @@ importers:
       '@smithy/signature-v4':
         specifier: ^5.4.5
         version: 5.7.2
-      '@stdy/cli':
-        specifier: 0.22.2
-        version: 0.22.2
       '@swc/core':
         specifier: ^1.3.102
         version: 1.16.1(@swc/helpers@0.5.23)
@@ -1031,36 +1028,6 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
-
-  '@stdy/cli-darwin-arm64@0.22.2':
-    resolution: {integrity: sha512-k5WGyCQl7DDpYWy3BI5TxGIxOdUpMeJ0q7kUi1EYs7Y72B/q0hIKDv3/fCgoZPWBI+N9XjnlSyetaxVQTRvWow==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@stdy/cli-darwin-x64@0.22.2':
-    resolution: {integrity: sha512-BYbQhEqBiEd+G9IyXWLpgAcSXFKMr6W3ZQXiOS3O5NnOWv+bNuyo793eBvEJ5fRKiuCV6n/ANVSJZLFOf6Nzog==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@stdy/cli-linux-arm64@0.22.2':
-    resolution: {integrity: sha512-HjSQdAt40CpYIauUKJ1xyIEsdrf5LtQP1x8Su7BEZJN94807ROJXxabW+jXyc48823tVBkrnxNUUTrBK4TVTRw==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@stdy/cli-linux-x64@0.22.2':
-    resolution: {integrity: sha512-kp5QdG26EC8gEzVXI0YgzmiiFHz7DFCNRLNfAWa2rDPHr/jUBnfkP8AlbTPmv0YNQpnKn1wzSWHFw88fn/OTog==}
-    cpu: [x64]
-    os: [linux]
-
-  '@stdy/cli-win32-x64@0.22.2':
-    resolution: {integrity: sha512-7ZsJltOYVvMTl6eAy1AKMya7TFhb629FXr/BKZTyQsBrPj28rAaebQSTFYs1IZN0+n6LnJTpue6m4SIkevqBNA==}
-    cpu: [x64]
-    os: [win32]
-
-  '@stdy/cli@0.22.2':
-    resolution: {integrity: sha512-37UQfqcOSv1kevXJDt4FUA/l3vc62gzahzMcKJx5qL/kSt5ExRg++hGMwV1/PTRLIBOgbMzpKfoK26TaUYkdng==}
-    engines: {node: '>=14.0.0'}
-    hasBin: true
 
   '@swc/core-darwin-arm64@1.16.1':
     resolution: {integrity: sha512-zlJblJ8ncErD43lKdxjbUaUskJQf+LxiPXYcWXD8/8ZMV+7uuAT+CwjciLXpyZBd5Pq/S726bMpeeAwSeL1hhg==}
@@ -4408,29 +4375,6 @@ snapshots:
       tslib: 2.8.1
 
   '@standard-schema/spec@1.1.0': {}
-
-  '@stdy/cli-darwin-arm64@0.22.2':
-    optional: true
-
-  '@stdy/cli-darwin-x64@0.22.2':
-    optional: true
-
-  '@stdy/cli-linux-arm64@0.22.2':
-    optional: true
-
-  '@stdy/cli-linux-x64@0.22.2':
-    optional: true
-
-  '@stdy/cli-win32-x64@0.22.2':
-    optional: true
-
-  '@stdy/cli@0.22.2':
-    optionalDependencies:
-      '@stdy/cli-darwin-arm64': 0.22.2
-      '@stdy/cli-darwin-x64': 0.22.2
-      '@stdy/cli-linux-arm64': 0.22.2
-      '@stdy/cli-linux-x64': 0.22.2
-      '@stdy/cli-win32-x64': 0.22.2
 
   '@swc/core-darwin-arm64@1.16.1':
     optional: true

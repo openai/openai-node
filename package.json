@@ -39,7 +39,6 @@
     "@aws-sdk/credential-provider-node": "^3.972.47",
     "@smithy/hash-node": "^4.3.5",
     "@smithy/signature-v4": "^5.4.5",
-    "@stdy/cli": "0.22.2",
     "@swc/core": "^1.3.102",
     "@swc/jest": "^0.2.29",
     "@types/jest": "^30.0.0",
