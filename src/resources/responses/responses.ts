@@ -3109,11 +3109,6 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
   item_id: string;
 
   /**
-   * The name of the function that was called.
-   */
-  name: string;
-
-  /**
    * The index of the output item.
    */
   output_index: number;
@@ -3124,6 +3119,11 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
   sequence_number: number;
 
   type: 'response.function_call_arguments.done';
+
+  /**
+   * The name of the function that was called.
+   */
+  name?: string;
 }
 
 /**

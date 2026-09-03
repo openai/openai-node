@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
 import type OpenAI from 'openai';
+import type { ResponseFunctionCallArgumentsDoneEvent } from 'openai/resources/responses/responses';
+import type { BetaResponseFunctionCallArgumentsDoneEvent } from 'openai/resources/beta/responses/responses';
 import { makeParseableResponseTool, maybeParseResponse, parseResponse } from '../../src/lib/ResponsesParser';
 import type { ExtractParsedContentFromParams } from '../../src/lib/ResponsesParser';
 import { makeParseableTextFormat } from '../../src/lib/parser';
@@ -10,7 +12,7 @@ import type {
   ResponseStreamParams,
 } from '../../src/lib/responses/ResponseStream';
 import type { Response, ResponseCreateParamsBase } from '../../src/resources/responses/responses';
-import { compareType } from '../utils/typing';
+import { compareType, expectType } from '../utils/typing';
 
 const structuredTextParams = {
   model: 'gpt-5.4-mini',
@@ -300,4 +302,34 @@ async function _responsesParsedTypes(client: OpenAI) {
     text: { format: { type: 'text' } },
   });
   compareType<(typeof textResponse)['output_parsed'], null>(true);
+}
+
+// Compile-time only; `tsc` covers this file, and the function is never called.
+function _responseFunctionCallDoneTypes(
+  stable: ResponseFunctionCallArgumentsDoneEvent,
+  beta: BetaResponseFunctionCallArgumentsDoneEvent,
+) {
+  const payload = {
+    type: 'response.function_call_arguments.done' as const,
+    item_id: 'fc_123',
+    output_index: 0,
+    sequence_number: 1,
+    arguments: '{}',
+  };
+  expectType<ResponseFunctionCallArgumentsDoneEvent>(payload);
+  expectType<BetaResponseFunctionCallArgumentsDoneEvent>(payload);
+  compareType<typeof stable.name, string | undefined>(true);
+  compareType<typeof beta.name, string | undefined>(true);
+
+  for (const event of [stable, beta]) {
+    if (event.name !== undefined) {
+      expectType<string>(event.name.toUpperCase());
+    }
+    // @ts-expect-error The done event may omit its name.
+    event.name.toUpperCase();
+  }
+  // @ts-expect-error An optional name is still a non-null string when present.
+  expectType<ResponseFunctionCallArgumentsDoneEvent>({ ...payload, name: null });
+  // @ts-expect-error Beta uses the same optional, non-null name contract.
+  expectType<BetaResponseFunctionCallArgumentsDoneEvent>({ ...payload, name: null });
 }
