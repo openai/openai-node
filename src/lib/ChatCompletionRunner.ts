@@ -11,7 +11,7 @@ import type { AutoParseableTool } from '../lib/parser';
 
 /** Events emitted while executing a non-streaming chat completion tool run. */
 export interface ChatCompletionRunnerEvents extends AbstractChatCompletionRunnerEvents {
-  /** Called when an assistant message with nonempty text content is received. */
+  /** Called when a new assistant message with nonempty text is received; input history is not emitted. */
   content: (content: string) => void;
 }
 
@@ -88,14 +88,18 @@ export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletion
     return runner;
   }
 
-  /** Appends a conversation message and emits text content for assistant replies. */
+  /**
+   * Appends a conversation message and emits text content for assistant replies.
+   * @param normalizeContent Defaults to true; initial history passes false to preserve caller-owned messages.
+   */
   override _addMessage(
     this: ChatCompletionRunner<ParsedT>,
     message: ChatCompletionMessageParam,
     emit = true,
+    normalizeContent = true,
   ) {
-    super._addMessage(message, emit);
-    if (isAssistantMessage(message) && message.content) {
+    super._addMessage(message, emit, normalizeContent);
+    if (emit && isAssistantMessage(message) && message.content) {
       this._emit('content', message.content as string);
     }
   }

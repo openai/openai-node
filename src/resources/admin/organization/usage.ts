@@ -6639,6 +6639,12 @@ export interface UsageCostsParams {
   limit?: number;
 
   /**
+   * Return only costs for these exact line item names. Each value must match the
+   * complete `line_item` value, for example `gpt-6-astra, input_tokens`.
+   */
+  line_items?: Array<string>;
+
+  /**
    * A cursor for use in pagination. Corresponding to the `next_page` field from the
    * previous response.
    */

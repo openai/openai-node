@@ -38,7 +38,6 @@ Object.defineProperty(CustomResponse.prototype, Symbol.toStringTag, {
   value: 'Response',
 });
 
-// oxlint-disable-next-line max-classes-per-file -- Both node-fetch layouts require distinct Body and Response prototypes.
 const NodeFetchBody = class Body {
   readonly nativeResponse: Response;
   readonly nodeFetchVersion: 'v2' | 'v3';

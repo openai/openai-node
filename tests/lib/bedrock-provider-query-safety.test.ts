@@ -61,6 +61,55 @@ function firstSignedRequest(calls: Parameters<SignatureV4['sign']>[]) {
 }
 
 describe('Bedrock SigV4 query parameter safety', () => {
+  test.each(endpointCases)(
+    'signs repeated query values without repeatedly traversing earlier values for $endpoint',
+    async ({ endpoint, signingService }) => {
+      const marker = 'synthetic-repeated-query-value';
+      const values = Object.freeze(Array.from({ length: 256 }, (_, index) => `${marker}-${index}`));
+      const extraValues = Object.freeze(['', 'one two', 'snowman☃', 'a+b']);
+      const sign = vi.spyOn(SignatureV4.prototype, 'sign');
+      const fetch = mockFetch();
+      const client = new OpenAI({ provider: staticProvider(endpoint), fetch, maxRetries: 0 });
+      const originalIterator = Array.prototype[Symbol.iterator];
+      let visitedValues = 0;
+      // oxlint-disable-next-line no-extend-native -- Count real traversal work; a Vitest iterator spy recursively invokes itself.
+      Array.prototype[Symbol.iterator] = function* countArrayValues(
+        this: unknown[],
+      ): Generator<unknown, undefined, unknown> {
+        for (const value of originalIterator.call(this)) {
+          if (typeof value === 'string' && value.startsWith(marker)) {
+            visitedValues += 1;
+          }
+          yield value;
+        }
+      };
+
+      try {
+        await client.get('/models', { query: { tag: values, extra: extraValues } });
+      } finally {
+        // oxlint-disable-next-line no-extend-native -- Restore the native iterator even when the request fails.
+        Array.prototype[Symbol.iterator] = originalIterator;
+      }
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(sign).toHaveBeenCalledTimes(1);
+      const signedRequest = firstSignedRequest(sign.mock.calls);
+      expect(signedRequest.query).toEqual({ 'tag[]': values, 'extra[]': extraValues });
+      const [request] = fetch.mock.calls;
+      if (!request) {
+        throw new Error('Expected the signed request to be sent.');
+      }
+      const [url, init] = request;
+      expect(new URL(String(url)).searchParams.getAll('tag[]')).toEqual(values);
+      expect(new URL(String(url)).searchParams.getAll('extra[]')).toEqual(extraValues);
+      expect(new Headers(init?.headers).get('authorization')).toContain(
+        `/us-east-1/${signingService}/aws4_request`,
+      );
+      // Count work rather than elapsed time so repeated array copies fail deterministically.
+      expect(visitedValues).toBeLessThanOrEqual(values.length * 4);
+    },
+  );
+
   test.each(
     endpointCases.flatMap(({ endpoint, signingService }) =>
       inheritedQueryNames.map((queryName) => ({ endpoint, signingService, queryName })),
