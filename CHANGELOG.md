@@ -1,5 +1,38 @@
 # Changelog
 
+## [7.10.0](https://github.com/openai/openai-node/compare/v7.9.0...v7.10.0) (2026-09-03)
+
+
+### Features
+
+* **api:** add gpt-6-astra and related features ([#2582](https://github.com/openai/openai-node/issues/2582)) ([94ecdc4](https://github.com/openai/openai-node/commit/94ecdc4e4e8d7fb6c2e36e713b7237438267103b))
+
+
+### Documentation
+
+* add canonical SDK security model ([#2566](https://github.com/openai/openai-node/issues/2566)) ([e6a7468](https://github.com/openai/openai-node/commit/e6a746865acf9f836b9b21dbf10afcf81eb160b3))
+
+## [7.9.0](https://github.com/openai/openai-node/compare/v7.8.0...v7.9.0) (2026-09-02)
+
+
+### Features
+
+* **api:** update usage APIs and documentation ([#2565](https://github.com/openai/openai-node/issues/2565)) ([4908505](https://github.com/openai/openai-node/commit/490850592b40f77f6a8769c5c43417bac0e50a36))
+
+
+### Bug Fixes
+
+* **api:** prevent Responses WebSockets from following redirects ([#2513](https://github.com/openai/openai-node/issues/2513)) ([0a4fb1b](https://github.com/openai/openai-node/commit/0a4fb1b23994d27aa73ce96162b18add4dac93d4))
+* load CommonJS under browser export conditions ([#2507](https://github.com/openai/openai-node/issues/2507)) ([222f3d7](https://github.com/openai/openai-node/commit/222f3d7dffd9fd3d3d183473e1a7810e5e027d7e))
+* restore monthly Node version review ([#2553](https://github.com/openai/openai-node/issues/2553)) ([15dc890](https://github.com/openai/openai-node/commit/15dc890326c5156bb49ea7292aa47e718d628d59))
+* support Jest 28 CommonJS package imports ([#2511](https://github.com/openai/openai-node/issues/2511)) ([eea2292](https://github.com/openai/openai-node/commit/eea2292a4a523da9405161dde0a79ac5dc2ecb2a))
+
+
+### Chores
+
+* **deps-dev:** bump browserslist to 4.28.7 across ecosystem tests ([#2554](https://github.com/openai/openai-node/issues/2554)) ([a408e0b](https://github.com/openai/openai-node/commit/a408e0b8d993fb4e04852cbaecbbcd92cee0dd1c))
+* raise custom-code budget to 4,000 lines ([#2562](https://github.com/openai/openai-node/issues/2562)) ([82c5b2d](https://github.com/openai/openai-node/commit/82c5b2def367f88d9c05c83b23dfb78ac6b9f25c))
+
 ## [7.8.0](https://github.com/openai/openai-node/compare/v7.7.0...v7.8.0) (2026-08-27)
 
 

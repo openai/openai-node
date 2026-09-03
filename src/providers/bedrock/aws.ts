@@ -115,7 +115,7 @@ function requestTarget(parsedURL: URL): { path: string; query: Record<string, st
     } else if (typeof existing === 'string') {
       query[name] = [existing, value];
     } else {
-      query[name] = [...existing, value];
+      existing.push(value);
     }
   }
   return { path: parsedURL.pathname, query };

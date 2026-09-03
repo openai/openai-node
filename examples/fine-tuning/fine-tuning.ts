@@ -49,7 +49,11 @@ async function main() {
 
   const events: Record<string, FineTuningJobEvent> = {};
 
-  while (fineTune.status === 'running' || fineTune.status === 'queued') {
+  while (
+    fineTune.status === 'validating_files' ||
+    fineTune.status === 'queued' ||
+    fineTune.status === 'running'
+  ) {
     fineTune = await client.fineTuning.jobs.retrieve(fineTune.id);
     console.log(`${fineTune.status}`);
 

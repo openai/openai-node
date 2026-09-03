@@ -170,6 +170,73 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
+    { name: 'sequential', options: [], packageOption: '--fromNpm' },
+    { name: 'explicit worker count', options: ['--jobs=2'], packageOption: '--fromNpm' },
+    { name: 'parallel', options: ['--parallel'], packageOption: '--from-npm' },
+  ])('installs the selected local package in $name mode', ({ options, packageOption }) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
+    const dependency = path.join(fixture, 'selected package = fixture');
+    const projects = ['node-js', 'cloudflare-worker'];
+    const version = '0.0.0-selected-fixture';
+
+    try {
+      mkdirSync(dependency);
+      writeFileSync(path.join(dependency, 'package.json'), JSON.stringify({ name: 'openai', version }));
+      writeFileSync(
+        path.join(fixture, 'package.json'),
+        JSON.stringify({
+          private: true,
+          packageManager: JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf-8')).packageManager,
+          scripts: { tsn: 'node tsn.cjs' },
+        }),
+      );
+      writeFileSync(
+        path.join(fixture, 'tsn.cjs'),
+        `require(${JSON.stringify(path.join(root, 'node_modules/ts-node/dist/bin.js'))}).main();\n`,
+      );
+
+      for (const name of projects) {
+        const project = path.join(fixture, 'ecosystem-tests', name);
+        mkdirSync(project, { recursive: true });
+        writeFileSync(
+          path.join(project, 'package.json'),
+          JSON.stringify({ private: true, scripts: { tsc: 'node test.js' } }),
+        );
+        writeFileSync(
+          path.join(project, 'test.js'),
+          [
+            "const fs = require('node:fs');",
+            "const { version } = require('openai/package.json');",
+            "fs.writeFileSync('installed-version.txt', version);",
+          ].join('\n'),
+        );
+      }
+
+      const result = runCli(
+        [...projects, `${packageOption}=${dependency}`, '--noCleanup', ...options],
+        fixture,
+        {
+          npm_config_audit: 'false',
+          npm_config_fund: 'false',
+          npm_config_offline: 'true',
+          npm_config_package_lock: 'false',
+        },
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      for (const project of projects) {
+        expect(
+          readFileSync(path.join(fixture, 'ecosystem-tests', project, 'installed-version.txt'), 'utf-8'),
+        ).toBe(version);
+      }
+      expect(existsSync(path.join(fixture, '.pack'))).toBe(false);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
     {
       projectName: 'node-ts-cjs',
       option: '--live',

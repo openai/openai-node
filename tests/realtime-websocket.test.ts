@@ -91,8 +91,11 @@ function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): 
   (realtime as { on: (event: string, listener: Listener) => unknown }).on(event, listener);
 }
 
-function createClient(apiKey: string | (() => Promise<string>) = 'test-key'): OpenAI {
-  return new OpenAI({ apiKey, baseURL: 'https://example.com/v1/' });
+function createClient(
+  apiKey: string | (() => Promise<string>) = 'test-key',
+  baseURL = 'https://example.com/v1/',
+): OpenAI {
+  return new OpenAI({ apiKey, baseURL });
 }
 
 function createAzureClient(
@@ -139,6 +142,28 @@ describe.each([
   { name: 'stable', Realtime: StableBrowserRealtime, beta: false },
   { name: 'beta', Realtime: BetaBrowserRealtime, beta: true },
 ])('$name browser realtime websocket', ({ Realtime, beta }) => {
+  test('preserves base URL routing queries when opening a model session', () => {
+    const client = createClient('test-key', 'https://example.com/v1?route=tenant#configuration');
+
+    const realtime = new Realtime({ model: 'gpt-realtime' }, client);
+
+    expect(lastBrowserSocket().url).toBe('wss://example.com/v1/realtime?route=tenant&model=gpt-realtime');
+    expect(realtime.url.toString()).toBe(lastBrowserSocket().url);
+    expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.test-key');
+  });
+
+  test('preserves base URL routing queries when resolving sideband credentials', async () => {
+    const client = createClient(
+      async () => 'rotating-key',
+      'https://example.com/v1/?route=tenant&call_id=previous#configuration',
+    );
+
+    await Realtime.create(client, { callID: 'rtc_123' });
+
+    expect(lastBrowserSocket().url).toBe('wss://example.com/v1/realtime?route=tenant&call_id=rtc_123');
+    expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.rotating-key');
+  });
+
   test('opens model and sideband sessions with the expected authentication protocols', () => {
     const client = createClient();
     const model = new Realtime({ model: 'gpt-realtime' }, client);
@@ -469,6 +494,32 @@ describe.each([
   { name: 'stable', Realtime: StableNodeRealtime, beta: false },
   { name: 'beta', Realtime: BetaNodeRealtime, beta: true },
 ])('$name Node realtime websocket', ({ Realtime, beta }) => {
+  test('preserves base URL routing queries when opening a model session', () => {
+    const client = createClient('test-key', 'https://example.com/v1?route=tenant#configuration');
+
+    const realtime = new Realtime({ model: 'gpt-realtime' }, client);
+
+    expect(lastNodeSocket().url.toString()).toBe(
+      'wss://example.com/v1/realtime?route=tenant&model=gpt-realtime',
+    );
+    expect(realtime.url.toString()).toBe(lastNodeSocket().url.toString());
+    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer test-key' });
+  });
+
+  test('preserves base URL routing queries when resolving sideband credentials', async () => {
+    const client = createClient(
+      async () => 'rotating-key',
+      'https://example.com/v1/?route=tenant&call_id=previous#configuration',
+    );
+
+    await Realtime.create(client, { callID: 'rtc_123' });
+
+    expect(lastNodeSocket().url.toString()).toBe(
+      'wss://example.com/v1/realtime?route=tenant&call_id=rtc_123',
+    );
+    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer rotating-key' });
+  });
+
   test('opens authenticated model and sideband sessions and preserves custom headers', () => {
     const client = createClient();
     const model = new Realtime(

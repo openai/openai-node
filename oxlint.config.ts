@@ -296,6 +296,20 @@ module.exports = defineConfig({
       },
     },
     {
+      // Privacy coverage needs a custom response and both node-fetch Body/Response layouts.
+      files: ['tests/auth/workload-identity-success-response-privacy.test.ts'],
+      rules: {
+        'max-classes-per-file': ['error', { max: 4 }],
+      },
+    },
+    {
+      // CommonJS constructor coverage verifies forwarding through two inheritance levels.
+      files: ['ecosystem-tests/node-js/test.js'],
+      rules: {
+        'max-classes-per-file': ['error', { max: 2 }],
+      },
+    },
+    {
       // Jest matcher augmentation and the public ChatCompletionStream type surface
       // intentionally rely on TypeScript declaration-merging namespaces.
       files: [
@@ -313,6 +327,40 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/no-namespace': 'off',
+      },
+    },
+    {
+      // Oxlint's core rule does not distinguish TypeScript's separate type/value
+      // bindings or declaration-merging namespaces; preserve these intentional pairs.
+      files: [
+        'examples/chat-completions/tool-call-helpers-zod.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'tests/lib/assistant-stream-event-history-retention.test.ts',
+        'tsconfig.dist-src.d.ts',
+      ],
+      rules: {
+        'no-redeclare': 'off',
+      },
+    },
+    {
+      // These existing state machines capture the same object that a logical
+      // assignment initializes; keep their reference and evaluation semantics.
+      files: [
+        'src/core/EventEmitter.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/EventEmitter.ts',
+        'src/lib/EventStream.ts',
+        'src/lib/transform.ts',
+      ],
+      rules: {
+        'no-multi-assign': 'off',
+      },
+    },
+    {
+      // The vendored parser's unused never parameter checks switch exhaustiveness.
+      files: ['src/_vendor/zod-to-json-schema/parseDef.ts'],
+      rules: {
+        'no-unused-vars': ['error', { argsIgnorePattern: '^_$' }],
       },
     },
     {
