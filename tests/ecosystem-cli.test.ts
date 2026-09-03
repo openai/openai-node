@@ -208,7 +208,10 @@ describe('ecosystem test CLI', () => {
         );
         writeFileSync(
           path.join(project, 'package.json'),
-          JSON.stringify({ private: true, scripts: { tsc: 'node test.js' } }),
+          JSON.stringify({
+            private: true,
+            scripts: { tsc: 'node test.js', 'test:smoke': 'node test.js' },
+          }),
         );
         writeFileSync(
           path.join(project, 'test.js'),
@@ -249,7 +252,11 @@ describe('ecosystem test CLI', () => {
       projectName: 'cloudflare-worker',
       option: '--deploy',
       phase: 'deploy',
-      scripts: { tsc: 'node observe.cjs typecheck', deploy: 'node observe.cjs deploy' },
+      scripts: {
+        tsc: 'node observe.cjs typecheck',
+        'test:smoke': 'node observe.cjs smoke',
+        deploy: 'node observe.cjs deploy',
+      },
     },
   ])(
     'provides API credentials and case variants only to the $phase ecosystem command',
@@ -325,6 +332,9 @@ describe('ecosystem test CLI', () => {
         ).toEqual([
           { phase: 'install', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' },
           { phase: 'typecheck', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' },
+          ...(projectName === 'cloudflare-worker'
+            ? [{ phase: 'smoke', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' }]
+            : []),
           { phase, apiKey, apiKeyNames: inheritedApiKeyNames, unrelatedValue: 'preserved-value' },
         ]);
       } finally {
