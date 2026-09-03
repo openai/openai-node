@@ -196,6 +196,17 @@ function normalizeFilenamePath(value: string): string {
   return normalized;
 }
 
+const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
+
+/** Recognizes native ArrayBuffers across realms without trusting their prototype or string tag. */
+export function isArrayBuffer(value: unknown): value is ArrayBuffer {
+  try {
+    return arrayBufferByteLengthGetter?.call(value) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
 export const isAsyncIterable = (value: any): value is AsyncIterable<any> =>
   value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
@@ -538,7 +549,7 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
     yield encodeUTF8(value);
   } else if (ArrayBuffer.isView(value)) {
     yield new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  } else if (value instanceof ArrayBuffer) {
+  } else if (isArrayBuffer(value)) {
     yield new Uint8Array(value);
   } else if (value instanceof Response) {
     yield* iterateBytes(value.body || (await value.blob()));

@@ -1,5 +1,5 @@
 import type { BlobPart } from './uploads';
-import { getName, makeFile, isAsyncIterable, checkFileSupport } from './uploads';
+import { getName, makeFile, isAsyncIterable, isArrayBuffer, checkFileSupport } from './uploads';
 import type { FilePropertyBag } from './builtin-types';
 
 /** Text, binary content, or a Blob-compatible value accepted inside a file stream. */
@@ -176,7 +176,7 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
   if (
     typeof value === 'string' ||
     ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.
-    value instanceof ArrayBuffer
+    isArrayBuffer(value)
   ) {
     parts.push(value);
   } else if (isBlobLike(value)) {
