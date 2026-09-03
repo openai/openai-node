@@ -226,6 +226,24 @@ afterEach(() => {
 });
 
 describe.each(directMethods)('%s public cancellation', (_name, requests, invoke) => {
+  test.each([
+    { name: 'default interval', header: undefined },
+    { name: 'server interval', header: '9000' },
+  ])('honors a zero interval over the $name and releases its abort listener', async ({ header }) => {
+    const controller = new AbortController();
+    const { client, fetch } = createClient(header);
+    const pending = observe(invoke(client, { signal: controller.signal, pollIntervalMs: 0 }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(requestCount(fetch)).toBe(requests + 1);
+    await expect(Promise.race([pending, Promise.resolve('still polling')])).resolves.toMatchObject({
+      completed: { status: 'completed' },
+    });
+    expect(getEventListeners(controller.signal, 'abort')).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   test('promptly cancels the documented caller signal without another request', async () => {
     const controller = new AbortController();
     const { client, fetch } = createClient();

@@ -51,4 +51,5 @@ const main = async () => {
 
 main().catch((error) => {
   console.error('Error generating image:', error);
+  process.exitCode = 1;
 });
