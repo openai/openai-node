@@ -133,6 +133,7 @@ const initial = client.responses.stream({
 
 let responseId: string | undefined;
 let lastSequenceNumber = -1;
+let completed = false;
 
 for await (const event of initial) {
   lastSequenceNumber = event.sequence_number;
@@ -141,7 +142,11 @@ for await (const event of initial) {
     responseId = event.response.id;
   }
 
-  if (event.sequence_number === 10) {
+  if (event.type === 'response.completed') {
+    completed = true;
+  }
+
+  if (event.sequence_number === 10 && !completed) {
     break;
   }
 }
@@ -150,20 +155,26 @@ if (!responseId) {
   throw new Error('The response ID was not received.');
 }
 
-const resumed = client.responses.stream({
-  response_id: responseId,
-  starting_after: lastSequenceNumber,
-});
+let finalStream = initial;
+if (!completed) {
+  finalStream = client.responses.stream({
+    response_id: responseId,
+    starting_after: lastSequenceNumber,
+  });
 
-for await (const event of resumed) {
-  if (event.type === 'response.output_text.delta') {
-    process.stdout.write(event.delta);
+  for await (const event of finalStream) {
+    if (event.type === 'response.output_text.delta') {
+      process.stdout.write(event.delta);
+    }
   }
 }
 
-const completed = await resumed.finalResponse();
-console.log(completed.output_text);
+const response = await finalStream.finalResponse();
+console.log(response.output_text);
 ```
+
+Reuse the initial response only after receiving `response.completed`. A clean end to the stream can still leave a
+background response queued or in progress, in which case retrieve it to continue streaming.
 
 `starting_after` suppresses events that the application has already handled. The helper still replays earlier events
 internally so snapshots and `finalResponse()` include the entire response. When resuming a response that used parsed

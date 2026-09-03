@@ -187,7 +187,20 @@ const handleRequest = async (req: Request, res: Response) => {
   }
 };
 
-app.post('/', (req: Request, res: Response) => handleRequest(req, res).catch(console.error));
+app.post('/', (req: Request, res: Response) =>
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Express 4 does not await async handlers; consume rejections in this synchronous route.
+  handleRequest(req, res).catch((error: unknown) => {
+    console.error(error);
+    if (res.destroyed || res.writableEnded) {
+      return;
+    }
+    if (res.headersSent) {
+      res.destroy();
+    } else {
+      res.status(500).end('Internal Server Error');
+    }
+  }),
+);
 
 const onListening = () => {
   console.log(

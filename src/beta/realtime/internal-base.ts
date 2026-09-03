@@ -186,8 +186,9 @@ export function buildRealtimeURL(
   const hasModel = !!config.model;
   const hasCallID = !!config.callID;
 
-  const path = '/realtime';
-  const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+  const url = new URL(baseURL);
+  url.pathname += url.pathname.endsWith('/') ? 'realtime' : '/realtime';
+  url.hash = '';
 
   if (hasModel === hasCallID) {
     throw new Error('Pass exactly one of `model` or `callID` when opening a Realtime WebSocket.');

@@ -309,7 +309,7 @@ export class NextCursorPage<Item> extends AbstractPage<Item> implements NextCurs
       return false;
     }
 
-    return super.hasNextPage();
+    return this.nextPageRequestOptions() != null;
   }
 
   nextPageRequestOptions(): PageRequestOptions | null {

@@ -39,7 +39,7 @@ type _StableCreateToolsStayShared = Assert<
   IsEqual<NonNullable<ResponseCreateParamsBase['tools']>[number], Tool>
 >;
 type _StableClientEventToolsStayShared = Assert<
-  IsEqual<NonNullable<ResponsesClientEvent['tools']>[number], Tool>
+  IsEqual<NonNullable<ResponsesClientEvent.ResponseCreate['tools']>[number], Tool>
 >;
 type _StableToolSearchOutputToolsStayShared = Assert<
   IsEqual<ResponseToolSearchOutputItemParam['tools'][number], Tool>
