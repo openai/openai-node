@@ -6,6 +6,9 @@ scriptShell: bash
 
 minimumReleaseAge: 11520
 minimumReleaseAgeStrict: true
+minimumReleaseAgeExclude:
+  # Security exception: qs 6.16.0 fixes GHSA-4mjr-xmp4-gh2g and GHSA-x5fp-wj9c-mxmx.
+  - 'qs@6.16.0'
 trustPolicy: no-downgrade
 trustPolicyExclude:
   # semver@6.3.1 is an established transitive dependency, but pnpm's trust-policy
@@ -30,6 +33,7 @@ overrides:
   # Keep the existing minimatch security override from the prior Yarn/npm setup.
   minimatch: ^9.0.9
   'postcss@<8.5.23': 8.5.23
+  'qs@<6.16.0': 6.16.0
 
 allowBuilds:
   '@swc/core': true
