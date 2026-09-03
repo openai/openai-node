@@ -303,6 +303,13 @@ module.exports = defineConfig({
       },
     },
     {
+      // CommonJS constructor coverage verifies forwarding through two inheritance levels.
+      files: ['ecosystem-tests/node-js/test.js'],
+      rules: {
+        'max-classes-per-file': ['error', { max: 2 }],
+      },
+    },
+    {
       // Jest matcher augmentation and the public ChatCompletionStream type surface
       // intentionally rely on TypeScript declaration-merging namespaces.
       files: [
