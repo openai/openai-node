@@ -152,6 +152,7 @@ import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Graders } from './resources/graders/graders';
 import { Realtime } from './resources/realtime/realtime';
 import { Responses } from './resources/responses/responses';
+import { Safety } from './resources/safety/safety';
 import {
   DeletedSkill,
   Skill,
@@ -1306,6 +1307,7 @@ export class OpenAI {
   fineTuning: API.FineTuning = new API.FineTuning(this);
   graders: API.Graders = new API.Graders(this);
   vectorStores: API.VectorStores = new API.VectorStores(this);
+  safety: API.Safety = new API.Safety(this);
   webhooks: API.Webhooks = new API.Webhooks(this);
   beta: API.Beta = new API.Beta(this);
   /**
@@ -1347,6 +1349,7 @@ OpenAI.Models = Models;
 OpenAI.FineTuning = FineTuning;
 OpenAI.Graders = Graders;
 OpenAI.VectorStores = VectorStores;
+OpenAI.Safety = Safety;
 OpenAI.Webhooks = Webhooks;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
@@ -1551,6 +1554,8 @@ export declare namespace OpenAI {
     type VectorStoreListParams as VectorStoreListParams,
     type VectorStoreSearchParams as VectorStoreSearchParams,
   };
+
+  export { Safety as Safety };
 
   export { Webhooks as Webhooks };
 

@@ -731,6 +731,78 @@ export namespace ResponseIncompleteWebhookEvent {
 }
 
 /**
+ * Sent when an approved safety alert is available for an API project.
+ */
+export interface SafetyAlertCreatedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyAlertCreatedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.alert.created`.
+   */
+  type: 'safety.alert.created';
+}
+
+export namespace SafetyAlertCreatedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety alert ID to pass to `GET /v1/safety/alerts/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when an approved safety alert is available for an enterprise workspace.
+ */
+export interface SafetyOrgAlertCreatedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyOrgAlertCreatedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.org_alert.created`.
+   */
+  type: 'safety.org_alert.created';
+}
+
+export namespace SafetyOrgAlertCreatedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety alert ID to pass to `GET /v1/safety/alerts/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
  * Sent when a batch API request has been cancelled.
  */
 export type UnwrapWebhookEvent =
@@ -749,7 +821,9 @@ export type UnwrapWebhookEvent =
   | ResponseCancelledWebhookEvent
   | ResponseCompletedWebhookEvent
   | ResponseFailedWebhookEvent
-  | ResponseIncompleteWebhookEvent;
+  | ResponseIncompleteWebhookEvent
+  | SafetyAlertCreatedWebhookEvent
+  | SafetyOrgAlertCreatedWebhookEvent;
 
 export declare namespace Webhooks {
   export {
@@ -769,6 +843,8 @@ export declare namespace Webhooks {
     type ResponseCompletedWebhookEvent as ResponseCompletedWebhookEvent,
     type ResponseFailedWebhookEvent as ResponseFailedWebhookEvent,
     type ResponseIncompleteWebhookEvent as ResponseIncompleteWebhookEvent,
+    type SafetyAlertCreatedWebhookEvent as SafetyAlertCreatedWebhookEvent,
+    type SafetyOrgAlertCreatedWebhookEvent as SafetyOrgAlertCreatedWebhookEvent,
     type UnwrapWebhookEvent as UnwrapWebhookEvent,
   };
 }

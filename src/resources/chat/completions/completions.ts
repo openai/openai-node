@@ -45,7 +45,7 @@ export class Completions extends APIResource {
    * const chatCompletion = await client.chat.completions.create(
    *   {
    *     messages: [{ content: 'string', role: 'developer' }],
-   *     model: 'gpt-5.6-sol',
+   *     model: 'gpt-6-astra',
    *   },
    * );
    * ```
@@ -1895,7 +1895,7 @@ export interface ChatCompletionCreateParamsBase {
   messages: Array<ChatCompletionMessageParam>;
 
   /**
-   * Model ID used to generate the response, like `gpt-5.6-sol` or `o3`. OpenAI
+   * Model ID used to generate the response, like `gpt-6-astra` or `o3`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare

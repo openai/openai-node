@@ -376,6 +376,18 @@ Methods:
 - <code title="post /vector_stores/{vector_store_id}/file_batches/{batch_id}/cancel">client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">cancel</a>(batchID, { ...params }) -> VectorStoreFileBatch</code>
 - <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}/files">client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">listFiles</a>(batchID, { ...params }) -> VectorStoreFilesPage</code>
 
+# Safety
+
+## Alerts
+
+Types:
+
+- <code><a href="./src/resources/safety/alerts.ts">SafetyAlert</a></code>
+
+Methods:
+
+- <code title="get /safety/alerts/{id}">client.safety.alerts.<a href="./src/resources/safety/alerts.ts">retrieve</a>(id) -> SafetyAlert</code>
+
 # [Webhooks](src/resources/webhooks/api.md)
 
 # Beta
@@ -426,6 +438,8 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseComputerToolCall</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseComputerToolCallOutputItem</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseComputerToolCallOutputScreenshot</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseConfigurationUpdateItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseConfigurationUpdateItemParam</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseContainerReference</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseContent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseContentPartAddedEvent</a></code>
@@ -515,6 +529,15 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallOutputContentDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseShellCallOutputContentDoneEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStatus</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerAcceptedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerErrorCode</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerFailedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerInput</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerInputContent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerPendingEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerPendingReason</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseSteerRequiredInput</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStreamEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseTextConfig</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseTextDeltaEvent</a></code>
