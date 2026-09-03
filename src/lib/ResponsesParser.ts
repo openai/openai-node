@@ -220,9 +220,9 @@ export function makeParseableResponseTool<OptionsT extends ToolOptions>(
     /** Converts the raw JSON argument string into the function's typed argument value. */
     parser: (content: string) => OptionsT['arguments'];
     /** Optional callback available to helpers that execute the parsed function. */
-    callback: ((args: any) => any) | undefined;
+    callback: ((args: OptionsT['arguments']) => any) | undefined;
   },
-): AutoParseableResponseTool<OptionsT['arguments']> {
+): AutoParseableResponseTool<OptionsT> {
   const obj = { ...tool };
 
   Object.defineProperties(obj, {
@@ -240,7 +240,7 @@ export function makeParseableResponseTool<OptionsT extends ToolOptions>(
     },
   });
 
-  return obj as AutoParseableResponseTool<OptionsT['arguments']>;
+  return obj as AutoParseableResponseTool<OptionsT>;
 }
 
 /** Returns whether a Responses API tool carries the SDK's argument-parser marker. */
