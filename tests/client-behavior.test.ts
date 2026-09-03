@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
+  APIUserAbortError,
   OAuthError,
   SubjectTokenProviderError,
 } from 'openai/core/error';
@@ -193,6 +194,34 @@ describe('OpenAI client request behavior', () => {
 
     await expect(client.get('/items', { signal: controller.signal })).rejects.toThrow('Request was aborted');
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('rejects promptly when aborted during retry backoff', async () => {
+    vi.useFakeTimers();
+    const reason = new Error('stop retrying');
+    const controller = new AbortController();
+    const fetch = vi.fn(async () =>
+      jsonResponse(
+        { error: { message: 'rate limited' } },
+        { status: 429, headers: { 'retry-after-ms': '60000' } },
+      ),
+    );
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+    const request = client.get('/items', { signal: controller.signal });
+
+    try {
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+      const typeAssertion = expect(request).rejects.toBeInstanceOf(APIUserAbortError);
+      const causeAssertion = expect(request).rejects.toMatchObject({ cause: reason });
+      controller.abort(reason);
+      await vi.advanceTimersByTimeAsync(0);
+
+      await typeAssertion;
+      await causeAssertion;
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('encodes URL-encoded request objects with the configured content type', async () => {

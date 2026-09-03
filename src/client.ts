@@ -1661,7 +1661,14 @@ export class OpenAI {
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
     } else {
-      await sleep(timeoutMillis);
+      try {
+        await sleep(timeoutMillis, options.signal);
+      } catch (error) {
+        if (options.signal?.aborted) {
+          throw this._makeUserAbortError(options.signal);
+        }
+        throw error;
+      }
     }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
