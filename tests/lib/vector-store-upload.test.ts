@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 
 import OpenAI from 'openai';
+import type { Fetch } from 'openai/internal/builtin-types';
 import type { Uploadable } from 'openai/uploads';
 import type { VectorStoreFileBatch } from 'openai/resources/vector-stores/file-batches';
 
@@ -90,22 +91,26 @@ describe('vector-store batch upload orchestration', () => {
     expect(active).toBe(0);
   });
 
-  test('preserves zero concurrency and copies existing identifiers', async () => {
-    const client = createClient();
-    const upload = vi.spyOn(client.files, 'create');
-    const createAndPoll = vi
-      .spyOn(client.vectorStores.fileBatches, 'createAndPoll')
-      .mockResolvedValue(completed);
-    const fileIds = ['existing'];
-    const options = { maxConcurrency: 0 };
+  test.each([
+    { name: 'zero with existing IDs', limit: 0, fileIds: ['existing'] },
+    { name: 'negative zero with existing IDs', limit: -0, fileIds: ['existing'] },
+    { name: 'zero without existing IDs', limit: 0, fileIds: undefined },
+  ])('rejects $name before any request', async ({ limit, fileIds }) => {
+    const fetch = vi.fn<Fetch>(async () => Response.json(completed));
+    const client = new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/', fetch });
+    const originalFileIds = fileIds === undefined ? undefined : [...fileIds];
+    const options = { maxConcurrency: limit };
 
-    await expect(
-      client.vectorStores.fileBatches.uploadAndPoll('vs_123', { files: createFiles(1), fileIds }, options),
-    ).resolves.toBe(completed);
-    expect(upload).not.toHaveBeenCalled();
-    expect(createAndPoll).toHaveBeenCalledWith('vs_123', { file_ids: ['existing'] }, options);
-    expect(createAndPoll.mock.calls[0]?.[1].file_ids).not.toBe(fileIds);
-    expect(fileIds).toEqual(['existing']);
+    const result = client.vectorStores.fileBatches.uploadAndPoll(
+      'vs_123',
+      { files: createFiles(1), ...(fileIds === undefined ? {} : { fileIds }) },
+      options,
+    );
+
+    await expect(result).rejects.toBeInstanceOf(RangeError);
+    await expect(result).rejects.toThrow('maxConcurrency must be greater than 0');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(fileIds).toEqual(originalFileIds);
   });
 
   test.each([-1, Number.NaN, 1.5, Number.NEGATIVE_INFINITY])(

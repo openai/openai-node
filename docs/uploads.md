@@ -203,6 +203,8 @@ if (batch.status !== 'completed' || batch.file_counts.failed > 0 || batch.file_c
 }
 ```
 
+A zero `maxConcurrency` is rejected before any upload or batch-creation request.
+
 Use `vectorStores.files.createAndPoll` or
 `vectorStores.fileBatches.createAndPoll` when files have already been uploaded
 and you only need to attach and process their IDs. These polling helpers accept

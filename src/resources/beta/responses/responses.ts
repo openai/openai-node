@@ -170,7 +170,7 @@ export class Responses extends APIResource {
    * ```ts
    * const betaCompactedResponse =
    *   await client.beta.responses.compact({
-   *     model: 'gpt-5.6-sol',
+   *     model: 'gpt-6-astra',
    *   });
    * ```
    */
@@ -614,6 +614,12 @@ export interface BetaCustomTool {
   allowed_callers?: Array<'direct' | 'programmatic'> | null;
 
   /**
+   * Whether the tool response can be returned asynchronously versus immediately
+   * returned on next response creation.
+   */
+  async?: boolean;
+
+  /**
    * Whether this tool should be deferred and discovered via tool search.
    */
   defer_loading?: boolean;
@@ -901,6 +907,8 @@ export interface BetaFunctionTool {
    */
   allowed_callers?: Array<'direct' | 'programmatic'> | null;
 
+  async?: boolean;
+
   /**
    * Whether this function is deferred and loaded via tool search.
    */
@@ -1058,6 +1066,12 @@ export namespace BetaNamespaceTool {
     allowed_callers?: Array<'direct' | 'programmatic'> | null;
 
     /**
+     * Whether the tool response can be returned asynchronously versus immediately
+     * returned on next response creation.
+     */
+    async?: boolean;
+
+    /**
      * Whether this function should be deferred and discovered via tool search.
      */
     defer_loading?: boolean;
@@ -1122,13 +1136,14 @@ export interface BetaResponse {
   metadata: { [key: string]: string } | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
+   * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
   model:
+    | 'gpt-6-astra'
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
@@ -1398,8 +1413,6 @@ export interface BetaResponse {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -1499,9 +1512,11 @@ export namespace BetaResponse {
    */
   export interface IncompleteDetails {
     /**
-     * The reason why the response is incomplete.
+     * The reason why the response is incomplete. `steered` means the response stopped
+     * at a safe output boundary after a WebSocket `response.steer` event. The server
+     * can then create a successor response automatically with the queued input.
      */
-    reason?: 'max_output_tokens' | 'content_filter';
+    reason?: 'max_output_tokens' | 'max_messages' | 'content_filter' | 'steered';
   }
 
   export interface BetaSpecificProgrammaticToolCallingParam {
@@ -1671,8 +1686,6 @@ export namespace BetaResponse {
   }
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -2669,6 +2682,105 @@ export interface BetaResponseComputerToolCallOutputScreenshot {
 }
 
 /**
+ * A configuration update that applies to subsequent responses until it is replaced
+ * by another configuration update.
+ */
+export interface BetaResponseConfigurationUpdateItem {
+  /**
+   * The unique ID of the configuration update item.
+   */
+  id: string;
+
+  /**
+   * The item type. Always `configuration_update`.
+   */
+  type: 'configuration_update';
+
+  /**
+   * The agent that produced this item.
+   */
+  agent?: BetaResponseConfigurationUpdateItem.Agent;
+
+  /**
+   * The reasoning configuration applied by this update.
+   */
+  reasoning?: BetaResponseConfigurationUpdateItem.Reasoning;
+}
+
+export namespace BetaResponseConfigurationUpdateItem {
+  /**
+   * The agent that produced this item.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+
+  /**
+   * The reasoning configuration applied by this update.
+   */
+  export interface Reasoning {
+    /**
+     * The reasoning effort used for subsequent responses until another configuration
+     * update replaces it.
+     */
+    effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+  }
+}
+
+/**
+ * An update to the conversation's response configuration. The configuration
+ * remains in effect for subsequent responses until it is replaced by another
+ * configuration update.
+ */
+export interface BetaResponseConfigurationUpdateItemParam {
+  /**
+   * The item type. Always `configuration_update`.
+   */
+  type: 'configuration_update';
+
+  /**
+   * The unique ID of the configuration update item.
+   */
+  id?: string | null;
+
+  /**
+   * The agent that produced this item.
+   */
+  agent?: BetaResponseConfigurationUpdateItemParam.Agent | null;
+
+  /**
+   * Updates to reasoning configuration. Only effort is supported.
+   */
+  reasoning?: BetaResponseConfigurationUpdateItemParam.Reasoning;
+}
+
+export namespace BetaResponseConfigurationUpdateItemParam {
+  /**
+   * The agent that produced this item.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+
+  /**
+   * Updates to reasoning configuration. Only effort is supported.
+   */
+  export interface Reasoning {
+    /**
+     * The reasoning effort to use for subsequent responses until another configuration
+     * update replaces it.
+     */
+    effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+  }
+}
+
+/**
  * Represents a container created with /v1/containers.
  */
 export interface BetaResponseContainerReference {
@@ -2924,6 +3036,11 @@ export interface BetaResponseCustomToolCall {
   agent?: BetaResponseCustomToolCall.Agent | null;
 
   /**
+   * Whether the custom tool call runs asynchronously.
+   */
+  async?: boolean;
+
+  /**
    * The execution context that produced this tool call.
    */
   caller?: BetaResponseCustomToolCall.Direct | BetaResponseCustomToolCall.Program | null;
@@ -3175,6 +3292,7 @@ export interface BetaResponseError {
     | 'invalid_prompt'
     | 'data_residency_mismatch'
     | 'bio_policy'
+    | 'misalignment_policy_violation'
     | 'vector_store_timeout'
     | 'invalid_image'
     | 'invalid_image_format'
@@ -3195,6 +3313,44 @@ export interface BetaResponseError {
    * A human-readable description of the error.
    */
   message: string;
+
+  misalignment?: BetaResponseError.Misalignment;
+}
+
+export namespace BetaResponseError {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 /**
@@ -3994,6 +4150,11 @@ export interface BetaResponseFunctionToolCall {
   agent?: BetaResponseFunctionToolCall.Agent | null;
 
   /**
+   * Whether the function tool call runs asynchronously.
+   */
+  async?: boolean;
+
+  /**
    * The execution context that produced this tool call.
    */
   caller?: BetaResponseFunctionToolCall.Direct | BetaResponseFunctionToolCall.Program | null;
@@ -4543,6 +4704,10 @@ export type BetaResponseIncludable =
 
 /**
  * An event that is emitted when a response finishes as incomplete.
+ *
+ * Over WebSocket, steering can finish a response with
+ * `response.incomplete_details.reason` set to `steered`, followed automatically by
+ * a successor `response.created` that commits the queued steering input.
  */
 export interface BetaResponseIncompleteEvent {
   /**
@@ -4960,6 +5125,7 @@ export type BetaResponseInputItem =
   | BetaResponseInputItem.ToolSearchCall
   | BetaResponseToolSearchOutputItemParam
   | BetaResponseInputItem.AdditionalTools
+  | BetaResponseConfigurationUpdateItemParam
   | BetaResponseReasoningItem
   | BetaResponseCompactionItemParam
   | BetaResponseInputItem.ImageGenerationCall
@@ -6612,6 +6778,7 @@ export type BetaResponseItem =
   | BetaResponseToolSearchCall
   | BetaResponseToolSearchOutputItem
   | BetaResponseItem.AdditionalTools
+  | BetaResponseConfigurationUpdateItem
   | BetaResponseReasoningItem
   | BetaResponseItem.Program
   | BetaResponseItem.ProgramOutput
@@ -10057,6 +10224,566 @@ export type BetaResponseStatus =
   | 'incomplete';
 
 /**
+ * Emitted when steering input has been validated and queued. Acceptance means the
+ * server owns the input, not that it has been applied. The successor's
+ * `response.created` event is the commit point. If accepted input cannot be
+ * committed, `response.steer.failed` returns it with the same steering ID.
+ *
+ * When the response stops for client-owned tool output or approval, the input
+ * remains queued and `response.steer.pending` is emitted after
+ * `response.completed`. Fill the pending event's `required_input` stubs with saved
+ * results and send one matching explicit `response.create` per parent. Do not
+ * resend accepted input while it is still queued.
+ */
+export interface BetaResponseSteerAcceptedEvent {
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The accepted steering submission.
+   */
+  steer: BetaResponseSteerAcceptedEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.accepted`.
+   */
+  type: 'response.steer.accepted';
+
+  /**
+   * The WebSocket lane that emitted this event. This field is present when the
+   * target response's `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace BetaResponseSteerAcceptedEvent {
+  /**
+   * The accepted steering submission.
+   */
+  export interface Steer {
+    /**
+     * The ID assigned to the steering submission.
+     */
+    id: string;
+
+    /**
+     * The ID of the response being steered.
+     */
+    previous_response_id: string;
+  }
+}
+
+/**
+ * A machine-readable steering error code. Clients should handle unknown values
+ * because additional codes may be introduced. Known values include:
+ *
+ * - `response_not_found`: The target response is not available on this connection.
+ * - `invalid_input`: The event or input failed validation.
+ * - `steering_not_supported`: The model or response execution mode does not
+ *   support steering.
+ * - `too_many_pending_steers`: Too much steering input is pending for the
+ *   response.
+ * - `response_already_completed`: The response completed and is no longer
+ *   accepting steering input.
+ * - `response_not_active`: The response is no longer accepting steering input.
+ * - `successor_creation_failed`: The successor response could not be created.
+ */
+export type BetaResponseSteerErrorCode =
+  | 'response_not_found'
+  | 'invalid_input'
+  | 'steering_not_supported'
+  | 'too_many_pending_steers'
+  | 'response_already_completed'
+  | 'response_not_active'
+  | 'successor_creation_failed'
+  | (string & {});
+
+/**
+ * Queues user input to steer a response on this WebSocket connection. Input can
+ * contain text, images, and files. Steering is supported only for single-agent
+ * responses on models and execution modes that support steering. Responses bound
+ * to a conversation or using automatic compaction do not support steering.
+ *
+ * A `response.steer.accepted` event acknowledges that the server owns the queued
+ * input, not that it has been applied. The successor's `response.created` event is
+ * the commit point. Input that cannot be committed is returned in
+ * `response.steer.failed`.
+ *
+ * Steering may cause the active response to finish at a safe output boundary with
+ * `response.incomplete` and `incomplete_details.reason` set to `steered`, followed
+ * automatically by a successor `response.created`. Normal completion can also be
+ * followed by an automatic successor. Automatic successors inherit the previous
+ * response's settings and continue from it with the queued input.
+ *
+ * If the response stops for client-owned tool output or approval, accepted
+ * steering input remains queued and `response.steer.pending` is emitted after
+ * `response.completed`. Fill the `required_input` stubs from that event with saved
+ * tool results or approval decisions, and send one explicit `response.create` per
+ * parent with the same `previous_response_id` and WebSocket lane. Do not rerun
+ * tools or resend accepted steering input. The queued input is prepended in
+ * submission order to that request's input, and the explicit request retains its
+ * own settings.
+ *
+ * This event accepts only `type`, `previous_response_id`, and `input`. Do not send
+ * `stream_id`; the target response determines the WebSocket lane.
+ */
+export interface BetaResponseSteerEvent {
+  /**
+   * Input to queue for a continuation of the response. Uses the same string or
+   * input-item shape as `response.create.input`, with a non-empty array when
+   * supplying input items.
+   *
+   * Steering accepts only messages with the `user` role. Each message may contain
+   * only `type`, `role`, and `content`, with `content` as a string or an array of
+   * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+   * `message`. Other roles, tool outputs, and item types are not supported for
+   * steering.
+   */
+  input: BetaResponseSteerInput;
+
+  /**
+   * The ID of the response to steer on this WebSocket connection.
+   */
+  previous_response_id: string;
+
+  /**
+   * The event discriminator. Always `response.steer`.
+   */
+  type: 'response.steer';
+}
+
+/**
+ * Emitted when steering input is rejected or cannot be committed to a successor
+ * response. Returns the original, uncommitted input so the client can carry it
+ * into `response.create` when appropriate. Invalid input must be corrected before
+ * retrying.
+ *
+ * Failures after acceptance include the same steering ID. Failures before an ID is
+ * allocated omit `steer.id`. A lost connection or missing acknowledgement leaves
+ * the outcome unknown; it is not proof that the input was rejected.
+ */
+export interface BetaResponseSteerFailedEvent {
+  /**
+   * Information about why the input could not be committed.
+   */
+  error: BetaResponseSteerFailedEvent.Error;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The steering submission that could not be committed.
+   */
+  steer: BetaResponseSteerFailedEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.failed`.
+   */
+  type: 'response.steer.failed';
+
+  /**
+   * The WebSocket lane that emitted this event, when the target response is
+   * available and its `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace BetaResponseSteerFailedEvent {
+  /**
+   * Information about why the input could not be committed.
+   */
+  export interface Error {
+    /**
+     * A machine-readable steering error code. Clients should handle unknown values
+     * because additional codes may be introduced. Known values include:
+     *
+     * - `response_not_found`: The target response is not available on this connection.
+     * - `invalid_input`: The event or input failed validation.
+     * - `steering_not_supported`: The model or response execution mode does not
+     *   support steering.
+     * - `too_many_pending_steers`: Too much steering input is pending for the
+     *   response.
+     * - `response_already_completed`: The response completed and is no longer
+     *   accepting steering input.
+     * - `response_not_active`: The response is no longer accepting steering input.
+     * - `successor_creation_failed`: The successor response could not be created.
+     */
+    code: ResponsesAPI.BetaResponseSteerErrorCode;
+
+    /**
+     * A human-readable description of the error.
+     */
+    message: string;
+
+    /**
+     * The error type. Always `invalid_request_error`.
+     */
+    type: 'invalid_request_error';
+  }
+
+  /**
+   * The steering submission that could not be committed.
+   */
+  export interface Steer {
+    /**
+     * Input to queue for a continuation of the response. Uses the same string or
+     * input-item shape as `response.create.input`, with a non-empty array when
+     * supplying input items.
+     *
+     * Steering accepts only messages with the `user` role. Each message may contain
+     * only `type`, `role`, and `content`, with `content` as a string or an array of
+     * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+     * `message`. Other roles, tool outputs, and item types are not supported for
+     * steering.
+     */
+    input: ResponsesAPI.BetaResponseSteerInput;
+
+    /**
+     * The ID of the response that was targeted for steering.
+     */
+    previous_response_id: string;
+
+    /**
+     * The ID assigned to the steering submission, if one was allocated.
+     */
+    id?: string;
+  }
+}
+
+/**
+ * Input to queue for a continuation of the response. Uses the same string or
+ * input-item shape as `response.create.input`, with a non-empty array when
+ * supplying input items.
+ *
+ * Steering accepts only messages with the `user` role. Each message may contain
+ * only `type`, `role`, and `content`, with `content` as a string or an array of
+ * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+ * `message`. Other roles, tool outputs, and item types are not supported for
+ * steering.
+ */
+export type BetaResponseSteerInput =
+  | string
+  | Array<ResponseSteerInputItemList.Message | ResponseSteerInputItemList.FunctionCallOutput>;
+
+export namespace ResponseSteerInputItemList {
+  export interface Message {
+    /**
+     * The message content, as an array of content parts.
+     */
+    content: Array<ResponsesAPI.BetaResponseSteerInputContent> | string;
+
+    /**
+     * The message role. Always `user`.
+     */
+    role: 'user';
+
+    /**
+     * The item type. Always `message`.
+     */
+    type: 'message';
+
+    /**
+     * The unique ID of this message item.
+     */
+    id?: string | null;
+
+    /**
+     * The agent that produced this item.
+     */
+    agent?: Message.Agent | null;
+
+    /**
+     * The status of the message item.
+     */
+    status?: string | null;
+  }
+
+  export namespace Message {
+    /**
+     * The agent that produced this item.
+     */
+    export interface Agent {
+      /**
+       * The canonical name of the agent that produced this item.
+       */
+      agent_name: string;
+    }
+  }
+
+  /**
+   * The output of a function tool call.
+   */
+  export interface FunctionCallOutput {
+    /**
+     * Text, image, or file output of the function tool call.
+     */
+    output: string | ResponsesAPI.BetaResponseFunctionCallOutputItemList;
+
+    /**
+     * The type of the function tool call output. Always `function_call_output`.
+     */
+    type: 'function_call_output';
+
+    /**
+     * The unique ID of the function tool call output. Populated when this item is
+     * returned via API.
+     */
+    id?: string | null;
+
+    /**
+     * The agent that produced this item.
+     */
+    agent?: FunctionCallOutput.Agent | null;
+
+    /**
+     * The unique ID of the function tool call generated by the model.
+     */
+    call_id?: string | null;
+
+    /**
+     * The execution context that produced this tool call.
+     */
+    caller?: FunctionCallOutput.Direct | FunctionCallOutput.Program | null;
+
+    /**
+     * The name of the tool that produced the output.
+     */
+    name?: string | null;
+
+    /**
+     * The namespace of the tool that produced the output.
+     */
+    namespace?: string | null;
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     * Populated when items are returned via API.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export namespace FunctionCallOutput {
+    /**
+     * The agent that produced this item.
+     */
+    export interface Agent {
+      /**
+       * The canonical name of the agent that produced this item.
+       */
+      agent_name: string;
+    }
+
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
+  }
+}
+
+/**
+ * A piece of message content, such as text, an image, or a file.
+ */
+export type BetaResponseSteerInputContent =
+  | BetaResponseInputTextContent
+  | BetaResponseInputImageContent
+  | BetaResponseInputFileContent;
+
+/**
+ * Emitted when accepted steering input remains queued after the target response
+ * completes. The server still owns the input. Do not resend it. The successor's
+ * `response.created` event is the commit point.
+ *
+ * When `reason` is `waiting_for_required_input`, this event follows
+ * `response.completed` while the response waits for the tool results or approval
+ * decisions identified by `required_input`. Copy those stubs, fill their result
+ * fields using the ordinary `response.create` input schemas, and submit one
+ * continuation per parent with the same `previous_response_id` and WebSocket lane.
+ * Use saved results without rerunning tools. The queued steering input is
+ * prepended in submission order to the continuation's input. That explicit request
+ * retains its own settings.
+ *
+ * This notification is emitted at most once per steering submission. Multiple
+ * submissions for the same parent can report the same required inputs; they do not
+ * each require a separate continuation.
+ */
+export interface BetaResponseSteerPendingEvent {
+  /**
+   * An extensible enum describing why accepted steering input is still queued.
+   * Clients should handle unknown values because additional reasons may be
+   * introduced. Known values include:
+   *
+   * - `waiting_for_required_input`: The response is waiting for the tool results or
+   *   approval decisions identified by `required_input`.
+   */
+  reason: BetaResponseSteerPendingReason;
+
+  /**
+   * Input stubs identifying outstanding client-owned tool results or approval
+   * decisions. Each stub contains identifying fields only; the client supplies the
+   * result before including it in `response.create`.
+   */
+  required_input: Array<BetaResponseSteerRequiredInput>;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The steering submission that remains queued.
+   */
+  steer: BetaResponseSteerPendingEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.pending`.
+   */
+  type: 'response.steer.pending';
+
+  /**
+   * The WebSocket lane that emitted this event. This field is present when the
+   * target response's `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace BetaResponseSteerPendingEvent {
+  /**
+   * The steering submission that remains queued.
+   */
+  export interface Steer {
+    /**
+     * The ID assigned to the steering submission.
+     */
+    id: string;
+
+    /**
+     * The ID of the response being steered.
+     */
+    previous_response_id: string;
+  }
+}
+
+/**
+ * An extensible enum describing why accepted steering input is still queued.
+ * Clients should handle unknown values because additional reasons may be
+ * introduced. Known values include:
+ *
+ * - `waiting_for_required_input`: The response is waiting for the tool results or
+ *   approval decisions identified by `required_input`.
+ */
+export type BetaResponseSteerPendingReason = 'waiting_for_required_input' | (string & {});
+
+/**
+ * An input stub identifying an outstanding client-owned tool result or approval
+ * decision. Copy the stub and fill the result fields using the corresponding
+ * `response.create` input schema. Use saved results without rerunning the tool.
+ * The server does not supply results, approval decisions, or safety
+ * acknowledgements in these stubs.
+ */
+export type BetaResponseSteerRequiredInput =
+  | BetaResponseSteerRequiredInput.FunctionCallOutput
+  | BetaResponseSteerRequiredInput.CustomToolCallOutput
+  | BetaResponseSteerRequiredInput.ComputerCallOutput
+  | BetaResponseSteerRequiredInput.ShellCallOutput
+  | BetaResponseSteerRequiredInput.ApplyPatchCallOutput
+  | BetaResponseSteerRequiredInput.ToolSearchOutput
+  | BetaResponseSteerRequiredInput.McpApprovalResponse;
+
+export namespace BetaResponseSteerRequiredInput {
+  /**
+   * Supply `output` using the function tool call output input schema.
+   */
+  export interface FunctionCallOutput {
+    call_id: string;
+
+    name: string;
+
+    type: 'function_call_output';
+  }
+
+  /**
+   * Supply `output` using the custom tool call output input schema. The original
+   * custom tool call supplies the tool's name.
+   */
+  export interface CustomToolCallOutput {
+    call_id: string;
+
+    type: 'custom_tool_call_output';
+  }
+
+  /**
+   * Supply `output` using the computer tool call output input schema, including any
+   * required `acknowledged_safety_checks`.
+   */
+  export interface ComputerCallOutput {
+    call_id: string;
+
+    type: 'computer_call_output';
+  }
+
+  /**
+   * Supply `output` using the shell tool call output input schema. Each output entry
+   * includes `stdout`, `stderr`, and `outcome`.
+   */
+  export interface ShellCallOutput {
+    call_id: string;
+
+    type: 'shell_call_output';
+  }
+
+  /**
+   * Supply `status` and optional `output` using the apply patch tool call output
+   * input schema.
+   */
+  export interface ApplyPatchCallOutput {
+    call_id: string;
+
+    type: 'apply_patch_call_output';
+  }
+
+  /**
+   * Supply `tools` using the tool search output input schema, retaining
+   * `execution: "client"`.
+   */
+  export interface ToolSearchOutput {
+    call_id: string;
+
+    execution: 'client';
+
+    type: 'tool_search_output';
+  }
+
+  /**
+   * Supply `approve` using the MCP approval response input schema. An optional
+   * `reason` can be supplied when denying the request. The original approval request
+   * identifies the tool and server.
+   */
+  export interface McpApprovalResponse {
+    approval_request_id: string;
+
+    type: 'mcp_approval_response';
+  }
+}
+
+/**
  * Event emitted while a response is streamed.
  */
 export type BetaResponseStreamEvent =
@@ -10525,11 +11252,6 @@ export interface BetaResponseUsage {
    * The total number of tokens used.
    */
   total_tokens: number;
-
-  /**
-   * Compute units for the request. Currently null when available.
-   */
-  compute_units?: number | null;
 }
 
 export namespace BetaResponseUsage {
@@ -10689,7 +11411,10 @@ export namespace BetaResponseWebSearchCallSearchingEvent {
 /**
  * Client events accepted by the Responses WebSocket server.
  */
-export type BetaResponsesClientEvent = BetaResponsesClientEvent.ResponseCreate | BetaResponseInjectEvent;
+export type BetaResponsesClientEvent =
+  | BetaResponsesClientEvent.ResponseCreate
+  | BetaResponseSteerEvent
+  | BetaResponseInjectEvent;
 
 export namespace BetaResponsesClientEvent {
   /**
@@ -10798,13 +11523,14 @@ export namespace BetaResponsesClientEvent {
     metadata?: { [key: string]: string } | null;
 
     /**
-     * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-     * wide range of models with different capabilities, performance characteristics,
-     * and price points. Refer to the
+     * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+     * range of models with different capabilities, performance characteristics, and
+     * price points. Refer to the
      * [model guide](https://platform.openai.com/docs/models) to browse and compare
      * available models.
      */
     model?:
+      | 'gpt-6-astra'
       | 'gpt-5.6-sol'
       | 'gpt-5.6-terra'
       | 'gpt-5.6-luna'
@@ -10980,8 +11706,6 @@ export namespace BetaResponsesClientEvent {
     prompt_cache_retention?: 'in_memory' | '24h' | null;
 
     /**
-     * **gpt-5 and o-series models only**
-     *
      * Configuration options for
      * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
      */
@@ -11261,8 +11985,6 @@ export namespace BetaResponsesClientEvent {
     }
 
     /**
-     * **gpt-5 and o-series models only**
-     *
      * Configuration options for
      * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
      */
@@ -11401,6 +12123,9 @@ export type BetaResponsesServerEvent =
   | BetaResponsesServerEvent.BetaResponseCustomToolCallInputWsDone
   | BetaResponsesServerEvent.BetaResponseWsStreamingError
   | BetaResponsesServerEvent.BetaResponseWsError
+  | BetaResponseSteerAcceptedEvent
+  | BetaResponseSteerPendingEvent
+  | BetaResponseSteerFailedEvent
   | BetaResponseInjectCreatedEvent
   | BetaResponseInjectFailedEvent;
 
@@ -11682,6 +12407,10 @@ export namespace BetaResponsesServerEvent {
 
   /**
    * An event that is emitted when a response finishes as incomplete.
+   *
+   * Over WebSocket, steering can finish a response with
+   * `response.incomplete_details.reason` set to `steered`, followed automatically by
+   * a successor `response.created` that commits the queued steering input.
    */
   export interface BetaResponseWsIncomplete extends BetaResponseIncompleteEvent {
     /**
@@ -12112,6 +12841,44 @@ export namespace BetaResponsesServerEvent {
        * The response headers that were emitted with the error, if any.
        */
       headers?: { [key: string]: string };
+
+      misalignment?: Error.Misalignment;
+    }
+
+    export namespace Error {
+      export interface Misalignment {
+        /**
+         * The public explanation for this block.
+         */
+        detailed_explanation?: string;
+
+        /**
+         * An optional classification; clients must accept additional values.
+         */
+        error_type?:
+          | (string & {})
+          | 'potentially_unintended_data_transfer'
+          | 'potentially_unintended_data_access'
+          | 'potentially_unintended_destructive_activity'
+          | 'other';
+
+        /**
+         * An optional public continuation instruction.
+         */
+        steer?: Misalignment.Steer;
+      }
+
+      export namespace Misalignment {
+        /**
+         * An optional public continuation instruction.
+         */
+        export interface Steer {
+          /**
+           * The public continuation instruction.
+           */
+          message: string;
+        }
+      }
     }
 
     /**
@@ -12961,13 +13728,14 @@ export interface ResponseCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
-   * Body param: Model ID used to generate the response, like `gpt-4o` or `o3`.
-   * OpenAI offers a wide range of models with different capabilities, performance
+   * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
+   * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
   model?:
+    | 'gpt-6-astra'
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
@@ -13145,9 +13913,7 @@ export interface ResponseCreateParamsBase {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * Body param: **gpt-5 and o-series models only**
-   *
-   * Configuration options for
+   * Body param: Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: ResponseCreateParams.Reasoning | null;
@@ -13426,8 +14192,6 @@ export namespace ResponseCreateParams {
   }
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
@@ -13615,13 +14379,14 @@ export interface ResponseCancelParams {
 
 export interface ResponseCompactParams {
   /**
-   * Body param: Model ID used to generate the response, like `gpt-5` or `o3`. OpenAI
+   * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
   model:
+    | 'gpt-6-astra'
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
@@ -13878,6 +14643,8 @@ export declare namespace Responses {
     type BetaResponseComputerToolCall as BetaResponseComputerToolCall,
     type BetaResponseComputerToolCallOutputItem as BetaResponseComputerToolCallOutputItem,
     type BetaResponseComputerToolCallOutputScreenshot as BetaResponseComputerToolCallOutputScreenshot,
+    type BetaResponseConfigurationUpdateItem as BetaResponseConfigurationUpdateItem,
+    type BetaResponseConfigurationUpdateItemParam as BetaResponseConfigurationUpdateItemParam,
     type BetaResponseContainerReference as BetaResponseContainerReference,
     type BetaResponseContent as BetaResponseContent,
     type BetaResponseContentPartAddedEvent as BetaResponseContentPartAddedEvent,
@@ -13967,6 +14734,15 @@ export declare namespace Responses {
     type BetaResponseShellCallOutputContentDeltaEvent as BetaResponseShellCallOutputContentDeltaEvent,
     type BetaResponseShellCallOutputContentDoneEvent as BetaResponseShellCallOutputContentDoneEvent,
     type BetaResponseStatus as BetaResponseStatus,
+    type BetaResponseSteerAcceptedEvent as BetaResponseSteerAcceptedEvent,
+    type BetaResponseSteerErrorCode as BetaResponseSteerErrorCode,
+    type BetaResponseSteerEvent as BetaResponseSteerEvent,
+    type BetaResponseSteerFailedEvent as BetaResponseSteerFailedEvent,
+    type BetaResponseSteerInput as BetaResponseSteerInput,
+    type BetaResponseSteerInputContent as BetaResponseSteerInputContent,
+    type BetaResponseSteerPendingEvent as BetaResponseSteerPendingEvent,
+    type BetaResponseSteerPendingReason as BetaResponseSteerPendingReason,
+    type BetaResponseSteerRequiredInput as BetaResponseSteerRequiredInput,
     type BetaResponseStreamEvent as BetaResponseStreamEvent,
     type BetaResponseTextConfig as BetaResponseTextConfig,
     type BetaResponseTextDeltaEvent as BetaResponseTextDeltaEvent,
