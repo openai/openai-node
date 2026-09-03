@@ -30,7 +30,7 @@ PowerShell instead, add the Git for Windows `bin` directory that contains `bash.
 To set up the repository, run:
 
 ```sh
-$ pnpm install
+$ ./scripts/bootstrap
 $ pnpm build
 ```
 
