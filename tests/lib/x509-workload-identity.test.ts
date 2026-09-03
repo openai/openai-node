@@ -13,6 +13,7 @@ import OpenAI, {
 import type { ClientOptions } from 'openai';
 import type { WorkloadIdentity, X509WorkloadIdentity } from 'openai/auth';
 import { createX509Transport } from 'openai/auth/x509-transport';
+import { X509WorkloadIdentityAuth } from 'openai/internal/auth/x509-workload-identity-auth';
 import type { X509Transport } from 'openai/auth/x509-transport';
 import * as transportCapability from 'openai/internal/auth/x509-transport-capability';
 import { createProvider } from 'openai/internal/provider';
@@ -844,6 +845,34 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       expect(response.bodyUsed).toBe(true);
     },
   );
+
+  test.each([
+    [100, APIConnectionTimeoutError],
+    [2000, RateLimitError],
+    [120_000, RateLimitError],
+  ] as const)('declines an excessive issuer retry hint with %i ms timeout', async (timeout, ErrorClass) => {
+    const wait = vi.spyOn(X509WorkloadIdentityAuth.prototype, 'waitForRetry').mockResolvedValue();
+    const send = vi
+      .spyOn(transportCapability, 'sendX509Request')
+      .mockImplementation(async () =>
+        Response.json(
+          { error: { message: 'Sensitive issuer detail.' } },
+          { status: 429, headers: { 'retry-after': '90' } },
+        ),
+      );
+    const client = new OpenAI(options({ timeout, maxRetries: 1 }));
+    const request = client.models.list();
+
+    await expect(request).rejects.toBeInstanceOf(ErrorClass);
+    if (ErrorClass === RateLimitError) {
+      await expect(request).rejects.toMatchObject({
+        status: 429,
+        message: '429 X.509 workload identity token exchange failed.',
+      });
+    }
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(wait).not.toHaveBeenCalled();
+  });
 
   test('retains its request scope and original deadline while consuming a delayed response body', async () => {
     const send = vi

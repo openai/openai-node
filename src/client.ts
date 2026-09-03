@@ -1209,11 +1209,15 @@ export class OpenAI {
         !options.__metadata?.['hasStreamingBody'] &&
         X509WorkloadIdentityAuth.isRetryableFailure(error)
       ) {
+        const retryHeaders = X509WorkloadIdentityAuth.retryHeaders(error);
+        if (!this.shouldRetryAfterHeader(options, retriesRemaining, retryHeaders)) {
+          throw error;
+        }
         return await this.retryRequest(
           options,
           retriesRemaining,
           retryOfRequestLogID ?? 'x509-token-exchange',
-          X509WorkloadIdentityAuth.retryHeaders(error),
+          retryHeaders,
         );
       }
       throw error;
@@ -1399,33 +1403,18 @@ export class OpenAI {
         rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
           ? false
           : await this.shouldRetry(response);
-      if (
-        retriesRemaining &&
-        shouldRetry &&
-        !hasStreamingBody &&
-        (this.parseRetryAfterMillis(response.headers) ?? 0) > 60 * 1000
-      ) {
-        // Preserve the existing deadline error before refusing an excessive server delay.
-        if (x509Authentication) {
-          try {
-            const remaining = x509Authentication.remainingTimeout(
-              options,
-              x509Authentication.requestSnapshot().timeout,
-            );
-            const fallbackDelay = this.calculateDefaultRetryTimeoutMillis(
-              retriesRemaining,
-              options.maxRetries ?? this.maxRetries,
-            );
-            if (fallbackDelay >= remaining) {
-              throw new Errors.APIConnectionTimeoutError();
-            }
-          } catch (error) {
-            void Shims.CancelReadableStream(response.body).catch(() => undefined);
-            throw error;
-          }
+      let declinedRetryDelay = false;
+      if (retriesRemaining && shouldRetry && !hasStreamingBody) {
+        try {
+          declinedRetryDelay = !this.shouldRetryAfterHeader(options, retriesRemaining, response.headers);
+        } catch (error) {
+          void Shims.CancelReadableStream(response.body).catch(() => undefined);
+          throw error;
         }
-        // Keep the response body available for the original status error below.
-        shouldRetry = false;
+        if (declinedRetryDelay) {
+          // Keep the response body available for the original status error below.
+          shouldRetry = false;
+        }
       }
       if (retriesRemaining && shouldRetry && !hasStreamingBody) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
@@ -1466,6 +1455,9 @@ export class OpenAI {
       const errText = x509Authentication
         ? await this.readX509ResponseError(response, options, timeout, controller, x509Authentication)
         : await response.text().catch((err: any) => castToError(err).message);
+      if (declinedRetryDelay && (callerSignal?.aborted || req.signal?.aborted)) {
+        throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
+      }
       const errJSON = safeJSON(errText) as any;
       const errMessage = errJSON ? undefined : errText;
 
@@ -1635,6 +1627,32 @@ export class OpenAI {
     // Retry internal errors.
     if (response.status >= 500) return true;
 
+    return false;
+  }
+
+  private shouldRetryAfterHeader(
+    options: FinalRequestOptions,
+    retriesRemaining: number,
+    responseHeaders?: Headers,
+  ): boolean {
+    if ((this.parseRetryAfterMillis(responseHeaders) ?? 0) <= 60 * 1000) {
+      return true;
+    }
+    // Preserve the existing deadline error before refusing an excessive server delay.
+    const x509Authentication = this.#x509Authentication;
+    if (x509Authentication) {
+      const remaining = x509Authentication.remainingTimeout(
+        options,
+        x509Authentication.requestSnapshot().timeout,
+      );
+      const fallbackDelay = this.calculateDefaultRetryTimeoutMillis(
+        retriesRemaining,
+        options.maxRetries ?? this.maxRetries,
+      );
+      if (fallbackDelay >= remaining) {
+        throw new Errors.APIConnectionTimeoutError();
+      }
+    }
     return false;
   }
 

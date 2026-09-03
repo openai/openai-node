@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
+  APIUserAbortError,
   InternalServerError,
   OAuthError,
   RateLimitError,
@@ -196,6 +197,37 @@ describe('OpenAI client request behavior', () => {
       parseDate.mockRestore();
     }
   });
+
+  test.each([429, 503])(
+    'preserves cancellation while reading an over-limit HTTP %i error',
+    async (status) => {
+      const controller = new AbortController();
+      const reason = new Error('Caller canceled the request.');
+      const response = new Response(
+        new ReadableStream(
+          {
+            pull(stream) {
+              controller.abort(reason);
+              stream.error(reason);
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+        { status, headers: { 'retry-after': '90' } },
+      );
+      const fetch = vi.fn(async () => response);
+      const client = new OpenAI({ apiKey: 'test-key', fetch });
+
+      const request = client.responses.create(
+        { model: 'test-model', input: 'Hello.' },
+        { signal: controller.signal },
+      );
+      await expect(request).rejects.toBeInstanceOf(APIUserAbortError);
+      await expect(request).rejects.toMatchObject({ cause: reason });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(response.bodyUsed).toBe(true);
+    },
+  );
 
   test.each([
     ['seconds at the limit', { 'retry-after': '60' }, 60_000, true],
