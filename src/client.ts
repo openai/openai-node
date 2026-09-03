@@ -1090,7 +1090,7 @@ export class OpenAI {
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
           undefined,
-          props.controller.signal,
+          props.requestSignal,
         );
         Object.assign(props, next);
       } finally {
@@ -1487,7 +1487,15 @@ export class OpenAI {
       helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
     });
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return {
+      response,
+      options,
+      controller,
+      requestSignal: req.signal,
+      requestLogID,
+      retryOfRequestLogID,
+      startTime,
+    };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(

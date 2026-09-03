@@ -256,6 +256,41 @@ describe('OpenAI client request behavior', () => {
     },
   );
 
+  test('retries a response body timeout without treating it as a user abort', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const preparedController = new AbortController();
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(new ReadableStream(), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ recovered: true }));
+    const client = new OpenAI({
+      provider: createProvider({
+        configure: () => ({
+          name: 'test-provider',
+          baseURL: 'https://api.openai.com/v1',
+          prepareRequest(request) {
+            request.signal = preparedController.signal;
+          },
+        }),
+      }),
+      maxRetries: 1,
+      timeout: 10,
+      fetch,
+    });
+    const request = client.get('/items');
+
+    try {
+      await expect(request).resolves.toEqual({ recovered: true });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
   test('encodes URL-encoded request objects with the configured content type', async () => {
     const client = new OpenAI({ apiKey: 'test-key' });
     const { req } = await client.buildRequest({
