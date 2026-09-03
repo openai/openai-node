@@ -1,22 +1,30 @@
-export const sleep = (ms: number, signal?: AbortSignal | null): Promise<void> =>
+export const sleep = (ms: number, ...signals: (AbortSignal | null | undefined)[]): Promise<void> =>
   new Promise((resolve, reject) => {
+    const activeSignals = [...new Set(signals.filter((signal): signal is AbortSignal => signal != null))];
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      for (const signal of activeSignals) {
+        signal.removeEventListener('abort', abort);
+      }
+    };
     const abort = () => {
       if (timeout !== undefined) {
         clearTimeout(timeout);
       }
-      signal?.removeEventListener('abort', abort);
-      reject(signal?.reason);
+      cleanup();
+      reject();
     };
 
-    if (signal?.aborted) {
+    if (activeSignals.some((signal) => signal.aborted)) {
       abort();
       return;
     }
 
     timeout = setTimeout(() => {
-      signal?.removeEventListener('abort', abort);
+      cleanup();
       resolve();
     }, ms);
-    signal?.addEventListener('abort', abort, { once: true });
+    for (const signal of activeSignals) {
+      signal.addEventListener('abort', abort, { once: true });
+    }
   });

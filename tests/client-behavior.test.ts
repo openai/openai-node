@@ -9,6 +9,7 @@ import {
   SubjectTokenProviderError,
 } from 'openai/core/error';
 import { CursorPage } from 'openai/core/pagination';
+import { createProvider } from 'openai/internal/provider';
 
 class IdempotentOpenAI extends OpenAI {
   protected override idempotencyHeader = 'Idempotency-Key';
@@ -23,6 +24,14 @@ function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
     ...init,
     headers: { 'content-type': 'application/json', ...init.headers },
   });
+}
+
+async function observe(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    return await promise;
+  } catch (error) {
+    return error;
+  }
 }
 
 describe('OpenAI client request behavior', () => {
@@ -196,33 +205,56 @@ describe('OpenAI client request behavior', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  test('rejects promptly when aborted during retry backoff', async () => {
-    vi.useFakeTimers();
-    const reason = new Error('stop retrying');
-    const controller = new AbortController();
-    const fetch = vi.fn(async () =>
-      jsonResponse(
-        { error: { message: 'rate limited' } },
-        { status: 429, headers: { 'retry-after-ms': '60000' } },
-      ),
-    );
-    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
-    const request = client.get('/items', { signal: controller.signal });
+  test.each(['caller', 'prepared'] as const)(
+    'rejects promptly when the %s signal aborts during retry backoff',
+    async (abortedSignal) => {
+      vi.useFakeTimers();
+      const reason = new Error(`stop ${abortedSignal} request`);
+      const callerController = new AbortController();
+      const preparedController = new AbortController();
+      const fetch = vi.fn(async () =>
+        jsonResponse(
+          { error: { message: 'rate limited' } },
+          { status: 429, headers: { 'retry-after-ms': '60000' } },
+        ),
+      );
+      const client = new OpenAI({
+        provider: createProvider({
+          configure: () => ({
+            name: 'test-provider',
+            baseURL: 'https://api.openai.com/v1',
+            prepareRequest(request) {
+              request.signal = preparedController.signal;
+            },
+          }),
+        }),
+        maxRetries: 1,
+        fetch,
+      });
+      const request = client.get('/items', {
+        signal: callerController.signal,
+      });
+      const observed = observe(request);
 
-    try {
-      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-      const typeAssertion = expect(request).rejects.toBeInstanceOf(APIUserAbortError);
-      const causeAssertion = expect(request).rejects.toMatchObject({ cause: reason });
-      controller.abort(reason);
-      await vi.advanceTimersByTimeAsync(0);
+      try {
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+        const controller = abortedSignal === 'caller' ? callerController : preparedController;
+        controller.abort(reason);
+        await vi.advanceTimersByTimeAsync(0);
 
-      await typeAssertion;
-      await causeAssertion;
-      expect(fetch).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+        const waiting = Symbol('request still waiting for retry delay');
+        const result = await Promise.race([observed, Promise.resolve(waiting)]);
+        expect(result).not.toBe(waiting);
+        expect(result).toBeInstanceOf(APIUserAbortError);
+        expect(result).toMatchObject({ cause: reason });
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        await vi.runAllTimersAsync();
+        await observed;
+        vi.useRealTimers();
+      }
+    },
+  );
 
   test('encodes URL-encoded request objects with the configured content type', async () => {
     const client = new OpenAI({ apiKey: 'test-key' });
