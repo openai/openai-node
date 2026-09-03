@@ -11,6 +11,8 @@ import {
   SubjectTokenProviderError,
 } from 'openai/core/error';
 import { CursorPage } from 'openai/core/pagination';
+import type { RequestInfo } from 'openai/internal/builtin-types';
+import { sleep } from 'openai/internal/utils/sleep';
 
 class IdempotentOpenAI extends OpenAI {
   protected override idempotencyHeader = 'Idempotency-Key';
@@ -226,6 +228,46 @@ describe('OpenAI client request behavior', () => {
       await expect(request).rejects.toMatchObject({ cause: reason });
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(response.bodyUsed).toBe(true);
+    },
+  );
+
+  test.each([429, 503])(
+    'times out a stalled over-limit HTTP %i error body without retrying',
+    async (status) => {
+      vi.useFakeTimers();
+      let requestSignal: AbortSignal | undefined;
+      const fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+        requestSignal = init?.signal ?? undefined;
+        await sleep(40);
+        return new Response(
+          new ReadableStream({
+            start(stream) {
+              requestSignal?.addEventListener('abort', () => stream.error(requestSignal?.reason), {
+                once: true,
+              });
+            },
+          }),
+          { status, headers: { 'retry-after': '90' } },
+        );
+      });
+      const client = new OpenAI({ apiKey: 'test-key', fetch, timeout: 100 });
+      try {
+        const result = Promise.allSettled([
+          client.responses.create({ model: 'test-model', input: 'Hello.' }),
+        ]);
+        await vi.advanceTimersByTimeAsync(99);
+        expect(requestSignal?.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(requestSignal?.aborted).toBe(true);
+        const [outcome] = await result;
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+        }
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     },
   );
 

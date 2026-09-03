@@ -1099,16 +1099,17 @@ export class OpenAI {
     }
   }
 
-  /** Keeps terminal X.509 error-body consumption inside the original logical request deadline. */
-  private async readX509ResponseError(
+  /** Bounds terminal error reads for X.509 requests and declined server retry delays. */
+  private async readResponseError(
     response: Response,
     options: FinalRequestOptions,
     timeout: number,
     controller: AbortController,
-    authentication: X509WorkloadIdentityAuth,
+    authentication?: X509WorkloadIdentityAuth,
   ): Promise<string> {
     const deadline = new AbortController();
     const callerSignal = controller.signal;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const cancel = () => deadline.abort(callerSignal.reason);
     callerSignal.addEventListener('abort', cancel, { once: true });
@@ -1117,12 +1118,30 @@ export class OpenAI {
     }
 
     try {
-      const remaining = authentication.remainingTimeout(options, timeout);
-      const expiration = authentication.waitForRetry(remaining, deadline.signal).then(() => {
+      if (!authentication && callerSignal.aborted) {
+        void Shims.CancelReadableStream(response.body).catch(() => undefined);
+        throw this._makeUserAbortError(callerSignal);
+      }
+      const remaining = authentication?.remainingTimeout(options, timeout) ?? timeout;
+      const wait = authentication
+        ? authentication.waitForRetry(remaining, deadline.signal)
+        : new Promise<void>((resolve, reject) => {
+            timer = setTimeout(resolve, remaining);
+            deadline.signal.addEventListener('abort', () => reject(this._makeUserAbortError(callerSignal)), {
+              once: true,
+            });
+          });
+      const expiration = wait.then(() => {
         throw new Errors.APIConnectionTimeoutError();
       });
       const body = await Promise.race([
-        response.text().catch(() => 'X.509 workload identity API response body could not be read.'),
+        response
+          .text()
+          .catch((error: unknown) =>
+            authentication
+              ? 'X.509 workload identity API response body could not be read.'
+              : castToError(error).message,
+          ),
         expiration,
       ]);
       if (callerSignal.aborted) {
@@ -1140,6 +1159,7 @@ export class OpenAI {
       }
       throw error;
     } finally {
+      if (timer !== undefined) clearTimeout(timer);
       callerSignal.removeEventListener('abort', cancel);
       deadline.abort();
     }
@@ -1453,8 +1473,15 @@ export class OpenAI {
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
       const errText = x509Authentication
-        ? await this.readX509ResponseError(response, options, timeout, controller, x509Authentication)
-        : await response.text().catch((err: any) => castToError(err).message);
+        ? await this.readResponseError(response, options, timeout, controller, x509Authentication)
+        : declinedRetryDelay
+          ? await this.readResponseError(
+              response,
+              options,
+              Math.max(0, startTime + timeout - Date.now()),
+              controller,
+            )
+          : await response.text().catch((err: any) => castToError(err).message);
       if (declinedRetryDelay && (callerSignal?.aborted || req.signal?.aborted)) {
         throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
       }
