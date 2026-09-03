@@ -3694,7 +3694,7 @@ export interface ResponseFunctionWebSearch {
   /**
    * The status of the web search tool call.
    */
-  status: 'in_progress' | 'searching' | 'completed' | 'failed';
+  status: 'in_progress' | 'searching' | 'completed' | 'failed' | 'incomplete';
 
   /**
    * The type of the web search tool call. Always `web_search_call`.
