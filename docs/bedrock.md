@@ -230,11 +230,14 @@ For credentials that can change, pass a provider. It is called before every requ
 const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
-    credentialProvider: async () => ({
-      accessKeyId: process.env['AWS_ACCESS_KEY_ID']!,
-      secretAccessKey: process.env['AWS_SECRET_ACCESS_KEY']!,
-      sessionToken: process.env['AWS_SESSION_TOKEN'],
-    }),
+    credentialProvider: async () => {
+      const sessionToken = process.env['AWS_SESSION_TOKEN'];
+      return {
+        accessKeyId: process.env['AWS_ACCESS_KEY_ID']!,
+        secretAccessKey: process.env['AWS_SECRET_ACCESS_KEY']!,
+        ...(sessionToken === undefined ? {} : { sessionToken }),
+      };
+    },
   }),
 });
 ```
