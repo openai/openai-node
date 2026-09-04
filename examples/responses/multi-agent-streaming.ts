@@ -31,6 +31,11 @@ async function main() {
         process.stdout.write(`${separator}━━━ ${role}: ${name} ━━━\n\n`);
       }
       process.stdout.write(event.delta);
+    } else if (
+      (event.type === 'response.failed' || event.type === 'response.incomplete') &&
+      (!event.agent || event.agent.agent_name === '/root')
+    ) {
+      throw new Error(`Response ended with ${event.type}.`);
     }
   }
   process.stdout.write('\n');

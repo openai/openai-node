@@ -27,6 +27,21 @@ The repository's pnpm scripts use Bash. On Windows, install [Git for Windows](ht
 and run the development commands from Git Bash, where `bash` is available on `PATH`. If you run pnpm from
 PowerShell instead, add the Git for Windows `bin` directory that contains `bash.exe` to `PATH` first.
 
+The repository keeps formatter inputs on LF through `.gitattributes`. Git does not rewrite unchanged files
+when an existing `core.autocrlf=true` checkout first pulls that rule. If `git ls-files --eol AGENTS.md`
+still reports `w/crlf` and `pnpm lint` reports widespread formatting failures, first make sure
+`git status --short` is empty, then run:
+
+```sh
+$ pnpm format
+$ git add -u
+$ git status --short
+```
+
+The format command rewrites the existing checkout to LF. Because the checkout was clean, `git add -u`
+only refreshes equivalent tracked content after line-ending normalization. The final status command should
+remain empty; inspect any reported changes instead of discarding them.
+
 To set up the repository, run:
 
 ```sh

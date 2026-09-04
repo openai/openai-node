@@ -14,6 +14,72 @@ function spawnPnpmScript(script: 'format' | 'lint') {
   return spawnSync(command, args, { cwd: repoRoot, encoding: 'utf-8' });
 }
 
+test('keeps formatter inputs on LF across Git checkout configurations', () => {
+  const paths = ['AGENTS.md', '.github/workflows/ci.yml', 'package.json', 'src/index.ts'];
+  const checked = spawnSync('git', ['check-attr', 'eol', '--', ...paths], {
+    cwd: repoRoot,
+    encoding: 'utf-8',
+  });
+
+  expect(checked.status).toBe(0);
+  expect(checked.stdout.trim().split(/\r?\n/u)).toEqual(paths.map((filePath) => `${filePath}: eol: lf`));
+});
+
+test('formats an existing CRLF checkout after the LF policy is pulled', () => {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'openai-node-line-endings-'));
+  const fixturePath = path.join(fixtureRoot, 'fixture.ts');
+  const runGit = (args: string[]) => {
+    const result = spawnSync('git', args, { cwd: fixtureRoot, encoding: 'utf-8' });
+
+    if (result.status !== 0) {
+      throw new Error(result.stderr);
+    }
+    return result.stdout.trim();
+  };
+
+  try {
+    runGit(['init', '--quiet']);
+    runGit(['config', 'user.email', 'line-endings@example.com']);
+    runGit(['config', 'user.name', 'Line Endings Test']);
+    runGit(['config', 'core.autocrlf', 'true']);
+    runGit(['config', 'core.safecrlf', 'false']);
+
+    writeFileSync(fixturePath, 'export const value = 1;\n');
+    runGit(['add', 'fixture.ts']);
+    runGit(['commit', '--quiet', '-m', 'parent']);
+    const parent = runGit(['rev-parse', 'HEAD']);
+
+    rmSync(fixturePath);
+    runGit(['checkout', '--', 'fixture.ts']);
+    expect(readFileSync(fixturePath, 'utf-8')).toContain('\r\n');
+
+    copyFileSync(path.join(repoRoot, '.gitattributes'), path.join(fixtureRoot, '.gitattributes'));
+    runGit(['add', '.gitattributes']);
+    runGit(['commit', '--quiet', '-m', 'add LF policy']);
+    const policy = runGit(['rev-parse', 'HEAD']);
+
+    runGit(['checkout', '--quiet', '--detach', parent]);
+    runGit(['checkout', '--quiet', '--detach', policy]);
+    expect(readFileSync(fixturePath, 'utf-8')).toContain('\r\n');
+    expect(runGit(['status', '--porcelain'])).toBe('');
+
+    const formatted = spawnSync(
+      process.execPath,
+      [oxfmt, '--config', path.join(repoRoot, 'oxfmt.config.ts'), fixturePath],
+      { cwd: fixtureRoot, encoding: 'utf-8' },
+    );
+
+    if (formatted.status !== 0) {
+      throw new Error(formatted.stderr);
+    }
+    expect(readFileSync(fixturePath, 'utf-8')).not.toContain('\r\n');
+    runGit(['add', '-u']);
+    expect(runGit(['status', '--porcelain'])).toBe('');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test('inherits Ultracite native plugins and enforces their rules', () => {
   const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
     cwd: repoRoot,

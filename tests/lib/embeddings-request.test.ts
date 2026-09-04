@@ -4,6 +4,7 @@ import { APIPromise } from 'openai/api-promise';
 import type { Fetch } from 'openai/internal/builtin-types';
 import type { RequestOptions } from 'openai/internal/request-options';
 import type { PromiseOrValue } from 'openai/internal/types';
+import { compareType } from '../utils/typing';
 
 const vector = [1.25, -2.5];
 const encodedVector = Buffer.from(new Float32Array(vector).buffer).toString('base64');
@@ -142,6 +143,59 @@ describe('embedding request compatibility', () => {
     expect(body).toEqual({ ...request, encoding_format: 'float' });
     expect(options).toEqual(originalOptions);
   });
+
+  test.each([undefined, 'float', 'base64'] as const)(
+    'preserves numeric output for a request-body override with %s encoding',
+    async (format) => {
+      const body = Object.freeze({ ...request });
+      const overrideBody = Object.freeze({
+        ...request,
+        input: 'overridden',
+        ...(format === undefined ? {} : { encoding_format: format }),
+      });
+      const expectedEmbedding = format === 'base64' ? encodedVector : vector;
+      const headers = Object.freeze({ 'X-Custom': 'kept' });
+      let bodyReads = 0;
+      const options = Object.freeze<RequestOptions>({
+        get body() {
+          bodyReads += 1;
+          return overrideBody;
+        },
+        headers,
+        __security: { adminAPIKeyAuth: true },
+      });
+      const fetch = vi.fn<Fetch>(async (_url, init) => {
+        expect(JSON.parse(String(init?.body))).toEqual(overrideBody);
+        expect(new Headers(init?.headers).get('X-Custom')).toBe('kept');
+        return embeddingResponse(expectedEmbedding);
+      });
+      const client = new RecordingClient({ apiKey: 'test-key', fetch });
+      const promise = client.embeddings.create(body, options);
+      const [call] = client.requests;
+      const rawResponse = await promise.asResponse();
+
+      expect(await rawResponse.clone().json()).toMatchObject({
+        data: [{ embedding: expectedEmbedding }],
+      });
+      const response = await promise;
+      compareType<(typeof response.data)[number]['embedding'], number[]>(true);
+      expect(response.data[0]?.embedding.map((value) => value * 2)).toEqual([2.5, -5]);
+      expect(response.data[0]?.embedding).toEqual(vector);
+      const dataAndResponse = await promise.withResponse();
+      expect(promise).not.toBe(call?.response);
+      expect(dataAndResponse.data).toBe(response);
+      expect(dataAndResponse.response).toBe(rawResponse);
+      expect(dataAndResponse.request_id).toBe('req_embeddings');
+      expect(await call?.response.asResponse()).toBe(rawResponse);
+      const sentOptions = await call?.options;
+      expect(sentOptions?.body).toBe(overrideBody);
+      expect(sentOptions?.headers).toBe(headers);
+      expect(sentOptions?.__security).toEqual({ bearerAuth: true });
+      expect(bodyReads).toBe(1);
+      expect(body).toEqual(request);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
 
   test('preserves response identity and sparse entries from custom parsers', async () => {
     const client = new OpenAI({ apiKey: 'test-key' });
