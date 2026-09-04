@@ -31,7 +31,7 @@ async function runExample(file: string, baseURL: string) {
       moveCursor: (...args) => readline.moveCursor(process.stdout, ...args),
       clearScreenDown: (...args) => readline.clearScreenDown(process.stdout, ...args),
     });
-    require(${JSON.stringify(path.join(root, 'node_modules/ts-node/register/transpile-only'))});
+    require(${JSON.stringify(path.join(root, 'node_modules/ts-node'))}).register({ swc: true });
     require(${JSON.stringify(path.join(root, 'node_modules/tsconfig-paths/register.js'))});
     require(${JSON.stringify(path.join(root, 'examples/chat-completions', file))});
   `;

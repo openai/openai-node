@@ -72,7 +72,7 @@ test.each(examples)('%s completes a tool round trip with redirected stdout', asy
     process.execPath,
     [
       path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '-T',
+      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       path.join(root, 'examples/chat-completions', filename),
