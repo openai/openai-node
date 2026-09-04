@@ -1452,6 +1452,9 @@ export class EventStream<EventTypes extends BaseEvents> {
       this.controller.abort();
       return;
     }
+    if (this.#abortListeners.some((registration) => registration.signal === signal)) {
+      return;
+    }
 
     const listener = () => this.controller.abort();
     signal.addEventListener('abort', listener, { once: true });
