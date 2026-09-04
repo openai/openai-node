@@ -191,18 +191,18 @@ describe('OpenAI with Workload Identity', () => {
     global.fetch = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
       if (url.toString().includes('/oauth/token')) {
         issuerCalls++;
-        return Response.json({ access_token: `fake-token-${issuerCalls}`, expires_in: 3600 });
+        return globalThis.Response.json({ access_token: `fake-token-${issuerCalls}`, expires_in: 3600 });
       }
       apiCalls++;
       return apiCalls === 1
-        ? Response.json(
+        ? globalThis.Response.json(
             { error: { message: 'Try later', code: 'retry_later' } },
             {
               status: 401,
               headers: { 'x-should-retry': 'true', 'retry-after': '90', 'x-request-id': 'req_fake' },
             },
           )
-        : Response.json({ data: [] });
+        : globalThis.Response.json({ data: [] });
     });
     const client = new OpenAI({ ...createTestClientOptions(), maxRetries: 1 });
 
