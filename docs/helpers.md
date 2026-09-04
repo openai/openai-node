@@ -384,10 +384,10 @@ will trigger consumption of the stream until completion and then return the rele
 ### Streaming Responses
 
 ```ts
-openai.chat.completions.stream({ stream?: false, … }, options?): ChatCompletionStreamingRunner
+openai.chat.completions.stream({ stream?: true, … }, options?): ChatCompletionStream
 ```
 
-`openai.chat.completions.stream()` returns a `ChatCompletionStreamingRunner`, which emits events, has an async
+`openai.chat.completions.stream()` returns a `ChatCompletionStream`, which emits events, has an async
 iterator, and exposes helper methods to accumulate chunks into a convenient shape and make it easy to reason
 about the conversation.
 
