@@ -20,6 +20,9 @@ async function main() {
     }
 
     console.log('event', event);
+    if (event.type === 'response.failed' || event.type === 'response.incomplete') {
+      throw new Error(`Response ended with ${event.type}.`);
+    }
     if (event.type === 'response.completed') {
       completed = true;
     }
@@ -46,6 +49,9 @@ async function main() {
   }
 
   const result = await runner2.finalResponse();
+  if (result.status !== 'completed') {
+    throw new Error(`Response ended with status ${result.status}.`);
+  }
   console.log(result);
 }
 
