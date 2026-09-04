@@ -1105,17 +1105,20 @@ export class OpenAI {
     options: FinalRequestOptions,
     timeout: number,
     controller: AbortController,
+    requestSignal?: AbortSignal | null,
     authentication?: X509WorkloadIdentityAuth,
   ): Promise<string> {
     const deadline = new AbortController();
     const callerSignal = controller.signal;
     // A request hook may replace the original caller signal on the transport.
-    const originalSignal = authentication ? undefined : options.signal;
-    const cancelCaller = () => controller.abort(originalSignal?.reason);
-    const abortError = () =>
-      this._makeUserAbortError(originalSignal?.aborted ? originalSignal : callerSignal);
-    originalSignal?.addEventListener('abort', cancelCaller, { once: true });
-    if (originalSignal?.aborted) cancelCaller();
+    const originalSignals = authentication ? [] : [options.signal, requestSignal];
+    const abortedSignal = () => originalSignals.find((signal) => signal?.aborted) ?? callerSignal;
+    const cancelCaller = () => controller.abort(abortedSignal().reason);
+    const abortError = () => this._makeUserAbortError(abortedSignal());
+    for (const signal of originalSignals) {
+      signal?.addEventListener('abort', cancelCaller, { once: true });
+      if (signal?.aborted) cancelCaller();
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let timedOut = false;
@@ -1186,7 +1189,7 @@ export class OpenAI {
         response.body.destroy();
       }
       if (timer !== undefined) clearTimeout(timer);
-      originalSignal?.removeEventListener('abort', cancelCaller);
+      for (const signal of originalSignals) signal?.removeEventListener('abort', cancelCaller);
       callerSignal.removeEventListener('abort', cancel);
       deadline.abort();
     }
@@ -1500,13 +1503,14 @@ export class OpenAI {
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
       const errText = x509Authentication
-        ? await this.readResponseError(response, options, timeout, controller, x509Authentication)
+        ? await this.readResponseError(response, options, timeout, controller, req.signal, x509Authentication)
         : declinedRetryDelay
           ? await this.readResponseError(
               response,
               options,
               Math.max(0, startTime + timeout - Date.now()),
               controller,
+              req.signal,
             )
           : await response.text().catch((err: any) => castToError(err).message);
       if (declinedRetryDelay && (callerSignal?.aborted || req.signal?.aborted)) {

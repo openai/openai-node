@@ -75,6 +75,49 @@ describe('OpenAI client request behavior', () => {
     );
   });
 
+  test.each(['caller', 'hook'] as const)(
+    'preserves %s cancellation with a request hook and custom fetchWithTimeout',
+    async (source) => {
+      vi.useFakeTimers();
+      const caller = new AbortController();
+      const hook = new AbortController();
+      const reason = new Error('Canceled during the terminal body read.');
+      const cancelBody = vi.fn();
+      const response = new Response(new ReadableStream({ cancel: cancelBody }), {
+        status: 503,
+        headers: { 'retry-after': '90' },
+      });
+      const client = new OpenAI({ apiKey: 'test-key', timeout: 100 });
+      Object.assign(client, {
+        async prepareRequest(request: RequestInit): Promise<void> {
+          request.signal = hook.signal;
+        },
+      });
+      const fetch = vi.spyOn(client, 'fetchWithTimeout').mockResolvedValue(response);
+      const startedAt = Date.now();
+      try {
+        const result = Promise.allSettled([
+          client.responses.create({ model: 'test-model', input: 'Hello.' }, { signal: caller.signal }),
+        ]);
+        setTimeout(() => (source === 'caller' ? caller : hook).abort(reason), 10);
+        await vi.runAllTimersAsync();
+        const [outcome] = await result;
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason).toBeInstanceOf(APIUserAbortError);
+          expect(outcome.reason).toMatchObject({ cause: reason });
+        }
+        expect(Date.now() - startedAt).toBe(10);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(cancelBody).toHaveBeenCalledTimes(1);
+        expect(response.body?.locked).toBe(false);
+      } finally {
+        fetch.mockRestore();
+        vi.useRealTimers();
+      }
+    },
+  );
+
   test.each([
     [408, {}, true],
     [409, {}, true],
