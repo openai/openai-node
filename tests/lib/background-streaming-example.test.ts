@@ -1,15 +1,16 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
 
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { expect, test } from 'vitest';
 
-type TerminalStatus = 'completed' | 'failed' | 'incomplete';
+type ResponseStatus = 'completed' | 'failed' | 'incomplete' | 'queued' | 'in_progress';
 const privateErrorDetail = 'Synthetic private response error detail';
 
-function responseEvents(chunks: readonly string[], status: TerminalStatus): ResponseStreamEvent[] {
+function responseEvents(chunks: readonly string[], status: ResponseStatus): ResponseStreamEvent[] {
   const response: Response = {
     id: 'resp_background_example',
     object: 'response',
@@ -26,11 +27,14 @@ function responseEvents(chunks: readonly string[], status: TerminalStatus): Resp
     tool_choice: 'auto',
     tools: [],
     top_p: null,
-    status: 'in_progress',
+    status: status === 'queued' ? 'queued' : 'in_progress',
     background: true,
   };
-  const events: ResponseStreamEvent[] = [
-    { type: 'response.created', sequence_number: 0, response },
+  const events: ResponseStreamEvent[] = [{ type: 'response.created', sequence_number: 0, response }];
+  if (status === 'queued') {
+    return events;
+  }
+  events.push(
     {
       type: 'response.output_item.added',
       sequence_number: 1,
@@ -45,7 +49,7 @@ function responseEvents(chunks: readonly string[], status: TerminalStatus): Resp
       content_index: 0,
       part: { type: 'output_text', annotations: [], text: '' },
     },
-  ];
+  );
   for (const delta of chunks) {
     events.push({
       type: 'response.output_text.delta',
@@ -56,6 +60,9 @@ function responseEvents(chunks: readonly string[], status: TerminalStatus): Resp
       delta,
       logprobs: [],
     });
+  }
+  if (status === 'in_progress') {
+    return events;
   }
   const text = chunks.join('');
   events.push({
@@ -108,17 +115,33 @@ const scenarios = [
   },
 ] as const;
 
-const cases = scenarios.flatMap((scenario) =>
-  (['completed', 'failed', 'incomplete'] as const).map((status) => ({ ...scenario, status })),
-);
+const cases = [
+  ...(['example', 'guide'] as const).flatMap((source) =>
+    scenarios.flatMap((scenario) =>
+      (['completed', 'failed', 'incomplete'] as const).map((status) => ({ ...scenario, status, source })),
+    ),
+  ),
+  ...(['queued', 'in_progress'] as const).map((status) => ({
+    ...scenarios[3],
+    status,
+    source: 'guide' as const,
+  })),
+];
 
-test.each(cases)('background example: $status $name', async ({ chunks, resumed, partial, status }) => {
+const guideSection = readFileSync(path.join(process.cwd(), 'docs/streaming.md'), 'utf-8')
+  .split('## Resume a background response\n')[1]
+  ?.split('\n## ')[0];
+const guideSnippet = guideSection?.match(/```ts\n(?<snippet>[\s\S]*?)\n```/u)?.groups?.['snippet'];
+if (!guideSnippet) {
+  throw new Error('The background response guide snippet was not found.');
+}
+
+test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, status, source }) => {
   const events = responseEvents(chunks, status);
-  const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\ndata: [DONE]\n\n`;
-  const partialBody = `${events
-    .slice(0, -1)
-    .map((event) => `data: ${JSON.stringify(event)}`)
-    .join('\n\n')}\n\n`;
+  const nonterminal = status === 'queued' || status === 'in_progress';
+  const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n${nonterminal ? '' : 'data: [DONE]\n\n'}`;
+  const partialEvents = nonterminal ? events : events.slice(0, -1);
+  const partialBody = `${partialEvents.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n`;
   const requests: { method: string | undefined; url: string | undefined; body: unknown }[] = [];
   const server = createServer((request, response) => {
     let requestBody = '';
@@ -150,7 +173,17 @@ test.each(cases)('background example: $status $name', async ({ chunks, resumed, 
       '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'examples/responses/stream_background.ts'),
+      ...(source === 'guide'
+        ? [
+            '--eval',
+            `import OpenAI from 'openai';
+const client = new OpenAI();
+async function main() {
+${guideSnippet}
+}
+main();`,
+          ]
+        : [path.join(root, 'examples/responses/stream_background.ts')]),
     ],
     {
       cwd: root,
@@ -182,12 +215,20 @@ test.each(cases)('background example: $status $name', async ({ chunks, resumed, 
       expect(stderr).toBe('');
       expect(stdout).toContain(chunks.join(''));
     } else {
-      expect(stderr).toContain(
-        resumed ? `Response ended with status ${status}.` : `Response ended with response.${status}.`,
-      );
+      if (source === 'guide') {
+        expect(stderr).toContain('The background response did not complete successfully.');
+      } else {
+        expect(stderr).toContain(
+          resumed ? `Response ended with status ${status}.` : `Response ended with response.${status}.`,
+        );
+      }
       expect(stderr).not.toContain(privateErrorDetail);
     }
-    expect(stdout.includes('Interrupted. Continuing...')).toBe(resumed);
+    if (source === 'example') {
+      expect(stdout.includes('Interrupted. Continuing...')).toBe(resumed);
+    } else {
+      expect(stdout + stderr).not.toContain(privateErrorDetail);
+    }
     expect(stdout).not.toContain('synthetic-example-key');
     expect(requests).toHaveLength(resumed ? 2 : 1);
     expect(requests[0]).toMatchObject({
