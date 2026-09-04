@@ -11,7 +11,7 @@ import {
   SubjectTokenProviderError,
 } from 'openai/core/error';
 import { CursorPage } from 'openai/core/pagination';
-import type { RequestInfo } from 'openai/internal/builtin-types';
+import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { sleep } from 'openai/internal/utils/sleep';
 
 class IdempotentOpenAI extends OpenAI {
@@ -263,6 +263,55 @@ describe('OpenAI client request behavior', () => {
         expect(outcome.status).toBe('rejected');
         if (outcome.status === 'rejected') {
           expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+        }
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  test.each([429, 503])(
+    'preserves caller cancellation when a request hook replaces the signal for HTTP %i',
+    async (status) => {
+      vi.useFakeTimers();
+      const caller = new AbortController();
+      const reason = new Error('Caller canceled the request after headers.');
+      const hook = new AbortController();
+      let requestSignal: AbortSignal | undefined;
+      const fetch = vi.fn(async (_url: RequestInfo, init?: RequestInit) => {
+        requestSignal = init?.signal ?? undefined;
+        return new Response(
+          new ReadableStream({
+            start(stream) {
+              requestSignal?.addEventListener('abort', () => stream.error(requestSignal?.reason), {
+                once: true,
+              });
+            },
+          }),
+          { status, headers: { 'retry-after': '90' } },
+        );
+      });
+      const client = new OpenAI({ apiKey: 'test-key', fetch, timeout: 1200 });
+      Object.assign(client, {
+        async prepareRequest(request: RequestInit): Promise<void> {
+          request.signal = hook.signal;
+        },
+      });
+
+      try {
+        const result = Promise.allSettled([
+          client.responses.create({ model: 'test-model', input: 'Hello.' }, { signal: caller.signal }),
+        ]);
+        await vi.advanceTimersByTimeAsync(20);
+        caller.abort(reason);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(requestSignal?.aborted).toBe(true);
+        const [outcome] = await result;
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason).toBeInstanceOf(APIUserAbortError);
+          expect(outcome.reason).toMatchObject({ cause: reason });
         }
         expect(fetch).toHaveBeenCalledTimes(1);
       } finally {

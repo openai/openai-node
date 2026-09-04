@@ -1109,6 +1109,13 @@ export class OpenAI {
   ): Promise<string> {
     const deadline = new AbortController();
     const callerSignal = controller.signal;
+    // A request hook may replace the original caller signal on the transport.
+    const originalSignal = authentication ? undefined : options.signal;
+    const cancelCaller = () => controller.abort(originalSignal?.reason);
+    const abortError = () =>
+      this._makeUserAbortError(originalSignal?.aborted ? originalSignal : callerSignal);
+    originalSignal?.addEventListener('abort', cancelCaller, { once: true });
+    if (originalSignal?.aborted) cancelCaller();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const cancel = () => deadline.abort(callerSignal.reason);
@@ -1120,14 +1127,14 @@ export class OpenAI {
     try {
       if (!authentication && callerSignal.aborted) {
         void Shims.CancelReadableStream(response.body).catch(() => undefined);
-        throw this._makeUserAbortError(callerSignal);
+        throw abortError();
       }
       const remaining = authentication?.remainingTimeout(options, timeout) ?? timeout;
       const wait = authentication
         ? authentication.waitForRetry(remaining, deadline.signal)
         : new Promise<void>((resolve, reject) => {
             timer = setTimeout(resolve, remaining);
-            deadline.signal.addEventListener('abort', () => reject(this._makeUserAbortError(callerSignal)), {
+            deadline.signal.addEventListener('abort', () => reject(abortError()), {
               once: true,
             });
           });
@@ -1145,7 +1152,7 @@ export class OpenAI {
         expiration,
       ]);
       if (callerSignal.aborted) {
-        throw this._makeUserAbortError(callerSignal);
+        throw abortError();
       }
       return body;
     } catch (error) {
@@ -1155,11 +1162,12 @@ export class OpenAI {
         void Shims.CancelReadableStream(response.body).catch(() => undefined);
       }
       if (callerSignal.aborted && !timedOut) {
-        throw this._makeUserAbortError(callerSignal);
+        throw abortError();
       }
       throw error;
     } finally {
       if (timer !== undefined) clearTimeout(timer);
+      originalSignal?.removeEventListener('abort', cancelCaller);
       callerSignal.removeEventListener('abort', cancel);
       deadline.abort();
     }
