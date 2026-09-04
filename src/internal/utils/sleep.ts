@@ -2,17 +2,30 @@ export const sleep = (ms: number, ...signals: (AbortSignal | null | undefined)[]
   new Promise((resolve, reject) => {
     const activeSignals = [...new Set(signals.filter((signal): signal is AbortSignal => signal != null))];
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    let settled = false;
     const cleanup = () => {
       for (const signal of activeSignals) {
-        signal.removeEventListener('abort', abort);
+        try {
+          signal.removeEventListener('abort', abort);
+        } catch {
+          // Structural signal cleanup must not prevent the promise from settling.
+        }
       }
     };
-    const abort = () => {
+    const settle = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       if (timeout !== undefined) {
         clearTimeout(timeout);
+        timeout = undefined;
       }
       cleanup();
-      reject();
+      callback();
+    };
+    const abort = () => {
+      settle(() => reject());
     };
 
     if (activeSignals.some((signal) => signal.aborted)) {
@@ -21,10 +34,19 @@ export const sleep = (ms: number, ...signals: (AbortSignal | null | undefined)[]
     }
 
     timeout = setTimeout(() => {
-      cleanup();
-      resolve();
+      settle(resolve);
     }, ms);
     for (const signal of activeSignals) {
-      signal.addEventListener('abort', abort, { once: true });
+      if (settled) {
+        break;
+      }
+      try {
+        signal.addEventListener('abort', abort, { once: true });
+      } catch (error) {
+        settle(() => reject(error));
+      }
+    }
+    if (activeSignals.some((signal) => signal.aborted)) {
+      abort();
     }
   });

@@ -9,7 +9,7 @@ export type APIResponseProps = {
   response: Response;
   options: FinalRequestOptions;
   controller: AbortController;
-  requestSignal: AbortSignal | null | undefined;
+  requestSignal?: AbortSignal | null | undefined;
   requestLogID: string;
   retryOfRequestLogID: string | undefined;
   startTime: number;
