@@ -188,7 +188,7 @@ describe('OpenAI with Workload Identity', () => {
   test('declines excessive API retry delays without retaining the rejected workload token', async () => {
     let issuerCalls = 0;
     let apiCalls = 0;
-    global.fetch = vi.fn(async (url: RequestInfo | URL) => {
+    global.fetch = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
       if (url.toString().includes('/oauth/token')) {
         issuerCalls++;
         return Response.json({ access_token: `fake-token-${issuerCalls}`, expires_in: 3600 });
