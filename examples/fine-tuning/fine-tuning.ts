@@ -32,6 +32,8 @@ async function main() {
 
     if (file.status === 'processed') {
       break;
+    } else if (file.status === 'error') {
+      throw new Error(`File processing failed for ${file.id}`);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
