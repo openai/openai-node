@@ -1,5 +1,15 @@
 # Security Policy
 
+## Security model and reportability
+
+This is the repository's canonical security policy. The canonical detailed
+threat model for Codex Security scans is
+[`docs/architecture/security-model.md`](../docs/architecture/security-model.md).
+Load that document from the exact scanned revision when deciding scan scope,
+trust boundaries, attacker capabilities, security objectives, exclusions,
+reportability, and severity. This policy adds no separate trust-boundary rules,
+exclusions, or severity guidance.
+
 ## Reporting a vulnerability
 
 Please report potential security vulnerabilities through OpenAI's

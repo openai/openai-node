@@ -482,9 +482,9 @@ describe.each([
 
         expect(sourceCredentials).toEqual([value]);
         expect(destinationRequests).toEqual([]);
-        expect(redirects).toHaveBeenCalledTimes(1);
+        expect(redirects).not.toHaveBeenCalled();
         expect(errors).toHaveBeenCalledWith(
-          expect.objectContaining({ message: 'WebSocket was closed before the connection was established' }),
+          expect.objectContaining({ message: 'Unexpected server response: 302' }),
         );
       } finally {
         await closeServers(source, destination);

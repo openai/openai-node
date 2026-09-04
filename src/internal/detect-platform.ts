@@ -75,7 +75,7 @@ const getPlatformProperties = (): PlatformProperties => {
       'X-Stainless-OS': 'Unknown',
       'X-Stainless-Arch': `other:${EdgeRuntime}`,
       'X-Stainless-Runtime': 'edge',
-      'X-Stainless-Runtime-Version': (globalThis as any).process.version,
+      'X-Stainless-Runtime-Version': (globalThis as any).process?.version ?? 'unknown',
     };
   }
   // Check if Node.js

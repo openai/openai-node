@@ -124,11 +124,14 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   const openai = new OpenAI();
-  const stream = openai.chat.completions.stream({
-    model: 'gpt-3.5-turbo',
-    stream: true,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const stream = openai.chat.completions.stream(
+    {
+      model: 'gpt-3.5-turbo',
+      stream: true,
+      messages: [{ role: 'user', content: prompt }],
+    },
+    { signal: request.signal },
+  );
 
   return new Response(stream.toReadableStream());
 }

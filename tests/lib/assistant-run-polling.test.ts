@@ -21,7 +21,8 @@ afterEach(() => {
 
 describe('assistant run polling compatibility', () => {
   test.each([
-    { label: 'zero explicit interval', interval: 0, header: '17', expected: 17 },
+    { label: 'zero explicit interval', interval: 0, header: '17', expected: 0 },
+    { label: 'zero interval without a server interval', interval: 0, header: '', expected: 0 },
     { label: 'negative explicit interval', interval: -2, header: '17', expected: -2 },
     { label: 'NaN explicit interval', interval: Number.NaN, header: '0x10', expected: 16 },
     { label: 'numeric header prefix', interval: undefined, header: '12ms', expected: 12 },

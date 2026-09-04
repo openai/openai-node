@@ -1,3 +1,5 @@
+import type { EmittedEventResult } from '../lib/EventEmitter';
+
 /** Listener callback associated with one event name in a typed event map. */
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
@@ -145,13 +147,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    */
   emitted<Event extends keyof EventTypes>(
     event: Event,
-  ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param]
-      ? Param
-      : EventParameters<EventTypes, Event> extends []
-        ? void
-        : EventParameters<EventTypes, Event>
-  > {
+  ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
       const listeners = {
         onError: (error: unknown) => {

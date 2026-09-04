@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { Fetch } from 'openai/internal/builtin-types';
 import type * as DetectPlatform from 'openai/internal/detect-platform';
 
 type PlatformModule = typeof DetectPlatform;
@@ -96,6 +97,52 @@ describe('platform detection', () => {
       'X-Stainless-Runtime': 'edge',
       'X-Stainless-Runtime-Version': process.version,
     });
+  });
+
+  test('sends public SDK requests in Edge Runtime without a Node process global', async () => {
+    vi.resetModules();
+    const { default: OpenAI } = await import('openai');
+    const response = Response.json({ object: 'list', data: [] });
+    const requests: Headers[] = [];
+    const fetch = vi.fn<Fetch>(async (_url, init) => {
+      requests.push(new Headers(init?.headers));
+      return response;
+    });
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      organization: null,
+      project: null,
+      maxRetries: 0,
+      fetch,
+    });
+    const descriptors = new Map(
+      ['EdgeRuntime', 'process'].map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+    );
+    let result: unknown;
+    let requestError: unknown;
+
+    try {
+      Object.defineProperty(globalThis, 'EdgeRuntime', { configurable: true, value: 'edge-runtime' });
+      delete (globalThis as Record<string, unknown>)['process'];
+      result = await client.models.list();
+    } catch (error) {
+      requestError = error;
+    } finally {
+      for (const [name, descriptor] of descriptors) {
+        if (descriptor) {
+          Object.defineProperty(globalThis, name, descriptor);
+        } else {
+          delete (globalThis as Record<string, unknown>)[name];
+        }
+      }
+    }
+
+    expect(requestError).toBeUndefined();
+    expect(result).toMatchObject({ object: 'list', data: [] });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(requests[0]?.get('X-Stainless-Runtime')).toBe('edge');
+    expect(requests[0]?.get('X-Stainless-Runtime-Version')).toBe('unknown');
+    expect(requests[0]?.get('X-Stainless-Arch')).toBe('other:edge-runtime');
   });
 
   test('detects Node.js platforms and handles missing process metadata', async () => {
