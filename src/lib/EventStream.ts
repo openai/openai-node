@@ -1449,14 +1449,14 @@ export class EventStream<EventTypes extends BaseEvents> {
       return;
     }
     if (signal.aborted) {
-      this.controller.abort();
+      this.controller.abort(signal.reason);
       return;
     }
     if (this.#abortListeners.some((registration) => registration.signal === signal)) {
       return;
     }
 
-    const listener = () => this.controller.abort();
+    const listener = () => this.controller.abort(signal.reason);
     signal.addEventListener('abort', listener, { once: true });
     this.#abortListeners.push({ signal, listener });
   }

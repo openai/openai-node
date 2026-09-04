@@ -131,11 +131,14 @@ test('keeps distinct abort sources and immediately observes an already-aborted s
   expect(getEventListeners(first.signal, 'abort')).toHaveLength(1);
   expect(getEventListeners(second.signal, 'abort')).toHaveLength(1);
 
-  second.abort();
+  const reason = new Error('second source aborted');
+  second.abort(reason);
   expect(stream.controller.signal.aborted).toBe(true);
+  expect(stream.controller.signal.reason).toBe(reason);
   stream.controller = new AbortController();
   stream.observe(second.signal);
   expect(stream.controller.signal.aborted).toBe(true);
+  expect(stream.controller.signal.reason).toBe(reason);
 
   stream.end();
   expect(getEventListeners(first.signal, 'abort')).toHaveLength(0);

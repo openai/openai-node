@@ -443,6 +443,15 @@ export class AbstractChatCompletionRunner<
     };
 
     let allowBufferedToolCall = false;
+    const userAbortError = () => {
+      const error = new APIUserAbortError();
+      Object.defineProperty(error, 'cause', {
+        value: this.controller.signal.reason,
+        writable: true,
+        configurable: true,
+      });
+      return error;
+    };
 
     const runToolCall = async (toolCall: ChatCompletionMessageToolCall): Promise<ToolCallResult> => {
       const bufferedToolCall = allowBufferedToolCall;
@@ -480,18 +489,18 @@ export class AbstractChatCompletionRunner<
           parsed = await fn.parse(args);
         } catch (error) {
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw userAbortError();
           }
           const content = error instanceof Error ? error.message : String(error);
           return { message: { role, tool_call_id, content }, functionCalled: false };
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw userAbortError();
         }
         rawContent = await fn.function(parsed, runner, toolContext);
       } else {
         if (this.controller.signal.aborted && !bufferedToolCall) {
-          throw new APIUserAbortError();
+          throw userAbortError();
         }
         rawContent = await fn.function(args, runner, toolContext);
       }
@@ -531,7 +540,7 @@ export class AbstractChatCompletionRunner<
             this._addMessage(result.message);
           }
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw userAbortError();
           }
 
           if (singleFunctionToCall && result.functionCalled) {
@@ -560,7 +569,7 @@ export class AbstractChatCompletionRunner<
           }
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw userAbortError();
         }
       }
 
