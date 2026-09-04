@@ -282,6 +282,41 @@ format-on-save and lint-autofix editor settings.
 Changes made to this repository via the automated release PR pipeline publish to npm automatically. Publishing
 requires GitHub Actions OIDC trusted publishing; local token-based publishing is not supported.
 
+### CI coverage and release policy
+
+The table describes workflow execution and npm publication dependencies for changes targeting `main`
+in `openai/openai-node`.
+Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
+tests, benchmarks, and credential-free ecosystem job to succeed.
+
+| Checks                                                              | PR             | Merge queue   | Push to `main`    | Release PR     | npm publication                             |
+| ------------------------------------------------------------------- | -------------- | ------------- | ----------------- | -------------- | ------------------------------------------- |
+| CI lint, build, Node.js tests, packed-package tests, benchmarks     | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Credential-free ecosystem startup/import and compatibility checks   | Runs           | Runs          | Runs              | Runs           | CI gate                                     |
+| Live examples and live ecosystem tests                              | Skipped        | Skipped       | Runs²             | Skipped        | CI gate²                                    |
+| CodeQL merge protection, breaking-change detection, Castiron checks | Runs           | Runs          | Not triggered     | Runs           | Merge protection; no separate release gate  |
+| Standalone Node.js support policy workflow                          | Not triggered  | Not triggered | Runs              | Not triggered  | No separate gate; assertions also run in CI |
+| Release PR title/version validation                                 | Not applicable | Not triggered | Not applicable    | Runs           | Checked before release creation             |
+| Release state, native-browser compatibility, release-package build  | Not applicable | Not triggered | Release workflow³ | Not applicable | Required                                    |
+
+¹ Same-repository PRs run these checks through branch pushes; duplicate PR-event jobs may be skipped.
+Fork PRs and `ready_for_review` events run them directly. Release PRs receive the same CI coverage.
+² Live checks require credentials and skip main pushes triggered by `dependabot[bot]`.
+³ Release state is checked on main pushes; browser compatibility and package build run when publication is due.
+
+The **CI gate** in [`create-releases.yml`](workflows/create-releases.yml) requires a successful
+[`ci.yml`](workflows/ci.yml) push run on `main` for the immutable release SHA, including live checks when
+they run. Missing CI, a mismatched SHA, failure, cancellation, or timeout prevents publication; a green
+run for another commit cannot satisfy the gate. The gate checks the overall workflow conclusion, so it
+does not independently reject skipped jobs. Experimental Node.js results remain advisory as defined by
+[the Node.js support policy](../NODE_VERSION_POLICY.md).
+
+When adding or changing checks, especially main-only checks, explicitly choose whether they block
+publication or are advisory. Update this table and the focused workflow regressions in
+[`tests/release-publish-workflow.test.ts`](../tests/release-publish-workflow.test.ts) to preserve the
+release SHA, failure handling, and publication dependencies. Keep merge-only workflows distinct from
+the publication gate.
+
 ### Override an automated release version
 
 Do not edit an automated release PR title to change its version. The title must match the version generated in
