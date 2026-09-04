@@ -34,7 +34,6 @@ export function createEmbedding(
     ...options,
     __security: { bearerAuth: true },
   };
-  const hasBodyOverride = requestOptions.body !== optimizedBody;
   const response: APIPromise<CreateEmbeddingResponse> = client.post('/embeddings', requestOptions);
 
   // Explicit encodings return the original response promise unchanged.
@@ -55,8 +54,8 @@ export function createEmbedding(
         if (index in embeddings) {
           const embeddingBase64Obj = embeddings[index] as Embedding;
           const { embedding } = embeddingBase64Obj;
-          // A body override can request float embeddings or omit the format.
-          if (hasBodyOverride && Array.isArray(embedding)) {
+          // Request hooks and serialization can also select float embeddings.
+          if (Array.isArray(embedding)) {
             continue;
           }
           embeddingBase64Obj.embedding = toFloat32Array(embedding as unknown as string);
