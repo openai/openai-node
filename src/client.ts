@@ -1114,7 +1114,12 @@ export class OpenAI {
     const originalSignals = authentication ? [] : [options.signal, requestSignal];
     const abortedSignal = () => originalSignals.find((signal) => signal?.aborted) ?? callerSignal;
     const cancelCaller = () => controller.abort(abortedSignal().reason);
-    const abortError = () => this._makeUserAbortError(abortedSignal());
+    const abortError = () => {
+      const signal = originalSignals.find((original) => original?.aborted);
+      return signal || authentication
+        ? this._makeUserAbortError(signal ?? callerSignal)
+        : new Errors.APIConnectionTimeoutError();
+    };
     for (const signal of originalSignals) {
       signal?.addEventListener('abort', cancelCaller, { once: true });
       if (signal?.aborted) cancelCaller();

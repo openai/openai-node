@@ -75,6 +75,37 @@ describe('OpenAI client request behavior', () => {
     );
   });
 
+  test('preserves timeout errors when a custom fetch returns headers after its deadline', async () => {
+    vi.useFakeTimers();
+    const caller = new AbortController();
+    const cancelBody = vi.fn();
+    const response = new Response(new ReadableStream({ cancel: cancelBody }), {
+      status: 503,
+      headers: { 'retry-after': '90' },
+    });
+    const fetch = vi.fn(async () => {
+      await sleep(110);
+      return response;
+    });
+    const client = new OpenAI({ apiKey: 'test-key', fetch, timeout: 100 });
+    try {
+      const result = Promise.allSettled([
+        client.responses.create({ model: 'test-model', input: 'Hello.' }, { signal: caller.signal }),
+      ]);
+      await vi.runAllTimersAsync();
+      const [outcome] = await result;
+      expect(outcome.status).toBe('rejected');
+      if (outcome.status === 'rejected') {
+        expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+      }
+      expect(caller.signal.aborted).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(cancelBody).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test.each(['caller', 'hook'] as const)(
     'preserves %s cancellation with a request hook and custom fetchWithTimeout',
     async (source) => {
