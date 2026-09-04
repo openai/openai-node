@@ -303,6 +303,37 @@ describe('X.509 workload credential lifecycle', () => {
     },
   );
 
+  test('preserves a timeout-shaped caller reason during the issuer minimum wait', async () => {
+    const caller = new AbortController();
+    const reason = new APIConnectionTimeoutError();
+    let exchanges = 0;
+    let dispatches = 0;
+    const clock = vi.spyOn(performance, 'now');
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        exchanges += 1;
+        return exchanges === 2
+          ? new Response(null, { status: 503, headers: { 'retry-after': '1' } })
+          : token('synthetic-caller-reason', 20);
+      }
+      dispatches += 1;
+      if (dispatches === 2) {
+        setTimeout(() => caller.abort(reason), 10);
+        return new Response(null, { status: 401 });
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI(options({ maxRetries: 1 }));
+    await client.models.list();
+    clock.mockReturnValue(performance.now() + 11_000);
+
+    const request = client.models.list({ signal: caller.signal });
+    await expect(request).rejects.toBeInstanceOf(APIUserAbortError);
+    await expect(request).rejects.toMatchObject({ cause: reason });
+    expect(exchanges).toBe(2);
+    expect(dispatches).toBe(2);
+  });
+
   test.each([false, true])(
     'keeps a shared issuer refusal in each surviving request (cancel first=%s)',
     async (cancelFirst) => {

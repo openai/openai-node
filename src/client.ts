@@ -1100,7 +1100,7 @@ export class OpenAI {
     }
   }
 
-  /** Bounds terminal error reads for X.509 requests and declined server retry delays. */
+  /** Bounds error reads for X.509 requests and declined or exhausted retries. */
   private async readResponseError(
     response: Response,
     options: FinalRequestOptions,
@@ -1522,9 +1522,11 @@ export class OpenAI {
 
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
+      const boundedErrorRead =
+        declinedRetryDelay || (shouldRetry && retriesRemaining === 0 && !hasStreamingBody);
       const errText = x509Authentication
         ? await this.readResponseError(response, options, timeout, controller, req.signal, x509Authentication)
-        : declinedRetryDelay
+        : boundedErrorRead
           ? await this.readResponseError(
               response,
               options,
@@ -1533,7 +1535,7 @@ export class OpenAI {
               req.signal,
             )
           : await response.text().catch((err: any) => castToError(err).message);
-      if (declinedRetryDelay && (callerSignal?.aborted || req.signal?.aborted)) {
+      if (boundedErrorRead && (callerSignal?.aborted || req.signal?.aborted)) {
         throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
       }
       const errJSON = safeJSON(errText) as any;

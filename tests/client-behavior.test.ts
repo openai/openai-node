@@ -11,6 +11,7 @@ import {
   RateLimitError,
   SubjectTokenProviderError,
 } from 'openai/core/error';
+import type { APIError } from 'openai/core/error';
 import { CursorPage } from 'openai/core/pagination';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { sleep } from 'openai/internal/utils/sleep';
@@ -455,6 +456,88 @@ describe('OpenAI client request behavior', () => {
       vi.useRealTimers();
     }
   });
+
+  test.each(
+    [429, 503].flatMap((status) =>
+      [0, 1].flatMap((maxRetries) =>
+        (['timeout', 'abort', 'complete'] as const).map((cause) => ({ status, maxRetries, cause })),
+      ),
+    ),
+  )(
+    'bounds exhausted HTTP $status error reads with $maxRetries retries on $cause',
+    async ({ status, maxRetries, cause }) => {
+      vi.useFakeTimers();
+      const caller = new AbortController();
+      const reason = new Error('Caller canceled the exhausted request.');
+      const responseError = { message: 'Retry later.', code: 'test_error', type: 'test_error' };
+      const cancelBody = vi.fn();
+      let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+      const response = new Response(
+        new ReadableStream<Uint8Array>({
+          start(stream) {
+            streamController = stream;
+            if (cause === 'complete') {
+              stream.enqueue(new TextEncoder().encode(JSON.stringify({ error: responseError })));
+              stream.close();
+            }
+          },
+          cancel: cancelBody,
+        }),
+        { status, headers: { 'retry-after': '0.01', 'x-request-id': 'exhausted-request' } },
+      );
+      const fetch = vi.fn(async () => {
+        await sleep(40);
+        return fetch.mock.calls.length <= maxRetries
+          ? jsonResponse({ error: responseError }, { status, headers: { 'retry-after': '0.01' } })
+          : response;
+      });
+      const client = new OpenAI({ apiKey: 'test-key', fetch, maxRetries, timeout: 100 });
+      let settled = false;
+      let failure: unknown;
+      const request = (async () => {
+        try {
+          await client.responses.create({ model: 'test-model', input: 'Hello.' }, { signal: caller.signal });
+        } catch (error) {
+          failure = error;
+        } finally {
+          settled = true;
+        }
+      })();
+
+      try {
+        // Each previous attempt spends 40ms receiving headers and 10ms waiting to retry.
+        await vi.advanceTimersByTimeAsync(maxRetries * 50 + 50);
+        if (cause === 'abort') {
+          caller.abort(reason);
+        }
+        await vi.advanceTimersByTimeAsync(49);
+        if (cause === 'timeout') {
+          expect(settled).toBe(false);
+        }
+        await vi.advanceTimersByTimeAsync(1);
+        expect(settled).toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(maxRetries + 1);
+        if (cause === 'complete') {
+          expect(failure).toBeInstanceOf(status === 429 ? RateLimitError : InternalServerError);
+          expect(failure).toMatchObject({ status, error: responseError, requestID: 'exhausted-request' });
+          expect((failure as APIError).headers?.get('retry-after')).toBe('0.01');
+        } else {
+          expect(failure).toBeInstanceOf(cause === 'abort' ? APIUserAbortError : APIConnectionTimeoutError);
+          if (cause === 'abort') {
+            expect(failure).toMatchObject({ cause: reason });
+          }
+          expect(cancelBody).toHaveBeenCalledTimes(1);
+          expect(response.body?.locked).toBe(false);
+        }
+      } finally {
+        if (!settled) {
+          streamController?.close();
+        }
+        await request;
+        vi.useRealTimers();
+      }
+    },
+  );
 
   test.each(['timeout', 'abort'] as const)('cancels the owned terminal error reader on %s', async (cause) => {
     vi.useFakeTimers();

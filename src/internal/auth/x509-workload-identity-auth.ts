@@ -35,6 +35,12 @@ const userAbortError = (signal: AbortSignal): APIUserAbortError => {
   return error;
 };
 
+function throwIfUserAborted(signal: AbortSignal | null | undefined): void {
+  if (signal?.aborted) {
+    throw userAbortError(signal);
+  }
+}
+
 function assertSafeHeaders(headers: Headers): void {
   for (const name of Headers.prototype.keys.call(headers)) {
     const canonical = name.toLowerCase().split('_').join('-');
@@ -634,9 +640,7 @@ export class X509WorkloadIdentityAuth {
   /** Exchanges the exact certificate capability selected for the matching API dispatch. */
   async getToken(options?: FinalRequestOptions, context?: X509TokenRequestContext): Promise<string> {
     const callerSignal = context ? context.signal : options?.signal;
-    if (callerSignal?.aborted) {
-      throw userAbortError(callerSignal);
-    }
+    throwIfUserAborted(callerSignal);
     if (options) {
       assertX509RequestOptions(context ? context.fetchOptions : options.fetchOptions);
     }
@@ -654,6 +658,7 @@ export class X509WorkloadIdentityAuth {
       }
     } catch (error) {
       dispose();
+      throwIfUserAborted(callerSignal);
       throw signal.reason instanceof APIConnectionTimeoutError ? signal.reason : error;
     }
     if (callerSignal?.aborted) {
