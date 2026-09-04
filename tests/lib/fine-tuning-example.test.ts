@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { inspect } from 'node:util';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { vi } from 'vitest';
@@ -8,6 +9,7 @@ import type { FileObject } from 'openai/resources/files';
 import type { FineTuningJob } from 'openai/resources/fine-tuning';
 
 type Status = FineTuningJob['status'];
+const privateErrorDetail = 'Synthetic private fine-tuning error detail';
 const filename = 'examples/fine-tuning/fine-tuning.ts';
 const source = ts.transpileModule(fs.readFileSync(filename, 'utf-8'), {
   compilerOptions: {
@@ -43,7 +45,8 @@ async function executeExample(
     id: 'ftjob_test',
     object: 'fine_tuning.job',
     created_at: 0,
-    error: null,
+    error:
+      status === 'failed' ? { code: 'synthetic_failure', message: privateErrorDetail, param: null } : null,
     fine_tuned_model: null,
     finished_at: null,
     hyperparameters: { n_epochs: 'auto' },
@@ -126,8 +129,20 @@ async function executeExample(
 
 async function runExample(initialStatus: Status, followingStatuses: Status[]) {
   const { requests, waits, log, error, exit } = await executeExample(initialStatus, followingStatuses);
-  expect(error).not.toHaveBeenCalled();
-  expect(exit).not.toHaveBeenCalled();
+  // oxlint-disable-next-line unicorn/prefer-at -- Keep indexed access compatible with the repository's ES2020 type library.
+  const finalStatus = followingStatuses[followingStatuses.length - 1] ?? initialStatus;
+  if (finalStatus === 'succeeded') {
+    expect(error).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
+  } else {
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Fine-tuning job did not complete successfully.' }),
+    );
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+  }
+  expect(inspect([log.mock.calls, error.mock.calls], { depth: null })).not.toContain(privateErrorDetail);
   expect(requests.filter((request) => request === 'POST /fine_tuning/jobs')).toHaveLength(1);
   expect(requests.filter((request) => request === 'GET /fine_tuning/jobs/ftjob_test')).toHaveLength(
     followingStatuses.length,
@@ -186,6 +201,10 @@ test.each<Status>(['succeeded', 'failed', 'cancelled'])(
   },
 );
 
-test.each<Status>(['failed', 'cancelled'])('stops when validation ends with %s', async (status) => {
-  await runExample('validating_files', [status]);
+test.each(
+  (['validating_files', 'queued', 'running'] as const).flatMap((initialStatus) =>
+    (['failed', 'cancelled'] as const).map((status) => ({ initialStatus, status })),
+  ),
+)('stops when $initialStatus ends with $status', async ({ initialStatus, status }) => {
+  await runExample(initialStatus, [status]);
 });
