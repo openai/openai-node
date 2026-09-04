@@ -1300,6 +1300,7 @@ describe('toStrictJsonSchema', () => {
       'minContains',
       'minProperties',
       'not',
+      'oneOf',
       'patternProperties',
       'prefixItems',
       'propertyNames',
