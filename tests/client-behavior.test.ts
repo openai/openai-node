@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { Readable } from 'node:stream';
 
 import OpenAI from 'openai';
 import {
@@ -323,6 +324,7 @@ describe('OpenAI client request behavior', () => {
   test.each([
     ['seconds at the limit', { 'retry-after': '60' }, 60_000, true],
     ['seconds above the limit', { 'retry-after': '61' }, 0, false],
+    ['finite seconds overflow', { 'retry-after': `2${'0'.repeat(307)}` }, 0, false],
     ['milliseconds at the limit', { 'retry-after-ms': '60000' }, 60_000, true],
     ['milliseconds above the limit', { 'retry-after-ms': '60001' }, 0, false],
     ['date at the limit', { 'retry-after': 'Thu, 03 Sep 2026 12:01:00 GMT' }, 60_000, true],
@@ -332,6 +334,14 @@ describe('OpenAI client request behavior', () => {
     ['explicit retry cannot exceed the limit', { 'retry-after': '90', 'x-should-retry': 'true' }, 0, false],
     ['explicit retry opt-out', { 'retry-after': '1', 'x-should-retry': 'false' }, 0, false],
     ['invalid hint uses backoff', { 'retry-after': 'invalid' }, 500, true],
+    ['malformed seconds use backoff', { 'retry-after': '61garbage' }, 500, true],
+    ['malformed milliseconds use backoff', { 'retry-after-ms': '60001ms' }, 500, true],
+    [
+      'malformed milliseconds fall back to seconds',
+      { 'retry-after-ms': '60001ms', 'retry-after': '0.25' },
+      250,
+      true,
+    ],
     ['nonfinite hint uses backoff', { 'retry-after-ms': 'Infinity', 'retry-after': '90' }, 500, true],
     ['negative hint uses backoff', { 'retry-after': '-1' }, 500, true],
     ['missing hint uses backoff', {}, 500, true],
@@ -363,6 +373,114 @@ describe('OpenAI client request behavior', () => {
       vi.useRealTimers();
     }
   });
+
+  test.each(['timeout', 'abort'] as const)('cancels the owned terminal error reader on %s', async (cause) => {
+    vi.useFakeTimers();
+    const caller = new AbortController();
+    const cancelBody = vi.fn();
+    const response = new Response(new ReadableStream({ cancel: cancelBody }), {
+      status: 503,
+      headers: { 'retry-after': '90' },
+    });
+    const fetch = vi.fn(async () => response);
+    const client = new OpenAI({ apiKey: 'test-key', fetch, timeout: 100 });
+    try {
+      const result = Promise.allSettled([
+        client.responses.create({ model: 'test-model', input: 'Hello.' }, { signal: caller.signal }),
+      ]);
+      await vi.advanceTimersByTimeAsync(10);
+      if (cause === 'abort') {
+        caller.abort();
+      }
+      await vi.advanceTimersByTimeAsync(90);
+      const [outcome] = await result;
+      expect(outcome.status).toBe('rejected');
+      if (outcome.status === 'rejected') {
+        expect(outcome.reason).toBeInstanceOf(
+          cause === 'abort' ? APIUserAbortError : APIConnectionTimeoutError,
+        );
+      }
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(cancelBody).toHaveBeenCalledTimes(1);
+      expect(response.body?.locked).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('preserves UTF-8 error text split across terminal response chunks', async () => {
+    const message = 'Try again later 🌍';
+    const bytes = new TextEncoder().encode(`\uFEFF${JSON.stringify({ error: { message } })}`);
+    const response = new Response(
+      new ReadableStream({
+        start(stream) {
+          for (const byte of bytes) {
+            stream.enqueue(Uint8Array.of(byte));
+          }
+          stream.close();
+        },
+      }),
+      { status: 503, headers: { 'retry-after': '90' } },
+    );
+    const client = new OpenAI({ apiKey: 'test-key', fetch: async () => response });
+    await expect(client.responses.create({ model: 'test-model', input: 'Hello.' })).rejects.toMatchObject({
+      status: 503,
+      error: { message },
+    });
+    expect(response.body?.locked).toBe(false);
+  });
+
+  test.each(['complete', 'timeout', 'abort'] as const)(
+    'preserves custom-fetch Node readable error bodies on %s',
+    async (cause) => {
+      vi.useFakeTimers();
+      const caller = new AbortController();
+      const error = { message: 'Retry later.', code: 'server_overloaded', type: 'server_error' };
+      const body =
+        cause === 'complete'
+          ? Readable.from([Buffer.from(JSON.stringify({ error }))])
+          : new Readable({ read() {} });
+      const response = new Response(null, { status: 503, headers: { 'retry-after': '90' } });
+      Object.defineProperty(response, 'body', { value: body });
+      // Custom fetch implementations consume Node readable bodies in response.text().
+      vi.spyOn(response, 'text').mockImplementation(async () => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of body) {
+          chunks.push(chunk);
+        }
+        return Buffer.concat(chunks).toString('utf-8');
+      });
+      const fetch = vi.fn(async () => response);
+      const client = new OpenAI({ apiKey: 'test-key', fetch, timeout: 100 });
+      try {
+        const result = Promise.allSettled([
+          client.responses.create({ model: 'test-model', input: 'Hello.' }, { signal: caller.signal }),
+        ]);
+        await vi.advanceTimersByTimeAsync(10);
+        if (cause === 'abort') {
+          caller.abort();
+        }
+        await vi.advanceTimersByTimeAsync(90);
+        const [outcome] = await result;
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          if (cause === 'complete') {
+            expect(outcome.reason).toBeInstanceOf(InternalServerError);
+            expect(outcome.reason).toMatchObject({ status: 503, error, code: error.code, type: error.type });
+          } else {
+            expect(outcome.reason).toBeInstanceOf(
+              cause === 'abort' ? APIUserAbortError : APIConnectionTimeoutError,
+            );
+          }
+        }
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(body.destroyed).toBe(true);
+      } finally {
+        body.destroy();
+        vi.useRealTimers();
+      }
+    },
+  );
 
   test.each([
     [new Error('network unavailable'), APIConnectionError],

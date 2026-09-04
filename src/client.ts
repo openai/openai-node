@@ -1117,6 +1117,7 @@ export class OpenAI {
     originalSignal?.addEventListener('abort', cancelCaller, { once: true });
     if (originalSignal?.aborted) cancelCaller();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let timedOut = false;
     const cancel = () => deadline.abort(callerSignal.reason);
     callerSignal.addEventListener('abort', cancel, { once: true });
@@ -1141,14 +1142,25 @@ export class OpenAI {
       const expiration = wait.then(() => {
         throw new Errors.APIConnectionTimeoutError();
       });
+      const readBody = async () => {
+        if (!response.body || typeof response.body.getReader !== 'function') return response.text();
+        reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        const chunks: string[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(decoder.decode(value, { stream: true }));
+        }
+        chunks.push(decoder.decode());
+        return chunks.join('');
+      };
       const body = await Promise.race([
-        response
-          .text()
-          .catch((error: unknown) =>
-            authentication
-              ? 'X.509 workload identity API response body could not be read.'
-              : castToError(error).message,
-          ),
+        readBody().catch((error: unknown) =>
+          authentication
+            ? 'X.509 workload identity API response body could not be read.'
+            : castToError(error).message,
+        ),
         expiration,
       ]);
       if (callerSignal.aborted) {
@@ -1159,13 +1171,20 @@ export class OpenAI {
       if (error instanceof Errors.APIConnectionTimeoutError) {
         timedOut = !callerSignal.aborted;
         controller.abort();
-        void Shims.CancelReadableStream(response.body).catch(() => undefined);
+        if (!reader) void Shims.CancelReadableStream(response.body).catch(() => undefined);
       }
       if (callerSignal.aborted && !timedOut) {
         throw abortError();
       }
       throw error;
     } finally {
+      if (reader) {
+        void reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+      } else if (response.body && 'destroy' in response.body && typeof response.body.destroy === 'function') {
+        // Node readable bodies must be destroyed to interrupt a pending response.text().
+        response.body.destroy();
+      }
       if (timer !== undefined) clearTimeout(timer);
       originalSignal?.removeEventListener('abort', cancelCaller);
       callerSignal.removeEventListener('abort', cancel);
@@ -1697,7 +1716,7 @@ export class OpenAI {
     // Note the `retry-after-ms` header may not be standard, but is a good idea and we'd like proactive support for it.
     const retryAfterMillisHeader = responseHeaders?.get('retry-after-ms');
     if (retryAfterMillisHeader) {
-      const timeoutMs = parseFloat(retryAfterMillisHeader);
+      const timeoutMs = Number(retryAfterMillisHeader);
       if (!Number.isNaN(timeoutMs)) {
         timeoutMillis = timeoutMs;
       }
@@ -1706,9 +1725,12 @@ export class OpenAI {
     // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
     const retryAfterHeader = responseHeaders?.get('retry-after');
     if (retryAfterHeader && timeoutMillis === undefined) {
-      const timeoutSeconds = parseFloat(retryAfterHeader);
+      const timeoutSeconds = Number(retryAfterHeader);
       if (!Number.isNaN(timeoutSeconds)) {
-        timeoutMillis = timeoutSeconds * 1000;
+        // Keep finite seconds over the limit distinguishable from invalid hints after scaling.
+        timeoutMillis = Number.isFinite(timeoutSeconds)
+          ? Math.min(timeoutSeconds * 1000, Number.MAX_VALUE)
+          : timeoutSeconds;
       } else {
         timeoutMillis = Date.parse(retryAfterHeader) - Date.now();
       }
