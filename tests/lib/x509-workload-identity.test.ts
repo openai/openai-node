@@ -538,10 +538,10 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     let issuerCalls = 0;
     vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
       if (url.origin === 'https://mtls.auth.openai.com') {
-        issuerCalls++;
+        issuerCalls += 1;
         return Response.json({ ...TOKEN_RESPONSE, access_token: `fake-token-${issuerCalls}` });
       }
-      apiCalls++;
+      apiCalls += 1;
       return apiCalls === 1
         ? Response.json(
             { error: { message: 'Try later', code: 'retry_later' } },
@@ -557,7 +557,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     await expect(client.models.list()).rejects.toMatchObject({
       status: 401,
       code: 'retry_later',
-      request_id: 'req_fake',
+      requestID: 'req_fake',
       error: { message: 'Try later', code: 'retry_later' },
     });
     expect([apiCalls, issuerCalls]).toEqual([1, 1]);

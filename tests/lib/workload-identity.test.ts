@@ -209,7 +209,7 @@ describe('OpenAI with Workload Identity', () => {
     await expect(client.models.list()).rejects.toMatchObject({
       status: 401,
       code: 'retry_later',
-      request_id: 'req_fake',
+      requestID: 'req_fake',
       error: { message: 'Try later', code: 'retry_later' },
     });
     expect([apiCalls, issuerCalls]).toEqual([1, 1]);
