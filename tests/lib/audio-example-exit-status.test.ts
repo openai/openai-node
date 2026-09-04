@@ -16,8 +16,10 @@ const audioTool = [
   "const tool = require('node:path').basename(process.argv[1]);",
   "const failed = process.env.AUDIO_TOOL_FAILURE === 'true';",
   "if (tool === 'ffmpeg') {",
-  '  fs.writeFileSync(process.env.AUDIO_TRACE, JSON.stringify({ tool }));',
-  '  if (failed) process.exitCode = 47;',
+  "  const input = process.argv[process.argv.indexOf('-i') + 1];",
+  '  fs.writeFileSync(process.env.AUDIO_TRACE, JSON.stringify({ tool, input }));',
+  // Model a machine with only input zero available.
+  "  if (failed || ![':0', 'hw:0'].includes(input)) process.exitCode = 47;",
   "  else process.stdout.write(Buffer.from(process.env.AUDIO_BYTES, 'hex'));",
   '} else {',
   '  const chunks = [];',
@@ -160,9 +162,13 @@ describeOnUnix('audio executable examples', () => {
       if (!recording && scenario === 'HTTP rejection') {
         expect(existsSync(trace)).toBe(false);
       } else {
-        expect(JSON.parse(await readFile(trace, 'utf-8'))).toEqual(
-          recording ? { tool: 'ffmpeg' } : { tool: 'ffplay', audio: audio.toString('hex') },
-        );
+        const recorded = JSON.parse(await readFile(trace, 'utf-8'));
+        if (recording) {
+          expect(recorded.tool).toBe('ffmpeg');
+          expect([':0', 'hw:0']).toContain(recorded.input);
+        } else {
+          expect(recorded).toEqual({ tool: 'ffplay', audio: audio.toString('hex') });
+        }
       }
       if (scenario === 'success') {
         expect(result.stderr).toBe('');
