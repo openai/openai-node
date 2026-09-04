@@ -844,12 +844,13 @@ describe.each([
   describe.each(['final response', 'forced tool', 'parallel limit', 'sequential limit'] as const)(
     'afterCompletion on %s',
     (exitRoute) => {
-      test.each(['context.abort', 'external signal', 'not aborted'] as const)(
+      test.each(['context.abort', 'runner.controller.abort', 'external signal', 'not aborted'] as const)(
         'settles correctly when %s while awaiting the callback',
         async (abortMethod) => {
           const calls = exitRoute === 'final response' ? [] : [toolCall('readBalance')];
           const { client, respond } = clientWithToolCalls(streaming, calls);
           const controller = new AbortController();
+          const abortReason = new Error('synthetic completion callback cancellation');
           const callbackStarted = deferred<boolean>();
           const callbackReady = deferred<boolean>();
           const readBalance = vi.fn(() => 'balance already read');
@@ -893,12 +894,23 @@ describe.each([
           expect(onFinal).not.toHaveBeenCalled();
           if (abortMethod === 'external signal') {
             controller.abort();
+          } else if (abortMethod === 'runner.controller.abort') {
+            runner.controller.abort(abortReason);
           }
           callbackReady.resolve(true);
 
-          await (abortMethod === 'not aborted'
-            ? expect(runner.done()).resolves.toBeUndefined()
-            : expect(runner.done()).rejects.toBeInstanceOf(APIUserAbortError));
+          if (abortMethod === 'not aborted') {
+            await expect(runner.done()).resolves.toBeUndefined();
+          } else {
+            const abortError = await runner.done().catch((error: unknown) => error);
+            expect(abortError).toBeInstanceOf(APIUserAbortError);
+            expect(Object.getOwnPropertyDescriptor(abortError, 'cause')?.value).toBe(
+              runner.controller.signal.reason,
+            );
+            if (abortMethod === 'runner.controller.abort') {
+              expect(runner.controller.signal.reason).toBe(abortReason);
+            }
+          }
           expect(runner.aborted).toBe(abortMethod !== 'not aborted');
           expect(onFinal).toHaveBeenCalledTimes(abortMethod === 'not aborted' ? 1 : 0);
           expect(afterCompletion).toHaveBeenCalledTimes(1);

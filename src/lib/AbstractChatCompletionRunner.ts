@@ -391,7 +391,13 @@ export class AbstractChatCompletionRunner<
       }
       await afterCompletion(completion, runner);
       if (this.controller.signal.aborted) {
-        throw new APIUserAbortError();
+        const error = new APIUserAbortError();
+        Object.defineProperty(error, 'cause', {
+          value: this.controller.signal.reason,
+          writable: true,
+          configurable: true,
+        });
+        throw error;
       }
     };
 
