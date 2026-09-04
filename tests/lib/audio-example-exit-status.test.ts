@@ -37,6 +37,7 @@ async function runExample(directory: string, example: string, baseURL: string, t
     process.execPath,
     [
       path.join(root, 'node_modules/ts-node/dist/bin.js'),
+      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       path.join(root, 'examples/audio', `${example}.ts`),

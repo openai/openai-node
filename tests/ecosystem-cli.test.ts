@@ -201,10 +201,11 @@ describe('ecosystem test CLI', () => {
       for (const name of projects) {
         const project = path.join(fixture, 'ecosystem-tests', name);
         mkdirSync(project, { recursive: true });
-        // pnpm does not forward npm_config_* variables to its worker scripts.
+        // pnpm workers strip npm_config_* from the environment. Keep local installs offline
+        // even with npm versions that audit linked packages.
         writeFileSync(
           path.join(project, '.npmrc'),
-          'audit=false\nfund=false\noffline=true\npackage-lock=false\n',
+          'audit=false\nfund=false\noffline=true\npackage-lock=false\nupdate-notifier=false\n',
         );
         writeFileSync(
           path.join(project, 'package.json'),

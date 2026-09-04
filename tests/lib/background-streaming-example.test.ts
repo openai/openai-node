@@ -138,7 +138,7 @@ test.each(scenarios)('background example: $name', async ({ chunks, resumed, part
     process.execPath,
     [
       path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '-T',
+      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       path.join(root, 'examples/responses/stream_background.ts'),

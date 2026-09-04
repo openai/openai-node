@@ -80,7 +80,7 @@ async function runExample(reply: (request: ResponsesClientEvent, index: number) 
     process.execPath,
     [
       path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '-T',
+      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       path.join(root, 'examples/responses/websocket.ts'),
