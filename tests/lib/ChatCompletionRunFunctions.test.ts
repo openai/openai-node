@@ -660,6 +660,57 @@ describe('resource completions', () => {
       await runner.done();
     });
 
+    test.each([
+      { name: 'text in default mode', content: 'Earlier reply', stream: undefined },
+      { name: 'text with stream: false', content: 'Earlier reply', stream: false as const },
+      {
+        name: 'content parts',
+        content: [{ type: 'text' as const, text: 'Earlier reply' }],
+        stream: false as const,
+      },
+    ])('does not emit assistant $name from input history', async ({ content, stream }) => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+      const openai = new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/', fetch });
+      const messages: ChatCompletionMessageParam[] = [
+        { role: 'user', content: 'Earlier question' },
+        { role: 'assistant', content },
+        { role: 'user', content: 'Continue' },
+      ];
+      const runner = openai.chat.completions.runTools({
+        messages,
+        model: 'gpt-4o-mini',
+        tools: [],
+        ...(stream === undefined ? {} : { stream }),
+      });
+      const listener = new RunnerListener(runner);
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual(messages);
+        return {
+          id: 'chatcmpl_123',
+          object: 'chat.completion',
+          created: 0,
+          model: 'gpt-4o-mini',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: { role: 'assistant', content: 'New reply', refusal: null },
+            },
+          ],
+        };
+      });
+      await runner.done();
+
+      expect(listener.contents).toEqual(['New reply']);
+      expect(listener.messages).toMatchObject([{ role: 'assistant', content: 'New reply' }]);
+      expect(runner.messages).toHaveLength(messages.length + 1);
+      expect(runner.messages.slice(0, messages.length)).toEqual(messages);
+      expect(runner.messages[1]).toBe(messages[1]);
+      await listener.sanityCheck();
+    });
+
     test('successful flow', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 

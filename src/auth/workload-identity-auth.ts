@@ -2,6 +2,14 @@ import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { APIError, OAuthError, OpenAIError } from '../core/error';
+import { parseRetryAfterMillis } from '../internal/utils/retry-after';
+import {
+  currentWorkloadIdentityRequest,
+  strongestWorkloadIdentityRefresh,
+  waitForWorkloadIdentityRetry,
+  waitForWorkloadIdentityRefresh,
+} from '../internal/auth/workload-identity-request';
+import type { WorkloadIdentityRefresh } from '../internal/auth/workload-identity-request';
 
 interface CachedToken {
   token: string;
@@ -135,7 +143,7 @@ function isUnsafeAccessToken(accessToken: string): boolean {
  */
 export class WorkloadIdentityAuth {
   private cachedToken: CachedToken | null = null;
-  private refreshPromise: Promise<string> | null = null;
+  private refresh: WorkloadIdentityRefresh | null = null;
   private tokenGeneration = 0;
   private readonly config: WorkloadIdentity;
   private readonly tokenExchangeUrl: string = 'https://auth.openai.com/oauth/token';
@@ -173,37 +181,60 @@ export class WorkloadIdentityAuth {
    * @throws {OpenAIError} When a successful exchange has an invalid access token or expiration.
    */
   async getToken(): Promise<string> {
+    const request = currentWorkloadIdentityRequest(this);
+    const previous = strongestWorkloadIdentityRefresh(request);
     if (!this.cachedToken || WorkloadIdentityAuth.isTokenExpired(this.cachedToken)) {
-      if (this.refreshPromise) {
-        return await this.refreshPromise;
+      const refresh = this.refresh ?? this.startRefresh(previous, false);
+      if (request) {
+        request.refresh = refresh;
+        (request.refreshes ??= new Set()).add(refresh);
+        return await waitForWorkloadIdentityRefresh(refresh, request.deadline, request.signal);
       }
-
-      const refreshPromise = this.refreshToken(this.tokenGeneration);
-      this.refreshPromise = refreshPromise;
-
-      try {
-        return await refreshPromise;
-      } finally {
-        if (this.refreshPromise === refreshPromise) {
-          this.refreshPromise = null;
-        }
-      }
+      return await refresh.promise;
     }
 
-    if (WorkloadIdentityAuth.needsRefresh(this.cachedToken) && !this.refreshPromise) {
-      const refreshPromise = this.refreshToken(this.tokenGeneration).finally(() => {
-        if (this.refreshPromise === refreshPromise) {
-          this.refreshPromise = null;
-        }
-      });
-      this.refreshPromise = refreshPromise;
-      void refreshPromise.catch(() => null);
+    if (WorkloadIdentityAuth.needsRefresh(this.cachedToken) && !this.refresh) {
+      this.startRefresh(previous, true);
     }
-
+    if (request && this.refresh) {
+      request.refresh = this.refresh;
+      (request.refreshes ??= new Set()).add(this.refresh);
+    }
     return this.cachedToken.token;
   }
 
-  private async refreshToken(generation: number): Promise<string> {
+  private startRefresh(
+    previous: WorkloadIdentityRefresh | undefined,
+    background: boolean,
+  ): WorkloadIdentityRefresh {
+    // Shared work retains only the observed generation, never one caller's deadline or signal.
+    const generation = this.tokenGeneration;
+    const refresh: WorkloadIdentityRefresh = { promise: Promise.resolve('') };
+    refresh.promise = (async () => {
+      if (previous?.minimum && !previous.failure) {
+        await previous.promise.catch(() => null);
+      }
+      const refusal = previous?.failure;
+      if (refusal) {
+        refresh.failure = refusal;
+        await waitForWorkloadIdentityRetry(refusal);
+        delete refresh.failure;
+      }
+      return await this.refreshToken(generation, refresh);
+    })().finally(() => {
+      refresh.complete = true;
+      if (this.refresh === refresh) {
+        this.refresh = null;
+      }
+    });
+    this.refresh = refresh;
+    if (background) {
+      void refresh.promise.catch(() => null);
+    }
+    return refresh;
+  }
+
+  private async refreshToken(generation: number, refresh: WorkloadIdentityRefresh): Promise<string> {
     const subjectToken = await this.config.provider.getToken();
     const body: Record<string, string> = {
       grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
@@ -227,24 +258,7 @@ export class WorkloadIdentityAuth {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      let body: any = undefined;
-
-      try {
-        body = JSON.parse(errorText);
-      } catch {
-        // Ignore non-JSON error bodies.
-      }
-
-      if (response.status === 400 || response.status === 401 || response.status === 403) {
-        throw new OAuthError(response.status as 400 | 401 | 403, body, response.headers);
-      }
-      throw APIError.generate(
-        response.status,
-        body,
-        `Token exchange failed with status ${response.status}`,
-        response.headers,
-      );
+      await WorkloadIdentityAuth.throwTokenExchangeError(response, refresh);
     }
 
     const tokenResponse: unknown = await parseOAuthTokenResponse(response);
@@ -282,6 +296,42 @@ export class WorkloadIdentityAuth {
     return accessToken;
   }
 
+  private static async throwTokenExchangeError(
+    response: Response,
+    refresh: WorkloadIdentityRefresh,
+  ): Promise<never> {
+    const delayMillis = parseRetryAfterMillis(response.headers);
+    const notBefore = delayMillis === undefined ? undefined : performance.now() + delayMillis;
+    if (delayMillis !== undefined && notBefore !== undefined) {
+      refresh.minimum = { delayMillis, notBefore };
+    }
+    try {
+      const errorText = await response.text();
+      let body: any = undefined;
+
+      try {
+        body = JSON.parse(errorText);
+      } catch {
+        // Ignore non-JSON error bodies.
+      }
+
+      if (response.status === 400 || response.status === 401 || response.status === 403) {
+        throw new OAuthError(response.status as 400 | 401 | 403, body, response.headers);
+      }
+      throw APIError.generate(
+        response.status,
+        body,
+        `Token exchange failed with status ${response.status}`,
+        response.headers,
+      );
+    } catch (error) {
+      if (delayMillis !== undefined && notBefore !== undefined) {
+        refresh.failure = { error, delayMillis, notBefore };
+      }
+      throw error;
+    }
+  }
+
   private static isTokenExpired(cachedToken: CachedToken): boolean {
     return Date.now() >= cachedToken.expiresAt;
   }
@@ -294,6 +344,6 @@ export class WorkloadIdentityAuth {
   invalidateToken(): void {
     this.tokenGeneration += 1;
     this.cachedToken = null;
-    this.refreshPromise = null;
+    this.refresh = null;
   }
 }

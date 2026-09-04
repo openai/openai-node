@@ -96,6 +96,7 @@ const response = await client.responses.create({
         { type: 'input_text', text: 'What is in this image?' },
         {
           type: 'input_image',
+          detail: 'auto',
           image_url:
             'https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg',
         },
@@ -112,6 +113,14 @@ console.log(response.output_text);
 For secure, automated environments like cloud-managed Kubernetes, Azure, and GCP, you can use workload identity authentication with short-lived tokens from cloud identity providers instead of long-lived API keys.
 
 The `workloadIdentity` parameter is mutually exclusive with `apiKey`.
+
+For advanced subclasses using subject-token workload identity, the SDK starts each logical request with
+a shallow copy of the caller options. Protected hooks keep their existing signatures, and hook mutations
+apply to that request. Hooks no longer receive the original caller options
+object: do not rely on identity comparisons with it or on top-level hook mutations changing it. Nested
+values, including headers and the body, retain their original references. This isolates authentication
+retry state when concurrent requests reuse the same caller options. API-key and X.509 requests keep their
+existing options behavior.
 
 For subject-token workload identity, the required fields are `identityProviderId`, `serviceAccountId`, and `provider`. X.509 workload identity instead uses an enrolled client certificate and its separately configured transport.
 
@@ -318,7 +327,7 @@ const client = new OpenAI({
 });
 
 export async function webhook(request: Request) {
-  const headersList = headers();
+  const headersList = await headers();
   const body = await request.text();
 
   try {
@@ -358,7 +367,7 @@ const client = new OpenAI({
 });
 
 export async function webhook(request: Request) {
-  const headersList = headers();
+  const headersList = await headers();
   const body = await request.text();
 
   try {
@@ -419,7 +428,9 @@ Connection errors (for example, due to a network connectivity problem), 408 Requ
 
 The SDK honors valid `Retry-After` delays of up to 60 seconds (`retry-after-ms` takes precedence when
 provided). If the server requests a longer delay, the SDK returns the original status error, including
-its response headers, without retrying. Missing or invalid retry hints use exponential backoff for
+its response headers, without retrying. X.509 requests retain their existing deadline precedence:
+if the remaining timeout cannot accommodate another attempt, `APIConnectionTimeoutError` takes
+precedence over the status error. Missing or invalid retry hints use exponential backoff for
 ordinary HTTP retries; workload-identity authentication refreshes retain their immediate replay.
 Valid retry hints also apply to authentication replays, subject to the request timeout.
 

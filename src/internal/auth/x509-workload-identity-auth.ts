@@ -8,7 +8,7 @@ import { CancelReadableStream } from '../shims';
 import type { MergedRequestInit } from '../types';
 import { isSensitiveHeader } from '../utils/log';
 import { hasOwn } from '../utils/values';
-import { parseRetryAfterMillis } from '../utils/retry-after';
+import { parseRetryAfter } from '../utils/retry-after';
 import { assertX509APIOrigin } from './x509-api-origin';
 import { resolveX509Transport } from './x509-transport-registry';
 import {
@@ -692,15 +692,16 @@ export class X509WorkloadIdentityAuth {
   ): Promise<string | undefined> {
     let cached = this.#cachedToken;
     if (scope?.issuerRetryRefusal !== undefined) {
-      const { error, retryAt } = scope.issuerRetryRefusal;
-      if (performance.now() < retryAt) {
+      const { error, retryAt, wallRetryAt } = scope.issuerRetryRefusal;
+      const remaining = wallRetryAt === undefined ? retryAt - performance.now() : wallRetryAt - Date.now();
+      if (remaining > 0) {
         if (cached && performance.now() < cached.expiresAt && Date.now() < cached.wallExpiresAt) {
           return X509WorkloadIdentityAuth.#assignToken(scope, cached);
         }
         if (!Number.isFinite(retryAt)) {
           throw error;
         }
-        await this.waitForRetry(Math.ceil(Math.max(0, retryAt - performance.now())), signal);
+        await this.waitForRetry(Math.ceil(remaining), signal);
       }
       delete scope.issuerRetryRefusal;
       cached = this.#cachedToken;
@@ -763,12 +764,14 @@ export class X509WorkloadIdentityAuth {
     ) {
       return undefined;
     }
-    const requested = parseRetryAfterMillis(X509WorkloadIdentityAuth.retryHeaders(error));
+    const hint = parseRetryAfter(X509WorkloadIdentityAuth.retryHeaders(error));
+    const requested = hint?.delayMillis;
     if (scope && requested !== undefined && requested > 0) {
       // Cached fallback must not let an API retry restart the issuer before its minimum.
       scope.issuerRetryRefusal ??= {
         error,
         retryAt: requested <= 60_000 ? performance.now() + Math.ceil(requested) : Number.POSITIVE_INFINITY,
+        ...(requested <= 60_000 && hint?.retryAt !== undefined ? { wallRetryAt: hint.retryAt } : {}),
       };
     }
     const cooldown =

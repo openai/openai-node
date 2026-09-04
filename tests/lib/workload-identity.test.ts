@@ -1,6 +1,13 @@
+/* oxlint-disable max-classes-per-file -- Distinct subclasses exercise existing async protected-hook forwarding contracts. */
 import { vi } from 'vitest';
-import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
-import type { Response, RequestInit } from 'openai/internal/builtin-types';
+import OpenAI, {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  OAuthError,
+  SubjectTokenProviderError,
+} from 'openai';
+import type { Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
 
 const originalFetch = global.fetch;
 
@@ -27,9 +34,492 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     global.fetch = originalFetch;
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENAI_ADMIN_KEY'];
+  });
+
+  test.each([
+    [false, 'none'],
+    [true, 'none'],
+    [false, 'forward'],
+    [true, 'forward'],
+    [false, 'copy-build'],
+    [true, 'copy-build'],
+    [false, 'copy-bearer'],
+    [true, 'copy-bearer'],
+  ] as const)(
+    'retains a failed background issuer minimum (pending body: %s, legacy hooks: %s)',
+    async (pendingBody, legacyHooks) => {
+      vi.useFakeTimers();
+      let issuerCalls = 0;
+      let apiCalls = 0;
+      const failure = Response.json(
+        { error: 'temporarily_unavailable' },
+        {
+          status: 503,
+          headers: { 'retry-after': '90' },
+        },
+      );
+      let finishFailureRead!: () => void;
+      const failureRead = new Promise<void>((resolve) => {
+        finishFailureRead = resolve;
+      });
+      let releaseFailureBody!: () => void;
+      const failureBody = new Promise<void>((resolve) => {
+        releaseFailureBody = resolve;
+      });
+      const read = failure.text.bind(failure);
+      vi.spyOn(failure, 'text').mockImplementation(async () => {
+        finishFailureRead();
+        if (pendingBody) {
+          await failureBody;
+        }
+        return await read();
+      });
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          issuerCalls += 1;
+          return issuerCalls === 2
+            ? failure
+            : Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+        }
+        apiCalls += 1;
+        if (apiCalls === 2) {
+          await failureRead;
+          return Response.json({ error: { message: 'expired' } }, { status: 401 });
+        }
+        return Response.json({ data: [] });
+      });
+      class LegacyHooksClient extends OpenAI {
+        override async buildRequest(
+          options: Parameters<OpenAI['buildRequest']>[0],
+          retries?: Parameters<OpenAI['buildRequest']>[1],
+        ) {
+          await Promise.resolve();
+          return await super.buildRequest(legacyHooks === 'copy-build' ? { ...options } : options, retries);
+        }
+
+        protected override async authHeaders(
+          options: Parameters<OpenAI['buildRequest']>[0],
+          schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        ) {
+          await Promise.resolve();
+          return await super.authHeaders(options, schemes);
+        }
+
+        protected override async bearerAuth(options: Parameters<OpenAI['buildRequest']>[0]) {
+          await Promise.resolve();
+          return await super.bearerAuth(legacyHooks === 'copy-bearer' ? { ...options } : options);
+        }
+      }
+      const Client = legacyHooks === 'none' ? OpenAI : LegacyHooksClient;
+      const client = new Client({ ...createTestClientOptions(), fetch: send, maxRetries: 0 });
+      await client.models.list();
+      await vi.advanceTimersByTimeAsync(1001);
+      const result = (async () => {
+        try {
+          return await client.models.list();
+        } catch (error) {
+          return error;
+        }
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+      releaseFailureBody();
+      expect(issuerCalls).toBe(2);
+      expect(await result).toBeInstanceOf(Error);
+      expect(issuerCalls).toBe(2);
+      expect(apiCalls).toBe(2);
+      await client.models.list();
+      expect(issuerCalls).toBe(3);
+    },
+  );
+
+  test.each(['timeout', 'signal'] as const)(
+    'honors a build hook mutation of %s during issuer acquisition without restarting the deadline',
+    async (mode) => {
+      vi.useFakeTimers();
+      const original = new AbortController();
+      const replacement = new AbortController();
+      class MutatingHookClient extends OpenAI {
+        override async buildRequest(
+          options: Parameters<OpenAI['buildRequest']>[0],
+          retries?: Parameters<OpenAI['buildRequest']>[1],
+        ) {
+          if (mode === 'timeout') {
+            options.timeout = 100;
+          } else {
+            options.signal = replacement.signal;
+          }
+          await new Promise<void>((resolve) => setTimeout(resolve, 50));
+          return await super.buildRequest(options, retries);
+        }
+      }
+      let releaseIssuer!: (response: Response) => void;
+      const issuer = new Promise<Response>((resolve) => {
+        releaseIssuer = resolve;
+      });
+      let apiCalls = 0;
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          return await issuer;
+        }
+        apiCalls += 1;
+        return Response.json({ data: [] });
+      });
+      const client = new MutatingHookClient({ ...createTestClientOptions(), fetch: send, maxRetries: 0 });
+      let settled = false;
+      const result = (async () => {
+        try {
+          return await client.models.list({ timeout: 1000, signal: original.signal });
+        } catch (error) {
+          return error;
+        } finally {
+          settled = true;
+        }
+      })();
+      try {
+        await vi.advanceTimersByTimeAsync(60);
+        expect(send).toHaveBeenCalledTimes(1);
+        if (mode === 'signal') {
+          replacement.abort('synthetic-hook-cancel');
+        }
+        await vi.advanceTimersByTimeAsync(40);
+        expect(settled).toBe(true);
+        expect(await result).toBeInstanceOf(
+          mode === 'timeout' ? APIConnectionTimeoutError : APIUserAbortError,
+        );
+        expect(apiCalls).toBe(0);
+      } finally {
+        releaseIssuer(Response.json({ access_token: 'synthetic-token', expires_in: 3600 }));
+        await vi.advanceTimersByTimeAsync(0);
+      }
+    },
+  );
+
+  test('honors an issuer minimum when a protected auth hook defers acquisition to dispatch', async () => {
+    vi.useFakeTimers();
+    class DeferredAuthenticationClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This existing protected hook can defer token acquisition to dispatch.
+      protected override async bearerAuth(): Promise<undefined> {}
+    }
+    let issuerCalls = 0;
+    const send = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).includes('/oauth/token')) {
+        issuerCalls += 1;
+        return issuerCalls === 1
+          ? Response.json(
+              { error: 'temporarily_unavailable' },
+              {
+                status: 503,
+                headers: { 'retry-after': '90' },
+              },
+            )
+          : Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new DeferredAuthenticationClient({
+      ...createTestClientOptions(),
+      fetch: send,
+      maxRetries: 1,
+    });
+    const result = (async () => {
+      try {
+        return await client.models.list();
+      } catch (error) {
+        return error;
+      }
+    })();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await result).toBeInstanceOf(APIConnectionError);
+    expect(issuerCalls).toBe(1);
+  });
+
+  test.each(['wait', 'cancel', 'deadline', 'invalid'] as const)(
+    'preserves %s behavior for a cached bearer followed by a hinted issuer failure',
+    async (mode) => {
+      vi.useFakeTimers();
+      const controller = new AbortController();
+      let issuerCalls = 0;
+      let apiCalls = 0;
+      let finishFailureRead!: () => void;
+      const failureRead = new Promise<void>((resolve) => {
+        finishFailureRead = resolve;
+      });
+      const failure = Response.json(
+        { error: 'temporarily_unavailable' },
+        {
+          status: 503,
+          headers: { 'retry-after-ms': mode === 'invalid' ? 'invalid' : '200' },
+        },
+      );
+      const read = failure.text.bind(failure);
+      vi.spyOn(failure, 'text').mockImplementation(async () => {
+        const body = await read();
+        finishFailureRead();
+        return body;
+      });
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          issuerCalls += 1;
+          return issuerCalls === 2
+            ? failure
+            : Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+        }
+        apiCalls += 1;
+        if (apiCalls === 2) {
+          await failureRead;
+          return Response.json({ error: { message: 'expired' } }, { status: 401 });
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        fetch: send,
+        maxRetries: 0,
+        timeout: mode === 'deadline' ? 100 : 1000,
+      });
+      await client.models.list();
+      await vi.advanceTimersByTimeAsync(1001);
+      const result = (async () => {
+        try {
+          return await client.models.list({ signal: controller.signal });
+        } catch (error) {
+          return error;
+        }
+      })();
+      await vi.advanceTimersByTimeAsync(199);
+      if (mode === 'invalid') {
+        expect(issuerCalls).toBe(3);
+      } else {
+        expect(issuerCalls).toBe(2);
+      }
+      if (mode === 'cancel') {
+        controller.abort('synthetic-cancel');
+      }
+      await vi.advanceTimersByTimeAsync(1);
+      const outcome = await result;
+      if (mode === 'cancel') {
+        expect(outcome).toBeInstanceOf(APIUserAbortError);
+      } else if (mode === 'deadline') {
+        expect(outcome).toBeInstanceOf(APIConnectionTimeoutError);
+      } else {
+        expect(outcome).not.toBeInstanceOf(Error);
+        expect(issuerCalls).toBe(3);
+      }
+    },
+  );
+
+  test.each(['abort', 'deadline'] as const)(
+    'keeps a second caller alive when the first caller reaches its %s during a shared issuer wait',
+    async (mode) => {
+      vi.useFakeTimers();
+      const controller = new AbortController();
+      let issuerCalls = 0;
+      let apiCalls = 0;
+      let releaseBody!: () => void;
+      const pendingBody = new Promise<void>((resolve) => {
+        releaseBody = resolve;
+      });
+      const failure = Response.json(
+        { error: 'temporarily_unavailable' },
+        { status: 503, headers: { 'retry-after-ms': '200' } },
+      );
+      const read = failure.text.bind(failure);
+      vi.spyOn(failure, 'text').mockImplementation(async () => {
+        await pendingBody;
+        return await read();
+      });
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          issuerCalls += 1;
+          return issuerCalls === 2
+            ? failure
+            : Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+        }
+        apiCalls += 1;
+        return apiCalls === 2
+          ? Response.json({ error: { message: 'expired' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new OpenAI({ ...createTestClientOptions(), fetch: send, maxRetries: 0 });
+      await client.models.list();
+      await vi.advanceTimersByTimeAsync(1001);
+      const first = (async () => {
+        try {
+          return await client.models.list({
+            signal: controller.signal,
+            timeout: mode === 'deadline' ? 100 : 1000,
+          });
+        } catch (error) {
+          return error;
+        }
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+      let secondSettled = false;
+      const second = (async () => {
+        try {
+          return await client.models.list({ timeout: 1000 });
+        } catch (error) {
+          return error;
+        } finally {
+          secondSettled = true;
+        }
+      })();
+      await vi.advanceTimersByTimeAsync(50);
+      if (mode === 'abort') {
+        controller.abort('synthetic-cancel');
+      }
+      await vi.advanceTimersByTimeAsync(50);
+      const firstError = await first;
+      releaseBody();
+      expect(firstError).toBeInstanceOf(mode === 'abort' ? APIUserAbortError : APIConnectionTimeoutError);
+      expect(secondSettled).toBe(false);
+      expect(issuerCalls).toBe(2);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(await second).not.toBeInstanceOf(Error);
+      expect(issuerCalls).toBe(3);
+    },
+  );
+
+  test.each(['short', 'absent'] as const)(
+    'retains an earlier issuer minimum after observing another generation with a %s hint',
+    async (hint) => {
+      vi.useFakeTimers();
+      let issuerCalls = 0;
+      let apiCalls = 0;
+      let releaseBody!: () => void;
+      const pendingBody = new Promise<void>((resolve) => {
+        releaseBody = resolve;
+      });
+      let expireToken!: (response: Response) => void;
+      const expiration = new Promise<Response>((resolve) => {
+        expireToken = resolve;
+      });
+      const laterFailure = Response.json(
+        { error: 'later-failure' },
+        { status: 503, headers: hint === 'short' ? { 'retry-after-ms': '10' } : {} },
+      );
+      const read = laterFailure.text.bind(laterFailure);
+      vi.spyOn(laterFailure, 'text').mockImplementation(async () => {
+        await pendingBody;
+        return await read();
+      });
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          issuerCalls += 1;
+          if (issuerCalls === 2) {
+            return Response.json(
+              { error: 'earlier-failure' },
+              { status: 503, headers: { 'retry-after': '90' } },
+            );
+          }
+          if (issuerCalls === 3) {
+            return laterFailure;
+          }
+          return Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+        }
+        apiCalls += 1;
+        if (apiCalls === 2) {
+          return Response.json(
+            { error: { message: 'retry API' } },
+            { status: 503, headers: { 'retry-after-ms': '100' } },
+          );
+        }
+        if (apiCalls === 4) {
+          return await expiration;
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({ ...createTestClientOptions(), fetch: send, maxRetries: 1 });
+      try {
+        await client.models.list();
+        await vi.advanceTimersByTimeAsync(1001);
+        const first = (async () => {
+          try {
+            return await client.models.list();
+          } catch (error) {
+            return error;
+          }
+        })();
+        await vi.advanceTimersByTimeAsync(0);
+        await client.models.list();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(apiCalls).toBe(4);
+        expect(issuerCalls).toBe(3);
+        releaseBody();
+        await vi.advanceTimersByTimeAsync(0);
+        expireToken(Response.json({ error: { message: 'expired' } }, { status: 401 }));
+        await vi.advanceTimersByTimeAsync(10);
+        expect(issuerCalls).toBe(3);
+        expect(await first).toMatchObject({ status: 503, error: 'earlier-failure' });
+      } finally {
+        releaseBody();
+        expireToken(Response.json({ data: [] }));
+      }
+    },
+  );
+
+  test('shares one foreground issuer failure across concurrent requests reusing their options', async () => {
+    let release!: (value: Response) => void;
+    const issuer = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const send = vi.fn(async () => issuer);
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: send, maxRetries: 1 });
+    const options = { path: '/models', method: 'get' as const };
+    const calls = [client.request(options), client.request(options)];
+    const settled = Promise.allSettled(calls);
+    release(
+      Response.json({ error: 'temporarily_unavailable' }, { status: 503, headers: { 'retry-after': '90' } }),
+    );
+    const results = await settled;
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(results.every((result) => result.status === 'rejected')).toBe(true);
+    if (results[0]?.status === 'rejected' && results[1]?.status === 'rejected') {
+      expect(results[0].reason).toBe(results[1].reason);
+    }
+  });
+
+  test('keeps legacy-signature forwarding isolated when caller options are reused', async () => {
+    const seen: object[] = [];
+    class LegacyForwardingClient extends OpenAI {
+      override async buildRequest(
+        options: Parameters<OpenAI['buildRequest']>[0],
+        retries?: Parameters<OpenAI['buildRequest']>[1],
+      ) {
+        seen.push(options);
+        await Promise.resolve();
+        return await super.buildRequest(options, retries);
+      }
+
+      protected override async bearerAuth(options: Parameters<OpenAI['buildRequest']>[0]) {
+        seen.push(options);
+        await Promise.resolve();
+        return await super.bearerAuth(options);
+      }
+    }
+    let issuerCalls = 0;
+    const send = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).includes('/oauth/token')) {
+        issuerCalls += 1;
+        return Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new LegacyForwardingClient({ ...createTestClientOptions(), fetch: send });
+    const headers = { 'x-test-request': 'synthetic' };
+    const options = { path: '/models', method: 'get' as const, headers };
+    await Promise.all([client.request(options), client.request(options)]);
+    expect(issuerCalls).toBe(1);
+    expect(seen).toHaveLength(4);
+    expect(seen[0]).not.toBe(seen[1]);
+    expect(seen[0]).toBe(seen[2]);
+    expect(seen[1]).toBe(seen[3]);
+    expect(seen.every((value) => (value as typeof options).headers === headers)).toBe(true);
+    expect(options).toEqual({ path: '/models', method: 'get', headers });
   });
 
   test('initializes with workloadIdentity', () => {

@@ -27,10 +27,25 @@ The repository's pnpm scripts use Bash. On Windows, install [Git for Windows](ht
 and run the development commands from Git Bash, where `bash` is available on `PATH`. If you run pnpm from
 PowerShell instead, add the Git for Windows `bin` directory that contains `bash.exe` to `PATH` first.
 
+The repository keeps formatter inputs on LF through `.gitattributes`. Git does not rewrite unchanged files
+when an existing `core.autocrlf=true` checkout first pulls that rule. If `git ls-files --eol AGENTS.md`
+still reports `w/crlf` and `pnpm lint` reports widespread formatting failures, first make sure
+`git status --short` is empty, then run:
+
+```sh
+$ pnpm format
+$ git add -u
+$ git status --short
+```
+
+The format command rewrites the existing checkout to LF. Because the checkout was clean, `git add -u`
+only refreshes equivalent tracked content after line-ending normalization. The final status command should
+remain empty; inspect any reported changes instead of discarding them.
+
 To set up the repository, run:
 
 ```sh
-$ pnpm install
+$ ./scripts/bootstrap
 $ pnpm build
 ```
 
@@ -142,6 +157,30 @@ $ pnpm link --global openai
 
 ## Running tests
 
+The mock server uses [the OpenAI Steady fork](https://github.com/openai-oss-forks/steady).
+`scripts/steady/manifest.json` is the single source of dependency pins: the
+Steady Git commit and source digest, plus the Deno version and runtime checksums. `./scripts/steady/install` fetches that source, verifies the runtime,
+and caches dependencies using the fork's frozen Deno lockfile. It requires
+Git, Node.js, curl, unzip, and sha256sum or shasum. The installation supports
+macOS and Linux on x64/ARM64, and Windows x64 through Git Bash.
+
+`./scripts/run-steady` verifies the local source and runtime, then runs without
+downloading dependencies. Pass a local OpenAPI specification path. To update
+Steady, review the fork commit and run
+`node scripts/steady/update.cjs <full-commit-sha>`. This updates the manifest
+with the commit and its source digest; no launcher or test edits are needed.
+Then run `./scripts/steady/install`. Review the release checksums when changing Deno.
+Run `node scripts/steady/test.cjs` to check the
+installation, integrity checks, and mock-server lifecycle.
+
+This checkout owns `scripts/steady/.cache`. Source and dependency entries are
+keyed by the Steady revision; the runtime and dependencies also include the Deno
+version, and runtimes include the platform. Install and launch commands remove
+unselected entries after 30 idle days. A process lease protects entries until
+the command exits, including running Windows executables. The current pins are
+retained; changing the manifest makes the previous entries eligible for expiry.
+Cleanup runs on the next install or launch, without background work.
+
 The test suite is split between handwritten unit tests, which run with Vitest,
 and generated API-resource tests, which remain on Jest. Generated tests have a
 generator comment at the top of the file and primarily
@@ -162,7 +201,7 @@ its corresponding runner, for example `./scripts/test tests/lib/parser.test.ts`
 or `./scripts/test tests/api-resources/models.test.ts`.
 
 The generated portion of the full and generated suites automatically
-starts a [Steady mock server](https://github.com/dgellow/steady) against the
+starts a [Steady mock server](https://github.com/openai-oss-forks/steady) against the
 OpenAPI spec when one is not already running. To manage that server yourself,
 run `./scripts/mock` in a separate terminal.
 

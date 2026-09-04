@@ -384,10 +384,10 @@ will trigger consumption of the stream until completion and then return the rele
 ### Streaming Responses
 
 ```ts
-openai.chat.completions.stream({ stream?: false, … }, options?): ChatCompletionStreamingRunner
+openai.chat.completions.stream({ stream?: true, … }, options?): ChatCompletionStream
 ```
 
-`openai.chat.completions.stream()` returns a `ChatCompletionStreamingRunner`, which emits events, has an async
+`openai.chat.completions.stream()` returns a `ChatCompletionStream`, which emits events, has an async
 iterator, and exposes helper methods to accumulate chunks into a convenient shape and make it easy to reason
 about the conversation.
 
@@ -757,6 +757,8 @@ main();
 The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
 next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
 The callback also runs for the final completion, when no further request will be made.
+Once the callback resolves, any pending cancellation is reported through the `abort` event and rejects
+`done()` and the `final*` helpers, including on the final completion.
 
 ```ts
 const runner = client.chat.completions.runTools(

@@ -106,7 +106,9 @@ jobs:
 
       - name: Read policy matrix
         id: policy
-        run: echo "matrix=$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)" >> "$GITHUB_OUTPUT"
+        run: |
+          matrix="$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   test:
     name: test (${{ matrix.node-version }})
@@ -143,6 +145,11 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '${{ matrix.node-version }}'
+
+      - name: Check Steady cache lifecycle
+        run: |
+          node scripts/steady/publication.test.cjs
+          node scripts/steady/cache.test.cjs
 
       - name: Run tests
         run: ./scripts/test

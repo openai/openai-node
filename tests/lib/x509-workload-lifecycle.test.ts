@@ -303,6 +303,54 @@ describe('X.509 workload credential lifecycle', () => {
     },
   );
 
+  test.each(['date', 'milliseconds'] as const)(
+    'keeps the issuer %s clock contract when wall time advances during cached fallback',
+    async (hint) => {
+      vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+      vi.setSystemTime(new Date('2026-09-04T12:00:00Z'));
+      let exchanges = 0;
+      let dispatches = 0;
+      vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          exchanges += 1;
+          if (exchanges === 2) {
+            const headers =
+              hint === 'date'
+                ? { 'retry-after': new Date(Date.now() + 1000).toUTCString() }
+                : { 'retry-after-ms': '1000' };
+            return new Response(null, { status: 503, headers });
+          }
+          return token('synthetic-wall-clock-bearer', 20);
+        }
+        dispatches += 1;
+        if (dispatches === 2) {
+          // Suspension can advance wall time without advancing the monotonic timer.
+          vi.setSystemTime(Date.now() + 2000);
+          return new Response(null, { status: 401 });
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI(options({ maxRetries: 1, timeout: 100 }));
+      await client.models.list();
+      await vi.advanceTimersByTimeAsync(11_000);
+      const pending = Promise.allSettled([client.models.list()]);
+      await vi.advanceTimersByTimeAsync(200);
+      const [outcome] = await pending;
+      if (hint === 'date') {
+        expect(outcome.status).toBe('fulfilled');
+        expect(exchanges).toBe(3);
+        expect(dispatches).toBe(3);
+      } else {
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+        }
+        expect(exchanges).toBe(2);
+        expect(dispatches).toBe(2);
+      }
+    },
+  );
+
   test('preserves a timeout-shaped caller reason during the issuer minimum wait', async () => {
     const caller = new AbortController();
     const reason = new APIConnectionTimeoutError();

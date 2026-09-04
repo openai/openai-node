@@ -20,6 +20,8 @@ import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import type { WorkloadIdentity, X509Credential, X509WorkloadIdentity } from './auth/types';
 import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
+import { getWorkloadIdentityToken } from './internal/auth/workload-identity-request';
+import type { WorkloadIdentityRequestContext } from './internal/auth/workload-identity-request';
 import { X509_API_BASE_URL, assertX509APIOrigin } from './internal/auth/x509-api-origin';
 import {
   X509WorkloadIdentityAuth,
@@ -477,10 +479,14 @@ export class OpenAI {
       retriesRemaining: number;
       hasStreamingBody: boolean;
       authentication?: X509WorkloadIdentityAuth;
+      workloadIdentityRequest?: WorkloadIdentityRequestContext | undefined;
       helperMethod?: unknown;
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
+  #workloadIdentityRequests = new WeakMap<AbortController, WorkloadIdentityRequestContext>();
+  #workloadIdentityOptions = new WeakMap<object, WorkloadIdentityRequestContext>();
+  #workloadIdentityOptionsKey = Symbol();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
@@ -779,6 +785,14 @@ export class OpenAI {
   }
 
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    const workloadIdentityRequest = this.#workloadIdentityOptions.get(
+      Reflect.get(opts, this.#workloadIdentityOptionsKey),
+    );
+    if (workloadIdentityRequest) {
+      workloadIdentityRequest.deadline =
+        (workloadIdentityRequest.startedAt ?? performance.now()) + (opts.timeout ?? this.timeout);
+      workloadIdentityRequest.signal = opts.signal;
+    }
     const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
     if (authentication) {
       if (authentication instanceof X509WorkloadIdentityAuth) {
@@ -811,7 +825,7 @@ export class OpenAI {
               signal: authentication.effectiveSignal(),
               ...authentication.tenantSnapshot(),
             })
-          : await authentication.getToken();
+          : await getWorkloadIdentityToken(authentication, workloadIdentityRequest);
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
     if (this.apiKey == null) {
@@ -1091,6 +1105,8 @@ export class OpenAI {
           props.options,
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
+          undefined,
+          attempt?.workloadIdentityRequest,
         );
         Object.assign(props, next);
       } finally {
@@ -1205,8 +1221,23 @@ export class OpenAI {
     optionsInput: PromiseOrValue<FinalRequestOptions>,
     retriesRemaining: number | null,
     retryOfRequestLogID: string | undefined,
+    workloadIdentityRequest?: WorkloadIdentityRequestContext,
   ): Promise<APIResponseProps> {
-    const options = await optionsInput;
+    let options = await optionsInput;
+    if (this._workloadIdentityAuth && !this.#x509Authentication) {
+      if (!workloadIdentityRequest) {
+        workloadIdentityRequest = {};
+        // Each logical request owns its options carrier, including concurrent reuse of caller options.
+        options = { ...options };
+        // Enumerable symbols survive ordinary shallow-copy forwarding without exposing context values.
+        const carrier = {};
+        Object.defineProperty(options, this.#workloadIdentityOptionsKey, {
+          value: carrier,
+          enumerable: true,
+        });
+        this.#workloadIdentityOptions.set(carrier, workloadIdentityRequest);
+      }
+    }
     const maxRetries = options.maxRetries ?? this.maxRetries;
     if (retriesRemaining == null) {
       retriesRemaining = maxRetries;
@@ -1215,13 +1246,15 @@ export class OpenAI {
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
     await this.prepareOptions(options);
+    if (workloadIdentityRequest) {
+      workloadIdentityRequest.startedAt = performance.now();
+    }
 
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     try {
-      const candidate = await this.buildRequest(options, {
-        retryCount: maxRetries - retriesRemaining,
-      });
+      const buildOptions = { retryCount: maxRetries - retriesRemaining };
+      const candidate = await this.buildRequest(options, buildOptions);
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
@@ -1323,6 +1356,11 @@ export class OpenAI {
             x509Authentication ? callerSignal : undefined,
           )
         : new AbortController();
+    if (workloadIdentityRequest) {
+      workloadIdentityRequest.deadline = (workloadIdentityRequest.startedAt ?? performance.now()) + timeout;
+      workloadIdentityRequest.signal = req.signal ?? callerSignal;
+      this.#workloadIdentityRequests.set(controller, workloadIdentityRequest);
+    }
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
     x509Authentication?.releaseRequestBody(req.body);
@@ -1343,10 +1381,13 @@ export class OpenAI {
       const isTimeout =
         isAbortError(response) ||
         /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
+      const issuerFailure = workloadIdentityRequest?.refresh?.failure;
+      const issuerDelay = issuerFailure?.error === response ? issuerFailure.delayMillis : undefined;
       if (
         retriesRemaining &&
         !hasStreamingBody &&
-        (!x509Authentication || isTransientX509ConnectionError(response))
+        (!x509Authentication || isTransientX509ConnectionError(response)) &&
+        this.shouldRetryAfterHeader(options, retriesRemaining, issuerDelay)
       ) {
         loggerFor(this).info(
           `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`,
@@ -1360,7 +1401,13 @@ export class OpenAI {
             message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          issuerDelay === undefined ? undefined : Math.max(0, issuerFailure!.notBefore - performance.now()),
+          workloadIdentityRequest,
+        );
       }
       const terminalMessage = hasStreamingBody
         ? 'error; streaming body cannot be retried'
@@ -1501,6 +1548,7 @@ export class OpenAI {
           replayOptions,
           x509Authentication ? retriesRemaining - 1 : retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
+          workloadIdentityRequest,
         );
       }
 
@@ -1529,6 +1577,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           remainingRetryDelay(),
+          workloadIdentityRequest,
         );
       }
 
@@ -1595,6 +1644,7 @@ export class OpenAI {
       hasStreamingBody,
       ...(x509Authentication ? { authentication: x509Authentication } : {}),
       helperMethod: options.__metadata?.['helperMethod'],
+      workloadIdentityRequest,
       ...(continueRequest ? { continueRequest } : {}),
     });
     return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
@@ -1654,7 +1704,10 @@ export class OpenAI {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
-        const token = await this._workloadIdentityAuth.getToken();
+        const token = await getWorkloadIdentityToken(
+          this._workloadIdentityAuth,
+          this.#workloadIdentityRequests.get(controller),
+        );
         headers.set('Authorization', `Bearer ${token}`);
       }
     }
@@ -1760,6 +1813,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     timeoutMillis?: number,
+    workloadIdentityRequest?: WorkloadIdentityRequestContext,
   ): Promise<APIResponseProps> {
     // If the API asks us to wait a certain amount of time, just do what it
     // says, but otherwise calculate a default
@@ -1768,7 +1822,7 @@ export class OpenAI {
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
     await this.waitForRetry(options, timeoutMillis);
-    return this.makeRequest(options, retriesRemaining - 1, requestLogID);
+    return this.makeRequest(options, retriesRemaining - 1, requestLogID, workloadIdentityRequest);
   }
 
   private async waitForRetry(

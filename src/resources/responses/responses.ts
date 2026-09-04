@@ -1213,6 +1213,15 @@ export interface Response {
   prompt?: ResponsePrompt | null;
 
   /**
+   * Prompt cache diagnostics requested for this response.
+   */
+  prompt_cache_diagnostics?:
+    | Response.CacheMiss
+    | Response.CacheHit
+    | Response.ComparisonResponseNotFound
+    | Response.Unavailable;
+
+  /**
    * Used by OpenAI to cache responses for similar requests to optimize your cache
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
@@ -1502,6 +1511,47 @@ export namespace Response {
     }
   }
 
+  export interface CacheMiss {
+    /**
+     * The estimated number of input tokens affected after the first detected
+     * divergence.
+     */
+    cache_missed_tokens: number;
+
+    /**
+     * The reason prompt cache reuse did not occur.
+     */
+    reason:
+      | 'model_changed'
+      | 'prompt_cache_key_changed'
+      | 'tools_changed'
+      | 'text_format_changed'
+      | 'reasoning_effort_changed'
+      | 'verbosity_changed'
+      | 'context_compacted'
+      | 'input_changed'
+      | 'service_tier_changed';
+
+    type: 'cache_miss';
+
+    /**
+     * The raw token count of the reusable prefix in the compared response.
+     */
+    comparison_reusable_tokens?: number;
+  }
+
+  export interface CacheHit {
+    type: 'cache_hit';
+  }
+
+  export interface ComparisonResponseNotFound {
+    type: 'comparison_response_not_found';
+  }
+
+  export interface Unavailable {
+    type: 'unavailable';
+  }
+
   /**
    * The prompt-caching options that were applied to the response. Supported for
    * `gpt-5.6` and later models.
@@ -1516,6 +1566,11 @@ export namespace Response {
      * The minimum lifetime applied to each cache breakpoint.
      */
     ttl: '30m';
+
+    /**
+     * The response ID supplied as the prompt cache diagnostics comparison.
+     */
+    comparison_response_id?: string | null;
   }
 }
 
@@ -3238,11 +3293,6 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
   item_id: string;
 
   /**
-   * The name of the function that was called.
-   */
-  name: string;
-
-  /**
    * The index of the output item.
    */
   output_index: number;
@@ -3694,7 +3744,7 @@ export interface ResponseFunctionWebSearch {
   /**
    * The status of the web search tool call.
    */
-  status: 'in_progress' | 'searching' | 'completed' | 'failed';
+  status: 'in_progress' | 'searching' | 'completed' | 'failed' | 'incomplete';
 
   /**
    * The type of the web search tool call. Always `web_search_call`.
@@ -8916,6 +8966,12 @@ export namespace ResponsesClientEvent {
      */
     export interface PromptCacheOptions {
       /**
+       * The ID of a response to compare when diagnosing prompt cache reuse. Supplying
+       * this field requests prompt cache diagnostics when the feature is enabled.
+       */
+      comparison_response_id?: string | null;
+
+      /**
        * Controls whether OpenAI automatically creates an implicit cache breakpoint.
        * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
        * and writes up to the latest three explicit breakpoints in the request. With
@@ -10901,6 +10957,12 @@ export namespace ResponseCreateParams {
    */
   export interface PromptCacheOptions {
     /**
+     * The ID of a response to compare when diagnosing prompt cache reuse. Supplying
+     * this field requests prompt cache diagnostics when the feature is enabled.
+     */
+    comparison_response_id?: string | null;
+
+    /**
      * Controls whether OpenAI automatically creates an implicit cache breakpoint.
      * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
      * and writes up to the latest three explicit breakpoints in the request. With
@@ -11201,12 +11263,13 @@ export interface ResponseCompactParams {
    * request will be processed with the Flex Processing service tier. - To opt-in to
    * [Fast mode](/api/docs/guides/fast-mode) at the request level, include the
    * `service_tier=fast` or `service_tier=priority` parameter for Responses or Chat
-   * Completions. The response will show `service_tier=priority` regardless of if you
-   * specify `service_tier=fast` or `priority` in your request. - When not set, the
-   * default behavior is 'auto'. When the `service_tier` parameter is set, the
-   * response body will include the `service_tier` value based on the processing mode
-   * actually used to serve the request. This response value may be different from
-   * the value set in the parameter.
+   * Completions. For models with a dedicated Fast tier, either value resolves to
+   * `service_tier=fast`; for other models, either value resolves to
+   * `service_tier=priority`. - When not set, the default behavior is 'auto'. When
+   * the `service_tier` parameter is set, the response body will include the
+   * `service_tier` value based on the processing mode actually used to serve the
+   * request. This response value may be different from the value set in the
+   * parameter.
    */
   service_tier?: 'auto' | 'default' | 'fast' | 'flex' | 'priority' | null;
 }
