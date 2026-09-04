@@ -6,9 +6,13 @@ import { compareType, expectType } from '../utils/typing';
 
 const vector = [1.25, -2.5];
 const encodedVector = Buffer.from(new Float32Array(vector).buffer).toString('base64');
+const incompleteVectors = [1, 2, 3, 5, 6, 7].map((byteLength) => ({
+  byteLength,
+  encoded: Buffer.alloc(byteLength).toString('base64'),
+}));
 const request = { input: 'hello', model: 'text-embedding-3-small' } as const;
 
-function createClient(): OpenAI {
+function createClient(base64Embedding = encodedVector): OpenAI {
   return new OpenAI({
     apiKey: 'test-key',
     fetch: async (_url, init) => {
@@ -20,7 +24,7 @@ function createClient(): OpenAI {
           {
             object: 'embedding',
             index: 0,
-            embedding: body.encoding_format === 'base64' ? encodedVector : vector,
+            embedding: body.encoding_format === 'base64' ? base64Embedding : vector,
           },
         ],
         model: request.model,
@@ -44,6 +48,21 @@ function makeFixtureClient(): OpenAI {
 }
 
 describe('resource embeddings', () => {
+  test.each(incompleteVectors)('default rejects $byteLength decoded embedding bytes', async ({ encoded }) => {
+    await expect(createClient(encoded).embeddings.create(request)).rejects.toBeInstanceOf(RangeError);
+  });
+
+  test.each(incompleteVectors)(
+    'explicit base64 preserves $byteLength decoded embedding bytes',
+    async ({ encoded }) => {
+      const response = await createClient(encoded).embeddings.create({
+        ...request,
+        encoding_format: 'base64',
+      });
+      expect(response.data[0]?.embedding).toBe(encoded);
+    },
+  );
+
   test('create: encoding_format=default should create float32 embeddings', async () => {
     const client = makeFixtureClient();
     const response = await client.embeddings.create({
