@@ -28,12 +28,28 @@ class SignalReplacingOpenAI extends OpenAI {
 const dependencyFreeProvider: ProviderFactory = (endpoint, tokenProvider) =>
   bearerBedrock({ endpoint, region: 'us-east-1', tokenProvider });
 
+const sigV4Provider: ProviderFactory = (endpoint, tokenProvider) =>
+  awsBedrock({
+    endpoint,
+    region: 'us-east-1',
+    baseURL:
+      endpoint === 'mantle'
+        ? 'https://bedrock-mantle.us-east-1.api.aws/openai/v1'
+        : 'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1',
+    apiKey: null,
+    credentialProvider: async () => ({
+      accessKeyId: 'synthetic-access-key',
+      secretAccessKey: await tokenProvider(),
+    }),
+  });
+
 const providerFactories: [string, ProviderFactory][] = [
   ['dependency-free bearer', dependencyFreeProvider],
   [
     'AWS-entrypoint bearer',
     (endpoint, tokenProvider) => awsBedrock({ endpoint, region: 'us-east-1', tokenProvider }),
   ],
+  ['AWS SigV4', sigV4Provider],
 ];
 
 const providerCases: [string, Endpoint, ProviderFactory][] = providerFactories.flatMap(([name, create]) =>
@@ -117,7 +133,7 @@ function throwAfterRemovingOnce(signal: AbortSignal): void {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe.each(providerCases)('%s %s bearer credentials', (_name, endpoint, create) => {
+describe.each(providerCases)('%s %s credentials', (_name, endpoint, create) => {
   test('cancels a documented public models request while its token provider remains pending', async () => {
     const controller = new AbortController();
     const reason = new Error('caller cancelled credential resolution');
@@ -191,6 +207,85 @@ describe.each(providerCases)('%s %s bearer credentials', (_name, endpoint, creat
     expect(tokenProvider).not.toHaveBeenCalled();
     expect(getEventListeners(original.signal, 'abort')).toEqual([]);
     expect(getEventListeners(finalized.signal, 'abort')).toEqual([]);
+  });
+});
+
+describe.each(['mantle', 'runtime'] as const)('Bedrock %s SigV4 credential lifecycle', (endpoint) => {
+  test.each(['resolve', 'reject'] as const)(
+    'keeps cancellation when late credentials %s and permits a fresh request',
+    async (settlement) => {
+      const controller = new AbortController();
+      const lateFailure = new Error('synthetic late credential refresh failure');
+      let finishLate!: () => void;
+      // oxlint-disable-next-line promise/avoid-new -- The deferred credential exercises settlement after cancellation.
+      const lateCredential = new Promise<string>((resolve, reject) => {
+        finishLate = () => {
+          if (settlement === 'resolve') {
+            resolve('synthetic-late-secret-key');
+          } else {
+            reject(lateFailure);
+          }
+        };
+      });
+      const tokenProvider = vi
+        .fn<TokenProvider>()
+        .mockReturnValueOnce(lateCredential)
+        .mockResolvedValue('synthetic-fresh-secret-key');
+      const { client, fetch } = createClient(tokenProvider, sigV4Provider, endpoint);
+      const pending = observe(client.models.list({ signal: controller.signal }));
+      const unhandled = vi.fn();
+      process.on('unhandledRejection', unhandled);
+
+      try {
+        await waitForProvider(tokenProvider);
+        controller.abort(new Error('caller cancelled pending AWS credentials'));
+        await expectImmediateCancellation(pending, controller.signal, fetch);
+        finishLate();
+        await nextTurn();
+
+        await expect(pending).resolves.toBeInstanceOf(APIUserAbortError);
+        expect(fetch).not.toHaveBeenCalled();
+        expect(unhandled).not.toHaveBeenCalled();
+        expect(getEventListeners(controller.signal, 'abort')).toEqual([]);
+
+        await expect(client.models.list()).resolves.toBeDefined();
+        expect(tokenProvider).toHaveBeenCalledTimes(2);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toContain(
+          'Credential=synthetic-access-key/',
+        );
+      } finally {
+        finishLate();
+        await pending;
+        process.removeListener('unhandledRejection', unhandled);
+      }
+    },
+  );
+
+  test('cancels credential refresh on a retry without sending a second request', async () => {
+    const controller = new AbortController();
+    const tokenProvider = vi
+      .fn<TokenProvider>()
+      .mockResolvedValueOnce('synthetic-first-secret-key')
+      .mockImplementationOnce(() => Promise.race([]));
+    const fetch = vi.fn<Fetch>(async () =>
+      Response.json(
+        { error: { message: 'retry once' } },
+        { status: 500, headers: { 'retry-after-ms': '1' } },
+      ),
+    );
+    const client = new OpenAI({
+      provider: sigV4Provider(endpoint, tokenProvider),
+      fetch,
+      maxRetries: 1,
+    });
+    const pending = observe(client.models.list({ signal: controller.signal }));
+
+    await vi.waitFor(() => expect(tokenProvider).toHaveBeenCalledTimes(2), { timeout: 1000, interval: 1 });
+    controller.abort(new Error('caller cancelled the refreshed AWS credentials'));
+
+    await expectImmediateCancellation(pending, controller.signal, fetch, 1);
+    expect(getEventListeners(controller.signal, 'abort')).toEqual([]);
   });
 });
 
