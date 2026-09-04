@@ -19,6 +19,22 @@ const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchan
 // workload-identity path, so short-lived tokens keep a usable cache window.
 const MAX_REFRESH_BUFFER_FRACTION = 0.5;
 
+function calculateExpiresAt(expiresIn: unknown, exchangeStartedAt: number): number {
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+
+  const expiresAt = exchangeStartedAt + expiresIn * 1000;
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= exchangeStartedAt) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+  if (Date.now() >= expiresAt) {
+    throw new OpenAIError('Workload identity token expired before its exchange completed.');
+  }
+
+  return expiresAt;
+}
+
 function calculateRefreshAt(
   expiresAt: number,
   now: number,
@@ -217,6 +233,8 @@ export class WorkloadIdentityAuth {
       body['client_id'] = this.config.clientId;
     }
 
+    // Response delivery consumes the exchanged token's lifetime; provider acquisition does not.
+    const exchangeStartedAt = Date.now();
     const response = await this.fetch(this.tokenExchangeUrl, {
       method: 'POST',
       headers: {
@@ -261,21 +279,13 @@ export class WorkloadIdentityAuth {
     }
 
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
-    if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
-
-    const now = Date.now();
-    const expiresAt = now + expiresIn * 1000;
-    if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
+    const expiresAt = calculateExpiresAt(expiresIn, exchangeStartedAt);
 
     if (this.tokenGeneration === generation) {
       this.cachedToken = {
         token: accessToken,
         expiresAt,
-        refreshAt: calculateRefreshAt(expiresAt, now, this.config.refreshBufferSeconds),
+        refreshAt: calculateRefreshAt(expiresAt, exchangeStartedAt, this.config.refreshBufferSeconds),
       };
     }
 

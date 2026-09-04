@@ -45,6 +45,140 @@ describe('workload-identity access-token expiration', () => {
     vi.restoreAllMocks();
   });
 
+  function delayedTokenResponse(expiresIn: number, accessToken: string, elapsed: number): Response {
+    return new Response(
+      new ReadableStream(
+        {
+          pull(controller) {
+            currentTime += elapsed;
+            controller.enqueue(
+              new TextEncoder().encode(JSON.stringify({ access_token: accessToken, expires_in: expiresIn })),
+            );
+            controller.close();
+          },
+        },
+        { highWaterMark: 0 },
+      ),
+      { headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  test.each(['headers', 'body'])('subtracts time spent receiving token response %s', async (stage) => {
+    let exchangeCount = 0;
+    const authorizations: (string | null)[] = [];
+    const clientFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        if (exchangeCount === 1) {
+          if (stage === 'body') {
+            return delayedTokenResponse(1, 'initial-token', 750);
+          }
+          currentTime += 750;
+        }
+        return tokenExchangeResponse(1, exchangeCount === 1 ? 'initial-token' : 'replacement-token');
+      }
+      authorizations.push(new Headers(init?.headers).get('Authorization'));
+      return Response.json({ data: [] });
+    };
+    const client = new OpenAI({ apiKey: null, workloadIdentity, fetch: clientFetch });
+
+    await Promise.all([client.models.list(), client.models.list()]);
+    currentTime = INITIAL_TIME + 999;
+    await client.models.list();
+    expect(exchangeCount).toBe(1);
+    currentTime += 1;
+    await client.models.list();
+
+    expect(exchangeCount).toBe(2);
+    expect(authorizations).toEqual([
+      'Bearer initial-token',
+      'Bearer initial-token',
+      'Bearer initial-token',
+      'Bearer replacement-token',
+    ]);
+  });
+
+  test.each([
+    ['headers', 1000],
+    ['headers', 1500],
+    ['body', 1000],
+    ['body', 1500],
+  ])('rejects a token after %s consume its lifetime (%i ms)', async (stage, elapsed) => {
+    let exchangeCount = 0;
+    const authorizations: (string | null)[] = [];
+    const clientFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      if (url.toString().includes('/oauth/token')) {
+        exchangeCount += 1;
+        if (exchangeCount === 1) {
+          if (stage === 'body') {
+            return delayedTokenResponse(1, 'expired-token', elapsed);
+          }
+          currentTime += elapsed;
+          return tokenExchangeResponse(1, 'expired-token');
+        }
+        return tokenExchangeResponse(3600, 'replacement-token');
+      }
+      authorizations.push(new Headers(init?.headers).get('Authorization'));
+      return Response.json({ data: [] });
+    };
+    const client = new OpenAI({ apiKey: null, workloadIdentity, fetch: clientFetch });
+
+    const results = await Promise.allSettled([client.models.list(), client.models.list()]);
+    for (const result of results) {
+      expect(result.status).toBe('rejected');
+      if (result.status === 'rejected') {
+        expect(result.reason).toBeInstanceOf(OpenAIError);
+        expect(result.reason.message).toContain('token expired before its exchange completed');
+      }
+    }
+    expect(exchangeCount).toBe(1);
+    expect(authorizations).toEqual([]);
+
+    await client.models.list();
+    await client.models.list();
+    expect(exchangeCount).toBe(2);
+    expect(authorizations).toEqual(['Bearer replacement-token', 'Bearer replacement-token']);
+  });
+
+  test('does not count subject-token acquisition against the exchanged token lifetime', async () => {
+    const getToken = vi.fn(async () => {
+      currentTime += 10_000;
+      return 'subject-token';
+    });
+    const customFetch = vi.fn(async () => tokenExchangeResponse(1, 'valid-token'));
+    const auth = new WorkloadIdentityAuth(
+      { ...workloadIdentity, provider: { tokenType: 'jwt', getToken } },
+      customFetch,
+    );
+
+    await expect(auth.getToken()).resolves.toBe('valid-token');
+    currentTime += 999;
+    await expect(auth.getToken()).resolves.toBe('valid-token');
+    expect(getToken).toHaveBeenCalledTimes(1);
+    currentTime += 1;
+    await expect(auth.getToken()).resolves.toBe('valid-token');
+    expect(getToken).toHaveBeenCalledTimes(2);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('keeps proactive refresh relative to the original lifetime after a delayed exchange', async () => {
+    const customFetch = vi
+      .fn()
+      .mockImplementationOnce(async () => delayedTokenResponse(60, 'cached-token', 10_000))
+      .mockImplementationOnce(async () => tokenExchangeResponse(60, 'replacement-token'));
+    const auth = new WorkloadIdentityAuth({ ...workloadIdentity, refreshBufferSeconds: 1200 }, customFetch);
+
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    currentTime = INITIAL_TIME + 29_999;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    currentTime += 1;
+    await expect(auth.getToken()).resolves.toBe('cached-token');
+    await delay(0);
+    await expect(auth.getToken()).resolves.toBe('replacement-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
   test.each([
     ['a nonnumeric string', 'invalid'],
     ['a numeric string', '3600'],
