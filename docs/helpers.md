@@ -757,6 +757,8 @@ main();
 The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
 next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
 The callback also runs for the final completion, when no further request will be made.
+Once the callback resolves, any pending cancellation is reported through the `abort` event and rejects
+`done()` and the `final*` helpers, including on the final completion.
 
 ```ts
 const runner = client.chat.completions.runTools(
