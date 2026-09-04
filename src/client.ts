@@ -1264,15 +1264,15 @@ export class OpenAI {
         !options.__metadata?.['hasStreamingBody'] &&
         X509WorkloadIdentityAuth.isRetryableFailure(error)
       ) {
-        const retryHeaders = X509WorkloadIdentityAuth.retryHeaders(error);
-        if (!this.shouldRetryAfterHeader(options, retriesRemaining, retryHeaders)) {
+        const retryDelay = this.parseRetryAfterMillis(X509WorkloadIdentityAuth.retryHeaders(error));
+        if (!this.shouldRetryAfterHeader(options, retriesRemaining, retryDelay)) {
           throw error;
         }
         return await this.retryRequest(
           options,
           retriesRemaining,
           retryOfRequestLogID ?? 'x509-token-exchange',
-          retryHeaders,
+          retryDelay,
         );
       }
       throw error;
@@ -1440,13 +1440,14 @@ export class OpenAI {
         rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
           ? false
           : await this.shouldRetry(response);
+      const retryDelay = this.parseRetryAfterMillis(response.headers);
       let declinedRetryDelay = false;
       if ((shouldRefreshWorkloadIdentity || (retriesRemaining && shouldRetry)) && !hasStreamingBody) {
         try {
           declinedRetryDelay = !this.shouldRetryAfterHeader(
             options,
             retriesRemaining,
-            response.headers,
+            retryDelay,
             Boolean(shouldRefreshWorkloadIdentity),
           );
         } catch (error) {
@@ -1463,6 +1464,15 @@ export class OpenAI {
           void Shims.CancelReadableStream(response.body).catch(() => undefined);
         } else {
           await Shims.CancelReadableStream(response.body);
+        }
+
+        if (retryDelay !== undefined) {
+          await this.waitForRetry(
+            options,
+            retryDelay,
+            Math.max(0, startTime + timeout - Date.now()),
+            createRequestController(req.signal ?? callerSignal, callerSignal).signal,
+          );
         }
 
         const replayOptions = {
@@ -1499,12 +1509,7 @@ export class OpenAI {
             durationMs: headersTime - startTime,
           }),
         );
-        return this.retryRequest(
-          options,
-          retriesRemaining,
-          retryOfRequestLogID ?? requestLogID,
-          response.headers,
-        );
+        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID, retryDelay);
       }
 
       const retryMessage = shouldRetry
@@ -1704,13 +1709,13 @@ export class OpenAI {
   private shouldRetryAfterHeader(
     options: FinalRequestOptions,
     retriesRemaining: number,
-    responseHeaders?: Headers,
+    retryDelay: number | undefined,
     authenticationReplay = false,
   ): boolean {
-    if ((this.parseRetryAfterMillis(responseHeaders) ?? 0) <= 60 * 1000) {
+    if ((retryDelay ?? 0) <= 60 * 1000) {
       return true;
     }
-    // Preserve HTTP-backoff deadline precedence; authentication refreshes replay immediately.
+    // Preserve existing HTTP-backoff deadline precedence for a refused server delay.
     const x509Authentication = this.#x509Authentication;
     if (x509Authentication && !authenticationReplay) {
       const remaining = x509Authentication.remainingTimeout(
@@ -1772,33 +1777,54 @@ export class OpenAI {
     options: FinalRequestOptions,
     retriesRemaining: number,
     requestLogID: string,
-    responseHeaders?: Headers | undefined,
+    timeoutMillis?: number,
   ): Promise<APIResponseProps> {
-    let timeoutMillis = this.parseRetryAfterMillis(responseHeaders);
-
     // If the API asks us to wait a certain amount of time, just do what it
     // says, but otherwise calculate a default
     if (timeoutMillis === undefined) {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
+    await this.waitForRetry(options, timeoutMillis);
+    return this.makeRequest(options, retriesRemaining - 1, requestLogID);
+  }
+
+  private async waitForRetry(
+    options: FinalRequestOptions,
+    timeoutMillis: number,
+    remainingTimeout?: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    // Native timers truncate fractions; rounding up preserves the server's minimum.
+    timeoutMillis = Math.ceil(timeoutMillis);
     const x509Authentication = this.#x509Authentication;
-    if (x509Authentication) {
-      const remaining = x509Authentication.remainingTimeout(
-        options,
-        x509Authentication.requestSnapshot().timeout,
-      );
-      if (timeoutMillis >= remaining) {
-        throw new Errors.APIConnectionTimeoutError();
-      }
+    const remaining = x509Authentication
+      ? x509Authentication.remainingTimeout(options, x509Authentication.requestSnapshot().timeout)
+      : remainingTimeout;
+    signal = x509Authentication?.effectiveSignal() ?? signal ?? options.signal ?? undefined;
+    if (signal?.aborted) throw this._makeUserAbortError(signal);
+    if (remaining !== undefined && timeoutMillis >= remaining) {
+      throw new Errors.APIConnectionTimeoutError();
     }
     if (x509Authentication) {
-      await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
+      await x509Authentication.waitForRetry(timeoutMillis, signal);
+    } else if (signal) {
+      const retrySignal = signal;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          retrySignal.removeEventListener('abort', abort);
+          resolve();
+        }, timeoutMillis);
+        const abort = () => {
+          clearTimeout(timer);
+          retrySignal.removeEventListener('abort', abort);
+          reject(this._makeUserAbortError(retrySignal));
+        };
+        retrySignal.addEventListener('abort', abort, { once: true });
+      });
     } else {
       await sleep(timeoutMillis);
     }
-
-    return this.makeRequest(options, retriesRemaining - 1, requestLogID);
   }
 
   private calculateDefaultRetryTimeoutMillis(retriesRemaining: number, maxRetries: number): number {

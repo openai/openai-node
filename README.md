@@ -419,7 +419,9 @@ Connection errors (for example, due to a network connectivity problem), 408 Requ
 
 The SDK honors valid `Retry-After` delays of up to 60 seconds (`retry-after-ms` takes precedence when
 provided). If the server requests a longer delay, the SDK returns the original status error, including
-its response headers, without retrying. Missing or invalid retry hints use exponential backoff.
+its response headers, without retrying. Missing or invalid retry hints use exponential backoff for
+ordinary HTTP retries; workload-identity authentication refreshes retain their immediate replay.
+Valid retry hints also apply to authentication replays, subject to the request timeout.
 
 You can use the `maxRetries` option to configure or disable this:
 
