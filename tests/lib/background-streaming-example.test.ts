@@ -6,7 +6,10 @@ import path from 'node:path';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { expect, test } from 'vitest';
 
-function responseEvents(chunks: readonly string[]): ResponseStreamEvent[] {
+type TerminalStatus = 'completed' | 'failed' | 'incomplete';
+const privateErrorDetail = 'Synthetic private response error detail';
+
+function responseEvents(chunks: readonly string[], status: TerminalStatus): ResponseStreamEvent[] {
   const response: Response = {
     id: 'resp_background_example',
     object: 'response',
@@ -56,18 +59,20 @@ function responseEvents(chunks: readonly string[]): ResponseStreamEvent[] {
   }
   const text = chunks.join('');
   events.push({
-    type: 'response.completed',
+    type: `response.${status}`,
     sequence_number: events.length,
     response: {
       ...response,
-      status: 'completed',
+      status,
+      error: status === 'failed' ? { code: 'server_error', message: privateErrorDetail } : null,
+      incomplete_details: status === 'incomplete' ? { reason: 'max_output_tokens' } : null,
       output_text: text,
       output: [
         {
           id: 'msg_example',
           type: 'message',
           role: 'assistant',
-          status: 'completed',
+          status: status === 'completed' ? 'completed' : 'incomplete',
           content: [{ type: 'output_text', annotations: [], text }],
         },
       ],
@@ -78,33 +83,37 @@ function responseEvents(chunks: readonly string[]): ResponseStreamEvent[] {
 
 const scenarios = [
   {
-    name: 'completion before the cutoff',
+    name: 'before the cutoff',
     chunks: ['Synthetic completion.'],
     resumed: false,
     partial: false,
   },
   {
-    name: 'completion at the cutoff',
+    name: 'at the cutoff',
     chunks: ['Synthetic ', 'response ', 'completed ', 'exactly ', 'at ', 'the ', 'cutoff.'],
     resumed: false,
     partial: false,
   },
   {
-    name: 'explicit interruption',
+    name: 'after explicit interruption',
     chunks: ['Synthetic ', 'background ', 'response ', 'resumed ', 'after ', 'the ', 'demo ', 'break.'],
     resumed: true,
     partial: false,
   },
   {
-    name: 'clean EOF before completion',
+    name: 'after clean EOF',
     chunks: ['Synthetic completion.'],
     resumed: true,
     partial: true,
   },
 ] as const;
 
-test.each(scenarios)('background example: $name', async ({ chunks, resumed, partial }) => {
-  const events = responseEvents(chunks);
+const cases = scenarios.flatMap((scenario) =>
+  (['completed', 'failed', 'incomplete'] as const).map((status) => ({ ...scenario, status })),
+);
+
+test.each(cases)('background example: $status $name', async ({ chunks, resumed, partial, status }) => {
+  const events = responseEvents(chunks, status);
   const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\ndata: [DONE]\n\n`;
   const partialBody = `${events
     .slice(0, -1)
@@ -168,9 +177,16 @@ test.each(scenarios)('background example: $name', async ({ chunks, resumed, part
   try {
     const [exitCode, signal] = await once(child, 'close');
     expect(signal).toBeNull();
-    expect(stderr).toBe('');
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain(chunks.join(''));
+    expect(exitCode).toBe(status === 'completed' ? 0 : 1);
+    if (status === 'completed') {
+      expect(stderr).toBe('');
+      expect(stdout).toContain(chunks.join(''));
+    } else {
+      expect(stderr).toContain(
+        resumed ? `Response ended with status ${status}.` : `Response ended with response.${status}.`,
+      );
+      expect(stderr).not.toContain(privateErrorDetail);
+    }
     expect(stdout.includes('Interrupted. Continuing...')).toBe(resumed);
     expect(stdout).not.toContain('synthetic-example-key');
     expect(requests).toHaveLength(resumed ? 2 : 1);
