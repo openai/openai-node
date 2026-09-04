@@ -5,7 +5,7 @@ import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestIni
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
-import { parseRetryAfterMillis } from './internal/utils/retry-after';
+import { parseRetryAfter, parseRetryAfterMillis } from './internal/utils/retry-after';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -1441,7 +1441,10 @@ export class OpenAI {
         rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
           ? false
           : await this.shouldRetry(response);
-      const retryDelay = parseRetryAfterMillis(response.headers);
+      const retryAfter = parseRetryAfter(response.headers);
+      const retryDelay = retryAfter?.delayMillis;
+      const remainingRetryDelay = () =>
+        retryAfter?.retryAt === undefined ? retryDelay : Math.max(0, retryAfter.retryAt - Date.now());
       let declinedRetryDelay = false;
       if ((shouldRefreshWorkloadIdentity || (retriesRemaining && shouldRetry)) && !hasStreamingBody) {
         try {
@@ -1470,11 +1473,21 @@ export class OpenAI {
         if (retryDelay !== undefined) {
           await this.waitForRetry(
             options,
-            retryDelay,
+            remainingRetryDelay()!,
             Math.max(0, startTime + timeout - Date.now()),
             req.signal,
             callerSignal,
           );
+          // An event-loop stall can resume the retry timer after the original deadline.
+          if (!x509Authentication && Date.now() >= startTime + timeout) {
+            const aborted = callerSignal?.aborted
+              ? callerSignal
+              : req.signal?.aborted
+                ? req.signal
+                : undefined;
+            if (aborted) throw this._makeUserAbortError(aborted);
+            throw new Errors.APIConnectionTimeoutError();
+          }
         }
 
         const replayOptions = {
@@ -1511,7 +1524,12 @@ export class OpenAI {
             durationMs: headersTime - startTime,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID, retryDelay);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          remainingRetryDelay(),
+        );
       }
 
       const retryMessage = shouldRetry

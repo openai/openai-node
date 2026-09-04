@@ -8,9 +8,12 @@ function parseNumericDelay(header: string): number {
   return Number.isFinite(value) ? Number.NaN : value;
 }
 
-/** Parses one server minimum, preserving positive overflow for retry-limit decisions. */
-export function parseRetryAfterMillis(responseHeaders?: Headers): number | undefined {
+/** Captures a server minimum and its absolute deadline when it is an HTTP date. */
+export function parseRetryAfter(
+  responseHeaders?: Headers,
+): { delayMillis: number; retryAt?: number } | undefined {
   let timeoutMillis: number | undefined;
+  let retryAt: number | undefined;
   // Note the `retry-after-ms` header may not be standard, but is a good idea and we'd like proactive support for it.
   const retryAfterMillisHeader = responseHeaders?.get('retry-after-ms');
   if (retryAfterMillisHeader) {
@@ -25,7 +28,8 @@ export function parseRetryAfterMillis(responseHeaders?: Headers): number | undef
   if (retryAfterHeader && timeoutMillis === undefined) {
     const timeoutSeconds = parseNumericDelay(retryAfterHeader);
     if (Number.isNaN(timeoutSeconds)) {
-      timeoutMillis = Date.parse(retryAfterHeader) - Date.now();
+      retryAt = Date.parse(retryAfterHeader);
+      timeoutMillis = retryAt - Date.now();
     } else {
       // Keep finite seconds over the limit distinguishable from invalid hints after scaling.
       timeoutMillis = Number.isFinite(timeoutSeconds)
@@ -35,6 +39,11 @@ export function parseRetryAfterMillis(responseHeaders?: Headers): number | undef
   }
 
   return timeoutMillis !== undefined && Number.isFinite(timeoutMillis) && timeoutMillis >= 0
-    ? timeoutMillis
+    ? { delayMillis: timeoutMillis, ...(retryAt === undefined ? {} : { retryAt }) }
     : undefined;
+}
+
+/** Parses one server minimum, preserving positive overflow for retry-limit decisions. */
+export function parseRetryAfterMillis(responseHeaders?: Headers): number | undefined {
+  return parseRetryAfter(responseHeaders)?.delayMillis;
 }
