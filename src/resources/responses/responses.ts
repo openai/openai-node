@@ -3293,11 +3293,6 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
   item_id: string;
 
   /**
-   * The name of the function that was called.
-   */
-  name: string;
-
-  /**
    * The index of the output item.
    */
   output_index: number;
