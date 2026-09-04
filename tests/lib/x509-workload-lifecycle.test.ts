@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { Agent } from 'undici';
 import { vi } from 'vitest';
 
-import OpenAI, { APIConnectionError, APIUserAbortError, OAuthError } from 'openai';
+import OpenAI, { APIConnectionError, APIConnectionTimeoutError, APIUserAbortError, OAuthError } from 'openai';
 import type { ClientOptions } from 'openai';
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
@@ -201,6 +201,158 @@ describe('X.509 workload credential lifecycle', () => {
     await client.models.list();
     expect(exchanges).toBe(3);
   });
+
+  test.each([401, 503])('retains an issuer refusal across a cached-token API %i replay', async (status) => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    let exchanges = 0;
+    let dispatches = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        exchanges += 1;
+        return exchanges === 2
+          ? new Response(null, { status: 503, headers: { 'retry-after': '90' } })
+          : token('synthetic-still-valid-bearer', 20);
+      }
+      dispatches += 1;
+      if (dispatches === 2) {
+        // Simulate time spent at the API past the cache's failed-refresh cooldown.
+        await vi.advanceTimersByTimeAsync(1001);
+        return new Response(null, { status, headers: { 'retry-after': '0' } });
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI(options({ maxRetries: 1, timeout: 30_000 }));
+    await client.models.list();
+    await vi.advanceTimersByTimeAsync(10_001);
+    const result = Promise.allSettled([client.models.list()]);
+    await vi.advanceTimersByTimeAsync(0);
+    const [outcome] = await result;
+    if (status === 401) {
+      expect(outcome.status).toBe('rejected');
+      if (outcome.status === 'rejected') {
+        expect(outcome.reason).toMatchObject({ status: 503 });
+        expect(outcome.reason.headers.get('retry-after')).toBe('90');
+      }
+    } else {
+      expect(outcome.status).toBe('fulfilled');
+    }
+    expect(exchanges).toBe(2);
+    // A fresh logical request is free to exchange; the refusal is not a global cooldown.
+    await client.models.list();
+    expect(exchanges).toBe(3);
+  });
+
+  test.each([
+    [0, 'success'],
+    [55, 'success'],
+    [0, 'cancel'],
+    [0, 'timeout'],
+  ] as const)(
+    'handles a cached-token auth replay after the issuer minimum (API delay=%ims, %s)',
+    async (apiDelay, expected) => {
+      vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+      let exchanges = 0;
+      let dispatches = 0;
+      let refusedAt = 0;
+      let recoveredAt = 0;
+      vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          exchanges += 1;
+          if (exchanges === 2) {
+            refusedAt = performance.now();
+            return new Response(null, { status: 503, headers: { 'retry-after-ms': '50' } });
+          }
+          if (exchanges === 3) {
+            recoveredAt = performance.now();
+          }
+          return token('synthetic-expiring-minimum', 20);
+        }
+        dispatches += 1;
+        if (dispatches === 2) {
+          await vi.advanceTimersByTimeAsync(apiDelay);
+          return new Response(null, { status: 401 });
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI(options({ maxRetries: 1, timeout: expected === 'timeout' ? 30 : 30_000 }));
+      await client.models.list();
+      await vi.advanceTimersByTimeAsync(11_000);
+      const controller = new AbortController();
+      const pending = Promise.allSettled([client.models.list({ signal: controller.signal })]);
+      await vi.advanceTimersByTimeAsync(0);
+      if (expected === 'cancel') {
+        controller.abort();
+      }
+      await vi.advanceTimersByTimeAsync(100);
+      const [outcome] = await pending;
+      if (expected === 'success') {
+        expect(outcome.status).toBe('fulfilled');
+        expect(exchanges).toBe(3);
+        expect(dispatches).toBe(3);
+        expect(recoveredAt - refusedAt).toBeGreaterThanOrEqual(50);
+      } else {
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason).toBeInstanceOf(
+            expected === 'cancel' ? APIUserAbortError : APIConnectionTimeoutError,
+          );
+        }
+        expect(exchanges).toBe(2);
+        expect(dispatches).toBe(2);
+      }
+    },
+  );
+
+  test.each([false, true])(
+    'keeps a shared issuer refusal in each surviving request (cancel first=%s)',
+    async (cancelFirst) => {
+      vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+      const gate = new EventTarget();
+      const pending = once(gate, 'release');
+      let exchanges = 0;
+      let dispatches = 0;
+      vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+        if (url.origin === 'https://mtls.auth.openai.com') {
+          exchanges += 1;
+          if (exchanges === 2) {
+            await pending;
+            return new Response(null, { status: 503, headers: { 'retry-after': '90' } });
+          }
+          return token('synthetic-shared-cache', 20);
+        }
+        dispatches += 1;
+        return dispatches === 1 ? Response.json({ data: [] }) : new Response(null, { status: 401 });
+      });
+      const client = new OpenAI(options({ maxRetries: 1 }));
+      await client.models.list();
+      await vi.advanceTimersByTimeAsync(10_001);
+      const controller = new AbortController();
+      const requests = Promise.allSettled([
+        client.models.list({ signal: controller.signal }),
+        client.models.list(),
+      ]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(exchanges).toBe(2);
+      if (cancelFirst) {
+        controller.abort();
+      }
+      gate.dispatchEvent(new Event('release'));
+      await vi.advanceTimersByTimeAsync(0);
+      const outcomes = await requests;
+      for (const [index, outcome] of outcomes.entries()) {
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          if (cancelFirst && index === 0) {
+            expect(outcome.reason).toBeInstanceOf(APIUserAbortError);
+          } else {
+            expect(outcome.reason).toMatchObject({ status: 503 });
+            expect(outcome.reason.headers.get('retry-after')).toBe('90');
+          }
+        }
+      }
+      expect(exchanges).toBe(2);
+    },
+  );
 
   test.each(['permanent-tls', 'permanent-body', 'invalid-token', 'retry-disabled'])(
     'never falls back to a cached bearer after a terminal %s refresh failure',

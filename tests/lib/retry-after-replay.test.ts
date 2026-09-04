@@ -118,6 +118,58 @@ describe.each(['legacy', 'x509'] as const)('%s authentication replay Retry-After
     expect(apiCalls).toHaveLength(1);
     expect(issuerCalls).toBe(1);
   });
+  if (kind === 'legacy') {
+    test.each([
+      ['missing-any', 'caller'],
+      ['missing-any', 'hook'],
+      ['non-native', 'caller'],
+    ] as const)('cancels replay through %s %s signals without a second exchange', async (mode, source) => {
+      const originalAny = AbortSignal.any;
+      const caller = new AbortController();
+      const hook = new AbortController();
+      const signal =
+        mode === 'non-native'
+          ? new Proxy(caller.signal, {
+              getPrototypeOf: () => Object.prototype,
+              get(target, key) {
+                const value = Reflect.get(target, key, target);
+                return typeof value === 'function' ? value.bind(target) : value;
+              },
+            })
+          : caller.signal;
+      const sdk = client({ 'retry-after-ms': '300' });
+      Object.assign(sdk, {
+        async prepareRequest(request: RequestInit): Promise<void> {
+          request.signal = mode === 'non-native' ? signal : hook.signal;
+        },
+      });
+      let settled = false;
+      if (mode === 'missing-any') {
+        Object.defineProperty(AbortSignal, 'any', { value: undefined });
+      }
+      try {
+        const request = (async () => {
+          try {
+            await sdk.models.list({ signal });
+            return null;
+          } catch (error) {
+            return error;
+          } finally {
+            settled = true;
+          }
+        })();
+        await vi.advanceTimersByTimeAsync(24);
+        (source === 'caller' ? caller : hook).abort();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(settled).toBe(true);
+        expect(await request).toBeInstanceOf(APIUserAbortError);
+        expect(apiCalls).toHaveLength(1);
+        expect(issuerCalls).toBe(1);
+      } finally {
+        Object.defineProperty(AbortSignal, 'any', { value: originalAny });
+      }
+    });
+  }
   test('declines a hinted wait beyond the remaining deadline', async () => {
     const request = Promise.allSettled([client({ 'retry-after': '0.5' }, 100).models.list()]);
     await vi.advanceTimersByTimeAsync(0);

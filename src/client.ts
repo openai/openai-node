@@ -5,6 +5,7 @@ import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestIni
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
+import { parseRetryAfterMillis } from './internal/utils/retry-after';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -1264,7 +1265,7 @@ export class OpenAI {
         !options.__metadata?.['hasStreamingBody'] &&
         X509WorkloadIdentityAuth.isRetryableFailure(error)
       ) {
-        const retryDelay = this.parseRetryAfterMillis(X509WorkloadIdentityAuth.retryHeaders(error));
+        const retryDelay = parseRetryAfterMillis(X509WorkloadIdentityAuth.retryHeaders(error));
         if (!this.shouldRetryAfterHeader(options, retriesRemaining, retryDelay)) {
           throw error;
         }
@@ -1440,7 +1441,7 @@ export class OpenAI {
         rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
           ? false
           : await this.shouldRetry(response);
-      const retryDelay = this.parseRetryAfterMillis(response.headers);
+      const retryDelay = parseRetryAfterMillis(response.headers);
       let declinedRetryDelay = false;
       if ((shouldRefreshWorkloadIdentity || (retriesRemaining && shouldRetry)) && !hasStreamingBody) {
         try {
@@ -1471,7 +1472,8 @@ export class OpenAI {
             options,
             retryDelay,
             Math.max(0, startTime + timeout - Date.now()),
-            createRequestController(req.signal ?? callerSignal, callerSignal).signal,
+            req.signal,
+            callerSignal,
           );
         }
 
@@ -1733,46 +1735,6 @@ export class OpenAI {
     return false;
   }
 
-  private parseRetryAfterMillis(responseHeaders?: Headers): number | undefined {
-    let timeoutMillis: number | undefined;
-    const parseNumericDelay = (header: string): number => {
-      const value = Number(header);
-      // Accept complete decimal numbers and keep overflowing delays above the retry limit.
-      if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(header.trim())) {
-        return Math.min(value, Number.MAX_VALUE);
-      }
-      // Preserve invalid nonfinite hints without accepting other Number syntax, such as hexadecimal.
-      return Number.isFinite(value) ? NaN : value;
-    };
-
-    // Note the `retry-after-ms` header may not be standard, but is a good idea and we'd like proactive support for it.
-    const retryAfterMillisHeader = responseHeaders?.get('retry-after-ms');
-    if (retryAfterMillisHeader) {
-      const timeoutMs = parseNumericDelay(retryAfterMillisHeader);
-      if (!Number.isNaN(timeoutMs)) {
-        timeoutMillis = timeoutMs;
-      }
-    }
-
-    // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-    const retryAfterHeader = responseHeaders?.get('retry-after');
-    if (retryAfterHeader && timeoutMillis === undefined) {
-      const timeoutSeconds = parseNumericDelay(retryAfterHeader);
-      if (!Number.isNaN(timeoutSeconds)) {
-        // Keep finite seconds over the limit distinguishable from invalid hints after scaling.
-        timeoutMillis = Number.isFinite(timeoutSeconds)
-          ? Math.min(timeoutSeconds * 1000, Number.MAX_VALUE)
-          : timeoutSeconds;
-      } else {
-        timeoutMillis = Date.parse(retryAfterHeader) - Date.now();
-      }
-    }
-
-    return timeoutMillis !== undefined && Number.isFinite(timeoutMillis) && timeoutMillis >= 0
-      ? timeoutMillis
-      : undefined;
-  }
-
   private async retryRequest(
     options: FinalRequestOptions,
     retriesRemaining: number,
@@ -1793,7 +1755,8 @@ export class OpenAI {
     options: FinalRequestOptions,
     timeoutMillis: number,
     remainingTimeout?: number,
-    signal?: AbortSignal,
+    signal?: AbortSignal | null,
+    originalSignal?: AbortSignal | null,
   ): Promise<void> {
     // Native timers truncate fractions; rounding up preserves the server's minimum.
     timeoutMillis = Math.ceil(timeoutMillis);
@@ -1802,26 +1765,32 @@ export class OpenAI {
       ? x509Authentication.remainingTimeout(options, x509Authentication.requestSnapshot().timeout)
       : remainingTimeout;
     signal = x509Authentication?.effectiveSignal() ?? signal ?? options.signal ?? undefined;
-    if (signal?.aborted) throw this._makeUserAbortError(signal);
+    const retrySignals = [...new Set([signal, originalSignal ?? options.signal])].filter(
+      (candidate): candidate is AbortSignal => candidate !== undefined && candidate !== null,
+    );
+    const aborted = retrySignals.find((candidate) => candidate.aborted);
+    if (aborted) throw this._makeUserAbortError(aborted);
     if (remaining !== undefined && timeoutMillis >= remaining) {
       throw new Errors.APIConnectionTimeoutError();
     }
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, signal);
-    } else if (signal) {
-      const retrySignal = signal;
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          retrySignal.removeEventListener('abort', abort);
-          resolve();
-        }, timeoutMillis);
-        const abort = () => {
-          clearTimeout(timer);
-          retrySignal.removeEventListener('abort', abort);
-          reject(this._makeUserAbortError(retrySignal));
-        };
-        retrySignal.addEventListener('abort', abort, { once: true });
-      });
+    } else if (retrySignals.length) {
+      const cleanups: (() => void)[] = [];
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, timeoutMillis);
+          cleanups.push(() => clearTimeout(timer));
+          for (const retrySignal of retrySignals) {
+            const abort = () => reject(this._makeUserAbortError(retrySignal));
+            retrySignal.addEventListener('abort', abort, { once: true });
+            cleanups.push(() => retrySignal.removeEventListener('abort', abort));
+            if (retrySignal.aborted) abort();
+          }
+        });
+      } finally {
+        for (const cleanup of cleanups) cleanup();
+      }
     } else {
       await sleep(timeoutMillis);
     }

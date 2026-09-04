@@ -84,6 +84,7 @@ export interface X509RequestScope {
   requestHeaders?: NullableHeaders;
   token?: string;
   tokenGeneration?: number;
+  issuerRetryRefusal?: { error: unknown; retryAt: number };
   headers?: Headers;
   authorization?: string | null;
 }

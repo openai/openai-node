@@ -8,6 +8,7 @@ import { CancelReadableStream } from '../shims';
 import type { MergedRequestInit } from '../types';
 import { isSensitiveHeader } from '../utils/log';
 import { hasOwn } from '../utils/values';
+import { parseRetryAfterMillis } from '../utils/retry-after';
 import { assertX509APIOrigin } from './x509-api-origin';
 import { resolveX509Transport } from './x509-transport-registry';
 import {
@@ -643,12 +644,18 @@ export class X509WorkloadIdentityAuth {
 
     const scope = options ? this.#scope() : undefined;
     const cached = this.#cachedToken;
-    if (cached && performance.now() < cached.refreshAt && Date.now() < cached.wallRefreshAt) {
-      return X509WorkloadIdentityAuth.#assignToken(scope, cached);
-    }
-
     const remaining = context && options ? this.remainingTimeout(options, context.timeout) : context?.timeout;
     const { signal, dispose } = exchangeDeadline(remaining, callerSignal);
+    try {
+      const reusable = await this.#reusableToken(scope, signal);
+      if (reusable !== undefined) {
+        dispose();
+        return reusable;
+      }
+    } catch (error) {
+      dispose();
+      throw signal.reason instanceof APIConnectionTimeoutError ? signal.reason : error;
+    }
     if (callerSignal?.aborted) {
       dispose();
       throw userAbortError(callerSignal);
@@ -672,6 +679,31 @@ export class X509WorkloadIdentityAuth {
       attempt.waiters -= 1;
       this.#retireRefresh(attempt);
     }
+  }
+
+  async #reusableToken(
+    scope: X509RequestScope | undefined,
+    signal: AbortSignal | null | undefined,
+  ): Promise<string | undefined> {
+    let cached = this.#cachedToken;
+    if (scope?.issuerRetryRefusal !== undefined) {
+      const { error, retryAt } = scope.issuerRetryRefusal;
+      if (performance.now() < retryAt) {
+        if (cached && performance.now() < cached.expiresAt && Date.now() < cached.wallExpiresAt) {
+          return X509WorkloadIdentityAuth.#assignToken(scope, cached);
+        }
+        if (!Number.isFinite(retryAt)) {
+          throw error;
+        }
+        await this.waitForRetry(Math.ceil(Math.max(0, retryAt - performance.now())), signal);
+      }
+      delete scope.issuerRetryRefusal;
+      cached = this.#cachedToken;
+    }
+    if (cached && performance.now() < cached.refreshAt && Date.now() < cached.wallRefreshAt) {
+      return X509WorkloadIdentityAuth.#assignToken(scope, cached);
+    }
+    return undefined;
   }
 
   static #assignToken(scope: X509RequestScope | undefined, token: CachedX509Token): string {
@@ -726,13 +758,13 @@ export class X509WorkloadIdentityAuth {
     ) {
       return undefined;
     }
-    const headers = X509WorkloadIdentityAuth.retryHeaders(error);
-    const milliseconds = headers?.get('retry-after-ms');
-    let requested = milliseconds ? Number(milliseconds) : undefined;
-    const retryAfter = headers?.get('retry-after');
-    if (retryAfter && (requested === undefined || Number.isNaN(requested))) {
-      const seconds = Number(retryAfter);
-      requested = Number.isNaN(seconds) ? Date.parse(retryAfter) - Date.now() : seconds * 1000;
+    const requested = parseRetryAfterMillis(X509WorkloadIdentityAuth.retryHeaders(error));
+    if (scope && requested !== undefined && requested > 0) {
+      // Cached fallback must not let an API retry restart the issuer before its minimum.
+      scope.issuerRetryRefusal ??= {
+        error,
+        retryAt: requested <= 60_000 ? performance.now() + Math.ceil(requested) : Number.POSITIVE_INFINITY,
+      };
     }
     const cooldown =
       requested !== undefined && Number.isFinite(requested) && requested >= 0 && requested <= 60_000
