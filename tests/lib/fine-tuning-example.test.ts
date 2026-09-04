@@ -18,13 +18,18 @@ const source = ts.transpileModule(fs.readFileSync(filename, 'utf-8'), {
   fileName: filename,
 }).outputText;
 
-async function runExample(initialStatus: Status, followingStatuses: Status[]) {
+async function executeExample(
+  initialStatus: Status,
+  followingStatuses: Status[],
+  fileStatuses: readonly FileObject['status'][] = ['processed'],
+) {
   const requests: string[] = [];
   const waits: number[] = [];
   const log = vi.fn();
   const error = vi.fn();
   const exit = vi.fn();
   let statusIndex = 0;
+  let fileStatusIndex = 0;
   const file: FileObject = {
     id: 'file_test',
     object: 'file',
@@ -32,7 +37,7 @@ async function runExample(initialStatus: Status, followingStatuses: Status[]) {
     created_at: 0,
     filename: 'training.jsonl',
     purpose: 'fine-tune',
-    status: 'processed',
+    status: 'uploaded',
   };
   const job = (status: Status): FineTuningJob => ({
     id: 'ftjob_test',
@@ -61,7 +66,12 @@ async function runExample(initialStatus: Status, followingStatuses: Status[]) {
       return Response.json(file);
     }
     if (request === 'GET /files/file_test') {
-      return Response.json(file);
+      const status = fileStatuses[fileStatusIndex];
+      fileStatusIndex += 1;
+      if (status === undefined) {
+        throw new Error('The example polled past its terminal file status');
+      }
+      return Response.json({ ...file, status });
     }
     if (request === 'POST /fine_tuning/jobs') {
       return Response.json(job(initialStatus));
@@ -111,6 +121,11 @@ async function runExample(initialStatus: Status, followingStatuses: Status[]) {
     { filename },
   );
 
+  return { requests, waits, log, error, exit };
+}
+
+async function runExample(initialStatus: Status, followingStatuses: Status[]) {
+  const { requests, waits, log, error, exit } = await executeExample(initialStatus, followingStatuses);
   expect(error).not.toHaveBeenCalled();
   expect(exit).not.toHaveBeenCalled();
   expect(requests.filter((request) => request === 'POST /fine_tuning/jobs')).toHaveLength(1);
@@ -125,6 +140,36 @@ async function runExample(initialStatus: Status, followingStatuses: Status[]) {
     expect(log).toHaveBeenCalledWith(status);
   }
 }
+
+test.each([
+  { name: 'first processing check', statuses: ['error'] },
+  { name: 'previously uploaded file', statuses: ['uploaded', 'error'] },
+] as const)('stops after a file-processing error for the $name', async ({ statuses }) => {
+  const { requests, waits, error, exit } = await executeExample('succeeded', [], statuses);
+
+  expect(requests).toEqual(['POST /files', ...statuses.map(() => 'GET /files/file_test')]);
+  expect(waits).toEqual(statuses.slice(0, -1).map(() => 1000));
+  expect(error).toHaveBeenCalledTimes(1);
+  expect(error).toHaveBeenCalledWith(
+    expect.objectContaining({ message: 'File processing failed for file_test' }),
+  );
+  expect(exit).toHaveBeenCalledTimes(1);
+  expect(exit).toHaveBeenCalledWith(1);
+});
+
+test('starts fine-tuning after an uploaded file is processed', async () => {
+  const { requests, waits, error, exit } = await executeExample('succeeded', [], ['uploaded', 'processed']);
+
+  expect(requests).toEqual([
+    'POST /files',
+    'GET /files/file_test',
+    'GET /files/file_test',
+    'POST /fine_tuning/jobs',
+  ]);
+  expect(waits).toEqual([1000]);
+  expect(error).not.toHaveBeenCalled();
+  expect(exit).not.toHaveBeenCalled();
+});
 
 test('tracks a newly created job through file validation, queueing, and training', async () => {
   await runExample('validating_files', ['validating_files', 'queued', 'running', 'succeeded']);
