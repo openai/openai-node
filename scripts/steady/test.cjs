@@ -41,10 +41,19 @@ async function health(port) {
 }
 
 async function main() {
+  const lifetime = spawnSync(process.execPath, [path.join(__dirname, 'cache.test.cjs')], {
+    stdio: 'inherit',
+  });
+  assert.equal(lifetime.status, 0, 'Cache lifetime checks must succeed');
+  const publication = spawnSync(process.execPath, [path.join(__dirname, 'publication.test.cjs')], {
+    stdio: 'inherit',
+  });
+  assert.equal(publication.status, 0, 'Concurrent publication must succeed');
   fs.mkdirSync(path.join(fixture, 'scripts/steady'), { recursive: true });
   for (const file of [
     'scripts/run-steady',
     'scripts/steady/settings',
+    'scripts/steady/cache.cjs',
     'scripts/steady/source-sha256.cjs',
     'scripts/steady/manifest.json',
   ]) {
@@ -56,7 +65,7 @@ async function main() {
   assert.equal(installed.status, 0, 'Pinned source installation must succeed');
   const copied = spawnSync('cp', [
     '-R',
-    path.join(root, 'scripts/steady/.cache'),
+    `${path.join(root, 'scripts/steady/.cache')}/.`,
     path.join(fixture, 'scripts/steady/.cache'),
   ]);
   assert.equal(copied.status, 0);
@@ -75,7 +84,7 @@ async function main() {
     { encoding: 'utf-8' },
   );
   assert.equal(configured.status, 0, configured.stderr);
-  const [source, runtime] = configured.stdout.trim().split('\n');
+  const [source, runtime] = configured.stdout.trim().split(/\r?\n/u);
   const gitConfig = path.join(source, '.git/config');
   const originalConfig = fs.readFileSync(gitConfig);
   const marker = path.join(temporary, 'hook-ran');

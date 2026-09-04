@@ -4,19 +4,17 @@ set -euo pipefail
 STEADY_ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 source "$STEADY_ROOT/scripts/steady/settings"
 
+if [[ "${STEADY_CACHE_LEASE:-}" != 1 ]]; then
+  exec node "$STEADY_ROOT/scripts/steady/cache.cjs" "$STEADY_CACHE" "$STEADY_SOURCE" "$DENO_DIRECTORY" "$DENO_DIR" bash "$0" "$@"
+fi
+
 mkdir -p "$STEADY_CACHE"
 [[ "$(cd "$STEADY_CACHE" && pwd -P)" == "$STEADY_CACHE" ]] || steady_fail 'Steady cache cannot be a symlink.'
 temporary="$(mktemp -d "$STEADY_CACHE/install.XXXXXXXX")"
 trap 'rm -rf "$temporary"' EXIT
 
 publish_directory() {
-  node -e '
-    try {
-      require("fs").renameSync(process.argv[1], process.argv[2]);
-    } catch (error) {
-      if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error;
-    }
-  ' "$1" "$2"
+  node "$STEADY_ROOT/scripts/steady/publish.cjs" "$1" "$2"
 }
 
 if [[ ! -e "$STEADY_SOURCE" ]]; then
@@ -29,7 +27,7 @@ fi
 
 if [[ ! -e "$DENO_DIRECTORY" ]]; then
   mkdir "$temporary/deno"
-  curl --fail --location --silent --show-error \
+  curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error \
     "https://github.com/denoland/deno/releases/download/v$DENO_VERSION/deno-$DENO_TARGET.zip" \
     -o "$temporary/deno/deno.zip"
   [[ "$(steady_sha256 < "$temporary/deno/deno.zip")" == "$DENO_SHA256" ]] || steady_fail 'Deno download checksum mismatch.'

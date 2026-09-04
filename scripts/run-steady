@@ -3,6 +3,10 @@ set -euo pipefail
 
 STEADY_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 source "$STEADY_ROOT/scripts/steady/settings"
+
+if [[ "${STEADY_CACHE_LEASE:-}" != 1 ]]; then
+  exec node "$STEADY_ROOT/scripts/steady/cache.cjs" "$STEADY_CACHE" "$STEADY_SOURCE" "$DENO_DIRECTORY" "$DENO_DIR" bash "$0" "$@"
+fi
 steady_verify
 
 # Keep the caller's working directory so relative spec paths keep working.

@@ -158,6 +158,14 @@ Then run `./scripts/steady/install`. Review the release checksums when changing 
 Run `node scripts/steady/test.cjs` to check the
 installation, integrity checks, and mock-server lifecycle.
 
+This checkout owns `scripts/steady/.cache`. Source and dependency entries are
+keyed by the Steady revision; the runtime and dependencies also include the Deno
+version, and runtimes include the platform. Install and launch commands remove
+unselected entries after 30 idle days. A process lease protects entries until
+the command exits, including running Windows executables. The current pins are
+retained; changing the manifest makes the previous entries eligible for expiry.
+Cleanup runs on the next install or launch, without background work.
+
 The test suite is split between handwritten unit tests, which run with Vitest,
 and generated API-resource tests, which remain on Jest. Generated tests have a
 generator comment at the top of the file and primarily
