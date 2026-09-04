@@ -9,6 +9,8 @@ export interface WorkloadIdentityRetryFailure {
   delayMillis: number;
   /** Monotonic time before which another exchange must not start. */
   notBefore: number;
+  /** Absolute HTTP-date minimum, recomputed against the wall clock before waiting. */
+  retryAt?: number | undefined;
 }
 
 /** Lightweight exchange result; background work never retains a caller's request options. */
@@ -18,7 +20,7 @@ export interface WorkloadIdentityRefresh {
   /** Whether the exchange settled, allowing request-local observations to be pruned. */
   complete?: boolean;
   /** Minimum already received while error decoding is still pending. */
-  minimum?: { delayMillis: number; notBefore: number };
+  minimum?: Omit<WorkloadIdentityRetryFailure, 'error'>;
   /** Server minimum captured before reading an unsuccessful response body. */
   failure?: WorkloadIdentityRetryFailure;
 }
@@ -75,6 +77,13 @@ export interface WorkloadIdentityRequestContext {
   signal?: AbortSignal | null | undefined;
 }
 
+function remainingWorkloadIdentityRetry(minimum: Omit<WorkloadIdentityRetryFailure, 'error'>): number {
+  return Math.max(
+    0,
+    minimum.retryAt === undefined ? minimum.notBefore - performance.now() : minimum.retryAt - Date.now(),
+  );
+}
+
 /** Retains lazy observations while discarding completed exchanges and weaker known minima. */
 export function strongestWorkloadIdentityRefresh(
   request: WorkloadIdentityRequestContext | undefined,
@@ -98,7 +107,8 @@ export function strongestWorkloadIdentityRefresh(
     if (
       !previous ||
       (terminal && !previousTerminal) ||
-      (terminal === previousTerminal && minimum.notBefore > previous.notBefore)
+      (terminal === previousTerminal &&
+        remainingWorkloadIdentityRetry(minimum) > remainingWorkloadIdentityRetry(previous))
     ) {
       strongest = refresh;
     }
@@ -144,7 +154,7 @@ export async function waitForWorkloadIdentityRetry(failure: WorkloadIdentityRetr
   if (failure.delayMillis > 60_000) {
     throw failure.error;
   }
-  const delay = Math.ceil(Math.max(0, failure.notBefore - performance.now()));
+  const delay = Math.ceil(remainingWorkloadIdentityRetry(failure));
   if (delay) {
     await sleep(delay);
   }

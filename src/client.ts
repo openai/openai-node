@@ -1521,12 +1521,17 @@ export class OpenAI {
           await this.waitForRetry(
             options,
             remainingRetryDelay()!,
-            Math.max(0, startTime + timeout - Date.now()),
+            Math.max(
+              0,
+              x509Authentication
+                ? startTime + timeout - Date.now()
+                : workloadIdentityRequest!.deadline! - performance.now(),
+            ),
             req.signal,
             callerSignal,
           );
           // An event-loop stall can resume the retry timer after the original deadline.
-          if (!x509Authentication && Date.now() >= startTime + timeout) {
+          if (!x509Authentication && performance.now() >= workloadIdentityRequest!.deadline!) {
             const aborted = callerSignal?.aborted
               ? callerSignal
               : req.signal?.aborted

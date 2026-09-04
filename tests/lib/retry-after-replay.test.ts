@@ -182,10 +182,10 @@ describe.each(['legacy', 'x509'] as const)('%s authentication replay Retry-After
   }
   if (kind === 'legacy') {
     test('does not replay after a late retry timer crosses the authentication deadline', async () => {
-      const startedAt = Date.now();
+      const startedAt = performance.now();
       const request = Promise.allSettled([client({ 'retry-after-ms': '50' }, 100).models.list()]);
       await vi.advanceTimersByTimeAsync(0);
-      vi.setSystemTime(startedAt + 150);
+      vi.spyOn(performance, 'now').mockReturnValue(startedAt + 150);
       await vi.advanceTimersByTimeAsync(50);
       const [result] = await request;
       expect(result.status).toBe('rejected');

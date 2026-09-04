@@ -2,7 +2,7 @@ import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { APIError, OAuthError, OpenAIError } from '../core/error';
-import { parseRetryAfterMillis } from '../internal/utils/retry-after';
+import { parseRetryAfter } from '../internal/utils/retry-after';
 import {
   currentWorkloadIdentityRequest,
   strongestWorkloadIdentityRefresh,
@@ -300,10 +300,11 @@ export class WorkloadIdentityAuth {
     response: Response,
     refresh: WorkloadIdentityRefresh,
   ): Promise<never> {
-    const delayMillis = parseRetryAfterMillis(response.headers);
+    const retryAfter = parseRetryAfter(response.headers);
+    const delayMillis = retryAfter?.delayMillis;
     const notBefore = delayMillis === undefined ? undefined : performance.now() + delayMillis;
     if (delayMillis !== undefined && notBefore !== undefined) {
-      refresh.minimum = { delayMillis, notBefore };
+      refresh.minimum = { delayMillis, notBefore, retryAt: retryAfter?.retryAt };
     }
     try {
       const errorText = await response.text();
@@ -326,7 +327,7 @@ export class WorkloadIdentityAuth {
       );
     } catch (error) {
       if (delayMillis !== undefined && notBefore !== undefined) {
-        refresh.failure = { error, delayMillis, notBefore };
+        refresh.failure = { error, delayMillis, notBefore, retryAt: retryAfter?.retryAt };
       }
       throw error;
     }

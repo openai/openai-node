@@ -41,6 +41,110 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test.each([
+    ['forward', 50, 3_600_000, false],
+    ['backward', 150, -3_600_000, true],
+  ] as const)(
+    'keeps the 401 deadline monotonic when the wall clock moves %s',
+    async (_direction, elapsed, jump, timesOut) => {
+      vi.useFakeTimers();
+      let apiCalls = 0;
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          return globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+        }
+        apiCalls += 1;
+        if (apiCalls === 1) {
+          await new Promise((resolve) => setTimeout(resolve, elapsed));
+          vi.setSystemTime(Date.now() + jump);
+          return globalThis.Response.json(
+            { error: { message: 'expired' } },
+            { status: 401, headers: { 'retry-after-ms': '100' } },
+          );
+        }
+        return globalThis.Response.json({ data: [] });
+      });
+      const client = new OpenAI({ ...createTestClientOptions(), fetch: send, timeout: 200, maxRetries: 0 });
+      const result = (async () => {
+        try {
+          return await client.models.list();
+        } catch (error) {
+          return error;
+        }
+      })();
+      await vi.advanceTimersByTimeAsync(300);
+      const outcome = await result;
+      if (timesOut) {
+        expect(outcome).toBeInstanceOf(APIConnectionTimeoutError);
+        expect(apiCalls).toBe(1);
+      } else {
+        expect(outcome).not.toBeInstanceOf(Error);
+        expect(apiCalls).toBe(2);
+      }
+    },
+  );
+
+  test.each(['date', 'numeric'] as const)(
+    'retains a background issuer %s minimum across a wall-clock adjustment',
+    async (hint) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-09-04T00:00:00Z'));
+      let issuerCalls = 0;
+      let apiCalls = 0;
+      let finishFailureRead!: () => void;
+      const failureRead = new Promise<void>((resolve) => {
+        finishFailureRead = resolve;
+      });
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          issuerCalls += 1;
+          if (issuerCalls !== 2) {
+            return globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+          }
+          const failure = globalThis.Response.json(
+            { error: 'temporarily_unavailable' },
+            {
+              status: 503,
+              headers:
+                hint === 'date'
+                  ? { 'retry-after': new Date(Date.now() + 2999).toUTCString() }
+                  : { 'retry-after-ms': '2999' },
+            },
+          );
+          const read = failure.text.bind(failure);
+          vi.spyOn(failure, 'text').mockImplementation(async () => {
+            const body = await read();
+            finishFailureRead();
+            return body;
+          });
+          return failure;
+        }
+        apiCalls += 1;
+        if (apiCalls === 2) {
+          await failureRead;
+          vi.setSystemTime(Date.now() + 60_000);
+          return globalThis.Response.json({ error: { message: 'expired' } }, { status: 401 });
+        }
+        return globalThis.Response.json({ data: [] });
+      });
+      const client = new OpenAI({ ...createTestClientOptions(), fetch: send, maxRetries: 0, timeout: 5000 });
+      await client.models.list();
+      await vi.advanceTimersByTimeAsync(1001);
+      const result = (async () => {
+        try {
+          return await client.models.list();
+        } catch (error) {
+          return error;
+        }
+      })();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(issuerCalls).toBe(hint === 'date' ? 3 : 2);
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(await result).not.toBeInstanceOf(Error);
+      expect(issuerCalls).toBe(3);
+    },
+  );
+
+  test.each([
     [false, 'none'],
     [true, 'none'],
     [false, 'forward'],
@@ -55,7 +159,7 @@ describe('OpenAI with Workload Identity', () => {
       vi.useFakeTimers();
       let issuerCalls = 0;
       let apiCalls = 0;
-      const failure = Response.json(
+      const failure = globalThis.Response.json(
         { error: 'temporarily_unavailable' },
         {
           status: 503,
@@ -83,14 +187,14 @@ describe('OpenAI with Workload Identity', () => {
           issuerCalls += 1;
           return issuerCalls === 2
             ? failure
-            : Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+            : globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 2 });
         }
         apiCalls += 1;
         if (apiCalls === 2) {
           await failureRead;
-          return Response.json({ error: { message: 'expired' } }, { status: 401 });
+          return globalThis.Response.json({ error: { message: 'expired' } }, { status: 401 });
         }
-        return Response.json({ data: [] });
+        return globalThis.Response.json({ data: [] });
       });
       class LegacyHooksClient extends OpenAI {
         override async buildRequest(
@@ -166,7 +270,7 @@ describe('OpenAI with Workload Identity', () => {
           return await issuer;
         }
         apiCalls += 1;
-        return Response.json({ data: [] });
+        return globalThis.Response.json({ data: [] });
       });
       const client = new MutatingHookClient({ ...createTestClientOptions(), fetch: send, maxRetries: 0 });
       let settled = false;
@@ -192,7 +296,7 @@ describe('OpenAI with Workload Identity', () => {
         );
         expect(apiCalls).toBe(0);
       } finally {
-        releaseIssuer(Response.json({ access_token: 'synthetic-token', expires_in: 3600 }));
+        releaseIssuer(globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 }));
         await vi.advanceTimersByTimeAsync(0);
       }
     },
@@ -209,16 +313,16 @@ describe('OpenAI with Workload Identity', () => {
       if (String(url).includes('/oauth/token')) {
         issuerCalls += 1;
         return issuerCalls === 1
-          ? Response.json(
+          ? globalThis.Response.json(
               { error: 'temporarily_unavailable' },
               {
                 status: 503,
                 headers: { 'retry-after': '90' },
               },
             )
-          : Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+          : globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
       }
-      return Response.json({ data: [] });
+      return globalThis.Response.json({ data: [] });
     });
     const client = new DeferredAuthenticationClient({
       ...createTestClientOptions(),
@@ -248,7 +352,7 @@ describe('OpenAI with Workload Identity', () => {
       const failureRead = new Promise<void>((resolve) => {
         finishFailureRead = resolve;
       });
-      const failure = Response.json(
+      const failure = globalThis.Response.json(
         { error: 'temporarily_unavailable' },
         {
           status: 503,
@@ -266,14 +370,14 @@ describe('OpenAI with Workload Identity', () => {
           issuerCalls += 1;
           return issuerCalls === 2
             ? failure
-            : Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+            : globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 2 });
         }
         apiCalls += 1;
         if (apiCalls === 2) {
           await failureRead;
-          return Response.json({ error: { message: 'expired' } }, { status: 401 });
+          return globalThis.Response.json({ error: { message: 'expired' } }, { status: 401 });
         }
-        return Response.json({ data: [] });
+        return globalThis.Response.json({ data: [] });
       });
       const client = new OpenAI({
         ...createTestClientOptions(),
@@ -323,7 +427,7 @@ describe('OpenAI with Workload Identity', () => {
       const pendingBody = new Promise<void>((resolve) => {
         releaseBody = resolve;
       });
-      const failure = Response.json(
+      const failure = globalThis.Response.json(
         { error: 'temporarily_unavailable' },
         { status: 503, headers: { 'retry-after-ms': '200' } },
       );
@@ -337,12 +441,12 @@ describe('OpenAI with Workload Identity', () => {
           issuerCalls += 1;
           return issuerCalls === 2
             ? failure
-            : Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+            : globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 2 });
         }
         apiCalls += 1;
         return apiCalls === 2
-          ? Response.json({ error: { message: 'expired' } }, { status: 401 })
-          : Response.json({ data: [] });
+          ? globalThis.Response.json({ error: { message: 'expired' } }, { status: 401 })
+          : globalThis.Response.json({ data: [] });
       });
       const client = new OpenAI({ ...createTestClientOptions(), fetch: send, maxRetries: 0 });
       await client.models.list();
@@ -398,7 +502,7 @@ describe('OpenAI with Workload Identity', () => {
       const expiration = new Promise<Response>((resolve) => {
         expireToken = resolve;
       });
-      const laterFailure = Response.json(
+      const laterFailure = globalThis.Response.json(
         { error: 'later-failure' },
         { status: 503, headers: hint === 'short' ? { 'retry-after-ms': '10' } : {} },
       );
@@ -411,7 +515,7 @@ describe('OpenAI with Workload Identity', () => {
         if (String(url).includes('/oauth/token')) {
           issuerCalls += 1;
           if (issuerCalls === 2) {
-            return Response.json(
+            return globalThis.Response.json(
               { error: 'earlier-failure' },
               { status: 503, headers: { 'retry-after': '90' } },
             );
@@ -419,11 +523,11 @@ describe('OpenAI with Workload Identity', () => {
           if (issuerCalls === 3) {
             return laterFailure;
           }
-          return Response.json({ access_token: 'synthetic-token', expires_in: 2 });
+          return globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 2 });
         }
         apiCalls += 1;
         if (apiCalls === 2) {
-          return Response.json(
+          return globalThis.Response.json(
             { error: { message: 'retry API' } },
             { status: 503, headers: { 'retry-after-ms': '100' } },
           );
@@ -431,7 +535,7 @@ describe('OpenAI with Workload Identity', () => {
         if (apiCalls === 4) {
           return await expiration;
         }
-        return Response.json({ data: [] });
+        return globalThis.Response.json({ data: [] });
       });
       const client = new OpenAI({ ...createTestClientOptions(), fetch: send, maxRetries: 1 });
       try {
@@ -451,13 +555,13 @@ describe('OpenAI with Workload Identity', () => {
         expect(issuerCalls).toBe(3);
         releaseBody();
         await vi.advanceTimersByTimeAsync(0);
-        expireToken(Response.json({ error: { message: 'expired' } }, { status: 401 }));
+        expireToken(globalThis.Response.json({ error: { message: 'expired' } }, { status: 401 }));
         await vi.advanceTimersByTimeAsync(10);
         expect(issuerCalls).toBe(3);
         expect(await first).toMatchObject({ status: 503, error: 'earlier-failure' });
       } finally {
         releaseBody();
-        expireToken(Response.json({ data: [] }));
+        expireToken(globalThis.Response.json({ data: [] }));
       }
     },
   );
@@ -473,7 +577,10 @@ describe('OpenAI with Workload Identity', () => {
     const calls = [client.request(options), client.request(options)];
     const settled = Promise.allSettled(calls);
     release(
-      Response.json({ error: 'temporarily_unavailable' }, { status: 503, headers: { 'retry-after': '90' } }),
+      globalThis.Response.json(
+        { error: 'temporarily_unavailable' },
+        { status: 503, headers: { 'retry-after': '90' } },
+      ),
     );
     const results = await settled;
     expect(send).toHaveBeenCalledTimes(1);
@@ -505,9 +612,9 @@ describe('OpenAI with Workload Identity', () => {
     const send = vi.fn(async (url: RequestInfo | URL) => {
       if (String(url).includes('/oauth/token')) {
         issuerCalls += 1;
-        return Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+        return globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
       }
-      return Response.json({ data: [] });
+      return globalThis.Response.json({ data: [] });
     });
     const client = new LegacyForwardingClient({ ...createTestClientOptions(), fetch: send });
     const headers = { 'x-test-request': 'synthetic' };
@@ -555,7 +662,7 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: 'exchanged-access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -568,7 +675,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/models')) {
         apiRequestHeaders = new Headers(init?.headers);
-        return Response.json({ data: [] }, { status: 200 });
+        return globalThis.Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -608,7 +715,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: 'exchanged-access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -620,7 +727,7 @@ describe('OpenAI with Workload Identity', () => {
       }
 
       if (urlStr.includes('/models')) {
-        return Response.json({ data: [] }, { status: 200 });
+        return globalThis.Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -644,7 +751,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: `access-token-${tokenExchangeCallCount}`,
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -658,9 +765,9 @@ describe('OpenAI with Workload Identity', () => {
       if (urlStr.includes('/models')) {
         apiCallCount++;
         if (apiCallCount === 1) {
-          return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+          return globalThis.Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
         }
-        return Response.json({ data: [] }, { status: 200 });
+        return globalThis.Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -743,7 +850,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -756,7 +863,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/models')) {
         apiCallCount++;
-        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+        return globalThis.Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -779,7 +886,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -792,7 +899,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/files')) {
         apiCallCount++;
-        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+        return globalThis.Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -839,7 +946,7 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return Response.json(
+        return globalThis.Response.json(
           {
             error: 'invalid_grant',
             error_description: 'Invalid subject token',
@@ -864,7 +971,7 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: `access-token-${tokenExchangeCallCount}`,
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -876,7 +983,7 @@ describe('OpenAI with Workload Identity', () => {
       }
 
       if (urlStr.includes('/models')) {
-        return Response.json({ data: [] }, { status: 200 });
+        return globalThis.Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -898,7 +1005,7 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -910,7 +1017,7 @@ describe('OpenAI with Workload Identity', () => {
       }
 
       if (urlStr.includes('/models')) {
-        return Response.json({ data: [] }, { status: 200 });
+        return globalThis.Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -932,7 +1039,7 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -944,7 +1051,7 @@ describe('OpenAI with Workload Identity', () => {
       }
 
       if (urlStr.includes('/models')) {
-        return Response.json({ data: [] }, { status: 200 });
+        return globalThis.Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -979,7 +1086,7 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return Response.json(
+        return globalThis.Response.json(
           {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
@@ -991,7 +1098,7 @@ describe('OpenAI with Workload Identity', () => {
       }
 
       if (urlStr.includes('/models')) {
-        return Response.json({ data: [] }, { status: 200 });
+        return globalThis.Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
