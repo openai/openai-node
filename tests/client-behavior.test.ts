@@ -325,6 +325,9 @@ describe('OpenAI client request behavior', () => {
     ['seconds at the limit', { 'retry-after': '60' }, 60_000, true],
     ['seconds above the limit', { 'retry-after': '61' }, 0, false],
     ['finite seconds overflow', { 'retry-after': `2${'0'.repeat(307)}` }, 0, false],
+    ['numeric seconds overflow', { 'retry-after': '9'.repeat(309) }, 0, false],
+    ['numeric milliseconds overflow', { 'retry-after-ms': '9'.repeat(309) }, 0, false],
+    ['exponent overflow', { 'retry-after': '1e999' }, 0, false],
     ['milliseconds at the limit', { 'retry-after-ms': '60000' }, 60_000, true],
     ['milliseconds above the limit', { 'retry-after-ms': '60001' }, 0, false],
     ['date at the limit', { 'retry-after': 'Thu, 03 Sep 2026 12:01:00 GMT' }, 60_000, true],
@@ -336,6 +339,9 @@ describe('OpenAI client request behavior', () => {
     ['invalid hint uses backoff', { 'retry-after': 'invalid' }, 500, true],
     ['malformed seconds use backoff', { 'retry-after': '61garbage' }, 500, true],
     ['malformed milliseconds use backoff', { 'retry-after-ms': '60001ms' }, 500, true],
+    ['hexadecimal seconds use backoff', { 'retry-after': '0x100' }, 500, true],
+    ['binary seconds use backoff', { 'retry-after': '0b1000000' }, 500, true],
+    ['octal milliseconds use backoff', { 'retry-after-ms': '0o200000' }, 500, true],
     [
       'malformed milliseconds fall back to seconds',
       { 'retry-after-ms': '60001ms', 'retry-after': '0.25' },
@@ -343,6 +349,8 @@ describe('OpenAI client request behavior', () => {
       true,
     ],
     ['nonfinite hint uses backoff', { 'retry-after-ms': 'Infinity', 'retry-after': '90' }, 500, true],
+    ['nonfinite seconds use backoff', { 'retry-after': '+Infinity' }, 500, true],
+    ['negative overflow uses backoff', { 'retry-after-ms': `-${'9'.repeat(309)}` }, 500, true],
     ['negative hint uses backoff', { 'retry-after': '-1' }, 500, true],
     ['missing hint uses backoff', {}, 500, true],
   ] as const)('schedules retries correctly: %s', async (_name, headers, elapsedMillis, retried) => {

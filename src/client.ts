@@ -1712,11 +1712,20 @@ export class OpenAI {
 
   private parseRetryAfterMillis(responseHeaders?: Headers): number | undefined {
     let timeoutMillis: number | undefined;
+    const parseNumericDelay = (header: string): number => {
+      const value = Number(header);
+      // Accept complete decimal numbers and keep overflowing delays above the retry limit.
+      if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(header.trim())) {
+        return Math.min(value, Number.MAX_VALUE);
+      }
+      // Preserve invalid nonfinite hints without accepting other Number syntax, such as hexadecimal.
+      return Number.isFinite(value) ? NaN : value;
+    };
 
     // Note the `retry-after-ms` header may not be standard, but is a good idea and we'd like proactive support for it.
     const retryAfterMillisHeader = responseHeaders?.get('retry-after-ms');
     if (retryAfterMillisHeader) {
-      const timeoutMs = Number(retryAfterMillisHeader);
+      const timeoutMs = parseNumericDelay(retryAfterMillisHeader);
       if (!Number.isNaN(timeoutMs)) {
         timeoutMillis = timeoutMs;
       }
@@ -1725,7 +1734,7 @@ export class OpenAI {
     // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
     const retryAfterHeader = responseHeaders?.get('retry-after');
     if (retryAfterHeader && timeoutMillis === undefined) {
-      const timeoutSeconds = Number(retryAfterHeader);
+      const timeoutSeconds = parseNumericDelay(retryAfterHeader);
       if (!Number.isNaN(timeoutSeconds)) {
         // Keep finite seconds over the limit distinguishable from invalid hints after scaling.
         timeoutMillis = Number.isFinite(timeoutSeconds)
