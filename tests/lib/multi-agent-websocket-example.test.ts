@@ -52,7 +52,10 @@ const textEvent: BetaResponsesServerEvent = {
   sequence_number: 1,
 };
 
-async function runExample(events: BetaResponsesServerEvent[], writeFailure?: Error) {
+async function runExample(
+  events: BetaResponsesServerEvent[],
+  options: { writeFailure?: Error; close?: 'clean' | 'abrupt' } = {},
+) {
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await once(server, 'listening');
   const address = server.address();
@@ -82,7 +85,12 @@ async function runExample(events: BetaResponsesServerEvent[], writeFailure?: Err
       for (const event of events) {
         socket.send(JSON.stringify(event));
       }
-      // Keep the server open: the one-response example owns closing its connection.
+      if (options.close === 'clean') {
+        socket.close(1000, 'SYNTHETIC_PRIVATE_CLOSE_REASON');
+      } else if (options.close === 'abrupt') {
+        socket.terminate();
+      }
+      // Otherwise keep the server open: the example owns closing its connection.
     });
   });
 
@@ -104,8 +112,8 @@ async function runExample(events: BetaResponsesServerEvent[], writeFailure?: Err
         process: {
           stdout: {
             write(value: string) {
-              if (writeFailure) {
-                throw writeFailure;
+              if (options.writeFailure) {
+                throw options.writeFailure;
               }
               output.push(value);
               return true;
@@ -125,7 +133,9 @@ async function runExample(events: BetaResponsesServerEvent[], writeFailure?: Err
     })();
 
     await vi.waitFor(() => expect(requests).toHaveLength(1), { timeout: 2000 });
-    await vi.waitFor(() => expect(closeCodes).toEqual([1000]), { timeout: 2000 });
+    await vi.waitFor(() => expect(closeCodes).toEqual([options.close === 'abrupt' ? 1006 : 1000]), {
+      timeout: 2000,
+    });
     expect(requests[0]).toMatchObject({
       type: 'response.create',
       model: 'gpt-5.6-sol',
@@ -145,6 +155,41 @@ async function runExample(events: BetaResponsesServerEvent[], writeFailure?: Err
 
 test('closes the multi-agent WebSocket example after a completed response', async () => {
   const result = await runExample([textEvent, terminalEvent('completed')]);
+
+  expect(result.error).toBeUndefined();
+  expect(result.output).toBe('━━━ Coordinator: /root ━━━\n\nSynthetic answer\n');
+});
+
+test.each([
+  ['clean', false],
+  ['abrupt', false],
+  ['clean', true],
+] as const)(
+  'rejects %s closure before coordinator completion (partial output: %s)',
+  async (close, partialOutput) => {
+    const result = await runExample(partialOutput ? [textEvent] : [], { close });
+
+    expect(result.error).toMatchObject({
+      message: 'WebSocket closed before the coordinator response completed.',
+    });
+    expect(result.output).toBe(partialOutput ? '━━━ Coordinator: /root ━━━\n\nSynthetic answer' : '');
+    expect(result.output).not.toContain('SYNTHETIC_PRIVATE_CLOSE_REASON');
+  },
+);
+
+test('rejects a close after only a child agent has completed', async () => {
+  const result = await runExample([{ ...terminalEvent('completed'), agent: { agent_name: '/root/alpha' } }], {
+    close: 'clean',
+  });
+
+  expect(result.error).toMatchObject({
+    message: 'WebSocket closed before the coordinator response completed.',
+  });
+  expect(result.output).toBe('');
+});
+
+test('accepts coordinator completion before the server closes', async () => {
+  const result = await runExample([textEvent, terminalEvent('completed')], { close: 'clean' });
 
   expect(result.error).toBeUndefined();
   expect(result.output).toBe('━━━ Coordinator: /root ━━━\n\nSynthetic answer\n');
@@ -231,9 +276,27 @@ test.each([
   expect(result.output).toBe('');
 });
 
+test('preserves an API error received before the server closes', async () => {
+  const result = await runExample(
+    [
+      {
+        type: 'error',
+        code: 'invalid_request',
+        message: 'Synthetic API failure',
+        param: null,
+        sequence_number: 0,
+      },
+    ],
+    { close: 'clean' },
+  );
+
+  expect(result.error).toMatchObject({ message: 'Synthetic API failure' });
+  expect(result.output).toBe('');
+});
+
 test('closes the example and preserves a failure while writing output', async () => {
   const error = new Error('Synthetic output failure');
-  const result = await runExample([textEvent], error);
+  const result = await runExample([textEvent], { writeFailure: error });
 
   expect(result.error).toBe(error);
   expect(result.output).toBe('');
