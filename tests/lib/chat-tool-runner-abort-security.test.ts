@@ -1,6 +1,11 @@
 import { vi } from 'vitest';
 import OpenAI from 'openai';
-import { APIUserAbortError } from 'openai/error';
+import { APIUserAbortError, OpenAIError } from 'openai/error';
+import type {
+  AbstractChatCompletionRunner,
+  AbstractChatCompletionRunnerEvents,
+  RunnerOptions,
+} from 'openai/lib/AbstractChatCompletionRunner';
 
 import { mockFetch } from '../utils/mock-fetch';
 
@@ -47,12 +52,12 @@ function clientWithToolCalls(streaming: boolean, calls: ReturnType<typeof toolCa
           choices: [
             {
               index: 0,
-              finish_reason: 'tool_calls',
+              finish_reason: calls.length ? 'tool_calls' : 'stop',
               logprobs: null,
               delta: {
                 role: 'assistant',
-                content: null,
-                tool_calls: calls.map((call, index) => ({ ...call, index })),
+                content: calls.length ? null : 'Final answer',
+                tool_calls: calls.length ? calls.map((call, index) => ({ ...call, index })) : undefined,
               },
             },
           ],
@@ -71,13 +76,13 @@ function clientWithToolCalls(streaming: boolean, calls: ReturnType<typeof toolCa
         choices: [
           {
             index: 0,
-            finish_reason: 'tool_calls',
+            finish_reason: calls.length ? 'tool_calls' : 'stop',
             logprobs: null,
             message: {
               role: 'assistant',
-              content: null,
+              content: calls.length ? null : 'Final answer',
               refusal: null,
-              tool_calls: calls,
+              tool_calls: calls.length ? calls : undefined,
             },
           },
         ],
@@ -834,6 +839,111 @@ describe.each([
       },
     ]);
     expect(runner.aborted).toBe(true);
+  });
+
+  describe.each(['final response', 'forced tool', 'parallel limit', 'sequential limit'] as const)(
+    'afterCompletion on %s',
+    (exitRoute) => {
+      test.each(['context.abort', 'external signal', 'not aborted'] as const)(
+        'settles correctly when %s while awaiting the callback',
+        async (abortMethod) => {
+          const calls = exitRoute === 'final response' ? [] : [toolCall('readBalance')];
+          const { client, respond } = clientWithToolCalls(streaming, calls);
+          const controller = new AbortController();
+          const callbackStarted = deferred<boolean>();
+          const callbackReady = deferred<boolean>();
+          const readBalance = vi.fn(() => 'balance already read');
+          const afterCompletion = vi.fn<NonNullable<RunnerOptions['afterCompletion']>>(
+            async (_completion, context) => {
+              callbackStarted.resolve(true);
+              if (abortMethod === 'context.abort') {
+                context.abort();
+              }
+              await callbackReady.promise;
+            },
+          );
+          const params = {
+            model: 'gpt-4o-mini',
+            parallel_tool_calls: exitRoute !== 'sequential limit',
+            ...(exitRoute === 'forced tool'
+              ? { tool_choice: { type: 'function' as const, function: { name: 'readBalance' } } }
+              : {}),
+            messages: [{ role: 'user' as const, content: 'read the current balance' }],
+            tools: [
+              {
+                type: 'function' as const,
+                function: {
+                  name: 'readBalance',
+                  description: 'Reads the current balance',
+                  parameters: { type: 'object' as const },
+                  function: readBalance,
+                },
+              },
+            ],
+          };
+          const options = { signal: controller.signal, maxChatCompletions: 1, afterCompletion };
+          const runner: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, null> = streaming
+            ? client.chat.completions.runTools({ ...params, stream: true }, options)
+            : client.chat.completions.runTools({ ...params, stream: false }, options);
+          const onFinal = vi.fn();
+          runner.on('finalChatCompletion', onFinal);
+
+          await respond();
+          await callbackStarted.promise;
+          expect(onFinal).not.toHaveBeenCalled();
+          if (abortMethod === 'external signal') {
+            controller.abort();
+          }
+          callbackReady.resolve(true);
+
+          await (abortMethod === 'not aborted'
+            ? expect(runner.done()).resolves.toBeUndefined()
+            : expect(runner.done()).rejects.toBeInstanceOf(APIUserAbortError));
+          expect(runner.aborted).toBe(abortMethod !== 'not aborted');
+          expect(onFinal).toHaveBeenCalledTimes(abortMethod === 'not aborted' ? 1 : 0);
+          expect(afterCompletion).toHaveBeenCalledTimes(1);
+          expect(readBalance).toHaveBeenCalledTimes(calls.length);
+          expect(runner.messages.filter((message) => message.role === 'tool')).toEqual(
+            calls.map((call) => ({
+              role: 'tool',
+              tool_call_id: call.id,
+              content: 'balance already read',
+            })),
+          );
+        },
+      );
+    },
+  );
+
+  test('preserves a rejected afterCompletion error even when the callback aborts', async () => {
+    const { client, respond } = clientWithToolCalls(streaming, []);
+    const error = new OpenAIError('synthetic lifecycle callback failure');
+    const params = {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user' as const, content: 'hello' }],
+      tools: [],
+    };
+    const options: RunnerOptions = {
+      afterCompletion: async (_completion, context) => {
+        context.abort();
+        throw error;
+      },
+    };
+    const runner: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, null> = streaming
+      ? client.chat.completions.runTools({ ...params, stream: true }, options)
+      : client.chat.completions.runTools({ ...params, stream: false }, options);
+    const onError = vi.fn();
+    const onAbort = vi.fn();
+    runner.on('error', onError);
+    runner.on('abort', onAbort);
+
+    await respond();
+    await expect(runner.done()).rejects.toBe(error);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(error);
+    expect(onAbort).not.toHaveBeenCalled();
+    expect(runner.controller.signal.aborted).toBe(true);
+    expect(runner.aborted).toBe(false);
   });
 
   test('preserves successful tool context, result ordering, and afterCompletion', async () => {

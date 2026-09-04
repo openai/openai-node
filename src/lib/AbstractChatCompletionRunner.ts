@@ -385,6 +385,15 @@ export class AbstractChatCompletionRunner<
     const singleFunctionToCall =
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
+    const runAfterCompletion = async (completion: ChatCompletion) => {
+      if (afterCompletion == null) {
+        return;
+      }
+      await afterCompletion(completion, runner);
+      if (this.controller.signal.aborted) {
+        throw new APIUserAbortError();
+      }
+    };
 
     // Normalize tool definitions before invoking callbacks.
     const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
@@ -520,7 +529,7 @@ export class AbstractChatCompletionRunner<
         throw new OpenAIError(`missing message in ChatCompletion response`);
       }
       if (!message.tool_calls?.length) {
-        await afterCompletion?.(chatCompletion, runner);
+        await runAfterCompletion(chatCompletion);
         return;
       }
 
@@ -535,7 +544,7 @@ export class AbstractChatCompletionRunner<
           }
 
           if (singleFunctionToCall && result.functionCalled) {
-            await afterCompletion?.(chatCompletion, runner);
+            await runAfterCompletion(chatCompletion);
             return;
           }
         }
@@ -564,7 +573,7 @@ export class AbstractChatCompletionRunner<
         }
       }
 
-      await afterCompletion?.(chatCompletion, runner);
+      await runAfterCompletion(chatCompletion);
     }
   }
 
