@@ -1443,7 +1443,12 @@ export class OpenAI {
       let declinedRetryDelay = false;
       if ((shouldRefreshWorkloadIdentity || (retriesRemaining && shouldRetry)) && !hasStreamingBody) {
         try {
-          declinedRetryDelay = !this.shouldRetryAfterHeader(options, retriesRemaining, response.headers);
+          declinedRetryDelay = !this.shouldRetryAfterHeader(
+            options,
+            retriesRemaining,
+            response.headers,
+            Boolean(shouldRefreshWorkloadIdentity),
+          );
         } catch (error) {
           void Shims.CancelReadableStream(response.body).catch(() => undefined);
           throw error;
@@ -1700,13 +1705,14 @@ export class OpenAI {
     options: FinalRequestOptions,
     retriesRemaining: number,
     responseHeaders?: Headers,
+    authenticationReplay = false,
   ): boolean {
     if ((this.parseRetryAfterMillis(responseHeaders) ?? 0) <= 60 * 1000) {
       return true;
     }
-    // Preserve the existing deadline error before refusing an excessive server delay.
+    // Preserve HTTP-backoff deadline precedence; authentication refreshes replay immediately.
     const x509Authentication = this.#x509Authentication;
-    if (x509Authentication) {
+    if (x509Authentication && !authenticationReplay) {
       const remaining = x509Authentication.remainingTimeout(
         options,
         x509Authentication.requestSnapshot().timeout,

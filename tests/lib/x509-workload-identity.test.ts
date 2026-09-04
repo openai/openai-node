@@ -536,6 +536,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
   test.each([undefined, 'true', 'false'])(
     'declines excessive certificate replay delays (x-should-retry=%s)',
     async (retryHeader) => {
+      vi.spyOn(performance, 'now').mockReturnValue(0);
       let apiCalls = 0;
       let issuerCalls = 0;
       vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
@@ -558,7 +559,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
             )
           : Response.json({ data: [] });
       });
-      const client = new OpenAI(options({ maxRetries: 1 }));
+      const client = new OpenAI(options({ maxRetries: 1, timeout: 100 }));
 
       await expect(client.models.list()).rejects.toMatchObject({
         status: 401,
