@@ -68,7 +68,6 @@ describe('release commit CI gate', () => {
         path.join(fixture, 'gh'),
         `
 const { appendFileSync } = require('node:fs');
-const { execFileSync } = require('node:child_process');
 const args = process.argv.slice(2);
 const data = JSON.parse(process.env.GATE_FIXTURE);
 appendFileSync(process.env.GATE_INVOCATIONS, JSON.stringify(args) + '\\n');
@@ -86,7 +85,14 @@ if (args[0] === 'api') {
   } else {
     throw new Error('Unexpected API request: ' + JSON.stringify(args));
   }
-  process.stdout.write(execFileSync('jq', ['-r', query], { input: JSON.stringify(response), encoding: 'utf8' }));
+  if (query === '.workflow_runs | map(select(.head_branch == "main")) | first | .id // empty') {
+    const selected = response.workflow_runs.find(run => run.head_branch === 'main');
+    if (selected) process.stdout.write(String(selected.id) + '\\n');
+  } else if (query === '.head_sha') {
+    process.stdout.write(String(response.head_sha) + '\\n');
+  } else {
+    throw new Error('Unexpected jq query: ' + query);
+  }
 } else if (args[0] === 'run' && args[1] === 'watch') {
   process.exit(args.includes('--exit-status') ? data.watchExit : 0);
 } else {
@@ -94,6 +100,8 @@ if (args[0] === 'api') {
 }
 `,
       );
+      // The release-gate fixture must not depend on an undeclared host jq binary.
+      writeExecutable(path.join(fixture, 'jq'), 'process.exit(91);');
       // Keep the missing-run polling path deterministic and fast.
       writeExecutable(path.join(fixture, 'sleep'), 'process.exit(0);');
 
