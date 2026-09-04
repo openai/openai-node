@@ -513,7 +513,7 @@ const main = async (): Promise<void> => {
       console.log(`\n=== Turn ${index + 1} ===`);
       console.log(`User: ${turn.prompt}`);
 
-      const turnResult = await runTurn({
+      const turnResult: RunTurnResult = await runTurn({
         ws,
         model: args.model,
         previousResponseID,
