@@ -156,19 +156,6 @@ describe('Zod v3 optional schemas extracted into definitions', () => {
     expect(collectNotPointers(zodV4Schema)).toEqual([]);
   });
 
-  it('keeps non-strict Realtime tools consistent too', () => {
-    const shared = zv3.string().nullable().optional();
-    const parameters = zodRealtimeFunction({
-      name: 'root',
-      parameters: zv3.object({ primary: shared, secondary: shared }),
-    }).parameters as JsonSchema;
-
-    expect(collectNotPointers(parameters)).toEqual([]);
-    expect(definitionFor(parameters, parameters.properties?.['secondary']?.$ref)).toEqual(
-      parameters.properties?.['primary'],
-    );
-  });
-
   it.each([
     {
       description: 'distinct optional schemas that are never extracted',
@@ -359,6 +346,7 @@ describe('a definition keeps the context it was referenced from', () => {
     const described = zv3.string().nullable().optional().describe('guidance');
 
     const schema = zodToJsonSchema(zv3.object({ a: described, b: described }), {
+      openaiStrictMode: true,
       name: 'p',
       markdownDescription: true,
       $refStrategy: 'extract-to-root',
@@ -767,22 +755,6 @@ describe('a definition keeps the context it was referenced from', () => {
     });
   });
 
-  test('an openApi3 nullable optional reuses one encoding', () => {
-    // The OpenAPI targets spell a nullable as a `nullable` sibling rather than
-    // an `anyOf` branch, so the shared definition has to reach the same shape
-    // the inline occurrence gets.
-    const shared = zv3.string().optional().nullable();
-    const out = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
-      target: 'openApi3',
-      name: 'p',
-      nameStrategy: 'duplicate-ref',
-      $refStrategy: 'extract-to-root',
-    }) as any;
-
-    expect(out.definitions.p_properties_a).toEqual({ type: 'string', nullable: true });
-    expect(out.definitions.p.properties.a).toEqual({ type: 'string', nullable: true });
-  });
-
   describe('a reference the scan cannot read is still a reference', () => {
     test('361 accessor-backed $ref', () => {
       const marker = zv3.number();
@@ -854,31 +826,70 @@ describe('a definition keeps the context it was referenced from', () => {
       expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
     });
 
-    test('312 duplicate openApi3 nullable', () => {
-      const shared = zv3.string().nullable().optional().nullable();
-      const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
-        target: 'openApi3',
-        name: 'p',
-        nameStrategy: 'duplicate-ref',
-        $refStrategy: 'extract-to-root',
-      });
-      expect(out.definitions.p_properties_a).toEqual(out.definitions.p.properties.a);
-    });
-
-    test('a recursive definition does not count its own back-reference', () => {
-      // The array branch points back at the definition it lives in. That is
-      // the schema describing itself, not a second call site, so it must not
-      // make the definition look like it was reached from outside a property.
-      const node: any = zv3.lazy(() => zv3.union([zv3.string(), zv3.array(node)])).optional();
+    test('a recursive definition keeps the encoding it had', () => {
+      // A schema that refers back to itself materializes a definition whose
+      // shape differs from the inline occurrence by more than the wrapper, so
+      // whether removing the wrapper preserves meaning cannot be established
+      // here. Leaving it is what the converter did before, and that is the
+      // right answer for a form this fix cannot prove safe.
+      const node: any = zv3
+        .lazy(() => zv3.union([zv3.string(), zv3.array(node)]))
+        .nullable()
+        .optional();
 
       const out: any = zodToJsonSchema(zv3.object({ a: node, b: node }), {
+        openaiStrictMode: true,
         name: 'p',
         nameStrategy: 'duplicate-ref',
         $refStrategy: 'extract-to-root',
       });
 
-      expect(out.definitions.p_properties_a).toEqual(out.definitions.p.properties.a);
-      expect(out.definitions.p_properties_a).not.toHaveProperty('not');
+      expect(out.definitions.p_properties_a).toHaveProperty('anyOf');
+      expect(out.definitions.p_properties_a.anyOf[0]).toEqual({ not: {} });
+    });
+
+    test('an accessor inside a schema map is treated as a reference', () => {
+      // `properties: { get x() { ... } }` puts the accessor on the entry, not
+      // on `properties`, so reading the map yields `undefined` and the walk
+      // stops there. Whether the getter returns a pointer into a branch this
+      // rewrite is about to remove cannot be known without running caller
+      // code, and `JSON.stringify` runs it afterwards. Its presence is enough
+      // to leave the schema alone.
+      const shared = zv3.string().nullable().optional();
+      const marker = zv3.number();
+      const supplied: any = {
+        type: 'object',
+        properties: {
+          get x() {
+            return { $ref: '#/definitions/p_properties_a/anyOf/1' };
+          },
+        },
+      };
+
+      const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared, c: marker }), {
+        openaiStrictMode: true,
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+        override: (def) => (def === (marker as any)._def ? supplied : ignoreOverride),
+      });
+
+      const wire = JSON.parse(JSON.stringify(out));
+      expect(wire.definitions.p_properties_a).toHaveProperty('anyOf');
+      expect(wire.definitions.p_properties_a.anyOf[1]).toBeDefined();
+    });
+
+    test('a strict helper is the only path this rewrites', () => {
+      // Everything outside the strict helpers keeps the output it had.
+      const shared = zv3.string().nullable().optional();
+      const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+        name: 'p',
+        nameStrategy: 'duplicate-ref',
+        $refStrategy: 'extract-to-root',
+      });
+      expect(out.definitions.p_properties_a).toEqual({
+        anyOf: [{ not: {} }, { type: ['string', 'null'] }],
+      });
     });
 
     test('an omitted wrapper annotation does not erase the branch value', () => {
@@ -892,6 +903,7 @@ describe('a definition keeps the context it was referenced from', () => {
       };
 
       const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
+        openaiStrictMode: true,
         name: 'p',
         nameStrategy: 'duplicate-ref',
         $refStrategy: 'extract-to-root',
@@ -937,13 +949,16 @@ describe('a definition keeps the context it was referenced from', () => {
       // One Zod def under two names. The property references exactly one of
       // them; the other is a standalone definition nothing reached, and
       // rewriting it would change a schema no reference names.
-      const shared = zv3.string().optional();
+      const shared = zv3.string().nullable().optional();
       const out: any = zodToJsonSchema(zv3.object({ a: shared }), {
+        openaiStrictMode: true,
         definitions: { First: shared, Second: shared },
       });
       expect(out.properties.a).toEqual({ $ref: '#/definitions/Second' });
-      expect(out.definitions.Second).toEqual({ type: 'string' });
-      expect(out.definitions.First).toEqual({ anyOf: [{ not: {} }, { type: 'string' }] });
+      expect(out.definitions.Second).toEqual({ type: ['string', 'null'] });
+      expect(out.definitions.First).toEqual({
+        anyOf: [{ not: {} }, { type: ['string', 'null'] }],
+      });
     });
 
     test('553 definition order changes the result', () => {

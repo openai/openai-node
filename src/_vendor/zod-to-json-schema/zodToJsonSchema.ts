@@ -420,7 +420,6 @@ const collectRefs = (value: unknown): { ref: string; insideProperty: boolean }[]
 const indexReferences = (
   main: JsonSchema7Type,
   definitions: Record<string, unknown>,
-  pathOf: (key: string) => string,
 ): {
   referencedFromProperty: Set<string>;
   referencedElsewhere: Set<string>;
@@ -434,29 +433,13 @@ const indexReferences = (
   // of shared optionals.
   const referencedPrefixes = new Set<string>();
 
-  const add = (ref: string, insideProperty: boolean, ownerPath: string | undefined) => {
-    // A recursive schema points back at its own definition. That is the
-    // definition describing itself rather than a second call site asking for a
-    // different encoding, so it does not decide which encoding is owed. It
-    // still counts as a pointer below: removing a wrapper strands a
-    // self-reference into it exactly as it would an external one.
-    const isSelf = ownerPath !== undefined && (ref === ownerPath || ref.startsWith(`${ownerPath}/`));
-    if (!isSelf) {
-      (insideProperty ? referencedFromProperty : referencedElsewhere).add(ref);
-    }
+  // Wrapped so the walk reads `definitions` as a map of schemas; its own keys
+  // are names, not keywords.
+  for (const { ref, insideProperty } of [...collectRefs(main), ...collectRefs({ definitions })]) {
+    (insideProperty ? referencedFromProperty : referencedElsewhere).add(ref);
     const segments = ref.split('/');
     for (let end = 1; end <= segments.length; end++) {
       referencedPrefixes.add(segments.slice(0, end).join('/'));
-    }
-  };
-
-  for (const { ref, insideProperty } of collectRefs(main)) {
-    add(ref, insideProperty, undefined);
-  }
-  for (const key of Object.keys(definitions)) {
-    const ownerPath = pathOf(key);
-    for (const { ref, insideProperty } of collectRefs(definitions[key])) {
-      add(ref, insideProperty, ownerPath);
     }
   }
 
@@ -547,6 +530,24 @@ const hasHiddenReference = (node: Record<string, unknown>): boolean => {
     }
     const descriptor = Object.getOwnPropertyDescriptor(node, key);
     if (descriptor !== undefined && !('value' in descriptor)) {
+      return true;
+    }
+    // The container one level down as well. `properties: { get x() { ... } }`
+    // puts the accessor on an entry rather than on `properties` itself, so the
+    // check above passes and the walk below reads `undefined` and stops -- the
+    // reference the getter returns is never seen, and `JSON.stringify` emits it
+    // afterwards into a branch this rewrite has already removed. Whether that
+    // getter would in fact return a reference is not knowable without running
+    // caller code, so its presence is treated as one.
+    const child = descriptor === undefined ? undefined : descriptor.value;
+    if (Array.isArray(child) && ('toJSON' in child || hasArrayAccessor(child))) {
+      return true;
+    }
+    if (
+      SCHEMA_CHILDREN.get(key) === 'map' &&
+      isPlainObject(child) &&
+      ('toJSON' in child || hasAccessor(child))
+    ) {
       return true;
     }
   }
@@ -692,13 +693,18 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     // reference scan because an ordinary schema has none, and the scans below
     // walk the whole document -- including a schema an `override` supplied,
     // which can be arbitrarily deep.
+    // Only the strict helpers. The divergence this fixes is that `not` reaches
+    // Structured Outputs, which is a constraint of that path alone; every other
+    // caller of the converter keeps the output it had, byte for byte.
     const candidates: {
       key: string;
       path: string;
       collapsed: JsonSchema7Type;
       wrapperPaths: string[];
     }[] = [];
-    for (const { key, definitionPath, materialized } of materializedDefinitions) {
+    for (const { key, definitionPath, materialized } of refs.openaiStrictMode
+      ? materializedDefinitions
+      : []) {
       if (!isPlainObject(materialized)) {
         continue;
       }
@@ -729,7 +735,6 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     const { referencedFromProperty, referencedElsewhere, referencedPrefixes } = indexReferences(
       main,
       definitions,
-      (key) => [...refs.basePath, refs.definitionPath, key].join('/'),
     );
 
     // Only when every reference to a definition came from a property is the
