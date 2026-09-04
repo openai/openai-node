@@ -186,57 +186,61 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test.each([
-    [0, false],
-    [1, true],
-    [1, false],
+    [0, false, undefined],
+    [0, false, 'true'],
+    [0, false, 'false'],
+    [1, true, undefined],
+    [1, true, 'true'],
+    [1, true, 'false'],
+    [1, false, undefined],
+    [1, false, 'true'],
+    [1, false, 'false'],
   ] as const)(
-    'declines excessive authentication replay delays (maxRetries=%i, prior retry=%s)',
-    async (maxRetries, retryFirst) => {
-      for (const retryHeader of [undefined, 'true', 'false']) {
-        let issuerCalls = 0;
-        let apiCalls = 0;
-        const terminalAttempt = retryFirst ? 2 : 1;
-        global.fetch = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
-          if (url.toString().includes('/oauth/token')) {
-            issuerCalls++;
-            return globalThis.Response.json({ access_token: `fake-token-${issuerCalls}`, expires_in: 3600 });
-          }
-          apiCalls++;
-          if (retryFirst && apiCalls === 1) {
-            return globalThis.Response.json(
-              { error: { message: 'Retry now' } },
+    'declines excessive authentication replay delays (maxRetries=%i, prior retry=%s, x-should-retry=%s)',
+    async (maxRetries, retryFirst, retryHeader) => {
+      let issuerCalls = 0;
+      let apiCalls = 0;
+      const terminalAttempt = retryFirst ? 2 : 1;
+      global.fetch = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
+        if (url.toString().includes('/oauth/token')) {
+          issuerCalls++;
+          return globalThis.Response.json({ access_token: `fake-token-${issuerCalls}`, expires_in: 3600 });
+        }
+        apiCalls++;
+        if (retryFirst && apiCalls === 1) {
+          return globalThis.Response.json(
+            { error: { message: 'Retry now' } },
+            {
+              status: 503,
+              headers: { 'retry-after': '0' },
+            },
+          );
+        }
+        return apiCalls === terminalAttempt
+          ? globalThis.Response.json(
+              { error: { message: 'Try later', code: 'retry_later' } },
               {
-                status: 503,
-                headers: { 'retry-after': '0' },
-              },
-            );
-          }
-          return apiCalls === terminalAttempt
-            ? globalThis.Response.json(
-                { error: { message: 'Try later', code: 'retry_later' } },
-                {
-                  status: 401,
-                  headers: {
-                    ...(retryHeader === undefined ? {} : { 'x-should-retry': retryHeader }),
-                    'retry-after': '90',
-                    'x-request-id': 'req_fake',
-                  },
+                status: 401,
+                headers: {
+                  ...(retryHeader === undefined ? {} : { 'x-should-retry': retryHeader }),
+                  'retry-after': '90',
+                  'x-request-id': 'req_fake',
                 },
-              )
-            : globalThis.Response.json({ data: [] });
-        });
-        const client = new OpenAI({ ...createTestClientOptions(), maxRetries });
+              },
+            )
+          : globalThis.Response.json({ data: [] });
+      });
+      const client = new OpenAI({ ...createTestClientOptions(), maxRetries });
 
-        await expect(client.models.list()).rejects.toMatchObject({
-          status: 401,
-          code: 'retry_later',
-          requestID: 'req_fake',
-          error: { message: 'Try later', code: 'retry_later' },
-        });
-        expect([apiCalls, issuerCalls]).toEqual([terminalAttempt, 1]);
-        await expect(client.models.list()).resolves.toMatchObject({ data: [] });
-        expect([apiCalls, issuerCalls]).toEqual([terminalAttempt + 1, 2]);
-      }
+      await expect(client.models.list()).rejects.toMatchObject({
+        status: 401,
+        code: 'retry_later',
+        requestID: 'req_fake',
+        error: { message: 'Try later', code: 'retry_later' },
+      });
+      expect([apiCalls, issuerCalls]).toEqual([terminalAttempt, 1]);
+      await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+      expect([apiCalls, issuerCalls]).toEqual([terminalAttempt + 1, 2]);
     },
   );
 
