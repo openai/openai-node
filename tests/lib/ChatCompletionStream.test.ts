@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type OpenAI from 'openai';
-import { OpenAIError } from 'openai/error';
+import { APIError, OpenAIError } from 'openai/error';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import type { ChatCompletionSnapshot } from 'openai/lib/ChatCompletionStream';
@@ -1061,6 +1061,66 @@ describe('.stream()', () => {
     expect(collected).toHaveLength(chunks.length);
     expect(caught).toBeInstanceOf(OpenAIError);
     expect((caught as OpenAIError).message).toBe('network boom');
+  });
+
+  it('surfaces a server error frame from a readable stream as an APIError', async () => {
+    const errorBody = {
+      message: 'upstream exploded',
+      type: 'server_error',
+      code: 'server_error',
+      param: 'messages',
+    };
+    const readable = new Stream(async function* errorFrames() {
+      yield { error: errorBody };
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    const failure = await stream.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(APIError);
+    expect(failure).toMatchObject({
+      message: 'upstream exploded',
+      code: 'server_error',
+      param: 'messages',
+      type: 'server_error',
+      error: errorBody,
+    });
+  });
+
+  it('ignores an inherited error property when reading stream items', async () => {
+    // eslint-disable-next-line no-extend-native -- deliberately simulates prototype pollution; removed in finally
+    Object.defineProperty(Object.prototype, 'error', {
+      value: { message: 'polluted', type: 'server_error' },
+      configurable: true,
+      enumerable: false,
+      writable: true,
+    });
+    try {
+      const readable = new Stream(async function* chunks() {
+        yield {
+          id: 'chatcmpl-own',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'gpt-test',
+          choices: [{ index: 0, delta: { role: 'assistant', content: 'ok' }, finish_reason: null }],
+        };
+        yield {
+          id: 'chatcmpl-own',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'gpt-test',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        };
+      }, new AbortController()).toReadableStream();
+
+      const stream = ChatCompletionStream.fromReadableStream(readable);
+      await expect(stream.finalContent()).resolves.toBe('ok');
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)['error'];
+    }
   });
 
   it('rejects a pending read exactly once when the stream errors while a reader is waiting', async () => {

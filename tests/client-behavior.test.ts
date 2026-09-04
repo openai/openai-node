@@ -211,9 +211,58 @@ describe('OpenAI client request behavior', () => {
 
 describe('JSON response parsing', () => {
   test.each([
+    'application/json; charset=utf-8',
+    'Application/JSON',
+    'APPLICATION/JSON; Charset=UTF-8',
+    'application/vnd.openai+JSON',
+    'Application/Vnd.OpenAI+Json; profile="CaseSensitive"',
+  ])('parses %s without changing response accessors or headers', async (contentType) => {
+    const body = { id: 'model_123', object: 'model', created: 1, owned_by: 'synthetic' };
+    const response = Response.json(body, {
+      headers: { 'content-type': contentType, 'x-request-id': 'req_123' },
+    });
+    const fetch = vi.fn(async () => response);
+    const client = new OpenAI({ apiKey: 'test-key', fetch });
+    const promise = client.models.retrieve('model_123');
+    const rawResponse = await promise.asResponse();
+
+    expect(rawResponse).toBe(response);
+    expect(rawResponse.bodyUsed).toBe(false);
+    expect(rawResponse.headers.get('content-type')).toBe(contentType);
+    const parsed = await promise;
+    expect(parsed).toEqual(body);
+    expect(parsed._request_id).toBe('req_123');
+    expect(Object.keys(parsed)).not.toContain('_request_id');
+    const dataAndResponse = await promise.withResponse();
+    expect(dataAndResponse.data).toBe(parsed);
+    expect(dataAndResponse.response).toBe(response);
+    expect(dataAndResponse.request_id).toBe('req_123');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves paginated items from a mixed-case JSON response', async () => {
+    const data = [{ id: 'model_123', object: 'model', created: 1, owned_by: 'synthetic' }];
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () =>
+        Response.json(
+          { object: 'list', data },
+          {
+            headers: { 'content-type': 'Application/JSON' },
+          },
+        ),
+    });
+    const page = await client.models.list();
+
+    expect(page.data).toEqual(data);
+    expect(page.object).toBe('list');
+  });
+
+  test.each([
     ['application/json', undefined],
     ['application/json; charset=utf-8', undefined],
     ['application/vnd.openai+json', undefined],
+    ['Application/JSON', undefined],
     ['application/json', '0'],
   ])('accepts an empty %s response with content-length %s', async (contentType, contentLength) => {
     const response = new Response('', {
@@ -281,6 +330,15 @@ describe('JSON response parsing', () => {
     const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch: vi.fn(async () => response) });
 
     await expect(client.get('/items')).rejects.toBeInstanceOf(SyntaxError);
+  });
+
+  test('rejects malformed JSON with a mixed-case media type', async () => {
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () => new Response('{invalid', { headers: { 'content-type': 'Application/JSON' } }),
+    });
+
+    await expect(client.models.retrieve('model_123')).rejects.toBeInstanceOf(SyntaxError);
   });
 
   test('preserves the null result for genuine HTTP 204 responses', async () => {
