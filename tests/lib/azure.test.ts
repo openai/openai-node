@@ -452,6 +452,195 @@ describe('instantiate azure client', () => {
   });
 });
 
+describe('azure withOptions', () => {
+  const env = process.env;
+  const testFetch = async (url: RequestInfo): Promise<Response> =>
+    Response.json({ url }, { headers: { 'content-type': 'application/json' } });
+
+  beforeEach(() => {
+    process.env = { ...env };
+    delete process.env['OPENAI_API_VERSION'];
+    delete process.env['OPENAI_BASE_URL'];
+    delete process.env['AZURE_OPENAI_ENDPOINT'];
+  });
+
+  afterEach(() => {
+    process.env = env;
+  });
+
+  test('keeps the api version when it is not in the environment', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(client.withOptions({ maxRetries: 5 }).apiVersion).toEqual(apiVersion);
+  });
+
+  test('keeps the deployment', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+      deployment,
+    });
+
+    expect(client.withOptions({ maxRetries: 5 }).deploymentName).toEqual(deployment);
+  });
+
+  test('keeps routing clone requests through the configured deployment', async () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+      deployment,
+      fetch: testFetch,
+    });
+
+    expect(
+      await client.withOptions({ maxRetries: 0 }).chat.completions.create({
+        model,
+        messages: [{ role: 'system', content: 'Hello' }],
+      }),
+    ).toMatchObject({
+      url: `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
+    });
+  });
+
+  test('lets an explicit api version override the inherited one', async () => {
+    const overrideApiVersion = '2024-10-21';
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+      deployment,
+      fetch: testFetch,
+    });
+    const clone = client.withOptions({ apiVersion: overrideApiVersion });
+
+    expect(clone.apiVersion).toEqual(overrideApiVersion);
+    expect(
+      await clone.chat.completions.create({ model, messages: [{ role: 'system', content: 'Hello' }] }),
+    ).toMatchObject({
+      url: `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${overrideApiVersion}`,
+    });
+  });
+
+  test('rebases the clone onto an endpoint override', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(client.withOptions({ endpoint: 'https://another.example.com' }).baseURL).toEqual(
+      'https://another.example.com/openai',
+    );
+  });
+
+  test('keeps an explicit baseURL override', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(client.withOptions({ baseURL: 'https://another.example.com/openai' }).baseURL).toEqual(
+      'https://another.example.com/openai',
+    );
+  });
+
+  test('still rejects a clone that sets both baseURL and endpoint', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(() =>
+      client.withOptions({
+        baseURL: 'https://another.example.com',
+        endpoint: 'https://yetanother.example.com',
+      }),
+    ).toThrow(/baseURL and endpoint are mutually exclusive/);
+  });
+
+  test('keeps the inherited base URL for an option bag that only inherits an endpoint', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+    const options: Partial<AzureClientOptions> = Object.create({
+      endpoint: 'https://another.example.com',
+    });
+    options.maxRetries = 0;
+
+    expect(client.withOptions(options).baseURL).toEqual('https://example.com/openai');
+  });
+
+  test('rebases onto an own endpoint for an option bag that only inherits a baseURL', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+    const options: Partial<AzureClientOptions> = Object.create({
+      baseURL: 'https://inherited.example.com/openai',
+    });
+    options.endpoint = 'https://another.example.com';
+
+    expect(client.withOptions(options).baseURL).toEqual('https://another.example.com/openai');
+  });
+
+  test('keeps the inherited base URL when the clone passes an undefined endpoint', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(client.withOptions({ endpoint: undefined }).baseURL).toEqual('https://example.com/openai');
+  });
+
+  test('rebases onto an endpoint paired with an explicitly undefined baseURL', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(
+      client.withOptions({ baseURL: undefined, endpoint: 'https://another.example.com' }).baseURL,
+    ).toEqual('https://another.example.com/openai');
+  });
+
+  test('still rejects a clone whose only override is an undefined baseURL', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(() => client.withOptions({ baseURL: undefined })).toThrow(
+      /Must provide one of the `baseURL` or `endpoint` arguments, or the `AZURE_OPENAI_ENDPOINT` environment variable/,
+    );
+  });
+
+  test('still rejects a clone whose only overrides are an undefined baseURL and endpoint', () => {
+    const client = new AzureOpenAI({
+      endpoint: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    });
+
+    expect(() => client.withOptions({ endpoint: undefined, baseURL: undefined })).toThrow(
+      /Must provide one of the `baseURL` or `endpoint` arguments, or the `AZURE_OPENAI_ENDPOINT` environment variable/,
+    );
+  });
+});
+
 describe('azure request building', () => {
   const client = new AzureOpenAI({ baseURL: 'https://example.com', apiKey: 'My API Key', apiVersion });
 

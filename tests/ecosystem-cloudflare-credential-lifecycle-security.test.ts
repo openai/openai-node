@@ -305,7 +305,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -320,7 +324,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run deploy']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run deploy',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -335,7 +344,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run test:ci']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run test:ci',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -498,7 +512,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run test:ci']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run test:ci',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -515,6 +534,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         expect(records.map(({ command }) => command)).toEqual([
           'install -D openai',
           'run tsc',
+          'run test:smoke',
           'run test:ci',
         ]);
         expect(readFileSync(fixture.vars)).toEqual(Buffer.alloc(0));
@@ -931,7 +951,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('64 KiB');
       expect(statSync(fixture.vars).size).toBe(64 * 1024 + 1);
-      expect(observations(fixture).map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(observations(fixture).map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
     });
   });
 
@@ -970,7 +994,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('64 KiB');
       expect(statSync(fixture.vars).size).toBe(originalContents.length + 64 * 1024 + 1);
-      expect(observations(fixture).map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(observations(fixture).map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
     });
   });
 
@@ -988,9 +1016,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(records.map(({ command }) => command)).toEqual([
         'install -D openai',
         'run tsc',
+        'run test:smoke',
         'run test:ci',
         'install -D openai',
         'run tsc',
+        'run test:smoke',
         'run test:ci',
       ]);
       expectScopedObservations(records, state);
@@ -1010,6 +1040,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(records.map(({ command }) => command)).toEqual([
         'install -D openai',
         'run tsc',
+        'run test:smoke',
         'run test:ci',
         'run deploy',
       ]);
@@ -1041,7 +1072,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run test:ci']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run test:ci',
+      ]);
       expectScopedObservations(records, credentialStates[0] as CredentialState);
       expect(existsSync(fixture.vars)).toBe(false);
     });
@@ -1069,7 +1105,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(readFileSync(target)).toEqual(originalContents);
       expect(lstatSync(fixture.vars).isSymbolicLink()).toBe(true);
     });
@@ -1085,7 +1125,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(existsSync(target)).toBe(false);
       expect(lstatSync(fixture.vars).isSymbolicLink()).toBe(true);
     });
@@ -1106,7 +1150,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(statSync(fixture.vars).isFIFO()).toBe(true);
     });
   });
@@ -1122,7 +1170,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(readFileSync(target)).toEqual(originalContents);
       expect(readFileSync(fixture.vars)).toEqual(originalContents);
     });
@@ -1137,7 +1189,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(statSync(fixture.vars).isDirectory()).toBe(true);
     });
   });

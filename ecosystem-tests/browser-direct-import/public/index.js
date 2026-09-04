@@ -22,7 +22,13 @@ async function runTests() {
     pre.textContent = JSON.stringify(results, null, 2);
   }
   for (const { path, run, timeout } of tests) {
-    if (!live && path[0] !== 'browser API-key protection remains enabled by default') {
+    if (
+      !live &&
+      ![
+        'browser API-key protection remains enabled by default',
+        'toFile accepts ArrayBuffers from another realm',
+      ].includes(path[0])
+    ) {
       continue;
     }
     console.log('running', ...path);
@@ -133,6 +139,27 @@ it('browser API-key protection remains enabled by default', () => {
     !browserError.message.includes('dangerouslyAllowBrowser')
   ) {
     throw new Error('Expected API-key use to be disabled in browsers by default.');
+  }
+});
+
+it('toFile accepts ArrayBuffers from another realm', async () => {
+  const frame = document.createElement('iframe');
+  document.body.append(frame);
+  try {
+    const { contentWindow } = frame;
+    if (!contentWindow) {throw new Error('The iframe did not create a window');}
+    const foreign = /** @type {Window & typeof globalThis} */ (contentWindow);
+    const { buffer } = new foreign.Uint8Array([0, 1, 127, 255]);
+    expect(buffer instanceof ArrayBuffer).toEqual(false);
+
+    const file = await toFile(buffer, 'foreign.bin');
+    expect(file.name).toEqual('foreign.bin');
+    expect([...new Uint8Array(await file.arrayBuffer())].join(',')).toEqual('0,1,127,255');
+
+    const empty = await toFile(new foreign.ArrayBuffer(0), 'empty.bin');
+    expect(empty.size).toEqual(0);
+  } finally {
+    frame.remove();
   }
 });
 

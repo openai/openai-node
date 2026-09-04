@@ -1,7 +1,8 @@
 import { vi } from 'vitest';
-import { APIUserAbortError, OpenAIError } from 'openai/core/error';
+import { APIError, APIUserAbortError, OpenAIError } from 'openai/core/error';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
+import { Stream } from 'openai/streaming';
 import { assistantStream, completedRun } from './assistant-stream-test-utils';
 
 type Event = Record<string, any>;
@@ -1225,6 +1226,47 @@ describe('AssistantStream run-step lifecycle', () => {
 });
 
 describe('AssistantStream factories and async iteration', () => {
+  test('surfaces a server error event from a readable stream as an APIError', async () => {
+    const errorBody = {
+      message: 'upstream exploded',
+      type: 'server_error',
+      code: 'server_error',
+      param: 'thread_id',
+    };
+    const readable = new Stream(async function* errorEvents() {
+      yield { event: 'error' as const, data: errorBody };
+    }, new AbortController()).toReadableStream();
+
+    const runner = AssistantStream.fromReadableStream(readable);
+    const failure = await runner.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(APIError);
+    expect(failure).toMatchObject({
+      message: 'upstream exploded',
+      code: 'server_error',
+      param: 'thread_id',
+      type: 'server_error',
+      error: errorBody,
+    });
+  });
+
+  test('surfaces an error event with malformed data as an APIError instead of crashing', async () => {
+    const readable = new Stream(async function* errorEvents() {
+      yield { event: 'error' as const, data: null as any };
+    }, new AbortController()).toReadableStream();
+
+    const runner = AssistantStream.fromReadableStream(readable);
+    const failure = await runner.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(APIError);
+  });
+
   test('creates a run stream with helper metadata and preserves Headers instances', async () => {
     const runs = { create: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const headers = new Headers({ 'x-custom': 'value' });
@@ -1459,9 +1501,21 @@ describe('AssistantStream factories and async iteration', () => {
     await expect(runner.finalRun()).resolves.toMatchObject({ id: 'run_123' });
   });
 
-  test('rejects unexpected streamed error events', async () => {
-    const runner = assistantStream([{ event: 'error', data: { message: 'unexpected' } }, completedRun()]);
+  test('surfaces streamed error events as APIError', async () => {
+    const error = {
+      message: 'unexpected',
+      type: 'server_error',
+      code: 'server_error',
+      param: 'thread_id',
+    };
+    const runner = assistantStream([{ event: 'error', data: error }, completedRun()]);
 
-    await expect(runner.done()).rejects.toThrow('Encountered an error event in event processing');
+    await expect(runner.done()).rejects.toMatchObject({
+      message: 'unexpected',
+      code: 'server_error',
+      param: 'thread_id',
+      type: 'server_error',
+      error,
+    });
   });
 });

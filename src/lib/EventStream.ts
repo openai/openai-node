@@ -18,6 +18,7 @@ import {
   SubjectTokenProviderError,
   UnprocessableEntityError,
 } from '../error';
+import type { EmittedEventResult } from './EventEmitter';
 
 const MAX_BUFFERED_ITERATOR_EVENTS = 4096;
 const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
@@ -1359,6 +1360,10 @@ export class EventStream<EventTypes extends BaseEvents> {
   #errored = false;
   #aborted = false;
   #catchingPromiseCreated = false;
+  // Terminal failure recorded during settlement, before `end` is emitted, so
+  // iterators can surface it even when a throwing user listener prevented
+  // their internal failure listeners from running.
+  #terminalFailure: { kind: 'error' | 'abort'; error: OpenAIError } | undefined;
 
   /** Creates an unstarted stream with independent connection and completion lifecycle promises. */
   constructor() {
@@ -1577,13 +1582,7 @@ export class EventStream<EventTypes extends BaseEvents> {
    */
   emitted<Event extends keyof EventTypes>(
     event: Event,
-  ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param]
-      ? Param
-      : EventParameters<EventTypes, Event> extends []
-        ? void
-        : EventParameters<EventTypes, Event>
-  > {
+  ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;
       const onError = (error: OpenAIError) => {
@@ -1790,8 +1789,24 @@ export class EventStream<EventTypes extends BaseEvents> {
         rejectReader();
       }
     };
+    // A throwing user listener registered before this iterator stops dispatch
+    // before onFailure runs; adopt the failure the stream recorded during
+    // settlement so terminal errors are never converted into clean completion.
+    const adoptTerminalFailure = () => {
+      if (failure) {
+        return;
+      }
+      const terminal = this.#terminalFailure;
+      if (!terminal) {
+        return;
+      }
+      if (terminal.kind === 'error' ? rejectOnError : rejectOnAbort) {
+        failure = terminal.error;
+      }
+    };
     const onEnd = () => {
       ended = true;
+      adoptTerminalFailure();
       cleanup();
       if (!pushQueue.length) {
         rejectReader();
@@ -1826,6 +1841,9 @@ export class EventStream<EventTypes extends BaseEvents> {
           return Promise.resolve({ value, done: false });
         }
 
+        if (ended || this.ended) {
+          adoptTerminalFailure();
+        }
         if (failure && !failureDelivered) {
           failureDelivered = true;
           return Promise.reject(failure);
@@ -1841,6 +1859,9 @@ export class EventStream<EventTypes extends BaseEvents> {
       },
       return: () => {
         ended = true;
+        // The consumer walked away; terminal failures recorded later must not
+        // resurface through this iterator.
+        failureDelivered = true;
         while (bufferedEventSizes.length) {
           deactivateBufferedEvent(bufferedEventSizes.dequeue()!);
         }
@@ -1896,6 +1917,43 @@ export class EventStream<EventTypes extends BaseEvents> {
     return Boolean(this.#listeners[event]?.some((listener) => !listener.removed));
   }
 
+  #settleTerminalEvent<Event extends keyof EventTypes>(
+    event: Event,
+    args: EventParameters<EventTypes, Event>,
+    hasListeners: boolean,
+  ): void {
+    if (event === 'abort') {
+      const error = args[0] as APIUserAbortError;
+      this.#terminalFailure ??= { kind: 'abort', error };
+      if (!this.#catchingPromiseCreated && !hasListeners) {
+        Promise.reject(error);
+      }
+      this.#rejectConnectedPromise(error);
+      this.#rejectEndPromise(error);
+      this._emit('end');
+      return;
+    }
+
+    if (event === 'error') {
+      // NOTE: _emit('error', error) should only be called from #handleError().
+
+      const error = args[0] as OpenAIError;
+      this.#terminalFailure ??= { kind: 'error', error };
+      if (!this.#catchingPromiseCreated && !hasListeners) {
+        // Trigger an unhandled rejection if the user hasn't registered any error handlers.
+        // If you are seeing stack traces here, make sure to handle errors via either:
+        // - runner.on('error', () => ...)
+        // - await runner.done()
+        // - await runner.finalChatCompletion()
+        // - etc.
+        Promise.reject(error);
+      }
+      this.#rejectConnectedPromise(error);
+      this.#rejectEndPromise(error);
+      this._emit('end');
+    }
+  }
+
   /** Dispatches a connection, failure, cancellation, or completion lifecycle event. */
   _emit<Event extends keyof BaseEvents>(event: Event, ...args: EventParameters<BaseEvents, Event>): void;
   /** Dispatches a typed stream event to all listeners registered for that event. */
@@ -1918,61 +1976,52 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
 
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
-    if (listeners) {
-      this.#listeners[event] = listeners.filter((listener) => {
-        if (listener.once) {
-          listener.detached = true;
-        }
-        return !listener.once && !listener.removed;
-      }) as any;
-      this.#listenerDispatchDepth += 1;
-      try {
-        for (const registration of listeners as any) {
-          if (!registration.removed) {
-            registration.listener(...(args as any));
+    let dispatchError: unknown;
+    let dispatchThrew = false;
+    try {
+      if (listeners) {
+        this.#listeners[event] = listeners.filter((listener) => {
+          if (listener.once) {
+            listener.detached = true;
           }
-        }
-      } finally {
-        this.#listenerDispatchDepth -= 1;
-        if (this.#listenerDispatchDepth === 0) {
-          this.#cleanupEmittedListeners();
-          for (const check of this.#pendingBufferedEventChecks) {
-            this.#pendingBufferedEventChecks.delete(check);
-            if (!this.#ended) {
-              check();
+          return !listener.once && !listener.removed;
+        }) as any;
+        this.#listenerDispatchDepth += 1;
+        try {
+          for (const registration of listeners as any) {
+            if (!registration.removed) {
+              registration.listener(...(args as any));
+            }
+          }
+        } finally {
+          this.#listenerDispatchDepth -= 1;
+          if (this.#listenerDispatchDepth === 0) {
+            this.#cleanupEmittedListeners();
+            for (const check of this.#pendingBufferedEventChecks) {
+              this.#pendingBufferedEventChecks.delete(check);
+              if (!this.#ended) {
+                check();
+              }
             }
           }
         }
       }
+    } catch (error) {
+      dispatchError = error;
+      dispatchThrew = true;
     }
 
-    if (event === 'abort') {
-      const error = args[0] as APIUserAbortError;
-      if (!this.#catchingPromiseCreated && !listeners?.length) {
-        Promise.reject(error);
+    try {
+      this.#settleTerminalEvent(event, args, Boolean(listeners?.length));
+    } catch (error) {
+      if (!dispatchThrew) {
+        dispatchError = error;
+        dispatchThrew = true;
       }
-      this.#rejectConnectedPromise(error);
-      this.#rejectEndPromise(error);
-      this._emit('end');
-      return;
     }
 
-    if (event === 'error') {
-      // NOTE: _emit('error', error) should only be called from #handleError().
-
-      const error = args[0] as OpenAIError;
-      if (!this.#catchingPromiseCreated && !listeners?.length) {
-        // Trigger an unhandled rejection if the user hasn't registered any error handlers.
-        // If you are seeing stack traces here, make sure to handle errors via either:
-        // - runner.on('error', () => ...)
-        // - await runner.done()
-        // - await runner.finalChatCompletion()
-        // - etc.
-        Promise.reject(error);
-      }
-      this.#rejectConnectedPromise(error);
-      this.#rejectEndPromise(error);
-      this._emit('end');
+    if (dispatchThrew) {
+      throw dispatchError;
     }
   }
 

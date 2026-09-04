@@ -461,6 +461,7 @@ const projectRunners = {
   'cloudflare-worker': async () => {
     await installPackage();
     await run('npm', ['run', 'tsc']);
+    await run('npm', ['run', 'test:smoke']);
 
     if (state.live) {
       const apiKey = process.env['OPENAI_API_KEY'];
@@ -844,7 +845,7 @@ async function main() {
                       ...(args.live ? ['--live'] : []),
                       ...(args.verbose ? ['--verbose'] : []),
                       ...(args.deploy ? ['--deploy'] : []),
-                      ...(args.fromNpm ? ['--from-npm'] : []),
+                      ...(args.fromNpm ? [`--from-npm=${args.fromNpm}`] : []),
                     ],
                     {
                       stdio: 'pipe',

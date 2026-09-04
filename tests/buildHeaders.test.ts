@@ -158,4 +158,25 @@ describe('buildHeaders', () => {
       globalThis.Headers = OriginalHeaders;
     }
   });
+
+  test.each([undefined, null, 0, 'metadata'])('ignores non-callable iterator metadata: %s', (metadata) => {
+    const headers = { 'x-foo': 'bar', [Symbol.iterator]: metadata };
+
+    expect([...buildHeaders([headers]).values]).toEqual([['x-foo', 'bar']]);
+  });
+
+  test('reads the iterator once and calls it with its original receiver', () => {
+    const headers: [string, string][] = [['x-foo', 'bar']];
+    const iterator = headers[Symbol.iterator];
+    let reads = 0;
+    Object.defineProperty(headers, Symbol.iterator, {
+      get() {
+        reads += 1;
+        return iterator;
+      },
+    });
+
+    expect([...buildHeaders([headers]).values]).toEqual([['x-foo', 'bar']]);
+    expect(reads).toBe(1);
+  });
 });

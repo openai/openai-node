@@ -24,7 +24,17 @@ const recordingProviders: Record<NodeJS.Platform, string> = {
 };
 
 function isResponse(stream: NodeJS.ReadableStream | Response | File): stream is Response {
-  return (stream as any).body !== undefined;
+  // Readables have event and flow-control methods, even after they have ended.
+  const nodeReadable =
+    'pipe' in stream &&
+    typeof stream.pipe === 'function' &&
+    'on' in stream &&
+    typeof stream.on === 'function' &&
+    'pause' in stream &&
+    typeof stream.pause === 'function' &&
+    'resume' in stream &&
+    typeof stream.resume === 'function';
+  return !nodeReadable && 'body' in stream && stream.body !== undefined;
 }
 
 function isFile(stream: NodeJS.ReadableStream | Response | File): stream is File {
@@ -103,7 +113,7 @@ type RecordAudioOptions = {
   /** Stops recording when aborted; successful termination returns the captured audio. */
   signal?: AbortSignal;
 
-  /** Zero-based audio-input device number passed to FFmpeg; defaults to `0`. */
+  /** Zero-based audio-input index (ALSA card number on Linux); defaults to `0`. */
   device?: number;
 
   /** Positive recording duration in milliseconds; nonpositive values disable the timeout. */
@@ -223,7 +233,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
           '-f',
           provider,
           '-i',
-          `:${device ?? 0}`, // default audio input device; adjust as needed
+          provider === 'alsa' ? `hw:${device ?? 0}` : `:${device ?? 0}`,
           '-ar',
           DEFAULT_SAMPLE_RATE.toString(),
           '-ac',

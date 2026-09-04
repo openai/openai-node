@@ -214,19 +214,43 @@ export type AutoParseableTool<
   $parseRaw(args: string): OptionsT['arguments'];
 };
 
+/** Parser and optional callback supplied when creating a custom chat function tool. */
+type ToolParserOptions<OptionsT extends ToolOptions> = {
+  /** Converts the raw JSON argument string into the tool's typed argument value. */
+  parser: (content: string) => OptionsT['arguments'];
+  /** Optional callback invoked by a chat completion tool runner. */
+  callback: ((args: OptionsT['arguments']) => any) | undefined;
+};
+
+/** Creates a runnable function tool with a guaranteed execution callback. */
+export function makeParseableTool<OptionsT extends ToolOptions>(
+  tool: ChatCompletionFunctionTool,
+  options: ToolParserOptions<OptionsT> & {
+    /** Callback invoked with the parsed tool arguments. */
+    callback: (args: OptionsT['arguments']) => any;
+  },
+): AutoParseableTool<OptionsT, true>;
+
+/** Creates a parse-only function tool without an execution callback. */
+export function makeParseableTool<OptionsT extends ToolOptions>(
+  tool: ChatCompletionFunctionTool,
+  options: ToolParserOptions<OptionsT> & {
+    /** No execution callback is attached to this tool. */
+    callback: undefined;
+  },
+): AutoParseableTool<OptionsT, false>;
+
+/** Creates a function tool whose execution callback may be unavailable. */
+export function makeParseableTool<OptionsT extends ToolOptions>(
+  tool: ChatCompletionFunctionTool,
+  options: ToolParserOptions<OptionsT>,
+): AutoParseableTool<OptionsT, boolean>;
+
 /** Copies a function tool and attaches non-enumerable parsing and callback metadata. */
 export function makeParseableTool<OptionsT extends ToolOptions>(
   tool: ChatCompletionFunctionTool,
-  {
-    parser,
-    callback,
-  }: {
-    /** Converts the raw JSON argument string into the tool's typed argument value. */
-    parser: (content: string) => OptionsT['arguments'];
-    /** Optional callback invoked by a chat completion tool runner. */
-    callback: ((args: any) => any) | undefined;
-  },
-): AutoParseableTool<OptionsT['arguments']> {
+  { parser, callback }: ToolParserOptions<OptionsT>,
+): AutoParseableTool<OptionsT, boolean> {
   const obj = { ...tool };
 
   Object.defineProperties(obj, {
@@ -244,7 +268,7 @@ export function makeParseableTool<OptionsT extends ToolOptions>(
     },
   });
 
-  return obj as AutoParseableTool<OptionsT['arguments']>;
+  return obj as AutoParseableTool<OptionsT, boolean>;
 }
 
 /** Returns whether a Chat Completions tool carries the SDK's argument-parser marker. */

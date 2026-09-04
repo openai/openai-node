@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.10.0](https://github.com/openai/openai-node/compare/v7.9.0...v7.10.0) (2026-09-03)
+
+
+### Features
+
+* **api:** add gpt-6-astra and related features ([#2582](https://github.com/openai/openai-node/issues/2582)) ([94ecdc4](https://github.com/openai/openai-node/commit/94ecdc4e4e8d7fb6c2e36e713b7237438267103b))
+
+
+### Documentation
+
+* add canonical SDK security model ([#2566](https://github.com/openai/openai-node/issues/2566)) ([e6a7468](https://github.com/openai/openai-node/commit/e6a746865acf9f836b9b21dbf10afcf81eb160b3))
+
 ## [7.9.0](https://github.com/openai/openai-node/compare/v7.8.0...v7.9.0) (2026-09-02)
 
 

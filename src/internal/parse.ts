@@ -54,7 +54,7 @@ export async function defaultParseResponse<T>(
     }
 
     const contentType = response.headers.get('content-type');
-    const mediaType = contentType?.split(';')[0]?.trim();
+    const mediaType = contentType?.split(';')[0]?.trim().toLowerCase();
     const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
     if (isJSON) {
       const contentLength = response.headers.get('content-length');

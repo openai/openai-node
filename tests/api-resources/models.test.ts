@@ -10,7 +10,7 @@ const client = new OpenAI({
 
 describe('resource models', () => {
   test('retrieve', async () => {
-    const responsePromise = client.models.retrieve('gpt-5.6-sol');
+    const responsePromise = client.models.retrieve('gpt-6-astra');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

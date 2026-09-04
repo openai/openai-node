@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { expect } from 'vitest';
 
 const root = process.cwd();
 const protectedMainCondition =
@@ -170,6 +171,77 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
+    { name: 'sequential', options: [], packageOption: '--fromNpm' },
+    { name: 'explicit worker count', options: ['--jobs=2'], packageOption: '--fromNpm' },
+    { name: 'parallel', options: ['--parallel'], packageOption: '--from-npm' },
+  ])('installs the selected local package in $name mode', ({ options, packageOption }) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
+    const dependency = path.join(fixture, 'selected package = fixture');
+    const projects = ['node-js', 'cloudflare-worker'];
+    const version = '0.0.0-selected-fixture';
+
+    try {
+      mkdirSync(dependency);
+      writeFileSync(path.join(dependency, 'package.json'), JSON.stringify({ name: 'openai', version }));
+      writeFileSync(
+        path.join(fixture, 'package.json'),
+        JSON.stringify({
+          private: true,
+          packageManager: JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf-8')).packageManager,
+          scripts: { tsn: 'node tsn.cjs' },
+        }),
+      );
+      writeFileSync(
+        path.join(fixture, 'tsn.cjs'),
+        `require(${JSON.stringify(path.join(root, 'node_modules/ts-node/dist/bin.js'))}).main();\n`,
+      );
+      // The fixture uses the repository's installed ts-node; parallel workers need no root install.
+      writeFileSync(path.join(fixture, 'pnpm-workspace.yaml'), 'verifyDepsBeforeRun: false\n');
+
+      for (const name of projects) {
+        const project = path.join(fixture, 'ecosystem-tests', name);
+        mkdirSync(project, { recursive: true });
+        // pnpm does not forward npm_config_* variables to its worker scripts.
+        writeFileSync(
+          path.join(project, '.npmrc'),
+          'audit=false\nfund=false\noffline=true\npackage-lock=false\n',
+        );
+        writeFileSync(
+          path.join(project, 'package.json'),
+          JSON.stringify({
+            private: true,
+            scripts: { tsc: 'node test.js', 'test:smoke': 'node test.js' },
+          }),
+        );
+        writeFileSync(
+          path.join(project, 'test.js'),
+          [
+            "const fs = require('node:fs');",
+            "const { version } = require('openai/package.json');",
+            "fs.writeFileSync('installed-version.txt', version);",
+          ].join('\n'),
+        );
+      }
+
+      const result = runCli(
+        [...projects, `${packageOption}=${dependency}`, '--noCleanup', ...options],
+        fixture,
+      );
+
+      expect(result.error, result.stdout + result.stderr).toBeUndefined();
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      for (const project of projects) {
+        expect(
+          readFileSync(path.join(fixture, 'ecosystem-tests', project, 'installed-version.txt'), 'utf-8'),
+        ).toBe(version);
+      }
+      expect(existsSync(path.join(fixture, '.pack'))).toBe(false);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
     {
       projectName: 'node-ts-cjs',
       option: '--live',
@@ -180,7 +252,11 @@ describe('ecosystem test CLI', () => {
       projectName: 'cloudflare-worker',
       option: '--deploy',
       phase: 'deploy',
-      scripts: { tsc: 'node observe.cjs typecheck', deploy: 'node observe.cjs deploy' },
+      scripts: {
+        tsc: 'node observe.cjs typecheck',
+        'test:smoke': 'node observe.cjs smoke',
+        deploy: 'node observe.cjs deploy',
+      },
     },
   ])(
     'provides API credentials and case variants only to the $phase ecosystem command',
@@ -256,6 +332,9 @@ describe('ecosystem test CLI', () => {
         ).toEqual([
           { phase: 'install', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' },
           { phase: 'typecheck', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' },
+          ...(projectName === 'cloudflare-worker'
+            ? [{ phase: 'smoke', apiKey: null, apiKeyNames: [], unrelatedValue: 'preserved-value' }]
+            : []),
           { phase, apiKey, apiKeyNames: inheritedApiKeyNames, unrelatedValue: 'preserved-value' },
         ]);
       } finally {

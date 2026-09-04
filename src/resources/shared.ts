@@ -24,6 +24,7 @@ export type AllModels =
   | 'gpt-5.6-cyber';
 
 export type ChatModel =
+  | 'gpt-6-astra'
   | 'gpt-5.6-sol'
   | 'gpt-5.6-terra'
   | 'gpt-5.6-luna'
@@ -201,6 +202,44 @@ export interface ErrorObject {
   param: string | null;
 
   type: string;
+
+  misalignment?: ErrorObject.Misalignment;
+}
+
+export namespace ErrorObject {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 export interface FunctionDefinition {
