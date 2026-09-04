@@ -533,6 +533,38 @@ describe('OpenAI X.509 workload-identity client integration', () => {
     );
   });
 
+  test('declines excessive API retry delays without retaining the rejected certificate credential', async () => {
+    let apiCalls = 0;
+    let issuerCalls = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        issuerCalls++;
+        return Response.json({ ...TOKEN_RESPONSE, access_token: `fake-token-${issuerCalls}` });
+      }
+      apiCalls++;
+      return apiCalls === 1
+        ? Response.json(
+            { error: { message: 'Try later', code: 'retry_later' } },
+            {
+              status: 401,
+              headers: { 'x-should-retry': 'true', 'retry-after': '90', 'x-request-id': 'req_fake' },
+            },
+          )
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI(options({ maxRetries: 1 }));
+
+    await expect(client.models.list()).rejects.toMatchObject({
+      status: 401,
+      code: 'retry_later',
+      request_id: 'req_fake',
+      error: { message: 'Try later', code: 'retry_later' },
+    });
+    expect([apiCalls, issuerCalls]).toEqual([1, 1]);
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+    expect([apiCalls, issuerCalls]).toEqual([2, 2]);
+  });
+
   test('consumes one retry allowance when replaying a rejected certificate credential', async () => {
     const send = vi
       .spyOn(transportCapability, 'sendX509Request')

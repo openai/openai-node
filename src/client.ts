@@ -1424,34 +1424,16 @@ export class OpenAI {
       if (rejectedX509Credential) {
         x509Authentication.invalidateToken();
       }
-      if (
+      const shouldRefreshWorkloadIdentity =
         response.status === 401 &&
         (x509Authentication || this._workloadIdentityAuth) &&
         security.bearerAuth &&
         (!x509Authentication || x509Authentication.usedWorkloadToken(options)) &&
         (!x509Authentication || retriesRemaining > 0) &&
         !hasStreamingBody &&
-        !options.__metadata?.['workloadIdentityTokenRefreshed']
-      ) {
-        if (x509Authentication) {
-          void Shims.CancelReadableStream(response.body).catch(() => undefined);
-        } else {
-          await Shims.CancelReadableStream(response.body);
-          this._workloadIdentityAuth?.invalidateToken();
-        }
-
-        const replayOptions = {
-          ...options,
-          __metadata: {
-            ...options.__metadata,
-            workloadIdentityTokenRefreshed: true,
-          },
-        };
-        return this.makeRequest(
-          replayOptions,
-          x509Authentication ? retriesRemaining - 1 : retriesRemaining,
-          retryOfRequestLogID ?? requestLogID,
-        );
+        !options.__metadata?.['workloadIdentityTokenRefreshed'];
+      if (shouldRefreshWorkloadIdentity && !x509Authentication) {
+        this._workloadIdentityAuth?.invalidateToken();
       }
 
       let shouldRetry =
@@ -1471,6 +1453,27 @@ export class OpenAI {
           shouldRetry = false;
         }
       }
+      if (shouldRefreshWorkloadIdentity && !declinedRetryDelay) {
+        if (x509Authentication) {
+          void Shims.CancelReadableStream(response.body).catch(() => undefined);
+        } else {
+          await Shims.CancelReadableStream(response.body);
+        }
+
+        const replayOptions = {
+          ...options,
+          __metadata: {
+            ...options.__metadata,
+            workloadIdentityTokenRefreshed: true,
+          },
+        };
+        return this.makeRequest(
+          replayOptions,
+          x509Authentication ? retriesRemaining - 1 : retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+        );
+      }
+
       if (retriesRemaining && shouldRetry && !hasStreamingBody) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 

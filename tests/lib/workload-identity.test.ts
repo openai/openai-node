@@ -185,6 +185,38 @@ describe('OpenAI with Workload Identity', () => {
     expect(tokenExchangeCallCount).toBe(2);
   });
 
+  test('declines excessive API retry delays without retaining the rejected workload token', async () => {
+    let issuerCalls = 0;
+    let apiCalls = 0;
+    global.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      if (url.toString().includes('/oauth/token')) {
+        issuerCalls++;
+        return Response.json({ access_token: `fake-token-${issuerCalls}`, expires_in: 3600 });
+      }
+      apiCalls++;
+      return apiCalls === 1
+        ? Response.json(
+            { error: { message: 'Try later', code: 'retry_later' } },
+            {
+              status: 401,
+              headers: { 'x-should-retry': 'true', 'retry-after': '90', 'x-request-id': 'req_fake' },
+            },
+          )
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), maxRetries: 1 });
+
+    await expect(client.models.list()).rejects.toMatchObject({
+      status: 401,
+      code: 'retry_later',
+      request_id: 'req_fake',
+      error: { message: 'Try later', code: 'retry_later' },
+    });
+    expect([apiCalls, issuerCalls]).toEqual([1, 1]);
+    await expect(client.models.list()).resolves.toMatchObject({ data: [] });
+    expect([apiCalls, issuerCalls]).toEqual([2, 2]);
+  });
+
   test('only retries once for 401 errors', async () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
