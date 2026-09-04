@@ -318,7 +318,7 @@ const client = new OpenAI({
 });
 
 export async function webhook(request: Request) {
-  const headersList = headers();
+  const headersList = await headers();
   const body = await request.text();
 
   try {
@@ -358,7 +358,7 @@ const client = new OpenAI({
 });
 
 export async function webhook(request: Request) {
-  const headersList = headers();
+  const headersList = await headers();
   const body = await request.text();
 
   try {
