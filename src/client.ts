@@ -1441,7 +1441,7 @@ export class OpenAI {
           ? false
           : await this.shouldRetry(response);
       let declinedRetryDelay = false;
-      if (retriesRemaining && shouldRetry && !hasStreamingBody) {
+      if ((shouldRefreshWorkloadIdentity || (retriesRemaining && shouldRetry)) && !hasStreamingBody) {
         try {
           declinedRetryDelay = !this.shouldRetryAfterHeader(options, retriesRemaining, response.headers);
         } catch (error) {
