@@ -35,22 +35,31 @@ function tokenExchangeResponse(expiresIn: unknown, accessToken: string): Respons
 
 describe('workload-identity access-token expiration', () => {
   let currentTime = INITIAL_TIME;
+  let monotonicTime = 10_000;
 
   beforeEach(() => {
     currentTime = INITIAL_TIME;
+    monotonicTime = 10_000;
     vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  function delayedTokenResponse(expiresIn: number, accessToken: string, elapsed: number): Response {
+  function delayedTokenResponse(
+    expiresIn: number,
+    accessToken: string,
+    elapsed: number,
+    clockAdjustment = 0,
+  ): Response {
     return new Response(
       new ReadableStream(
         {
           pull(controller) {
-            currentTime += elapsed;
+            currentTime += elapsed + clockAdjustment;
+            monotonicTime += elapsed;
             controller.enqueue(
               new TextEncoder().encode(JSON.stringify({ access_token: accessToken, expires_in: expiresIn })),
             );
@@ -63,7 +72,14 @@ describe('workload-identity access-token expiration', () => {
     );
   }
 
-  test.each(['headers', 'body'])('subtracts time spent receiving token response %s', async (stage) => {
+  test.each([
+    ['headers', 0],
+    ['body', 0],
+    ['headers', -60_000],
+    ['body', -60_000],
+    ['headers', 60_000],
+    ['body', 60_000],
+  ])('subtracts %s delivery time with a %i ms wall-clock adjustment', async (stage, clockAdjustment) => {
     let exchangeCount = 0;
     const authorizations: (string | null)[] = [];
     const clientFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -71,9 +87,10 @@ describe('workload-identity access-token expiration', () => {
         exchangeCount += 1;
         if (exchangeCount === 1) {
           if (stage === 'body') {
-            return delayedTokenResponse(1, 'initial-token', 750);
+            return delayedTokenResponse(1, 'initial-token', 750, clockAdjustment);
           }
-          currentTime += 750;
+          currentTime += 750 + clockAdjustment;
+          monotonicTime += 750;
         }
         return tokenExchangeResponse(1, exchangeCount === 1 ? 'initial-token' : 'replacement-token');
       }
@@ -83,7 +100,7 @@ describe('workload-identity access-token expiration', () => {
     const client = new OpenAI({ apiKey: null, workloadIdentity, fetch: clientFetch });
 
     await Promise.all([client.models.list(), client.models.list()]);
-    currentTime = INITIAL_TIME + 999;
+    currentTime += 249;
     await client.models.list();
     expect(exchangeCount).toBe(1);
     currentTime += 1;
@@ -99,50 +116,63 @@ describe('workload-identity access-token expiration', () => {
   });
 
   test.each([
-    ['headers', 1000],
-    ['headers', 1500],
-    ['body', 1000],
-    ['body', 1500],
-  ])('rejects a token after %s consume its lifetime (%i ms)', async (stage, elapsed) => {
-    let exchangeCount = 0;
-    const authorizations: (string | null)[] = [];
-    const clientFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
-      if (url.toString().includes('/oauth/token')) {
-        exchangeCount += 1;
-        if (exchangeCount === 1) {
-          if (stage === 'body') {
-            return delayedTokenResponse(1, 'expired-token', elapsed);
+    ['headers', 1000, 0],
+    ['headers', 1500, 0],
+    ['body', 1000, 0],
+    ['body', 1500, 0],
+    ['headers', 1000, -60_000],
+    ['headers', 1500, -60_000],
+    ['body', 1000, -60_000],
+    ['body', 1500, -60_000],
+    ['headers', 1000, 60_000],
+    ['headers', 1500, 60_000],
+    ['body', 1000, 60_000],
+    ['body', 1500, 60_000],
+  ])(
+    'rejects expired %s (%i ms elapsed, %i ms clock adjustment)',
+    async (stage, elapsed, clockAdjustment) => {
+      let exchangeCount = 0;
+      const authorizations: (string | null)[] = [];
+      const clientFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+        if (url.toString().includes('/oauth/token')) {
+          exchangeCount += 1;
+          if (exchangeCount === 1) {
+            if (stage === 'body') {
+              return delayedTokenResponse(1, 'expired-token', elapsed, clockAdjustment);
+            }
+            currentTime += elapsed + clockAdjustment;
+            monotonicTime += elapsed;
+            return tokenExchangeResponse(1, 'expired-token');
           }
-          currentTime += elapsed;
-          return tokenExchangeResponse(1, 'expired-token');
+          return tokenExchangeResponse(3600, 'replacement-token');
         }
-        return tokenExchangeResponse(3600, 'replacement-token');
-      }
-      authorizations.push(new Headers(init?.headers).get('Authorization'));
-      return Response.json({ data: [] });
-    };
-    const client = new OpenAI({ apiKey: null, workloadIdentity, fetch: clientFetch });
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ data: [] });
+      };
+      const client = new OpenAI({ apiKey: null, workloadIdentity, fetch: clientFetch });
 
-    const results = await Promise.allSettled([client.models.list(), client.models.list()]);
-    for (const result of results) {
-      expect(result.status).toBe('rejected');
-      if (result.status === 'rejected') {
-        expect(result.reason).toBeInstanceOf(OpenAIError);
-        expect(result.reason.message).toContain('token expired before its exchange completed');
+      const results = await Promise.allSettled([client.models.list(), client.models.list()]);
+      for (const result of results) {
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected') {
+          expect(result.reason).toBeInstanceOf(OpenAIError);
+          expect(result.reason.message).toContain('token expired before its exchange completed');
+        }
       }
-    }
-    expect(exchangeCount).toBe(1);
-    expect(authorizations).toEqual([]);
+      expect(exchangeCount).toBe(1);
+      expect(authorizations).toEqual([]);
 
-    await client.models.list();
-    await client.models.list();
-    expect(exchangeCount).toBe(2);
-    expect(authorizations).toEqual(['Bearer replacement-token', 'Bearer replacement-token']);
-  });
+      await client.models.list();
+      await client.models.list();
+      expect(exchangeCount).toBe(2);
+      expect(authorizations).toEqual(['Bearer replacement-token', 'Bearer replacement-token']);
+    },
+  );
 
   test('does not count subject-token acquisition against the exchanged token lifetime', async () => {
     const getToken = vi.fn(async () => {
       currentTime += 10_000;
+      monotonicTime += 10_000;
       return 'subject-token';
     });
     const customFetch = vi.fn(async () => tokenExchangeResponse(1, 'valid-token'));
@@ -158,6 +188,33 @@ describe('workload-identity access-token expiration', () => {
     currentTime += 1;
     await expect(auth.getToken()).resolves.toBe('valid-token');
     expect(getToken).toHaveBeenCalledTimes(2);
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('preserves a representable fractional-millisecond remaining lifetime', async () => {
+    const customFetch = vi
+      .fn()
+      .mockImplementationOnce(async () => delayedTokenResponse(0.001, 'short-lived-token', 0.5, -0.5))
+      .mockImplementationOnce(async () => tokenExchangeResponse(3600, 'replacement-token'));
+    const auth = new WorkloadIdentityAuth(workloadIdentity, customFetch);
+
+    await expect(auth.getToken()).resolves.toBe('short-lived-token');
+    await expect(auth.getToken()).resolves.toBe('short-lived-token');
+    expect(customFetch).toHaveBeenCalledTimes(1);
+    currentTime += 1;
+    await expect(auth.getToken()).resolves.toBe('replacement-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('rejects remaining lifetime that rounds down to the completion time', async () => {
+    const customFetch = vi
+      .fn()
+      .mockImplementationOnce(async () => delayedTokenResponse(0.001, 'expired-token', 0.99999, -0.99999))
+      .mockImplementationOnce(async () => tokenExchangeResponse(3600, 'replacement-token'));
+    const auth = new WorkloadIdentityAuth(workloadIdentity, customFetch);
+
+    await expect(auth.getToken()).rejects.toThrow('token expired before its exchange completed');
+    await expect(auth.getToken()).resolves.toBe('replacement-token');
     expect(customFetch).toHaveBeenCalledTimes(2);
   });
 
