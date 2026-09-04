@@ -11,18 +11,27 @@ import { WebSocketServer } from 'ws';
 
 import { createX509TestLab } from '../utils/x509-test-lab';
 
-const cases = (['ws', 'websocket'] as const).flatMap((example) =>
-  (['completed', 'failed', 'cancelled', 'incomplete'] as const).map((status) => ({ example, status })),
+const cases = (['openai', 'azure'] as const).flatMap((provider) =>
+  (['ws', 'websocket'] as const).flatMap((example) =>
+    (['completed', 'failed', 'cancelled', 'incomplete'] as const).map((status) => ({
+      provider,
+      example,
+      status,
+    })),
+  ),
 );
 
-test.each(cases)('Realtime $example example handles a $status response', async ({ example, status }) => {
+test.each(cases)('$provider Realtime $example handles $status', async ({ provider, example, status }) => {
   const lab = createX509TestLab();
   const directory = await mkdtemp(path.join(tmpdir(), 'openai-realtime-example-'));
   const certificatePath = path.join(directory, 'ca.pem');
+  const identityPath = path.join(directory, 'azure-identity.cjs');
+  const azureToken = 'synthetic-azure-example-token';
   const server = createServer({ cert: lab.server.certificate, key: lab.server.privateKey });
   const sockets = new WebSocketServer({ server });
   const requests: unknown[] = [];
   const urls: (string | undefined)[] = [];
+  const authorization: (string | undefined)[] = [];
   const text = 'Synthetic Realtime answer.';
   const textFields = {
     content_index: 0,
@@ -65,6 +74,7 @@ test.each(cases)('Realtime $example example handles a $status response', async (
   ];
   sockets.on('connection', (socket, request) => {
     urls.push(request.url);
+    authorization.push(request.headers.authorization);
     socket.on('message', (data) => {
       const event: unknown = JSON.parse(data.toString());
       requests.push(event);
@@ -83,6 +93,21 @@ test.each(cases)('Realtime $example example handles a $status response', async (
 
   try {
     await writeFile(certificatePath, lab.certificateAuthority);
+    if (provider === 'azure') {
+      await writeFile(
+        identityPath,
+        `const Module = require('node:module');
+const load = Module._load;
+Module._load = function(request, ...args) {
+  if (request === '@azure/identity') return {
+    DefaultAzureCredential: class {},
+    getBearerTokenProvider: () => async () => ${JSON.stringify(azureToken)},
+  };
+  return Reflect.apply(load, this, [request, ...args]);
+};
+`,
+      );
+    }
     const listening = once(server, 'listening');
     server.listen(0, '127.0.0.1');
     await listening;
@@ -97,16 +122,22 @@ test.each(cases)('Realtime $example example handles a $status response', async (
       [
         path.join(root, 'node_modules/ts-node/dist/bin.js'),
         '--swc',
+        ...(provider === 'azure' ? ['-r', identityPath] : []),
         '-r',
         path.join(root, 'node_modules/tsconfig-paths/register.js'),
-        path.join(root, 'examples/realtime', `${example}.ts`),
+        path.join(root, 'examples', ...(provider === 'azure' ? ['azure'] : []), 'realtime', `${example}.ts`),
       ],
       {
         cwd: root,
         env: {
-          OPENAI_API_KEY: 'synthetic-example-key',
-          OPENAI_BASE_URL: `https://127.0.0.1:${address.port}/v1`,
+          ...(provider === 'azure'
+            ? { AZURE_OPENAI_ENDPOINT: `https://127.0.0.1:${address.port}` }
+            : {
+                OPENAI_API_KEY: 'synthetic-example-key',
+                OPENAI_BASE_URL: `https://127.0.0.1:${address.port}/v1`,
+              }),
           NODE_EXTRA_CA_CERTS: certificatePath,
+          DOTENV_CONFIG_PATH: path.join(directory, '.env'),
           TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
           DISABLE_V8_COMPILE_CACHE: '1',
           SystemRoot: process.env['SystemRoot'],
@@ -127,7 +158,14 @@ test.each(cases)('Realtime $example example handles a $status response', async (
     try {
       const [exitCode, signal] = await once(child, 'close');
       expect(signal).toBeNull();
-      expect(urls).toEqual(['/v1/realtime?model=gpt-realtime']);
+      expect(urls).toEqual([
+        provider === 'azure'
+          ? '/openai/v1/realtime?model=gpt-4o-realtime-preview-1001'
+          : '/v1/realtime?model=gpt-realtime',
+      ]);
+      if (provider === 'azure') {
+        expect(authorization).toEqual([`Bearer ${azureToken}`]);
+      }
       expect(requests).toEqual([
         {
           type: 'session.update',
@@ -146,6 +184,7 @@ test.each(cases)('Realtime $example example handles a $status response', async (
       expect(stdout).toContain(text);
       expect(stdout).toContain('Connection closed!');
       expect(stdout + stderr).not.toContain('synthetic-example-key');
+      expect(stdout + stderr).not.toContain(azureToken);
       expect(stdout + stderr).not.toContain('SYNTHETIC_PRIVATE_RESPONSE_METADATA');
       expect(exitCode).toBe(status === 'completed' ? 0 : 1);
       expect(stderr.includes('Response did not complete successfully.')).toBe(status !== 'completed');

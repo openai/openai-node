@@ -52,7 +52,14 @@ async function main() {
   rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
   rt.on('response.output_text.done', () => console.log());
 
-  rt.on('response.done', () => rt.close());
+  // response.done also covers failed, cancelled, and incomplete responses.
+  rt.on('response.done', (event) => {
+    if (event.response.status !== 'completed') {
+      console.error('Response did not complete successfully.');
+      process.exitCode = 1;
+    }
+    rt.close();
+  });
 
   rt.socket.on('close', () => console.log('\nConnection closed!'));
 }
