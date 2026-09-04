@@ -844,7 +844,14 @@ describe.each([
   describe.each(['final response', 'forced tool', 'parallel limit', 'sequential limit'] as const)(
     'afterCompletion on %s',
     (exitRoute) => {
-      test.each(['context.abort', 'runner.controller.abort', 'external signal', 'not aborted'] as const)(
+      const callbackCancellationCases = [
+        'context.abort',
+        'runner.controller.abort',
+        'external signal',
+        'callback promise reaction',
+        'not aborted',
+      ] as const;
+      test.each(callbackCancellationCases)(
         'settles correctly when %s while awaiting the callback',
         async (abortMethod) => {
           const calls = exitRoute === 'final response' ? [] : [toolCall('readBalance')];
@@ -852,16 +859,21 @@ describe.each([
           const controller = new AbortController();
           const abortReason = new Error('synthetic completion callback cancellation');
           const callbackStarted = deferred<boolean>();
-          const callbackReady = deferred<boolean>();
+          const callbackReady: Deferred<void> = deferred();
           const readBalance = vi.fn(() => 'balance already read');
           const afterCompletion = vi.fn<NonNullable<RunnerOptions['afterCompletion']>>(
-            async (_completion, context) => {
-              callbackStarted.resolve(true);
-              if (abortMethod === 'context.abort') {
-                context.abort();
-              }
-              await callbackReady.promise;
-            },
+            abortMethod === 'callback promise reaction'
+              ? () => {
+                  callbackStarted.resolve(true);
+                  return callbackReady.promise;
+                }
+              : async (_completion, context) => {
+                  callbackStarted.resolve(true);
+                  if (abortMethod === 'context.abort') {
+                    context.abort();
+                  }
+                  await callbackReady.promise;
+                },
           );
           const params = {
             model: 'gpt-4o-mini',
@@ -896,8 +908,10 @@ describe.each([
             controller.abort();
           } else if (abortMethod === 'runner.controller.abort') {
             runner.controller.abort(abortReason);
+          } else if (abortMethod === 'callback promise reaction') {
+            void callbackReady.promise.then(() => runner.controller.abort(abortReason));
           }
-          callbackReady.resolve(true);
+          callbackReady.resolve();
 
           if (abortMethod === 'not aborted') {
             await expect(runner.done()).resolves.toBeUndefined();
@@ -907,7 +921,7 @@ describe.each([
             expect(Object.getOwnPropertyDescriptor(abortError, 'cause')?.value).toBe(
               runner.controller.signal.reason,
             );
-            if (abortMethod === 'runner.controller.abort') {
+            if (abortMethod === 'runner.controller.abort' || abortMethod === 'callback promise reaction') {
               expect(runner.controller.signal.reason).toBe(abortReason);
             }
           }
@@ -926,6 +940,27 @@ describe.each([
       );
     },
   );
+
+  test('preserves completed-response cancellation behavior when no callback was invoked', async () => {
+    const { client, respond } = clientWithToolCalls(streaming, []);
+    const params = {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user' as const, content: 'hello' }],
+      tools: [],
+    };
+    const runner: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, null> = streaming
+      ? client.chat.completions.runTools({ ...params, stream: true })
+      : client.chat.completions.runTools({ ...params, stream: false });
+    const onFinal = vi.fn();
+    runner.on('finalChatCompletion', onFinal);
+    runner.on('chatCompletion', () => runner.abort());
+
+    await respond();
+    await expect(runner.done()).resolves.toBeUndefined();
+    expect(runner.controller.signal.aborted).toBe(true);
+    expect(runner.aborted).toBe(false);
+    expect(onFinal).toHaveBeenCalledTimes(1);
+  });
 
   test('preserves a rejected afterCompletion error even when the callback aborts', async () => {
     const { client, respond } = clientWithToolCalls(streaming, []);

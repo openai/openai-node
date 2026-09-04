@@ -128,6 +128,7 @@ export class AbstractChatCompletionRunner<
 > extends EventStream<EventTypes> {
   protected _chatCompletions: ParsedChatCompletion<ParsedT>[] = [];
   #completionArrivedBeforeAbort = false;
+  #afterCompletionInvoked = false;
   /** Mutable conversation history, including initial input, assistant replies, and tool results. */
   messages: ChatCompletionMessageParam[] = [];
 
@@ -306,6 +307,9 @@ export class AbstractChatCompletionRunner<
   protected override _emitFinal(
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
   ) {
+    if (this.#afterCompletionInvoked) {
+      this.#throwIfAborted();
+    }
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
     if (completion) {
       this._emit('finalChatCompletion', completion);
@@ -331,6 +335,18 @@ export class AbstractChatCompletionRunner<
 
     if (this._chatCompletions.some((c) => c.usage)) {
       this._emit('totalUsage', this.#calculateTotalUsage());
+    }
+  }
+
+  #throwIfAborted() {
+    if (this.controller.signal.aborted) {
+      const error = new APIUserAbortError();
+      Object.defineProperty(error, 'cause', {
+        value: this.controller.signal.reason,
+        writable: true,
+        configurable: true,
+      });
+      throw error;
     }
   }
 
@@ -389,16 +405,9 @@ export class AbstractChatCompletionRunner<
       if (afterCompletion == null) {
         return;
       }
+      this.#afterCompletionInvoked = true;
       await afterCompletion(completion, runner);
-      if (this.controller.signal.aborted) {
-        const error = new APIUserAbortError();
-        Object.defineProperty(error, 'cause', {
-          value: this.controller.signal.reason,
-          writable: true,
-          configurable: true,
-        });
-        throw error;
-      }
+      this.#throwIfAborted();
     };
 
     // Normalize tool definitions before invoking callbacks.
