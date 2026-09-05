@@ -8,6 +8,11 @@ import OpenAI, {
   SubjectTokenProviderError,
 } from 'openai';
 import type { Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
+import { WorkloadIdentityAuth } from 'openai/auth/workload-identity-auth';
+import {
+  getWorkloadIdentityToken,
+  waitForWorkloadIdentityRetry,
+} from 'openai/internal/auth/workload-identity-request';
 
 const originalFetch = global.fetch;
 
@@ -27,6 +32,63 @@ const createTestClientOptions = () => ({
 });
 
 describe('OpenAI with Workload Identity', () => {
+  test('a cache-owned issuer retry does not keep Node alive after callers leave', async () => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const original = globalThis.setTimeout;
+    globalThis.setTimeout = ((...args: Parameters<typeof setTimeout>) => {
+      const timer = original(...args);
+      timers.push(timer);
+      return timer;
+    }) as typeof setTimeout;
+    try {
+      const pending = waitForWorkloadIdentityRetry({
+        error: new Error('issuer unavailable'),
+        delayMillis: 30,
+        notBefore: performance.now() + 30,
+      });
+      expect(timers.some((timer) => typeof timer.hasRef === 'function' && !timer.hasRef())).toBe(true);
+      await pending;
+    } finally {
+      globalThis.setTimeout = original;
+    }
+  });
+
+  test('a direct token caller keeps a shared issuer retry alive after SDK callers abort', async () => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const original = globalThis.setTimeout;
+    globalThis.setTimeout = ((...args: Parameters<typeof setTimeout>) => {
+      const timer = original(...args);
+      timers.push(timer);
+      return timer;
+    }) as typeof setTimeout;
+    let exchanges = 0;
+    const auth = new WorkloadIdentityAuth(createTestWorkloadIdentity(), async () => {
+      exchanges += 1;
+      return exchanges === 1
+        ? globalThis.Response.json(
+            { error: 'temporarily_unavailable' },
+            { status: 503, headers: { 'retry-after-ms': '50' } },
+          )
+        : globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+    });
+    const caller = new AbortController();
+    const request = { deadline: performance.now() + 500, signal: caller.signal };
+    try {
+      await expect(getWorkloadIdentityToken(auth, request)).rejects.toThrow();
+      const sdkWait = getWorkloadIdentityToken(auth, request);
+      const retryTimer = timers.find((timer) => typeof timer.hasRef === 'function' && !timer.hasRef());
+      expect(retryTimer).toBeDefined();
+      const directWait = auth.getToken();
+      expect(retryTimer?.hasRef()).toBe(true);
+      caller.abort();
+      await expect(sdkWait).rejects.toBeInstanceOf(APIUserAbortError);
+      expect(retryTimer?.hasRef()).toBe(true);
+      await expect(directWait).resolves.toBe('synthetic-token');
+      expect(exchanges).toBe(2);
+    } finally {
+      globalThis.setTimeout = original;
+    }
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env['OPENAI_API_KEY'];
@@ -339,6 +401,102 @@ describe('OpenAI with Workload Identity', () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(await result).toBeInstanceOf(APIConnectionError);
     expect(issuerCalls).toBe(1);
+  });
+
+  test.each(['insufficient budget', 'late timer'] as const)(
+    'bounds deferred issuer retries by the monotonic request deadline (%s)',
+    async (mode) => {
+      vi.useFakeTimers();
+      class DeferredAuthenticationClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- Exercise the supported deferred auth hook.
+        protected override async bearerAuth(): Promise<undefined> {}
+      }
+      let issuerCalls = 0;
+      const send = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).includes('/oauth/token')) {
+          issuerCalls += 1;
+          if (issuerCalls === 1) {
+            if (mode === 'insufficient budget') {
+              await new Promise((resolve) => setTimeout(resolve, 150));
+            }
+            return globalThis.Response.json(
+              { error: 'temporarily_unavailable' },
+              { status: 503, headers: { 'retry-after-ms': mode === 'late timer' ? '50' : '100' } },
+            );
+          }
+          return globalThis.Response.json({ access_token: 'unexpected-token', expires_in: 3600 });
+        }
+        return globalThis.Response.json({ data: [] });
+      });
+      const client = new DeferredAuthenticationClient({
+        ...createTestClientOptions(),
+        fetch: send,
+        timeout: 200,
+        maxRetries: 1,
+      });
+      const pending = Promise.allSettled([client.models.list()]);
+      if (mode === 'late timer') {
+        // The sleep timer wakes before the abort timer despite elapsed monotonic time.
+        const clock = performance.now.bind(performance);
+        setTimeout(() => vi.spyOn(performance, 'now').mockImplementation(() => clock() + 250), 49);
+      }
+      try {
+        await vi.advanceTimersByTimeAsync(300);
+        const [outcome] = await pending;
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+        }
+        expect(issuerCalls).toBe(1);
+      } finally {
+        vi.restoreAllMocks();
+      }
+    },
+  );
+
+  test('uses an issuer HTTP-date after its error body advances the wall clock in deferred dispatch', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-04T12:00:00Z'));
+    class DeferredAuthenticationClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- Exercise the supported deferred auth hook.
+      protected override async bearerAuth(): Promise<undefined> {}
+    }
+    let issuerCalls = 0;
+    let retriedAt = 0;
+    const send = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).includes('/oauth/token')) {
+        issuerCalls += 1;
+        if (issuerCalls === 1) {
+          const failure = globalThis.Response.json(
+            { error: 'temporarily_unavailable' },
+            { status: 503, headers: { 'retry-after': new Date(Date.now() + 1000).toUTCString() } },
+          );
+          const read = failure.text.bind(failure);
+          vi.spyOn(failure, 'text').mockImplementation(async () => {
+            const body = await read();
+            vi.setSystemTime(Date.now() + 2000);
+            return body;
+          });
+          return failure;
+        }
+        retriedAt = performance.now();
+        return globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+      }
+      return globalThis.Response.json({ data: [] });
+    });
+    const client = new DeferredAuthenticationClient({
+      ...createTestClientOptions(),
+      fetch: send,
+      maxRetries: 1,
+      timeout: 500,
+    });
+    const started = performance.now();
+    const pending = Promise.allSettled([client.models.list()]);
+    await vi.advanceTimersByTimeAsync(1200);
+    const [outcome] = await pending;
+    expect(outcome.status).toBe('fulfilled');
+    expect(issuerCalls).toBe(2);
+    expect(retriedAt - started).toBeLessThan(500);
   });
 
   test.each(['wait', 'cancel', 'deadline', 'invalid'] as const)(

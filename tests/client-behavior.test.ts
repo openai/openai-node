@@ -347,6 +347,68 @@ describe('OpenAI client request behavior', () => {
     },
   );
 
+  test.each([
+    ['forward', 3_600_000],
+    ['backward', -3_600_000],
+  ] as const)(
+    'bounds a terminal error body with monotonic time after a %s wall-clock jump',
+    async (_direction, jump) => {
+      vi.useFakeTimers();
+      let settled = false;
+      let requestSignal: AbortSignal | undefined;
+      const fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+        requestSignal = init?.signal ?? undefined;
+        await sleep(40);
+        vi.setSystemTime(Date.now() + jump);
+        return new Response(
+          new ReadableStream({
+            start(stream) {
+              requestSignal?.addEventListener('abort', () => stream.error(requestSignal?.reason), {
+                once: true,
+              });
+            },
+          }),
+          { status: 503, headers: { 'retry-after': '90' } },
+        );
+      });
+      const client = new OpenAI({ apiKey: 'test-key', fetch, timeout: 100 });
+      try {
+        const pending = Promise.allSettled([client.get('/items')]);
+        void pending.then(() => {
+          settled = true;
+        });
+        await vi.advanceTimersByTimeAsync(99);
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(settled).toBe(true);
+        const [outcome] = await pending;
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+        }
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  test.each([false, true])(
+    'preserves custom Response.text for bounded errors (exhausted: %s)',
+    async (exhausted) => {
+      const response = new Response('{"error":{"message":"raw body"}}', {
+        status: 503,
+        headers: exhausted ? {} : { 'retry-after': '90' },
+      });
+      const text = vi.spyOn(response, 'text').mockResolvedValue('{"error":{"message":"decoded body"}}');
+      const fetch = vi.fn(async () => response);
+      const client = new OpenAI({ apiKey: 'test-key', fetch, maxRetries: 0, timeout: 1000 });
+
+      await expect(client.models.list()).rejects.toMatchObject({ message: '503 decoded body' });
+      expect(text).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test.each([429, 503])(
     'preserves caller cancellation when a request hook replaces the signal for HTTP %i',
     async (status) => {

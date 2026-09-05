@@ -665,6 +665,7 @@ export class X509WorkloadIdentityAuth {
       dispose();
       throw userAbortError(callerSignal);
     }
+    this.#assertExchangeBudget(options, context, dispose);
     const attempt = this.#refresh ?? this.#beginRefresh();
     attempt.waiters += 1;
     const waiter = waitForRefresh(attempt, signal);
@@ -683,6 +684,21 @@ export class X509WorkloadIdentityAuth {
       dispose();
       attempt.waiters -= 1;
       this.#retireRefresh(attempt);
+    }
+  }
+
+  #assertExchangeBudget(
+    options: FinalRequestOptions | undefined,
+    context: X509TokenRequestContext | undefined,
+    dispose: () => void,
+  ): void {
+    try {
+      if (context && options) {
+        this.remainingTimeout(options, context.timeout);
+      }
+    } catch (error) {
+      dispose();
+      throw error;
     }
   }
 

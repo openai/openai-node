@@ -6,6 +6,7 @@ import { parseRetryAfter } from '../internal/utils/retry-after';
 import {
   currentWorkloadIdentityRequest,
   strongestWorkloadIdentityRefresh,
+  waitForDirectWorkloadIdentityRefresh,
   waitForWorkloadIdentityRetry,
   waitForWorkloadIdentityRefresh,
 } from '../internal/auth/workload-identity-request';
@@ -190,7 +191,7 @@ export class WorkloadIdentityAuth {
         (request.refreshes ??= new Set()).add(refresh);
         return await waitForWorkloadIdentityRefresh(refresh, request.deadline, request.signal);
       }
-      return await refresh.promise;
+      return await waitForDirectWorkloadIdentityRefresh(refresh);
     }
 
     if (WorkloadIdentityAuth.needsRefresh(this.cachedToken) && !this.refresh) {
@@ -217,7 +218,7 @@ export class WorkloadIdentityAuth {
       const refusal = previous?.failure;
       if (refusal) {
         refresh.failure = refusal;
-        await waitForWorkloadIdentityRetry(refusal);
+        await waitForWorkloadIdentityRetry(refusal, refresh);
         delete refresh.failure;
       }
       return await this.refreshToken(generation, refresh);

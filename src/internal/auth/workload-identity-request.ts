@@ -1,5 +1,4 @@
 import { APIConnectionTimeoutError, APIUserAbortError } from '../../core/error';
-import { sleep } from '../utils/sleep';
 
 /** A single exchange's observed failure, shared only with requests using that exchange. */
 export interface WorkloadIdentityRetryFailure {
@@ -23,6 +22,32 @@ export interface WorkloadIdentityRefresh {
   minimum?: Omit<WorkloadIdentityRetryFailure, 'error'>;
   /** Server minimum captured before reading an unsuccessful response body. */
   failure?: WorkloadIdentityRetryFailure;
+  /** Direct getToken callers keep a shared retry alive without a request deadline timer. */
+  directWaiters?: number;
+  retryTimer?: ReturnType<typeof setTimeout>;
+}
+
+/** Direct public token callers have no request deadline timer to keep Node alive. */
+export async function waitForDirectWorkloadIdentityRefresh(
+  refresh: WorkloadIdentityRefresh,
+): Promise<string> {
+  refresh.directWaiters = (refresh.directWaiters ?? 0) + 1;
+  if (refresh.retryTimer && typeof refresh.retryTimer === 'object' && 'ref' in refresh.retryTimer) {
+    refresh.retryTimer.ref();
+  }
+  try {
+    return await refresh.promise;
+  } finally {
+    refresh.directWaiters -= 1;
+    if (
+      refresh.directWaiters === 0 &&
+      refresh.retryTimer &&
+      typeof refresh.retryTimer === 'object' &&
+      'unref' in refresh.retryTimer
+    ) {
+      refresh.retryTimer.unref();
+    }
+  }
 }
 
 /** Waits for an observed issuer response without canceling the cache-owned exchange. */
@@ -150,12 +175,30 @@ export function getWorkloadIdentityToken(
 }
 
 /** Enforces the cache-owned exchange's minimum independently of individual callers. */
-export async function waitForWorkloadIdentityRetry(failure: WorkloadIdentityRetryFailure): Promise<void> {
+export async function waitForWorkloadIdentityRetry(
+  failure: WorkloadIdentityRetryFailure,
+  refresh?: WorkloadIdentityRefresh,
+): Promise<void> {
   if (failure.delayMillis > 60_000) {
     throw failure.error;
   }
   const delay = Math.ceil(remainingWorkloadIdentityRetry(failure));
   if (delay) {
-    await sleep(delay);
+    try {
+      // oxlint-disable-next-line promise/avoid-new -- The cache owns this timer after foreground callers leave.
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, delay);
+        if (refresh) {
+          refresh.retryTimer = timer;
+        }
+        if (!refresh?.directWaiters && typeof timer === 'object' && 'unref' in timer) {
+          timer.unref();
+        }
+      });
+    } finally {
+      if (refresh) {
+        delete refresh.retryTimer;
+      }
+    }
   }
 }

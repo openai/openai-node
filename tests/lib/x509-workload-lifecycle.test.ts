@@ -351,6 +351,36 @@ describe('X.509 workload credential lifecycle', () => {
     },
   );
 
+  test('does not exchange a cached bearer after a late issuer-minimum timer exceeds the request deadline', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    let exchanges = 0;
+    let dispatches = 0;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        exchanges += 1;
+        return exchanges === 2
+          ? new Response(null, { status: 503, headers: { 'retry-after-ms': '50' } })
+          : token('synthetic-expiring-minimum', 20);
+      }
+      dispatches += 1;
+      return dispatches === 2 ? new Response(null, { status: 401 }) : Response.json({ data: [] });
+    });
+    const client = new OpenAI(options({ maxRetries: 1, timeout: 100 }));
+    await client.models.list();
+    await vi.advanceTimersByTimeAsync(11_000);
+    const pending = Promise.allSettled([client.models.list()]);
+    const clock = performance.now.bind(performance);
+    setTimeout(() => vi.spyOn(performance, 'now').mockImplementation(() => clock() + 150), 49);
+    await vi.advanceTimersByTimeAsync(50);
+    const [outcome] = await pending;
+    expect(outcome.status).toBe('rejected');
+    if (outcome.status === 'rejected') {
+      expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+    }
+    expect(exchanges).toBe(2);
+    expect(dispatches).toBe(2);
+  });
+
   test('preserves a timeout-shaped caller reason during the issuer minimum wait', async () => {
     const caller = new AbortController();
     const reason = new APIConnectionTimeoutError();

@@ -1168,7 +1168,13 @@ export class OpenAI {
         throw new Errors.APIConnectionTimeoutError();
       });
       const readBody = async () => {
-        if (!response.body || typeof response.body.getReader !== 'function') return response.text();
+        // A custom fetch may supply a Response with its own text decoder.
+        if (
+          response.text !== globalThis.Response.prototype.text ||
+          !response.body ||
+          typeof response.body.getReader !== 'function'
+        )
+          return response.text();
         reader = response.body.getReader();
         const decoder = new TextDecoder();
         const chunks: string[] = [];
@@ -1331,6 +1337,7 @@ export class OpenAI {
     const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
     const retryLogStr = retryOfRequestLogID === undefined ? '' : `, retryOf: ${retryOfRequestLogID}`;
     const startTime = x509Authentication?.requestStartedAt(options) ?? Date.now();
+    const attemptStartedAt = performance.now();
 
     loggerFor(this).debug(
       `[${requestLogID}] sending request`,
@@ -1405,7 +1412,14 @@ export class OpenAI {
           options,
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
-          issuerDelay === undefined ? undefined : Math.max(0, issuerFailure!.notBefore - performance.now()),
+          issuerDelay === undefined
+            ? undefined
+            : Math.max(
+                0,
+                issuerFailure!.retryAt === undefined
+                  ? issuerFailure!.notBefore - performance.now()
+                  : issuerFailure!.retryAt - Date.now(),
+              ),
           workloadIdentityRequest,
         );
       }
@@ -1602,7 +1616,7 @@ export class OpenAI {
           ? await this.readResponseError(
               response,
               options,
-              Math.max(0, startTime + timeout - Date.now()),
+              Math.max(0, attemptStartedAt + timeout - performance.now()),
               controller,
               req.signal,
             )
@@ -1826,7 +1840,22 @@ export class OpenAI {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
-    await this.waitForRetry(options, timeoutMillis);
+    await this.waitForRetry(
+      options,
+      timeoutMillis,
+      workloadIdentityRequest?.deadline === undefined
+        ? undefined
+        : Math.max(0, workloadIdentityRequest.deadline - performance.now()),
+      workloadIdentityRequest?.signal,
+    );
+    if (
+      workloadIdentityRequest?.deadline !== undefined &&
+      performance.now() >= workloadIdentityRequest.deadline
+    ) {
+      const aborted = [workloadIdentityRequest.signal, options.signal].find((signal) => signal?.aborted);
+      if (aborted) throw this._makeUserAbortError(aborted);
+      throw new Errors.APIConnectionTimeoutError();
+    }
     return this.makeRequest(options, retriesRemaining - 1, requestLogID, workloadIdentityRequest);
   }
 
