@@ -243,6 +243,93 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
+    ['selected package', true, false, ''],
+    ['live selected package', true, true, ''],
+    ['install failure', true, false, 'install'],
+    ['typecheck failure', true, false, 'typecheck'],
+    ['test failure', true, false, 'test'],
+    ['local tarball', false, false, ''],
+    ['live local tarball', false, true, ''],
+    ['local tarball test failure', false, false, 'test'],
+  ] as const)('runs Bun validation for %s', (_name, fromNpm, live, failure) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-bun-cli-'));
+    const bin = path.join(fixture, 'bin');
+    const project = path.join(fixture, 'ecosystem-tests', 'bun');
+    const selectedPackage = path.join(fixture, 'selected package = fixture');
+    const observations = path.join(fixture, 'commands.jsonl');
+    const recordCommand = [
+      "const fs = require('node:fs');",
+      'const args = process.argv.slice(2);',
+      "const phase = tool === 'npm' ? 'typecheck' : args[0] === 'install' ? 'install' : 'test';",
+      'const observation = { tool, args, apiKeyPresent: Boolean(process.env.OPENAI_API_KEY) };',
+      "fs.appendFileSync(process.env.ECOSYSTEM_COMMAND_OBSERVATIONS, JSON.stringify(observation) + '\\n');",
+      'process.exit(phase === process.env.ECOSYSTEM_COMMAND_FAILURE ? 47 : 0);',
+    ].join('\n');
+
+    try {
+      mkdirSync(bin);
+      mkdirSync(project, { recursive: true });
+      mkdirSync(path.join(fixture, '.pack'));
+      writeFileSync(path.join(fixture, 'package.json'), '{}\n');
+      writeFileSync(path.join(fixture, '.pack', 'openai.tgz'), 'synthetic command-dispatch fixture');
+      // Record command dispatch and exit statuses; no real Bun or package installation is needed.
+      for (const tool of ['bun', 'npm']) {
+        const script = path.join(bin, process.platform === 'win32' ? `${tool}.cjs` : tool);
+        writeFileSync(script, `#!/usr/bin/env node\nconst tool = '${tool}';\n${recordCommand}`, {
+          mode: 0o755,
+        });
+        if (process.platform === 'win32') {
+          writeFileSync(path.join(bin, `${tool}.cmd`), `@"${process.execPath}" "${script}" %*\r\n`);
+        }
+      }
+
+      const result = runCli(
+        [
+          'bun',
+          ...(fromNpm ? [`--from-npm=${selectedPackage}`] : []),
+          '--skipPack',
+          '--noCleanup',
+          '--retry=0',
+          ...(live ? ['--live'] : []),
+        ],
+        fixture,
+        {
+          PATH: `${bin}${path.delimiter}${path.dirname(process.execPath)}`,
+          OPENAI_API_KEY: 'synthetic-bun-cli-key',
+          ECOSYSTEM_COMMAND_OBSERVATIONS: observations,
+          ECOSYSTEM_COMMAND_FAILURE: failure,
+        },
+      );
+
+      expect(result.error, result.stdout + result.stderr).toBeUndefined();
+      expect(result.status, result.stdout + result.stderr).toBe(failure ? 1 : 0);
+      const expected = [
+        {
+          tool: 'bun',
+          args: ['install', '-D', fromNpm ? selectedPackage : './openai.tgz'],
+          apiKeyPresent: false,
+        },
+        { tool: 'npm', args: ['run', 'tsc'], apiKeyPresent: false },
+        {
+          tool: 'bun',
+          args: live ? ['test'] : ['test', 'workload-identity-access-token.test.ts'],
+          apiKeyPresent: live,
+        },
+      ];
+      const failedPhase = ['install', 'typecheck', 'test'].indexOf(failure);
+      expect(
+        readFileSync(observations, 'utf-8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line)),
+      ).toEqual(expected.slice(0, failedPhase === -1 ? expected.length : failedPhase + 1));
+      expect(result.stdout + result.stderr).not.toContain('synthetic-bun-cli-key');
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
     {
       projectName: 'node-ts-cjs',
       option: '--live',
