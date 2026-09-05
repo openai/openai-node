@@ -27,7 +27,7 @@ async function withGlobals<T>(overrides: PlatformGlobals, run: (detection: Platf
       }
     }
 
-    return run(detection);
+    return await run(detection);
   } finally {
     for (const [name, descriptor] of descriptors) {
       if (descriptor) {
@@ -166,6 +166,7 @@ describe('platform detection', () => {
 
   test.each([
     ['Edge/105.3.1', 'edge', '105.3.1'],
+    ['Edge', 'edge', '0.0.0'],
     ['MSIE 11.0', 'ie', '11.0.0'],
     ['Trident/7.0; rv:11.2', 'ie', '11.2.0'],
     ['Chrome/126.5.2', 'chrome', '126.5.2'],
@@ -186,21 +187,69 @@ describe('platform detection', () => {
     });
   });
 
-  test.each([{ userAgent: 'unrecognized browser' }, null, undefined])(
-    'returns unknown runtime information when no platform is recognizable',
-    async (navigator) => {
-      const headers = await withGlobals({ process: undefined, navigator }, ({ getPlatformHeaders }) =>
-        getPlatformHeaders(),
-      );
-
-      expect(headers).toMatchObject({
-        'X-Stainless-OS': 'Unknown',
-        'X-Stainless-Arch': 'unknown',
-        'X-Stainless-Runtime': 'unknown',
-        'X-Stainless-Runtime-Version': 'unknown',
-      });
+  test.each([
+    {
+      name: 'desktop',
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.1.2.3',
+      version: '120.1.2',
     },
-  );
+    {
+      name: 'Android',
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 EdgA/121.2.3.4',
+      version: '121.2.3',
+    },
+    {
+      name: 'iOS',
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 EdgiOS/122.3.4.5',
+      version: '122.3.4',
+    },
+  ])('sends Edge $name browser metadata on public SDK requests', async ({ userAgent, version }) => {
+    vi.resetModules();
+    const { default: OpenAI } = await import('openai');
+    const response = Response.json({ object: 'list', data: [] });
+    const requests: Headers[] = [];
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      dangerouslyAllowBrowser: true,
+      organization: null,
+      project: null,
+      maxRetries: 0,
+      fetch: async (_url, init) => {
+        requests.push(new Headers(init?.headers));
+        return response;
+      },
+    });
+
+    await withGlobals({ process: undefined, navigator: { userAgent }, window: { document: {} } }, () =>
+      client.models.list(),
+    );
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.get('X-Stainless-Runtime')).toBe('browser:edge');
+    expect(requests[0]?.get('X-Stainless-Runtime-Version')).toBe(version);
+  });
+
+  test.each([
+    { userAgent: 'unrecognized browser' },
+    { userAgent: 'EdgarBot/1.2.3' },
+    { userAgent: 'EdgX/1.2.3' },
+    null,
+    undefined,
+  ])('returns unknown runtime information when no platform is recognizable', async (navigator) => {
+    const headers = await withGlobals({ process: undefined, navigator }, ({ getPlatformHeaders }) =>
+      getPlatformHeaders(),
+    );
+
+    expect(headers).toMatchObject({
+      'X-Stainless-OS': 'Unknown',
+      'X-Stainless-Arch': 'unknown',
+      'X-Stainless-Runtime': 'unknown',
+      'X-Stainless-Runtime-Version': 'unknown',
+    });
+  });
 
   test.each([
     [{ document: {} }, { userAgent: 'browser' }, true],
