@@ -115,8 +115,17 @@ export class Stream<Item> implements AsyncIterable<Item> {
       consumed = true;
       let done = false;
       let receivedCompletionSentinel = false;
+      const messages = _iterSSEMessages(response, controller);
+      const closeMessages = messages.return.bind(messages);
+      messages.return = (value) => {
+        // Abort before nested iterator cleanup can wait on the response body's cancellation.
+        if (!receivedCompletionSentinel) {
+          controller.abort();
+        }
+        return closeMessages(value);
+      };
       try {
-        for await (const sse of _iterSSEMessages(response, controller)) {
+        for await (const sse of messages) {
           if (sse.data === '[DONE]') {
             receivedCompletionSentinel = true;
             break;
