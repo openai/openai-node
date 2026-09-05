@@ -477,12 +477,11 @@ const projectRunners = {
   bun: async () => {
     if (state.fromNpm) {
       await run('bun', ['install', '-D', state.fromNpm]);
-      return;
+    } else {
+      const packFile = getPackFile();
+      await fs.copyFile(packFile, `./${TAR_NAME}`);
+      await run('bun', ['install', '-D', `./${TAR_NAME}`]);
     }
-
-    const packFile = getPackFile();
-    await fs.copyFile(packFile, `./${TAR_NAME}`);
-    await run('bun', ['install', '-D', `./${TAR_NAME}`]);
 
     await run('npm', ['run', 'tsc']);
 
