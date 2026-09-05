@@ -10,7 +10,11 @@ import { expect, test } from 'vitest';
 type ResponseStatus = 'completed' | 'failed' | 'incomplete' | 'queued' | 'in_progress';
 const privateErrorDetail = 'Synthetic private response error detail';
 
-function responseEvents(chunks: readonly string[], status: ResponseStatus): ResponseStreamEvent[] {
+function responseEvents(
+  chunks: readonly string[],
+  status: ResponseStatus,
+  background: boolean,
+): ResponseStreamEvent[] {
   const response: Response = {
     id: 'resp_background_example',
     object: 'response',
@@ -28,10 +32,10 @@ function responseEvents(chunks: readonly string[], status: ResponseStatus): Resp
     tools: [],
     top_p: null,
     status: status === 'queued' ? 'queued' : 'in_progress',
-    background: true,
+    background,
   };
   const events: ResponseStreamEvent[] = [{ type: 'response.created', sequence_number: 0, response }];
-  if (status === 'queued') {
+  if (status === 'queued' || (status === 'in_progress' && chunks.length === 0)) {
     return events;
   }
   events.push(
@@ -126,6 +130,16 @@ const cases = [
     status,
     source: 'guide' as const,
   })),
+  ...(['stream', 'streaming-tools'] as const).flatMap((source) =>
+    (['completed', 'failed', 'incomplete', 'in_progress'] as const).map((status) => ({
+      name: 'after draining the stream',
+      chunks: status === 'in_progress' ? [] : ['Synthetic completion.'],
+      resumed: false,
+      partial: false,
+      status,
+      source,
+    })),
+  ),
 ];
 
 const guideSection = readFileSync(path.join(process.cwd(), 'docs/streaming.md'), 'utf-8')
@@ -137,12 +151,18 @@ if (!guideSnippet) {
 }
 
 test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, status, source }) => {
-  const events = responseEvents(chunks, status);
+  const background = source === 'example' || source === 'guide';
+  const events = responseEvents(chunks, status, background);
   const nonterminal = status === 'queued' || status === 'in_progress';
   const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n${nonterminal ? '' : 'data: [DONE]\n\n'}`;
   const partialEvents = nonterminal ? events : events.slice(0, -1);
   const partialBody = `${partialEvents.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n`;
-  const requests: { method: string | undefined; url: string | undefined; body: unknown }[] = [];
+  const requests: {
+    method: string | undefined;
+    url: string | undefined;
+    body: unknown;
+    syntheticAuthorization: boolean;
+  }[] = [];
   const server = createServer((request, response) => {
     let requestBody = '';
     request.setEncoding('utf-8').on('data', (chunk: string) => {
@@ -153,6 +173,7 @@ test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, st
         method: request.method,
         url: request.url,
         body: requestBody ? JSON.parse(requestBody) : null,
+        syntheticAuthorization: request.headers.authorization === 'Bearer synthetic-example-key',
       });
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       response.end(partial && requests.length === 1 ? partialBody : body);
@@ -183,16 +204,24 @@ ${guideSnippet}
 }
 main();`,
           ]
-        : [path.join(root, 'examples/responses/stream_background.ts')]),
+        : [
+            path.join(
+              root,
+              'examples/responses',
+              source === 'example' ? 'stream_background.ts' : `${source}.ts`,
+            ),
+          ]),
     ],
     {
       cwd: root,
       env: {
+        ...process.env,
         OPENAI_API_KEY: 'synthetic-example-key',
         OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
+        OPENAI_CUSTOM_HEADERS: undefined,
+        OPENAI_LOG: undefined,
         TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
         DISABLE_V8_COMPILE_CACHE: '1',
-        SystemRoot: process.env['SystemRoot'],
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 15_000,
@@ -210,6 +239,19 @@ main();`,
   try {
     const [exitCode, signal] = await once(child, 'close');
     expect(signal).toBeNull();
+    expect(requests).toHaveLength(resumed ? 2 : 1);
+    expect(requests[0]).toMatchObject({
+      method: 'POST',
+      url: '/v1/responses',
+      body: {
+        ...(background ? { background: true } : { model: 'gpt-4o-2024-08-06' }),
+        ...(source === 'streaming-tools'
+          ? { tools: [{ type: 'function', name: 'query', strict: true }] }
+          : {}),
+        stream: true,
+      },
+      syntheticAuthorization: true,
+    });
     expect(exitCode).toBe(status === 'completed' ? 0 : 1);
     if (status === 'completed') {
       expect(stderr).toBe('');
@@ -217,25 +259,21 @@ main();`,
     } else {
       if (source === 'guide') {
         expect(stderr).toContain('The background response did not complete successfully.');
-      } else {
+      } else if (source === 'example') {
         expect(stderr).toContain(
           resumed ? `Response ended with status ${status}.` : `Response ended with response.${status}.`,
         );
+      } else {
+        expect(stderr).toBe(`Response ended with status ${status}.\n`);
       }
       expect(stderr).not.toContain(privateErrorDetail);
     }
     if (source === 'example') {
       expect(stdout.includes('Interrupted. Continuing...')).toBe(resumed);
-    } else {
+    } else if (source === 'guide') {
       expect(stdout + stderr).not.toContain(privateErrorDetail);
     }
     expect(stdout).not.toContain('synthetic-example-key');
-    expect(requests).toHaveLength(resumed ? 2 : 1);
-    expect(requests[0]).toMatchObject({
-      method: 'POST',
-      url: '/v1/responses',
-      body: { background: true, stream: true },
-    });
     if (resumed) {
       expect(requests[1]).toMatchObject({
         method: 'GET',

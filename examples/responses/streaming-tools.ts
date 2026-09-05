@@ -47,6 +47,12 @@ async function main() {
   for await (const event of stream) {
     console.dir(event, { depth: 10 });
   }
+
+  const result = await stream.finalResponse();
+  if (result.status !== 'completed') {
+    console.error(`Response ended with status ${result.status ?? 'unknown'}.`);
+    process.exitCode = 1;
+  }
 }
 
 main();
