@@ -2,6 +2,7 @@ import { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
 
 async function main() {
   const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime' });
+  let responseDone = false;
 
   // access the underlying `ws.WebSocket` instance
   rt.socket.addEventListener('open', () => {
@@ -42,6 +43,7 @@ async function main() {
 
   // response.done also covers failed, cancelled, and incomplete responses.
   rt.on('response.done', (event) => {
+    responseDone = true;
     if (event.response.status !== 'completed') {
       console.error('Response did not complete successfully.');
       process.exitCode = 1;
@@ -49,7 +51,13 @@ async function main() {
     rt.close();
   });
 
-  rt.socket.addEventListener('close', () => console.log('\nConnection closed!'));
+  rt.socket.addEventListener('close', () => {
+    if (!responseDone) {
+      console.error('WebSocket closed before the response completed.');
+      process.exitCode = 1;
+    }
+    console.log('\nConnection closed!');
+  });
 }
 
 main();
