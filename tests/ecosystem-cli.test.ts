@@ -151,36 +151,49 @@ describe('ecosystem test CLI', () => {
     expect(result.stderr).not.toContain('OPENAI_API_KEY');
   });
 
-  test.each([undefined, '0', '-0', '2', '2e0', '9007199254740991'])(
-    'permits bounded keyless non-live project checks with retry %s',
-    (retry) => {
-      const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
+  test.each([
+    undefined,
+    '0',
+    '-0',
+    '2',
+    '2e0',
+    '1.0000000000000000',
+    '10e-1',
+    '.2e1',
+    '0x2',
+    '0o2',
+    '0b10',
+    '0e-400',
+    '-0.000e-400',
+    ' 2 ',
+    '9007199254740991',
+  ])('permits bounded keyless non-live project checks with retry %s', (retry) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
 
-      try {
-        writeFileSync(path.join(fixture, 'package.json'), '{}\n');
+    try {
+      writeFileSync(path.join(fixture, 'package.json'), '{}\n');
 
-        const result = runCli(
-          [
-            'node-ts-cjs',
-            '--skip=node-ts-cjs',
-            '--skipPack',
-            '--noCleanup',
-            ...(retry === undefined ? [] : [`--retry=${retry}`]),
-          ],
-          fixture,
-        );
+      const result = runCli(
+        [
+          'node-ts-cjs',
+          '--skip=node-ts-cjs',
+          '--skipPack',
+          '--noCleanup',
+          ...(retry === undefined ? [] : [`--retry=${retry}`]),
+        ],
+        fixture,
+      );
 
-        expect(result.error).toBeUndefined();
-        expect(result.status).toBe(0);
-        expect(result.stderr).toContain('running projects:');
-        expect(result.stderr).not.toContain('▶️');
-        expect(result.stderr).not.toContain('OPENAI_API_KEY');
-        expect(result.stdout).not.toContain('[run]:');
-      } finally {
-        rmSync(fixture, { recursive: true, force: true });
-      }
-    },
-  );
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain('running projects:');
+      expect(result.stderr).not.toContain('▶️');
+      expect(result.stderr).not.toContain('OPENAI_API_KEY');
+      expect(result.stdout).not.toContain('[run]:');
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
 
   test.each([
     ['NaN', true],
@@ -189,9 +202,17 @@ describe('ecosystem test CLI', () => {
     ['1e309', true],
     ['-1', true],
     ['0.5', true],
+    ['0.99999999999999999', true],
+    ['1.0000000000000001', true],
+    [' 1.0000000000000001 ', true],
+    ['9007199254740991.1', true],
+    ['10000000000000001e-16', true],
+    ['1e-400', true],
+    ['-1e-400', true],
     ['9007199254740992', true],
     ['1e20', true],
     ['NaN', false],
+    ['1.0000000000000001', false],
   ] as const)('rejects retry %s before ecosystem setup with skipPack=%s', (retry, skipPack) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-ecosystem-retry-count-'));
 
