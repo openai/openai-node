@@ -32,7 +32,7 @@ export type Config = InferConfig & {
 };
 
 export async function resolveProjectPath(cwd: string, projects: string[]): Promise<string[]> {
-  return glob(projects, { cwd, onlyFiles: false });
+  return glob(projects, { cwd, absolute: true, onlyFiles: false });
 }
 
 export interface LoadConfigOptions {
