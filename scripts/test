@@ -138,7 +138,14 @@ if ! is_overriding_api_base_url && ! steady_is_running ; then
   trap 'kill_server_on_port 4010' EXIT
 
   # Start the dev server
-  ./scripts/mock --daemon
+  ./scripts/mock --daemon || {
+    mock_status=$?
+    # The launcher cleans up ordinary startup failures. Signals may skip its trap.
+    if [ "$mock_status" -le 128 ]; then
+      trap - EXIT
+    fi
+    exit "$mock_status"
+  }
 fi
 
 if is_overriding_api_base_url ; then
