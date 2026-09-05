@@ -470,6 +470,10 @@ await client.chat.completions.create({ messages: [{ role: 'user', content: 'How 
 
 On timeout, an `APIConnectionTimeoutError` is thrown.
 
+If a subclass changes the timeout in `buildRequest()`, set `options.timeout` before calling
+`super.buildRequest()`. Workload identity can start acquiring a token inside that call, so changing
+only its returned timeout cannot extend the token acquisition deadline already in progress.
+
 Note that requests which time out will be [retried twice by default](#retries).
 
 ## Request IDs
