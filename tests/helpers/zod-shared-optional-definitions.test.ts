@@ -892,14 +892,18 @@ describe('a definition keeps the context it was referenced from', () => {
       });
     });
 
-    test('an omitted wrapper annotation does not erase the branch value', () => {
-      // `description: undefined` would have been dropped on serialization, so
-      // the wrapper never stated it. Carrying it onto the branch would delete
-      // a description the branch does state.
+    test.each([
+      { name: 'undefined', value: undefined },
+      { name: 'a function', value: () => 'fromWrapper' },
+      { name: 'a symbol', value: Symbol('fromWrapper') },
+    ])('a wrapper annotation holding $name does not erase the branch value', ({ value }) => {
+      // Serialization drops all three from an object property, so the wrapper
+      // never states one. Carrying it onto the branch would delete a
+      // description the branch does state.
       const shared = zv3.string().nullable().optional();
       const supplied: any = {
         anyOf: [{ not: {} }, { type: 'string', description: 'inner' }],
-        description: undefined,
+        description: value,
       };
 
       const out: any = zodToJsonSchema(zv3.object({ a: shared, b: shared }), {
@@ -911,7 +915,10 @@ describe('a definition keeps the context it was referenced from', () => {
           forceResolution && def === (shared as any)._def ? supplied : ignoreOverride,
       });
 
-      expect(out.definitions.p_properties_a).toEqual({ type: 'string', description: 'inner' });
+      expect(JSON.parse(JSON.stringify(out)).definitions.p_properties_a).toEqual({
+        type: 'string',
+        description: 'inner',
+      });
     });
 
     test('112 branch order changes the result', () => {

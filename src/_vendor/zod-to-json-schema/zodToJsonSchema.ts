@@ -233,10 +233,11 @@ const carriedSiblings = (
       return null;
     }
     const value = dataValue(schema, key);
-    // `undefined` is not a value JSON has. The wrapper's own key would have
-    // been dropped on serialization, so carrying it would delete a value the
-    // branch does state rather than move one the wrapper stated.
-    if (value === undefined) {
+    // `undefined` is not a value JSON has, and an object property holding a
+    // function or a symbol is dropped just the same. The wrapper's own key
+    // would not have survived serialization, so carrying it would delete a
+    // value the branch does state rather than move one the wrapper stated.
+    if (value === undefined || typeof value === 'function' || typeof value === 'symbol') {
       continue;
     }
     carried[key] = value;
