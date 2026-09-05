@@ -172,7 +172,10 @@ child.once('message', () => {
     expect(isRunning(fixturePid())).toBe(true);
   });
 
-  test('cleans up its mock when the wrapper is terminated during startup', async () => {
+  test.each([
+    { target: 'wrapper', status: null },
+    { target: 'launcher', status: 137 },
+  ])('cleans up its mock when the $target is terminated during startup', async ({ target, status }) => {
     env['PAUSE_STARTUP'] = 'true';
     const wrapper = spawn('bash', [path.join(fixture, 'scripts/test')], {
       cwd: fixture,
@@ -185,8 +188,12 @@ child.once('message', () => {
         timeout: 5000,
       });
       expect(isRunning(fixturePid())).toBe(true);
-      wrapper.kill('SIGTERM');
-      expect(await closed).toEqual([null, 'SIGTERM']);
+      if (target === 'wrapper') {
+        wrapper.kill('SIGTERM');
+      } else {
+        process.kill(fixturePid('mock.called'), 'SIGKILL');
+      }
+      expect(await closed).toEqual([status, target === 'wrapper' ? 'SIGTERM' : null]);
       await vi.waitFor(() => expect(isRunning(fixturePid())).toBe(false));
       expect(existsSync(path.join(fixture, 'lsof.called'))).toBe(true);
       expect(existsSync(path.join(fixture, 'jest.called'))).toBe(false);

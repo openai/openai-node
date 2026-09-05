@@ -140,8 +140,10 @@ if ! is_overriding_api_base_url && ! steady_is_running ; then
   # Start the dev server
   ./scripts/mock --daemon || {
     mock_status=$?
-    # The launcher already cleans up its own process when startup fails.
-    trap - EXIT
+    # The launcher cleans up ordinary startup failures. Signals may skip its trap.
+    if [ "$mock_status" -le 128 ]; then
+      trap - EXIT
+    fi
     exit "$mock_status"
   }
 fi
