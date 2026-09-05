@@ -637,6 +637,9 @@ function parseArgs() {
           throw new Error(`Unknown ecosystem project: ${JSON.stringify(project)}`);
         }
       }
+      if (!Number.isSafeInteger(args.retry) || args.retry < 0) {
+        throw new Error('--retry must be a non-negative safe integer.');
+      }
       return true;
     })
     .help().argv;
