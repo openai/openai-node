@@ -612,9 +612,30 @@ function parseArgs() {
         description: 'number of parallel jobs to run',
       },
       retry: {
-        type: 'number',
-        default: 0,
+        type: 'string',
+        default: '0',
         description: 'number of times to retry failing jobs',
+        coerce: (value: unknown) => {
+          const retry = Number(value);
+          const decimal = /^[+-]?(?<whole>\d*)(?:\.(?<fraction>\d*))?(?:e(?<exponent>[+-]?\d+))?$/iu.exec(
+            String(value).trim(),
+          )?.groups;
+          let hasFraction = false;
+          if (decimal) {
+            const { whole = '', fraction = '', exponent = '0' } = decimal;
+            const digits = whole + fraction;
+            let significantDigits = digits.length;
+            while (digits[significantDigits - 1] === '0') {
+              significantDigits--;
+            }
+            // Check the original digits: Number can round a fraction to an integer or zero.
+            hasFraction = significantDigits > 0 && Number(exponent) < significantDigits - whole.length;
+          }
+          if (!Number.isSafeInteger(retry) || retry < 0 || hasFraction) {
+            throw new Error('--retry must be a non-negative safe integer.');
+          }
+          return retry;
+        },
       },
       retryDelay: {
         type: 'number',

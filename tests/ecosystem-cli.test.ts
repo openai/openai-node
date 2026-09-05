@@ -151,13 +151,38 @@ describe('ecosystem test CLI', () => {
     expect(result.stderr).not.toContain('OPENAI_API_KEY');
   });
 
-  test('permits bounded keyless non-live project checks', () => {
+  test.each([
+    undefined,
+    '0',
+    '-0',
+    '2',
+    '2e0',
+    '1.0000000000000000',
+    '10e-1',
+    '.2e1',
+    '0x2',
+    '0o2',
+    '0b10',
+    '0e-400',
+    '-0.000e-400',
+    ' 2 ',
+    '9007199254740991',
+  ])('permits bounded keyless non-live project checks with retry %s', (retry) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
 
     try {
       writeFileSync(path.join(fixture, 'package.json'), '{}\n');
 
-      const result = runCli(['node-ts-cjs', '--skip=node-ts-cjs', '--skipPack', '--noCleanup'], fixture);
+      const result = runCli(
+        [
+          'node-ts-cjs',
+          '--skip=node-ts-cjs',
+          '--skipPack',
+          '--noCleanup',
+          ...(retry === undefined ? [] : [`--retry=${retry}`]),
+        ],
+        fixture,
+      );
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
@@ -165,6 +190,49 @@ describe('ecosystem test CLI', () => {
       expect(result.stderr).not.toContain('▶️');
       expect(result.stderr).not.toContain('OPENAI_API_KEY');
       expect(result.stdout).not.toContain('[run]:');
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ['NaN', true],
+    ['Infinity', true],
+    ['-Infinity', true],
+    ['1e309', true],
+    ['-1', true],
+    ['0.5', true],
+    ['0.99999999999999999', true],
+    ['1.0000000000000001', true],
+    [' 1.0000000000000001 ', true],
+    ['9007199254740991.1', true],
+    ['10000000000000001e-16', true],
+    ['1e-400', true],
+    ['-1e-400', true],
+    ['9007199254740992', true],
+    ['1e20', true],
+    ['NaN', false],
+    ['1.0000000000000001', false],
+  ] as const)('rejects retry %s before ecosystem setup with skipPack=%s', (retry, skipPack) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-ecosystem-retry-count-'));
+
+    try {
+      writeFileSync(path.join(fixture, 'package.json'), '{}\n');
+
+      const result = runCli(
+        ['node-js', '--skip=node-js', ...(skipPack ? ['--skipPack'] : []), '--noCleanup', `--retry=${retry}`],
+        fixture,
+        { PATH: path.join(fixture, 'missing-bin') },
+      );
+
+      expect(result.error, result.stdout + result.stderr).toBeUndefined();
+      expect(result.status, result.stdout + result.stderr).toBe(1);
+      expect(result.stderr).toContain('--retry must be a non-negative safe integer.');
+      expect(result.stderr).not.toContain('rootDir:');
+      expect(result.stderr).not.toContain('running projects:');
+      expect(result.stdout).not.toContain('[run]:');
+      expect(existsSync(path.join(fixture, '.pack'))).toBe(false);
+      expect(existsSync(path.join(fixture, 'tmp'))).toBe(false);
     } finally {
       rmSync(fixture, { recursive: true, force: true });
     }
@@ -273,15 +341,16 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
-    ['selected package', true, false, ''],
-    ['live selected package', true, true, ''],
-    ['install failure', true, false, 'install'],
-    ['typecheck failure', true, false, 'typecheck'],
-    ['test failure', true, false, 'test'],
-    ['local tarball', false, false, ''],
-    ['live local tarball', false, true, ''],
-    ['local tarball test failure', false, false, 'test'],
-  ] as const)('runs Bun validation for %s', (_name, fromNpm, live, failure) => {
+    ['selected package', true, false, '', 0],
+    ['live selected package', true, true, '', 0],
+    ['install failure', true, false, 'install', 0],
+    ['typecheck failure', true, false, 'typecheck', 0],
+    ['test failure', true, false, 'test', 0],
+    ['test failure with retry budget', true, false, 'test', 2],
+    ['local tarball', false, false, '', 0],
+    ['live local tarball', false, true, '', 0],
+    ['local tarball test failure', false, false, 'test', 0],
+  ] as const)('runs Bun validation for %s', (_name, fromNpm, live, failure, retry) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-bun-cli-'));
     const bin = path.join(fixture, 'bin');
     const project = path.join(fixture, 'ecosystem-tests', 'bun');
@@ -319,7 +388,8 @@ describe('ecosystem test CLI', () => {
           ...(fromNpm ? [`--from-npm=${selectedPackage}`] : []),
           '--skipPack',
           '--noCleanup',
-          '--retry=0',
+          `--retry=${retry}`,
+          '--retryDelay=0',
           ...(live ? ['--live'] : []),
         ],
         fixture,
@@ -352,7 +422,11 @@ describe('ecosystem test CLI', () => {
           .trim()
           .split('\n')
           .map((line) => JSON.parse(line)),
-      ).toEqual(expected.slice(0, failedPhase === -1 ? expected.length : failedPhase + 1));
+      ).toEqual(
+        Array.from({ length: retry + 1 }, () =>
+          expected.slice(0, failedPhase === -1 ? expected.length : failedPhase + 1),
+        ).flat(),
+      );
       expect(result.stdout + result.stderr).not.toContain('synthetic-bun-cli-key');
     } finally {
       rmSync(fixture, { recursive: true, force: true });
