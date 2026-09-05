@@ -1504,8 +1504,12 @@ export class OpenAI {
           : await this.shouldRetry(response);
       const retryAfter = parseRetryAfter(response.headers);
       const retryDelay = retryAfter?.delayMillis;
+      const retryAt = retryAfter?.retryAt;
+      const retryDeadline = retryAt === undefined ? undefined : performance.now() + (retryDelay ?? 0);
       const remainingRetryDelay = () =>
-        retryAfter?.retryAt === undefined ? retryDelay : Math.max(0, retryAfter.retryAt - Date.now());
+        retryAt === undefined || retryDeadline === undefined
+          ? retryDelay
+          : Math.max(0, Math.min(retryAt - Date.now(), retryDeadline - performance.now()));
       let declinedRetryDelay = false;
       if ((shouldRefreshWorkloadIdentity || (retriesRemaining && shouldRetry)) && !hasStreamingBody) {
         try {
@@ -1609,7 +1613,7 @@ export class OpenAI {
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
       const boundedErrorRead =
-        declinedRetryDelay || (shouldRetry && retriesRemaining === 0 && !hasStreamingBody);
+        declinedRetryDelay || (shouldRetry && (retriesRemaining === 0 || hasStreamingBody));
       const errText = x509Authentication
         ? await this.readResponseError(response, options, timeout, controller, req.signal, x509Authentication)
         : boundedErrorRead

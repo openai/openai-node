@@ -347,6 +347,37 @@ describe('OpenAI client request behavior', () => {
     },
   );
 
+  test.each([429, 503])('bounds HTTP %i error bodies after a streaming upload', async (status) => {
+    vi.useFakeTimers();
+    const cancelBody = vi.fn();
+    const response = new Response(new ReadableStream({ cancel: cancelBody }), {
+      status,
+      headers: { 'retry-after': '90' },
+    });
+    const fetch = vi.fn(async () => response);
+    const client = new OpenAI({ apiKey: 'test-key', fetch, timeout: 100, maxRetries: 1 });
+    const upload = new ReadableStream<Uint8Array>({
+      start(stream) {
+        stream.enqueue(new TextEncoder().encode('upload'));
+        stream.close();
+      },
+    });
+    try {
+      const pending = Promise.allSettled([client.post('/items', { body: upload })]);
+      await vi.advanceTimersByTimeAsync(100);
+      const [outcome] = await pending;
+      expect(outcome.status).toBe('rejected');
+      if (outcome.status === 'rejected') {
+        expect(outcome.reason).toBeInstanceOf(APIConnectionTimeoutError);
+      }
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(cancelBody).toHaveBeenCalledTimes(1);
+      expect(response.body?.locked).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test.each([
     ['forward', 3_600_000],
     ['backward', -3_600_000],
@@ -457,6 +488,33 @@ describe('OpenAI client request behavior', () => {
       }
     },
   );
+
+  test('keeps an accepted HTTP-date retry within its limit after a backward clock jump', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-03T12:00:00Z'));
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          new ReadableStream({
+            cancel() {
+              vi.setSystemTime(new Date('2026-09-03T11:00:00Z'));
+            },
+          }),
+          { status: 503, headers: { 'retry-after': 'Thu, 03 Sep 2026 12:00:01 GMT' } },
+        ),
+      )
+      .mockResolvedValueOnce(jsonResponse({ id: 'recovered' }));
+    const client = new OpenAI({ apiKey: 'test-key', fetch, maxRetries: 1 });
+    try {
+      const pending = client.get('/items');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      await expect(pending).resolves.toMatchObject({ id: 'recovered' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   test.each([
     ['seconds at the limit', { 'retry-after': '60' }, 60_000, true],
