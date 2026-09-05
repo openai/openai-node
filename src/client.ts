@@ -1205,6 +1205,7 @@ export class OpenAI {
         if (!reader) void Shims.CancelReadableStream(response.body).catch(() => undefined);
       }
       if (callerSignal.aborted && !timedOut) {
+        if (!reader) void Shims.CancelReadableStream(response.body).catch(() => undefined);
         throw abortError();
       }
       throw error;
@@ -1371,9 +1372,17 @@ export class OpenAI {
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
     x509Authentication?.releaseRequestBody(req.body);
+    const priorIssuerFailure = workloadIdentityRequest?.refresh?.failure;
+    let normalizedIssuerFailure: typeof priorIssuerFailure;
     const response = await fetchWithAuth
       .call(this, url, req, remainingTimeout, controller, security)
-      .catch(castToError);
+      .catch((error: unknown) => {
+        const failure = workloadIdentityRequest?.refresh?.failure;
+        if (failure && failure !== priorIssuerFailure && failure.error === error) {
+          normalizedIssuerFailure = failure;
+        }
+        return castToError(error);
+      });
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1389,7 +1398,10 @@ export class OpenAI {
         isAbortError(response) ||
         /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
       const issuerFailure = workloadIdentityRequest?.refresh?.failure;
-      const issuerDelay = issuerFailure?.error === response ? issuerFailure.delayMillis : undefined;
+      const issuerDelay =
+        issuerFailure && (issuerFailure.error === response || issuerFailure === normalizedIssuerFailure)
+          ? issuerFailure.delayMillis
+          : undefined;
       if (
         retriesRemaining &&
         !hasStreamingBody &&
@@ -1421,6 +1433,7 @@ export class OpenAI {
                   : issuerFailure!.retryAt - Date.now(),
               ),
           workloadIdentityRequest,
+          issuerDelay !== undefined,
         );
       }
       const terminalMessage = hasStreamingBody
@@ -1837,6 +1850,7 @@ export class OpenAI {
     requestLogID: string,
     timeoutMillis?: number,
     workloadIdentityRequest?: WorkloadIdentityRequestContext,
+    issuerReplay = false,
   ): Promise<APIResponseProps> {
     // If the API asks us to wait a certain amount of time, just do what it
     // says, but otherwise calculate a default
@@ -1847,12 +1861,13 @@ export class OpenAI {
     await this.waitForRetry(
       options,
       timeoutMillis,
-      workloadIdentityRequest?.deadline === undefined
+      !issuerReplay || workloadIdentityRequest?.deadline === undefined
         ? undefined
         : Math.max(0, workloadIdentityRequest.deadline - performance.now()),
       workloadIdentityRequest?.signal,
     );
     if (
+      issuerReplay &&
       workloadIdentityRequest?.deadline !== undefined &&
       performance.now() >= workloadIdentityRequest.deadline
     ) {

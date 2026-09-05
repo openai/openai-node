@@ -693,6 +693,36 @@ describe('OpenAI client request behavior', () => {
     }
   });
 
+  test('cancels an unlocked custom error decoder body after caller abort', async () => {
+    vi.useFakeTimers();
+    const caller = new AbortController();
+    const cancelBody = vi.fn();
+    const response = new Response(new ReadableStream({ cancel: cancelBody }), {
+      status: 503,
+      headers: { 'retry-after': '90' },
+    });
+    // oxlint-disable-next-line promise/avoid-new -- A stalled custom decoder must not settle the request.
+    vi.spyOn(response, 'text').mockImplementation(() => new Promise<string>(() => {}));
+    const client = new OpenAI({ apiKey: 'test-key', fetch: async () => response, timeout: 100 });
+    try {
+      const result = Promise.allSettled([
+        client.responses.create({ model: 'test-model', input: 'Hello.' }, { signal: caller.signal }),
+      ]);
+      await vi.advanceTimersByTimeAsync(10);
+      caller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      const [outcome] = await result;
+      expect(outcome.status).toBe('rejected');
+      if (outcome.status === 'rejected') {
+        expect(outcome.reason).toBeInstanceOf(APIUserAbortError);
+      }
+      expect(cancelBody).toHaveBeenCalledTimes(1);
+      expect(response.body?.locked).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test('preserves UTF-8 error text split across terminal response chunks', async () => {
     const message = 'Try again later 🌍';
     const bytes = new TextEncoder().encode(`\uFEFF${JSON.stringify({ error: { message } })}`);

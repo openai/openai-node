@@ -1,4 +1,5 @@
 /* oxlint-disable max-classes-per-file -- Distinct subclasses exercise existing async protected-hook forwarding contracts. */
+import { runInNewContext } from 'node:vm';
 import { vi } from 'vitest';
 import OpenAI, {
   APIConnectionError,
@@ -401,6 +402,99 @@ describe('OpenAI with Workload Identity', () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(await result).toBeInstanceOf(APIConnectionError);
     expect(issuerCalls).toBe(1);
+  });
+
+  test.each(['response', 'timeout'] as const)(
+    'keeps a fresh per-attempt timeout for ordinary workload API %s retries',
+    async (mode) => {
+      vi.useFakeTimers();
+      let apiCalls = 0;
+      const send = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).includes('/oauth/token')) {
+          return globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+        }
+        apiCalls += 1;
+        if (apiCalls === 1) {
+          if (mode === 'response') {
+            return new Response('unavailable', { status: 503 });
+          }
+          await new Promise<void>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('request timed out')), {
+              once: true,
+            });
+          });
+        }
+        return globalThis.Response.json({ data: [] });
+      });
+      const client = new OpenAI({ ...createTestClientOptions(), fetch: send, timeout: 100, maxRetries: 1 });
+      const result = Promise.allSettled([client.models.list()]);
+      await vi.advanceTimersByTimeAsync(700);
+      const [outcome] = await result;
+      expect(outcome.status).toBe('fulfilled');
+      expect(apiCalls).toBe(2);
+    },
+  );
+
+  test.each([
+    ['primitive', '200', false],
+    ['foreign error', '200', false],
+    ['primitive over-limit', '90000', true],
+  ] as const)('preserves %s issuer hint after error normalization', async (kind, hint, refused) => {
+    vi.useFakeTimers();
+    let attempts = 0;
+    class DeferredAuthenticationClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- Acquire the token during fetchWithAuth.
+      protected override async bearerAuth(): Promise<undefined> {}
+
+      override async buildRequest(
+        options: Parameters<OpenAI['buildRequest']>[0],
+        retries?: Parameters<OpenAI['buildRequest']>[1],
+      ) {
+        attempts += 1;
+        return await super.buildRequest(options, retries);
+      }
+    }
+    let issuerCalls = 0;
+    let secondExchangeAt = 0;
+    const send = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).includes('/oauth/token')) {
+        issuerCalls += 1;
+        if (issuerCalls === 1) {
+          const failure = new Response('unavailable', {
+            status: 503,
+            headers: { 'retry-after-ms': hint },
+          });
+          vi.spyOn(failure, 'text').mockImplementation(async () => {
+            throw kind === 'foreign error'
+              ? runInNewContext('new Error("foreign failure")')
+              : 'synthetic failure';
+          });
+          return failure;
+        }
+        secondExchangeAt = performance.now();
+        return globalThis.Response.json({ access_token: 'synthetic-token', expires_in: 3600 });
+      }
+      return globalThis.Response.json({ data: [] });
+    });
+    const client = new DeferredAuthenticationClient({
+      ...createTestClientOptions(),
+      fetch: send,
+      timeout: 1000,
+      maxRetries: 1,
+    });
+    const started = performance.now();
+    const pending = Promise.allSettled([client.models.list()]);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(attempts).toBe(refused ? 1 : 2);
+    expect(issuerCalls).toBe(refused ? 1 : 2);
+    await vi.advanceTimersByTimeAsync(450);
+    const [outcome] = await pending;
+    expect(outcome.status).toBe(refused ? 'rejected' : 'fulfilled');
+    expect(attempts).toBe(refused ? 1 : 2);
+    expect(issuerCalls).toBe(refused ? 1 : 2);
+    if (!refused) {
+      expect(secondExchangeAt - started).toBeGreaterThanOrEqual(200);
+    }
   });
 
   test.each(['insufficient budget', 'late timer'] as const)(

@@ -756,6 +756,12 @@ import fetch from 'my-fetch';
 const client = new OpenAI({ fetch });
 ```
 
+For API requests, custom `fetch` implementations should stop response body reads when the request's
+`init.signal` aborts.
+If a custom response overrides `text()` and acquires a Web stream reader, that decoder must cancel
+and release its own reader on abort. The SDK cannot release a reader locked inside the custom decoder;
+this also applies when the SDK times out while reading an error response.
+
 ### Fetch options
 
 If you want to set custom `fetch` options without overriding the `fetch` function, you can provide a `fetchOptions` object when instantiating the client or making a request. (Request-specific options override client options.)
