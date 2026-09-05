@@ -57,10 +57,21 @@ async function runExample(directory: string, baseURL: string) {
 }
 
 describe('image-streaming executable example', () => {
-  test.each(['HTTP rejection', 'SSE error', 'output write failure', 'success'] as const)(
-    'reports the process result for %s',
+  test.each([
+    'HTTP rejection',
+    'SSE error',
+    'output write failure',
+    'success',
+    'empty EOF',
+    'partial-only EOF',
+    'completed without partial',
+  ] as const)(
+    'reports the executable process result, output image files, and diagnostics for %s',
     async (scenario) => {
       const directory = await mkdtemp(path.join(tmpdir(), 'openai-image-stream-example-'));
+      const incomplete = scenario === 'empty EOF' || scenario === 'partial-only EOF';
+      const hasPartial =
+        scenario !== 'HTTP rejection' && scenario !== 'empty EOF' && scenario !== 'completed without partial';
       const requests: {
         method: string | undefined;
         url: string | undefined;
@@ -80,13 +91,19 @@ describe('image-streaming executable example', () => {
         }
 
         response.writeHead(200, { 'content-type': 'text/event-stream', connection: 'close' });
-        response.write(
-          `data: ${JSON.stringify({
-            type: 'image_generation.partial_image',
-            partial_image_index: 0,
-            b64_json: partialImage.toString('base64'),
-          })}\n\n`,
-        );
+        if (hasPartial) {
+          response.write(
+            `data: ${JSON.stringify({
+              type: 'image_generation.partial_image',
+              partial_image_index: 0,
+              b64_json: partialImage.toString('base64'),
+            })}\n\n`,
+          );
+        }
+        if (incomplete) {
+          response.end();
+          return;
+        }
         response.end(
           scenario === 'SSE error'
             ? `event: error\ndata: ${JSON.stringify({ error: failure })}\n\n`
@@ -117,16 +134,26 @@ describe('image-streaming executable example', () => {
             authorization: 'Bearer synthetic-image-example-key',
           },
         ]);
-        if (scenario === 'HTTP rejection') {
+        if (scenario === 'HTTP rejection' || scenario === 'empty EOF') {
           expect(await readdir(directory)).toEqual([]);
-        } else {
+        } else if (hasPartial) {
           expect(await readFile(path.join(directory, 'partial_1.png'))).toEqual(partialImage);
+        } else {
+          expect(await readdir(directory)).toEqual(['final_image.png']);
         }
-        if (scenario === 'success') {
+        if (scenario === 'success' || scenario === 'completed without partial') {
           expect(await readFile(path.join(directory, 'final_image.png'))).toEqual(finalImage);
           expect(result.stdout).toContain('Saved to:');
           expect(result.stderr).toBe('');
           expect(result.code).toBe(0);
+        } else if (incomplete) {
+          expect(result.code).toBe(1);
+          expect(result.stderr).toContain('Error generating image:');
+          expect(result.stderr).toContain('Image stream ended without a final image.');
+          expect(await readdir(directory)).toEqual(hasPartial ? ['partial_1.png'] : []);
+          expect(result.stdout + result.stderr).not.toContain(partialImage.toString('base64'));
+          expect(result.stdout + result.stderr).not.toContain(finalImage.toString('base64'));
+          expect(result.stdout + result.stderr).not.toContain('synthetic-image-example-key');
         } else {
           expect(result.stderr).toContain('Error generating image:');
           expect(result.stderr).toContain(
