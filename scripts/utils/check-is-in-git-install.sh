@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Check if you happen to call prepare for a repository that's already in node_modules.
-[ "$(basename "$(dirname "$PWD")")" = 'node_modules' ] ||
-# The name of the containing directory that 'npm` uses, which looks like
-# $HOME/.npm/_cacache/git-cloneXXXXXX
-[ "$(basename "$(dirname "$PWD")")" = 'tmp' ] ||
-# The name of the containing directory that some package managers use, e.g. .tmp/XXXXX
-[ "$(basename "$(dirname "$PWD")")" = '.tmp' ]
+# Keep installed packages and the staging names used by npm, pnpm, and Yarn Classic.
+# A tmp or .tmp parent alone does not identify a disposable Git-install checkout.
+parent="${PWD%/*}"
+case "${parent##*/}/${PWD##*/}" in
+  node_modules/* | tmp/git-clone* | tmp/_tmp_* | .tmp/*.prepare)
+    exit 0
+    ;;
+  *)
+    exit 1
+    ;;
+esac
