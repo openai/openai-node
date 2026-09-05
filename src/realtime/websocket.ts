@@ -257,7 +257,12 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     });
 
     this.socket.addEventListener('error', (event: any) => {
-      this._onError(null, event.message, null);
+      // Native ErrorEvents can carry an empty message while `error` still holds the failure.
+      const cause = event.error ?? null;
+      const message = [event.message, cause?.message].find(
+        (value) => typeof value === 'string' && value !== '',
+      );
+      this._onError(null, message ?? 'unknown error', cause);
     });
   }
 
