@@ -1993,7 +1993,8 @@ export class EventStream<EventTypes extends BaseEvents> {
         try {
           for (const registration of listeners as any) {
             if (!registration.removed) {
-              registration.listener(...(args as any));
+              const { listener } = registration;
+              listener(...(args as any));
             }
           }
         } finally {

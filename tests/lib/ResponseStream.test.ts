@@ -31,6 +31,28 @@ test('parsed response deltas retain their required snapshots', () => {
 });
 
 describe('.stream()', () => {
+  it.each(['on', 'once'] as const)('preserves callback receivers for %s listeners', async (method) => {
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      { type: 'response.completed', sequence_number: 1, response: makeResponse({ status: 'completed' }) },
+    ];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    const unbound = vi.fn();
+    const bound = vi.fn();
+    const context = { name: 'caller-owned context' };
+
+    stream[method]('event', unbound);
+    stream[method]('event', bound.bind(context));
+    await stream.done();
+
+    const calls = (method === 'once' ? events.slice(0, 1) : events).map((event) => [event]);
+    expect(bound.mock.calls).toEqual(calls);
+    expect(bound.mock.contexts).toEqual(calls.map(() => context));
+    expect(unbound.mock.calls).toEqual(calls);
+    expect(unbound.mock.contexts).toHaveLength(calls.length);
+    expect(unbound.mock.contexts.every((receiver) => receiver === undefined)).toBe(true);
+  });
+
   it('replays prior events when resuming by ID so snapshots stay complete', async () => {
     const requests: string[] = [];
     const response = {
