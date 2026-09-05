@@ -82,7 +82,7 @@ yargs(process.argv.slice(2))
         force: args.force,
         watch: args.watch,
         clean: args.clean,
-        maxWorkers: args.maxWorkers,
+        maxWorkers: args.maxWorkers ?? config.maxWorkers,
       });
     },
   )
