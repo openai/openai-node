@@ -1,13 +1,18 @@
 # openai-bun-test
 
-To install dependencies:
+After [setting up the repository](../../.github/CONTRIBUTING.md#setting-up-the-environment) and installing Bun,
+run this fixture from the repository root:
 
-```bash
-bun install
+```sh
+pnpm tsn ecosystem-tests/cli.ts bun
 ```
 
-To run:
+The runner builds and installs the local SDK, type-checks the fixture, and runs loopback tests without
+live API credentials.
 
-```bash
-bun run index.ts
+Live tests can incur API charges and upload synthetic files that the suite does not delete.
+Set `OPENAI_API_KEY` in your environment and add `--live` to run them:
+
+```sh
+pnpm tsn ecosystem-tests/cli.ts bun --live
 ```
