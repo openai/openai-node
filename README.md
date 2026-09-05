@@ -389,10 +389,10 @@ const job = await client.fineTuning.jobs
   .create({ model: 'gpt-4o', training_file: 'file-abc123' })
   .catch(async (err) => {
     if (err instanceof OpenAI.APIError) {
-      console.log(err.request_id);
+      console.log(err.requestID);
       console.log(err.status); // 400
-      console.log(err.name); // BadRequestError
-      console.log(err.headers); // {server: 'nginx', ...}
+      console.log(err instanceof OpenAI.BadRequestError); // true for an HTTP 400 response
+      console.log(err.headers); // response Headers
     } else {
       throw err;
     }
@@ -407,6 +407,7 @@ Error codes are as follows:
 | 401         | `AuthenticationError`      |
 | 403         | `PermissionDeniedError`    |
 | 404         | `NotFoundError`            |
+| 409         | `ConflictError`            |
 | 422         | `UnprocessableEntityError` |
 | 429         | `RateLimitError`           |
 | >=500       | `InternalServerError`      |
