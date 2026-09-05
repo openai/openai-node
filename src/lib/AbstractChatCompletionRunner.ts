@@ -497,12 +497,26 @@ export class AbstractChatCompletionRunner<
         if (this.controller.signal.aborted) {
           throw userAbortError();
         }
-        rawContent = await fn.function(parsed, runner, toolContext);
+        try {
+          rawContent = await fn.function(parsed, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && error === this.controller.signal.reason) {
+            throw userAbortError();
+          }
+          throw error;
+        }
       } else {
         if (this.controller.signal.aborted && !bufferedToolCall) {
           throw userAbortError();
         }
-        rawContent = await fn.function(args, runner, toolContext);
+        try {
+          rawContent = await fn.function(args, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && error === this.controller.signal.reason) {
+            throw userAbortError();
+          }
+          throw error;
+        }
       }
 
       const content = AbstractChatCompletionRunner.#stringifyFunctionCallResult(rawContent);
