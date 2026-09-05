@@ -539,7 +539,7 @@ const projectRunners = {
 };
 
 let projectNames = Object.keys(projectRunners) as (keyof typeof projectRunners)[];
-const projectNamesSet = new Set(projectNames);
+const projectNamesSet = new Set<string>(projectNames);
 
 async function startProxy() {
   const proxy = createServer((_req, res) => {
@@ -631,6 +631,14 @@ function parseArgs() {
         type: 'boolean',
         default: false,
       },
+    })
+    .check((args) => {
+      for (const project of args._) {
+        if (typeof project !== 'string' || !projectNamesSet.has(project)) {
+          throw new Error(`Unknown ecosystem project: ${JSON.stringify(project)}`);
+        }
+      }
+      return true;
     })
     .help().argv;
 }

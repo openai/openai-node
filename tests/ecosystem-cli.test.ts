@@ -171,6 +171,36 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
+    ['an unknown project', ['bun-typo'], true],
+    ['mixed known and unknown projects', ['node-js', 'bun-typo'], true],
+    ['an inherited property name', ['toString'], true],
+    ['a numeric zero', ['0'], true],
+    ['an empty project name', [''], true],
+    ['an unknown project after --', ['--', 'bun-typo'], true],
+    ['an unknown project with packing enabled', ['bun-typo'], false],
+  ] as const)('rejects %s before ecosystem setup', (_name, projects, skipPack) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-ecosystem-project-selection-'));
+
+    try {
+      writeFileSync(path.join(fixture, 'package.json'), '{}\n');
+
+      const result = runCli([...(skipPack ? ['--skipPack'] : []), '--noCleanup', ...projects], fixture, {
+        PATH: path.join(fixture, 'missing-bin'),
+      });
+
+      expect(result.error, result.stdout + result.stderr).toBeUndefined();
+      expect(result.status, result.stdout + result.stderr).toBe(1);
+      expect(result.stderr).toContain('Unknown ecosystem project:');
+      expect(result.stderr).not.toContain('running projects:');
+      expect(result.stdout).not.toContain('[run]:');
+      expect(existsSync(path.join(fixture, '.pack'))).toBe(false);
+      expect(existsSync(path.join(fixture, 'tmp'))).toBe(false);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
     { name: 'sequential', options: [], packageOption: '--fromNpm' },
     { name: 'explicit worker count', options: ['--jobs=2'], packageOption: '--fromNpm' },
     { name: 'parallel', options: ['--parallel'], packageOption: '--from-npm' },
