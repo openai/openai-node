@@ -13,6 +13,7 @@ Basic text based example with `ws`:
 import { OpenAIRealtimeWS } from 'openai/realtime/ws';
 
 const rt = new OpenAIRealtimeWS({ model: 'gpt-realtime' });
+let responseDone = false;
 
 // access the underlying `ws.WebSocket` instance
 rt.socket.on('open', () => {
@@ -49,10 +50,26 @@ rt.on('session.created', (event) => {
 rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 rt.on('response.output_text.done', () => console.log());
 
-rt.on('response.done', () => rt.close());
+// response.done also covers failed, cancelled, and incomplete responses.
+rt.on('response.done', (event) => {
+  responseDone = true;
+  if (event.response.status !== 'completed') {
+    console.error('Response did not complete successfully.');
+    process.exitCode = 1;
+  }
+  rt.close();
+});
 
-rt.socket.on('close', () => console.log('\nConnection closed!'));
+rt.socket.on('close', () => {
+  if (!responseDone) {
+    console.error('WebSocket closed before the response completed.');
+    process.exitCode = 1;
+  }
+  console.log('\nConnection closed!');
+});
 ```
+
+`response.done` indicates a terminal response, not necessarily a successful one. Check `event.response.status` for `completed`; a socket close before `response.done` also leaves the response unfinished.
 
 To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `OpenAIRealtimeWebSocket` and adjust any `rt.socket` access:
 
