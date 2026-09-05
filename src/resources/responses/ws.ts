@@ -4,6 +4,7 @@ import * as WS from 'ws';
 import { NodeWebSocket } from '../../internal/ws-adapter-node';
 import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
+import { OpenAIError } from '../../error';
 import { VERSION } from '../../version';
 
 export type { ResponsesWSReconnectOptions } from './ws-base';
@@ -17,6 +18,11 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
     if (!WS?.WebSocket) {
       throw new Error(
         'ResponsesWS from "openai/resources/responses/ws" requires the "ws" package but it could not be loaded.',
+      );
+    }
+    if (typeof client._options.apiKey === 'function') {
+      throw new OpenAIError(
+        'Cannot instantiate ResponsesWS with a function-based apiKey. Use a client with a resolved string apiKey instead.',
       );
     }
 
