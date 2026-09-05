@@ -131,7 +131,15 @@ function throwAfterRemovingOnce(signal: AbortSignal): void {
   });
 }
 
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Vitest requires its second argument when removing an environment variable.
+  vi.stubEnv('AWS_BEDROCK_BASE_URL', undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe.each(providerCases)('%s %s credentials', (_name, endpoint, create) => {
   test('cancels a documented public models request while its token provider remains pending', async () => {
