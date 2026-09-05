@@ -1253,6 +1253,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
+      const abortReason = new Error('stop after assistant message');
       const runner = openai.chat.completions.runTools(
         {
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
@@ -1276,7 +1277,7 @@ describe('resource completions', () => {
 
       runner.on('message', (message) => {
         if (message.role === 'assistant') {
-          controller.abort();
+          controller.abort(abortReason);
         }
       });
       await handleRequest(async (request) => {
@@ -1312,7 +1313,8 @@ describe('resource completions', () => {
         };
       });
 
-      await runner.done().catch(() => {});
+      const abortError = await runner.done().catch((error) => error);
+      expect(abortError).toMatchObject({ cause: abortReason });
 
       expect(listener.messages).toEqual([
         {
