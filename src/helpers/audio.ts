@@ -67,10 +67,18 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       ffplay.stderr?.resume();
       ffplay.on('error', reject);
 
+      // The player can exit before the input stream finishes its cleanup.
+      let inputFinished = false;
+      let processClosed = false;
       pipeline(source, ffplay.stdin, (error) => {
         if (error) {
           ffplay.kill();
           reject(error);
+          return;
+        }
+        inputFinished = true;
+        if (processClosed) {
+          resolve();
         }
       });
 
@@ -79,7 +87,10 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
           reject(new Error(`ffplay process exited with code ${code}`));
           return;
         }
-        resolve();
+        processClosed = true;
+        if (inputFinished) {
+          resolve();
+        }
       });
     } catch (error) {
       reject(error);
