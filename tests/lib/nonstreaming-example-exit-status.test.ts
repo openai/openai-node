@@ -217,3 +217,44 @@ describe.each(examples)('$file exit status', ({ file, kind, model }) => {
     }
   });
 });
+
+test('manual conversation example drains large error diagnostics before exiting', async () => {
+  const message = `Synthetic rejection start:${'x'.repeat(1024 * 1024)}:synthetic rejection end`;
+  const requests: { method: string | undefined; url: string | undefined }[] = [];
+  const server = createServer((request, response) => {
+    requests.push({ method: request.method, url: request.url });
+    request.resume();
+    request.on('end', () => {
+      response.writeHead(400, { 'content-type': 'application/json', connection: 'close' });
+      response.end(JSON.stringify({ error: { message, type: 'invalid_request_error' } }));
+    });
+  });
+
+  try {
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected a loopback HTTP address');
+    }
+    const result = await runExample(
+      'responses/manual-conversation-state.ts',
+      `http://127.0.0.1:${address.port}/v1`,
+      false,
+    );
+
+    expect(result).toMatchObject({ code: 1, signal: null, stdout: '' });
+    expect(requests).toEqual([{ method: 'POST', url: '/v1/responses' }]);
+    expect(result.stderr).toContain('BadRequestError: 400 Synthetic rejection start:');
+    // Compare without dumping the synthetic megabyte into a failed assertion.
+    expect(result.stderr.includes(message)).toBe(true);
+    expect(result.stderr).not.toContain(credential);
+  } finally {
+    if (server.listening) {
+      const closed = once(server, 'close');
+      server.close();
+      server.closeAllConnections();
+      await closed;
+    }
+  }
+});
