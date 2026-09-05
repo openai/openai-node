@@ -1,4 +1,7 @@
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const { SourceMap } = require('node:module');
+const path = require('node:path');
 const OpenAI = require('openai');
 
 const requests = [];
@@ -67,6 +70,27 @@ void (async () => {
       assert.equal(url.pathname, '/v1/models/synthetic-model');
       assert.equal(url.searchParams.get('caller'), 'present');
       assert.equal(url.searchParams.get('from_subclass'), 'true');
+    }
+
+    const indexPath = require.resolve('openai');
+    const packageDir = path.dirname(indexPath);
+    const generatedLines = readFileSync(indexPath, 'utf-8').split('\n');
+    const payload = JSON.parse(readFileSync(`${indexPath}.map`, 'utf-8'));
+    const sourceMap = new SourceMap(payload);
+    assert.equal(payload.sources.length, 1);
+    assert.equal(path.basename(payload.sources[0]), 'index.ts');
+    const sourcePath = path.resolve(packageDir, payload.sourceRoot ?? '', payload.sources[0]);
+    const sourceLines = readFileSync(sourcePath, 'utf-8').split('\n');
+    for (const symbol of ['toFile', 'APIPromise', 'AzureOpenAI', 'BedrockOpenAI']) {
+      const generatedLine = generatedLines.findIndex((line) =>
+        line.includes(`Object.defineProperty(exports, "${symbol}"`),
+      );
+      assert.notEqual(generatedLine, -1, `Missing CommonJS getter for ${symbol}`);
+      const column = generatedLines[generatedLine].indexOf('return ');
+      assert.notEqual(column, -1);
+      const mapping = sourceMap.findEntry(generatedLine, column);
+      assert.equal(mapping.originalSource, payload.sources[0]);
+      assert.match(sourceLines[mapping.originalLine] ?? '', new RegExp(`\\b${symbol}\\b`, 'u'));
     }
 
     console.log('CommonJS constructor compatibility checks passed.');
