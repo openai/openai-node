@@ -60,6 +60,7 @@ describe('public Responses SSE iterator early exit', () => {
     let pending: Promise<unknown>;
     if (method === 'break') {
       pending = (async () => {
+        // oxlint-disable-next-line no-unreachable-loop -- Exercise for-await cleanup after one event.
         for await (const item of stream) {
           expect(item).toEqual(event);
           break;
