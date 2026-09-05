@@ -32,20 +32,17 @@ export async function waitForDirectWorkloadIdentityRefresh(
   refresh: WorkloadIdentityRefresh,
 ): Promise<string> {
   refresh.directWaiters = (refresh.directWaiters ?? 0) + 1;
-  if (refresh.retryTimer && typeof refresh.retryTimer === 'object' && 'ref' in refresh.retryTimer) {
-    refresh.retryTimer.ref();
+  const timer = refresh.retryTimer;
+  if (typeof timer === 'object' && timer !== null) {
+    (timer as { ref?: () => void }).ref?.();
   }
   try {
     return await refresh.promise;
   } finally {
     refresh.directWaiters -= 1;
-    if (
-      refresh.directWaiters === 0 &&
-      refresh.retryTimer &&
-      typeof refresh.retryTimer === 'object' &&
-      'unref' in refresh.retryTimer
-    ) {
-      refresh.retryTimer.unref();
+    const { retryTimer } = refresh;
+    if (refresh.directWaiters === 0 && typeof retryTimer === 'object' && retryTimer !== null) {
+      (retryTimer as { unref?: () => void }).unref?.();
     }
   }
 }
@@ -191,8 +188,8 @@ export async function waitForWorkloadIdentityRetry(
         if (refresh) {
           refresh.retryTimer = timer;
         }
-        if (!refresh?.directWaiters && typeof timer === 'object' && 'unref' in timer) {
-          timer.unref();
+        if (!refresh?.directWaiters && typeof timer === 'object' && timer !== null) {
+          (timer as { unref?: () => void }).unref?.();
         }
       });
     } finally {
