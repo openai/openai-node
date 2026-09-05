@@ -47,6 +47,10 @@ jobs:
         github.repository == 'openai/openai-node'
       }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-please-${{ github.ref }}
+      queue: max
+      cancel-in-progress: false
     environment: release
     permissions: {}
     steps:
