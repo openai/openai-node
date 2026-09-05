@@ -416,7 +416,7 @@ describe('OpenAI with Workload Identity', () => {
         apiCalls += 1;
         if (apiCalls === 1) {
           if (mode === 'response') {
-            return new Response('unavailable', { status: 503 });
+            return new globalThis.Response('unavailable', { status: 503 });
           }
           await new Promise<void>((_resolve, reject) => {
             init?.signal?.addEventListener('abort', () => reject(new Error('request timed out')), {
@@ -460,7 +460,7 @@ describe('OpenAI with Workload Identity', () => {
       if (String(url).includes('/oauth/token')) {
         issuerCalls += 1;
         if (issuerCalls === 1) {
-          const failure = new Response('unavailable', {
+          const failure = new globalThis.Response('unavailable', {
             status: 503,
             headers: { 'retry-after-ms': hint },
           });
