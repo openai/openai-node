@@ -13,15 +13,17 @@ import { createX509TestLab } from '../utils/x509-test-lab';
 
 const cases = (['openai', 'azure'] as const).flatMap((provider) =>
   (['ws', 'websocket'] as const).flatMap((example) =>
-    (['completed', 'failed', 'cancelled', 'incomplete'] as const).map((status) => ({
-      provider,
-      example,
-      status,
-    })),
+    (['completed', 'failed', 'cancelled', 'incomplete', 'clean close', 'abrupt close'] as const).map(
+      (scenario) => ({
+        provider,
+        example,
+        scenario,
+      }),
+    ),
   ),
 );
 
-test.each(cases)('$provider Realtime $example handles $status', async ({ provider, example, status }) => {
+test.each(cases)('$provider Realtime $example handles $scenario', async ({ provider, example, scenario }) => {
   const lab = createX509TestLab();
   const directory = await mkdtemp(path.join(tmpdir(), 'openai-realtime-example-'));
   const certificatePath = path.join(directory, 'ca.pem');
@@ -52,26 +54,28 @@ test.each(cases)('$provider Realtime $example handles $status', async ({ provide
       event_id: 'event_text_done',
       text,
     },
-    {
+  ];
+  if (scenario !== 'clean close' && scenario !== 'abrupt close') {
+    events.push({
       type: 'response.done',
       event_id: 'event_response_done',
       response: {
         id: 'resp_example',
         object: 'realtime.response',
-        status,
+        status: scenario,
         output: [
           {
             id: 'msg_example',
             type: 'message',
             role: 'assistant',
-            status: status === 'completed' ? 'completed' : 'incomplete',
+            status: scenario === 'completed' ? 'completed' : 'incomplete',
             content: [{ type: 'output_text', text }],
           },
         ],
         metadata: { note: 'SYNTHETIC_PRIVATE_RESPONSE_METADATA' },
       },
-    },
-  ];
+    });
+  }
   sockets.on('connection', (socket, request) => {
     urls.push(request.url);
     authorization.push(request.headers.authorization);
@@ -84,8 +88,15 @@ test.each(cases)('$provider Realtime $example handles $status', async ({ provide
         'type' in event &&
         event.type === 'response.create'
       ) {
-        for (const responseEvent of events) {
-          socket.send(JSON.stringify(responseEvent));
+        if (scenario === 'abrupt close') {
+          socket.terminate();
+        } else {
+          for (const responseEvent of events) {
+            socket.send(JSON.stringify(responseEvent));
+          }
+          if (scenario === 'clean close') {
+            socket.close(1000, 'SYNTHETIC_PRIVATE_CLOSE_REASON');
+          }
         }
       }
     });
@@ -181,13 +192,20 @@ Module._load = function(request, ...args) {
         },
         { type: 'response.create' },
       ]);
-      expect(stdout).toContain(text);
+      if (scenario !== 'abrupt close') {
+        expect(stdout).toContain(text);
+      }
       expect(stdout).toContain('Connection closed!');
       expect(stdout + stderr).not.toContain('synthetic-example-key');
       expect(stdout + stderr).not.toContain(azureToken);
       expect(stdout + stderr).not.toContain('SYNTHETIC_PRIVATE_RESPONSE_METADATA');
-      expect(exitCode).toBe(status === 'completed' ? 0 : 1);
-      expect(stderr.includes('Response did not complete successfully.')).toBe(status !== 'completed');
+      expect(stdout + stderr).not.toContain('SYNTHETIC_PRIVATE_CLOSE_REASON');
+      expect(exitCode).toBe(scenario === 'completed' ? 0 : 1);
+      const closedEarly = scenario === 'clean close' || scenario === 'abrupt close';
+      expect(stderr.includes('Response did not complete successfully.')).toBe(
+        scenario !== 'completed' && !closedEarly,
+      );
+      expect(stderr.includes('WebSocket closed before the response completed.')).toBe(closedEarly);
     } finally {
       child.kill();
     }
