@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { vi } from 'vitest';
 
@@ -169,6 +170,53 @@ describe('APIError', () => {
     [undefined, undefined, undefined, '(no status code or body)'],
   ] as const)('formats errors without assuming a string response body', (status, body, message, expected) => {
     expect(new APIError(status, body, message, headers).message).toBe(expected);
+  });
+});
+
+describe('README error handling', () => {
+  const section = readFileSync('README.md', 'utf-8')
+    .split('## Handling errors')[1]
+    ?.split(/\r?\n## /u)[0];
+  const example = section?.match(/```ts\r?\n(?<source>[\s\S]*?)\r?\n```/u)?.groups?.['source'];
+  if (!example) {
+    throw new Error('Expected the README error-handling example');
+  }
+
+  test.each([400, 409])('reports request IDs and narrows HTTP %i errors', async (status) => {
+    const response = Response.json(
+      { error: { message: 'Synthetic request failure', type: 'invalid_request_error' } },
+      { status, headers: { 'x-request-id': 'req_readme_example' } },
+    );
+    const fetch = vi.fn(async () => response);
+    const client = new OpenAI({ apiKey: 'synthetic-test-key', fetch, maxRetries: 0 });
+    const log = vi.fn();
+
+    await runInNewContext(`(async () => {\n${example}\n})()`, { OpenAI, client, console: { log } });
+
+    expect(log).toHaveBeenCalledTimes(4);
+    expect(log.mock.calls.slice(0, 3)).toEqual([['req_readme_example'], [status], [status === 400]]);
+    expect(log.mock.calls[3]?.[0]).toBe(response.headers);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('rethrows unexpected errors without logging them', async () => {
+    const failure = new Error('Synthetic non-API failure');
+    const fetch = vi.fn(async () => {
+      throw new Error('The rejected example operation must not reach fetch');
+    });
+    const client = new OpenAI({ apiKey: 'synthetic-test-key', fetch, maxRetries: 0 });
+    const create = vi.spyOn(client.fineTuning.jobs, 'create').mockRejectedValueOnce(failure);
+    const log = vi.fn();
+
+    try {
+      await expect(
+        runInNewContext(`(async () => {\n${example}\n})()`, { OpenAI, client, console: { log } }),
+      ).rejects.toBe(failure);
+      expect(log).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      create.mockRestore();
+    }
   });
 });
 
