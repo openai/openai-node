@@ -21,7 +21,7 @@ describe('resource invites', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.invites.create({
+    await client.admin.organization.invites.create({
       email: 'email',
       role: 'reader',
       projects: [{ id: 'id', role: 'member' }],

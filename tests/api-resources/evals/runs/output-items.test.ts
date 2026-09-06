@@ -24,7 +24,7 @@ describe('resource outputItems', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.evals.runs.outputItems.retrieve('output_item_id', {
+    await client.evals.runs.outputItems.retrieve('output_item_id', {
       eval_id: 'eval_id',
       run_id: 'run_id',
     });
@@ -42,7 +42,7 @@ describe('resource outputItems', () => {
   });
 
   test('list: required and optional params', async () => {
-    const response = await client.evals.runs.outputItems.list('run_id', {
+    await client.evals.runs.outputItems.list('run_id', {
       eval_id: 'eval_id',
       after: 'after',
       limit: 0,

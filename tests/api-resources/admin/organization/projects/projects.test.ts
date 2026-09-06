@@ -21,7 +21,7 @@ describe('resource projects', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.projects.create({
+    await client.admin.organization.projects.create({
       name: 'name',
       external_key_id: 'external_key_id',
       geography: 'geography',

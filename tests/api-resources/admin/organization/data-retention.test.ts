@@ -34,7 +34,7 @@ describe('resource dataRetention', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.admin.organization.dataRetention.update({
+    await client.admin.organization.dataRetention.update({
       retention_type: 'zero_data_retention',
     });
   });

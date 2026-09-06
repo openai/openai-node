@@ -23,7 +23,7 @@ describe('resource images', () => {
   });
 
   test('createVariation: required and optional params', async () => {
-    const response = await client.images.createVariation({
+    await client.images.createVariation({
       image: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'gpt-image-1',
       n: 1,
@@ -48,7 +48,7 @@ describe('resource images', () => {
   });
 
   test('edit: required and optional params', async () => {
-    const response = await client.images.edit({
+    await client.images.edit({
       image: await toFile(Buffer.from('Example data'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
       background: 'transparent',
@@ -79,7 +79,7 @@ describe('resource images', () => {
   });
 
   test('generate: required and optional params', async () => {
-    const response = await client.images.generate({
+    await client.images.generate({
       prompt: 'A cute baby sea otter',
       background: 'transparent',
       model: 'gpt-image-2',

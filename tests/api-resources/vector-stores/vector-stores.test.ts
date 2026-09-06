@@ -91,7 +91,7 @@ describe('resource vectorStores', () => {
   });
 
   test('search: required and optional params', async () => {
-    const response = await client.vectorStores.search('vs_abc123', {
+    await client.vectorStores.search('vs_abc123', {
       query: 'string',
       filters: {
         key: 'key',

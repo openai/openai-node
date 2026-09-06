@@ -24,10 +24,9 @@ describe('resource permissions', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.fineTuning.checkpoints.permissions.create(
-      'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
-      { project_ids: ['string'] },
-    );
+    await client.fineTuning.checkpoints.permissions.create('ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd', {
+      project_ids: ['string'],
+    });
   });
 
   test('retrieve', async () => {
@@ -98,7 +97,7 @@ describe('resource permissions', () => {
   });
 
   test('delete: required and optional params', async () => {
-    const response = await client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
+    await client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
       fine_tuned_model_checkpoint: 'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
     });
   });

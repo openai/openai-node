@@ -34,7 +34,7 @@ describe('resource dataRetention', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.admin.organization.projects.dataRetention.update('project_id', {
+    await client.admin.organization.projects.dataRetention.update('project_id', {
       retention_type: 'organization_default',
     });
   });

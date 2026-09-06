@@ -23,7 +23,7 @@ describe('resource contentProvenanceChecks', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.contentProvenanceChecks.create({
+    await client.contentProvenanceChecks.create({
       file: await toFile(Buffer.from('Example data'), 'README.md'),
     });
   });

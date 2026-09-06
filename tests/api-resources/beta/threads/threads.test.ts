@@ -98,7 +98,7 @@ describe('resource threads', () => {
   });
 
   test('createAndRun: required and optional params', async () => {
-    const response = await client.beta.threads.createAndRun({
+    await client.beta.threads.createAndRun({
       assistant_id: 'assistant_id',
       instructions: 'instructions',
       max_completion_tokens: 256,

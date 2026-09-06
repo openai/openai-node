@@ -21,7 +21,7 @@ describe('resource containers', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.containers.create({
+    await client.containers.create({
       name: 'name',
       expires_after: { anchor: 'last_active_at', minutes: 0 },
       file_ids: ['string'],
