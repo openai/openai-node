@@ -91,6 +91,34 @@ function customToolChunks(): OpenAI.Chat.ChatCompletionChunk[] {
 }
 
 describe('.stream()', () => {
+  it.each(['on', 'once'] as const)('preserves callback receivers for %s listeners', async (method) => {
+    const chunks = contentChunks('Hello', ' world');
+    const readable = new Stream(async function* streamChunks() {
+      yield* chunks;
+    }, new AbortController()).toReadableStream();
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    const unbound = vi.fn();
+    const bound = vi.fn();
+    const context = { name: 'caller-owned context' };
+
+    stream[method]('content', unbound);
+    stream[method]('content', bound.bind(context));
+    await stream.done();
+
+    const calls =
+      method === 'once'
+        ? [['Hello', 'Hello']]
+        : [
+            ['Hello', 'Hello'],
+            [' world', 'Hello world'],
+          ];
+    expect(bound.mock.calls).toEqual(calls);
+    expect(bound.mock.contexts).toEqual(calls.map(() => context));
+    expect(unbound.mock.calls).toEqual(calls);
+    expect(unbound.mock.contexts).toHaveLength(calls.length);
+    expect(unbound.mock.contexts.every((receiver) => receiver === undefined)).toBe(true);
+  });
+
   it.each([
     ['first-padding', 'last-padding'],
     [undefined, 'last-padding'],

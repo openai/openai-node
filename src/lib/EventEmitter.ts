@@ -199,7 +199,8 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         for (const registration of listeners as any) {
           if (!registration.removed) {
             try {
-              registration.listener(...(args as any));
+              const { listener } = registration;
+              listener(...(args as any));
             } catch (error) {
               if (!listenerThrew) {
                 listenerThrew = true;
