@@ -125,16 +125,17 @@ describe('tsc-multi declaration-file specifiers', () => {
     expect(ts.getPreEmitDiagnostics(consumer)).toEqual([]);
 
     const artifact = path.join(fixture, `dist/index${extname}`);
-    const load =
+    const program =
       module === 'commonjs'
-        ? `require(${JSON.stringify(artifact)})`
-        : `await import(${JSON.stringify(pathToFileURL(artifact).href)})`;
+        ? '(async () => { const artifact = require(process.argv[1]); console.log(JSON.stringify([artifact.staticValue, artifact.reexportedValue, await artifact.dynamicValue(), artifact.tsDirectoryValue, artifact.mtsDirectoryValue, artifact.ctsDirectoryValue])); })();'
+        : '(async () => { const artifact = await import(process.argv[1]); console.log(JSON.stringify([artifact.staticValue, artifact.reexportedValue, await artifact.dynamicValue(), artifact.tsDirectoryValue, artifact.mtsDirectoryValue, artifact.ctsDirectoryValue])); })();';
     const runtime = spawnSync(
       process.execPath,
       [
         ...(module === 'esnext' ? ['--input-type=module'] : []),
         '-e',
-        `(async () => { const artifact = ${load}; console.log(JSON.stringify([artifact.staticValue, artifact.reexportedValue, await artifact.dynamicValue(), artifact.tsDirectoryValue, artifact.mtsDirectoryValue, artifact.ctsDirectoryValue])); })();`,
+        program,
+        module === 'commonjs' ? artifact : pathToFileURL(artifact).href,
       ],
       { cwd: fixture, encoding: 'utf-8', timeout: 15_000 },
     );
