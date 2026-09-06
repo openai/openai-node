@@ -607,9 +607,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   }
 
   protected _authHeaders(): Record<string, string> {
-    if (this._client.apiKey) {
-      return { Authorization: `Bearer ${this._client.apiKey}` };
-    }
-    return {};
+    const apiKey = this._client.apiKey;
+    return typeof apiKey === 'string' ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 }
