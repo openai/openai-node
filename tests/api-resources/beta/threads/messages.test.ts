@@ -24,7 +24,7 @@ describe('resource messages', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.beta.threads.messages.create('thread_id', {
+    const response = await client.beta.threads.messages.create('thread_id', {
       content: 'string',
       role: 'user',
       attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
@@ -44,7 +44,7 @@ describe('resource messages', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.beta.threads.messages.retrieve('message_id', { thread_id: 'thread_id' });
+    const response = await client.beta.threads.messages.retrieve('message_id', { thread_id: 'thread_id' });
   });
 
   test('update: only required params', async () => {
@@ -59,7 +59,7 @@ describe('resource messages', () => {
   });
 
   test('update: required and optional params', async () => {
-    await client.beta.threads.messages.update('message_id', {
+    const response = await client.beta.threads.messages.update('message_id', {
       thread_id: 'thread_id',
       metadata: { foo: 'string' },
     });
@@ -105,6 +105,6 @@ describe('resource messages', () => {
   });
 
   test('delete: required and optional params', async () => {
-    await client.beta.threads.messages.delete('message_id', { thread_id: 'thread_id' });
+    const response = await client.beta.threads.messages.delete('message_id', { thread_id: 'thread_id' });
   });
 });

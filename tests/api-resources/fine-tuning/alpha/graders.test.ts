@@ -30,7 +30,7 @@ describe('resource graders', () => {
   });
 
   test('run: required and optional params', async () => {
-    await client.fineTuning.alpha.graders.run({
+    const response = await client.fineTuning.alpha.graders.run({
       grader: {
         input: 'input',
         name: 'name',
@@ -63,7 +63,7 @@ describe('resource graders', () => {
   });
 
   test('validate: required and optional params', async () => {
-    await client.fineTuning.alpha.graders.validate({
+    const response = await client.fineTuning.alpha.graders.validate({
       grader: {
         input: 'input',
         name: 'name',

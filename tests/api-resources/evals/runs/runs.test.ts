@@ -26,7 +26,7 @@ describe('resource runs', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.evals.runs.create('eval_id', {
+    const response = await client.evals.runs.create('eval_id', {
       data_source: {
         source: {
           content: [
@@ -56,7 +56,7 @@ describe('resource runs', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.evals.runs.retrieve('run_id', { eval_id: 'eval_id' });
+    const response = await client.evals.runs.retrieve('run_id', { eval_id: 'eval_id' });
   });
 
   test('list', async () => {
@@ -98,7 +98,7 @@ describe('resource runs', () => {
   });
 
   test('delete: required and optional params', async () => {
-    await client.evals.runs.delete('run_id', { eval_id: 'eval_id' });
+    const response = await client.evals.runs.delete('run_id', { eval_id: 'eval_id' });
   });
 
   test('cancel: only required params', async () => {
@@ -113,6 +113,6 @@ describe('resource runs', () => {
   });
 
   test('cancel: required and optional params', async () => {
-    await client.evals.runs.cancel('run_id', { eval_id: 'eval_id' });
+    const response = await client.evals.runs.cancel('run_id', { eval_id: 'eval_id' });
   });
 });

@@ -24,7 +24,7 @@ describe('resource files', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.files.create({
+    const response = await client.files.create({
       file: await toFile(Buffer.from('Example data'), 'README.md'),
       purpose: 'assistants',
       expires_after: { anchor: 'created_at', seconds: 3600 },

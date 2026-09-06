@@ -21,7 +21,7 @@ describe('resource assistants', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.beta.assistants.create({
+    const response = await client.beta.assistants.create({
       model: 'gpt-5',
       description: 'description',
       instructions: 'instructions',

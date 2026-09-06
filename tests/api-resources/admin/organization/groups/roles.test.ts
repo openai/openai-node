@@ -21,7 +21,7 @@ describe('resource roles', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.admin.organization.groups.roles.create('group_id', { role_id: 'role_id' });
+    const response = await client.admin.organization.groups.roles.create('group_id', { role_id: 'role_id' });
   });
 
   test('retrieve: only required params', async () => {
@@ -38,7 +38,7 @@ describe('resource roles', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.admin.organization.groups.roles.retrieve('role_id', {
+    const response = await client.admin.organization.groups.roles.retrieve('role_id', {
       group_id: 'group_id',
     });
   });
@@ -83,6 +83,6 @@ describe('resource roles', () => {
   });
 
   test('delete: required and optional params', async () => {
-    await client.admin.organization.groups.roles.delete('role_id', { group_id: 'group_id' });
+    const response = await client.admin.organization.groups.roles.delete('role_id', { group_id: 'group_id' });
   });
 });

@@ -36,7 +36,7 @@ describe('resource evals', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.evals.create({
+    const response = await client.evals.create({
       data_source_config: {
         item_schema: { foo: 'bar' },
         type: 'custom',

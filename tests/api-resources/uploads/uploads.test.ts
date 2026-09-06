@@ -26,7 +26,7 @@ describe('resource uploads', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.uploads.create({
+    const response = await client.uploads.create({
       bytes: 0,
       filename: 'filename',
       mime_type: 'mime_type',
@@ -58,6 +58,6 @@ describe('resource uploads', () => {
   });
 
   test('complete: required and optional params', async () => {
-    await client.uploads.complete('upload_abc123', { part_ids: ['string'], md5: 'md5' });
+    const response = await client.uploads.complete('upload_abc123', { part_ids: ['string'], md5: 'md5' });
   });
 });

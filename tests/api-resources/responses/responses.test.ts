@@ -81,7 +81,7 @@ describe('resource responses', () => {
   });
 
   test('compact: required and optional params', async () => {
-    await client.responses.compact({
+    const response = await client.responses.compact({
       model: 'gpt-6-astra',
       input: 'string',
       instructions: 'instructions',

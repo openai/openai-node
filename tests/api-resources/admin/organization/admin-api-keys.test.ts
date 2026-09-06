@@ -21,7 +21,7 @@ describe('resource adminAPIKeys', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.admin.organization.adminAPIKeys.create({
+    const response = await client.admin.organization.adminAPIKeys.create({
       name: 'New Admin Key',
       expires_in_seconds: 2592000,
     });

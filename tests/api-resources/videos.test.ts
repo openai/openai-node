@@ -21,7 +21,7 @@ describe('resource videos', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.videos.create({
+    const response = await client.videos.create({
       prompt: 'x',
       input_reference: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'sora-2',
@@ -92,7 +92,7 @@ describe('resource videos', () => {
   });
 
   test('createCharacter: required and optional params', async () => {
-    await client.videos.createCharacter({
+    const response = await client.videos.createCharacter({
       name: 'x',
       video: await toFile(Buffer.from('Example data'), 'README.md'),
     });
@@ -120,7 +120,7 @@ describe('resource videos', () => {
   });
 
   test('edit: required and optional params', async () => {
-    await client.videos.edit({
+    const response = await client.videos.edit({
       prompt: 'x',
       video: await toFile(Buffer.from('Example data'), 'README.md'),
     });
@@ -142,7 +142,7 @@ describe('resource videos', () => {
   });
 
   test('extend: required and optional params', async () => {
-    await client.videos.extend({
+    const response = await client.videos.extend({
       prompt: 'x',
       seconds: '4',
       video: await toFile(Buffer.from('Example data'), 'README.md'),
@@ -172,6 +172,6 @@ describe('resource videos', () => {
   });
 
   test('remix: required and optional params', async () => {
-    await client.videos.remix('video_123', { prompt: 'x' });
+    const response = await client.videos.remix('video_123', { prompt: 'x' });
   });
 });

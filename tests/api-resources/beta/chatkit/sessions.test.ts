@@ -24,7 +24,7 @@ describe('resource sessions', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.beta.chatkit.sessions.create({
+    const response = await client.beta.chatkit.sessions.create({
       user: 'x',
       workflow: {
         id: 'id',

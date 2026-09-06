@@ -21,7 +21,7 @@ describe('resource usage', () => {
   });
 
   test('audioSpeeches: required and optional params', async () => {
-    await client.admin.organization.usage.audioSpeeches({
+    const response = await client.admin.organization.usage.audioSpeeches({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1m',
@@ -47,7 +47,7 @@ describe('resource usage', () => {
   });
 
   test('audioTranscriptions: required and optional params', async () => {
-    await client.admin.organization.usage.audioTranscriptions({
+    const response = await client.admin.organization.usage.audioTranscriptions({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1m',
@@ -73,7 +73,7 @@ describe('resource usage', () => {
   });
 
   test('codeInterpreterSessions: required and optional params', async () => {
-    await client.admin.organization.usage.codeInterpreterSessions({
+    const response = await client.admin.organization.usage.codeInterpreterSessions({
       start_time: 0,
       bucket_width: '1m',
       end_time: 0,
@@ -96,7 +96,7 @@ describe('resource usage', () => {
   });
 
   test('completions: required and optional params', async () => {
-    await client.admin.organization.usage.completions({
+    const response = await client.admin.organization.usage.completions({
       start_time: 0,
       api_key_ids: ['string'],
       batch: true,
@@ -123,7 +123,7 @@ describe('resource usage', () => {
   });
 
   test('costs: required and optional params', async () => {
-    await client.admin.organization.usage.costs({
+    const response = await client.admin.organization.usage.costs({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1d',
@@ -148,7 +148,7 @@ describe('resource usage', () => {
   });
 
   test('embeddings: required and optional params', async () => {
-    await client.admin.organization.usage.embeddings({
+    const response = await client.admin.organization.usage.embeddings({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1m',
@@ -174,7 +174,7 @@ describe('resource usage', () => {
   });
 
   test('fileSearchCalls: required and optional params', async () => {
-    await client.admin.organization.usage.fileSearchCalls({
+    const response = await client.admin.organization.usage.fileSearchCalls({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1m',
@@ -200,7 +200,7 @@ describe('resource usage', () => {
   });
 
   test('images: required and optional params', async () => {
-    await client.admin.organization.usage.images({
+    const response = await client.admin.organization.usage.images({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1m',
@@ -228,7 +228,7 @@ describe('resource usage', () => {
   });
 
   test('moderations: required and optional params', async () => {
-    await client.admin.organization.usage.moderations({
+    const response = await client.admin.organization.usage.moderations({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1m',
@@ -254,7 +254,7 @@ describe('resource usage', () => {
   });
 
   test('vectorStores: required and optional params', async () => {
-    await client.admin.organization.usage.vectorStores({
+    const response = await client.admin.organization.usage.vectorStores({
       start_time: 0,
       bucket_width: '1m',
       end_time: 0,
@@ -277,7 +277,7 @@ describe('resource usage', () => {
   });
 
   test('webSearchCalls: required and optional params', async () => {
-    await client.admin.organization.usage.webSearchCalls({
+    const response = await client.admin.organization.usage.webSearchCalls({
       start_time: 0,
       api_key_ids: ['string'],
       bucket_width: '1m',

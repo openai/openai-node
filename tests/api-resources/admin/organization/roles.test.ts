@@ -24,7 +24,7 @@ describe('resource roles', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.admin.organization.roles.create({
+    const response = await client.admin.organization.roles.create({
       permissions: ['string'],
       role_name: 'role_name',
       description: 'description',

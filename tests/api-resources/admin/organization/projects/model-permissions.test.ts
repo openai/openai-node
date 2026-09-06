@@ -35,7 +35,7 @@ describe('resource modelPermissions', () => {
   });
 
   test('update: required and optional params', async () => {
-    await client.admin.organization.projects.modelPermissions.update('project_id', {
+    const response = await client.admin.organization.projects.modelPermissions.update('project_id', {
       mode: 'allow_list',
       model_ids: ['string'],
     });

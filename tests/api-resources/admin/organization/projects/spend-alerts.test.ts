@@ -26,7 +26,7 @@ describe('resource spendAlerts', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.admin.organization.projects.spendAlerts.create('project_id', {
+    const response = await client.admin.organization.projects.spendAlerts.create('project_id', {
       currency: 'USD',
       interval: 'month',
       notification_channel: {
@@ -52,7 +52,7 @@ describe('resource spendAlerts', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.admin.organization.projects.spendAlerts.retrieve('alert_id', {
+    const response = await client.admin.organization.projects.spendAlerts.retrieve('alert_id', {
       project_id: 'project_id',
     });
   });
@@ -75,7 +75,7 @@ describe('resource spendAlerts', () => {
   });
 
   test('update: required and optional params', async () => {
-    await client.admin.organization.projects.spendAlerts.update('alert_id', {
+    const response = await client.admin.organization.projects.spendAlerts.update('alert_id', {
       project_id: 'project_id',
       currency: 'USD',
       interval: 'month',
@@ -129,7 +129,7 @@ describe('resource spendAlerts', () => {
   });
 
   test('delete: required and optional params', async () => {
-    await client.admin.organization.projects.spendAlerts.delete('alert_id', {
+    const response = await client.admin.organization.projects.spendAlerts.delete('alert_id', {
       project_id: 'project_id',
     });
   });

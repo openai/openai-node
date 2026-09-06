@@ -34,7 +34,7 @@ describe('resource fileBatches', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.vectorStores.fileBatches.retrieve('vsfb_abc123', {
+    const response = await client.vectorStores.fileBatches.retrieve('vsfb_abc123', {
       vector_store_id: 'vs_abc123',
     });
   });
@@ -53,7 +53,7 @@ describe('resource fileBatches', () => {
   });
 
   test('cancel: required and optional params', async () => {
-    await client.vectorStores.fileBatches.cancel('batch_id', {
+    const response = await client.vectorStores.fileBatches.cancel('batch_id', {
       vector_store_id: 'vector_store_id',
     });
   });
@@ -72,7 +72,7 @@ describe('resource fileBatches', () => {
   });
 
   test('listFiles: required and optional params', async () => {
-    await client.vectorStores.fileBatches.listFiles('batch_id', {
+    const response = await client.vectorStores.fileBatches.listFiles('batch_id', {
       vector_store_id: 'vector_store_id',
       after: 'after',
       before: 'before',

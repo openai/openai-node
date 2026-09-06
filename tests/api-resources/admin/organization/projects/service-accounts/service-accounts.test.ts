@@ -23,7 +23,7 @@ describe('resource serviceAccounts', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.admin.organization.projects.serviceAccounts.create('project_id', {
+    const response = await client.admin.organization.projects.serviceAccounts.create('project_id', {
       name: 'name',
       create_service_account_only: true,
     });
@@ -44,7 +44,7 @@ describe('resource serviceAccounts', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.admin.organization.projects.serviceAccounts.retrieve('service_account_id', {
+    const response = await client.admin.organization.projects.serviceAccounts.retrieve('service_account_id', {
       project_id: 'project_id',
     });
   });
@@ -63,7 +63,7 @@ describe('resource serviceAccounts', () => {
   });
 
   test('update: required and optional params', async () => {
-    await client.admin.organization.projects.serviceAccounts.update('service_account_id', {
+    const response = await client.admin.organization.projects.serviceAccounts.update('service_account_id', {
       project_id: 'project_id',
       name: 'name',
       role: 'member',
@@ -106,7 +106,7 @@ describe('resource serviceAccounts', () => {
   });
 
   test('delete: required and optional params', async () => {
-    await client.admin.organization.projects.serviceAccounts.delete('service_account_id', {
+    const response = await client.admin.organization.projects.serviceAccounts.delete('service_account_id', {
       project_id: 'project_id',
     });
   });

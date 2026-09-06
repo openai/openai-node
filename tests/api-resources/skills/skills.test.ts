@@ -53,7 +53,7 @@ describe('resource skills', () => {
   });
 
   test('update: required and optional params', async () => {
-    await client.skills.update('skill_123', { default_version: 'default_version' });
+    const response = await client.skills.update('skill_123', { default_version: 'default_version' });
   });
 
   test('list', async () => {

@@ -24,7 +24,7 @@ describe('resource jobs', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.fineTuning.jobs.create({
+    const response = await client.fineTuning.jobs.create({
       model: 'gpt-4o-mini',
       training_file: 'file-abc123',
       hyperparameters: {

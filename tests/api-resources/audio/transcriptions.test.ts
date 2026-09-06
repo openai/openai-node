@@ -24,7 +24,7 @@ describe('resource transcriptions', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.audio.transcriptions.create({
+    const response = await client.audio.transcriptions.create({
       file: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'gpt-4o-transcribe',
       chunking_strategy: 'auto',

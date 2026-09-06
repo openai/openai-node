@@ -24,7 +24,7 @@ describe('resource embeddings', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.embeddings.create({
+    const response = await client.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-3-small',
       dimensions: 1,

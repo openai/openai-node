@@ -23,7 +23,7 @@ describe('resource apiKeys', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.admin.organization.projects.apiKeys.retrieve('api_key_id', {
+    const response = await client.admin.organization.projects.apiKeys.retrieve('api_key_id', {
       project_id: 'project_id',
     });
   });
@@ -68,7 +68,7 @@ describe('resource apiKeys', () => {
   });
 
   test('delete: required and optional params', async () => {
-    await client.admin.organization.projects.apiKeys.delete('api_key_id', {
+    const response = await client.admin.organization.projects.apiKeys.delete('api_key_id', {
       project_id: 'project_id',
     });
   });

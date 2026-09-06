@@ -32,7 +32,7 @@ describe('resource files', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    await client.containers.files.retrieve('file_id', { container_id: 'container_id' });
+    const response = await client.containers.files.retrieve('file_id', { container_id: 'container_id' });
   });
 
   test('list', async () => {
@@ -73,6 +73,6 @@ describe('resource files', () => {
   });
 
   test('delete: required and optional params', async () => {
-    await client.containers.files.delete('file_id', { container_id: 'container_id' });
+    const response = await client.containers.files.delete('file_id', { container_id: 'container_id' });
   });
 });

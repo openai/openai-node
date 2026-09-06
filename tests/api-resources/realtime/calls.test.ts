@@ -11,7 +11,7 @@ const client = new OpenAI({
 describe('resource calls', () => {
   // binary tests are currently broken
   test.skip('create: required and optional params', async () => {
-    await client.realtime.calls.create({
+    const response = await client.realtime.calls.create({
       sdp: 'sdp',
       session: {
         type: 'realtime',
@@ -82,7 +82,7 @@ describe('resource calls', () => {
   });
 
   test('accept: required and optional params', async () => {
-    await client.realtime.calls.accept('call_id', {
+    const response = await client.realtime.calls.accept('call_id', {
       type: 'realtime',
       audio: {
         input: {
@@ -161,7 +161,7 @@ describe('resource calls', () => {
   });
 
   test('refer: required and optional params', async () => {
-    await client.realtime.calls.refer('call_id', { target_uri: 'tel:+14155550123' });
+    const response = await client.realtime.calls.refer('call_id', { target_uri: 'tel:+14155550123' });
   });
 
   test('reject', async () => {

@@ -36,7 +36,7 @@ describe('resource spendLimit', () => {
   });
 
   test('update: required and optional params', async () => {
-    await client.admin.organization.spendLimit.update({
+    const response = await client.admin.organization.spendLimit.update({
       currency: 'USD',
       interval: 'month',
       threshold_amount: 1,
