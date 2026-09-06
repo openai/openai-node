@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
 import { AzureOpenAI, OpenAIError } from 'openai';
-import type { RequestInit, RequestInfo, Response } from 'openai/internal/builtin-types';
+import type { RequestInit, RequestInfo, Response as FetchResponse } from 'openai/internal/builtin-types';
 
 const apiVersion = '2024-02-15-preview';
-const testFetch = async (url: RequestInfo): Promise<Response> =>
+const testFetch = async (url: RequestInfo): Promise<FetchResponse> =>
   Response.json({ url }, { headers: { 'content-type': 'application/json' } });
 
 describe('deployment path safety', () => {
@@ -56,7 +56,7 @@ describe('deployment path safety', () => {
   const requestClient = new AzureOpenAI({ endpoint, apiKey, apiVersion, fetch: testFetch });
 
   test('keeps authenticated public chat requests inside the deployment route', async () => {
-    const authenticatedFetch = vi.fn(async (url: RequestInfo, init?: RequestInit): Promise<Response> =>
+    const authenticatedFetch = vi.fn(async (url: RequestInfo, init?: RequestInit): Promise<FetchResponse> =>
       Response.json(
         { url, apiKey: new Headers(init?.headers).get('api-key') },
         { headers: { 'content-type': 'application/json' } },

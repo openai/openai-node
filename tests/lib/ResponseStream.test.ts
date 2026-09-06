@@ -7,7 +7,7 @@ import type {
   ResponseFunctionCallArgumentsDeltaEvent,
   ResponseTextDeltaEvent,
 } from 'openai/lib/responses/EventTypes';
-import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
+import type { Response as APIResponse, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 test('parsed response events include every API event with unchanged non-delta shapes', () => {
@@ -211,7 +211,7 @@ describe('.stream()', () => {
   ] as const)(
     'dispatches the originally validated text route when a raw listener $mutation $field',
     async ({ field, mutation }) => {
-      const output: Response['output'] = [
+      const output: APIResponse['output'] = [
         {
           id: 'msg_first',
           type: 'message',
@@ -278,7 +278,7 @@ describe('.stream()', () => {
   );
 
   it('dispatches validated function-call routes even when raw listeners alter their identities', async () => {
-    const output: Response['output'] = [
+    const output: APIResponse['output'] = [
       {
         id: 'function_first',
         type: 'function_call',
@@ -329,7 +329,7 @@ describe('.stream()', () => {
   });
 
   it('captures a custom-transport routing accessor exactly once for accumulation and dispatch', async () => {
-    const output: Response['output'] = [
+    const output: APIResponse['output'] = [
       {
         id: 'msg_first',
         type: 'message',
@@ -535,7 +535,7 @@ describe('.stream()', () => {
       (['message', 'reasoning', 'shell_call_output'] as const).map((itemType) => ({ type, itemType })),
     ),
   )('rejects public $type targeting $itemType before any emission', async ({ type, itemType }) => {
-    const outputByType: Record<typeof itemType, Response['output'][number]> = {
+    const outputByType: Record<typeof itemType, APIResponse['output'][number]> = {
       message: {
         id: 'msg_123',
         type: 'message',
@@ -1115,7 +1115,7 @@ function readableStreamFromEvents(events: ResponseStreamEvent[]) {
   return ReadableStreamFrom(events.map((event) => encoder.encode(JSON.stringify(event) + '\n')));
 }
 
-function makeResponse(overrides: Partial<Response> = {}): Response {
+function makeResponse(overrides: Partial<APIResponse> = {}): APIResponse {
   return {
     id: 'resp_123',
     object: 'response',
@@ -1143,5 +1143,5 @@ function makeResponse(overrides: Partial<Response> = {}): Response {
     usage: null,
     user: null,
     ...overrides,
-  } as Response;
+  } as APIResponse;
 }
