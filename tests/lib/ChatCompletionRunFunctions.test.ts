@@ -1404,6 +1404,48 @@ describe('resource completions', () => {
       expect(listener.gotAbort).toBe(true);
     });
 
+    test('uses SameValue semantics for NaN abort reasons from sequential tool callbacks', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const controller = new AbortController();
+      const abortReason = Number.NaN;
+      const runner = openai.chat.completions.runTools(
+        {
+          messages: [{ role: 'user', content: 'run the tool' }],
+          model: 'gpt-3.5-turbo',
+          parallel_tool_calls: false,
+          tools: [{
+            type: 'function',
+            function: {
+              function: (_args: string, activeRunner: ChatCompletionRunner<any>) => {
+                controller.abort(abortReason);
+                activeRunner.controller.signal.throwIfAborted();
+                return 'unreachable';
+              },
+              parameters: {},
+              description: 'aborts while running',
+            },
+          }],
+        },
+        { signal: controller.signal, maxChatCompletions: 1 },
+      );
+      await handleRequest(async () => ({
+        id: '1',
+        choices: [{
+          index: 0, finish_reason: 'tool_calls', logprobs: null,
+          message: {
+            role: 'assistant', content: null, refusal: null, parsed: null,
+            tool_calls: [{ type: 'function', id: 'abort-call', function: { arguments: '', name: 'function' } }],
+          },
+        }],
+        created: Math.floor(Date.now() / 1000), model: 'gpt-3.5-turbo', object: 'chat.completion',
+      }));
+      const error = await runner.done().catch((caught) => caught);
+      expect(error).toBeInstanceOf(APIUserAbortError);
+      expect(error.cause).toBe(abortReason);
+      expect(runner.aborted).toBe(true);
+    });
+
     test('successful flow with parse', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 

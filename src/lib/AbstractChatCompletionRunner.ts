@@ -443,15 +443,7 @@ export class AbstractChatCompletionRunner<
     };
 
     let allowBufferedToolCall = false;
-    const userAbortError = () => {
-      const error = new APIUserAbortError();
-      Object.defineProperty(error, 'cause', {
-        value: this.controller.signal.reason,
-        writable: true,
-        configurable: true,
-      });
-      return error;
-    };
+    const userAbortError = () => this._userAbortError();
 
     const runToolCall = async (toolCall: ChatCompletionMessageToolCall): Promise<ToolCallResult> => {
       const bufferedToolCall = allowBufferedToolCall;
@@ -500,7 +492,7 @@ export class AbstractChatCompletionRunner<
         try {
           rawContent = await fn.function(parsed, runner, toolContext);
         } catch (error) {
-          if (this.controller.signal.aborted && error === this.controller.signal.reason) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
             throw userAbortError();
           }
           throw error;
@@ -512,7 +504,7 @@ export class AbstractChatCompletionRunner<
         try {
           rawContent = await fn.function(args, runner, toolContext);
         } catch (error) {
-          if (this.controller.signal.aborted && error === this.controller.signal.reason) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
             throw userAbortError();
           }
           throw error;
