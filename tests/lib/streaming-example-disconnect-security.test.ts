@@ -2,7 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { setTimeout } from 'node:timers/promises';
 import { runInNewContext } from 'node:vm';
 
 import ts from 'typescript';
@@ -11,6 +12,8 @@ import { describe, expect, test, vi } from 'vitest';
 import OpenAI, { APIUserAbortError } from '../../src/index';
 
 const examples = ['stream-to-client-express.ts', 'stream-to-client-raw.ts'] as const;
+const largeContentChunk = 'x'.repeat(256 * 1024);
+const largeContentChunkCount = 64;
 
 type Example = (typeof examples)[number];
 interface Completion {
@@ -54,6 +57,7 @@ function createResponse() {
     headersSent: false,
     statusCode: 200,
     writableEnded: false,
+    writeResult: true,
     onWrite: null as (() => void) | null,
   });
 
@@ -72,7 +76,7 @@ function createResponse() {
       response.headersSent = true;
       response.body += String(chunk);
       response.onWrite?.();
-      return true;
+      return response.writeResult;
     }),
 
     end: vi.fn((chunk?: string) => {
@@ -255,6 +259,9 @@ function loadExample(
     if (specifier === 'node:crypto') {
       return { timingSafeEqual };
     }
+    if (specifier === 'node:events') {
+      return { once };
+    }
     if (specifier === 'node:fs') {
       return { readFileSync: vi.fn() };
     }
@@ -293,7 +300,7 @@ function invoke(runtime: ExampleRuntime, request: unknown, response: unknown): P
 
 async function loadPublicExample(
   filename: Example,
-  mode: 'pending' | 'complete' | 'failure' | 'partial' = 'pending',
+  mode: 'pending' | 'complete' | 'failure' | 'partial' | 'large' | 'large-failure' = 'pending',
 ) {
   const upstreamClosed: Promise<unknown[]>[] = [];
   const upstream = createServer((_request, response) => {
@@ -312,7 +319,8 @@ async function loadPublicExample(
     response.writeHead(200, { 'Content-Type': 'text/event-stream' });
     response.flushHeaders();
 
-    if (mode === 'complete' || mode === 'partial') {
+    if (mode === 'complete' || mode === 'partial' || mode === 'large' || mode === 'large-failure') {
+      const large = mode === 'large' || mode === 'large-failure';
       const base = {
         id: 'chatcmpl-public-loopback',
         object: 'chat.completion.chunk',
@@ -322,7 +330,11 @@ async function loadPublicExample(
       const content = {
         ...base,
         choices: [
-          { index: 0, delta: { role: 'assistant', content: 'safe public chunk' }, finish_reason: null },
+          {
+            index: 0,
+            delta: { role: 'assistant', content: large ? largeContentChunk : 'safe public chunk' },
+            finish_reason: null,
+          },
         ],
       };
       const finished = {
@@ -333,9 +345,12 @@ async function loadPublicExample(
         response.write(`data: ${JSON.stringify(content)}\n\n`);
         return;
       }
-      response.end(
-        `data: ${JSON.stringify(content)}\n\ndata: ${JSON.stringify(finished)}\n\ndata: [DONE]\n\n`,
-      );
+      const contentEvents = `data: ${JSON.stringify(content)}\n\n`.repeat(large ? largeContentChunkCount : 1);
+      const endEvent =
+        mode === 'large-failure'
+          ? `data: ${JSON.stringify({ error: { message: 'intentional upstream failure after backpressure' } })}\n\n`
+          : `data: ${JSON.stringify(finished)}\n\ndata: [DONE]\n\n`;
+      response.end(contentEvents + endEvent);
     }
   });
 
@@ -518,6 +533,219 @@ test.each(examples)('%s does not rewrite an already-ended response after an erro
   expect(response.end).toHaveBeenCalledOnce();
   expect(response.destroy).not.toHaveBeenCalled();
 });
+
+test('the raw example waits for drain before consuming another upstream chunk', async () => {
+  const runtime = loadExample('stream-to-client-raw.ts');
+  const request = createRequest();
+  const response = createResponse();
+  response.writeResult = false;
+
+  const pending = invoke(runtime, request, response);
+  await vi.waitFor(() => expect(response.listenerCount('drain')).toBe(1));
+
+  expect(runtime.generated).toBe(1);
+  expect(response.write).toHaveBeenCalledOnce();
+  expect(response.end).not.toHaveBeenCalled();
+
+  response.writeResult = true;
+  response.emit('drain');
+  await pending;
+
+  expect(runtime.generated).toBe(3);
+  expect(response.body).toBe('safe chunk'.repeat(3));
+  expect(response.end).toHaveBeenCalledOnce();
+  expect(runtime.signal?.aborted).toBe(false);
+  expect(runtime.consoleError).not.toHaveBeenCalled();
+  expect(request.listenerCount('aborted')).toBe(0);
+  expect(response.listenerCount('drain')).toBe(0);
+  expect(response.listenerCount('error')).toBe(0);
+  expect(response.listenerCount('close')).toBe(0);
+});
+
+test.each(['response close', 'request abort', 'close during write'] as const)(
+  'the raw example cancels a drain wait after %s',
+  async (event) => {
+    const runtime = loadExample('stream-to-client-raw.ts');
+    const request = createRequest();
+    const response = createResponse();
+    response.writeResult = false;
+    if (event === 'close during write') {
+      response.onWrite = () => response.destroy();
+    }
+
+    const pending = invoke(runtime, request, response);
+    if (event !== 'close during write') {
+      await vi.waitFor(() => expect(response.listenerCount('drain')).toBe(1));
+      if (event === 'response close') {
+        response.destroy();
+      } else {
+        request.emit('aborted');
+      }
+    }
+    await pending;
+
+    expect(runtime.signal?.aborted).toBe(true);
+    expect(runtime.generated).toBe(1);
+    expect(runtime.cancellations).toBe(1);
+    expect(response.end).not.toHaveBeenCalled();
+    expect(runtime.consoleError).not.toHaveBeenCalled();
+    expect(request.listenerCount('aborted')).toBe(0);
+    expect(response.listenerCount('drain')).toBe(0);
+    expect(response.listenerCount('error')).toBe(0);
+    expect(response.listenerCount('close')).toBe(0);
+  },
+);
+
+test.each(['write', 'drain wait'] as const)(
+  'the raw example reports a genuine response error during %s',
+  async (phase) => {
+    const failure = new Error(`intentional response ${phase} failure`);
+    const runtime = loadExample('stream-to-client-raw.ts');
+    const request = createRequest();
+    const response = createResponse();
+    response.writeResult = false;
+    if (phase === 'write') {
+      response.onWrite = () => {
+        throw failure;
+      };
+    }
+
+    const pending = invoke(runtime, request, response);
+    if (phase === 'drain wait') {
+      await vi.waitFor(() => expect(response.listenerCount('drain')).toBe(1));
+      response.emit('error', failure);
+    }
+    await pending;
+
+    expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(runtime.signal?.aborted).toBe(false);
+    expect(runtime.cancellations).toBe(1);
+    expect(response.destroy).toHaveBeenCalledOnce();
+    expect(response.end).not.toHaveBeenCalled();
+    expect(request.listenerCount('aborted')).toBe(0);
+    expect(response.listenerCount('drain')).toBe(0);
+    expect(response.listenerCount('error')).toBe(0);
+    expect(response.listenerCount('close')).toBe(0);
+  },
+);
+
+test.each(['response close', 'request abort'] as const)(
+  'the raw example preserves a response error immediately followed by %s',
+  async (event) => {
+    const failure = new Error('intentional response error before client disconnect');
+    const runtime = loadExample('stream-to-client-raw.ts');
+    const request = createRequest();
+    const response = createResponse();
+    response.writeResult = false;
+
+    const pending = invoke(runtime, request, response);
+    await vi.waitFor(() => expect(response.listenerCount('drain')).toBe(1));
+    response.emit('error', failure);
+    if (event === 'response close') {
+      response.destroy();
+    } else {
+      request.emit('aborted');
+    }
+    await pending;
+
+    expect(runtime.signal?.aborted).toBe(true);
+    expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(runtime.cancellations).toBe(1);
+    expect(response.end).not.toHaveBeenCalled();
+    expect(request.listenerCount('aborted')).toBe(0);
+    expect(response.listenerCount('drain')).toBe(0);
+    expect(response.listenerCount('error')).toBe(0);
+    expect(response.listenerCount('close')).toBe(0);
+  },
+);
+
+test.each(['resume', 'disconnect', 'upstream failure'] as const)(
+  'the raw example handles a paused real downstream client followed by %s',
+  async (mode) => {
+    const client = await loadPublicExample(
+      'stream-to-client-raw.ts',
+      mode === 'upstream failure' ? 'large-failure' : 'large',
+    );
+    let incomingRequest: IncomingMessage | undefined;
+    let outgoing: ServerResponse | undefined;
+    let routeFinished = false;
+    const downstream = createServer(async (request, response) => {
+      incomingRequest = request;
+      let body = '';
+      for await (const chunk of request) {
+        body += String(chunk);
+      }
+      outgoing = response;
+      const adaptedResponse = Object.assign(response, {
+        header(name: string, value: string) {
+          response.setHeader(name, value);
+          return response;
+        },
+        status(code: number) {
+          response.statusCode = code;
+          return response;
+        },
+      });
+      await invoke(client.runtime, Object.assign(request, { body }), adaptedResponse);
+      routeFinished = true;
+    });
+    const listening = once(downstream, 'listening');
+    downstream.listen(0, '127.0.0.1');
+    await listening;
+    const address = downstream.address();
+    if (address === null || typeof address === 'string') {
+      throw new Error('The downstream server has no local port');
+    }
+
+    const controller = new AbortController();
+    try {
+      const incoming = await fetch(`http://127.0.0.1:${address.port}`, {
+        method: 'POST',
+        body: 'A synthetic prompt',
+        signal: controller.signal,
+      });
+      // Leave the actual HTTP response unread while the provider sends 16 MiB.
+      await vi.waitFor(() => expect(outgoing?.writableNeedDrain).toBe(true));
+      await setTimeout(100);
+      expect(routeFinished).toBe(false);
+      expect(outgoing?.writableNeedDrain).toBe(true);
+      expect(outgoing?.writableLength).toBeLessThan(largeContentChunk.length * 2);
+      expect(incoming.status).toBe(200);
+
+      if (mode === 'resume') {
+        expect(await incoming.text()).toBe(largeContentChunk.repeat(largeContentChunkCount));
+      } else if (mode === 'upstream failure') {
+        await expect(incoming.text()).rejects.toThrow();
+      } else {
+        controller.abort();
+      }
+      await vi.waitFor(() => expect(routeFinished).toBe(true));
+      expect(client.transport).toHaveBeenCalledOnce();
+      expect(client.upstreamClosed).toHaveLength(1);
+      await client.upstreamClosed[0];
+
+      if (mode === 'upstream failure') {
+        expect(client.runtime.consoleError).toHaveBeenCalledOnce();
+        expect(String(client.runtime.consoleError.mock.calls[0]?.[0])).toContain(
+          'intentional upstream failure after backpressure',
+        );
+        expect(outgoing?.destroyed).toBe(true);
+      } else {
+        expect(client.runtime.consoleError).not.toHaveBeenCalled();
+        expect(client.signal?.aborted).toBe(mode === 'disconnect');
+      }
+      expect(outgoing?.writableEnded).toBe(mode === 'resume');
+      expect(incomingRequest?.listenerCount('aborted')).toBe(0);
+      expect(outgoing?.listenerCount('drain')).toBe(0);
+      expect(outgoing?.listenerCount('error')).toBe(0);
+      expect(outgoing?.listenerCount('close')).toBe(0);
+    } finally {
+      controller.abort();
+      await closePublicExample(downstream);
+      await closePublicExample(client.upstream);
+    }
+  },
+);
 
 test.each([
   ['stream-to-client-express.ts', 'response close'],
