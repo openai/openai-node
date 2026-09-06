@@ -390,7 +390,8 @@ export function zodFunction<Parameters extends ZodTypeLike>(
 
 /** Builds a strict Chat Completions function tool from the supplied Zod schema. */
 export function zodFunction<Parameters extends ZodTypeLike>(options: ZodFunctionOptions<Parameters>) {
-  const zodSchema = options.parameters as unknown as ZodSchema;
+  const parameters = options.parameters;
+  const zodSchema = parameters as unknown as ZodSchema;
 
   return makeParseableTool<any>(
     {
@@ -406,7 +407,7 @@ export function zodFunction<Parameters extends ZodTypeLike>(options: ZodFunction
     },
     {
       callback: options.function,
-      parser: (args) => parseZodObject(options.parameters, args),
+      parser: (args) => parseZodObject(parameters, args),
     },
   );
 }
@@ -444,7 +445,8 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   /** Callback signature associated with validated function-call arguments. */
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
-  const zodSchema = options.parameters as unknown as ZodSchema;
+  const parameters = options.parameters;
+  const zodSchema = parameters as unknown as ZodSchema;
 
   return makeParseableResponseTool<any>(
     {
@@ -458,7 +460,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
     },
     {
       callback: options.function,
-      parser: (args) => parseZodObject(options.parameters, args),
+      parser: (args) => parseZodObject(parameters, args),
     },
   );
 }
