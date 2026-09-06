@@ -387,13 +387,8 @@ class StreamingRunnerListener {
     expect(this.eventChatCompletions).toEqual(this.runner.allChatCompletions());
     const runnerMessages = this.runner.messages.filter((message) => !ignoredMessages.has(message));
     expect(this.eventMessages).toEqual(runnerMessages.slice(-this.eventMessages.length));
-    if (error) {
-      expect(this.error?.message).toEqual(error);
-      expect(this.runner.errored).toBe(true);
-    } else {
-      expect(this.error).toBeUndefined();
-      expect(this.runner.errored).toBe(false);
-    }
+    expect(this.error).toBeUndefined();
+    expect(this.runner.errored).toBe(false);
     expect(this.gotEnd).toBe(true);
   }
 }

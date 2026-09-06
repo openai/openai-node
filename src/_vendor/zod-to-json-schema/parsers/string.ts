@@ -410,7 +410,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
   }
 
   try {
-    const regexTest = new RegExp(pattern);
+    void new RegExp(pattern);
   } catch {
     console.warn(
       `Could not convert regex pattern at ${refs.currentPath.join(
