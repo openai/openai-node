@@ -32,7 +32,7 @@ async function locked(cache, action, signal) {
   }
   try {
     signal?.throwIfAborted();
-    return action();
+    return await action();
   } finally {
     fs.rmdirSync(lock);
   }
@@ -105,15 +105,29 @@ async function run(cache, selected, command, args) {
   try {
     const { exited } = await locked(
       cache,
-      () => {
+      async () => {
         prune(cache, selected);
         child = spawn(command, args, { stdio: 'inherit', env: { ...process.env, STEADY_CACHE_LEASE: '1' } });
-        fs.writeFileSync(
-          lease,
-          JSON.stringify({ pids: [process.pid, child.pid].filter(Boolean), entries: selected }),
-          { flag: 'wx' },
-        );
-        return { exited: once(child, 'exit') };
+        const exit = once(child, 'exit');
+        void exit.catch(() => {
+          // Rollback reports the lease error after the child has closed.
+        });
+        const { promise: closed, resolve } = Promise.withResolvers();
+        child.once('close', resolve);
+        try {
+          fs.writeFileSync(
+            lease,
+            JSON.stringify({ pids: [process.pid, child.pid].filter(Boolean), entries: selected }),
+            { flag: 'wx' },
+          );
+        } catch (error) {
+          if (child.pid !== undefined) {
+            child.kill('SIGKILL');
+          }
+          await closed;
+          throw error;
+        }
+        return { exited: exit };
       },
       pending.signal,
     );
