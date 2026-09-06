@@ -57,6 +57,7 @@ describeBash('scripts/test mock-server cleanup', () => {
       STARTUP_EXIT: '0',
       PAUSE_STARTUP: 'false',
       REUSE_HEALTHY: 'false',
+      HEALTH_STATUS: '200',
       JEST_EXIT: '0',
     };
     for (const directory of ['scripts', 'bin', 'node_modules/.bin']) {
@@ -65,7 +66,16 @@ describeBash('scripts/test mock-server cleanup', () => {
     for (const file of ['scripts/test', 'scripts/generated-test-patterns.json']) {
       copyFileSync(path.join(repoRoot, file), path.join(fixture, file));
     }
-    writeExecutable('bin/curl', 'bash', '[ "$REUSE_HEALTHY" = true ] || [ -f "$FIXTURE_ROOT/mock.ready" ]');
+    writeExecutable(
+      'bin/curl',
+      'bash',
+      `[ "$REUSE_HEALTHY" = true ] || [ -f "$FIXTURE_ROOT/mock.ready" ] || exit 1
+# curl treats HTTP error responses as failures only when --fail is enabled.
+for option in "$@"; do
+  if [ "$option" = --fail ] && [ "$HEALTH_STATUS" -ge 400 ]; then exit 22; fi
+done
+exit 0`,
+    );
     writeExecutable('bin/lsof', 'bash', 'touch "$FIXTURE_ROOT/lsof.called"\ncat "$FIXTURE_ROOT/server.pid"');
     writeExecutable('node_modules/.bin/jest', 'bash', 'touch "$FIXTURE_ROOT/jest.called"\nexit "$JEST_EXIT"');
     writeExecutable(
@@ -137,6 +147,20 @@ child.once('message', () => {
 
   test('does not kill an unrelated process when mock startup fails', async () => {
     await startExistingProcess();
+    env['STARTUP_EXIT'] = '23';
+
+    runTests(23);
+
+    expect(existsSync(path.join(fixture, 'mock.called'))).toBe(true);
+    expect(existsSync(path.join(fixture, 'jest.called'))).toBe(false);
+    expect(existsSync(path.join(fixture, 'lsof.called'))).toBe(false);
+    expect(isRunning(fixturePid())).toBe(true);
+  });
+
+  test.each([404, 503])('rejects HTTP %i health responses before running Jest', async (status) => {
+    await startExistingProcess();
+    env['REUSE_HEALTHY'] = 'true';
+    env['HEALTH_STATUS'] = String(status);
     env['STARTUP_EXIT'] = '23';
 
     runTests(23);
