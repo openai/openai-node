@@ -607,12 +607,12 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   }
 
   protected _authHeaders(): Record<string, string> {
-    const apiKey = this._client.apiKey;
-    if (!apiKey) {
+    if (this._client._hasUnresolvedApiKey()) {
       throw new OpenAIError(
-        'Cannot open a Responses WebSocket without a resolved string apiKey. Resolve function-based credentials before constructing the WebSocket.',
+        'Cannot open a Responses WebSocket with an unresolved function-based apiKey. Resolve it before constructing the WebSocket.',
       );
     }
-    return { Authorization: `Bearer ${apiKey}` };
+    const apiKey = this._client.apiKey;
+    return apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 }
