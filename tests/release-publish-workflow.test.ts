@@ -12,11 +12,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const root = process.cwd();
-const workflow = readFileSync(path.join(root, '.github/workflows/create-releases.yml'), 'utf-8');
+const workflow = readFileSync(path.join(root, '.github/workflows/create-releases.yml'), 'utf-8')
+  .split('\r\n')
+  .join('\n');
 const publishJob = workflow.split('\n  publish:\n')[1] ?? '';
+const releaseCIJob = workflow.split('\n  release-ci:\n')[1]?.split(/\n {2}[\w-]+:\n/u)[0] ?? '';
 
-function workflowRunStep(name: string): string {
-  const [, step] = publishJob.split(`      - name: ${name}\n`);
+function workflowRunStep(name: string, job = publishJob): string {
+  const [, step] = job.split(`      - name: ${name}\n`);
   const script = step?.split('        run: |\n')[1]?.split('\n      - ')[0];
 
   if (!script) {
@@ -32,6 +35,129 @@ function workflowRunStep(name: string): string {
 function writeExecutable(filename: string, source: string) {
   writeFileSync(filename, `#!/usr/bin/env node\n${source}\n`, { mode: 0o755 });
 }
+
+describe('release commit CI gate', () => {
+  test('requires successful release CI before publication', () => {
+    const publicationCondition = "    if: needs.publication-check.outputs.should_publish == 'true'\n";
+    expect(publishJob).toContain(publicationCondition);
+    expect(publishJob).toContain('\n      - release-ci\n');
+    expect(releaseCIJob).toContain(publicationCondition);
+    expect(releaseCIJob).toContain('\n    needs: publication-check\n');
+    // oxlint-disable-next-line no-template-curly-in-string -- This is a literal GitHub Actions expression.
+    expect(releaseCIJob).toContain('RELEASE_SHA: ${{ needs.publication-check.outputs.release_sha }}');
+    expect(releaseCIJob).toContain('      actions: read\n      checks: read');
+    expect(releaseCIJob).not.toContain('continue-on-error:');
+  });
+
+  test.each([
+    { name: 'successful CI', exitCode: 0, watchExit: 0 },
+    { name: 'failed CI', exitCode: 1, watchExit: 1 },
+    { name: 'cancelled CI', exitCode: 1, watchExit: 1 },
+    { name: 'missing CI', exitCode: 1, missing: true, error: 'No CI push workflow found' },
+    { name: 'mismatched commit', exitCode: 1, mismatch: true, error: 'targets' },
+    { name: 'API failure', exitCode: 73, apiFailure: true },
+  ])('handles $name for the immutable release commit', (scenario) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-release-ci-'));
+    const releaseSHA = 'a'.repeat(40);
+    const repository = 'openai/test-sdk';
+    const invocations = path.join(fixture, 'gh.jsonl');
+    const selectedRun = { id: 42, event: 'push', head_sha: releaseSHA, head_branch: 'main' };
+
+    try {
+      writeExecutable(
+        path.join(fixture, 'gh'),
+        `
+const { appendFileSync } = require('node:fs');
+const args = process.argv.slice(2);
+const data = JSON.parse(process.env.GATE_FIXTURE);
+appendFileSync(process.env.GATE_INVOCATIONS, JSON.stringify(args) + '\\n');
+if (args[0] === 'api') {
+  if (data.apiFailure) process.exit(73);
+  const query = args[args.indexOf('--jq') + 1];
+  let response;
+  if (args.includes('repos/' + process.env.GITHUB_REPOSITORY + '/actions/workflows/ci.yml/runs')) {
+    const filters = Object.fromEntries(args.flatMap((arg, index) => arg === '-f' ? [args[index + 1].split('=')] : []));
+    response = { workflow_runs: data.runs.filter(run =>
+      (!filters.event || run.event === filters.event) && (!filters.head_sha || run.head_sha === filters.head_sha)
+    ) };
+  } else if (args.includes('repos/' + process.env.GITHUB_REPOSITORY + '/actions/runs/42')) {
+    response = { head_sha: data.runSHA };
+  } else {
+    throw new Error('Unexpected API request: ' + JSON.stringify(args));
+  }
+  if (query === '.workflow_runs | map(select(.head_branch == "main")) | first | .id // empty') {
+    const selected = response.workflow_runs.find(run => run.head_branch === 'main');
+    if (selected) process.stdout.write(String(selected.id) + '\\n');
+  } else if (query === '.head_sha') {
+    process.stdout.write(String(response.head_sha) + '\\n');
+  } else {
+    throw new Error('Unexpected jq query: ' + query);
+  }
+} else if (args[0] === 'run' && args[1] === 'watch') {
+  process.exit(args.includes('--exit-status') ? data.watchExit : 0);
+} else {
+  throw new Error('Unexpected gh invocation: ' + JSON.stringify(args));
+}
+`,
+      );
+      // The release-gate fixture must not depend on an undeclared host jq binary.
+      writeExecutable(path.join(fixture, 'jq'), 'process.exit(91);');
+      // Keep the missing-run polling path deterministic and fast.
+      writeExecutable(path.join(fixture, 'sleep'), 'process.exit(0);');
+
+      const result = spawnSync(
+        'bash',
+        [
+          '-e',
+          '-o',
+          'pipefail',
+          '-c',
+          workflowRunStep('Wait for CI on the immutable release commit', releaseCIJob),
+        ],
+        {
+          cwd: fixture,
+          encoding: 'utf-8',
+          timeout: 15_000,
+          env: {
+            PATH: `${fixture}${path.delimiter}${path.dirname(process.execPath)}${path.delimiter}${process.env['PATH']}`,
+            GITHUB_REPOSITORY: repository,
+            RELEASE_SHA: releaseSHA,
+            GH_TOKEN: 'synthetic-github-token',
+            GATE_INVOCATIONS: invocations,
+            GATE_FIXTURE: JSON.stringify({
+              ...scenario,
+              runSHA: scenario.mismatch ? 'b'.repeat(40) : releaseSHA,
+              runs: [
+                { ...selectedRun, id: 11, head_sha: 'b'.repeat(40) },
+                { ...selectedRun, id: 12, event: 'pull_request' },
+                { ...selectedRun, id: 13, head_branch: 'feature' },
+                ...(scenario.missing ? [] : [selectedRun]),
+              ],
+            }),
+          },
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(scenario.exitCode);
+      if (scenario.error) {
+        expect(result.stdout).toContain(scenario.error);
+      }
+
+      const calls: string[][] = readFileSync(invocations, 'utf-8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      const watchCalls = calls.filter((args) => args[0] === 'run');
+      expect(watchCalls).toEqual(
+        scenario.watchExit === undefined
+          ? []
+          : [['run', 'watch', '42', '--repo', repository, '--exit-status']],
+      );
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('trusted npm release publication', () => {
   test('preserves immutable publisher, artifact, OIDC, and npm provenance boundaries', () => {
