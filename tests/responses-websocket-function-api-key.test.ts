@@ -60,6 +60,41 @@ describe.each([
     }
   });
 
+  test.each([
+    { name: 'Basic auth', options: { auth: 'user:pass' } },
+    { name: 'proxy authorization', options: { headers: { 'Proxy-Authorization': 'Basic proxy' } } },
+    { name: 'cookie', options: { headers: { Cookie: 'session=secret' } } },
+    { name: 'X-API-Key', options: { headers: { 'X-API-Key': 'key-secret' } } },
+  ])('allows caller-supplied $name with an unresolved function api key', ({ options }) => {
+    const apiKey = vi.fn(async () => 'sk-refreshed');
+    const client = new OpenAI({ apiKey });
+    const responses = new Responses(client, options);
+    try {
+      expect(apiKey).not.toHaveBeenCalled();
+      expect(handshake).toHaveBeenCalledTimes(1);
+    } finally {
+      responses.close();
+    }
+  });
+
+  test('validates the same accessor-backed authorization snapshot sent to ws', () => {
+    const apiKey = vi.fn(async () => 'sk-refreshed');
+    const client = new OpenAI({ apiKey });
+    let reads = 0;
+    const headers: Record<string, string> = {};
+    Object.defineProperty(headers, 'Authorization', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? '' : 'Bearer later-value';
+      },
+    });
+
+    expect(() => new Responses(client, { headers })).toThrow(/unresolved function-based apiKey/);
+    expect(reads).toBe(1);
+    expect(handshake).not.toHaveBeenCalled();
+  });
+
   test('accepts a function api key after it has been resolved', async () => {
     const apiKey = vi.fn(async () => 'sk-refreshed');
     const client = new OpenAI({ apiKey });
