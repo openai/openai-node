@@ -6,13 +6,14 @@ const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { setInterval: interval } = require('node:timers/promises');
 const { once } = require('node:events');
+const { performance } = require('node:perf_hooks');
 
 const MAX_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Serialize lease changes and pruning, never the commands using the cache.
 async function locked(cache, action, signal) {
   const lock = path.join(cache, '.lifecycle-lock');
-  const deadline = Date.now() + 10_000;
+  const deadline = performance.now() + 10_000;
   for await (const tick of interval(50, undefined, { signal })) {
     void tick;
     try {
@@ -22,7 +23,7 @@ async function locked(cache, action, signal) {
       if (error.code !== 'EEXIST') {
         throw error;
       }
-      if (Date.now() >= deadline) {
+      if (performance.now() >= deadline) {
         throw new Error(`Steady cache is locked. If no install or mock is running, remove ${lock}.`, {
           cause: error,
         });
