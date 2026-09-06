@@ -1,9 +1,12 @@
 import { vi } from 'vitest';
-import type OpenAI from 'openai';
+import OpenAI, { AzureOpenAI } from 'openai';
 import { APIError, OpenAIError } from 'openai/error';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
-import type { ChatCompletionSnapshot } from 'openai/lib/ChatCompletionStream';
+import type {
+  ChatCompletionSnapshot,
+  FunctionToolCallArgumentsDoneEvent,
+} from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
 import { makeParseableResponseFormat } from 'openai/lib/parser';
 import type { ChatCompletionTokenLogprob } from 'openai/resources';
@@ -88,6 +91,33 @@ function customToolChunks(): OpenAI.Chat.ChatCompletionChunk[] {
     customToolChunk({ tool_calls: [{ index: 1, function: { arguments: '"SF"}' } }] }),
     customToolChunk({}, 'tool_calls'),
   ];
+}
+
+function responseWithAnnotations(chunks: OpenAI.Chat.ChatCompletionChunk[], annotationCount: number) {
+  const annotation = {
+    id: '',
+    object: '',
+    created: 0,
+    model: '',
+    choices: [...new Set(chunks.flatMap((chunk) => chunk.choices.map((choice) => choice.index)))].map(
+      (index) => ({ index, finish_reason: null, content_filter_results: {} }),
+    ),
+    usage: null,
+  };
+  const frames = [...chunks, ...Array.from({ length: annotationCount }, () => annotation)];
+  return new Response(
+    `${frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('')}data: [DONE]\n\n`,
+    {
+      headers: { 'Content-Type': 'text/event-stream' },
+    },
+  );
+}
+
+function streamingClient(azure: boolean, fetch: OpenAI['fetch']) {
+  const options = { apiKey: 'test-key', fetch, maxRetries: 0 };
+  return azure
+    ? new AzureOpenAI({ ...options, endpoint: 'https://example.com', apiVersion: '2024-02-01' })
+    : new OpenAI({ ...options, baseURL: 'https://example.com/v1' });
 }
 
 describe('.stream()', () => {
@@ -1367,6 +1397,188 @@ describe('.stream()', () => {
       },
     ]);
   });
+
+  it.each([false, true].flatMap((azure) => [0, 2].map((annotationCount) => ({ azure, annotationCount }))))(
+    'emits function arguments done once per choice with $annotationCount trailing annotations (Azure: $azure)',
+    async ({ azure, annotationCount }) => {
+      const chunks = customToolChunks().map((chunk) => ({
+        ...chunk,
+        choices: chunk.choices.flatMap((choice) =>
+          [0, 1].map((index) => ({
+            ...choice,
+            index,
+            delta: {
+              ...choice.delta,
+              ...(choice.delta.tool_calls
+                ? {
+                    tool_calls: choice.delta.tool_calls.map((toolCall) => ({
+                      ...toolCall,
+                      ...(toolCall.id ? { id: `${toolCall.id}_${index}` } : {}),
+                    })),
+                  }
+                : {}),
+            },
+          })),
+        ),
+      }));
+      const fetch = vi.fn(async () => responseWithAnnotations(chunks, annotationCount));
+      const client = streamingClient(azure, fetch);
+      const stream = client.chat.completions.stream({
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Run code and check the weather' }],
+        n: 2,
+        tools: [
+          { type: 'custom', custom: { name: 'code_exec' } },
+          {
+            type: 'function',
+            function: {
+              name: 'get_weather',
+              strict: true,
+              parameters: {
+                type: 'object',
+                properties: { city: { type: 'string' } },
+                required: ['city'],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+      });
+      const done: FunctionToolCallArgumentsDoneEvent[] = [];
+      stream.on('tool_calls.function.arguments.done', (event) => done.push(event));
+
+      const completion = await stream.finalChatCompletion();
+      const expected = {
+        name: 'get_weather',
+        index: 1,
+        arguments: '{"city":"SF"}',
+        parsed_arguments: { city: 'SF' },
+      };
+      expect(done).toEqual([expected, expected]);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(completion.choices).toHaveLength(2);
+      for (const choice of completion.choices) {
+        expect(choice.message.tool_calls).toEqual([
+          {
+            id: `call_custom_123_${choice.index}`,
+            type: 'custom',
+            custom: { name: 'code_exec', input: 'print("hello")\nreturn 42' },
+          },
+          {
+            id: `call_function_456_${choice.index}`,
+            type: 'function',
+            function: {
+              name: 'get_weather',
+              arguments: '{"city":"SF"}',
+              parsed_arguments: { city: 'SF' },
+            },
+          },
+        ]);
+      }
+    },
+  );
+
+  it('preserves interleaved non-strict tool completion notifications', async () => {
+    const fragments = [
+      { index: 0, arguments: '{"city":' },
+      { index: 1, arguments: '{"city":' },
+      { index: 0, arguments: '"SF"}' },
+      { index: 1, arguments: '"NY"}' },
+    ];
+    const chunks = fragments.map((fragment, position) =>
+      customToolChunk({
+        ...(position === 0 ? { role: 'assistant' } : {}),
+        tool_calls: [
+          {
+            index: fragment.index,
+            ...(position < 2 ? { id: `call_${fragment.index}`, type: 'function' as const } : {}),
+            function: {
+              ...(position < 2 ? { name: 'get_weather' } : {}),
+              arguments: fragment.arguments,
+            },
+          },
+        ],
+      }),
+    );
+    chunks.push(customToolChunk({}, 'tool_calls'));
+    const client = streamingClient(false, async () => responseWithAnnotations(chunks, 0));
+    const stream = client.chat.completions.stream({
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Check two cities' }],
+      tools: [{ type: 'function', function: { name: 'get_weather', parameters: {} } }],
+    });
+    const done: FunctionToolCallArgumentsDoneEvent[] = [];
+    stream.on('tool_calls.function.arguments.done', (event) => done.push(event));
+
+    const completion = await stream.finalChatCompletion();
+    // Preserve existing switch notifications without suppressing the later complete arguments.
+    expect(done.map(({ index, arguments: args }) => ({ index, arguments: args }))).toEqual([
+      { index: 0, arguments: '{"city":' },
+      { index: 1, arguments: '{"city":' },
+      { index: 0, arguments: '{"city":"SF"}' },
+      { index: 1, arguments: '{"city":"NY"}' },
+    ]);
+    expect(completion.choices[0]?.message.tool_calls).toMatchObject([
+      { type: 'function', function: { arguments: '{"city":"SF"}' } },
+      { type: 'function', function: { arguments: '{"city":"NY"}' } },
+    ]);
+  });
+
+  it.each([false, true])(
+    'resets function arguments done for each tool-runner request (Azure: %s)',
+    async (azure) => {
+      let requests = 0;
+      const fetch = vi.fn(async () => {
+        requests += 1;
+        const chunks = [
+          customToolChunk({
+            role: 'assistant',
+            tool_calls: [
+              {
+                index: 0,
+                id: `call_${requests}`,
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+          }),
+          customToolChunk({}, 'tool_calls'),
+        ].map((chunk) => ({ ...chunk, id: `chatcmpl-${requests}` }));
+        return responseWithAnnotations(chunks, 2);
+      });
+      const client = streamingClient(azure, fetch);
+      const lookup = vi.fn((args: string) => args);
+      const runner = client.chat.completions.runTools(
+        {
+          model: 'gpt-test',
+          messages: [{ role: 'user', content: 'Look up two things' }],
+          stream: true,
+          tools: [
+            {
+              type: 'function',
+              function: {
+                name: 'lookup',
+                description: 'Look up a synthetic record',
+                parameters: {},
+                function: lookup,
+              },
+            },
+          ],
+        },
+        { maxChatCompletions: 2 },
+      );
+      const done: FunctionToolCallArgumentsDoneEvent[] = [];
+      runner.on('tool_calls.function.arguments.done', (event) => done.push(event));
+
+      const completion = await runner.finalChatCompletion();
+      const expected = { name: 'lookup', index: 0, arguments: '{}', parsed_arguments: null };
+      expect(done).toEqual([expected, expected]);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(lookup).toHaveBeenCalledTimes(2);
+      expect(runner.allChatCompletions().map((result) => result.id)).toEqual(['chatcmpl-1', 'chatcmpl-2']);
+      expect(completion.id).toBe('chatcmpl-2');
+    },
+  );
 
   it('preserves custom calls and unparsed function calls without auto-parseable tools', async () => {
     const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(customToolChunks()), {
