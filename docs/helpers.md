@@ -147,8 +147,6 @@ if (toolCall?.type === 'function') {
   console.log(args);
   console.log(args.table_name);
 }
-
-main();
 ```
 
 ### Differences from `.create()`
