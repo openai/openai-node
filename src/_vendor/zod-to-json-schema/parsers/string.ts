@@ -410,8 +410,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
   }
 
   try {
-    // oxlint-disable-next-line no-new -- Construction validates the converted pattern; only failures matter.
-    new RegExp(pattern);
+    const regexTest = new RegExp(pattern);
   } catch {
     console.warn(
       `Could not convert regex pattern at ${refs.currentPath.join(
