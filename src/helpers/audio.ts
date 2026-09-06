@@ -158,7 +158,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       }
     };
     const stopRecording = () => {
-      if (!settled && ffmpeg) {
+      if (!settled && ffmpeg?.pid) {
         try {
           wasStopped ||= ffmpeg.kill('SIGTERM');
         } catch (error) {
@@ -291,7 +291,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       }
 
       try {
-        if (!wasStopped) {
+        if (!wasStopped && ffmpeg?.pid) {
           ffmpeg?.kill('SIGTERM');
         }
       } catch {
