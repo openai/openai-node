@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { Stream } from 'openai/core/streaming';
 import type { OpenAIError } from 'openai/error';
-import { APIConnectionError } from 'openai/error';
+import { APIConnectionError, APIUserAbortError } from 'openai/error';
 import { PassThrough } from 'node:stream';
 import {
   ParsingToolFunction,
@@ -1253,6 +1253,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
+      const abortReason = new Error('stop after assistant message');
       const runner = openai.chat.completions.runTools(
         {
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
@@ -1276,7 +1277,7 @@ describe('resource completions', () => {
 
       runner.on('message', (message) => {
         if (message.role === 'assistant') {
-          controller.abort();
+          controller.abort(abortReason);
         }
       });
       await handleRequest(async (request) => {
@@ -1312,7 +1313,8 @@ describe('resource completions', () => {
         };
       });
 
-      await runner.done().catch(() => {});
+      const abortError = await runner.done().catch((error) => error);
+      expect(abortError).toMatchObject({ cause: abortReason });
 
       expect(listener.messages).toEqual([
         {
@@ -1338,6 +1340,112 @@ describe('resource completions', () => {
       await listener.sanityCheck({ error: 'Request was aborted.' });
       expect(runner.aborted).toBe(true);
     });
+    test('classifies a sequential tool callback throwing the caller abort reason as a user abort', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const controller = new AbortController();
+      const abortReason = new Error('stop during tool callback');
+
+      const runner = openai.chat.completions.runTools(
+        {
+          messages: [{ role: 'user', content: 'run the tool' }],
+          model: 'gpt-3.5-turbo',
+          parallel_tool_calls: false,
+          tools: [
+            {
+              type: 'function',
+              function: {
+                function: (_args: string, activeRunner: ChatCompletionRunner<any>) => {
+                  controller.abort(abortReason);
+                  activeRunner.controller.signal.throwIfAborted();
+                  return 'unreachable';
+                },
+                parameters: {},
+                description: 'aborts while running',
+              },
+            },
+          ],
+        },
+        { signal: controller.signal, maxChatCompletions: 1 },
+      );
+      const listener = new RunnerListener(runner);
+
+      await handleRequest(async () => ({
+        id: '1',
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'tool_calls',
+            logprobs: null,
+            message: {
+              role: 'assistant',
+              content: null,
+              refusal: null,
+              parsed: null,
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: 'abort-call',
+                  function: { arguments: '', name: 'function' },
+                },
+              ],
+            },
+          },
+        ],
+        created: Math.floor(Date.now() / 1000),
+        model: 'gpt-3.5-turbo',
+        object: 'chat.completion',
+      }));
+
+      const error = await runner.done().catch((caught) => caught);
+      expect(error).toBeInstanceOf(APIUserAbortError);
+      expect(error).toMatchObject({ cause: abortReason });
+      expect(runner.aborted).toBe(true);
+      expect(listener.gotAbort).toBe(true);
+    });
+
+    test('uses SameValue semantics for NaN abort reasons from sequential tool callbacks', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const controller = new AbortController();
+      const abortReason = Number.NaN;
+      const runner = openai.chat.completions.runTools(
+        {
+          messages: [{ role: 'user', content: 'run the tool' }],
+          model: 'gpt-3.5-turbo',
+          parallel_tool_calls: false,
+          tools: [{
+            type: 'function',
+            function: {
+              function: (_args: string, activeRunner: ChatCompletionRunner<any>) => {
+                controller.abort(abortReason);
+                activeRunner.controller.signal.throwIfAborted();
+                return 'unreachable';
+              },
+              parameters: {},
+              description: 'aborts while running',
+            },
+          }],
+        },
+        { signal: controller.signal, maxChatCompletions: 1 },
+      );
+      await handleRequest(async () => ({
+        id: '1',
+        choices: [{
+          index: 0, finish_reason: 'tool_calls', logprobs: null,
+          message: {
+            role: 'assistant', content: null, refusal: null, parsed: null,
+            tool_calls: [{ type: 'function', id: 'abort-call', function: { arguments: '', name: 'function' } }],
+          },
+        }],
+        created: Math.floor(Date.now() / 1000), model: 'gpt-3.5-turbo', object: 'chat.completion',
+      }));
+      const error = await runner.done().catch((caught) => caught);
+      expect(error).toBeInstanceOf(APIUserAbortError);
+      expect(error.cause).toBe(abortReason);
+      expect(runner.aborted).toBe(true);
+    });
+
     test('successful flow with parse', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 

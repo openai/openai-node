@@ -8,7 +8,7 @@ import type {
 } from '../../resources/responses/responses';
 import type { RequestOptions } from '../../internal/request-options';
 import type { ReadableStream } from '../../internal/shim-types';
-import { APIError, APIUserAbortError, OpenAIError } from '../../error';
+import { APIError, OpenAIError } from '../../error';
 import type OpenAI from '../../index';
 import { EventStream } from '../EventStream';
 import type { BaseEvents } from '../EventStream';
@@ -263,7 +263,7 @@ export class ResponseStream<ParsedT = null>
       this.#addEvent(event, starting_after);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     return this.#endRequest();
   }
@@ -280,7 +280,7 @@ export class ResponseStream<ParsedT = null>
       this.#addEvent(event, null);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     return this.#endRequest();
   }
