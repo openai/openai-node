@@ -1681,7 +1681,7 @@ export class OpenAI {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
     } else {
       const retrySignals =
-        requestSignal === options.signal ? [requestSignal] : [requestSignal, options.signal];
+        requestSignal === options.signal ? [requestSignal] : [options.signal, requestSignal];
       try {
         await sleep(timeoutMillis, ...retrySignals);
       } catch (error) {

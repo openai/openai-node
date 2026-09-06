@@ -256,6 +256,56 @@ describe('OpenAI client request behavior', () => {
     },
   );
 
+  test('prefers the caller abort reason when both signals abort during retry backoff', async () => {
+    vi.useFakeTimers();
+    const callerReason = new Error('stop caller request');
+    const preparedReason = new Error('stop prepared request');
+    const callerController = new AbortController();
+    const preparedController = new AbortController();
+    const fetch = vi.fn(async () =>
+      jsonResponse(
+        { error: { message: 'rate limited' } },
+        { status: 429, headers: { 'retry-after-ms': '60000' } },
+      ),
+    );
+    const client = new OpenAI({
+      provider: createProvider({
+        configure: () => ({
+          name: 'test-provider',
+          baseURL: 'https://api.openai.com/v1',
+          prepareRequest(request) {
+            request.signal = preparedController.signal;
+          },
+        }),
+      }),
+      maxRetries: 1,
+      fetch,
+    });
+    const request = client.get('/items', {
+      signal: callerController.signal,
+    });
+    const observed = observe(request);
+
+    try {
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+      // Provider/replacement signal aborts first (e.g. linked to caller), then caller.
+      preparedController.abort(preparedReason);
+      callerController.abort(callerReason);
+      await vi.advanceTimersByTimeAsync(0);
+
+      const waiting = Symbol('request still waiting for retry delay');
+      const result = await Promise.race([observed, Promise.resolve(waiting)]);
+      expect(result).not.toBe(waiting);
+      expect(result).toBeInstanceOf(APIUserAbortError);
+      expect(result).toMatchObject({ cause: callerReason });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      await vi.runAllTimersAsync();
+      await observed;
+      vi.useRealTimers();
+    }
+  });
+
   test('retries a response body timeout without treating it as a user abort', async () => {
     const random = vi.spyOn(Math, 'random').mockReturnValue(0);
     const preparedController = new AbortController();

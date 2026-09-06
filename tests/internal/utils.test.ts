@@ -168,6 +168,76 @@ describe('environment and request utilities', () => {
       vi.useRealTimers();
     }
   });
+
+  test('cleans up when the post-registration abort probe throws', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const controller = new AbortController();
+      let abortedReads = 0;
+      const signal = new Proxy(controller.signal, {
+        get(target, property) {
+          if (property === 'aborted') {
+            abortedReads += 1;
+            if (abortedReads > 1) {
+              throw new Error('aborted probe failed');
+            }
+            return false;
+          }
+          if (property === 'addEventListener') {
+            return () => {};
+          }
+          if (property === 'removeEventListener') {
+            return () => {};
+          }
+          return Reflect.get(target, property, target);
+        },
+      });
+      let rejection: unknown;
+      void sleep(25, signal).catch((error) => {
+        rejection = error;
+      });
+      await Promise.resolve();
+
+      expect(rejection).toMatchObject({ message: 'aborted probe failed' });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('removes listeners installed after synchronous cancellation', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const listeners = new Set<Parameters<AbortSignal['addEventListener']>[1]>();
+      const signal = {
+        aborted: false,
+        addEventListener(_type: string, listener: Parameters<AbortSignal['addEventListener']>[1]) {
+          if (typeof listener === 'function') {
+            listener.call(this, new Event('abort'));
+          } else {
+            listener.handleEvent(new Event('abort'));
+          }
+          listeners.add(listener);
+        },
+        removeEventListener(_type: string, listener: Parameters<AbortSignal['addEventListener']>[1]) {
+          listeners.delete(listener);
+        },
+      } as AbortSignal;
+      let rejected = false;
+      void sleep(25, signal).catch(() => {
+        rejected = true;
+      });
+      await Promise.resolve();
+
+      expect(rejected).toBe(true);
+      expect(listeners.size).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('value utilities', () => {
