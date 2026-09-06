@@ -322,7 +322,10 @@ export class AssistantStream
     return Object.values(this.#runStepSnapshots);
   }
 
-  /** Waits for successful completion and returns the final snapshot of every observed message. */
+  /**
+   * Waits for successful completion and returns the final snapshot of every observed message.
+   * Terminal message events replace accumulated snapshots without mutating earlier snapshots.
+   */
   async finalMessages(): Promise<Message[]> {
     await this.done();
 
@@ -479,6 +482,9 @@ export class AssistantStream
       case 'thread.message.delta':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
+        if (messageID !== undefined && this.#messageSnapshot) {
+          this.#reserveMessageAlias(this.#messageSnapshot, messageID);
+        }
         this.#handleMessage(stableEvent);
         if (messageID !== undefined) {
           this.#reserveMessageAlias(stableEvent.data, messageID);
@@ -918,9 +924,9 @@ export class AssistantStream
       case 'thread.message.in_progress':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
-        //No changes on other thread events
+        //Terminal events provide the authoritative message snapshot.
         if (snapshot) {
-          return [snapshot, newContent];
+          return [event.event === 'thread.message.in_progress' ? snapshot : event.data, newContent];
         }
         throw new Error('Received thread message event with no existing snapshot');
       }
