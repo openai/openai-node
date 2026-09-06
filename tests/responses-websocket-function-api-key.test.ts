@@ -40,6 +40,26 @@ describe.each([
     expect(handshake).not.toHaveBeenCalled();
   });
 
+  test.each(['Authorization', 'authorization'])('allows caller-supplied %s with an unresolved function api key', (headerName) => {
+    const apiKey = vi.fn(async () => 'sk-refreshed');
+    const client = new OpenAI({ apiKey });
+    const responses = new Responses(client, {
+      headers: { [headerName]: 'Bearer caller-managed-token' },
+    });
+    try {
+      expect(apiKey).not.toHaveBeenCalled();
+      expect(handshake).toHaveBeenCalledTimes(1);
+      expect(handshake).toHaveBeenCalledWith(
+        expect.any(URL),
+        expect.objectContaining({
+          headers: expect.objectContaining({ [headerName]: 'Bearer caller-managed-token' }),
+        }),
+      );
+    } finally {
+      responses.close();
+    }
+  });
+
   test('accepts a function api key after it has been resolved', async () => {
     const apiKey = vi.fn(async () => 'sk-refreshed');
     const client = new OpenAI({ apiKey });
