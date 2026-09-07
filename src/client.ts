@@ -1309,7 +1309,9 @@ export class OpenAI {
             replayable: buildInputReplayable,
           };
         }
-        const authorization = candidate.req.headers.get('authorization');
+        const platformHeader = getPlatformHeader(candidate.req.headers, 'Authorization');
+        const authorization =
+          platformHeader === undefined ? candidate.req.headers.get('Authorization') : platformHeader.value;
         if (
           authorization !== null &&
           this.#workloadTokenProvenance.matchesResult(candidate, authorization, workloadIdentityAuthScope)
