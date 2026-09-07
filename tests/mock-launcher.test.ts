@@ -200,13 +200,12 @@ exit 23`,
   test('terminates the daemon if it times out before becoming healthy', () => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-mock-launcher-timeout-'));
     const checkout = path.join(fixture, 'checkout');
-    const executableDirectory = path.join(fixture, 'executables');
+    const bashEnvironment = path.join(fixture, 'bash-env');
     const steadyPidFile = path.join(fixture, 'steady.pid');
     let steadyPid: number | undefined;
 
     try {
       mkdirSync(path.join(checkout, 'scripts'), { recursive: true });
-      mkdirSync(executableDirectory);
       writeFileSync(path.join(checkout, 'scripts/mock'), readFileSync(path.join(root, 'scripts/mock')));
 
       writeExecutable(
@@ -219,19 +218,24 @@ exit 23`,
           'setInterval(() => {}, 1000);',
         ].join('\n'),
       );
-      writeShellExecutable(
-        path.join(executableDirectory, 'curl'),
-        `attempts=0
+      writeFileSync(
+        bashEnvironment,
+        `curl() {
+  attempts=0
 while [[ ! -s "$STEADY_PID_FILE" && "$attempts" -lt 1000 ]]; do
   attempts=$((attempts + 1))
   :
 done
-exit 1`,
+  return 1
+}
+sleep() {
+  :
+}
+`,
       );
-      writeShellExecutable(path.join(executableDirectory, 'sleep'), 'exit 0');
 
-      const curlWithoutPid = spawnSync('bash', [path.join(executableDirectory, 'curl')], {
-        env: { ...process.env, STEADY_PID_FILE: steadyPidFile },
+      const curlWithoutPid = spawnSync('bash', ['-c', 'curl'], {
+        env: { ...process.env, BASH_ENV: bashEnvironment, STEADY_PID_FILE: steadyPidFile },
         timeout: 1000,
       });
       expect(curlWithoutPid.error).toBeUndefined();
@@ -242,7 +246,7 @@ exit 1`,
         encoding: 'utf-8',
         env: {
           ...process.env,
-          PATH: `${executableDirectory}${path.delimiter}${path.dirname(process.execPath)}${path.delimiter}${process.env['PATH']}`,
+          BASH_ENV: bashEnvironment,
           STEADY_PID_FILE: steadyPidFile,
         },
         timeout: 15_000,
