@@ -1209,13 +1209,18 @@ export class OpenAI {
     if (
       previousBuildInput &&
       previousBuildInput.source === options.headers &&
-      !canReplayHeaderInput(previousBuildInput.source)
+      (!previousBuildInput.replayable || !canReplayHeaderInput(previousBuildInput.source))
     ) {
       throw new Errors.OpenAIError(
         'A custom buildRequest hook must retain parsed headers before retrying a one-shot source.',
       );
     }
     const buildInputHeaders = options.headers;
+    const buildInputReplayable =
+      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
+      this.buildRequest !== OpenAI.prototype.buildRequest
+        ? canReplayHeaderInput(buildInputHeaders)
+        : true;
     const credentialContext = {};
     workloadHeaders?.defaultHeaders.refresh(this._options.defaultHeaders);
     workloadHeaders?.requestHeaders.refresh(options.headers);
@@ -1250,6 +1255,7 @@ export class OpenAI {
         ) {
           workloadHeaders.customBuildInput = {
             source: buildInputHeaders,
+            replayable: buildInputReplayable,
           };
         }
         const authorization = candidate.req.headers.get('authorization');
