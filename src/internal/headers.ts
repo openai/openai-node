@@ -716,7 +716,9 @@ export interface WorkloadHeaderSnapshots {
   defaultHeaders: ReturnType<typeof snapshotHeaders>;
   customBuildInput?: {
     source: HeadersLike;
+    defaultSource: HeadersLike;
     replayable: boolean;
+    defaultReplayable: boolean;
     owned: boolean;
     independentAuthorization: boolean;
     preventCredentialUpgrade: boolean;
