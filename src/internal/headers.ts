@@ -488,9 +488,17 @@ export interface HeaderSnapshot {
 
 const createHeaderSnapshot = (
   initialSource: HeadersLike,
-  initial?: { snapshot?: NullableHeaders; refreshable?: boolean; deferred?: boolean; replay?: HeaderReplay },
+  initial?: {
+    snapshot?: NullableHeaders;
+    refreshable?: boolean;
+    deferred?: boolean;
+    replay?: HeaderReplay;
+    materialization?: { source: HeadersLike; snapshot?: NullableHeaders };
+  },
 ): HeaderSnapshot => {
   let source = initialSource;
+  // Forks share only their first materialization; source replacement and replay state stay layer-local.
+  const materialization = initial?.materialization ?? { source: initialSource };
   const captured = initial?.snapshot ? capturedHeaderReplays.get(initial.snapshot) : undefined;
   let replay: HeaderReplay =
     initial?.replay ??
@@ -498,13 +506,27 @@ const createHeaderSnapshot = (
       ? copyHeaderReplay(captured.replay)
       : { refreshable: initial?.refreshable ?? true });
   let snapshot = initial?.snapshot;
+  const inheritMaterialization = () => {
+    if (!snapshot && source === materialization.source && materialization.snapshot) {
+      snapshot = materialization.snapshot;
+      const metadata = capturedHeaderReplays.get(snapshot);
+      replay = metadata ? copyHeaderReplay(metadata.replay) : { refreshable: false };
+    }
+  };
+  const rememberMaterialization = () => {
+    if (snapshot && source === materialization.source && !materialization.snapshot) {
+      materialization.snapshot = snapshot;
+    }
+  };
   const initialize = () => {
+    inheritMaterialization();
     if (snapshot) return snapshot;
     const provenance = { unknown: false };
     snapshot = mergeHeaderEntries([
       { source, provenance, replay, entries: iterateHeaders(source, replay, provenance) },
     ]);
     capturedHeaderReplays.set(snapshot, { source, replay: copyHeaderReplay(replay) });
+    rememberMaterialization();
     return snapshot;
   };
   if (!initial?.deferred) initialize();
@@ -525,6 +547,7 @@ const createHeaderSnapshot = (
       return replay.refreshable && !replay.unverifiedHeaders && !replay.properties?.size;
     },
     refresh: (...sources: [] | [HeadersLike]) => {
+      inheritMaterialization();
       const currentSource = sources.length === 0 ? source : sources[0];
       if (snapshot && currentSource === snapshot) return snapshot;
       if (!snapshot || currentSource !== source || replay.refreshable) {
@@ -566,6 +589,7 @@ const createHeaderSnapshot = (
         replay = nextReplay;
         snapshot = nextSnapshot;
         capturedHeaderReplays.set(snapshot, { source, replay: copyHeaderReplay(replay) });
+        rememberMaterialization();
       }
       return initialize();
     },
@@ -575,6 +599,7 @@ const createHeaderSnapshot = (
         const metadata = capturedHeaderReplays.get(captured);
         replay =
           metadata && metadata.source === source ? copyHeaderReplay(metadata.replay) : { refreshable: false };
+        rememberMaterialization();
       }
     },
     fork: () =>
@@ -582,6 +607,7 @@ const createHeaderSnapshot = (
         ...(snapshot ? { snapshot } : {}),
         deferred: !snapshot,
         replay: copyHeaderReplay(replay),
+        materialization,
       }),
   };
 };
