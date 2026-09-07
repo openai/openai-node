@@ -1,0 +1,64 @@
+import OpenAI from 'openai';
+import { vi } from 'vitest';
+import {
+  createTestClientOptions,
+  createTestWorkloadIdentity,
+  createWorkloadIdentityTransport,
+} from './workload-identity-fixtures';
+
+beforeEach(() => {
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit undefined removes inherited credentials.
+  vi.stubEnv('OPENAI_API_KEY', undefined);
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit undefined removes inherited credentials.
+  vi.stubEnv('OPENAI_ADMIN_KEY', undefined);
+});
+
+afterEach(() => vi.unstubAllEnvs());
+
+describe.each(['request', 'default'] as const)('replaced %s Authorization accessor', (layer) => {
+  test.each([null, 'Bearer independent'])(
+    'observes a data property replacement during token acquisition (%s)',
+    async (authorization) => {
+      const read = vi.fn(() => {
+        if (read.mock.calls.length > 1) {
+          throw new Error('Original accessor must be read once');
+        }
+      });
+      const headers: Record<string, string | null | undefined> = {};
+      Object.defineProperty(headers, 'Authorization', { enumerable: true, configurable: true, get: read });
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        await Promise.resolve();
+        Object.defineProperty(headers, 'Authorization', {
+          value: authorization,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+        return 'subject-token';
+      };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        defaultHeaders: layer === 'default' ? headers : undefined,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await expect(
+        client.get('https://independent.example.test/synthetic', {
+          headers: layer === 'request' ? headers : undefined,
+        }),
+      ).rejects.toMatchObject({ status: 401 });
+
+      expect(sent).toEqual([authorization]);
+      expect(transport.exchanges).toBe(1);
+      expect(read).toHaveBeenCalledTimes(1);
+    },
+  );
+});

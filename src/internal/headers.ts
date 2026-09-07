@@ -93,7 +93,7 @@ const sameHeaderProperty = (
       : !('value' in previous) && current.get === previous.get
     : current === previous;
 
-const getHeaderRowDescriptor = (row: HeaderEntry, key: string): PropertyDescriptor | undefined => {
+const getHeaderRowDescriptor = (row: object, key: string): PropertyDescriptor | undefined => {
   const seen = new Set<object>();
   try {
     for (let object: object | null = row; object; object = Object.getPrototypeOf(object)) {
@@ -119,6 +119,30 @@ interface HeaderReplay {
   propertyOrder?: string[];
   property?: HeaderPropertySnapshot;
   rows?: WeakMap<object, HeaderRowSnapshot>;
+  arraySlots?: Map<number, { descriptor: PropertyDescriptor | undefined; row: HeaderEntry }>;
+}
+
+function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderReplay): Generator<HeaderEntry> {
+  let index = 0;
+  // Match native array iteration's live length, with each row validated before reading the next slot.
+  for (; index < Math.min(Math.floor(headers.length), Number.MAX_SAFE_INTEGER); index += 1) {
+    const descriptor = getHeaderRowDescriptor(headers, String(index));
+    const retained = replay.arraySlots?.get(index);
+    if (retained && (!descriptor || sameHeaderProperty(descriptor, retained.descriptor))) {
+      yield retained.row;
+      continue;
+    }
+    replay.arraySlots?.delete(index);
+    const row = headers[index]!;
+    if (!descriptor || !('value' in descriptor)) {
+      replay.arraySlots ??= new Map();
+      replay.arraySlots.set(index, { descriptor, row });
+    }
+    yield row;
+  }
+  for (const slot of replay.arraySlots?.keys() ?? []) {
+    if (slot >= index) replay.arraySlots?.delete(slot);
+  }
 }
 
 export const hasNativeHeadersBrand = (headers: object): boolean => {
@@ -189,7 +213,6 @@ export const canPreserveHeaderInput = (headers: HeadersLike): boolean => {
 const hasStatefulArrayProperties = (
   array: readonly unknown[],
   iterator?: () => Iterator<unknown>,
-  capturedProtocol = false,
 ): boolean => {
   const seen = new Set<object>();
   try {
@@ -198,7 +221,6 @@ const hasStatefulArrayProperties = (
       if (seen.has(object)) return true;
       seen.add(object);
       for (const key of Reflect.ownKeys(object)) {
-        if (capturedProtocol && key === Symbol.iterator) continue;
         if (key !== Symbol.iterator && (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key))) {
           continue;
         }
@@ -254,13 +276,14 @@ function* iterateHeaders(
     replay.refreshable =
       !hasIterator ||
       (typeof iterator === 'function' &&
-        ((Array.isArray(headers) &&
-          iterator === getArrayIterator(headers) &&
-          !hasStatefulArrayProperties(headers, iterator, true)) ||
+        ((Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
           (!Array.isArray(headers) && iterator === nativeHeadersIterator)));
   }
   if (typeof iterator === 'function') {
-    const iteration = iterator.call(headers);
+    const iteration =
+      replay?.refreshable && Array.isArray(headers)
+        ? iterateHeaderArray(headers, replay)
+        : iterator.call(headers);
     if (replay?.refreshable) {
       replay.iterator = iterator;
       replay.iterations ??= new WeakSet<object>();
@@ -507,6 +530,7 @@ const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
   ...replay,
   ...(replay.properties ? { properties: new Map(replay.properties) } : {}),
   ...(replay.propertyOrder ? { propertyOrder: [...replay.propertyOrder] } : {}),
+  ...(replay.arraySlots ? { arraySlots: new Map(replay.arraySlots) } : {}),
 });
 
 /** Captures synchronous protected-hook reads without leaving request state ambient across an await. */
@@ -637,7 +661,13 @@ const createHeaderSnapshot = (
       return snapshot !== undefined;
     },
     get replayable() {
-      return replay.refreshable && !replay.unverifiedHeaders && !replay.properties?.size && !replay.rows;
+      return (
+        replay.refreshable &&
+        !replay.unverifiedHeaders &&
+        !replay.properties?.size &&
+        !replay.rows &&
+        !replay.arraySlots?.size
+      );
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       inheritMaterialization();
@@ -656,6 +686,7 @@ const createHeaderSnapshot = (
                 properties: replay.properties,
                 propertyOrder: replay.propertyOrder,
                 rows: replay.rows,
+                arraySlots: replay.arraySlots,
               }
             : undefined),
         };

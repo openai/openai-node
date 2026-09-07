@@ -9,7 +9,9 @@ test.each(['buildRequest', 'fetchWithAuth', 'fetchWithTimeout'] as const)(
     const StructuralHeaders = class Headers {
       // oxlint-disable-next-line class-methods-use-this -- This deliberately disagrees with iterator serialization.
       get() {
-        if (hook === 'buildRequest') {throw new Error('Unverified get must not run during bookkeeping');}
+        if (hook === 'buildRequest') {
+          throw new Error('Unverified get must not run during bookkeeping');
+        }
         return 'Bearer access-token-1';
       }
 
@@ -27,7 +29,9 @@ test.each(['buildRequest', 'fetchWithAuth', 'fetchWithTimeout'] as const)(
     class HookClient extends OpenAI {
       override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
         const built = await super.buildRequest(...args);
-        if (hook === 'buildRequest') {built.req.headers = supplied;}
+        if (hook === 'buildRequest') {
+          built.req.headers = supplied;
+        }
         return built;
       }
 
