@@ -285,6 +285,35 @@ describe('HTTP credential hook compatibility', () => {
     expect(client.apiKey).toBe('synthetic-token-2');
     expect(provider).toHaveBeenCalledTimes(2);
   });
+
+  test('isolates credentials replaced by a forwarding preparation hook', async () => {
+    class ReplacementClient extends OpenAI {
+      protected override async prepareOptions(
+        options: FinalRequestOptions,
+        context?: RequestCredentialContext,
+      ): Promise<void> {
+        await super.prepareOptions(options, context);
+        if (typeof context?.apiKey !== 'string') {
+          throw new TypeError('Expected a request credential');
+        }
+        context.apiKey = `${context.apiKey}-replacement`;
+        this.apiKey = 'synthetic-shared-key';
+        await Promise.resolve();
+      }
+    }
+    const { fetch, sent } = recordRequests();
+    const provider = rotatingProvider();
+    const client = new ReplacementClient({ apiKey: provider, fetch });
+
+    await Promise.all([client.models.list(), client.models.list()]);
+
+    expect(tokens(sent)).toEqual([
+      'Bearer synthetic-token-1-replacement',
+      'Bearer synthetic-token-2-replacement',
+    ]);
+    expect(client.apiKey).toBe('synthetic-shared-key');
+    expect(provider).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe.each(['OpenAI', 'Azure'] as const)('%s explicit Authorization headers', (name) => {

@@ -44,6 +44,18 @@ const client = new OpenAI({
 This also works with an OAuth bearer-token provider for a compatible endpoint;
 see the [Azure v1 example](azure.md#v1-api).
 
+Concurrent HTTP requests keep each function result with the request attempt that
+resolved it. Retries call the provider again. The client still exposes the most
+recently resolved value as `client.apiKey`, which can change while another
+request is being prepared.
+
+Subclasses that override request preparation or authentication hooks should
+forward the optional credential context to `super`. A forwarding `prepareOptions`
+override can replace the current attempt's credential by assigning
+`credentialContext.apiKey` after awaiting `super.prepareOptions`. Updating
+`this.apiKey` changes the shared client property, not a captured function result.
+Legacy overrides that omit the context retain their shared-key behavior.
+
 ### Environment and client configuration
 
 The client reads these optional environment variables when their corresponding

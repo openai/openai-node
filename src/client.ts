@@ -941,6 +941,9 @@ export class OpenAI {
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    * Forward `credentialContext` to retain per-attempt function credentials.
+   * After forwarding, replace `credentialContext.apiKey` to change only this
+   * attempt's resolved key. Legacy overrides that omit the context continue
+   * to use the shared `this.apiKey` property.
    */
   protected async prepareOptions(
     options: FinalRequestOptions,
