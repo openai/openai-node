@@ -82,7 +82,7 @@ describe('Workload identity raw build input retries', () => {
             : new Headers(options.headers as HeadersInit);
           const built = await super.buildRequest(
             { ...options, headers },
-            forwardContext ? settings : { retryCount: settings?.retryCount },
+            forwardContext ? settings : { retryCount: settings?.retryCount ?? 0 },
           );
           return { ...built, req: Object.fromEntries(Object.entries(built.req)) } as typeof built;
         }
