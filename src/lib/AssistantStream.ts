@@ -194,7 +194,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       capturedDescriptors,
     ) as AssistantStreamEvent['data'] & { delta: unknown };
     stableData = capturedData;
-    if (delta && typeof delta === 'object') {
+    if (delta && (typeof delta === 'object' || typeof delta === 'function')) {
       let observedDescriptor = deltaDescriptor;
       let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = () => {
@@ -215,7 +215,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       getRunStepDelta = readCurrentDelta;
       refreshRunStepDelta = () => {
         const currentDelta = readCurrentDelta();
-        if (!currentDelta || typeof currentDelta !== 'object') {
+        if (!currentDelta || (typeof currentDelta !== 'object' && typeof currentDelta !== 'function')) {
           capturedData.delta = currentDelta;
           return;
         }

@@ -279,6 +279,106 @@ describe('AssistantStream run-step deltas', () => {
     },
   );
 
+  test.each(['unchanged', 'add-id', 'replace-object', 'replace-callable', 'object-to-callable-id'] as const)(
+    'stabilizes callable delta content for %s raw listener behavior',
+    async (behavior) => {
+      const step = runStep('step_original');
+      const { delta: original } = toolCallDelta(step.id).data;
+      const callable = Object.assign(() => 'synthetic callable', original);
+      const event = {
+        event: 'thread.run.step.delta',
+        data: { id: step.id, delta: behavior === 'object-to-callable-id' ? original : callable },
+      };
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        event,
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      const readID = vi.fn(() => '_alias');
+      const replacement = {
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+        },
+      };
+      runner.on('event', (received) => {
+        if (received.event !== 'thread.run.step.delta') {
+          return;
+        }
+        if (behavior === 'replace-object') {
+          event.data.delta = replacement;
+        } else if (behavior === 'replace-callable' || behavior === 'object-to-callable-id') {
+          event.data.delta = Object.assign(() => 'synthetic replacement', replacement);
+        }
+        if (behavior === 'add-id' || behavior === 'object-to-callable-id') {
+          Object.defineProperty(event.data.delta, 'id', { enumerable: true, get: readID });
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(readID).not.toHaveBeenCalled();
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      const emittedDelta = stepDelta.mock.calls[0]?.[0];
+      if (behavior === 'add-id' || behavior === 'object-to-callable-id') {
+        expect(Object.is(emittedDelta, event.data.delta)).toBe(false);
+        expect(emittedDelta).not.toHaveProperty('id');
+      } else {
+        expect(emittedDelta).toBe(event.data.delta);
+      }
+      expect(step.id).toBe('step_original');
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe(
+        `{"to":"trusted"}${behavior === 'unchanged' || behavior === 'add-id' ? ' updated' : ' replacement'}`,
+      );
+    },
+  );
+
+  test.each(['initialize', 'replace'] as const)(
+    'defers enumerable delta getters until raw listeners %s them',
+    async (mutation) => {
+      const step = runStep('step_original');
+      const { delta } = toolCallDelta(step.id).data;
+      const details = delta.step_details;
+      let initialized = false;
+      const readDetails = vi.fn(() => {
+        expect(initialized).toBe(true);
+        return details;
+      });
+      Object.defineProperty(delta, 'step_details', {
+        configurable: true,
+        enumerable: true,
+        get: readDetails,
+      });
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data: { id: step.id, delta } },
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          expect(readDetails).not.toHaveBeenCalled();
+          if (mutation === 'initialize') {
+            initialized = true;
+          } else {
+            Object.defineProperty(delta, 'step_details', { value: details });
+          }
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(readDetails.mock.calls.length > 0).toBe(mutation === 'initialize');
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).toBe(delta);
+      expect(step.id).toBe('step_original');
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+    },
+  );
+
   test.each([false, true])(
     'reads delta properties on the original receiver (listener adds id: %s)',
     async (addIdentity) => {
