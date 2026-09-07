@@ -48,6 +48,9 @@ export function createEmbedding(
   return response._thenUnwrap((data) => {
     if (data && data.data) {
       const embeddings = data.data;
+      if (!Array.isArray(embeddings)) {
+        throw new TypeError('Expected embeddings response data to be an array');
+      }
       const { length } = embeddings;
       // Preserve the original iteration length and skip sparse-array holes.
       for (let index = 0; index < length; index += 1) {

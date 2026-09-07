@@ -48,6 +48,36 @@ function makeFixtureClient(): OpenAI {
 }
 
 describe('resource embeddings', () => {
+  test.each([
+    { length: 3 },
+    { length: 0 },
+    { 0: { embedding: encodedVector }, length: 1 },
+    'invalid',
+    1,
+    true,
+  ])('rejects a non-array response collection: %j', async (data) => {
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () => Response.json({ data }),
+    });
+
+    await expect(client.embeddings.create(request)).rejects.toThrow(
+      'Expected embeddings response data to be an array',
+    );
+  });
+
+  test.each(['float', 'base64'] as const)('preserves explicit %s response passthrough', async (encoding) => {
+    const data = { length: 3 };
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () => Response.json({ data }),
+    });
+
+    await expect(client.embeddings.create({ ...request, encoding_format: encoding })).resolves.toEqual({
+      data,
+    });
+  });
+
   test.each(incompleteVectors)('default rejects $byteLength decoded embedding bytes', async ({ encoded }) => {
     await expect(createClient(encoded).embeddings.create(request)).rejects.toBeInstanceOf(RangeError);
   });
