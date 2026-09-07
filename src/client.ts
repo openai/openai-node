@@ -802,7 +802,7 @@ export class OpenAI {
     return headers;
   }
 
-  /** Resolves bearer authentication; delegating hooks must forward the opaque request context. */
+  /** Resolves bearer authentication with result-owned workload provenance. */
   protected async bearerAuth(
     opts: FinalRequestOptions,
     credentialContext?: RequestCredentialContext,
