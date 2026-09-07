@@ -1,6 +1,8 @@
+/* oxlint-disable max-classes-per-file -- Independent fixtures use subclasses to exercise protected SDK hooks. */
 import { vi } from 'vitest';
 import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
 import type { RequestInit } from 'openai/internal/builtin-types';
+import { buildHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 
 const originalFetch = global.fetch;
@@ -284,6 +286,119 @@ describe('OpenAI with Workload Identity', () => {
       expect(req.headers.get('Authorization')).toBe('Bearer hook-override');
     },
   );
+
+  describe.each(['authHeaders', 'bearerAuth'])('rebuilt %s results', (hook) => {
+    test.each([undefined, 'Bearer replacement'])(
+      'refreshes only the preserved workload credential (override: %j)',
+      async (authorization) => {
+        const extraHeaders = { 'X-Custom': 'wrapped', Authorization: authorization };
+        class HookClient extends OpenAI {
+          protected override async authHeaders(
+            options: FinalRequestOptions,
+            schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          ) {
+            const headers = await super.authHeaders(options, schemes);
+            return hook === 'authHeaders' ? buildHeaders([headers, extraHeaders]) : headers;
+          }
+
+          protected override async bearerAuth(options: FinalRequestOptions) {
+            const headers = await super.bearerAuth(options);
+            return hook === 'bearerAuth' ? buildHeaders([headers, extraHeaders]) : headers;
+          }
+        }
+
+        const headers: Headers[] = [];
+        let exchanges = 0;
+        const client = new HookClient({
+          ...createTestClientOptions(),
+          maxRetries: 0,
+          fetch: async (url, init) => {
+            if (url.toString().endsWith('/oauth/token')) {
+              exchanges++;
+              return Response.json({
+                access_token: `access-token-${exchanges}`,
+                issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+                token_type: 'Bearer',
+                expires_in: 3600,
+              });
+            }
+            headers.push(new Headers(init?.headers));
+            return headers.length === 1
+              ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+              : Response.json({ data: [] });
+          },
+        });
+
+        const request = client.models.list();
+        await (authorization === undefined
+          ? request
+          : expect(request).rejects.toMatchObject({ status: 401 }));
+        await client.models.list();
+
+        expect(headers.map((value) => value.get('Authorization'))).toEqual(
+          authorization === undefined
+            ? ['Bearer access-token-1', 'Bearer access-token-2', 'Bearer access-token-2']
+            : [authorization, authorization],
+        );
+        expect(headers.every((value) => value.get('X-Custom') === 'wrapped')).toBe(true);
+        expect(exchanges).toBe(authorization === undefined ? 2 : 1);
+      },
+    );
+  });
+
+  test('refreshes rebuilt auth results for concurrent requests sharing options', async () => {
+    const options: FinalRequestOptions = { method: 'get', path: '/models' };
+    let releaseHeaders = () => {};
+    const bothHeadersReady = new Promise<void>((resolve) => {
+      releaseHeaders = resolve;
+    });
+    let authCalls = 0;
+    class HookClient extends OpenAI {
+      protected override async authHeaders(received: FinalRequestOptions) {
+        if (authCalls < 2) {
+          expect(received).toBe(options);
+        }
+        const headers = await super.authHeaders(received);
+        authCalls++;
+        if (authCalls === 2) {
+          releaseHeaders();
+        }
+        await bothHeadersReady;
+        return buildHeaders([headers, { 'X-Custom': 'wrapped' }]);
+      }
+    }
+
+    const headers: Headers[] = [];
+    let exchanges = 0;
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      maxRetries: 0,
+      fetch: async (url, init) => {
+        if (url.toString().endsWith('/oauth/token')) {
+          exchanges++;
+          return Response.json({
+            access_token: `access-token-${exchanges}`,
+            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          });
+        }
+        const requestHeaders = new Headers(init?.headers);
+        headers.push(requestHeaders);
+        return requestHeaders.get('Authorization') === 'Bearer access-token-1'
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      },
+    });
+
+    await Promise.all([client.request(options), client.request(options)]);
+
+    expect(headers).toHaveLength(4);
+    expect(headers.filter((value) => value.get('Authorization') === 'Bearer access-token-1')).toHaveLength(2);
+    expect(headers.every((value) => value.get('X-Custom') === 'wrapped')).toBe(true);
+    expect(exchanges).toBeGreaterThanOrEqual(2);
+    expect(exchanges).toBeLessThanOrEqual(3);
+  });
 
   test('consumes iterable Authorization overrides once without exchanging credentials', async () => {
     const requestHeaders = [

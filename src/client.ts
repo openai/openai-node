@@ -485,6 +485,10 @@ export class OpenAI {
   private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
   #workloadIdentityAuthorizations = new WeakMap<Headers, string>();
+  #workloadIdentityAuthScopes = new WeakMap<
+    FinalRequestOptions,
+    { pending: number; authorizations: Set<string> }
+  >();
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -822,6 +826,7 @@ export class OpenAI {
       const headers = buildHeaders([{ Authorization: `Bearer ${token}` }]);
       if (!(authentication instanceof X509WorkloadIdentityAuth)) {
         this.#workloadIdentityAuthorizations.set(headers.values, `Bearer ${token}`);
+        this.#workloadIdentityAuthScopes.get(opts)?.authorizations.add(`Bearer ${token}`);
       }
       return headers;
     }
@@ -1843,7 +1848,7 @@ export class OpenAI {
       (authenticationHeaders =
         this._provider || this.#x509Authentication?.isPlanningRequest()
           ? undefined
-          : await this.authHeaders(options, authenticationSecurity)),
+          : await this.#resolveAuthHeaders(options, authenticationSecurity)),
       suppliedHeaders ?? x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       suppliedHeaders ? undefined : bodyHeaders,
       suppliedHeaders ? undefined : (x509Headers?.requestHeaders ?? options.headers),
@@ -1860,6 +1865,34 @@ export class OpenAI {
     }
 
     return headers.values;
+  }
+
+  async #resolveAuthHeaders(
+    options: FinalRequestOptions,
+    security: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<NullableHeaders | undefined> {
+    if (!this._workloadIdentityAuth || this.#x509Authentication) {
+      return await this.authHeaders(options, security);
+    }
+    // Track tokens across rebuilt hook results, including overlapping calls with shared options.
+    const scope = this.#workloadIdentityAuthScopes.get(options) ?? {
+      pending: 0,
+      authorizations: new Set<string>(),
+    };
+    this.#workloadIdentityAuthScopes.set(options, scope);
+    scope.pending++;
+    try {
+      const headers = await this.authHeaders(options, security);
+      const authorization = headers?.values.get('authorization');
+      if (headers && authorization != null && scope.authorizations.has(authorization)) {
+        this.#workloadIdentityAuthorizations.set(headers.values, authorization);
+      }
+      return headers;
+    } finally {
+      if (--scope.pending === 0) {
+        this.#workloadIdentityAuthScopes.delete(options);
+      }
+    }
   }
 
   private _makeAbort(controller: AbortController) {
