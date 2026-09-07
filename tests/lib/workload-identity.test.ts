@@ -1,23 +1,9 @@
 import { vi } from 'vitest';
 import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
 import type { RequestInit } from 'openai/internal/builtin-types';
+import { createTestClientOptions, createTestWorkloadIdentity } from './workload-identity-fixtures';
 
 const originalFetch = global.fetch;
-
-const createTestWorkloadIdentity = () => ({
-  identityProviderId: 'test-identity-provider-id',
-  serviceAccountId: 'test-service-account-id',
-  provider: {
-    tokenType: 'jwt' as const,
-    getToken: async () => 'subject-token',
-  },
-});
-
-const createTestClientOptions = () => ({
-  workloadIdentity: createTestWorkloadIdentity(),
-  organization: 'test-org-id',
-  project: 'test-project-id',
-});
 
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {

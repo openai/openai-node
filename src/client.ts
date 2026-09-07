@@ -252,11 +252,12 @@ import {
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
-import { HeadersLike, NullableHeaders, buildHeaders, prepareHeaders } from './internal/headers';
+import { HeadersLike, NullableHeaders, buildHeaders, snapshotHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { prepareRequestAPIKey, type RequestCredentialContext } from './internal/request-credentials';
 import { readEnv } from './internal/utils/env';
+import { WorkloadTokenProvenance, bearerToken } from './internal/auth/workload-token-provenance';
 import {
   type LogLevel,
   type Logger,
@@ -287,6 +288,12 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
 }
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
+type WorkloadIdentityRequest = {
+  context: object;
+  bindings: Set<object>;
+  authorization: string | undefined;
+  used: boolean;
+};
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
 
@@ -485,15 +492,8 @@ export class OpenAI {
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
-  #workloadIdentityRequests = new WeakMap<
-    AbortController,
-    { authorization: string | undefined; used: boolean }
-  >();
-  // Legacy auth hooks may copy options without forwarding context. Keep token provenance
-  // on this client, for only as long as the oldest outstanding preparation needs it.
-  #workloadIdentityAuthSequence = 0;
-  #workloadIdentityAuthScopes = new Set<number>();
-  #workloadIdentityAuthorizations = new Map<string, number>();
+  #workloadIdentityRequests = new WeakMap<object, Set<WorkloadIdentityRequest>>();
+  #workloadTokenProvenance = new WorkloadTokenProvenance();
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -766,6 +766,11 @@ export class OpenAI {
     );
   }
 
+  /**
+   * Resolves authentication headers for one request attempt.
+   * Forward the opaque context when delegating from a hook that copies options
+   * or shares them across concurrent requests, so workload refresh stays request-local.
+   */
   protected async authHeaders(
     opts: FinalRequestOptions,
     schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
@@ -790,11 +795,13 @@ export class OpenAI {
     return headers;
   }
 
+  /** Resolves bearer authentication; delegating hooks must forward the opaque request context. */
   protected async bearerAuth(
     opts: FinalRequestOptions,
     credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
     const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
+    const workloadScope = this.#workloadTokenProvenance.find(opts, credentialContext);
     if (authentication) {
       if (authentication instanceof X509WorkloadIdentityAuth) {
         if (
@@ -828,11 +835,8 @@ export class OpenAI {
             })
           : await authentication.getToken();
       const headers = buildHeaders([{ Authorization: `Bearer ${token}` }]);
-      if (!(authentication instanceof X509WorkloadIdentityAuth) && this.#workloadIdentityAuthScopes.size) {
-        const authorization = `Bearer ${token}`;
-        // Reinsert repeated tokens to keep the ledger ordered by their latest resolution.
-        this.#workloadIdentityAuthorizations.delete(authorization);
-        this.#workloadIdentityAuthorizations.set(authorization, ++this.#workloadIdentityAuthSequence);
+      if (!(authentication instanceof X509WorkloadIdentityAuth)) {
+        workloadScope?.record(token);
       }
       return headers;
     }
@@ -1211,7 +1215,10 @@ export class OpenAI {
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     let initialWorkloadAuthorization: string | undefined;
     try {
-      const workloadIdentityAuthScope = this.#beginWorkloadIdentityAuthScope();
+      const workloadIdentityAuthScope =
+        this._workloadIdentityAuth instanceof WorkloadIdentityAuth
+          ? this.#workloadTokenProvenance.begin(options, credentialContext)
+          : undefined;
       let candidate: Awaited<ReturnType<OpenAI['buildRequest']>>;
       try {
         candidate = await this.buildRequest(options, {
@@ -1219,18 +1226,11 @@ export class OpenAI {
           credentialContext,
         });
         const authorization = candidate.req.headers.get('authorization');
-        const resolvedAt =
-          authorization === null ? undefined : this.#workloadIdentityAuthorizations.get(authorization);
-        if (
-          authorization !== null &&
-          workloadIdentityAuthScope !== undefined &&
-          resolvedAt !== undefined &&
-          resolvedAt > workloadIdentityAuthScope
-        ) {
+        if (authorization !== null && workloadIdentityAuthScope?.matches(authorization)) {
           initialWorkloadAuthorization = authorization;
         }
       } finally {
-        this.#endWorkloadIdentityAuthScope(workloadIdentityAuthScope);
+        workloadIdentityAuthScope?.dispose();
       }
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
       if (x509Authentication) {
@@ -1332,14 +1332,28 @@ export class OpenAI {
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
     x509Authentication?.releaseRequestBody(req.body);
-    const workloadRequest = { authorization: initialWorkloadAuthorization, used: false };
+    const workloadRequest = {
+      context: credentialContext,
+      bindings: new Set<object>(),
+      authorization: initialWorkloadAuthorization,
+      used: false,
+    };
     if (this._workloadIdentityAuth && !x509Authentication) {
-      this.#workloadIdentityRequests.set(controller, workloadRequest);
+      this.#bindWorkloadIdentityRequest(controller, workloadRequest);
+      this.#bindWorkloadIdentityRequest(req, workloadRequest);
+      this.#bindWorkloadIdentityRequest(credentialContext, workloadRequest);
     }
     const response = await fetchWithAuth
-      .call(this, url, req, remainingTimeout, controller, security)
+      .call(this, url, req, remainingTimeout, controller, security, credentialContext)
       .catch(castToError)
-      .finally(() => this.#workloadIdentityRequests.delete(controller));
+      .finally(() => {
+        for (const key of workloadRequest.bindings) {
+          const requests = this.#workloadIdentityRequests.get(key);
+          requests?.delete(workloadRequest);
+          if (requests?.size === 0) this.#workloadIdentityRequests.delete(key);
+        }
+        workloadRequest.bindings.clear();
+      });
     const usedWorkloadToken = workloadRequest.used;
     const headersTime = Date.now();
 
@@ -1603,14 +1617,19 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
+    credentialContext?: object,
   ): Promise<Response> {
+    const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
+    if (workloadRequest) {
+      this.#bindWorkloadIdentityRequest(controller, workloadRequest);
+      this.#bindWorkloadIdentityRequest(init, workloadRequest);
+    }
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
         headers.set('Authorization', `Bearer ${token}`);
-        const workloadRequest = this.#workloadIdentityRequests.get(controller);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
         }
@@ -1618,7 +1637,14 @@ export class OpenAI {
     }
 
     const fetchWithTimeout = this.#x509Fetch ? OpenAI.prototype.fetchWithTimeout : this.fetchWithTimeout;
-    const response = await fetchWithTimeout.call(this, url, init, timeout, controller);
+    const response = await fetchWithTimeout.call(
+      this,
+      url,
+      init,
+      timeout,
+      controller,
+      workloadRequest?.context,
+    );
 
     return response;
   }
@@ -1628,7 +1654,9 @@ export class OpenAI {
     init: RequestInit | undefined,
     ms: number,
     controller: AbortController,
+    credentialContext?: object,
   ): Promise<Response> {
+    const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
@@ -1653,9 +1681,11 @@ export class OpenAI {
     }
 
     try {
-      this.#snapshotWorkloadIdentityUsage(controller, fetchOptions);
+      // Only this dispatch owner can attest to the headers passed to the configured fetch.
+      // Hooks that send independently own their authentication retries.
+      const dispatchOptions = this.#snapshotWorkloadIdentityUsage(workloadRequest, fetchOptions);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, dispatchOptions);
     } catch (err) {
       if (signal && !composed) signal.removeEventListener('abort', abort);
       throw err;
@@ -1814,9 +1844,8 @@ export class OpenAI {
         options.signal = snapshot.signal;
       }
     }
-    const requestHeaderSnapshot = this.#canPreflightWorkloadIdentityHeaders(inputOptions)
-      ? prepareHeaders(options.headers)
-      : undefined;
+    const requestHeaderSnapshot =
+      this._workloadIdentityAuth && !x509Authentication ? snapshotHeaders(options.headers) : undefined;
     if (requestHeaderSnapshot) {
       options.headers = requestHeaderSnapshot.snapshot;
     }
@@ -1883,7 +1912,7 @@ export class OpenAI {
     credentialContext: RequestCredentialContext | undefined;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
-    requestHeaderSnapshot: ReturnType<typeof prepareHeaders> | undefined;
+    requestHeaderSnapshot: ReturnType<typeof snapshotHeaders> | undefined;
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
@@ -1900,13 +1929,13 @@ export class OpenAI {
     const security = options.__security ?? { bearerAuth: true };
     let authenticationSecurity = security;
     let suppliedHeaders: NullableHeaders | undefined;
-    let suppliedHeaderLayers: Array<ReturnType<typeof prepareHeaders>> | undefined;
+    let suppliedHeaderLayers: ReturnType<typeof snapshotHeaders>[] | undefined;
     if (this.#canPreflightWorkloadIdentityHeaders(options)) {
       // Custom auth hooks own credential resolution and may mutate the original header layers.
       suppliedHeaderLayers = [
-        prepareHeaders(this._options.defaultHeaders),
-        prepareHeaders(bodyHeaders),
-        requestHeaderSnapshot ?? prepareHeaders(options.headers),
+        snapshotHeaders(this._options.defaultHeaders),
+        snapshotHeaders(bodyHeaders),
+        requestHeaderSnapshot ?? snapshotHeaders(options.headers),
       ];
       suppliedHeaders = buildHeaders(suppliedHeaderLayers.map(({ snapshot }) => snapshot));
       const authorization = suppliedHeaders.values.get('authorization');
@@ -1939,7 +1968,12 @@ export class OpenAI {
       authenticationHeaders,
       suppliedHeaders ?? x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       suppliedHeaders ? undefined : bodyHeaders,
-      suppliedHeaders ? undefined : (x509Headers?.requestHeaders ?? options.headers),
+      suppliedHeaders
+        ? undefined
+        : (x509Headers?.requestHeaders ??
+          (requestHeaderSnapshot && requestHeaderSnapshot.source === options.headers
+            ? requestHeaderSnapshot.refresh()
+            : options.headers)),
     ]);
 
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
@@ -1949,38 +1983,40 @@ export class OpenAI {
     return headers.values;
   }
 
-  #beginWorkloadIdentityAuthScope() {
-    if (!this._workloadIdentityAuth || this.#x509Authentication) {
-      return undefined;
-    }
-    const scope = ++this.#workloadIdentityAuthSequence;
-    this.#workloadIdentityAuthScopes.add(scope);
-    return scope;
+  #workloadIdentityRequest(
+    controller: AbortController,
+    init: RequestInit | undefined,
+    context: object | undefined,
+  ) {
+    const lookup = (key: object) => {
+      const requests = this.#workloadIdentityRequests.get(key);
+      return requests?.size === 1 ? requests.values().next().value : undefined;
+    };
+    if (context !== undefined) return lookup(context);
+    return (init && lookup(init)) ?? lookup(controller);
   }
 
-  #endWorkloadIdentityAuthScope(scope: number | undefined) {
-    if (scope === undefined) return;
-    this.#workloadIdentityAuthScopes.delete(scope);
-    const oldestScope = this.#workloadIdentityAuthScopes.values().next().value;
-    if (oldestScope === undefined) {
-      this.#workloadIdentityAuthorizations.clear();
-      this.#workloadIdentityAuthSequence = 0;
-      return;
-    }
-    for (const [authorization, resolvedAt] of this.#workloadIdentityAuthorizations) {
-      if (resolvedAt > oldestScope) break;
-      this.#workloadIdentityAuthorizations.delete(authorization);
-    }
+  #bindWorkloadIdentityRequest(key: object, request: WorkloadIdentityRequest) {
+    const requests = this.#workloadIdentityRequests.get(key) ?? new Set<WorkloadIdentityRequest>();
+    requests.add(request);
+    this.#workloadIdentityRequests.set(key, requests);
+    request.bindings.add(key);
   }
 
-  #snapshotWorkloadIdentityUsage(controller: AbortController, init: RequestInit) {
-    const request = this.#workloadIdentityRequests.get(controller);
-    if (request) {
-      // Only the SDK's final fetch handoff proves which credential was dispatched.
-      request.used =
-        request.authorization !== undefined &&
-        new Headers(init.headers).get('Authorization') === request.authorization;
+  #snapshotWorkloadIdentityUsage<T extends RequestInit>(
+    request: WorkloadIdentityRequest | undefined,
+    init: T,
+  ): T {
+    if (!request) {
+      return init;
     }
+    // Materialize one-use iterators exactly once and forward that same snapshot to the next dispatch layer.
+    const headers = init.headers instanceof Headers ? init.headers : new Headers(init.headers);
+    // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
+    request.used =
+      request.authorization !== undefined &&
+      bearerToken(headers.get('Authorization')) === bearerToken(request.authorization);
+    return (headers === init.headers ? init : { ...init, headers }) as T;
   }
 
   private _makeAbort(controller: AbortController) {

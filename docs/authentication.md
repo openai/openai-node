@@ -243,10 +243,43 @@ a `401`, the SDK also invalidates the cached token and retries once with a fresh
 For subject-token workload identity, an independent `Authorization` header override in `defaultHeaders`
 or request `headers` skips token acquisition, including `null` to remove the header or an empty string.
 Subclasses that override authentication hooks retain control of credential resolution.
-Automatic `401` refresh requires dispatch through the SDK's `fetchWithTimeout` implementation so it can
-identify the credential sent. Overrides that dispatch requests directly own their credential refresh.
+For subject-token workload identity, a transport hook that dispatches without delegating to the SDK's
+`fetchWithTimeout` owns its authentication retries. The SDK records token usage immediately before
+calling the configured `fetch`; it cannot verify which credential an independent transport sent.
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
+
+### Authentication and transport hooks
+
+Delegating `authHeaders` and `bearerAuth` overrides should forward the optional opaque request context.
+This keeps workload-token ownership with the request when hooks copy options, including frozen options,
+or use one options object for concurrent requests:
+
+```ts
+import OpenAI from 'openai';
+import type { FinalRequestOptions } from 'openai/internal/request-options';
+
+class WrappedClient extends OpenAI {
+  protected override async authHeaders(
+    options: FinalRequestOptions,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    context?: object,
+  ) {
+    return super.authHeaders({ ...options }, schemes, context);
+  }
+}
+```
+
+`bearerAuth` receives the context as its second argument. `buildRequest` overrides should forward the
+complete second argument, including `credentialContext`. Hooks that discard options identity without
+forwarding context still supply their headers, but the SDK cannot establish workload-token ownership
+and will not perform the automatic `401` replay. Legacy hooks using the original options object retain
+refresh when those options identify one active attempt.
+
+`fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Forward it when
+a transport wrapper replaces both the request object and its abort controller. Changing either one
+alone preserves the original request's identity. Forward the same context object; copying it loses
+request ownership.
 
 ## Third-party providers
 

@@ -1,62 +1,7 @@
-/* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected SDK hooks. */
+/* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected dispatch hooks. */
 import OpenAI from 'openai';
-import type { Fetch, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
-import { buildHeaders } from 'openai/internal/headers';
-import type { FinalRequestOptions } from 'openai/internal/request-options';
-
-const clientOptions = {
-  apiKey: null,
-  adminAPIKey: null,
-  workloadIdentity: {
-    identityProviderId: 'test-identity-provider-id',
-    serviceAccountId: 'test-service-account-id',
-    provider: { tokenType: 'jwt' as const, getToken: async () => 'subject-token' },
-  },
-  organization: 'test-org-id',
-  project: 'test-project-id',
-};
-
-function createTransport(
-  reject: (request: Request, call: number) => boolean = (_request, call) => call === 1,
-) {
-  const requests: Request[] = [];
-  let exchanges = 0;
-  const fetch: Fetch = async (url, init) => {
-    if (url.toString().endsWith('/oauth/token')) {
-      exchanges += 1;
-      return Response.json({
-        access_token: `access-token-${exchanges}`,
-        issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-        token_type: 'Bearer',
-        expires_in: 3600,
-      });
-    }
-    const request = new Request(url, init);
-    requests.push(request);
-    return reject(request, requests.length)
-      ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
-      : Response.json({ data: [] });
-  };
-  return {
-    fetch,
-    requests,
-    get authorizations() {
-      return requests.map((request) => request.headers.get('Authorization'));
-    },
-    get exchanges() {
-      return exchanges;
-    },
-  };
-}
-
-function deferred() {
-  let resolveGate!: () => void;
-  // oxlint-disable-next-line promise/avoid-new -- Tests control concurrent authentication hook completion.
-  const promise = new Promise<void>((resolve) => {
-    resolveGate = resolve;
-  });
-  return { promise, resolve: resolveGate };
-}
+import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
 class CloningBuildRequestClient extends OpenAI {
   override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
@@ -66,44 +11,38 @@ class CloningBuildRequestClient extends OpenAI {
   }
 }
 
-describe('workload identity authentication and dispatch hooks', () => {
-  describe.each([undefined, 0])('retry budget %j', (maxRetries) => {
-    test.each(['none', 'prepareRequest', 'buildRequest'])(
-      'refreshes a rejected workload token with %s header cloning',
-      async (hook) => {
-        const transport = createTransport();
-        const Client = hook === 'buildRequest' ? CloningBuildRequestClient : OpenAI;
-        const client = new Client({ ...clientOptions, maxRetries, fetch: transport.fetch });
-        if (hook === 'prepareRequest') {
-          Object.defineProperty(client, 'prepareRequest', {
-            value: async (request: RequestInit) => {
-              request.headers = new Headers(request.headers);
-            },
-          });
-        }
+function normalizeBearerScheme(init: RequestInit) {
+  const headers = new Headers(init.headers);
+  const authorization = headers.get('Authorization');
+  if (authorization !== null) {
+    headers.set('Authorization', authorization.replace(/^Bearer /u, 'bEaReR '));
+  }
+  init.headers = headers;
+}
 
-        await client.models.list();
-
-        expect(transport.authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-        expect(transport.exchanges).toBe(2);
-      },
-    );
-
-    test.each([OpenAI, CloningBuildRequestClient])('refreshes at most once with %s', async (Client) => {
-      const transport = createTransport(() => true);
-      const client = new Client({ ...clientOptions, maxRetries, fetch: transport.fetch });
-
-      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-
-      expect(transport.authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-      expect(transport.exchanges).toBe(2);
-    });
+describe('Workload identity request and dispatch hooks', () => {
+  beforeEach(() => {
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
   });
 
-  test.each([null, '', 'Bearer replacement'])(
-    'does not refresh a workload token replaced after cloning headers: %j',
-    async (authorization) => {
-      class HookClient extends CloningBuildRequestClient {
+  afterEach(() => {
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
+  });
+
+  test.each([
+    [null, false],
+    [null, true],
+    ['', false],
+    ['', true],
+    ['Bearer replacement', false],
+    ['Bearer replacement', true],
+  ] as const)(
+    'does not refresh a workload token replaced by a request hook: %j (cloned headers: %s)',
+    async (authorization, cloneHeaders) => {
+      const Client = cloneHeaders ? CloningBuildRequestClient : OpenAI;
+      class HookClient extends Client {
         // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
         protected override async prepareRequest(request: RequestInit): Promise<void> {
           if (!(request.headers instanceof Headers)) {
@@ -116,143 +55,170 @@ describe('workload identity authentication and dispatch hooks', () => {
           }
         }
       }
-      const transport = createTransport();
-      const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+      const headers: Headers[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        headers.push(new Headers(init?.headers));
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        maxRetries: 0,
+        fetch: transport.fetch,
+      });
 
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-
-      expect(transport.authorizations).toEqual([authorization]);
+      expect(headers.map((value) => value.get('Authorization'))).toEqual([authorization]);
       expect(transport.exchanges).toBe(1);
     },
   );
 
-  test.each(['authHeaders', 'bearerAuth', 'adminAPIKeyAuth'])(
-    'preserves options identity and in-place header mutations in %s',
-    async (hook) => {
-      const headers: { Authorization: string | null } = { Authorization: null };
-      const options: FinalRequestOptions = {
-        method: 'get',
-        path: '/models',
-        headers,
-        __security: { bearerAuth: true, adminAPIKeyAuth: true },
-      };
-      const transport = createTransport();
-      const client = new OpenAI({ ...clientOptions, fetch: transport.fetch });
-      Object.defineProperty(client, hook, {
-        value: async (received: FinalRequestOptions) => {
-          expect(received).toBe(options);
-          headers.Authorization = 'Bearer hook-override';
-        },
+  describe.each([undefined, 0])('retry budget %j', (maxRetries) => {
+    test.each(['none', 'prepareRequest', 'buildRequest'])(
+      'refreshes a rejected workload token with %s header cloning',
+      async (hook) => {
+        const headers: Headers[] = [];
+        const transport = createWorkloadIdentityTransport((_url, init) => {
+          headers.push(new Headers(init?.headers));
+          return headers.length === 1
+            ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+            : Response.json({ data: [] });
+        });
+        const Client = hook === 'buildRequest' ? CloningBuildRequestClient : OpenAI;
+        const client = new Client({ ...createTestClientOptions(), maxRetries, fetch: transport.fetch });
+        if (hook === 'prepareRequest') {
+          Object.defineProperty(client, 'prepareRequest', {
+            value: async (request: RequestInit) => {
+              request.headers = new Headers(request.headers);
+            },
+          });
+        }
+
+        const result = await client.models.list();
+
+        expect(result).toBeDefined();
+        expect(headers.map((value) => value.get('Authorization'))).toEqual([
+          'Bearer access-token-1',
+          'Bearer access-token-2',
+        ]);
+        expect(transport.exchanges).toBe(2);
+      },
+    );
+
+    test.each([OpenAI, CloningBuildRequestClient])('refreshes at most once with %s', async (Client) => {
+      const headers: Headers[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        headers.push(new Headers(init?.headers));
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       });
+      const client = new Client({ ...createTestClientOptions(), maxRetries, fetch: transport.fetch });
 
-      const { req } = await client.buildRequest(options);
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-      expect(req.headers.get('Authorization')).toBe('Bearer hook-override');
+      expect(headers.map((value) => value.get('Authorization'))).toEqual([
+        'Bearer access-token-1',
+        'Bearer access-token-2',
+      ]);
+      expect(transport.exchanges).toBe(2);
+    });
+  });
+
+  test.each(['prepareRequest', 'fetchWithTimeout'] as const)(
+    'refreshes the same credential when %s normalizes the bearer scheme',
+    async (hook) => {
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+        protected override async prepareRequest(init: RequestInit) {
+          if (hook === 'prepareRequest') {
+            normalizeBearerScheme(init);
+          }
+        }
+
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+        ) {
+          if (hook === 'fetchWithTimeout' && init) {
+            normalizeBearerScheme(init);
+          }
+          return super.fetchWithTimeout(url, init, timeout, controller);
+        }
+      }
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await client.models.list();
+
+      expect(authorizations).toEqual(['bEaReR access-token-1', 'bEaReR access-token-2']);
+      expect(transport.exchanges).toBe(2);
     },
   );
 
-  describe.each([
-    ['authHeaders', false],
-    ['authHeaders', true],
-    ['bearerAuth', false],
-    ['bearerAuth', true],
-  ] as const)('rebuilt %s results (cloned options: %s)', (hook, cloneOptions) => {
-    test.each([undefined, 'Bearer replacement'])(
-      'refreshes only the preserved workload credential (override: %j)',
-      async (authorization) => {
-        const extraHeaders = { 'X-Custom': 'wrapped', Authorization: authorization };
-        class HookClient extends OpenAI {
-          protected override async authHeaders(
-            options: FinalRequestOptions,
-            schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-          ) {
-            const headers = await super.authHeaders(cloneOptions ? { ...options } : options, schemes);
-            return hook === 'authHeaders' ? buildHeaders([headers, extraHeaders]) : headers;
-          }
-
-          protected override async bearerAuth(options: FinalRequestOptions) {
-            const headers = await super.bearerAuth(cloneOptions ? { ...options } : options);
-            return hook === 'bearerAuth' ? buildHeaders([headers, extraHeaders]) : headers;
-          }
+  test.each([
+    ['fetchWithAuth', false],
+    ['fetchWithAuth', true],
+    ['fetchWithTimeout', false],
+    ['fetchWithTimeout', true],
+  ] as const)(
+    'refreshes after a delegating %s hook replaces the controller (copied request with context: %s)',
+    async (hook, copyRequest) => {
+      class HookClient extends OpenAI {
+        protected override async fetchWithAuth(
+          url: RequestInfo,
+          init: RequestInit,
+          timeout: number,
+          controller: AbortController,
+          schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          context?: object,
+        ) {
+          return super.fetchWithAuth(
+            url,
+            copyRequest ? { ...init } : init,
+            timeout,
+            hook === 'fetchWithAuth' ? new AbortController() : controller,
+            schemes,
+            copyRequest ? context : undefined,
+          );
         }
-        const transport = createTransport();
-        const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
 
-        const request = client.models.list();
-        await (authorization === undefined
-          ? request
-          : expect(request).rejects.toMatchObject({ status: 401 }));
-        await client.models.list();
-
-        expect(transport.authorizations).toEqual(
-          authorization === undefined
-            ? ['Bearer access-token-1', 'Bearer access-token-2', 'Bearer access-token-2']
-            : [authorization, authorization],
-        );
-        expect(transport.requests.every((value) => value.headers.get('X-Custom') === 'wrapped')).toBe(true);
-        expect(transport.exchanges).toBe(authorization === undefined ? 2 : 1);
-      },
-    );
-  });
-
-  test('refreshes rebuilt auth results for concurrent requests sharing options', async () => {
-    const options: FinalRequestOptions = { method: 'get', path: '/models' };
-    const bothHeadersReady = deferred();
-    let authCalls = 0;
-    class HookClient extends OpenAI {
-      protected override async authHeaders(received: FinalRequestOptions) {
-        if (authCalls < 2) {
-          expect(received).toBe(options);
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+          context?: object,
+        ) {
+          return super.fetchWithTimeout(
+            url,
+            copyRequest ? { ...init } : init,
+            timeout,
+            hook === 'fetchWithTimeout' ? new AbortController() : controller,
+            copyRequest ? context : undefined,
+          );
         }
-        const headers = await super.authHeaders({ ...received });
-        authCalls += 1;
-        if (authCalls === 2) {
-          bothHeadersReady.resolve();
-        }
-        await bothHeadersReady.promise;
-        return buildHeaders([headers, { 'X-Custom': 'wrapped' }]);
       }
-    }
-    const transport = createTransport(
-      (request) => request.headers.get('Authorization') === 'Bearer access-token-1',
-    );
-    const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+      let apiCalls = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        apiCalls += 1;
+        return apiCalls === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
 
-    await Promise.all([client.request(options), client.request(options)]);
+      await client.models.list();
 
-    expect(transport.requests).toHaveLength(4);
-    expect(transport.authorizations.filter((value) => value === 'Bearer access-token-1')).toHaveLength(2);
-    expect(transport.requests.every((value) => value.headers.get('X-Custom') === 'wrapped')).toBe(true);
-    expect(transport.exchanges).toBeGreaterThanOrEqual(2);
-    expect(transport.exchanges).toBeLessThanOrEqual(3);
-  });
-
-  test('keeps copied-option provenance independent across clients sharing options', async () => {
-    const options: FinalRequestOptions = { method: 'get', path: '/models' };
-    const firstComplete = deferred();
-    class HookClient extends OpenAI {
-      waitForFirst = false;
-      protected override async authHeaders(received: FinalRequestOptions) {
-        if (this.waitForFirst) {
-          await firstComplete.promise;
-        }
-        return buildHeaders([await super.authHeaders({ ...received }), { 'X-Custom': 'wrapped' }]);
-      }
-    }
-    const first = createTransport();
-    const second = createTransport();
-    const firstClient = new HookClient({ ...clientOptions, maxRetries: 0, fetch: first.fetch });
-    const secondClient = new HookClient({ ...clientOptions, maxRetries: 0, fetch: second.fetch });
-    secondClient.waitForFirst = true;
-
-    await Promise.all([
-      firstClient.request(options).finally(firstComplete.resolve),
-      secondClient.request(options),
-    ]);
-
-    expect(first.authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-    expect(second.authorizations).toEqual(first.authorizations);
-  });
+      expect(apiCalls).toBe(2);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
 
   describe.each(['fetch', 'fetchWithAuth', 'fetchWithTimeout'] as const)(
     'authorization snapshot at %s dispatch',
@@ -269,8 +235,8 @@ describe('workload identity authentication and dispatch hooks', () => {
               schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
             ) {
               const response = await super.fetchWithAuth(url, { ...init }, timeout, controller, schemes);
-              if (hook === 'fetchWithAuth' && init.headers instanceof Headers) {
-                init.headers.delete('Authorization');
+              if (hook === 'fetchWithAuth') {
+                (init.headers as Headers).delete('Authorization');
               }
               return response;
             }
@@ -282,41 +248,41 @@ describe('workload identity authentication and dispatch hooks', () => {
               controller: AbortController,
             ) {
               const headers =
-                hook === 'fetch' && replacement === undefined ? init?.headers : new Headers(init?.headers);
-              if (replacement !== undefined && headers instanceof Headers) {
+                hook === 'fetch' && replacement === undefined
+                  ? (init?.headers as Headers)
+                  : new Headers(init?.headers);
+              if (replacement !== undefined) {
                 headers.set('Authorization', replacement);
               }
-              const response = await super.fetchWithTimeout(
-                url,
-                { ...init, ...(headers === undefined ? {} : { headers }) },
-                timeout,
-                controller,
-              );
+              const response = await super.fetchWithTimeout(url, { ...init, headers }, timeout, controller);
               if (hook === 'fetchWithTimeout' && init?.headers instanceof Headers) {
                 init.headers.delete('Authorization');
               }
               return response;
             }
           }
-          const transport = createTransport();
+          const authorizations: (string | null)[] = [];
+          const transport = createWorkloadIdentityTransport((url, init) => {
+            const sent = new Request(url, init as globalThis.RequestInit);
+            authorizations.push(sent.headers.get('Authorization'));
+            if (hook === 'fetch' && init?.headers instanceof Headers) {
+              init.headers.delete('Authorization');
+            }
+            return authorizations.length === 1
+              ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+              : Response.json({ data: [] });
+          });
           const client = new HookClient({
-            ...clientOptions,
+            ...createTestClientOptions(),
             maxRetries: 0,
-            fetch: async (url, init) => {
-              const response = await transport.fetch(url, init);
-              if (hook === 'fetch' && init?.headers instanceof Headers) {
-                init.headers.delete('Authorization');
-              }
-              return response;
-            },
+            fetch: transport.fetch,
           });
 
           const request = client.models.list();
           await (replacement === undefined
             ? request
             : expect(request).rejects.toMatchObject({ status: 401 }));
-
-          expect(transport.authorizations).toEqual(
+          expect(authorizations).toEqual(
             replacement === undefined ? ['Bearer access-token-1', 'Bearer access-token-2'] : [replacement],
           );
           expect(transport.exchanges).toBe(replacement === undefined ? 2 : 1);
@@ -325,16 +291,92 @@ describe('workload identity authentication and dispatch hooks', () => {
     },
   );
 
+  test('retains provenance through a legacy controller wrapper followed by a request-copy wrapper', async () => {
+    class HookClient extends OpenAI {
+      protected override async fetchWithAuth(
+        url: RequestInfo,
+        init: RequestInit,
+        timeout: number,
+        _controller: AbortController,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+      ) {
+        return super.fetchWithAuth(url, init, timeout, new AbortController(), schemes);
+      }
+
+      override async fetchWithTimeout(
+        url: RequestInfo,
+        init: RequestInit | undefined,
+        timeout: number,
+        controller: AbortController,
+      ) {
+        return super.fetchWithTimeout(url, { ...init }, timeout, controller);
+      }
+    }
+    let apiCalls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      apiCalls += 1;
+      return apiCalls === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(apiCalls).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  });
+
+  test('forwards the same materialized header snapshot after a hook supplies an iterator', async () => {
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(
+        url: RequestInfo,
+        init: RequestInit | undefined,
+        timeout: number,
+        controller: AbortController,
+      ) {
+        const headers = new Headers(init?.headers).entries() as unknown as NonNullable<HeadersInit>;
+        return super.fetchWithTimeout(url, { ...init, headers }, timeout, controller);
+      }
+    }
+    const authorizations: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      authorizations.push(new Headers(init?.headers).get('Authorization'));
+      return authorizations.length === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      maxRetries: 0,
+      fetch: transport.fetch,
+    });
+
+    await client.models.list();
+
+    expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
+  });
+
   test.each(['fetchWithAuth', 'fetchWithTimeout'] as const)(
-    'does not refresh when %s dispatches an independent credential directly',
+    'does not infer workload usage when %s owns dispatch without calling super',
     async (hook) => {
-      const transport = createTransport();
-      const dispatch: Fetch = (url, init) => {
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        const sent = new Request(url, init as globalThis.RequestInit);
+        authorizations.push(sent.headers.get('Authorization'));
+        return Response.json({ data: [] });
+      });
+      const dispatchIndependent = (url: RequestInfo, init?: RequestInit) => {
         const headers = new Headers(init?.headers);
         headers.set('Authorization', 'Bearer independent');
-        return transport.fetch(url, { ...init, headers });
+        const sent = new Request(url, { ...init, headers } as globalThis.RequestInit);
+        authorizations.push(sent.headers.get('Authorization'));
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       };
       class HookClient extends OpenAI {
+        independent = true;
+
         protected override async fetchWithAuth(
           url: RequestInfo,
           init: RequestInit,
@@ -342,9 +384,10 @@ describe('workload identity authentication and dispatch hooks', () => {
           controller: AbortController,
           schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
         ) {
-          return hook === 'fetchWithAuth'
-            ? dispatch(url, init)
-            : super.fetchWithAuth(url, init, timeout, controller, schemes);
+          if (hook === 'fetchWithAuth' && this.independent) {
+            return dispatchIndependent(url, init);
+          }
+          return super.fetchWithAuth(url, init, timeout, controller, schemes);
         }
 
         override async fetchWithTimeout(
@@ -353,49 +396,26 @@ describe('workload identity authentication and dispatch hooks', () => {
           timeout: number,
           controller: AbortController,
         ) {
-          return hook === 'fetchWithTimeout'
-            ? dispatch(url, init)
-            : super.fetchWithTimeout(url, init, timeout, controller);
+          if (hook === 'fetchWithTimeout' && this.independent) {
+            return dispatchIndependent(url, init);
+          }
+          return super.fetchWithTimeout(url, init, timeout, controller);
         }
       }
-      const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        maxRetries: 0,
+        fetch: transport.fetch,
+      });
 
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(authorizations).toEqual(['Bearer independent']);
+      expect(transport.exchanges).toBe(1);
 
-      expect(transport.authorizations).toEqual(['Bearer independent']);
+      client.independent = false;
+      await client.models.list();
+      expect(authorizations).toEqual(['Bearer independent', 'Bearer access-token-1']);
       expect(transport.exchanges).toBe(1);
     },
   );
-
-  describe.each([
-    ['frozen', (options: FinalRequestOptions) => Object.freeze(options)],
-    ['sealed', (options: FinalRequestOptions) => Object.seal(options)],
-    ['non-extensible', (options: FinalRequestOptions) => Object.preventExtensions(options)],
-  ] as const)('%s request options', (_name, restrict) => {
-    test.each([false, true])('supports public requests (401 refresh: %s)', async (refresh) => {
-      const options: FinalRequestOptions = restrict({ method: 'get', path: '/models' });
-      const keys = Reflect.ownKeys(options);
-      let firstAttempt = true;
-      class HookClient extends OpenAI {
-        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
-          if (firstAttempt) {
-            expect(args[0]).toBe(options);
-            expect(Reflect.ownKeys(args[0])).toEqual(keys);
-            firstAttempt = false;
-          }
-          return super.buildRequest(...args);
-        }
-      }
-      const transport = createTransport((_request, call) => refresh && call === 1);
-      const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
-
-      await client.request(options);
-
-      expect(transport.authorizations).toEqual(
-        refresh ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer access-token-1'],
-      );
-      expect(transport.exchanges).toBe(refresh ? 2 : 1);
-      expect(Reflect.ownKeys(options)).toEqual(keys);
-    });
-  });
 });

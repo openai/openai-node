@@ -42,6 +42,30 @@ const getArrayIterator = (headers: readonly unknown[]) => {
   return arrayPrototype?.[Symbol.iterator];
 };
 
+const getHeadersIterator = (headers: object) => {
+  const seen = new Set<object>();
+  for (
+    let prototype = Object.getPrototypeOf(headers);
+    prototype;
+    prototype = Object.getPrototypeOf(prototype)
+  ) {
+    if (seen.has(prototype)) return undefined;
+    seen.add(prototype);
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    if (
+      typeof constructor === 'function' &&
+      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
+      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers'
+    ) {
+      const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value;
+      const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
+      if (typeof entries === 'function' && iterator === entries) return iterator;
+    }
+  }
+  return undefined;
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: { refreshable: boolean },
@@ -62,15 +86,16 @@ function* iterateHeaders(
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
     Symbol.iterator in headers ? headers[Symbol.iterator] : undefined;
+  if (replay) {
+    // Custom iterators may be one-shot whether inherited or owned. Platform Headers
+    // are reusable across realms, where instanceof cannot identify them.
+    replay.refreshable =
+      typeof iterator !== 'function' ||
+      (Array.isArray(headers) &&
+        (iterator === Array.prototype[Symbol.iterator] || iterator === getArrayIterator(headers))) ||
+      (!Array.isArray(headers) && iterator === getHeadersIterator(headers));
+  }
   if (typeof iterator === 'function') {
-    if (replay) {
-      // Custom iterable protocols may return the same exhausted iterator on every call.
-      // Recognize the actual method, including inherited overrides, before reusing a source.
-      replay.refreshable =
-        (Array.isArray(headers) &&
-          (iterator === Array.prototype[Symbol.iterator] || iterator === getArrayIterator(headers))) ||
-        (Object.prototype.toString.call(headers) === '[object Headers]' && iterator === headers.entries);
-    }
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
     shouldClear = true;
@@ -95,12 +120,12 @@ function* iterateHeaders(
   }
 }
 
-const mergeHeaders = (newHeaders: HeadersLike[], replay?: { refreshable: boolean }): NullableHeaders => {
+const mergeHeaderEntries = (newHeaders: Iterable<readonly [string, string | null]>[]): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
   for (const headers of newHeaders) {
     const seenHeaders = new Set<string>();
-    for (const [name, value] of iterateHeaders(headers, replay)) {
+    for (const [name, value] of headers) {
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
       }
@@ -121,13 +146,18 @@ const mergeHeaders = (newHeaders: HeadersLike[], replay?: { refreshable: boolean
   return { [brand_privateNullableHeaders]: true, values: targetHeaders, nulls: nullHeaders };
 };
 
-export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => mergeHeaders(newHeaders);
+export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
+  mergeHeaderEntries(newHeaders.map((headers) => iterateHeaders(headers)));
 
-/** Snapshot one-use iterables while allowing reusable headers to change during async authentication. */
-export const prepareHeaders = (headers: HeadersLike) => {
+/** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
+export const snapshotHeaders = (source: HeadersLike) => {
   const replay = { refreshable: true };
-  const snapshot = mergeHeaders([headers], replay);
-  return { snapshot, refresh: () => (replay.refreshable ? buildHeaders([headers]) : snapshot) };
+  const snapshot = mergeHeaderEntries([iterateHeaders(source, replay)]);
+  return {
+    source,
+    snapshot,
+    refresh: () => (replay.refreshable ? buildHeaders([source]) : snapshot),
+  };
 };
 
 export const isEmptyHeaders = (headers: HeadersLike) => {
