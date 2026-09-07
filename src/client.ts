@@ -1433,9 +1433,9 @@ export class OpenAI {
 
     if (!x509Authentication) {
       await this.prepareRequest(req, { url, options });
-      this.#observeWorkloadHeaderReplacement(workloadCredential, req.headers, initialWorkloadAuthorization);
+      this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
       await this._provider?.prepareRequest?.(req, { url, options });
-      this.#observeWorkloadHeaderReplacement(workloadCredential, req.headers, initialWorkloadAuthorization);
+      this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -1775,11 +1775,7 @@ export class OpenAI {
   ): Promise<Response> {
     const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
     if (workloadRequest) {
-      this.#observeWorkloadHeaderReplacement(
-        workloadRequest.credential,
-        init.headers,
-        workloadRequest.authorization,
-      );
+      this.#observeWorkloadHeaderReplacement(workloadRequest.credential, init, workloadRequest.authorization);
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
     }
@@ -2347,24 +2343,31 @@ export class OpenAI {
 
   #observeWorkloadHeaderReplacement(
     credential: WorkloadCredentialUsage | undefined,
-    headers: object | undefined,
+    request: RequestInit,
     authorization: string | undefined,
   ): void {
-    if (!credential || authorization === undefined) {
+    if (!credential || authorization === undefined || request.headers === undefined) {
       return;
     }
-    const matches = this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization);
-    if (matches === false) {
+    if (this.#workloadTokenProvenance.matchesHeaderCredential(request.headers, authorization) === false) {
       credential.revoke();
-    } else if (matches === undefined && headers && credential.isCurrent()) {
-      const platformHeader = getPlatformHeader(headers as Headers, 'Authorization');
-      if (platformHeader) {
-        if (bearerToken(platformHeader.value) === bearerToken(authorization)) {
-          credential.adopt(headers as Headers);
-        } else {
-          credential.revoke();
-        }
-      }
+      return;
+    }
+    if (!credential.isCurrent()) return;
+    if (!canPreserveHeaderInput(request.headers)) {
+      request.headers = new Headers(request.headers);
+    }
+    const headers = request.headers;
+    const native = hasNativeHeadersBrand(headers);
+    const platformHeader = native ? getPlatformHeader(headers, 'Authorization') : undefined;
+    const value = platformHeader ? platformHeader.value : new Headers(headers).get('Authorization');
+    if (
+      this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false ||
+      bearerToken(value) !== bearerToken(authorization)
+    ) {
+      credential.revoke();
+    } else if (native) {
+      credential.adopt(headers as Headers);
     }
   }
 
