@@ -300,6 +300,13 @@ replace the header layer, or use an explicit record with `Authorization: null`; 
 cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
 arrays, and data records retain live refresh behavior.
 
+When attributing a workload credential at dispatch, the SDK preserves local native `Headers`,
+plain-record, and ordinary tuple-array identity. Other iterable implementations, including foreign
+`Headers` collections, are materialized once and that same snapshot is passed to the transport.
+Structural constructor/tag descriptors cannot establish that a custom `get()` method agrees with its
+iterator. Foreign collection identity and custom properties are therefore not retained on this path;
+header values and workload refresh remain supported. Native `Request` delegation is unchanged.
+
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Ordinary object
 spread retains the SDK request carrier, including when a legacy wrapper also replaces the controller.
 Forward the context when reconstruction discards that carrier and replaces both request and controller
