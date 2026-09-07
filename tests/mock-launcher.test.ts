@@ -221,11 +221,11 @@ exit 23`,
       writeFileSync(
         bashEnvironment,
         `curl() {
-  attempts=0
-while [[ ! -s "$STEADY_PID_FILE" && "$attempts" -lt 1000 ]]; do
-  attempts=$((attempts + 1))
-  :
-done
+  local spin_attempts=0
+  while [[ ! -s "$STEADY_PID_FILE" && "$spin_attempts" -lt 1000 ]]; do
+    spin_attempts=$((spin_attempts + 1))
+    :
+  done
   return 1
 }
 sleep() {
@@ -234,10 +234,14 @@ sleep() {
 `,
       );
 
-      const curlWithoutPid = spawnSync('bash', ['-c', 'curl'], {
-        env: { ...process.env, BASH_ENV: bashEnvironment, STEADY_PID_FILE: steadyPidFile },
-        timeout: 1000,
-      });
+      const curlWithoutPid = spawnSync(
+        'bash',
+        ['-c', 'attempts=17; curl; curl_status=$?; [[ "$attempts" == 17 ]] || exit 99; exit "$curl_status"'],
+        {
+          env: { ...process.env, BASH_ENV: bashEnvironment, STEADY_PID_FILE: steadyPidFile },
+          timeout: 1000,
+        },
+      );
       expect(curlWithoutPid.error).toBeUndefined();
       expect(curlWithoutPid.status).toBe(1);
 
