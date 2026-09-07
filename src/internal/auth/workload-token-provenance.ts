@@ -1,3 +1,5 @@
+import type { WorkloadHeaderSnapshots } from '../headers';
+
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
 export function bearerToken(authorization: string | null): string | undefined {
   if (authorization?.slice(0, 7).toLowerCase() !== 'bearer ') {
@@ -30,6 +32,7 @@ export function rememberWorkloadHeaderCredential(headers: object, credential: He
 
 interface TokenScope {
   context: object;
+  headers: WorkloadHeaderSnapshots | undefined;
   record: (token: string) => void;
   matches: (authorization: string) => boolean;
   dispose: () => void;
@@ -40,6 +43,32 @@ export class WorkloadTokenProvenance {
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly results = new WeakMap<object, string | null>();
+  private invocation: TokenScope | undefined;
+
+  /** Owns synchronous hook entry only; the scope is never left ambient across an await. */
+  invoke<T>(options: object, context: object | undefined, operation: () => T): T {
+    const previous = this.invocation;
+    this.invocation = this.scopeFor(options, context);
+    try {
+      return operation();
+    } finally {
+      this.invocation = previous;
+    }
+  }
+
+  /** Captures synchronous delegation ownership only at authentication hook entry. */
+  authenticationScope(options: object, context: object | undefined): TokenScope | undefined {
+    if (context !== undefined) {
+      return this.contexts.get(context);
+    }
+    return this.invocation ?? this.scopeFor(options);
+  }
+
+  /** The private carrier is for SDK hooks, not the configured transport's RequestInit contract. */
+  static forDispatch<T extends object>(request: T): T {
+    Reflect.deleteProperty(request, requestCredentialCarrier);
+    return request;
+  }
 
   /** Marks the concrete authentication result issued by this client. */
   issue(headers: { values: Headers }, token: string): void {
@@ -109,12 +138,13 @@ export class WorkloadTokenProvenance {
   }
 
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
-  begin(options: object, context: object = {}): TokenScope {
+  begin(options: object, context: object = {}, headers?: WorkloadHeaderSnapshots): TokenScope {
     const tokens = new Set<string>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     let disposed = false;
     const scope: TokenScope = {
       context,
+      headers,
       record: (token) => {
         if (!disposed) {
           tokens.add(token);
@@ -130,6 +160,7 @@ export class WorkloadTokenProvenance {
         }
         disposed = true;
         tokens.clear();
+        scope.headers = undefined;
         this.contexts.delete(scope.context);
         scopes.delete(scope);
         if (scopes.size === 0) {
@@ -144,7 +175,7 @@ export class WorkloadTokenProvenance {
   }
 
   /** Resolves explicit ownership or the unambiguous original-options path used by legacy hooks. */
-  scopeFor(options: object, context: object | undefined): TokenScope | undefined {
+  scopeFor(options: object, context?: object): TokenScope | undefined {
     if (context !== undefined) {
       return this.contexts.get(context);
     }

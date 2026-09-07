@@ -157,6 +157,35 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test('strips SDK provenance from configured fetch while preserving caller extensions', async () => {
+    const extension = Symbol('caller extension');
+    class FrozenClient extends OpenAI {
+      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+        const built = await super.buildRequest(...args);
+        return { ...built, req: Object.freeze({ ...built.req }) };
+      }
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(Object.getOwnPropertySymbols(init)).toEqual([extension]);
+      expect(Object.getOwnPropertyDescriptor(init, extension)?.value).toBe('preserved');
+      calls += 1;
+      return calls === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const fetchOptions = { cache: 'no-store' as const, [extension]: 'preserved' };
+    const client = new FrozenClient({
+      ...createTestClientOptions(),
+      fetch: transport.fetch,
+      fetchOptions,
+      maxRetries: 0,
+    });
+    await client.models.list();
+    expect(calls).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  });
+
   test.each([false, true])(
     'does not replay independent equal-byte final headers (copied request: %s)',
     async (copyRequest) => {
@@ -374,10 +403,11 @@ describe('Workload identity request and dispatch hooks', () => {
           controller: AbortController,
           context?: object,
         ) {
-          const request = new ForeignRequest(
-            url as ConstructorParameters<typeof ForeignRequest>[0],
-            init as ConstructorParameters<typeof ForeignRequest>[1],
-          );
+          const request = new ForeignRequest(String(url), {
+            method: init?.method ?? 'GET',
+            headers: new Headers(init?.headers),
+            signal: init?.signal ?? null,
+          });
           if (throwTag) {
             Object.defineProperty(request, Symbol.toStringTag, {
               get() {
@@ -396,12 +426,11 @@ describe('Workload identity request and dispatch hooks', () => {
       }
       const authorizations: (string | null)[] = [];
       const transport = createWorkloadIdentityTransport((url, init) => {
-        authorizations.push(
-          new ForeignRequest(
-            url as ConstructorParameters<typeof ForeignRequest>[0],
-            init as ConstructorParameters<typeof ForeignRequest>[1],
-          ).headers.get('Authorization'),
-        );
+        expect(init?.headers).toBeUndefined();
+        if (!(url instanceof ForeignRequest)) {
+          throw new Error('Expected the foreign Request from the hook');
+        }
+        authorizations.push(url.headers.get('Authorization'));
         return authorizations.length === 1
           ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
           : Response.json({ data: [] });

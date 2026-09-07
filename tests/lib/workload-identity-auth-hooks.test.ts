@@ -137,16 +137,15 @@ describe('Workload identity authentication hook provenance', () => {
           protected override async authHeaders(
             options: FinalRequestOptions,
             schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-            context?: object,
           ) {
-            const headers = await super.authHeaders({ ...options }, schemes, context);
+            const headers = await super.authHeaders({ ...options }, schemes);
             return hook === 'authHeaders'
               ? buildHeaders([new Headers(headers?.values), replacement])
               : headers;
           }
 
-          protected override async bearerAuth(options: FinalRequestOptions, context?: object) {
-            const headers = await super.bearerAuth({ ...options }, context);
+          protected override async bearerAuth(options: FinalRequestOptions) {
+            const headers = await super.bearerAuth({ ...options });
             return hook === 'bearerAuth'
               ? buildHeaders([new Headers(headers?.values), replacement])
               : headers;
@@ -171,6 +170,43 @@ describe('Workload identity authentication hook provenance', () => {
       },
     );
   });
+
+  test.each([false, true])(
+    'requires explicit context for native copies delegated after await: %s',
+    async (forwardContext) => {
+      class DelayedClient extends OpenAI {
+        protected override async authHeaders(
+          options: FinalRequestOptions,
+          schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          context?: object,
+        ) {
+          await Promise.resolve();
+          const headers = await super.authHeaders(
+            { ...options },
+            schemes,
+            forwardContext ? context : undefined,
+          );
+          return buildHeaders([new Headers(headers?.values)]);
+        }
+      }
+      let calls = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        calls += 1;
+        return calls === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new DelayedClient({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+      const result = client.models.list();
+      await (forwardContext ? result : expect(result).rejects.toMatchObject({ status: 401 }));
+      expect(calls).toBe(forwardContext ? 2 : 1);
+      expect(transport.exchanges).toBe(forwardContext ? 2 : 1);
+    },
+  );
 
   test('refreshes rebuilt auth results for concurrent requests sharing options', async () => {
     const options: FinalRequestOptions = { method: 'get', path: '/models' };
