@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { vi } from 'vitest';
 import { buildHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
+import type { HeadersInit } from 'openai/internal/builtin-types';
 import {
   createTestClientOptions,
   createTestWorkloadIdentity,
@@ -27,6 +28,8 @@ class OneShotHeaders extends Array<[string, string | null]> {
     return (this.#iterator ??= super[Symbol.iterator]());
   }
 }
+
+function* emptyIterator() {}
 
 test.each(['array index accessor', 'one-shot array value'] as const)(
   'snapshots nested one-shot header state: %s',
@@ -121,4 +124,172 @@ test('preserves an inspected one-shot removal without requiring prepareOptions t
   await client.models.list({ headers: new OneShotHeaders(['Authorization', null]) });
 
   expect(transport.exchanges).toBe(0);
+});
+
+test('does not let an unrelated standalone build overwrite an active request snapshot', async () => {
+  let entered!: () => void;
+  let release!: () => void;
+  // oxlint-disable-next-line promise/avoid-new -- Controlled request interleaving requires a gate.
+  const enteredBuild = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  // oxlint-disable-next-line promise/avoid-new -- Controlled request interleaving requires a gate.
+  const resumeBuild = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  class PausingClient extends OpenAI {
+    override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+      if (args[0].path === '/held') {
+        entered();
+        await resumeBuild;
+      }
+      return super.buildRequest(...args);
+    }
+  }
+  let sent: string | null | undefined;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent = new Headers(init?.headers).get('Authorization');
+    return Response.json({ data: [] });
+  });
+  const client = new PausingClient({
+    ...createTestClientOptions(),
+    defaultHeaders: {},
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+  const headers: [string, string | null][] = [['Authorization', null]];
+  const iterator = headers.values();
+  headers[Symbol.iterator] = () => iterator;
+
+  const pending = client.get('/held', { headers });
+  await enteredBuild;
+  await client.buildRequest({
+    method: 'get',
+    path: '/standalone',
+    headers: { Authorization: 'Bearer synthetic-independent' },
+  });
+  release();
+  await pending;
+
+  expect(sent).toBeNull();
+  expect(transport.exchanges).toBe(0);
+});
+
+test.each(
+  ['prepare-request', 'prepare-default', 'auth-request', 'auth-default'].flatMap((stage) =>
+    [null, 'Bearer synthetic-replacement'].map((authorization) => ({ stage, authorization })),
+  ),
+)(
+  'honors mutable headers after a canonical $stage read to $authorization',
+  async ({ stage, authorization }) => {
+    const headers: Record<string, string | null> = { Authorization: 'Bearer synthetic-original' };
+    class ReadingClient extends OpenAI {
+      protected override async prepareOptions(options: FinalRequestOptions) {
+        if (stage.startsWith('prepare')) {
+          buildHeaders([stage.endsWith('default') ? this._options.defaultHeaders : options.headers]);
+          headers['Authorization'] = authorization;
+        }
+      }
+
+      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+        if (stage.startsWith('auth')) {
+          buildHeaders([stage.endsWith('default') ? this._options.defaultHeaders : args[0].headers]);
+          headers['Authorization'] = authorization;
+        }
+        return super.authHeaders(...args);
+      }
+    }
+    let sent: string | null | undefined;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent = new Headers(init?.headers).get('Authorization');
+      return Response.json({ data: [] });
+    });
+    const client = new ReadingClient({
+      ...createTestClientOptions(),
+      defaultHeaders: stage.endsWith('default') ? headers : undefined,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list({ headers: stage.endsWith('default') ? undefined : headers });
+
+    expect(sent).toBe(authorization);
+  },
+);
+
+test('preserves nested value iterator accessor results', async () => {
+  let reads = 0;
+  const values = ['Bearer synthetic-independent'];
+  Object.defineProperty(values, Symbol.iterator, {
+    get() {
+      reads += 1;
+      return reads === 1 ? Array.prototype.values : emptyIterator;
+    },
+  });
+  let sent: string | null | undefined;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent = new Headers(init?.headers).get('Authorization');
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await client.models.list({ headers: { Authorization: values } });
+
+  expect(sent).toBe('Bearer synthetic-independent');
+  expect(reads).toBe(1);
+  expect(transport.exchanges).toBe(0);
+});
+
+test('preserves custom auth first access to shared default and request headers', async () => {
+  class CustomAuthClient extends OpenAI {
+    // oxlint-disable-next-line class-methods-use-this -- This fixture models a custom authentication hook.
+    protected override async authHeaders(options: FinalRequestOptions) {
+      const input = new Headers(options.headers as HeadersInit);
+      return buildHeaders([{ Authorization: `Bearer ${input.get('X-Credential') ?? 'fallback'}` }]);
+    }
+  }
+  const rows = [['X-Credential', 'synthetic-independent']];
+  const cursor = rows.values();
+  rows[Symbol.iterator] = () => cursor;
+  let sent: string | null | undefined;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent = new Headers(init?.headers).get('Authorization');
+    return Response.json({ data: [] });
+  });
+  const client = new CustomAuthClient({
+    ...createTestClientOptions(),
+    defaultHeaders: rows,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list({ headers: rows });
+
+  expect(sent).toBe('Bearer synthetic-independent');
+});
+
+test('reads a shared native iterator accessor only once', async () => {
+  const headers = new Headers({ Authorization: 'Bearer synthetic-independent' });
+  const iterator = headers[Symbol.iterator];
+  let reads = 0;
+  Object.defineProperty(headers, Symbol.iterator, {
+    get() {
+      reads += 1;
+      if (reads > 1) {
+        throw new Error('iterator accessor read twice');
+      }
+      return iterator;
+    },
+  });
+  const transport = createWorkloadIdentityTransport(() => Response.json({ data: [] }));
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    defaultHeaders: headers,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list({ headers });
+
+  expect(reads).toBe(1);
 });
