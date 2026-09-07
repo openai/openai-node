@@ -82,6 +82,12 @@ export class WorkloadTokenProvenance {
     return request;
   }
 
+  /** Reads only this client's opaque SDK request carrier, without evaluating caller accessors. */
+  requestCarrier(request: object): object | undefined {
+    const carrier = Object.getOwnPropertyDescriptor(request, requestCredentialCarrier)?.value;
+    return typeof carrier === 'object' && carrier !== null && this.results.has(carrier) ? carrier : undefined;
+  }
+
   /** Marks the concrete authentication result issued by this client. */
   issue(headers: { values: Headers }, token: string): void {
     const credential = { owner: this, token };

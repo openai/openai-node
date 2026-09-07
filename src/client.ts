@@ -1388,6 +1388,8 @@ export class OpenAI {
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(req, workloadRequest);
       this.#bindWorkloadIdentityRequest(credentialContext, workloadRequest);
+      const carrier = this.#workloadTokenProvenance.requestCarrier(req);
+      if (carrier) this.#bindWorkloadIdentityRequest(carrier, workloadRequest);
     }
     const response = await fetchWithAuth
       .call(this, url, req, remainingTimeout, controller, security, credentialContext)
@@ -2158,7 +2160,8 @@ export class OpenAI {
       return requests?.size === 1 ? requests.values().next().value : undefined;
     };
     if (context !== undefined) return lookup(context);
-    return (init && lookup(init)) ?? lookup(controller);
+    const carrier = init && this.#workloadTokenProvenance.requestCarrier(init);
+    return (init && lookup(init)) ?? (carrier && lookup(carrier)) ?? lookup(controller);
   }
 
   #bindWorkloadIdentityRequest(key: object, request: WorkloadIdentityRequest) {

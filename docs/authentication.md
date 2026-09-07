@@ -286,10 +286,11 @@ replace the header layer, or use an explicit record with `Authorization: null`; 
 cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
 arrays, and data records retain live refresh behavior.
 
-`fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Forward it when
-a transport wrapper replaces both the request object and its abort controller. Changing either one
-alone preserves the original request's identity. Forward the same context object; copying it loses
-request ownership.
+`fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Ordinary object
+spread retains the SDK request carrier, including when a legacy wrapper also replaces the controller.
+Forward the context when reconstruction discards that carrier and replaces both request and controller
+identity. Changing either one alone preserves the original request's identity. Forward the same context
+object; copying it loses request ownership.
 
 ## Third-party providers
 
