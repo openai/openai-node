@@ -1,8 +1,10 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected SDK hooks. */
+import { vi } from 'vitest';
 import OpenAI from 'openai';
 import type { Fetch, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { buildHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
+import type { RequestCredentialContext } from 'openai/internal/request-credentials';
 
 const clientOptions = {
   apiKey: null,
@@ -67,13 +69,15 @@ class CloningBuildRequestClient extends OpenAI {
 }
 
 describe('workload identity authentication and dispatch hooks', () => {
+  afterEach(() => vi.unstubAllGlobals());
   describe.each([undefined, 0])('retry budget %j', (maxRetries) => {
     test.each(['none', 'prepareRequest', 'buildRequest'])(
       'refreshes a rejected workload token with %s header cloning',
       async (hook) => {
         const transport = createTransport();
         const Client = hook === 'buildRequest' ? CloningBuildRequestClient : OpenAI;
-        const client = new Client({ ...clientOptions, maxRetries, fetch: transport.fetch });
+        vi.stubGlobal('fetch', transport.fetch);
+        const client = new Client({ ...clientOptions, maxRetries });
         if (hook === 'prepareRequest') {
           Object.defineProperty(client, 'prepareRequest', {
             value: async (request: RequestInit) => {
@@ -91,7 +95,8 @@ describe('workload identity authentication and dispatch hooks', () => {
 
     test.each([OpenAI, CloningBuildRequestClient])('refreshes at most once with %s', async (Client) => {
       const transport = createTransport(() => true);
-      const client = new Client({ ...clientOptions, maxRetries, fetch: transport.fetch });
+      vi.stubGlobal('fetch', transport.fetch);
+      const client = new Client({ ...clientOptions, maxRetries });
 
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
@@ -117,7 +122,8 @@ describe('workload identity authentication and dispatch hooks', () => {
         }
       }
       const transport = createTransport();
-      const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+      vi.stubGlobal('fetch', transport.fetch);
+      const client = new HookClient({ ...clientOptions, maxRetries: 0 });
 
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
@@ -137,7 +143,8 @@ describe('workload identity authentication and dispatch hooks', () => {
         __security: { bearerAuth: true, adminAPIKeyAuth: true },
       };
       const transport = createTransport();
-      const client = new OpenAI({ ...clientOptions, fetch: transport.fetch });
+      vi.stubGlobal('fetch', transport.fetch);
+      const client = new OpenAI({ ...clientOptions });
       Object.defineProperty(client, hook, {
         value: async (received: FinalRequestOptions) => {
           expect(received).toBe(options);
@@ -165,18 +172,30 @@ describe('workload identity authentication and dispatch hooks', () => {
           protected override async authHeaders(
             options: FinalRequestOptions,
             schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+            credentialContext?: RequestCredentialContext,
           ) {
-            const headers = await super.authHeaders(cloneOptions ? { ...options } : options, schemes);
+            const headers = await super.authHeaders(
+              cloneOptions ? { ...options } : options,
+              schemes,
+              credentialContext,
+            );
             return hook === 'authHeaders' ? buildHeaders([headers, extraHeaders]) : headers;
           }
 
-          protected override async bearerAuth(options: FinalRequestOptions) {
-            const headers = await super.bearerAuth(cloneOptions ? { ...options } : options);
+          protected override async bearerAuth(
+            options: FinalRequestOptions,
+            credentialContext?: RequestCredentialContext,
+          ) {
+            const headers = await super.bearerAuth(
+              cloneOptions ? { ...options } : options,
+              credentialContext,
+            );
             return hook === 'bearerAuth' ? buildHeaders([headers, extraHeaders]) : headers;
           }
         }
         const transport = createTransport();
-        const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+        vi.stubGlobal('fetch', transport.fetch);
+        const client = new HookClient({ ...clientOptions, maxRetries: 0 });
 
         const request = client.models.list();
         await (authorization === undefined
@@ -200,11 +219,15 @@ describe('workload identity authentication and dispatch hooks', () => {
     const bothHeadersReady = deferred();
     let authCalls = 0;
     class HookClient extends OpenAI {
-      protected override async authHeaders(received: FinalRequestOptions) {
+      protected override async authHeaders(
+        received: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        credentialContext?: RequestCredentialContext,
+      ) {
         if (authCalls < 2) {
           expect(received).toBe(options);
         }
-        const headers = await super.authHeaders({ ...received });
+        const headers = await super.authHeaders({ ...received }, schemes, credentialContext);
         authCalls += 1;
         if (authCalls === 2) {
           bothHeadersReady.resolve();
@@ -216,7 +239,8 @@ describe('workload identity authentication and dispatch hooks', () => {
     const transport = createTransport(
       (request) => request.headers.get('Authorization') === 'Bearer access-token-1',
     );
-    const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+    vi.stubGlobal('fetch', transport.fetch);
+    const client = new HookClient({ ...clientOptions, maxRetries: 0 });
 
     await Promise.all([client.request(options), client.request(options)]);
 
@@ -232,17 +256,26 @@ describe('workload identity authentication and dispatch hooks', () => {
     const firstComplete = deferred();
     class HookClient extends OpenAI {
       waitForFirst = false;
-      protected override async authHeaders(received: FinalRequestOptions) {
+      protected override async authHeaders(
+        received: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        credentialContext?: RequestCredentialContext,
+      ) {
         if (this.waitForFirst) {
           await firstComplete.promise;
         }
-        return buildHeaders([await super.authHeaders({ ...received }), { 'X-Custom': 'wrapped' }]);
+        return buildHeaders([
+          await super.authHeaders({ ...received }, schemes, credentialContext),
+          { 'X-Custom': 'wrapped' },
+        ]);
       }
     }
     const first = createTransport();
     const second = createTransport();
-    const firstClient = new HookClient({ ...clientOptions, maxRetries: 0, fetch: first.fetch });
-    const secondClient = new HookClient({ ...clientOptions, maxRetries: 0, fetch: second.fetch });
+    vi.stubGlobal('fetch', first.fetch);
+    const firstClient = new HookClient({ ...clientOptions, maxRetries: 0 });
+    vi.stubGlobal('fetch', second.fetch);
+    const secondClient = new HookClient({ ...clientOptions, maxRetries: 0 });
     secondClient.waitForFirst = true;
 
     await Promise.all([
@@ -299,17 +332,15 @@ describe('workload identity authentication and dispatch hooks', () => {
             }
           }
           const transport = createTransport();
-          const client = new HookClient({
-            ...clientOptions,
-            maxRetries: 0,
-            fetch: async (url, init) => {
-              const response = await transport.fetch(url, init);
-              if (hook === 'fetch' && init?.headers instanceof Headers) {
-                init.headers.delete('Authorization');
-              }
-              return response;
-            },
-          });
+          const defaultFetch: Fetch = async (url, init) => {
+            const response = await transport.fetch(url, init);
+            if (hook === 'fetch' && init?.headers instanceof Headers) {
+              init.headers.delete('Authorization');
+            }
+            return response;
+          };
+          vi.stubGlobal('fetch', defaultFetch);
+          const client = new HookClient({ ...clientOptions, maxRetries: 0 });
 
           const request = client.models.list();
           await (replacement === undefined
@@ -322,6 +353,34 @@ describe('workload identity authentication and dispatch hooks', () => {
           expect(transport.exchanges).toBe(replacement === undefined ? 2 : 1);
         },
       );
+    },
+  );
+
+  test.each(['default', 'custom', 'reset'] as const)(
+    'preserves transport refresh ownership through a %s clone',
+    async (mode) => {
+      const transport = createTransport();
+      vi.stubGlobal('fetch', transport.fetch);
+      const customFetch: Fetch = (url, init) => transport.fetch(url, init);
+      const parent = new OpenAI({
+        ...clientOptions,
+        maxRetries: 0,
+        ...(mode === 'reset' ? { fetch: customFetch } : {}),
+      });
+      const cloneOptions = {
+        default: {},
+        custom: { fetch: customFetch },
+        reset: { fetch: undefined },
+      };
+      const client = parent.withOptions(cloneOptions[mode]);
+      const refresh = mode === 'default' || mode === 'reset';
+      const request = client.models.list();
+      await (refresh ? request : expect(request).rejects.toMatchObject({ status: 401 }));
+
+      expect(transport.authorizations).toEqual(
+        refresh ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer access-token-1'],
+      );
+      expect(transport.exchanges).toBe(refresh ? 2 : 1);
     },
   );
 
@@ -358,7 +417,8 @@ describe('workload identity authentication and dispatch hooks', () => {
             : super.fetchWithTimeout(url, init, timeout, controller);
         }
       }
-      const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+      vi.stubGlobal('fetch', transport.fetch);
+      const client = new HookClient({ ...clientOptions, maxRetries: 0 });
 
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
@@ -387,7 +447,8 @@ describe('workload identity authentication and dispatch hooks', () => {
         }
       }
       const transport = createTransport((_request, call) => refresh && call === 1);
-      const client = new HookClient({ ...clientOptions, maxRetries: 0, fetch: transport.fetch });
+      vi.stubGlobal('fetch', transport.fetch);
+      const client = new HookClient({ ...clientOptions, maxRetries: 0 });
 
       await client.request(options);
 

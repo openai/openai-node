@@ -411,6 +411,74 @@ test('retains the behavior of legacy overrides that omit credential context', as
   expect(provider).toHaveBeenCalledTimes(1);
 });
 
+describe.each([
+  {
+    name: 'OpenAI',
+    Base: class extends OpenAI {
+      constructor(provider: () => Promise<string>, fetch: Fetch) {
+        super({ apiKey: provider, fetch });
+      }
+    },
+  },
+  {
+    name: 'Azure',
+    Base: class extends AzureOpenAI {
+      constructor(provider: () => Promise<string>, fetch: Fetch) {
+        super({
+          baseURL: 'https://synthetic.example/v1',
+          apiVersion: '2024-10-01-preview',
+          azureADTokenProvider: provider,
+          fetch,
+        });
+      }
+    },
+  },
+  {
+    name: 'Bedrock',
+    Base: class extends BedrockOpenAI {
+      constructor(provider: () => Promise<string>, fetch: Fetch) {
+        super({ baseURL: 'https://synthetic.example/v1', bedrockTokenProvider: provider, fetch });
+      }
+    },
+  },
+])('$name preparation credential changes', ({ Base }) => {
+  test.each(['legacy', 'forwarded', 'transformed'] as const)('%s context contract', async (mode) => {
+    class PreparationClient extends Base {
+      protected override async prepareOptions(
+        options: FinalRequestOptions,
+        context?: RequestCredentialContext,
+      ): Promise<void> {
+        await super.prepareOptions(options, mode === 'legacy' ? undefined : context);
+        this.apiKey = 'synthetic-shared-replacement';
+        if (mode === 'transformed') {
+          if (context?.apiKey === undefined) {
+            throw new Error('Expected a captured provider credential');
+          }
+          context.apiKey = `${context.apiKey}-prepared`;
+        }
+      }
+    }
+    const { fetch, sent } = recordRequests();
+    const provider = rotatingProvider();
+    const client = new PreparationClient(provider, fetch);
+
+    if (mode === 'legacy') {
+      await client.models.list();
+      expect(tokens(sent)).toEqual(['Bearer synthetic-shared-replacement']);
+      expect(provider).toHaveBeenCalledTimes(1);
+    } else {
+      await Promise.all([client.models.list(), client.models.list()]);
+      const suffix = mode === 'transformed' ? '-prepared' : '';
+      expect(tokens(sent)).toEqual([
+        `Bearer synthetic-token-1${suffix}`,
+        `Bearer synthetic-token-2${suffix}`,
+      ]);
+      expect(provider).toHaveBeenCalledTimes(2);
+    }
+    expect(client.apiKey).toBe('synthetic-shared-replacement');
+  });
+});
+
 test('preserves a legacy credential resolver that does not capture its result', async () => {
   const { fetch, sent } = recordRequests();
   const client = new OpenAI({ apiKey: 'synthetic-static-key', fetch });

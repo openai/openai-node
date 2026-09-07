@@ -230,9 +230,17 @@ Concurrent token refreshes are shared. If a replayable request using a workload-
 a `401`, the SDK also invalidates the cached token and retries once with a fresh token.
 For subject-token workload identity, an independent `Authorization` header override in `defaultHeaders`
 or request `headers` skips token acquisition, including `null` to remove the header or an empty string.
-Subclasses that override authentication hooks retain control of credential resolution.
-Automatic `401` refresh requires dispatch through the SDK's `fetchWithTimeout` implementation so it can
-identify the credential sent. Overrides that dispatch requests directly own their credential refresh.
+Subclasses that override authentication hooks retain control of credential resolution. Forward the optional
+credential context through preparation, request-building, and authentication hooks to preserve each attempt's
+resolved credentials, including when copying options or rebuilding headers. For a function-based API key,
+a forwarding `prepareOptions` hook can transform the resolved key by updating `context.apiKey` after calling
+`super`. Legacy hooks that omit the context retain their shared `client.apiKey` behavior; assigning that
+property in a forwarding hook changes shared client state, while the attempt keeps its captured key.
+
+For subject-token workload identity, automatic `401` refresh requires dispatch through the SDK's
+`fetchWithTimeout` implementation and default fetch transport so it can identify the credential sent.
+Configured `fetch` functions and overrides that dispatch requests directly own their credential refresh:
+the SDK cannot observe whether they replace or remove authorization before sending the request.
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
 

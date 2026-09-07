@@ -489,11 +489,7 @@ export class OpenAI {
     AbortController,
     { authorization: string | undefined; used: boolean }
   >();
-  // Legacy auth hooks may copy options without forwarding context. Keep token provenance
-  // on this client, for only as long as the oldest outstanding preparation needs it.
-  #workloadIdentityAuthSequence = 0;
-  #workloadIdentityAuthScopes = new Set<number>();
-  #workloadIdentityAuthorizations = new Map<string, number>();
+  #workloadIdentityDefaultFetch: Fetch | undefined;
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -621,6 +617,7 @@ export class OpenAI {
     this.fetchOptions = options.fetchOptions;
     this.maxRetries = options.maxRetries ?? 2;
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
+    this.#workloadIdentityDefaultFetch = options.fetch == null ? this.fetch : undefined;
     this.#encoder = Opts.FallbackEncoder;
 
     const customHeadersEnv = provider || credential ? undefined : readEnv('OPENAI_CUSTOM_HEADERS');
@@ -703,6 +700,9 @@ export class OpenAI {
         !provider,
     };
     const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    if (!hasOwn(options, 'fetch') && client.fetch === this.fetch) {
+      client.#workloadIdentityDefaultFetch = this.#workloadIdentityDefaultFetch;
+    }
     if (provider && new URL(client.baseURL).origin !== new URL(this.baseURL).origin) {
       Object.assign(client._options, {
         defaultHeaders: options.defaultHeaders,
@@ -827,14 +827,11 @@ export class OpenAI {
               ...authentication.tenantSnapshot(),
             })
           : await authentication.getToken();
-      const headers = buildHeaders([{ Authorization: `Bearer ${token}` }]);
-      if (!(authentication instanceof X509WorkloadIdentityAuth) && this.#workloadIdentityAuthScopes.size) {
-        const authorization = `Bearer ${token}`;
-        // Reinsert repeated tokens to keep the ledger ordered by their latest resolution.
-        this.#workloadIdentityAuthorizations.delete(authorization);
-        this.#workloadIdentityAuthorizations.set(authorization, ++this.#workloadIdentityAuthSequence);
+      const authorization = `Bearer ${token}`;
+      if (!(authentication instanceof X509WorkloadIdentityAuth) && credentialContext) {
+        credentialContext.workloadAuthorization = authorization;
       }
-      return headers;
+      return buildHeaders([{ Authorization: authorization }]);
     }
     const apiKey = credentialContext?.apiKey === undefined ? this.apiKey : credentialContext.apiKey;
     if (apiKey == null) {
@@ -1206,29 +1203,11 @@ export class OpenAI {
 
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
-    let initialWorkloadAuthorization: string | undefined;
     try {
-      const workloadIdentityAuthScope = this.#beginWorkloadIdentityAuthScope();
-      let candidate: Awaited<ReturnType<OpenAI['buildRequest']>>;
-      try {
-        candidate = await this.buildRequest(options, {
-          retryCount: maxRetries - retriesRemaining,
-          credentialContext,
-        });
-        const authorization = candidate.req.headers.get('authorization');
-        const resolvedAt =
-          authorization === null ? undefined : this.#workloadIdentityAuthorizations.get(authorization);
-        if (
-          authorization !== null &&
-          workloadIdentityAuthScope !== undefined &&
-          resolvedAt !== undefined &&
-          resolvedAt > workloadIdentityAuthScope
-        ) {
-          initialWorkloadAuthorization = authorization;
-        }
-      } finally {
-        this.#endWorkloadIdentityAuthScope(workloadIdentityAuthScope);
-      }
+      const candidate = await this.buildRequest(options, {
+        retryCount: maxRetries - retriesRemaining,
+        credentialContext,
+      });
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
@@ -1329,7 +1308,7 @@ export class OpenAI {
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
     x509Authentication?.releaseRequestBody(req.body);
-    const workloadRequest = { authorization: initialWorkloadAuthorization, used: false };
+    const workloadRequest = { authorization: credentialContext.workloadAuthorization, used: false };
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#workloadIdentityRequests.set(controller, workloadRequest);
     }
@@ -1946,35 +1925,12 @@ export class OpenAI {
     return headers.values;
   }
 
-  #beginWorkloadIdentityAuthScope() {
-    if (!this._workloadIdentityAuth || this.#x509Authentication) {
-      return undefined;
-    }
-    const scope = ++this.#workloadIdentityAuthSequence;
-    this.#workloadIdentityAuthScopes.add(scope);
-    return scope;
-  }
-
-  #endWorkloadIdentityAuthScope(scope: number | undefined) {
-    if (scope === undefined) return;
-    this.#workloadIdentityAuthScopes.delete(scope);
-    const oldestScope = this.#workloadIdentityAuthScopes.values().next().value;
-    if (oldestScope === undefined) {
-      this.#workloadIdentityAuthorizations.clear();
-      this.#workloadIdentityAuthSequence = 0;
-      return;
-    }
-    for (const [authorization, resolvedAt] of this.#workloadIdentityAuthorizations) {
-      if (resolvedAt > oldestScope) break;
-      this.#workloadIdentityAuthorizations.delete(authorization);
-    }
-  }
-
   #snapshotWorkloadIdentityUsage(controller: AbortController, init: RequestInit) {
     const request = this.#workloadIdentityRequests.get(controller);
     if (request) {
-      // Only the SDK's final fetch handoff proves which credential was dispatched.
+      // A configured fetch may change credentials after this handoff and owns its refresh.
       request.used =
+        this.fetch === this.#workloadIdentityDefaultFetch &&
         request.authorization !== undefined &&
         new Headers(init.headers).get('Authorization') === request.authorization;
     }

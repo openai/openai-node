@@ -5,10 +5,14 @@ import type { OpenAI } from '../client';
  * options and request metadata. Overrides of preparation and authentication
  * hooks must forward this context to preserve per-attempt credentials. Legacy
  * overrides that omit it retain their shared `client.apiKey` behavior.
+ * To transform a captured provider credential in a forwarding hook, update
+ * `context.apiKey`; assigning `client.apiKey` only updates shared client state.
  * @internal
  */
 export interface RequestCredentialContext {
   apiKey?: string | null;
+  /** Subject-token authorization resolved for this HTTP attempt. @internal */
+  workloadAuthorization?: string;
 }
 
 /** Resolves once per attempt while retaining the existing credential-hook contract. @internal */
