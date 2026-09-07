@@ -44,7 +44,14 @@ export const getPlatformHeader = (
     if (!headers) {
       return undefined;
     }
-    const platform = getHeadersProtocol(headers);
+    let platform: ReturnType<typeof getHeadersProtocol>;
+    try {
+      // Native storage is authoritative even when a subclass forges the platform descriptors.
+      Headers.prototype.has.call(headers, name);
+      platform = { iterator: Headers.prototype[Symbol.iterator], prototype: Headers.prototype };
+    } catch {
+      platform = getHeadersProtocol(headers);
+    }
     if (!platform) {
       return undefined;
     }

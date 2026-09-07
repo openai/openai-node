@@ -71,3 +71,77 @@ test.each(['buildRequest', 'fetchWithAuth', 'fetchWithTimeout'] as const)(
     expect(transport.exchanges).toBe(1);
   },
 );
+
+test.each(['native-independent', 'native-workload', 'subclass-divergent', 'subclass-throwing'] as const)(
+  'uses native header storage for %s transport attribution',
+  async (kind) => {
+    let getCalls = 0;
+    let issuedAuthorization: string | null = null;
+    const independent = kind === 'native-independent' || kind === 'subclass-divergent';
+    const NativeBrandedHeaders = class Headers extends globalThis.Headers {};
+    Object.defineProperties(NativeBrandedHeaders.prototype, {
+      [Symbol.toStringTag]: { value: 'Headers' },
+      [Symbol.iterator]: { value: Headers.prototype[Symbol.iterator] },
+      entries: { value: Headers.prototype.entries },
+      get: {
+        configurable: true,
+        writable: true,
+        value(this: globalThis.Headers, name: string) {
+          getCalls += 1;
+          if (name.toLowerCase() === 'authorization') {
+            if (kind === 'subclass-throwing') {
+              throw new Error('Subclass get must not run during attribution');
+            }
+            return issuedAuthorization;
+          }
+          return globalThis.Headers.prototype.get.call(this, name);
+        },
+      },
+    });
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [, request] = args;
+        if (!request) {
+          throw new Error('Expected a request');
+        }
+        issuedAuthorization = new Headers(request.headers).get('Authorization');
+        if (issuedAuthorization === null) {
+          throw new Error('Expected workload authorization');
+        }
+        const values = {
+          Authorization: independent ? 'Bearer independent' : issuedAuthorization,
+          'X-Custom': 'synthetic-extension',
+        };
+        request.headers =
+          kind === 'subclass-divergent' || kind === 'subclass-throwing'
+            ? new NativeBrandedHeaders(values)
+            : new Headers(values);
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const serialized = new Headers(init?.headers);
+      sent.push(serialized.get('Authorization'));
+      expect(serialized.get('X-Custom')).toBe('synthetic-extension');
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    const request = client.models.list();
+    await (independent ? expect(request).rejects.toMatchObject({ status: 401 }) : request);
+
+    expect(sent).toEqual(
+      independent ? ['Bearer independent'] : ['Bearer access-token-1', 'Bearer access-token-2'],
+    );
+    expect(getCalls).toBe(0);
+    expect(transport.exchanges).toBe(independent ? 1 : 2);
+  },
+);
