@@ -16,6 +16,7 @@ interface HeaderCredential {
 }
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
+const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
 
 /** Reads the credential capability attached to an SDK-produced header layer. */
 export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
@@ -71,7 +72,10 @@ export class WorkloadTokenProvenance {
   /** Binds provenance to a completed SDK request result independently of caller options. */
   bindResult<T extends { req: { headers: Headers } }>(result: T): T {
     const credential = workloadHeaderCredential(result.req.headers);
-    this.results.set(result.req, credential?.owner === this ? credential.token : null);
+    const carrier = {};
+    // An opaque, secret-free carrier survives ordinary object spread of SDK-owned requests.
+    Object.defineProperty(result.req, requestCredentialCarrier, { value: carrier, enumerable: true });
+    this.results.set(carrier, credential?.owner === this ? credential.token : null);
     return result;
   }
 
@@ -96,10 +100,12 @@ export class WorkloadTokenProvenance {
     if (headerMatch !== undefined) {
       return headerMatch;
     }
-    const token = this.results.get(result.req);
-    return token === undefined
-      ? (scope?.matches(authorization) ?? false)
-      : token !== null && bearerToken(authorization) === token;
+    const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
+    if (typeof carrier === 'object' && carrier !== null) {
+      const token = this.results.get(carrier);
+      return token !== undefined && token !== null && bearerToken(authorization) === token;
+    }
+    return scope?.matches(authorization) ?? false;
   }
 
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */

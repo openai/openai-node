@@ -1857,7 +1857,10 @@ export class OpenAI {
       ...(((x509Authentication ? x509RequestFetchOptions : options.fetchOptions) as any) ?? {}),
     };
 
-    return this.#workloadTokenProvenance.bindResult({ req, url, timeout: options.timeout });
+    const result = { req, url, timeout: options.timeout };
+    return this._workloadIdentityAuth && !x509Authentication
+      ? this.#workloadTokenProvenance.bindResult(result)
+      : result;
   }
 
   #canPreflightWorkloadIdentityHeaders(options: FinalRequestOptions) {

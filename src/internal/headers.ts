@@ -76,10 +76,12 @@ const getHeadersIterator = (headers: object) => {
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: { refreshable: boolean },
+  provenance?: { unknown: boolean },
 ): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
   if (brand_privateNullableHeaders in headers) {
+    if (provenance) provenance.unknown = true;
     const { values, nulls } = headers;
     yield* values.entries();
     for (const name of nulls) {
@@ -95,6 +97,13 @@ function* iterateHeaders(
   const iterator: (() => Iterator<HeaderEntry>) | undefined = hasIterator
     ? headers[Symbol.iterator]
     : undefined;
+  const nativeHeadersIterator =
+    (replay || provenance) && typeof iterator === 'function' && !Array.isArray(headers)
+      ? getHeadersIterator(headers)
+      : undefined;
+  if (provenance) {
+    provenance.unknown = typeof iterator === 'function' && iterator === nativeHeadersIterator;
+  }
   if (replay) {
     // Custom iterators may be one-shot whether inherited or owned. Platform Headers
     // are reusable across realms, where instanceof cannot identify them.
@@ -102,7 +111,7 @@ function* iterateHeaders(
       !hasIterator ||
       (typeof iterator === 'function' &&
         ((Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
-          (!Array.isArray(headers) && iterator === getHeadersIterator(headers))));
+          (!Array.isArray(headers) && iterator === nativeHeadersIterator)));
   }
   if (typeof iterator === 'function') {
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
@@ -143,20 +152,36 @@ function* iterateHeaders(
 }
 
 const mergeHeaderEntries = (
-  newHeaders: { source: HeadersLike; entries: Iterable<readonly [string, string | null]> }[],
+  newHeaders: {
+    source: HeadersLike;
+    entries: Iterable<readonly [string, string | null]>;
+    provenance: { unknown: boolean };
+  }[],
 ): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
   let credential: ReturnType<typeof workloadHeaderCredential>;
-  for (const { source, entries } of newHeaders) {
+  let hasAuthorizationLayer = false;
+  for (const { source, entries, provenance } of newHeaders) {
     const seenHeaders = new Set<string>();
+    let suppliesAuthorization = false;
     for (const [name, value] of entries) {
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
       }
       const lowerName = name.toLowerCase();
       if (lowerName === 'authorization') {
-        credential = source ? (workloadHeaderCredential(source) ?? null) : null;
+        suppliesAuthorization = true;
+        const sourceCredential = source ? workloadHeaderCredential(source) : undefined;
+        // Native copies lose metadata; raw record/tuple layers explicitly supply independent credentials.
+        credential =
+          sourceCredential !== undefined
+            ? sourceCredential
+            : provenance.unknown
+              ? hasAuthorizationLayer
+                ? null
+                : undefined
+              : null;
       }
       if (!seenHeaders.has(lowerName)) {
         targetHeaders.delete(lowerName);
@@ -170,6 +195,7 @@ const mergeHeaderEntries = (
         nullHeaders.delete(lowerName);
       }
     }
+    hasAuthorizationLayer ||= suppliesAuthorization;
   }
   const result = { [brand_privateNullableHeaders]: true as const, values: targetHeaders, nulls: nullHeaders };
   if (credential !== undefined) {
@@ -180,12 +206,20 @@ const mergeHeaderEntries = (
 };
 
 export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
-  mergeHeaderEntries(newHeaders.map((source) => ({ source, entries: iterateHeaders(source) })));
+  mergeHeaderEntries(
+    newHeaders.map((source) => {
+      const provenance = { unknown: false };
+      return { source, provenance, entries: iterateHeaders(source, undefined, provenance) };
+    }),
+  );
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
 export const snapshotHeaders = (source: HeadersLike) => {
   const replay = { refreshable: true };
-  const snapshot = mergeHeaderEntries([{ source, entries: iterateHeaders(source, replay) }]);
+  const provenance = { unknown: false };
+  const snapshot = mergeHeaderEntries([
+    { source, provenance, entries: iterateHeaders(source, replay, provenance) },
+  ]);
   return {
     source,
     snapshot,

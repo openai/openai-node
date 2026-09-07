@@ -97,8 +97,12 @@ describe('Workload identity request and dispatch hooks', () => {
       ) {
         await Promise.resolve();
         const result = await super.buildRequest({ ...options }, { retryCount });
+        const carriers = Object.getOwnPropertySymbols(result.req).map(
+          (key) => Object.getOwnPropertyDescriptor(result.req, key)?.value,
+        );
+        expect(carriers).toEqual([{}]);
         result.req.headers = new Headers(result.req.headers);
-        return { ...result };
+        return { ...result, req: { ...result.req, headers: new Headers(result.req.headers) } };
       }
     }
     let apiCalls = 0;

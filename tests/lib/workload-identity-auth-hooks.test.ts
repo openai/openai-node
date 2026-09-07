@@ -127,6 +127,51 @@ describe('Workload identity authentication hook provenance', () => {
     },
   );
 
+  describe.each(['authHeaders', 'bearerAuth'] as const)('native %s result copies', (hook) => {
+    test.each([undefined, 'record', 'native'] as const)(
+      'refreshes only SDK-owned copies (independent layer: %s)',
+      async (independent) => {
+        const replacementRecord = independent ? { Authorization: 'Bearer access-token-1' } : undefined;
+        const replacement = independent === 'native' ? new Headers(replacementRecord) : replacementRecord;
+        class HookClient extends OpenAI {
+          protected override async authHeaders(
+            options: FinalRequestOptions,
+            schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+            context?: object,
+          ) {
+            const headers = await super.authHeaders({ ...options }, schemes, context);
+            return hook === 'authHeaders'
+              ? buildHeaders([new Headers(headers?.values), replacement])
+              : headers;
+          }
+
+          protected override async bearerAuth(options: FinalRequestOptions, context?: object) {
+            const headers = await super.bearerAuth({ ...options }, context);
+            return hook === 'bearerAuth'
+              ? buildHeaders([new Headers(headers?.values), replacement])
+              : headers;
+          }
+        }
+        let apiCalls = 0;
+        const transport = createWorkloadIdentityTransport(() => {
+          apiCalls += 1;
+          return apiCalls === 1
+            ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+            : Response.json({ data: [] });
+        });
+        const client = new HookClient({
+          ...createTestClientOptions(),
+          fetch: transport.fetch,
+          maxRetries: 0,
+        });
+        const result = client.models.list();
+        await (independent ? expect(result).rejects.toMatchObject({ status: 401 }) : result);
+        expect(apiCalls).toBe(independent ? 1 : 2);
+        expect(transport.exchanges).toBe(independent ? 1 : 2);
+      },
+    );
+  });
+
   test('refreshes rebuilt auth results for concurrent requests sharing options', async () => {
     const options: FinalRequestOptions = { method: 'get', path: '/models' };
     const bothHeadersReady = createBarrier();
