@@ -1,5 +1,11 @@
 import { isReadonlyArray } from './utils/values';
-import { rememberWorkloadHeaderCredential, workloadHeaderCredential } from './auth/workload-token-provenance';
+import { getHeadersIterator, getPlatformHeader } from './platform-headers';
+export { getPlatformHeader } from './platform-headers';
+import {
+  rememberWorkloadHeaderCredential,
+  rememberWorkloadHeaderValues,
+  workloadHeaderCredential,
+} from './auth/workload-token-provenance';
 
 type HeaderValue = string | undefined | null;
 type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
@@ -59,34 +65,6 @@ const getArrayIterator = <T>(headers: readonly T[]) => {
     }
     return platformIterator;
   } catch {
-    return undefined;
-  }
-};
-
-const getHeadersIterator = (headers: object) => {
-  try {
-    const seen = new Set<object>();
-    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-      if (seen.has(prototype)) return undefined;
-      seen.add(prototype);
-      const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-      if (!iterator) continue;
-      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-      const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
-      if (
-        typeof constructor === 'function' &&
-        Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
-        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
-        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers' &&
-        typeof iterator.value === 'function' &&
-        iterator.value === entries
-      ) {
-        return iterator.value as () => Iterator<HeaderEntry>;
-      }
-    }
-    return undefined;
-  } catch {
-    // Structural inspection is optional; a membrane may still expose a valid iterator.
     return undefined;
   }
 };
@@ -502,7 +480,7 @@ const mergeHeaderEntries = (
   const result = { [brand_privateNullableHeaders]: true as const, values: targetHeaders, nulls: nullHeaders };
   if (credential !== undefined) {
     rememberWorkloadHeaderCredential(result, credential);
-    rememberWorkloadHeaderCredential(targetHeaders, credential);
+    rememberWorkloadHeaderValues(targetHeaders, credential);
   }
   return result;
 };
@@ -769,42 +747,6 @@ export function createWorkloadHeaderSnapshots(
 export const isEmptyHeaders = (headers: HeadersLike) => {
   for (const _ of iterateHeaders(headers)) return false;
   return true;
-};
-
-/** Reads platform collections without consuming the iterable later handed to custom fetch. */
-export const getPlatformHeader = (
-  headers: HeadersLike,
-  name: string,
-): { value: string | null } | undefined => {
-  try {
-    if (!headers) return undefined;
-    const platformIterator = getHeadersIterator(headers);
-    if (!platformIterator) return undefined;
-    const seen = new Set<object>();
-    let actualIterator: PropertyDescriptor | undefined;
-    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-      if (seen.has(prototype)) return undefined;
-      seen.add(prototype);
-      actualIterator ??= Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-      if (actualIterator && actualIterator.value !== platformIterator) return undefined;
-      if (Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value !== platformIterator) continue;
-      const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-      if (
-        typeof constructor !== 'function' ||
-        Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Headers' ||
-        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype ||
-        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value !== 'Headers'
-      )
-        continue;
-      const getter = Object.getOwnPropertyDescriptor(prototype, 'get')?.value;
-      if (typeof getter === 'function') {
-        return { value: Reflect.apply(getter, headers, [name]) };
-      }
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
 };
 
 /** Reads Request internal headers through its defining getter, bypassing caller property shadows. */

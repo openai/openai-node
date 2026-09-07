@@ -267,7 +267,11 @@ import {
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
-import { WorkloadTokenProvenance, bearerToken } from './internal/auth/workload-token-provenance';
+import {
+  WorkloadTokenProvenance,
+  bearerToken,
+  type WorkloadCredentialUsage,
+} from './internal/auth/workload-token-provenance';
 import {
   type LogLevel,
   type Logger,
@@ -302,6 +306,7 @@ type WorkloadIdentityRequest = {
   context: object;
   bindings: Set<object>;
   authorization: string | undefined;
+  credential: WorkloadCredentialUsage | undefined;
   used: boolean;
 };
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
@@ -849,8 +854,7 @@ export class OpenAI {
           : await authentication.getToken();
       const headers = buildHeaders([{ Authorization: `Bearer ${token}` }]);
       if (!(authentication instanceof X509WorkloadIdentityAuth)) {
-        workloadScope?.record(token);
-        this.#workloadTokenProvenance.issue(headers, token);
+        this.#workloadTokenProvenance.issue(headers, token, workloadScope?.record(token));
       }
       return headers;
     }
@@ -1250,6 +1254,7 @@ export class OpenAI {
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     let initialWorkloadAuthorization: string | undefined;
+    let workloadCredential: WorkloadCredentialUsage | undefined;
     try {
       let candidate: Awaited<ReturnType<OpenAI['buildRequest']>>;
       try {
@@ -1276,6 +1281,11 @@ export class OpenAI {
           this.#workloadTokenProvenance.matchesResult(candidate, authorization, workloadIdentityAuthScope)
         ) {
           initialWorkloadAuthorization = authorization;
+          workloadCredential = this.#workloadTokenProvenance.retainResultCredential(
+            candidate,
+            authorization,
+            workloadIdentityAuthScope,
+          );
         }
       } finally {
         workloadIdentityAuthScope?.dispose();
@@ -1341,7 +1351,9 @@ export class OpenAI {
 
     if (!x509Authentication) {
       await this.prepareRequest(req, { url, options });
+      this.#observeWorkloadHeaderReplacement(workloadCredential, req.headers, initialWorkloadAuthorization);
       await this._provider?.prepareRequest?.(req, { url, options });
+      this.#observeWorkloadHeaderReplacement(workloadCredential, req.headers, initialWorkloadAuthorization);
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -1384,6 +1396,7 @@ export class OpenAI {
       context: credentialContext,
       bindings: new Set<object>(),
       authorization: initialWorkloadAuthorization,
+      credential: workloadCredential,
       used: false,
     };
     if (this._workloadIdentityAuth && !x509Authentication) {
@@ -1680,6 +1693,11 @@ export class OpenAI {
   ): Promise<Response> {
     const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
     if (workloadRequest) {
+      this.#observeWorkloadHeaderReplacement(
+        workloadRequest.credential,
+        init.headers,
+        workloadRequest.authorization,
+      );
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
     }
@@ -1694,9 +1712,10 @@ export class OpenAI {
         const authenticatedHeaders = headers ?? new Headers(init.headers);
         authenticatedHeaders.set('Authorization', `Bearer ${token}`);
         init.headers = authenticatedHeaders;
-        this.#workloadTokenProvenance.issue({ values: authenticatedHeaders }, token);
+        const credential = this.#workloadTokenProvenance.issue({ values: authenticatedHeaders }, token);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
+          workloadRequest.credential = credential;
         }
       }
     }
@@ -2200,6 +2219,7 @@ export class OpenAI {
         : new Headers(init.headers);
     // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
     request.used =
+      (request.credential?.isCurrent() ?? false) &&
       this.#workloadTokenProvenance.matchesHeaderCredential(
         init.headers ?? requestHeaders,
         request.authorization,
@@ -2207,6 +2227,20 @@ export class OpenAI {
       bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
         bearerToken(request.authorization);
     return preserveHeaders ? init : ({ ...init, headers } as T);
+  }
+
+  #observeWorkloadHeaderReplacement(
+    credential: WorkloadCredentialUsage | undefined,
+    headers: object | undefined,
+    authorization: string | undefined,
+  ): void {
+    if (
+      credential &&
+      authorization !== undefined &&
+      this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false
+    ) {
+      credential.revoke();
+    }
   }
 
   private _makeAbort(controller: AbortController) {

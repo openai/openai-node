@@ -263,6 +263,15 @@ class WrappedClient extends OpenAI {
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
 
+Successful `set`, `append`, and `delete` calls on an SDK-owned native `Headers` revoke that attempt's
+refresh ownership when they target Authorization, even if the resulting bytes are unchanged. An
+independent header layer observed between SDK hook calls also remains independent after a later copy.
+Reconstructed headers whose mutators cannot be observed retain their normal operations, but do not
+enable automatic authentication refresh. Calling native prototype methods directly, or creating and
+overwriting a native copy entirely inside a hook before delegating, bypasses this observation. Express
+independent credentials as a record or tuple layer through `buildHeaders` and return that layer to the
+SDK before further copying it.
+
 Immediate delegating calls also retain ownership when copying both options and native headers. A hook
 that awaits before delegating, copies its options, and reconstructs the authentication result with
 native `Headers` must forward the context. Once both identities are discarded across an asynchronous
