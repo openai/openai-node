@@ -33,6 +33,7 @@ export function rememberWorkloadHeaderCredential(headers: object, credential: He
 interface TokenScope {
   context: object;
   headers: WorkloadHeaderSnapshots | undefined;
+  captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
   record: (token: string) => void;
   matches: (authorization: string) => boolean;
   dispose: () => void;
@@ -43,7 +44,10 @@ export class WorkloadTokenProvenance {
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
-  private readonly results = new WeakMap<object, string | null>();
+  private readonly results = new WeakMap<
+    object,
+    { token: string | null; headers?: WorkloadHeaderSnapshots }
+  >();
   private invocation: TokenScope | undefined;
 
   /** Owns synchronous hook entry only; the scope is never left ambient across an await. */
@@ -107,13 +111,30 @@ export class WorkloadTokenProvenance {
   }
 
   /** Binds provenance to a completed SDK request result independently of caller options. */
-  bindResult<T extends { req: { headers: Headers } }>(result: T): T {
+  bindResult<T extends { req: { headers: Headers } }>(result: T, headers?: WorkloadHeaderSnapshots): T {
     const credential = workloadHeaderCredential(result.req.headers);
     const carrier = {};
     // An opaque, secret-free carrier survives ordinary object spread of SDK-owned requests.
     Object.defineProperty(result.req, requestCredentialCarrier, { value: carrier, enumerable: true });
-    this.results.set(carrier, credential?.owner === this ? credential.token : null);
+    this.results.set(carrier, {
+      token: credential?.owner === this ? credential.token : null,
+      ...(headers ? { headers } : undefined),
+    });
     return result;
+  }
+
+  /** Transfers snapshots to retry bookkeeping without retaining them on a held request result. */
+  takeHeaders(result: { req: object }): WorkloadHeaderSnapshots | undefined {
+    const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
+    if (typeof carrier !== 'object' || carrier === null) {
+      return undefined;
+    }
+    const state = this.results.get(carrier);
+    const headers = state?.headers;
+    if (state) {
+      delete state.headers;
+    }
+    return headers;
   }
 
   /** An explicitly replaced header capability is authoritative, including at dispatch. */
@@ -139,7 +160,7 @@ export class WorkloadTokenProvenance {
     }
     const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
     if (typeof carrier === 'object' && carrier !== null) {
-      const token = this.results.get(carrier);
+      const token = this.results.get(carrier)?.token;
       return token !== undefined && token !== null && bearerToken(authorization) === token;
     }
     return scope?.matches(authorization) ?? false;
@@ -154,6 +175,21 @@ export class WorkloadTokenProvenance {
     const scope: TokenScope = {
       context,
       headers,
+      captureHeaders: (captured) => {
+        if (disposed) {
+          return;
+        }
+        scope.headers = captured;
+        for (const snapshot of [captured.defaultHeaders, captured.requestHeaders]) {
+          if (!snapshot.source || snapshot.replayable) {
+            continue;
+          }
+          consumedSources.add(snapshot.source);
+          const owners = this.consumedHeaders.get(snapshot.source) ?? new Set<TokenScope>();
+          owners.add(scope);
+          this.consumedHeaders.set(snapshot.source, owners);
+        }
+      },
       record: (token) => {
         if (!disposed) {
           tokens.add(token);
@@ -188,14 +224,8 @@ export class WorkloadTokenProvenance {
     scopes.add(scope);
     this.options.set(options, scopes);
     this.contexts.set(scope.context, scope);
-    for (const snapshot of [headers?.defaultHeaders, headers?.requestHeaders]) {
-      if (!snapshot?.source || snapshot.replayable) {
-        continue;
-      }
-      consumedSources.add(snapshot.source);
-      const owners = this.consumedHeaders.get(snapshot.source) ?? new Set<TokenScope>();
-      owners.add(scope);
-      this.consumedHeaders.set(snapshot.source, owners);
+    if (headers) {
+      scope.captureHeaders(headers);
     }
     return scope;
   }

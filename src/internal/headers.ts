@@ -99,6 +99,37 @@ const hasNativeHeadersBrand = (headers: object): boolean => {
   }
 };
 
+/** Checks retryable hook inputs without invoking their iterable protocol or value getters. */
+export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<object>()): boolean => {
+  if (!headers || brand_privateNullableHeaders in headers) return true;
+  if (inputs.has(headers)) return false;
+  inputs.add(headers);
+  let descriptor: PropertyDescriptor | undefined;
+  const seen = new Set<object>();
+  for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+    if (seen.has(prototype)) return false;
+    seen.add(prototype);
+    descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+    if (descriptor) break;
+  }
+  if (descriptor) {
+    if (typeof descriptor.value !== 'function') return false;
+    if (Array.isArray(headers)) {
+      if (descriptor.value !== getArrayIterator(headers)) return false;
+    } else {
+      return hasNativeHeadersBrand(headers) && descriptor.value === Headers.prototype[Symbol.iterator];
+    }
+  }
+  const replayable = Object.values(Object.getOwnPropertyDescriptors(headers)).every(
+    (property) =>
+      !property.enumerable ||
+      ('value' in property &&
+        (!Array.isArray(property.value) || canReplayHeaderInput(property.value, inputs))),
+  );
+  inputs.delete(headers);
+  return replayable;
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: HeaderReplay,
@@ -323,6 +354,7 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
 export interface WorkloadHeaderSnapshots {
   requestHeaders: ReturnType<typeof snapshotHeaders>;
   defaultHeaders: ReturnType<typeof snapshotHeaders>;
+  customBuildInput?: { source: HeadersLike };
 }
 
 /** Materializes each source once within one request, without sharing credentials between requests. */

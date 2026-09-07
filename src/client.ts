@@ -259,6 +259,7 @@ import {
   snapshotHeaders,
   getRequestHeaders,
   createWorkloadHeaderSnapshots,
+  canReplayHeaderInput,
   type WorkloadHeaderSnapshots,
 } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
@@ -1245,10 +1246,22 @@ export class OpenAI {
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
     await this.prepareOptions(options, credentialContext);
+    const previousBuildInput = workloadHeaders?.customBuildInput;
+    if (
+      previousBuildInput &&
+      previousBuildInput.source === options.headers &&
+      !canReplayHeaderInput(previousBuildInput.source)
+    ) {
+      throw new Errors.OpenAIError(
+        'A custom buildRequest hook must retain parsed headers before retrying a one-shot source.',
+      );
+    }
+    const buildInputHeaders = options.headers;
     workloadHeaders?.defaultHeaders.refresh(this._options.defaultHeaders);
     workloadHeaders?.requestHeaders.refresh(options.headers);
     if (
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
+      this.buildRequest === OpenAI.prototype.buildRequest &&
       this.#canPreflightWorkloadIdentityHeaders(options)
     ) {
       // Caller preparation owns its input; SDK snapshots remain private to this request and its retries.
@@ -1270,6 +1283,16 @@ export class OpenAI {
           retryCount: maxRetries - retriesRemaining,
           credentialContext,
         });
+        workloadHeaders = this.#workloadTokenProvenance.takeHeaders(candidate) ?? workloadHeaders;
+        if (
+          workloadHeaders &&
+          this.buildRequest !== OpenAI.prototype.buildRequest &&
+          workloadHeaders.requestHeaders.source !== buildInputHeaders
+        ) {
+          workloadHeaders.customBuildInput = {
+            source: buildInputHeaders,
+          };
+        }
         const authorization = candidate.req.headers.get('authorization');
         if (
           authorization !== null &&
@@ -1903,6 +1926,12 @@ export class OpenAI {
         scope.dispose();
       }
     }
+    const workloadScope = this.#workloadTokenProvenance.scopeFor(inputOptions, credentialContext);
+    if (workloadScope && !workloadScope.headers && this.#canPreflightWorkloadIdentityHeaders(inputOptions)) {
+      workloadScope.captureHeaders(
+        createWorkloadHeaderSnapshots(inputOptions.headers, this._options.defaultHeaders),
+      );
+    }
     const options = { ...inputOptions };
     const x509Authentication = this.#x509Authentication;
     const x509Tenant = x509Authentication?.snapshotTenant(this.organization, this.project);
@@ -1983,7 +2012,7 @@ export class OpenAI {
 
     const result = { req, url, timeout: options.timeout };
     return this._workloadIdentityAuth && !x509Authentication
-      ? this.#workloadTokenProvenance.bindResult(result)
+      ? this.#workloadTokenProvenance.bindResult(result, workloadScope?.headers)
       : result;
   }
 
