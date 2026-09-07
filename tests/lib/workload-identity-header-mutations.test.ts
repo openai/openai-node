@@ -404,7 +404,7 @@ describe('Workload credential ownership after native header mutations', () => {
     },
   );
 
-  test.each(
+  test.for(
     (['native', 'foreign'] as const).flatMap((realm) =>
       (['buildRequest', 'prepareRequest'] as const).flatMap((boundary) =>
         [false, true].map((overwrite) => ({ realm, boundary, overwrite })),
@@ -414,7 +414,8 @@ describe('Workload credential ownership after native header mutations', () => {
     if (realm === 'foreign' && Number(process.versions.node.split('.')[0]) < 24) {
       context.skip();
     }
-    const HeadersConstructor = realm === 'foreign' ? (await import('undici')).Headers : Headers;
+    const foreign = realm === 'foreign' ? await import('undici') : undefined;
+    const HeadersConstructor = foreign?.Headers ?? Headers;
     class HookClient extends OpenAI {
       override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
         const result = await super.buildRequest(...args);
