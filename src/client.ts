@@ -849,6 +849,10 @@ export class OpenAI {
     return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
+  _hasUnresolvedApiKey(): boolean {
+    return this.apiKey == null && typeof this._options.apiKey === 'function';
+  }
+
   async _callApiKey(): Promise<boolean> {
     if (this._provider) return false;
 
