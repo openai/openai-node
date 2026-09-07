@@ -27,7 +27,25 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
-function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [string, string | null]> {
+const getArrayIterator = (headers: readonly unknown[]) => {
+  let arrayPrototype: readonly unknown[] | undefined;
+  let prototype: object | null = Object.getPrototypeOf(headers);
+  const seen = new Set<object>();
+  while (prototype) {
+    if (seen.has(prototype)) return undefined;
+    seen.add(prototype);
+    // Array.prototype is itself an array, including in another realm. Subclass
+    // prototypes are ordinary objects; intermediate array instances do not win.
+    if (Array.isArray(prototype)) arrayPrototype = prototype;
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return arrayPrototype?.[Symbol.iterator];
+};
+
+function* iterateHeaders(
+  headers: HeadersLike,
+  replay?: { refreshable: boolean },
+): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
   if (brand_privateNullableHeaders in headers) {
@@ -44,6 +62,15 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
     Symbol.iterator in headers ? headers[Symbol.iterator] : undefined;
+  if (replay) {
+    // Custom iterators may be one-shot whether inherited or owned. Platform Headers
+    // are reusable across realms, where instanceof cannot identify them.
+    replay.refreshable =
+      typeof iterator !== 'function' ||
+      (Array.isArray(headers) &&
+        (iterator === Array.prototype[Symbol.iterator] || iterator === getArrayIterator(headers))) ||
+      (Object.prototype.toString.call(headers) === '[object Headers]' && iterator === headers.entries);
+  }
   if (typeof iterator === 'function') {
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
@@ -69,12 +96,12 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   }
 }
 
-export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
+const mergeHeaderEntries = (newHeaders: Iterable<readonly [string, string | null]>[]): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
   for (const headers of newHeaders) {
     const seenHeaders = new Set<string>();
-    for (const [name, value] of iterateHeaders(headers)) {
+    for (const [name, value] of headers) {
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
       }
@@ -93,6 +120,16 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
     }
   }
   return { [brand_privateNullableHeaders]: true, values: targetHeaders, nulls: nullHeaders };
+};
+
+export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
+  mergeHeaderEntries(newHeaders.map((headers) => iterateHeaders(headers)));
+
+/** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
+export const snapshotHeaders = (source: HeadersLike) => {
+  const replay = { refreshable: true };
+  const snapshot = mergeHeaderEntries([iterateHeaders(source, replay)]);
+  return { snapshot, refresh: () => (replay.refreshable ? buildHeaders([source]) : snapshot) };
 };
 
 export const isEmptyHeaders = (headers: HeadersLike) => {

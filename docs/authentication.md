@@ -231,6 +231,9 @@ a `401`, the SDK also invalidates the cached token and retries once with a fresh
 For subject-token workload identity, an independent `Authorization` header override in `defaultHeaders`
 or request `headers` skips token acquisition, including `null` to remove the header or an empty string.
 Subclasses that override authentication hooks retain control of credential resolution.
+For subject-token workload identity, a transport hook that dispatches without delegating to the SDK's
+`fetchWithTimeout` owns its authentication retries. The SDK records token usage immediately before
+calling the configured `fetch`; it cannot verify which credential an independent transport sent.
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
 

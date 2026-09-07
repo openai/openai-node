@@ -252,7 +252,7 @@ import {
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
-import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
+import { HeadersLike, NullableHeaders, buildHeaders, snapshotHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
@@ -1305,7 +1305,6 @@ export class OpenAI {
     const workloadRequest = { authorization: initialWorkloadAuthorization, used: false };
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#workloadIdentityRequests.set(controller, workloadRequest);
-      this.#snapshotWorkloadIdentityUsage(controller, req);
     }
     const response = await fetchWithAuth
       .call(this, url, req, remainingTimeout, controller, security)
@@ -1589,8 +1588,7 @@ export class OpenAI {
     }
 
     const fetchWithTimeout = this.#x509Fetch ? OpenAI.prototype.fetchWithTimeout : this.fetchWithTimeout;
-    const dispatchInit = this.#snapshotWorkloadIdentityUsage(controller, init);
-    const response = await fetchWithTimeout.call(this, url, dispatchInit, timeout, controller);
+    const response = await fetchWithTimeout.call(this, url, init, timeout, controller);
 
     return response;
   }
@@ -1625,6 +1623,8 @@ export class OpenAI {
     }
 
     try {
+      // Only this dispatch owner can attest to the headers passed to the configured fetch.
+      // Hooks that send independently own their authentication retries.
       const dispatchOptions = this.#snapshotWorkloadIdentityUsage(controller, fetchOptions);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       return await (this.#x509Fetch ?? this.fetch).call(undefined, url, dispatchOptions);
@@ -1776,6 +1776,12 @@ export class OpenAI {
         options.signal = snapshot.signal;
       }
     }
+    const requestHeaderSnapshot = this.#canPreflightWorkloadIdentityHeaders(inputOptions)
+      ? snapshotHeaders(options.headers)
+      : undefined;
+    if (requestHeaderSnapshot) {
+      options.headers = requestHeaderSnapshot.snapshot;
+    }
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
     if (isStreamingBody) {
@@ -1790,6 +1796,7 @@ export class OpenAI {
       options: inputOptions,
       method,
       bodyHeaders,
+      requestHeaderSnapshot,
       retryCount,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
@@ -1810,10 +1817,23 @@ export class OpenAI {
     return { req, url, timeout: options.timeout };
   }
 
+  #canPreflightWorkloadIdentityHeaders(options: FinalRequestOptions) {
+    const security = options.__security ?? { bearerAuth: true };
+    return (
+      this._workloadIdentityAuth &&
+      !this.#x509Authentication &&
+      security.bearerAuth &&
+      this.authHeaders === OpenAI.prototype.authHeaders &&
+      this.bearerAuth === OpenAI.prototype.bearerAuth &&
+      (!security.adminAPIKeyAuth || this.adminAPIKeyAuth === OpenAI.prototype.adminAPIKeyAuth)
+    );
+  }
+
   private async buildHeaders({
     options,
     method,
     bodyHeaders,
+    requestHeaderSnapshot,
     retryCount,
     x509Headers,
     x509Timeout,
@@ -1822,6 +1842,7 @@ export class OpenAI {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
+    requestHeaderSnapshot: ReturnType<typeof snapshotHeaders> | undefined;
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
@@ -1838,27 +1859,14 @@ export class OpenAI {
     const security = options.__security ?? { bearerAuth: true };
     let authenticationSecurity = security;
     let suppliedHeaders: NullableHeaders | undefined;
-    let suppliedHeaderLayers:
-      | Array<{ source: HeadersLike; snapshot: NullableHeaders; refreshable: boolean }>
-      | undefined;
-    if (
-      this._workloadIdentityAuth &&
-      !this.#x509Authentication &&
-      security.bearerAuth &&
-      this.authHeaders === OpenAI.prototype.authHeaders &&
-      this.bearerAuth === OpenAI.prototype.bearerAuth &&
-      (!security.adminAPIKeyAuth || this.adminAPIKeyAuth === OpenAI.prototype.adminAPIKeyAuth)
-    ) {
+    let suppliedHeaderLayers: ReturnType<typeof snapshotHeaders>[] | undefined;
+    if (this.#canPreflightWorkloadIdentityHeaders(options)) {
       // Custom auth hooks own credential resolution and may mutate the original header layers.
-      suppliedHeaderLayers = [this._options.defaultHeaders, bodyHeaders, options.headers].map((source) => ({
-        source,
-        snapshot: buildHeaders([source]),
-        refreshable:
-          source == null ||
-          source instanceof Headers ||
-          (Array.isArray(source) && !hasOwn(source, Symbol.iterator)) ||
-          !(Symbol.iterator in source),
-      }));
+      suppliedHeaderLayers = [
+        snapshotHeaders(this._options.defaultHeaders),
+        snapshotHeaders(bodyHeaders),
+        requestHeaderSnapshot ?? snapshotHeaders(options.headers),
+      ];
       suppliedHeaders = buildHeaders(suppliedHeaderLayers.map(({ snapshot }) => snapshot));
       const authorization = suppliedHeaders.values.get('authorization');
       if (
@@ -1873,9 +1881,7 @@ export class OpenAI {
         ? undefined
         : await this.authHeaders(options, authenticationSecurity);
     if (suppliedHeaders && authenticationSecurity.bearerAuth && suppliedHeaderLayers) {
-      suppliedHeaders = buildHeaders(
-        suppliedHeaderLayers.map(({ source, snapshot, refreshable }) => (refreshable ? source : snapshot)),
-      );
+      suppliedHeaders = buildHeaders(suppliedHeaderLayers.map(({ refresh }) => refresh()));
     }
     const headers = buildHeaders([
       idempotencyHeaders,
