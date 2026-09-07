@@ -49,6 +49,8 @@ test('formats an existing CRLF checkout after the LF policy is pulled', () => {
     runGit(['init', '--quiet']);
     runGit(['config', 'user.email', 'line-endings@example.com']);
     runGit(['config', 'user.name', 'Line Endings Test']);
+    // Keep synthetic fixture commits independent of the developer's signing agent.
+    runGit(['config', 'commit.gpgsign', 'false']);
     runGit(['config', 'core.autocrlf', 'true']);
     runGit(['config', 'core.safecrlf', 'false']);
 
