@@ -79,10 +79,11 @@ function* iterateHeaders(
   headers: HeadersLike,
   replay?: { refreshable: boolean },
   provenance?: { unknown: boolean },
+  ignoreLease = false,
 ): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
-  const lease = headerLeases.get(headers);
+  const lease = ignoreLease ? undefined : headerLeases.get(headers);
   if (lease) {
     if (replay) replay.refreshable = false;
     yield* iterateHeaders(lease.snapshot, undefined, provenance);
@@ -224,18 +225,20 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
   );
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
-export const snapshotHeaders = (initialSource: HeadersLike) => {
+export const snapshotHeaders = (initialSource: HeadersLike, { isolated = false } = {}) => {
   let source = initialSource;
   const replay = { refreshable: true };
   const provenance = { unknown: false };
   let snapshot = mergeHeaderEntries([
-    { source, provenance, entries: iterateHeaders(source, replay, provenance) },
+    { source, provenance, entries: iterateHeaders(source, replay, provenance, isolated) },
   ]);
   let retained = false;
   let leasedSource: object | undefined;
   const acquire = () => {
     if (!retained || !source || replay.refreshable) return;
-    const lease = headerLeases.get(source) ?? { snapshot, users: 0 };
+    const existing = headerLeases.get(source);
+    if (existing && existing.snapshot !== snapshot) return;
+    const lease = existing ?? { snapshot, users: 0 };
     lease.users += 1;
     headerLeases.set(source, lease);
     snapshot = lease.snapshot;
@@ -255,6 +258,9 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
     get snapshot() {
       return snapshot;
     },
+    get requiresMaterializedSource() {
+      return !replay.refreshable && leasedSource === undefined;
+    },
     retain: () => {
       if (retained) return;
       retained = true;
@@ -266,6 +272,7 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       const currentSource = sources.length === 0 ? source : sources[0];
+      if (currentSource === snapshot) return snapshot;
       if (currentSource !== source || replay.refreshable) {
         const nextReplay = { refreshable: true };
         const nextProvenance = { unknown: false };
@@ -273,7 +280,7 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
           {
             source: currentSource,
             provenance: nextProvenance,
-            entries: iterateHeaders(currentSource, nextReplay, nextProvenance),
+            entries: iterateHeaders(currentSource, nextReplay, nextProvenance, isolated),
           },
         ]);
         relinquish();
@@ -298,10 +305,10 @@ export function createWorkloadHeaderSnapshots(
   request: HeadersLike,
   defaults: HeadersLike,
 ): WorkloadHeaderSnapshots {
-  const requestHeaders = snapshotHeaders(request);
+  const requestHeaders = snapshotHeaders(request, { isolated: true });
   requestHeaders.retain();
   try {
-    return { requestHeaders, defaultHeaders: snapshotHeaders(defaults) };
+    return { requestHeaders, defaultHeaders: snapshotHeaders(defaults, { isolated: true }) };
   } catch (error) {
     requestHeaders.release();
     throw error;

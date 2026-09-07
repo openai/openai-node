@@ -114,7 +114,6 @@ export class WorkloadTokenProvenance {
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
   begin(options: object, context: object = {}, headers?: WorkloadHeaderSnapshots): TokenScope {
     headers?.requestHeaders.retain();
-    headers?.defaultHeaders.retain();
     const tokens = new Set<string>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     let disposed = false;
@@ -137,7 +136,6 @@ export class WorkloadTokenProvenance {
         disposed = true;
         tokens.clear();
         scope.headers?.requestHeaders.release();
-        scope.headers?.defaultHeaders.release();
         scope.headers = undefined;
         this.contexts.delete(scope.context);
         scopes.delete(scope);

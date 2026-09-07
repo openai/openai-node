@@ -1209,11 +1209,23 @@ export class OpenAI {
     const workloadIdentityAuthScope = workloadHeaders
       ? this.#workloadTokenProvenance.begin(options, credentialContext, workloadHeaders)
       : undefined;
+    const requestHeaderSource = workloadHeaders?.requestHeaders.source;
+    const materializedRequestHeaders =
+      workloadHeaders?.requestHeaders.requiresMaterializedSource && options.headers === requestHeaderSource
+        ? workloadHeaders.requestHeaders.snapshot
+        : undefined;
+    const restoreRequestHeaders = () => {
+      if (materializedRequestHeaders && options.headers === materializedRequestHeaders) {
+        options.headers = requestHeaderSource;
+      }
+    };
     try {
       workloadHeaders?.requestHeaders.refresh(options.headers);
       workloadHeaders?.defaultHeaders.refresh(this._options.defaultHeaders);
+      if (materializedRequestHeaders) options.headers = materializedRequestHeaders;
       await this.prepareOptions(options);
     } catch (error) {
+      restoreRequestHeaders();
       workloadIdentityAuthScope?.dispose();
       throw error;
     }
@@ -1236,6 +1248,7 @@ export class OpenAI {
           initialWorkloadAuthorization = authorization;
         }
       } finally {
+        restoreRequestHeaders();
         workloadIdentityAuthScope?.dispose();
       }
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
@@ -1828,12 +1841,20 @@ export class OpenAI {
       const context = {};
       const headers = createWorkloadHeaderSnapshots(inputOptions.headers, this._options.defaultHeaders);
       const scope = this.#workloadTokenProvenance.begin(inputOptions, context, headers);
+      const requestHeaderSource = headers.requestHeaders.source;
+      const materializedRequestHeaders = headers.requestHeaders.requiresMaterializedSource
+        ? headers.requestHeaders.snapshot
+        : undefined;
+      if (materializedRequestHeaders) inputOptions.headers = materializedRequestHeaders;
       try {
         return await OpenAI.prototype.buildRequest.call(this, inputOptions, {
           retryCount,
           credentialContext: context,
         });
       } finally {
+        if (materializedRequestHeaders && inputOptions.headers === materializedRequestHeaders) {
+          inputOptions.headers = requestHeaderSource;
+        }
         scope.dispose();
       }
     }
