@@ -485,6 +485,7 @@ export class OpenAI {
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
+  #workloadIdentityAuthorizations = new WeakMap<Headers, string>();
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -773,10 +774,17 @@ export class OpenAI {
     ) {
       return await this.adminAPIKeyAuth(opts);
     }
-    return buildHeaders([
-      schemes.bearerAuth ? await this.bearerAuth(opts, credentialContext) : null,
+    const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, credentialContext) : undefined;
+    const headers = buildHeaders([
+      bearerHeaders,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
     ]);
+    const workloadAuthorization =
+      bearerHeaders && this.#workloadIdentityAuthorizations.get(bearerHeaders.values);
+    if (workloadAuthorization !== undefined) {
+      this.#workloadIdentityAuthorizations.set(headers.values, workloadAuthorization);
+    }
+    return headers;
   }
 
   protected async bearerAuth(
@@ -816,7 +824,11 @@ export class OpenAI {
               ...authentication.tenantSnapshot(),
             })
           : await authentication.getToken();
-      return buildHeaders([{ Authorization: `Bearer ${token}` }]);
+      const headers = buildHeaders([{ Authorization: `Bearer ${token}` }]);
+      if (!(authentication instanceof X509WorkloadIdentityAuth)) {
+        this.#workloadIdentityAuthorizations.set(headers.values, `Bearer ${token}`);
+      }
+      return headers;
     }
     const apiKey = credentialContext?.apiKey === undefined ? this.apiKey : credentialContext.apiKey;
     if (apiKey == null) {
@@ -1246,6 +1258,8 @@ export class OpenAI {
       throw error;
     }
     const { req, url } = built;
+    const initialWorkloadAuthorization = this.#workloadIdentityAuthorizations.get(req.headers);
+    this.#workloadIdentityAuthorizations.delete(req.headers);
     const timeout = x509Authentication
       ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
       : built.timeout;
@@ -1296,6 +1310,11 @@ export class OpenAI {
     const response = await fetchWithAuth
       .call(this, url, req, remainingTimeout, controller, security)
       .catch(castToError);
+    const workloadAuthorization =
+      this.#workloadIdentityAuthorizations.get(req.headers) ?? initialWorkloadAuthorization;
+    this.#workloadIdentityAuthorizations.delete(req.headers);
+    const usedWorkloadToken =
+      workloadAuthorization !== undefined && req.headers.get('Authorization') === workloadAuthorization;
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1396,7 +1415,7 @@ export class OpenAI {
         response.status === 401 &&
         (x509Authentication || this._workloadIdentityAuth) &&
         security.bearerAuth &&
-        (!x509Authentication || x509Authentication.usedWorkloadToken(options)) &&
+        (x509Authentication ? x509Authentication.usedWorkloadToken(options) : usedWorkloadToken) &&
         (!x509Authentication || retriesRemaining > 0) &&
         !hasStreamingBody &&
         !options.__metadata?.['workloadIdentityTokenRefreshed']
@@ -1562,9 +1581,10 @@ export class OpenAI {
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
-      if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
+      if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
         headers.set('Authorization', `Bearer ${token}`);
+        this.#workloadIdentityAuthorizations.set(headers, `Bearer ${token}`);
       }
     }
 
@@ -1826,6 +1846,28 @@ export class OpenAI {
 
     const helperMethod = options.__metadata?.['helperMethod'];
     const timeout = x509Headers ? x509Timeout : options.timeout;
+    const security = options.__security ?? { bearerAuth: true };
+    let authenticationSecurity = security;
+    let suppliedHeaders: NullableHeaders | undefined;
+    if (
+      this._workloadIdentityAuth &&
+      !this.#x509Authentication &&
+      security.bearerAuth &&
+      this.authHeaders === OpenAI.prototype.authHeaders &&
+      this.bearerAuth === OpenAI.prototype.bearerAuth &&
+      (!security.adminAPIKeyAuth || this.adminAPIKeyAuth === OpenAI.prototype.adminAPIKeyAuth)
+    ) {
+      // Custom auth hooks own credential resolution and may mutate the original header layers.
+      suppliedHeaders = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
+      const authorization = suppliedHeaders.values.get('authorization');
+      if (
+        suppliedHeaders.nulls.has('authorization') ||
+        (authorization !== null && authorization !== `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`)
+      ) {
+        authenticationSecurity = { ...security, bearerAuth: false };
+      }
+    }
+    let authenticationHeaders: NullableHeaders | undefined;
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1838,16 +1880,23 @@ export class OpenAI {
         'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
         'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
-      this._provider || this.#x509Authentication?.isPlanningRequest()
-        ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }, credentialContext),
-      x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
-      bodyHeaders,
-      x509Headers?.requestHeaders ?? options.headers,
+      (authenticationHeaders =
+        this._provider || this.#x509Authentication?.isPlanningRequest()
+          ? undefined
+          : await this.authHeaders(options, authenticationSecurity, credentialContext)),
+      suppliedHeaders ?? x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
+      suppliedHeaders ? undefined : bodyHeaders,
+      suppliedHeaders ? undefined : (x509Headers?.requestHeaders ?? options.headers),
     ]);
 
+    const workloadAuthorization =
+      authenticationHeaders && this.#workloadIdentityAuthorizations.get(authenticationHeaders.values);
+    if (workloadAuthorization !== undefined) {
+      this.#workloadIdentityAuthorizations.set(headers.values, workloadAuthorization);
+    }
+
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
-      this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
+      this.validateHeaders(headers, security);
     }
 
     return headers.values;
