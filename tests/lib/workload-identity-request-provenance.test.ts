@@ -79,9 +79,10 @@ describe('workload identity request provenance', () => {
         ) {
           if (!this.materializing) {
             this.materializing = true;
-            const first = await this.buildRequest(options, { credentialContext });
+            const settings = credentialContext ? { credentialContext } : {};
+            const first = await this.buildRequest(options, settings);
             expect(first.req.headers.get('Authorization')).toBeNull();
-            await this.buildRequest({ ...options }, forward ? { credentialContext } : {});
+            await this.buildRequest({ ...options }, forward ? settings : {});
           } else if (readInHook) {
             buildHeaders([source === 'defaults' ? this._options.defaultHeaders : options.headers]);
           }
