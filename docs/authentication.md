@@ -255,9 +255,10 @@ Requests with streamed upload bodies cannot be replayed; see the
 
 ### Authentication and transport hooks
 
-Delegating `authHeaders` and `bearerAuth` overrides should forward the optional opaque request context.
-This keeps workload-token ownership with the request when hooks copy options, including frozen options,
-or use one options object for concurrent requests:
+SDK-produced authentication and request results retain workload-token ownership when delegating hooks
+copy options, including frozen options, or rebuild headers with the SDK's `buildHeaders` helper.
+Existing overrides that return those results do not need a new argument. Hooks that reconstruct result
+objects can also forward the optional opaque request context:
 
 ```ts
 import OpenAI from 'openai';
@@ -274,11 +275,9 @@ class WrappedClient extends OpenAI {
 }
 ```
 
-`bearerAuth` receives the context as its second argument. `buildRequest` overrides should forward the
-complete second argument, including `credentialContext`. Hooks that discard options identity without
-forwarding context still supply their headers, but the SDK cannot establish workload-token ownership
-and will not perform the automatic `401` replay. Legacy hooks using the original options object retain
-refresh when those options identify one active attempt.
+`bearerAuth` receives the context as its second argument. `buildRequest` overrides can forward the
+complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
+Authorization layer replaces the SDK credential's provenance even when the string values are equal.
 
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Forward it when
 a transport wrapper replaces both the request object and its abort controller. Changing either one
