@@ -477,10 +477,12 @@ export const isEmptyHeaders = (headers: HeadersLike) => {
   return true;
 };
 
-/** Extracts native and foreign Request headers without evaluating caller-controlled tag getters. */
+/** Reads native and foreign Request internal headers without invoking caller-shadowed accessors. */
 export const getRequestHeaders = (request: unknown): Headers | undefined => {
   if (typeof request !== 'object' || request === null) return undefined;
-  if (typeof Request !== 'undefined' && request instanceof Request) return request.headers;
+  if (typeof Request !== 'undefined' && request instanceof Request) {
+    return Object.getOwnPropertyDescriptor(Request.prototype, 'headers')?.get?.call(request);
+  }
   const seen = new Set<object>();
   for (
     let prototype = Object.getPrototypeOf(request);
@@ -496,7 +498,7 @@ export const getRequestHeaders = (request: unknown): Headers | undefined => {
       Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
       Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Request'
     ) {
-      return (request as Request).headers;
+      return Object.getOwnPropertyDescriptor(prototype, 'headers')?.get?.call(request);
     }
   }
   return undefined;
