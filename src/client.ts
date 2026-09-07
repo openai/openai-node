@@ -1629,9 +1629,9 @@ export class OpenAI {
     }
 
     try {
-      this.#snapshotWorkloadIdentityUsage(controller, fetchOptions);
+      const dispatchOptions = this.#snapshotWorkloadIdentityUsage(controller, fetchOptions);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, dispatchOptions);
     } catch (err) {
       if (signal && !composed) signal.removeEventListener('abort', abort);
       throw err;
@@ -1925,15 +1925,17 @@ export class OpenAI {
     return headers.values;
   }
 
-  #snapshotWorkloadIdentityUsage(controller: AbortController, init: RequestInit) {
+  #snapshotWorkloadIdentityUsage<T extends RequestInit>(controller: AbortController, init: T): T {
     const request = this.#workloadIdentityRequests.get(controller);
+    const headers = init.headers instanceof Headers ? init.headers : new Headers(init.headers);
     if (request) {
       // A configured fetch may change credentials after this handoff and owns its refresh.
       request.used =
         this.fetch === this.#workloadIdentityDefaultFetch &&
         request.authorization !== undefined &&
-        new Headers(init.headers).get('Authorization') === request.authorization;
+        headers.get('Authorization') === request.authorization;
     }
+    return (headers === init.headers ? init : { ...init, headers }) as T;
   }
 
   private _makeAbort(controller: AbortController) {

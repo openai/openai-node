@@ -384,6 +384,31 @@ describe('workload identity authentication and dispatch hooks', () => {
     },
   );
 
+  test('forwards the materialized header snapshot used for dispatch provenance', async () => {
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(
+        url: RequestInfo,
+        init: RequestInit | undefined,
+        timeout: number,
+        controller: AbortController,
+      ) {
+        const iterator = new Headers(init?.headers).entries();
+        const headers = { [Symbol.iterator]: () => iterator } as unknown as NonNullable<
+          RequestInit['headers']
+        >;
+        return super.fetchWithTimeout(url, { ...init, headers }, timeout, controller);
+      }
+    }
+    const transport = createTransport();
+    vi.stubGlobal('fetch', transport.fetch);
+    const client = new HookClient({ ...clientOptions, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(transport.authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
+  });
+
   test.each(['fetchWithAuth', 'fetchWithTimeout'] as const)(
     'does not refresh when %s dispatches an independent credential directly',
     async (hook) => {

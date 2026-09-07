@@ -42,6 +42,26 @@ const getArrayIterator = (headers: readonly unknown[]) => {
   return arrayPrototype?.[Symbol.iterator];
 };
 
+const getHeadersIterator = (headers: object) => {
+  let platformIterator: (() => Iterator<HeaderEntry>) | undefined;
+  let prototype: object | null = headers;
+  const seen = new Set<object>();
+  while (prototype) {
+    if (seen.has(prototype)) return undefined;
+    seen.add(prototype);
+    const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+    const entries = Object.getOwnPropertyDescriptor(prototype, 'entries');
+    if (iterator || entries) {
+      if (platformIterator || typeof iterator?.value !== 'function' || iterator.value !== entries?.value) {
+        return undefined;
+      }
+      platformIterator = iterator.value as () => Iterator<HeaderEntry>;
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return platformIterator;
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: { refreshable: boolean },
@@ -69,7 +89,8 @@ function* iterateHeaders(
       replay.refreshable =
         (Array.isArray(headers) &&
           (iterator === Array.prototype[Symbol.iterator] || iterator === getArrayIterator(headers))) ||
-        (Object.prototype.toString.call(headers) === '[object Headers]' && iterator === headers.entries);
+        (Object.prototype.toString.call(headers) === '[object Headers]' &&
+          iterator === getHeadersIterator(headers));
     }
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
