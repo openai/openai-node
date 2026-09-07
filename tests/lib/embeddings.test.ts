@@ -11,6 +11,18 @@ const incompleteVectors = [1, 2, 3, 5, 6, 7].map((byteLength) => ({
   encoded: Buffer.alloc(byteLength).toString('base64'),
 }));
 const request = { input: 'hello', model: 'text-embedding-3-small' } as const;
+const nonArrayCollections = [
+  { length: 3 },
+  { length: 0 },
+  { 0: { embedding: encodedVector }, length: 1 },
+  'invalid',
+  1,
+  true,
+  null,
+  0,
+  false,
+  '',
+];
 
 function createClient(base64Embedding = encodedVector): OpenAI {
   return new OpenAI({
@@ -48,14 +60,7 @@ function makeFixtureClient(): OpenAI {
 }
 
 describe('resource embeddings', () => {
-  test.each([
-    { length: 3 },
-    { length: 0 },
-    { 0: { embedding: encodedVector }, length: 1 },
-    'invalid',
-    1,
-    true,
-  ])('rejects a non-array response collection: %j', async (data) => {
+  test.each(nonArrayCollections)('rejects a non-array response collection: %j', async (data) => {
     const client = new OpenAI({
       apiKey: 'test-key',
       fetch: async () => Response.json({ data }),
@@ -66,16 +71,26 @@ describe('resource embeddings', () => {
     );
   });
 
-  test.each(['float', 'base64'] as const)('preserves explicit %s response passthrough', async (encoding) => {
-    const data = { length: 3 };
+  describe.each(['float', 'base64'] as const)('explicit %s encoding', (encoding) => {
+    test.each(nonArrayCollections)('preserves response passthrough: %j', async (data) => {
+      const client = new OpenAI({
+        apiKey: 'test-key',
+        fetch: async () => Response.json({ data }),
+      });
+
+      await expect(client.embeddings.create({ ...request, encoding_format: encoding })).resolves.toEqual({
+        data,
+      });
+    });
+  });
+
+  test.each([{}, { data: [] }])('preserves an absent or empty response collection: %j', async (body) => {
     const client = new OpenAI({
       apiKey: 'test-key',
-      fetch: async () => Response.json({ data }),
+      fetch: async () => Response.json(body),
     });
 
-    await expect(client.embeddings.create({ ...request, encoding_format: encoding })).resolves.toEqual({
-      data,
-    });
+    await expect(client.embeddings.create(request)).resolves.toEqual(body);
   });
 
   test.each(incompleteVectors)('default rejects $byteLength decoded embedding bytes', async ({ encoded }) => {
