@@ -7,54 +7,67 @@ import {
   createWorkloadIdentityTransport,
 } from './workload-identity-fixtures';
 
-describe.each(['request', 'default'] as const)('captured mixed %s records', (layer) => {
-  test.each([null, 'Bearer independent'] as const)(
-    'refreshes ordinary Authorization after preparation captured the accessor: %j',
-    async (authorization) => {
-      let reads = 0;
-      const headers: Record<string, string | null | undefined> = { Authorization: undefined };
-      Object.defineProperty(headers, 'X-Custom', {
-        enumerable: true,
-        configurable: true,
-        get() {
-          reads += 1;
-          delete headers['X-Custom'];
-          return 'preserved';
-        },
-      });
-      class InspectClient extends OpenAI {
-        // oxlint-disable-next-line class-methods-use-this -- The fixture inspects a supplied record before authentication.
-        protected override async prepareOptions() {
-          expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');
+describe.each(['prepareOptions', 'authHeaders', 'bearerAuth'] as const)('captured %s records', (hook) => {
+  describe.each(['request', 'default'] as const)('captured mixed %s records', (layer) => {
+    test.each([null, 'Bearer independent'] as const)(
+      'refreshes ordinary Authorization after preparation captured the accessor: %j',
+      async (authorization) => {
+        let reads = 0;
+        const headers: Record<string, string | null | undefined> = { Authorization: undefined };
+        Object.defineProperty(headers, 'X-Custom', {
+          enumerable: true,
+          configurable: true,
+          get() {
+            reads += 1;
+            delete headers['X-Custom'];
+            return 'preserved';
+          },
+        });
+        class InspectClient extends OpenAI {
+          // oxlint-disable-next-line class-methods-use-this -- The fixture inspects a supplied record before authentication.
+          protected override async prepareOptions() {
+            if (hook === 'prepareOptions')
+              {expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');}
+          }
+          protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+            if (hook === 'authHeaders')
+              {expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');}
+            return super.authHeaders(...args);
+          }
+          protected override async bearerAuth(...args: Parameters<OpenAI['bearerAuth']>) {
+            if (hook === 'bearerAuth')
+              {expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');}
+            return super.bearerAuth(...args);
+          }
         }
-      }
-      const identity = createTestWorkloadIdentity();
-      identity.provider.getToken = async () => {
-        headers['Authorization'] = authorization;
-        return 'subject-token';
-      };
-      const transport = createWorkloadIdentityTransport((_url, init) => {
-        const actual = new Headers(init?.headers);
-        expect(actual.get('Authorization')).toBe(authorization);
-        expect(actual.get('X-Custom')).toBe('preserved');
-        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
-      });
-      const client = new InspectClient({
-        ...createTestClientOptions(),
-        apiKey: null,
-        workloadIdentity: identity,
-        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
-        fetch: transport.fetch,
-        maxRetries: 0,
-      });
+        const identity = createTestWorkloadIdentity();
+        identity.provider.getToken = async () => {
+          headers['Authorization'] = authorization;
+          return 'subject-token';
+        };
+        const transport = createWorkloadIdentityTransport((_url, init) => {
+          const actual = new Headers(init?.headers);
+          expect(actual.get('Authorization')).toBe(authorization);
+          expect(actual.get('X-Custom')).toBe('preserved');
+          return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+        });
+        const client = new InspectClient({
+          ...createTestClientOptions(),
+          apiKey: null,
+          workloadIdentity: identity,
+          ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+          fetch: transport.fetch,
+          maxRetries: 0,
+        });
 
-      await expect(client.models.list(layer === 'request' ? { headers } : {})).rejects.toMatchObject({
-        status: 401,
-      });
-      expect(reads).toBe(1);
-      expect(transport.exchanges).toBe(1);
-    },
-  );
+        await expect(client.models.list(layer === 'request' ? { headers } : {})).rejects.toMatchObject({
+          status: 401,
+        });
+        expect(reads).toBe(1);
+        expect(transport.exchanges).toBe(1);
+      },
+    );
+  });
 });
 
 describe.each(['request', 'default'] as const)('mixed %s header records', (layer) => {
