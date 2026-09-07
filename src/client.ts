@@ -1814,6 +1814,12 @@ export class OpenAI {
         options.signal = snapshot.signal;
       }
     }
+    const requestHeaderSnapshot = this.#canPreflightWorkloadIdentityHeaders(inputOptions)
+      ? prepareHeaders(options.headers)
+      : undefined;
+    if (requestHeaderSnapshot) {
+      options.headers = requestHeaderSnapshot.snapshot;
+    }
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
     if (isStreamingBody) {
@@ -1829,6 +1835,7 @@ export class OpenAI {
       credentialContext,
       method,
       bodyHeaders,
+      requestHeaderSnapshot,
       retryCount,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
@@ -1849,11 +1856,24 @@ export class OpenAI {
     return { req, url, timeout: options.timeout };
   }
 
+  #canPreflightWorkloadIdentityHeaders(options: FinalRequestOptions) {
+    const security = options.__security ?? { bearerAuth: true };
+    return (
+      this._workloadIdentityAuth &&
+      !this.#x509Authentication &&
+      security.bearerAuth &&
+      this.authHeaders === OpenAI.prototype.authHeaders &&
+      this.bearerAuth === OpenAI.prototype.bearerAuth &&
+      (!security.adminAPIKeyAuth || this.adminAPIKeyAuth === OpenAI.prototype.adminAPIKeyAuth)
+    );
+  }
+
   private async buildHeaders({
     options,
     credentialContext,
     method,
     bodyHeaders,
+    requestHeaderSnapshot,
     retryCount,
     x509Headers,
     x509Timeout,
@@ -1863,6 +1883,7 @@ export class OpenAI {
     credentialContext: RequestCredentialContext | undefined;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
+    requestHeaderSnapshot: ReturnType<typeof prepareHeaders> | undefined;
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
@@ -1880,16 +1901,13 @@ export class OpenAI {
     let authenticationSecurity = security;
     let suppliedHeaders: NullableHeaders | undefined;
     let suppliedHeaderLayers: Array<ReturnType<typeof prepareHeaders>> | undefined;
-    if (
-      this._workloadIdentityAuth &&
-      !this.#x509Authentication &&
-      security.bearerAuth &&
-      this.authHeaders === OpenAI.prototype.authHeaders &&
-      this.bearerAuth === OpenAI.prototype.bearerAuth &&
-      (!security.adminAPIKeyAuth || this.adminAPIKeyAuth === OpenAI.prototype.adminAPIKeyAuth)
-    ) {
+    if (this.#canPreflightWorkloadIdentityHeaders(options)) {
       // Custom auth hooks own credential resolution and may mutate the original header layers.
-      suppliedHeaderLayers = [this._options.defaultHeaders, bodyHeaders, options.headers].map(prepareHeaders);
+      suppliedHeaderLayers = [
+        prepareHeaders(this._options.defaultHeaders),
+        prepareHeaders(bodyHeaders),
+        requestHeaderSnapshot ?? prepareHeaders(options.headers),
+      ];
       suppliedHeaders = buildHeaders(suppliedHeaderLayers.map(({ snapshot }) => snapshot));
       const authorization = suppliedHeaders.values.get('authorization');
       if (
