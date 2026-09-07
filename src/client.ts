@@ -1207,7 +1207,7 @@ export class OpenAI {
     const credentialContext = {};
     if (
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
-      (this.#canPreflightWorkloadIdentityHeaders(options) || 'body' in options)
+      this.#canPreflightWorkloadIdentityHeaders(options)
     ) {
       // Caller preparation owns its input; SDK snapshots remain private to this request and its retries.
       workloadHeaders ??= createWorkloadHeaderSnapshots(options.headers, this._options.defaultHeaders);
@@ -1836,10 +1836,9 @@ export class OpenAI {
     ) {
       // Standalone builds own their header replay until every authentication hook returns.
       const context = {};
-      const headers =
-        this.#canPreflightWorkloadIdentityHeaders(inputOptions) || 'body' in inputOptions
-          ? createWorkloadHeaderSnapshots(inputOptions.headers, this._options.defaultHeaders)
-          : undefined;
+      const headers = this.#canPreflightWorkloadIdentityHeaders(inputOptions)
+        ? createWorkloadHeaderSnapshots(inputOptions.headers, this._options.defaultHeaders)
+        : undefined;
       const scope = this.#workloadTokenProvenance.begin(inputOptions, context, headers);
       try {
         return await OpenAI.prototype.buildRequest.call(this, inputOptions, {
@@ -1980,28 +1979,31 @@ export class OpenAI {
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
       (this.#canPreflightWorkloadIdentityHeaders(options) || requestHeaderSnapshot)
     ) {
-      // Custom hooks own credential acquisition; every path shares materialized headers.
-      const defaultLayer =
-        this.#workloadTokenProvenance.scopeFor(options, credentialContext)?.headers?.defaultHeaders ??
-        snapshotHeaders(this._options.defaultHeaders);
+      const canPreflight = this.#canPreflightWorkloadIdentityHeaders(options);
+      // Custom hooks keep first access to defaults; body encoding only needs request headers early.
+      let defaultLayer = this.#workloadTokenProvenance.scopeFor(options, credentialContext)?.headers
+        ?.defaultHeaders;
       const bodyLayer = snapshotHeaders(bodyHeaders);
       const requestLayer = requestHeaderSnapshot ?? snapshotHeaders(options.headers);
-      refreshSuppliedHeaders = () =>
-        buildHeaders([
+      refreshSuppliedHeaders = () => {
+        defaultLayer ??= snapshotHeaders(this._options.defaultHeaders);
+        return buildHeaders([
           defaultLayer.refresh(this._options.defaultHeaders),
           bodyLayer.refresh(bodyHeaders),
           requestLayer.refresh(options.headers),
         ]);
-      suppliedHeaders = refreshSuppliedHeaders();
-      const authorization = suppliedHeaders.values.get('authorization');
-      if (
-        this.#canPreflightWorkloadIdentityHeaders(options) &&
-        (suppliedHeaders.nulls.has('authorization') ||
-          (authorization !== null && authorization !== `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`))
-      ) {
-        authenticationSecurity = { ...security, bearerAuth: false };
-        // Stock authentication and dispatch must use the same explicit-override snapshot.
-        refreshSuppliedHeaders = undefined;
+      };
+      if (canPreflight) {
+        suppliedHeaders = refreshSuppliedHeaders();
+        const authorization = suppliedHeaders.values.get('authorization');
+        if (
+          suppliedHeaders.nulls.has('authorization') ||
+          (authorization !== null && authorization !== `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`)
+        ) {
+          authenticationSecurity = { ...security, bearerAuth: false };
+          // Stock authentication and dispatch must use the same explicit-override snapshot.
+          refreshSuppliedHeaders = undefined;
+        }
       }
     }
     const authenticationHeaders =
