@@ -45,14 +45,14 @@ describe.each(['native', 'foreign'] as const)('%s copied header inputs', (realm)
 test.each(['', 'Bearer independent'])(
   'guards exhausted Headers-shaped retry inputs: %j',
   async (authorization) => {
-  class ForeignHeaders {
-    private readonly authorization = authorization;
+    class ForeignHeaders {
+      private readonly authorization = authorization;
       private readonly rows = [['Authorization', authorization]][Symbol.iterator]();
       *entries() {
         yield* this.rows;
       }
-    get() {
-      return this.authorization;
+      get() {
+        return this.authorization;
       }
     }
     Object.defineProperty(ForeignHeaders, 'name', { value: 'Headers' });

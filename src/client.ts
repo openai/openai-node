@@ -1942,13 +1942,14 @@ export class OpenAI {
       }
       if (
         priorHeaders.customBuildInput.preventCredentialUpgrade &&
-        !suppliesWorkloadAuthorization(priorHeaders.requestHeaders.snapshot)
+        !suppliesWorkloadAuthorization(
+          buildHeaders([priorHeaders.defaultHeaders.snapshot, priorHeaders.requestHeaders.snapshot]),
+        )
       ) {
         throw new Errors.OpenAIError(
           'A custom buildRequest hook must retain parsed headers before retrying a one-shot source.',
         );
       }
-      priorHeaders.customBuildInput.preventCredentialUpgrade = false;
       workloadScope?.captureHeaders(priorHeaders);
     }
     if (workloadScope && !workloadScope.headers) {
