@@ -7,7 +7,7 @@ import {
 
 describe.each(['request', 'default'] as const)('%s header authentication selection', (layer) => {
   describe.each(['Bearer independent', null, ''])('explicit Authorization: %j', (authorization) => {
-    test.each([false, true])('uses a stable snapshot when deletion is queued: %s', async (mutate) => {
+    test.each([false, true])('aligns authentication with queued override deletion: %s', async (mutate) => {
       const record: Record<string, string | null> = { Authorization: authorization, 'X-Custom': 'preserved' };
       let scheduled = false;
       const headers = new Proxy(record, {
@@ -39,8 +39,8 @@ describe.each(['request', 'default'] as const)('%s header authentication selecti
 
       await client.models.list(layer === 'request' ? { headers } : {});
 
-      expect(sent).toEqual([authorization]);
-      expect(transport.exchanges).toBe(0);
+      expect(sent).toEqual([mutate ? 'Bearer access-token-1' : authorization]);
+      expect(transport.exchanges).toBe(mutate ? 1 : 0);
       expect(scheduled).toBe(mutate);
       expect(Object.getOwnPropertyDescriptor(record, 'Authorization') !== undefined).toBe(!mutate);
     });

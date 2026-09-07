@@ -289,6 +289,52 @@ test('lets a custom auth hook read one-shot headers on a bodyless request', asyn
   await client.models.list({ headers: new OneShotHeaders(['X-Credential', 'intended']) });
 });
 
+describe.each(['request', 'default'] as const)('%s header preflight changes', (location) => {
+  test.each(['in-place', 'replacement'] as const)(
+    'authenticates after %s removal of a preflight override',
+    async (update) => {
+      const headers: Record<string, string> = {
+        Authorization: 'Bearer independent',
+        'X-Custom': 'before',
+      };
+      class HookClient extends OpenAI {
+        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+          // Preflight runs synchronously; this mutation runs while authentication yields.
+          queueMicrotask(() => {
+            const replacement = { 'X-Custom': 'after' };
+            if (update === 'in-place') {
+              delete headers['Authorization'];
+              Object.assign(headers, replacement);
+            } else if (location === 'request') {
+              args[0].headers = replacement;
+            } else {
+              this._options.defaultHeaders = replacement;
+            }
+          });
+          return super.buildRequest(...args);
+        }
+      }
+      let sent: Headers | undefined;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent = new Headers(init?.headers);
+        return Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        defaultHeaders: location === 'default' ? headers : undefined,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list({ headers: location === 'request' ? headers : undefined });
+
+      expect(sent?.get('Authorization')).toBe('Bearer access-token-1');
+      expect(sent?.get('X-Custom')).toBe('after');
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
+
 test('uses a request header layer replaced during token acquisition', async () => {
   const options: FinalRequestOptions = {
     method: 'get',
