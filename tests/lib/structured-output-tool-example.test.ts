@@ -72,14 +72,31 @@ async function runExample(baseURL: string) {
   }
 }
 
-const cases: { name: string; output: ResponseOutputItem[]; succeeds: boolean }[] = [
-  { name: 'function call first', output: [toolCall], succeeds: true },
-  { name: 'message before function call', output: [message, toolCall], succeeds: true },
-  { name: 'message without a function call', output: [message], succeeds: false },
-  { name: 'empty output', output: [], succeeds: false },
+const cases: {
+  name: string;
+  status: Response['status'];
+  output: ResponseOutputItem[];
+  succeeds: boolean;
+}[] = [
+  { name: 'function call first', status: 'completed', output: [toolCall], succeeds: true },
+  {
+    name: 'message before function call',
+    status: 'completed',
+    output: [message, toolCall],
+    succeeds: true,
+  },
+  { name: 'message without a function call', status: 'completed', output: [message], succeeds: false },
+  { name: 'empty output', status: 'completed', output: [], succeeds: false },
+  { name: 'omitted response status', status: undefined, output: [toolCall], succeeds: true },
+  ...(['failed', 'incomplete', 'cancelled'] as const).map((status) => ({
+    name: `${status} response with a partial function call`,
+    status,
+    output: [{ ...toolCall, arguments: '{"table_name":', status: 'incomplete' as const }],
+    succeeds: false,
+  })),
 ];
 
-test.each(cases)('structured-output tool example: $name', async ({ output, succeeds }) => {
+test.each(cases)('structured-output tool example: $name', async ({ output, succeeds, status }) => {
   const requests: {
     method: string | undefined;
     url: string | undefined;
@@ -101,9 +118,9 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
         id: 'resp_synthetic',
         object: 'response',
         created_at: 0,
-        status: 'completed',
-        error: null,
-        incomplete_details: null,
+        ...(status === undefined ? {} : { status }),
+        error: status === 'failed' ? { code: 'server_error', message: 'Synthetic response failure' } : null,
+        incomplete_details: status === 'incomplete' ? { reason: 'max_output_tokens' } : null,
         instructions: null,
         metadata: {},
         model: 'gpt-4o-2024-08-06',
@@ -149,8 +166,13 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
       expect(result.stdout.trimEnd().endsWith(inspect(query))).toBe(true);
     } else {
       expect(result.code).toBe(1);
-      expect(result.stderr).toContain('Expected function call');
+      expect(result.stderr).toContain(
+        status && status !== 'completed' ? `Response ended with status ${status}.` : 'Expected function call',
+      );
       expect(result.stderr).not.toContain('TypeError');
+      if (status && status !== 'completed') {
+        expect(result.stdout).toBe('');
+      }
     }
   } finally {
     if (server.listening) {
