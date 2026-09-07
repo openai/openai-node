@@ -259,6 +259,7 @@ import {
   captureHeaderReads,
   snapshotHeaders,
   getRequestHeaders,
+  getPlatformHeader,
   createWorkloadHeaderSnapshots,
   canReplayHeaderInput,
   type WorkloadHeaderSnapshots,
@@ -1679,12 +1680,16 @@ export class OpenAI {
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
     }
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
-      const headers = init.headers as Headers;
-      const authHeader = headers.get('Authorization');
+      const platformHeader = getPlatformHeader(init.headers, 'Authorization');
+      const headers = platformHeader ? undefined : new Headers(init.headers);
+      if (headers && !canReplayHeaderInput(init.headers)) init.headers = headers;
+      const authHeader = platformHeader ? platformHeader.value : headers?.get('Authorization');
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
-        headers.set('Authorization', `Bearer ${token}`);
-        this.#workloadTokenProvenance.issue({ values: headers }, token);
+        const authenticatedHeaders = headers ?? new Headers(init.headers);
+        authenticatedHeaders.set('Authorization', `Bearer ${token}`);
+        init.headers = authenticatedHeaders;
+        this.#workloadTokenProvenance.issue({ values: authenticatedHeaders }, token);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
         }
@@ -2166,24 +2171,25 @@ export class OpenAI {
     url: RequestInfo,
     init: T,
   ): T {
+    if (!request || request.authorization === undefined) return init;
     const requestHeaders = init.headers === undefined ? getRequestHeaders(url) : undefined;
-    const headers =
-      init.headers === undefined
+    const platformHeader = getPlatformHeader(init.headers ?? requestHeaders, 'Authorization');
+    const preserveHeaders =
+      init.headers === undefined || platformHeader !== undefined || canReplayHeaderInput(init.headers);
+    const headers = platformHeader
+      ? undefined
+      : init.headers === undefined
         ? requestHeaders
-        : init.headers instanceof Headers
-          ? init.headers
-          : new Headers(init.headers);
-    if (request) {
-      // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
-      request.used =
-        request.authorization !== undefined &&
-        this.#workloadTokenProvenance.matchesHeaderCredential(
-          init.headers ?? requestHeaders,
-          request.authorization,
-        ) !== false &&
-        bearerToken(headers?.get('Authorization') ?? null) === bearerToken(request.authorization);
-    }
-    return init.headers === undefined || headers === init.headers ? init : ({ ...init, headers } as T);
+        : new Headers(init.headers);
+    // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
+    request.used =
+      this.#workloadTokenProvenance.matchesHeaderCredential(
+        init.headers ?? requestHeaders,
+        request.authorization,
+      ) !== false &&
+      bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
+        bearerToken(request.authorization);
+    return preserveHeaders ? init : ({ ...init, headers } as T);
   }
 
   private _makeAbort(controller: AbortController) {

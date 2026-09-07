@@ -536,6 +536,38 @@ export const isEmptyHeaders = (headers: HeadersLike) => {
   return true;
 };
 
+/** Reads platform collections without consuming the iterable later handed to custom fetch. */
+export const getPlatformHeader = (
+  headers: HeadersLike,
+  name: string,
+): { value: string | null } | undefined => {
+  if (!headers) return undefined;
+  const platformIterator = getHeadersIterator(headers);
+  if (!platformIterator) return undefined;
+  const seen = new Set<object>();
+  let actualIterator: PropertyDescriptor | undefined;
+  for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+    if (seen.has(prototype)) return undefined;
+    seen.add(prototype);
+    actualIterator ??= Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+    if (actualIterator && actualIterator.value !== platformIterator) return undefined;
+    if (Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value !== platformIterator) continue;
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    if (
+      typeof constructor !== 'function' ||
+      Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Headers' ||
+      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype ||
+      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value !== 'Headers'
+    )
+      continue;
+    const getter = Object.getOwnPropertyDescriptor(prototype, 'get')?.value;
+    if (typeof getter === 'function') {
+      return { value: Reflect.apply(getter, headers, [name]) };
+    }
+  }
+  return undefined;
+};
+
 /** Reads Request internal headers through its platform getter, without evaluating shadowing accessors. */
 export const getRequestHeaders = (request: unknown): Headers | undefined => {
   if (typeof request !== 'object' || request === null) return undefined;
