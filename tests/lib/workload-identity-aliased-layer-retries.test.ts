@@ -1,3 +1,4 @@
+/* oxlint-disable max-classes-per-file -- Separate fixtures exercise independent alias replacement paths. */
 import OpenAI from 'openai';
 import { test } from 'vitest';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
