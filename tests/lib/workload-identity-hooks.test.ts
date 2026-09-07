@@ -281,6 +281,48 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test('does not inspect a native Request toStringTag before dispatch', async () => {
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(
+        url: RequestInfo,
+        init: RequestInit | undefined,
+        timeout: number,
+        controller: AbortController,
+        context?: object,
+      ) {
+        const request = new Request(url, init as globalThis.RequestInit);
+        Object.defineProperty(request, Symbol.toStringTag, {
+          get() {
+            throw new Error('Unrelated tag getter must not run');
+          },
+        });
+        return super.fetchWithTimeout(request, undefined, timeout, controller, context);
+      }
+    }
+    const fetch = vi.fn(async () => Response.json({ data: [] }));
+    const client = new HookClient({ apiKey: 'test-key', fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  test('refreshes a resolved workload identity placeholder', async () => {
+    let apiCalls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      apiCalls += 1;
+      return apiCalls === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list({ headers: { Authorization: 'Bearer workload-identity-auth' } });
+
+    expect(apiCalls).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  });
+
   test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
     'preserves foreign Request headers when a transport hook delegates without init',
     async () => {
