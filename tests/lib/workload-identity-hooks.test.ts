@@ -153,13 +153,15 @@ describe('Workload identity request and dispatch hooks', () => {
     [false, true].flatMap((copy) =>
       [false, true].flatMap((forward) =>
         [false, true].flatMap((frozen) =>
-          [null, ''].map((authorization) => ({ copy, forward, frozen, authorization })),
+          [null, '', 'Bearer independent'].flatMap((authorization) =>
+            [false, true].map((foreign) => ({ copy, forward, frozen, authorization, foreign })),
+          ),
         ),
       ),
     ),
   )(
     'guards consumed headers through legacy buildRequest: %j',
-    async ({ copy, forward, frozen, authorization }) => {
+    async ({ copy, forward, frozen, authorization, foreign }) => {
       class LegacyClient extends OpenAI {
         override async buildRequest(
           options: FinalRequestOptions,
@@ -172,7 +174,20 @@ describe('Workload identity request and dispatch hooks', () => {
         }
       }
       const rows = [['Authorization', authorization] as const][Symbol.iterator]();
-      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      const ForeignHeaders = class Headers {
+        // oxlint-disable-next-line class-methods-use-this -- A fresh wrapper intentionally shares the outer cursor.
+        *entries() {
+          yield ['X-Custom', 'fixed'];
+          yield* rows;
+        }
+      };
+      Object.defineProperties(ForeignHeaders.prototype, {
+        [Symbol.toStringTag]: { value: 'Headers' },
+        [Symbol.iterator]: { value: ForeignHeaders.prototype.entries },
+      });
+      const headers = (foreign
+        ? new ForeignHeaders()
+        : { [Symbol.iterator]: () => rows }) as unknown as Headers;
       let calls = 0;
       const transport = createWorkloadIdentityTransport((_url, init) => {
         calls += 1;

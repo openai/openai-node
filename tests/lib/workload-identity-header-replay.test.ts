@@ -27,16 +27,25 @@ class OneShotHeaders extends Array<[string, string | null]> {
   }
 }
 
-test.each([false, true])(
-  'keeps a Headers-shaped one-shot iterator snapshot-only, fresh wrapper: %s',
-  async (fresh) => {
+test.each(
+  [false, true].flatMap((fresh) =>
+    [false, true].flatMap((sentinel) =>
+      [null, '', 'Bearer independent'].map((authorization) => ({ fresh, sentinel, authorization })),
+    ),
+  ),
+)(
+  'keeps a Headers-shaped one-shot iterator snapshot-only: %j',
+  async ({ fresh, sentinel, authorization }) => {
     const SpoofedHeaders = class Headers {
-      private iterator = [['Authorization', null] as const][Symbol.iterator]();
+      private iterator = [['Authorization', authorization] as const][Symbol.iterator]();
 
       entries() {
         const { iterator } = this;
         return fresh
           ? (function* replayEntries() {
+              if (sentinel) {
+                yield ['X-Custom', 'fixed'];
+              }
               yield* iterator;
             })()
           : iterator;
@@ -47,7 +56,7 @@ test.each([false, true])(
       [Symbol.iterator]: { value: SpoofedHeaders.prototype.entries },
     });
     const transport = createWorkloadIdentityTransport((_url, init) => {
-      expect(new Headers(init?.headers).get('Authorization')).toBeNull();
+      expect(new Headers(init?.headers).get('Authorization')).toBe(authorization);
       return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
     });
     const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });

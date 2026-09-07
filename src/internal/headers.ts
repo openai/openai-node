@@ -84,10 +84,20 @@ const getHeadersIterator = (headers: object) => {
 
 interface HeaderReplay {
   refreshable: boolean;
+  unverifiedHeaders?: boolean;
   iterator?: () => Iterator<HeaderEntry>;
   iterations?: WeakSet<object>;
   snapshot?: NullableHeaders;
 }
+
+const hasNativeHeadersBrand = (headers: object): boolean => {
+  try {
+    Headers.prototype.has.call(headers, 'authorization');
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 function* iterateHeaders(
   headers: HeadersLike,
@@ -120,6 +130,10 @@ function* iterateHeaders(
     provenance.unknown = typeof iterator === 'function' && iterator === nativeHeadersIterator;
   }
   if (replay) {
+    replay.unverifiedHeaders =
+      nativeHeadersIterator !== undefined &&
+      iterator === nativeHeadersIterator &&
+      !hasNativeHeadersBrand(headers);
     // Custom iterators may be one-shot whether inherited or owned. Platform Headers
     // are reusable across realms, where instanceof cannot identify them.
     replay.refreshable =
@@ -159,9 +173,7 @@ function* iterateHeaders(
       iter = Object.entries(headers);
     }
   }
-  let sawRow = false;
   for (let row of iter) {
-    sawRow = true;
     const name = row[0];
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
     const values = isReadonlyArray(row[1]) ? row[1] : [row[1]];
@@ -186,18 +198,6 @@ function* iterateHeaders(
       }
       yield [name, value];
     }
-  }
-  if (
-    replay?.snapshot &&
-    nativeHeadersIterator !== undefined &&
-    iterator === nativeHeadersIterator &&
-    !(headers instanceof Headers) &&
-    !sawRow &&
-    (!isEmptyHeaders(replay.snapshot.values) || replay.snapshot.nulls.size > 0)
-  ) {
-    // Empty foreign replay is indistinguishable from a fresh wrapper over an exhausted cursor.
-    replay.refreshable = false;
-    yield* iterateHeaders(replay.snapshot, undefined, provenance);
   }
 }
 
@@ -279,7 +279,7 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
       return snapshot;
     },
     get replayable() {
-      return replay.refreshable;
+      return replay.refreshable && !replay.unverifiedHeaders;
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       const currentSource = sources.length === 0 ? source : sources[0];
@@ -299,6 +299,17 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
             entries: iterateHeaders(currentSource, nextReplay, nextProvenance),
           },
         ]);
+        if (
+          currentSource === source &&
+          nextReplay.unverifiedHeaders &&
+          [...snapshot.values.keys(), ...snapshot.nulls].some(
+            (name) => !nextSnapshot.values.has(name) && !nextSnapshot.nulls.has(name),
+          )
+        ) {
+          // Missing foreign rows may come from a partially exhausted cursor, not an intentional deletion.
+          replay.refreshable = false;
+          return snapshot;
+        }
         source = currentSource;
         replay = nextReplay;
         snapshot = nextSnapshot;
