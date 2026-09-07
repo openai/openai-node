@@ -214,18 +214,55 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
   );
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
-export const snapshotHeaders = (source: HeadersLike) => {
+export const snapshotHeaders = (initialSource: HeadersLike) => {
+  let source = initialSource;
   const replay = { refreshable: true };
   const provenance = { unknown: false };
-  const snapshot = mergeHeaderEntries([
+  let snapshot = mergeHeaderEntries([
     { source, provenance, entries: iterateHeaders(source, replay, provenance) },
   ]);
   return {
-    source,
-    snapshot,
-    refresh: () => (replay.refreshable ? buildHeaders([source]) : snapshot),
+    get source() {
+      return source;
+    },
+    get snapshot() {
+      return snapshot;
+    },
+    refresh: (...sources: [] | [HeadersLike]) => {
+      const currentSource = sources.length === 0 ? source : sources[0];
+      if (currentSource !== source || replay.refreshable) {
+        const nextReplay = { refreshable: true };
+        const nextProvenance = { unknown: false };
+        const nextSnapshot = mergeHeaderEntries([
+          {
+            source: currentSource,
+            provenance: nextProvenance,
+            entries: iterateHeaders(currentSource, nextReplay, nextProvenance),
+          },
+        ]);
+        source = currentSource;
+        replay.refreshable = nextReplay.refreshable;
+        snapshot = nextSnapshot;
+      }
+      return snapshot;
+    },
   };
 };
+
+/** Parsed header layers shared by preparation and automatic retries. */
+export interface WorkloadHeaderSnapshots {
+  requestHeaders: ReturnType<typeof snapshotHeaders>;
+  defaultHeaders: ReturnType<typeof snapshotHeaders>;
+}
+
+/** Materializes each source once within one request, without sharing credentials between requests. */
+export function createWorkloadHeaderSnapshots(
+  request: HeadersLike,
+  defaults: HeadersLike,
+): WorkloadHeaderSnapshots {
+  const defaultHeaders = snapshotHeaders(defaults);
+  return { defaultHeaders, requestHeaders: request === defaults ? defaultHeaders : snapshotHeaders(request) };
+}
 
 export const isEmptyHeaders = (headers: HeadersLike) => {
   for (const _ of iterateHeaders(headers)) return false;

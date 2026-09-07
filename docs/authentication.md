@@ -263,6 +263,15 @@ class WrappedClient extends OpenAI {
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
 
+Immediate delegating calls also retain ownership when copying both options and native headers. A hook
+that awaits before delegating, copies its options, and reconstructs the authentication result with
+native `Headers` must forward the context. Once both identities are discarded across an asynchronous
+boundary, ownership cannot be inferred safely from matching credential strings.
+
+Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
+needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
+caller-owned header sources before `prepareOptions` or bodyless custom authentication hooks run.
+
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Forward it when
 a transport wrapper replaces both the request object and its abort controller. Changing either one
 alone preserves the original request's identity. Forward the same context object; copying it loses
