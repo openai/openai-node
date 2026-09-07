@@ -2003,13 +2003,14 @@ export class OpenAI {
       }
       if (
         priorHeaders.customBuildInput.preventCredentialUpgrade &&
-        !suppliesWorkloadAuthorization(priorHeaders.requestHeaders.snapshot)
+        !suppliesWorkloadAuthorization(
+          buildHeaders([priorHeaders.defaultHeaders.snapshot, priorHeaders.requestHeaders.snapshot]),
+        )
       ) {
         throw new Errors.OpenAIError(
           'A custom buildRequest hook must retain parsed headers before retrying a one-shot source.',
         );
       }
-      priorHeaders.customBuildInput.preventCredentialUpgrade = false;
       workloadScope?.captureHeaders(priorHeaders);
     }
     if (workloadScope && !workloadScope.headers) {
@@ -2327,12 +2328,21 @@ export class OpenAI {
     headers: object | undefined,
     authorization: string | undefined,
   ): void {
-    if (
-      credential &&
-      authorization !== undefined &&
-      this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false
-    ) {
+    if (!credential || authorization === undefined) {
+      return;
+    }
+    const matches = this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization);
+    if (matches === false) {
       credential.revoke();
+    } else if (matches === undefined && headers && credential.isCurrent()) {
+      const platformHeader = getPlatformHeader(headers as Headers, 'Authorization');
+      if (platformHeader) {
+        if (bearerToken(platformHeader.value) === bearerToken(authorization)) {
+          credential.adopt(headers as Headers);
+        } else {
+          credential.revoke();
+        }
+      }
     }
   }
 

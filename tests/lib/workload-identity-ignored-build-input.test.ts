@@ -1,3 +1,4 @@
+/* oxlint-disable max-classes-per-file -- Independent fixtures exercise ownership and retry selection. */
 import OpenAI from 'openai';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
@@ -67,3 +68,47 @@ describe.each(['context', 'original', 'discarded'] as const)('%s request ownersh
     },
   );
 });
+
+test.each(['nested', 'default'] as const)(
+  'retains the effective retry credential boundary: %s',
+  async (kind) => {
+    const rows = [['Authorization', 'Bearer independent']][Symbol.iterator]();
+    const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+    class HookClient extends OpenAI {
+      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+        const retry = args[1]?.retryCount;
+        if (retry && kind === 'nested') {
+          await super.buildRequest({ ...args[0], headers: { Authorization: 'Bearer nested' } }, args[1]);
+        }
+        return super.buildRequest(
+          { ...args[0], headers: retry ? {} : { Authorization: 'Bearer independent' } },
+          args[1],
+        );
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      ...(kind === 'default' ? { defaultHeaders: { Authorization: 'Bearer default' } } : {}),
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+    const request = client.models.list({ headers });
+    if (kind === 'nested') {
+      await expect(request).rejects.toThrow('must retain parsed headers');
+      expect(sent).toEqual(['Bearer independent']);
+    } else {
+      await request;
+      expect(sent).toEqual(['Bearer independent', 'Bearer default']);
+    }
+    expect(transport.exchanges).toBe(0);
+  },
+);

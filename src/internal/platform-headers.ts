@@ -1,11 +1,12 @@
 const getHeadersProtocol = (
   headers: object,
 ): { iterator: () => Iterator<unknown>; prototype: object } | undefined => {
+  let protocol: { iterator: () => Iterator<unknown>; prototype: object } | undefined;
   try {
     const seen = new Set<object>();
     for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
       if (seen.has(prototype)) {
-        return;
+        break;
       }
       seen.add(prototype);
       const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
@@ -22,13 +23,14 @@ const getHeadersProtocol = (
         typeof iterator.value === 'function' &&
         iterator.value === entries
       ) {
-        return { iterator: iterator.value as () => Iterator<unknown>, prototype };
+        protocol = { iterator: iterator.value as () => Iterator<unknown>, prototype };
+        break;
       }
     }
   } catch {
     // Caller-controlled descriptors can leave a collection's protocol unknown.
   }
-  return;
+  return protocol;
 };
 
 export const getHeadersIterator = (headers: object) => getHeadersProtocol(headers)?.iterator;
