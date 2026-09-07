@@ -147,6 +147,63 @@ describe('AssistantStream run-step identity security', () => {
       expect(finalSteps.map((snapshot) => snapshot.id)).toEqual([step.id, alias.id]);
     });
 
+    test('preserves the raw delta identity, prototype, and nonenumerable listener properties', async () => {
+      const step = runStep('step_original');
+      const runner = createStream([
+        { event: 'thread.run.step.created', data: step },
+        toolCallDelta(step.id),
+        completedRun(),
+      ]);
+      const prototype = { listenerMarker: 'synthetic' };
+      const metadata = { source: 'raw listener' };
+      const stepDelta = vi.fn();
+      let rawDelta: unknown;
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          rawDelta = event.data.delta;
+          Object.setPrototypeOf(event.data.delta, prototype);
+          Object.defineProperty(event.data.delta, 'listenerMetadata', { value: metadata });
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      const emittedDelta = stepDelta.mock.calls[0]?.[0];
+      expect(emittedDelta).toBe(rawDelta);
+      expect(Object.getPrototypeOf(emittedDelta)).toBe(prototype);
+      expect(Object.getOwnPropertyDescriptor(emittedDelta, 'listenerMetadata')).toEqual({
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: metadata,
+      });
+    });
+
+    test('isolates an identity field added by a tool callback before runStepDelta', async () => {
+      const step = runStep('step_original');
+      const runner = createStream([
+        { event: 'thread.run.step.created', data: step },
+        toolCallDelta(step.id),
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      runner.on('toolCallCreated', () => {
+        const event = runner.currentEvent();
+        if (event?.event === 'thread.run.step.delta') {
+          Object.defineProperty(event.data.delta, 'id', { enumerable: true, value: '_alias' });
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).not.toHaveProperty('id');
+      expect(stepDelta.mock.calls[0]?.[1].id).toBe(step.id);
+    });
+
     test.each(['replace-details', 'delete-details', 'replace-delta'] as const)(
       'preserves a raw listener %s mutation',
       async (kind) => {
@@ -156,6 +213,8 @@ describe('AssistantStream run-step identity security', () => {
           toolCallDelta(step.id),
           completedRun(),
         ]);
+        const stepDelta = vi.fn();
+        let rawDelta: unknown;
         runner.on('event', (event) => {
           if (event.event === 'thread.run.step.delta') {
             if (kind === 'delete-details') {
@@ -173,11 +232,15 @@ describe('AssistantStream run-step identity security', () => {
                 },
               };
             }
+            rawDelta = event.data.delta;
           }
         });
+        runner.on('runStepDelta', stepDelta);
 
         await runner.done();
 
+        expect(stepDelta).toHaveBeenCalledTimes(1);
+        expect(stepDelta.mock.calls[0]?.[0]).toBe(rawDelta);
         expect(runner.currentRunStepSnapshot()?.step_details).toMatchObject({
           tool_calls: [
             {
@@ -259,11 +322,13 @@ describe('AssistantStream run-step identity security', () => {
         completedRun(),
       ]);
       const rawDelta = vi.fn();
+      const stepDelta = vi.fn();
       runner.on('event', (received) => {
         if (received.event === 'thread.run.step.delta') {
           rawDelta(received, runner.currentEvent());
         }
       });
+      runner.on('runStepDelta', stepDelta);
 
       await runner.done();
 
@@ -274,6 +339,8 @@ describe('AssistantStream run-step identity security', () => {
       expect(current).toBe(event);
       expect(received.data).toBe(event.data);
       expect(received.data.delta).toBe(event.data.delta);
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).toBe(event.data.delta);
       expect(Object.getPrototypeOf(received.data.delta)).toBe(
         kind === 'ordinary' ? Object.prototype : prototype,
       );
@@ -319,7 +386,7 @@ describe('AssistantStream run-step identity security', () => {
       expect(readDelta).toHaveBeenCalledTimes(1);
       const emittedDelta = stepDelta.mock.calls[0]?.[0];
       expect(emittedDelta).toEqual(originalDelta);
-      expect(emittedDelta).not.toBe(originalDelta);
+      expect(emittedDelta).toBe(originalDelta);
       expect(emittedDelta.step_details).toBe(originalDelta.step_details);
       expect(rawEvent.mock.calls[1]?.[0].data).toBe(data);
       expect(stepDelta.mock.calls[0]?.[1]).toBe(step);

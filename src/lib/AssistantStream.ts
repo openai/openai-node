@@ -103,7 +103,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
   event: AssistantStreamEvent;
   exposedEvent: AssistantStreamEvent;
   runStepDeltaData: RunStepStreamEvent['data'] | undefined;
-  refreshRunStepDelta: (() => void) | undefined;
+  refreshRunStepDelta: (() => RunStepDelta | undefined) | undefined;
 } {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
@@ -146,7 +146,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     ? event
     : ({ event: eventType, data: stableData } as AssistantStreamEvent);
   let runStepDeltaData: RunStepStreamEvent['data'] | undefined;
-  let refreshRunStepDelta: (() => void) | undefined;
+  let refreshRunStepDelta: (() => RunStepDelta | undefined) | undefined;
 
   if (eventType === 'thread.run.step.delta') {
     // Track listener-created envelope aliases on the original data, independently of delta content.
@@ -182,6 +182,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         capturedData.delta = {
           ...Object.create(Object.getPrototypeOf(currentDelta), descriptors),
         } as RunStepDelta;
+        return currentDelta as RunStepDelta;
       };
     }
   }
@@ -482,7 +483,7 @@ export class AssistantStream
     if (runStepID !== undefined && runStepData !== undefined) {
       this.#reserveRunStepAlias(runStepData, runStepID);
     }
-    refreshRunStepDelta?.();
+    const exposedRunStepDelta = refreshRunStepDelta?.();
     if (runStepID === undefined && this.#activeRunStepID !== undefined && this.#currentRunStepSnapshot) {
       this.#reserveRunStepAlias(this.#currentRunStepSnapshot, this.#activeRunStepID);
     }
@@ -521,7 +522,7 @@ export class AssistantStream
         if (activeRunStep) {
           this.#reserveRunStepAlias(activeRunStep, runStepID);
         }
-        this.#handleRunStep(stableEvent, runStepID);
+        this.#handleRunStep(stableEvent, runStepID, exposedRunStepDelta);
         if (runStepData !== undefined) {
           this.#reserveRunStepAlias(runStepData, runStepID);
         }
@@ -809,7 +810,12 @@ export class AssistantStream
     }
   }
 
-  #handleRunStep(this: AssistantStream, event: RunStepStreamEvent, runStepID: string) {
+  #handleRunStep(
+    this: AssistantStream,
+    event: RunStepStreamEvent,
+    runStepID: string,
+    exposedDelta: RunStepDelta | undefined,
+  ) {
     const accumulatedRunStep = this.#accumulateRunStep(event, runStepID);
     this.#currentRunStepSnapshot = accumulatedRunStep;
 
@@ -849,7 +855,12 @@ export class AssistantStream
           }
         }
 
-        this.#emitExposed('runStepDelta', event.data.delta, accumulatedRunStep);
+        // Preserve callback identity unless a listener added an identity field, including tool listeners above.
+        this.#emitExposed(
+          'runStepDelta',
+          exposedDelta && !hasOwn(exposedDelta, 'id') ? exposedDelta : event.data.delta,
+          accumulatedRunStep,
+        );
         break;
       }
       case 'thread.run.step.completed':
