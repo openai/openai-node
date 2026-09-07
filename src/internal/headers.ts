@@ -36,12 +36,22 @@ const getArrayIterator = (headers: readonly unknown[]) => {
     if (seen.has(prototype)) return undefined;
     seen.add(prototype);
     const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-    if (descriptor) {
-      // Array.prototype is itself an array, including in another realm. Any
-      // earlier protocol descriptor is a caller override and may be one-shot.
-      if (platformIterator || !Array.isArray(prototype) || typeof descriptor.value !== 'function') {
-        return undefined;
+    if (descriptor && Array.isArray(prototype)) {
+      // Array.prototype is itself an array, including in another realm. Match
+      // the captured function without evaluating an intervening iterator getter.
+      if (typeof descriptor.value !== 'function') {
+        prototype = Object.getPrototypeOf(prototype);
+        continue;
       }
+      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+      if (
+        typeof constructor !== 'function' ||
+        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
+      ) {
+        prototype = Object.getPrototypeOf(prototype);
+        continue;
+      }
+      if (platformIterator) return undefined;
       platformIterator = descriptor.value as () => Iterator<HeaderEntry>;
     }
     prototype = Object.getPrototypeOf(prototype);
@@ -68,14 +78,20 @@ const getHeadersIterator = (headers: object) => {
     ) {
       return iterator.value as () => Iterator<HeaderEntry>;
     }
-    return undefined;
   }
   return undefined;
 };
 
+interface HeaderReplay {
+  refreshable: boolean;
+  iterator?: () => Iterator<HeaderEntry>;
+  iterations?: WeakSet<object>;
+  snapshot?: NullableHeaders;
+}
+
 function* iterateHeaders(
   headers: HeadersLike,
-  replay?: { refreshable: boolean },
+  replay?: HeaderReplay,
   provenance?: { unknown: boolean },
 ): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
@@ -93,10 +109,9 @@ function* iterateHeaders(
   let shouldClear = false;
   let iter: Iterable<HeaderEntry>;
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
-  const hasIterator = Symbol.iterator in headers;
-  const iterator: (() => Iterator<HeaderEntry>) | undefined = hasIterator
-    ? headers[Symbol.iterator]
-    : undefined;
+  const hasIterator = replay?.iterator !== undefined || Symbol.iterator in headers;
+  const iterator: (() => Iterator<HeaderEntry>) | undefined =
+    replay?.iterator ?? (hasIterator ? Reflect.get(headers, Symbol.iterator) : undefined);
   const nativeHeadersIterator =
     (replay || provenance) && typeof iterator === 'function' && !Array.isArray(headers)
       ? getHeadersIterator(headers)
@@ -114,7 +129,19 @@ function* iterateHeaders(
           (!Array.isArray(headers) && iterator === nativeHeadersIterator)));
   }
   if (typeof iterator === 'function') {
-    iter = { [Symbol.iterator]: () => iterator.call(headers) };
+    const iteration = iterator.call(headers);
+    if (replay?.refreshable) {
+      replay.iterator = iterator;
+      replay.iterations ??= new WeakSet<object>();
+      if (replay.iterations.has(iteration)) {
+        // Headers-shaped custom sources can return a consumed iterator despite matching descriptors.
+        replay.refreshable = false;
+        yield* iterateHeaders(replay.snapshot, undefined, provenance);
+        return;
+      }
+      replay.iterations.add(iteration);
+    }
+    iter = { [Symbol.iterator]: () => iteration };
   } else {
     shouldClear = true;
     if (replay) {
@@ -216,7 +243,7 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
 export const snapshotHeaders = (initialSource: HeadersLike) => {
   let source = initialSource;
-  const replay = { refreshable: true };
+  let replay: HeaderReplay = { refreshable: true };
   const provenance = { unknown: false };
   let snapshot = mergeHeaderEntries([
     { source, provenance, entries: iterateHeaders(source, replay, provenance) },
@@ -232,7 +259,12 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
       const currentSource = sources.length === 0 ? source : sources[0];
       if (currentSource === snapshot) return snapshot;
       if (currentSource !== source || replay.refreshable) {
-        const nextReplay = { refreshable: true };
+        const nextReplay: HeaderReplay = {
+          refreshable: true,
+          ...(currentSource === source
+            ? { iterator: replay.iterator, iterations: replay.iterations, snapshot }
+            : undefined),
+        };
         const nextProvenance = { unknown: false };
         const nextSnapshot = mergeHeaderEntries([
           {
@@ -242,7 +274,7 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
           },
         ]);
         source = currentSource;
-        replay.refreshable = nextReplay.refreshable;
+        replay = nextReplay;
         snapshot = nextSnapshot;
       }
       return snapshot;
