@@ -143,6 +143,7 @@ export function rememberWorkloadHeaderValues(headers: Headers, credential: Heade
 
 interface TokenScope {
   context: object;
+  resultOwner: object;
   headers: WorkloadHeaderSnapshots | undefined;
   captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
   record: (token: string) => HeaderCredential;
@@ -159,7 +160,7 @@ export class WorkloadTokenProvenance {
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
   private readonly results = new WeakMap<
     object,
-    { credential: HeaderCredential | null; headers?: WorkloadHeaderSnapshots }
+    { credential: HeaderCredential | null; owner?: object; headers?: WorkloadHeaderSnapshots }
   >();
   private invocation: TokenScope | undefined;
 
@@ -242,16 +243,28 @@ export class WorkloadTokenProvenance {
   }
 
   /** Binds provenance to a completed SDK request result independently of caller options. */
-  bindResult<T extends { req: { headers: Headers } }>(result: T, headers?: WorkloadHeaderSnapshots): T {
+  bindResult<T extends { req: { headers: Headers } }>(
+    result: T,
+    headers?: WorkloadHeaderSnapshots,
+    context?: object,
+  ): T {
     const credential = workloadHeaderCredential(result.req.headers);
     const carrier = {};
+    const owner = context ? this.contexts.get(context)?.resultOwner : undefined;
     // An opaque, secret-free carrier survives ordinary object spread of SDK-owned requests.
     Object.defineProperty(result.req, requestCredentialCarrier, { value: carrier, enumerable: true });
     this.results.set(carrier, {
       credential: credential?.owner === this ? credential : null,
+      ...(owner ? { owner } : {}),
       ...(headers ? { headers } : undefined),
     });
     return result;
+  }
+
+  ownsResult(result: { req: object }, context: object): boolean {
+    const carrier = this.requestCarrier(result.req);
+    const owner = this.contexts.get(context)?.resultOwner;
+    return owner !== undefined && carrier !== undefined && this.results.get(carrier)?.owner === owner;
   }
 
   /** Transfers snapshots to retry bookkeeping without retaining them on a held request result. */
@@ -264,6 +277,7 @@ export class WorkloadTokenProvenance {
     const headers = state?.headers;
     if (state) {
       delete state.headers;
+      delete state.owner;
     }
     return headers;
   }
@@ -331,6 +345,7 @@ export class WorkloadTokenProvenance {
     let disposed = false;
     const scope: TokenScope = {
       context,
+      resultOwner: {},
       headers,
       captureHeaders: (captured) => {
         if (disposed) {

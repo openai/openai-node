@@ -1,4 +1,6 @@
-const getHeadersProtocol = (headers: object) => {
+const getHeadersProtocol = (
+  headers: object,
+): { iterator: () => Iterator<unknown>; prototype: object } | undefined => {
   try {
     const seen = new Set<object>();
     for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
@@ -10,7 +12,7 @@ const getHeadersProtocol = (headers: object) => {
       if (!iterator) {
         continue;
       }
-      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+      const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
       const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
       if (
         typeof constructor === 'function' &&
@@ -24,8 +26,9 @@ const getHeadersProtocol = (headers: object) => {
       }
     }
   } catch {
-    return;
+    // Caller-controlled descriptors can leave a collection's protocol unknown.
   }
+  return;
 };
 
 export const getHeadersIterator = (headers: object) => getHeadersProtocol(headers)?.iterator;

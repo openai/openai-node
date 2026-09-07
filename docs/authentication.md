@@ -281,9 +281,12 @@ A `buildRequest` override keeps first access to its original inputs before SDK s
 delegation can copy options and native input headers without forwarding a new argument. A nested build
 that reuses a source already consumed by an active request must forward the complete settings argument,
 including `credentialContext`; without that owner, the SDK rejects the build before acquiring or
-dispatching credentials. A custom hook materializing a one-shot input must retain its parsed layer
-(for example, in `options.headers`) before an automatic retry; otherwise the SDK rejects the repeat
-instead of letting an exhausted input silently remove an independent credential.
+dispatching credentials. Retrying non-replayable inputs requires retaining the original options or
+forwarding `credentialContext`, including when the hook ignores the input and selects replacement headers.
+The hook may run and read its input again on a retry; retain parsed one-shot layers when their values are
+needed again. Before acquiring credentials, the owned base build rejects a retry that loses a previously
+selected independent Authorization value or removal. Stable replacements, including genuine foreign
+`Headers` copies, can retry without treating an ignored raw input as consumed.
 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace

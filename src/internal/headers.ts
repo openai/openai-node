@@ -1,5 +1,5 @@
 import { isReadonlyArray } from './utils/values';
-import { getHeadersIterator, getPlatformHeader } from './platform-headers';
+import { getHeadersIterator } from './platform-headers';
 export { getPlatformHeader } from './platform-headers';
 import {
   rememberWorkloadHeaderCredential,
@@ -155,11 +155,7 @@ export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<obje
           if (!Object.getOwnPropertyDescriptor(headers, String(index))) return false;
         }
       } else {
-        const platformHeader = getPlatformHeader(headers, 'Authorization');
-        return (
-          platformHeader !== undefined &&
-          (platformHeader.value === null || typeof platformHeader.value === 'string')
-        );
+        return hasNativeHeadersBrand(headers) && descriptor.value === Headers.prototype[Symbol.iterator];
       }
     }
     return Object.entries(Object.getOwnPropertyDescriptors(headers)).every(([key, property]) => {
@@ -705,7 +701,13 @@ export const snapshotHeaders = (initialSource: HeadersLike): HeaderSnapshot =>
 export interface WorkloadHeaderSnapshots {
   requestHeaders: ReturnType<typeof snapshotHeaders>;
   defaultHeaders: ReturnType<typeof snapshotHeaders>;
-  customBuildInput?: { source: HeadersLike; replayable: boolean };
+  customBuildInput?: {
+    source: HeadersLike;
+    replayable: boolean;
+    owned: boolean;
+    independentAuthorization: boolean;
+    preventCredentialUpgrade: boolean;
+  };
 }
 
 /** Materializes each source once within one request, without sharing credentials between requests. */
