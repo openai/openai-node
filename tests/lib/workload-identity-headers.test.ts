@@ -160,6 +160,48 @@ test.each(['Headers', 'array'] as const)('reads a changing %s iterator getter on
   expect(reads).toBe(1);
 });
 
+test.each(['Bearer previous', null, ''] as const)(
+  'uses a request header layer replaced during body serialization (previous: %j)',
+  async (previousAuthorization) => {
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/synthetic',
+      headers: { Authorization: previousAuthorization },
+    };
+    options.body = {
+      toJSON() {
+        options.headers = { Authorization: 'Bearer independent', 'X-Custom': 'replacement' };
+        return { synthetic: true };
+      },
+    };
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const sent = new Headers(init?.headers);
+      expect(sent.get('Authorization')).toBe('Bearer independent');
+      expect(sent.get('X-Custom')).toBe('replacement');
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.request(options);
+    expect(transport.exchanges).toBe(0);
+  },
+);
+
+test('snapshots a custom iterable with aligned one-shot methods', async () => {
+  const iterator = [['X-Custom', 'preserved']].values();
+  const iterate = vi.fn(() => iterator);
+  const headers = Object.create({ entries: iterate, [Symbol.iterator]: iterate });
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+  await client.models.list({ headers });
+
+  expect(iterate).toHaveBeenCalledTimes(1);
+});
+
 test.each(['authHeaders', 'bearerAuth'] as const)(
   'retains one-shot authorization removal through a delegating %s hook',
   async (hook) => {
@@ -253,19 +295,31 @@ test('preserves removal of the request header layer by an auth hook', async () =
 test.each(['entries', Symbol.toStringTag])(
   'does not evaluate the overridden %s getter on platform Headers',
   async (property) => {
-    const headers = new Headers({ 'X-Custom': 'preserved' });
+    const headers = new Headers({ 'X-Custom': 'before' });
     Object.defineProperty(headers, property, {
       get() {
         throw new Error('Unrelated getter must not run');
       },
     });
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      headers.set('X-Custom', 'after');
+      headers.set('Authorization', 'Bearer independent');
+      return 'subject-token';
+    };
     const transport = createWorkloadIdentityTransport((_url, init) => {
-      expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('after');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer independent');
       return Response.json({ data: [] });
     });
-    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      workloadIdentity: identity,
+      fetch: transport.fetch,
+    });
 
     await client.models.list({ headers });
+    expect(transport.exchanges).toBe(1);
   },
 );
 

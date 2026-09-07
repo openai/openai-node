@@ -314,6 +314,42 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
+    'preserves foreign Request headers when a transport hook delegates without init',
+    async () => {
+      const { Request: ForeignRequest } = await import('undici');
+      class HookClient extends OpenAI {
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+          context?: object,
+        ) {
+          return super.fetchWithTimeout(
+            new ForeignRequest(url, init as globalThis.RequestInit) as unknown as RequestInfo,
+            undefined,
+            timeout,
+            controller,
+            context,
+          );
+        }
+      }
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        authorizations.push(new ForeignRequest(url, init).headers.get('Authorization'));
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await client.models.list();
+
+      expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
   test.each([
     ['fetchWithAuth', false],
     ['fetchWithAuth', true],

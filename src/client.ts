@@ -1959,10 +1959,16 @@ export class OpenAI {
     let suppliedHeaderLayers: ReturnType<typeof snapshotHeaders>[] | undefined;
     if (this.#canPreflightWorkloadIdentityHeaders(options)) {
       // Custom auth hooks own credential resolution and may mutate the original header layers.
+      const requestHeaders =
+        requestHeaderSnapshot &&
+        options.headers !== requestHeaderSnapshot.source &&
+        options.headers !== requestHeaderSnapshot.snapshot
+          ? snapshotHeaders(options.headers)
+          : (requestHeaderSnapshot ?? snapshotHeaders(options.headers));
       suppliedHeaderLayers = [
         snapshotHeaders(this._options.defaultHeaders),
         snapshotHeaders(bodyHeaders),
-        requestHeaderSnapshot ?? snapshotHeaders(options.headers),
+        requestHeaders,
       ];
       suppliedHeaders = buildHeaders(suppliedHeaderLayers.map(({ snapshot }) => snapshot));
       const authorization = suppliedHeaders.values.get('authorization');
@@ -1978,12 +1984,12 @@ export class OpenAI {
         ? undefined
         : await this.authHeaders(options, authenticationSecurity, credentialContext);
     this.#workloadTokenProvenance.recover(authenticationHeaders, options, credentialContext);
-    if (suppliedHeaders && authenticationSecurity.bearerAuth && suppliedHeaderLayers) {
+    if (suppliedHeaders && suppliedHeaderLayers) {
       const currentRequestHeaders = options.headers;
+      const preparedRequestHeaders = suppliedHeaderLayers[2]!;
       if (
-        requestHeaderSnapshot &&
-        currentRequestHeaders !== requestHeaderSnapshot.source &&
-        currentRequestHeaders !== requestHeaderSnapshot.snapshot
+        currentRequestHeaders !== preparedRequestHeaders.source &&
+        currentRequestHeaders !== preparedRequestHeaders.snapshot
       ) {
         suppliedHeaderLayers[2] = snapshotHeaders(currentRequestHeaders);
       }
@@ -2045,8 +2051,11 @@ export class OpenAI {
     init: T,
   ): T {
     const requestHeaders =
-      init.headers === undefined && typeof Request !== 'undefined' && url instanceof Request
-        ? url.headers
+      init.headers === undefined &&
+      typeof url === 'object' &&
+      url !== null &&
+      Object.prototype.toString.call(url) === '[object Request]'
+        ? (url as Request).headers
         : undefined;
     const headers =
       init.headers === undefined
