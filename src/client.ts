@@ -286,6 +286,11 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
 }
 
 type WorkloadIdentityScopedOptions = FinalRequestOptions & { [key: symbol]: object | undefined };
+type WorkloadIdentityAuthScope = {
+  key: object;
+  pending: number;
+  authorizations: Set<string>;
+};
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
@@ -493,10 +498,8 @@ export class OpenAI {
     AbortController,
     { authorization: string | undefined; used: boolean }
   >();
-  #workloadIdentityAuthScopes = new WeakMap<
-    object,
-    { key: object; pending: number; authorizations: Set<string> }
-  >();
+  #workloadIdentityAuthScopes = new WeakMap<object, WorkloadIdentityAuthScope>();
+  #activeWorkloadIdentityAuthScopes = new Set<WorkloadIdentityAuthScope>();
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -834,6 +837,13 @@ export class OpenAI {
           this.#workloadIdentityAuthScopeAliases.get(scopedOptions);
         if (scopeKey) {
           this.#workloadIdentityAuthScopes.get(scopeKey)?.authorizations.add(`Bearer ${token}`);
+        } else {
+          // A shallow copy of immutable options cannot carry the private key. Associate the issued
+          // value with every in-flight scope; the final Authorization check still determines which
+          // request retained that credential.
+          for (const scope of this.#activeWorkloadIdentityAuthScopes) {
+            scope.authorizations.add(`Bearer ${token}`);
+          }
         }
       }
       return headers;
@@ -1928,16 +1938,18 @@ export class OpenAI {
       this.#workloadIdentityAuthScopeAliases.set(options, key);
     }
     this.#workloadIdentityAuthScopes.set(key, scope);
+    this.#activeWorkloadIdentityAuthScopes.add(scope);
     scope.pending++;
     return scope;
   }
 
   #endWorkloadIdentityAuthScope(
     options: WorkloadIdentityScopedOptions,
-    scope: { key: object; pending: number; authorizations: Set<string> } | undefined,
+    scope: WorkloadIdentityAuthScope | undefined,
   ) {
     if (scope && --scope.pending === 0) {
       this.#workloadIdentityAuthScopes.delete(scope.key);
+      this.#activeWorkloadIdentityAuthScopes.delete(scope);
       this.#workloadIdentityAuthScopeAliases.delete(options);
       if (options[this.#workloadIdentityAuthScopeKey] === scope.key) {
         try {

@@ -38,36 +38,38 @@ test('retains inherited one-shot header iterators during credential acquisition'
   expect(transport.exchanges).toBe(1);
 });
 
-test.each(['request', 'default'] as const)(
-  'refreshes reusable foreign Headers from %s options after credential acquisition',
-  async (location) => {
-    const { Headers: ForeignHeaders } = await import('undici');
-    const headers = new ForeignHeaders({ 'X-Custom': 'before' });
-    expect(headers).not.toBeInstanceOf(Headers);
-    const identity = createTestWorkloadIdentity();
-    identity.provider.getToken = async () => {
-      await Promise.resolve();
-      headers.set('X-Custom', 'after');
-      headers.set('Authorization', 'Bearer independent');
-      return 'subject-token';
-    };
-    const transport = createWorkloadIdentityTransport((_url, init) => {
-      expect(new Headers(init?.headers).get('X-Custom')).toBe('after');
-      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer independent');
-      return Response.json({ data: [] });
-    });
-    const client = new OpenAI({
-      ...createTestClientOptions(),
-      workloadIdentity: identity,
-      defaultHeaders: location === 'default' ? headers : undefined,
-      fetch: transport.fetch,
-      maxRetries: 0,
-    });
+for (const location of ['request', 'default'] as const) {
+  test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
+    `refreshes reusable foreign Headers from ${location} options after credential acquisition`,
+    async () => {
+      const { Headers: ForeignHeaders } = await import('undici');
+      const headers = new ForeignHeaders({ 'X-Custom': 'before' });
+      expect(headers).not.toBeInstanceOf(Headers);
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        await Promise.resolve();
+        headers.set('X-Custom', 'after');
+        headers.set('Authorization', 'Bearer independent');
+        return 'subject-token';
+      };
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        expect(new Headers(init?.headers).get('X-Custom')).toBe('after');
+        expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer independent');
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        defaultHeaders: location === 'default' ? headers : undefined,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
 
-    await client.models.list({ headers: location === 'request' ? headers : undefined });
-    expect(transport.exchanges).toBe(1);
-  },
-);
+      await client.models.list({ headers: location === 'request' ? headers : undefined });
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+}
 
 test.each(['native Headers', 'array', 'foreign array'] as const)(
   'refreshes ordinary reusable %s after credential acquisition',

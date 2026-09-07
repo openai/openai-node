@@ -242,6 +242,47 @@ describe('Workload identity authentication and dispatch hooks', () => {
     },
   );
 
+  test.each(['freeze', 'seal', 'preventExtensions'] as const)(
+    'retains copied-hook provenance for options protected with Object.%s',
+    async (kind) => {
+      class HookClient extends OpenAI {
+        protected override async authHeaders(
+          options: FinalRequestOptions,
+          schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        ) {
+          return buildHeaders([await super.authHeaders({ ...options }, schemes), { 'X-Custom': 'wrapped' }]);
+        }
+      }
+      const options: FinalRequestOptions = { method: 'get', path: '/models' };
+      if (kind === 'freeze') {
+        Object.freeze(options);
+      } else if (kind === 'seal') {
+        Object.seal(options);
+      } else {
+        Object.preventExtensions(options);
+      }
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        const headers = new Headers(init?.headers);
+        authorizations.push(headers.get('Authorization'));
+        expect(headers.get('X-Custom')).toBe('wrapped');
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        maxRetries: 0,
+        fetch: transport.fetch,
+      });
+
+      await client.request(options);
+
+      expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
+
   test.each(['freeze', 'seal'] as const)(
     'supports a buildRequest hook that applies Object.%s to request options',
     async (kind) => {
