@@ -2200,6 +2200,8 @@ export class OpenAI {
             : requestLayer.snapshot,
         ]);
         initialized = true;
+        const scope = this.#workloadTokenProvenance.scopeFor(options, credentialContext);
+        if (scope?.headers) scope.captureHeaders(scope.headers);
         return result;
       };
       if (canPreflight) {

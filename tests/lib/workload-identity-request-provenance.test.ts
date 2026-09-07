@@ -2,7 +2,6 @@
 import OpenAI from 'openai';
 import type { Fetch } from 'openai/internal/builtin-types';
 import { buildHeaders } from 'openai/internal/headers';
-import type { RequestCredentialContext } from 'openai/internal/request-credentials';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { vi } from 'vitest';
 
@@ -76,13 +75,14 @@ describe('workload identity request provenance', () => {
         protected override async authHeaders(
           options: FinalRequestOptions,
           _schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-          credentialContext?: RequestCredentialContext,
+          credentialContext?: object,
         ) {
           if (!this.materializing) {
             this.materializing = true;
-            const first = await this.buildRequest(options, { credentialContext });
+            const settings = credentialContext ? { credentialContext } : {};
+            const first = await this.buildRequest(options, settings);
             expect(first.req.headers.get('Authorization')).toBeNull();
-            await this.buildRequest({ ...options }, forward ? { credentialContext } : {});
+            await this.buildRequest({ ...options }, forward ? settings : {});
           } else if (readInHook) {
             buildHeaders([source === 'defaults' ? this._options.defaultHeaders : options.headers]);
           }
@@ -127,7 +127,7 @@ describe('workload identity request provenance', () => {
         protected override async authHeaders(
           options: FinalRequestOptions,
           schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-          context?: RequestCredentialContext,
+          context?: object,
         ) {
           if (options.path === '/independent') {
             independentReady.resolve();

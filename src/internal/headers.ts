@@ -118,7 +118,7 @@ interface HeaderReplay {
   properties?: Map<string, HeaderPropertySnapshot>;
   propertyOrder?: string[];
   property?: HeaderPropertySnapshot;
-  rows?: WeakMap<object, HeaderRowSnapshot>;
+  rows?: WeakMap<object, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, { descriptor: PropertyDescriptor | undefined; row: HeaderEntry }>;
 }
 
@@ -340,9 +340,14 @@ function* iterateHeaders(
       iter = Object.entries(headers);
     }
   }
+  // Reusing a tuple at another position still owns a separate initial accessor read.
+  const rowOccurrences = new Map<HeaderEntry, number>();
   for (let row of iter) {
+    const occurrence = rowOccurrences.get(row) ?? 0;
+    if (!shouldClear && replay) rowOccurrences.set(row, occurrence + 1);
     // Replacing one tuple column must not reread an unchanged getter in the other.
-    const retainedRow = !shouldClear && replay?.rows?.get(row);
+    const retainedRows = !shouldClear ? replay?.rows?.get(row) : undefined;
+    const retainedRow = retainedRows?.get(occurrence);
     const trackRow = !shouldClear && (retainedRow || replay?.refreshable);
     const nameDescriptor = trackRow ? getHeaderRowDescriptor(row, '0') : undefined;
     const retainName =
@@ -358,7 +363,7 @@ function* iterateHeaders(
       retainedRow.valueStateful &&
       (!valueDescriptor || sameHeaderProperty(valueDescriptor, retainedRow.valueDescriptor))
     ) {
-      replay?.rows?.set(row, {
+      retainedRows?.set(occurrence, {
         ...retainedRow,
         name,
         nameDescriptor: retainName ? retainedRow.nameDescriptor : nameDescriptor,
@@ -435,7 +440,8 @@ function* iterateHeaders(
     if (capturedRow && replay) {
       if (nameStateful || !rowReplay?.refreshable) {
         replay.rows ??= new WeakMap();
-        replay.rows.set(row, {
+        const rows = replay.rows.get(row) ?? new Map<number, HeaderRowSnapshot>();
+        rows.set(occurrence, {
           name,
           nameDescriptor: retainName ? retainedRow.nameDescriptor : nameDescriptor,
           nameStateful,
@@ -443,13 +449,21 @@ function* iterateHeaders(
           valueStateful: !rowReplay?.refreshable,
           entries: capturedRow,
         });
+        replay.rows.set(row, rows);
       } else {
-        replay.rows?.delete(row);
+        retainedRows?.delete(occurrence);
+        if (retainedRows?.size === 0) replay.rows?.delete(row);
       }
     }
     if (property && replay) {
       if (!rowReplay?.refreshable) replay.properties!.set(name, property);
       delete replay.property;
+    }
+  }
+  for (const [row, occurrences] of rowOccurrences) {
+    const retained = replay?.rows?.get(row);
+    for (const occurrence of retained?.keys() ?? []) {
+      if (occurrence >= occurrences) retained?.delete(occurrence);
     }
   }
 }
