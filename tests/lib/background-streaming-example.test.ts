@@ -155,7 +155,8 @@ test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, st
   const events = responseEvents(chunks, status, background);
   const nonterminal = status === 'queued' || status === 'in_progress';
   const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n${nonterminal ? '' : 'data: [DONE]\n\n'}`;
-  const partialEvents = nonterminal ? events : events.slice(0, -1);
+  // Disconnect before the final delta as well as the terminal event.
+  const partialEvents = nonterminal ? events : events.slice(0, -2);
   const partialBody = `${partialEvents.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n`;
   const requests: {
     method: string | undefined;
@@ -220,6 +221,8 @@ main();`,
         OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
         OPENAI_CUSTOM_HEADERS: undefined,
         OPENAI_LOG: undefined,
+        // Keep console-inspected event numbers plain for the sequence assertions.
+        FORCE_COLOR: undefined,
         TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
         DISABLE_V8_COMPILE_CACHE: '1',
       },
@@ -270,6 +273,10 @@ main();`,
     }
     if (source === 'example') {
       expect(stdout.includes('Interrupted. Continuing...')).toBe(resumed);
+      const seenSequences = [...stdout.matchAll(/sequence_number:\s*(?<sequence>\d+)/gu)].map((match) =>
+        Number(match.groups?.['sequence']),
+      );
+      expect(seenSequences).toEqual(events.map((event) => event.sequence_number));
     } else if (source === 'guide') {
       expect(stdout + stderr).not.toContain(privateErrorDetail);
     }
