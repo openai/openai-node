@@ -28,6 +28,8 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
+const headerLeases = new WeakMap<object, { snapshot: NullableHeaders; users: number }>();
+
 const getArrayIterator = (headers: readonly unknown[]) => {
   let platformIterator: (() => Iterator<HeaderEntry>) | undefined;
   let prototype: object | null = headers;
@@ -79,6 +81,13 @@ function* iterateHeaders(
   provenance?: { unknown: boolean },
 ): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
+
+  const lease = headerLeases.get(headers);
+  if (lease) {
+    if (replay) replay.refreshable = false;
+    yield* iterateHeaders(lease.snapshot, undefined, provenance);
+    return;
+  }
 
   if (brand_privateNullableHeaders in headers) {
     if (provenance) provenance.unknown = true;
@@ -163,6 +172,7 @@ const mergeHeaderEntries = (
   let credential: ReturnType<typeof workloadHeaderCredential>;
   let hasAuthorizationLayer = false;
   for (const { source, entries, provenance } of newHeaders) {
+    const credentialSource = source && (headerLeases.get(source)?.snapshot ?? source);
     const seenHeaders = new Set<string>();
     let suppliesAuthorization = false;
     for (const [name, value] of entries) {
@@ -172,7 +182,7 @@ const mergeHeaderEntries = (
       const lowerName = name.toLowerCase();
       if (lowerName === 'authorization') {
         suppliesAuthorization = true;
-        const sourceCredential = source ? workloadHeaderCredential(source) : undefined;
+        const sourceCredential = credentialSource ? workloadHeaderCredential(credentialSource) : undefined;
         // Native copies lose metadata; raw record/tuple layers explicitly supply independent credentials.
         credential =
           sourceCredential !== undefined
@@ -214,18 +224,89 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
   );
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
-export const snapshotHeaders = (source: HeadersLike) => {
+export const snapshotHeaders = (initialSource: HeadersLike) => {
+  let source = initialSource;
   const replay = { refreshable: true };
   const provenance = { unknown: false };
-  const snapshot = mergeHeaderEntries([
+  let snapshot = mergeHeaderEntries([
     { source, provenance, entries: iterateHeaders(source, replay, provenance) },
   ]);
+  let retained = false;
+  let leasedSource: object | undefined;
+  const acquire = () => {
+    if (!retained || !source || replay.refreshable) return;
+    const lease = headerLeases.get(source) ?? { snapshot, users: 0 };
+    lease.users += 1;
+    headerLeases.set(source, lease);
+    snapshot = lease.snapshot;
+    leasedSource = source;
+  };
+  const relinquish = () => {
+    if (!leasedSource) return;
+    const lease = headerLeases.get(leasedSource)!;
+    lease.users -= 1;
+    if (lease.users === 0) headerLeases.delete(leasedSource);
+    leasedSource = undefined;
+  };
   return {
-    source,
-    snapshot,
-    refresh: () => (replay.refreshable ? buildHeaders([source]) : snapshot),
+    get source() {
+      return source;
+    },
+    get snapshot() {
+      return snapshot;
+    },
+    retain: () => {
+      if (retained) return;
+      retained = true;
+      acquire();
+    },
+    release: () => {
+      retained = false;
+      relinquish();
+    },
+    refresh: (...sources: [] | [HeadersLike]) => {
+      const currentSource = sources.length === 0 ? source : sources[0];
+      if (currentSource !== source || replay.refreshable) {
+        const nextReplay = { refreshable: true };
+        const nextProvenance = { unknown: false };
+        const nextSnapshot = mergeHeaderEntries([
+          {
+            source: currentSource,
+            provenance: nextProvenance,
+            entries: iterateHeaders(currentSource, nextReplay, nextProvenance),
+          },
+        ]);
+        relinquish();
+        source = currentSource;
+        replay.refreshable = nextReplay.refreshable;
+        snapshot = nextSnapshot;
+        acquire();
+      }
+      return snapshot;
+    },
   };
 };
+
+/** Parsed header layers shared by preparation and automatic retries. */
+export interface WorkloadHeaderSnapshots {
+  requestHeaders: ReturnType<typeof snapshotHeaders>;
+  defaultHeaders: ReturnType<typeof snapshotHeaders>;
+}
+
+/** Materializes each source once, retaining request headers before parsing potentially shared defaults. */
+export function createWorkloadHeaderSnapshots(
+  request: HeadersLike,
+  defaults: HeadersLike,
+): WorkloadHeaderSnapshots {
+  const requestHeaders = snapshotHeaders(request);
+  requestHeaders.retain();
+  try {
+    return { requestHeaders, defaultHeaders: snapshotHeaders(defaults) };
+  } catch (error) {
+    requestHeaders.release();
+    throw error;
+  }
+}
 
 export const isEmptyHeaders = (headers: HeadersLike) => {
   for (const _ of iterateHeaders(headers)) return false;

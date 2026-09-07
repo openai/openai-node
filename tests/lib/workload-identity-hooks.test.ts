@@ -1,6 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected dispatch hooks. */
 import OpenAI from 'openai';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { buildHeaders } from 'openai/internal/headers';
@@ -304,7 +304,7 @@ describe('Workload identity request and dispatch hooks', () => {
 
     await client.models.list();
 
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   test('refreshes a resolved workload identity placeholder', async () => {
@@ -336,10 +336,11 @@ describe('Workload identity request and dispatch hooks', () => {
           context?: object,
         ) {
           return super.fetchWithTimeout(
-            new ForeignRequest(
-              url as ConstructorParameters<typeof ForeignRequest>[0],
-              init as ConstructorParameters<typeof ForeignRequest>[1],
-            ) as unknown as RequestInfo,
+            new ForeignRequest(String(url), {
+              method: init?.method ?? 'GET',
+              headers: new Headers(init?.headers),
+              signal: init?.signal ?? null,
+            }) as unknown as RequestInfo,
             undefined,
             timeout,
             controller,
@@ -349,12 +350,11 @@ describe('Workload identity request and dispatch hooks', () => {
       }
       const authorizations: (string | null)[] = [];
       const transport = createWorkloadIdentityTransport((url, init) => {
-        authorizations.push(
-          new ForeignRequest(
-            url as ConstructorParameters<typeof ForeignRequest>[0],
-            init as ConstructorParameters<typeof ForeignRequest>[1],
-          ).headers.get('Authorization'),
-        );
+        expect(init?.headers).toBeUndefined();
+        if (!(url instanceof ForeignRequest)) {
+          throw new Error('Expected the foreign Request from the hook');
+        }
+        authorizations.push(url.headers.get('Authorization'));
         return authorizations.length === 1
           ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
           : Response.json({ data: [] });

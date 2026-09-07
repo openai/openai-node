@@ -545,3 +545,243 @@ test.each(['own', 'inherited'] as const)(
     }
   },
 );
+
+test.each([null, ''] as const)(
+  'retains a one-shot authorization override after prepareOptions inspection: %j',
+  async (authorization) => {
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: 'https://synthetic.example.test/resource',
+      body: { synthetic: true },
+      headers: new OneShotHeaders(['Authorization', authorization], ['X-Custom', 'keep-me']),
+    };
+    class InspectingClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This instance override exercises the protected preparation hook.
+      protected override async prepareOptions(received: FinalRequestOptions) {
+        expect(received).toBe(options);
+        buildHeaders([received.headers]);
+      }
+    }
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      expect(url.toString()).toBe(options.path);
+      expect(new Headers(init?.headers).get('Authorization')).toBe(authorization);
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('keep-me');
+      expect(init?.body).toBe('{"synthetic":true}');
+      return Response.json({ ok: true });
+    });
+    const client = new InspectingClient({
+      ...createTestClientOptions(),
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.request(options);
+    expect(transport.exchanges).toBe(0);
+  },
+);
+
+test.each(['mutate', 'replace', 'delete'] as const)(
+  'preserves prepareOptions header changes after the first snapshot: %s',
+  async (change) => {
+    const headers: { Authorization: string | null } = { Authorization: null };
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/synthetic',
+      body: { synthetic: true },
+      headers,
+    };
+    class PreparingClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This instance override exercises the protected preparation hook.
+      protected override async prepareOptions(received: FinalRequestOptions) {
+        expect(received).toBe(options);
+        if (change === 'mutate') {
+          headers.Authorization = 'Bearer independent';
+        } else if (change === 'replace') {
+          received.headers = new OneShotHeaders(['Authorization', 'Bearer independent']);
+        } else {
+          delete received.headers;
+        }
+      }
+    }
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).get('Authorization')).toBe(
+        change === 'delete' ? 'Bearer access-token-1' : 'Bearer independent',
+      );
+      return Response.json({ data: [] });
+    });
+    const client = new PreparingClient({
+      ...createTestClientOptions(),
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.request(options);
+    expect(transport.exchanges).toBe(change === 'delete' ? 1 : 0);
+  },
+);
+
+describe.each(['request', 'default'] as const)('one-shot %s headers', (location) => {
+  test.each([null, '', undefined] as const)(
+    'retains headers through automatic retries: %j',
+    async (authorization) => {
+      const headers = new OneShotHeaders(['X-Custom', 'keep-me']);
+      if (authorization !== undefined) {
+        headers.push(['Authorization', authorization]);
+      }
+      const sent: Headers[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers));
+        return sent.length === 1
+          ? Response.json(
+              { error: { message: 'Synthetic retry' } },
+              { status: authorization === undefined ? 401 : 500, headers: { 'retry-after-ms': '1' } },
+            )
+          : Response.json({ ok: true });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        defaultHeaders: location === 'default' ? headers : undefined,
+        fetch: transport.fetch,
+        maxRetries: 1,
+      });
+
+      await client.post('https://synthetic.example.test/resource', {
+        body: { synthetic: true },
+        headers: location === 'request' ? headers : undefined,
+      });
+
+      expect(sent.map((value) => value.get('Authorization'))).toEqual(
+        authorization === undefined
+          ? ['Bearer access-token-1', 'Bearer access-token-2']
+          : [authorization, authorization],
+      );
+      expect(sent.map((value) => value.get('X-Custom'))).toEqual(['keep-me', 'keep-me']);
+      expect(transport.exchanges).toBe(authorization === undefined ? 2 : 0);
+    },
+  );
+});
+
+test('releases preparation state before reusing options with a legacy authentication hook', async () => {
+  const options: FinalRequestOptions = { method: 'get', path: '/models' };
+  const preparationError = new Error('Synthetic preparation failure');
+  let preparations = 0;
+  class PreparingClient extends OpenAI {
+    // oxlint-disable-next-line class-methods-use-this -- This instance override exercises the protected preparation hook.
+    protected override async prepareOptions() {
+      preparations += 1;
+      if (preparations === 1) {
+        throw preparationError;
+      }
+    }
+
+    protected override async authHeaders(
+      received: FinalRequestOptions,
+      schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    ) {
+      return super.authHeaders(received, schemes);
+    }
+  }
+  const sent: Headers[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers));
+    return sent.length === 1
+      ? Response.json({ error: { message: 'Synthetic retry' } }, { status: 401 })
+      : Response.json({ data: [] });
+  });
+  const client = new PreparingClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await expect(client.request(options)).rejects.toBe(preparationError);
+  expect(transport.exchanges).toBe(0);
+  await client.request(options);
+
+  expect(sent.map((value) => value.get('Authorization'))).toEqual([
+    'Bearer access-token-1',
+    'Bearer access-token-2',
+  ]);
+  expect(transport.exchanges).toBe(2);
+});
+
+test.each([null, ''] as const)(
+  'retains a one-shot authorization override through a response body timeout: %j',
+  async (authorization) => {
+    vi.useFakeTimers();
+    try {
+      const sent: Headers[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers));
+        if (sent.length !== 1) {
+          return Response.json({ ok: true });
+        }
+        const signal = init?.signal;
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              signal?.addEventListener('abort', () => controller.error(signal.reason), { once: true });
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: 1,
+        timeout: 1000,
+      });
+      const completed = client
+        .post('https://synthetic.example.test/resource', {
+          body: { synthetic: true },
+          headers: new OneShotHeaders(['Authorization', authorization], ['X-Custom', 'keep-me']),
+        })
+        .then((response) => expect(response).toEqual({ ok: true }));
+
+      await vi.advanceTimersByTimeAsync(2000);
+      await completed;
+
+      expect(sent.map((value) => value.get('Authorization'))).toEqual([authorization, authorization]);
+      expect(sent.map((value) => value.get('X-Custom'))).toEqual(['keep-me', 'keep-me']);
+      expect(transport.exchanges).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
+
+test('snapshots a replacement one-shot header source before retry preparation', async () => {
+  const options: FinalRequestOptions = {
+    method: 'post',
+    path: 'https://synthetic.example.test/resource',
+    body: { synthetic: true },
+    headers: new OneShotHeaders(['Authorization', null], ['X-Custom', 'first']),
+  };
+  class InspectingClient extends OpenAI {
+    // oxlint-disable-next-line class-methods-use-this -- This instance override exercises preparation on each attempt.
+    protected override async prepareOptions(received: FinalRequestOptions) {
+      expect(received).toBe(options);
+      buildHeaders([received.headers]);
+    }
+  }
+  const sent: Headers[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers));
+    if (sent.length === 1) {
+      options.headers = new OneShotHeaders(['Authorization', null], ['X-Custom', 'keep-me']);
+      return Response.json(
+        { error: { message: 'Synthetic retry' } },
+        { status: 500, headers: { 'retry-after-ms': '1' } },
+      );
+    }
+    return Response.json({ ok: true });
+  });
+  const client = new InspectingClient({
+    ...createTestClientOptions(),
+    fetch: transport.fetch,
+    maxRetries: 1,
+  });
+
+  await client.request(options);
+
+  expect(sent.map((value) => value.get('Authorization'))).toEqual([null, null]);
+  expect(sent.map((value) => value.get('X-Custom'))).toEqual(['first', 'keep-me']);
+  expect(transport.exchanges).toBe(0);
+});

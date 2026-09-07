@@ -1,3 +1,5 @@
+import type { WorkloadHeaderSnapshots } from '../headers';
+
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
 export function bearerToken(authorization: string | null): string | undefined {
   if (authorization?.slice(0, 7).toLowerCase() !== 'bearer ') {
@@ -30,6 +32,7 @@ export function rememberWorkloadHeaderCredential(headers: object, credential: He
 
 interface TokenScope {
   context: object;
+  headers: WorkloadHeaderSnapshots | undefined;
   record: (token: string) => void;
   matches: (authorization: string) => boolean;
   dispose: () => void;
@@ -109,12 +112,15 @@ export class WorkloadTokenProvenance {
   }
 
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
-  begin(options: object, context: object = {}): TokenScope {
+  begin(options: object, context: object = {}, headers?: WorkloadHeaderSnapshots): TokenScope {
+    headers?.requestHeaders.retain();
+    headers?.defaultHeaders.retain();
     const tokens = new Set<string>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     let disposed = false;
     const scope: TokenScope = {
       context,
+      headers,
       record: (token) => {
         if (!disposed) {
           tokens.add(token);
@@ -130,6 +136,9 @@ export class WorkloadTokenProvenance {
         }
         disposed = true;
         tokens.clear();
+        scope.headers?.requestHeaders.release();
+        scope.headers?.defaultHeaders.release();
+        scope.headers = undefined;
         this.contexts.delete(scope.context);
         scopes.delete(scope);
         if (scopes.size === 0) {
