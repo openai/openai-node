@@ -255,6 +255,7 @@ import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders, snapshotHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
+import { prepareRequestAPIKey, type RequestCredentialContext } from './internal/request-credentials';
 import { readEnv } from './internal/utils/env';
 import { WorkloadTokenProvenance, bearerToken } from './internal/auth/workload-token-provenance';
 import {
@@ -776,7 +777,7 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
-    context?: object,
+    credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
     const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
     if (
@@ -786,7 +787,7 @@ export class OpenAI {
     ) {
       return await this.adminAPIKeyAuth(opts);
     }
-    const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, context) : undefined;
+    const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, credentialContext) : undefined;
     const headers = buildHeaders([
       bearerHeaders,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
@@ -797,10 +798,10 @@ export class OpenAI {
   /** Resolves bearer authentication; delegating hooks must forward the opaque request context. */
   protected async bearerAuth(
     opts: FinalRequestOptions,
-    context?: object,
+    credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
     const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
-    const workloadScope = this.#workloadTokenProvenance.find(opts, context);
+    const workloadScope = this.#workloadTokenProvenance.find(opts, credentialContext);
     if (authentication) {
       if (authentication instanceof X509WorkloadIdentityAuth) {
         if (
@@ -839,10 +840,11 @@ export class OpenAI {
       }
       return headers;
     }
-    if (this.apiKey == null) {
+    const apiKey = credentialContext?.apiKey === undefined ? this.apiKey : credentialContext.apiKey;
+    if (apiKey == null) {
       return undefined;
     }
-    return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+    return buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
   }
 
   protected async adminAPIKeyAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
@@ -875,11 +877,25 @@ export class OpenAI {
     return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
-  async _callApiKey(): Promise<boolean> {
-    if (this._provider) return false;
+  /**
+   * Resolves a function-based API key and retains the resolved value on this client.
+   * Returns whether a provider was invoked. Internal callers can capture this
+   * invocation's key before another request updates the shared `apiKey` property.
+   * Overrides should forward `capture` or invoke it with their own resolved key
+   * to preserve connection-local credentials in concurrent Realtime factories.
+   * @internal
+   */
+  async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
+    if (this._provider) {
+      capture?.(this.apiKey);
+      return false;
+    }
 
     const apiKey = this._options.apiKey;
-    if (typeof apiKey !== 'function') return false;
+    if (typeof apiKey !== 'function') {
+      capture?.(this.apiKey);
+      return false;
+    }
 
     let token: unknown;
     try {
@@ -899,6 +915,7 @@ export class OpenAI {
       );
     }
     this.apiKey = token;
+    capture?.(this.apiKey);
     return true;
   }
 
@@ -927,13 +944,17 @@ export class OpenAI {
 
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
+   * Forward `credentialContext` to retain per-attempt function credentials.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
+  protected async prepareOptions(
+    options: FinalRequestOptions,
+    credentialContext?: RequestCredentialContext,
+  ): Promise<void> {
     if (this._provider) return;
 
     const security = options.__security ?? { bearerAuth: true };
     if (security.bearerAuth) {
-      await this._callApiKey();
+      await prepareRequestAPIKey(this, credentialContext);
     }
   }
 
@@ -1177,6 +1198,7 @@ export class OpenAI {
     retryOfRequestLogID: string | undefined,
   ): Promise<APIResponseProps> {
     const options = await optionsInput;
+    const credentialContext: RequestCredentialContext = {};
     const maxRetries = options.maxRetries ?? this.maxRetries;
     if (retriesRemaining == null) {
       retriesRemaining = maxRetries;
@@ -1184,10 +1206,9 @@ export class OpenAI {
 
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
-    await this.prepareOptions(options);
+    await this.prepareOptions(options, credentialContext);
 
     x509Authentication?.beginRequestPlanning();
-    const credentialContext = {};
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     let initialWorkloadAuthorization: string | undefined;
     try {
@@ -1233,7 +1254,7 @@ export class OpenAI {
         );
         x509Authentication.beginRequestNetwork();
         const security = options.__security ?? { bearerAuth: true };
-        const authenticationHeaders = await this.authHeaders(options, security);
+        const authenticationHeaders = await this.authHeaders(options, security, credentialContext);
         const suppliedHeaders = x509Authentication.headerSnapshots();
         const supplied = buildHeaders([suppliedHeaders.defaultHeaders, suppliedHeaders.requestHeaders]);
         for (const [name, value] of authenticationHeaders?.values ?? []) {
@@ -1768,12 +1789,22 @@ export class OpenAI {
 
   async buildRequest(
     inputOptions: FinalRequestOptions,
-    { retryCount = 0, credentialContext }: { retryCount?: number; credentialContext?: object } = {},
+    {
+      retryCount = 0,
+      credentialContext,
+    }: {
+      retryCount?: number;
+      /** Forward this internal context when overriding request construction. @internal */
+      credentialContext?: RequestCredentialContext | undefined;
+    } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
     if (this.#x509Authentication && !this.#x509Authentication.inRequest(this)) {
       const authentication = this.#x509Authentication;
       return await authentication.runRequest(async () => {
-        const built = await OpenAI.prototype.buildRequest.call(this, inputOptions, { retryCount });
+        const built = await OpenAI.prototype.buildRequest.call(this, inputOptions, {
+          retryCount,
+          credentialContext,
+        });
         authentication.releaseRequestBody(built.req.body);
         return built;
       }, this);
@@ -1879,7 +1910,7 @@ export class OpenAI {
     x509Tenant,
   }: {
     options: FinalRequestOptions;
-    credentialContext: object | undefined;
+    credentialContext: RequestCredentialContext | undefined;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
     requestHeaderSnapshot: ReturnType<typeof snapshotHeaders> | undefined;

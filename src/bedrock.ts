@@ -11,6 +11,8 @@ import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import type { FinalRequestOptions, RequestOptions } from './internal/request-options';
+import { prepareRequestAPIKey } from './internal/request-credentials';
+import type { RequestCredentialContext } from './internal/request-credentials';
 import { readEnv } from './internal/utils';
 import { addOutputText } from './lib/ResponsesParser';
 import type { ResponseStreamParams } from './lib/responses/ResponseStream';
@@ -221,16 +223,19 @@ export class BedrockOpenAI extends OpenAI {
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
   }
 
-  protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
+  protected override async prepareOptions(
+    options: FinalRequestOptions,
+    credentialContext?: RequestCredentialContext,
+  ): Promise<void> {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
 
     const security = options.__security ?? { bearerAuth: true };
     if (security.adminAPIKeyAuth && !security.bearerAuth) {
-      await this._callApiKey();
+      await prepareRequestAPIKey(this, credentialContext);
     }
 
-    await super.prepareOptions(options);
+    await super.prepareOptions(options, credentialContext);
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
   }
 
@@ -246,9 +251,10 @@ export class BedrockOpenAI extends OpenAI {
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    const credential = this.apiKey;
+    const credential = credentialContext?.apiKey === undefined ? this.apiKey : credentialContext.apiKey;
     if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
       assertValidBedrockBearerCredential(credential);
       try {
@@ -262,7 +268,7 @@ export class BedrockOpenAI extends OpenAI {
       }
     }
 
-    return super.authHeaders(opts, security);
+    return super.authHeaders(opts, security, credentialContext);
   }
 
   /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */
