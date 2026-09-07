@@ -2272,8 +2272,12 @@ export class OpenAI {
       credential.revoke();
     } else if (matches === undefined && headers && credential.isCurrent()) {
       const platformHeader = getPlatformHeader(headers as Headers, 'Authorization');
-      if (platformHeader && bearerToken(platformHeader.value) === bearerToken(authorization)) {
-        credential.adopt(headers as Headers);
+      if (platformHeader) {
+        if (bearerToken(platformHeader.value) === bearerToken(authorization)) {
+          credential.adopt(headers as Headers);
+        } else {
+          credential.revoke();
+        }
       }
     }
   }

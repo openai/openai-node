@@ -465,4 +465,57 @@ describe('Workload credential ownership after native header mutations', () => {
     expect(requests).toBe(overwrite ? 1 : 2);
     expect(transport.exchanges).toBe(overwrite ? 1 : 2);
   });
+
+  test.for(
+    (['native', 'foreign'] as const).flatMap((realm) =>
+      [null, 'Bearer independent'].map((replacement) => ({ realm, replacement })),
+    ),
+  )(
+    'retains an observed platform replacement before old bytes are restored: %j',
+    async ({ realm, replacement }, context) => {
+      if (realm === 'foreign' && Number(process.versions.node.split('.')[0]) < 24) {
+        context.skip();
+      }
+      const foreign = realm === 'foreign' ? await import('undici') : undefined;
+      const HeadersConstructor = foreign?.Headers ?? Headers;
+      let previousAuthorization: string | null = null;
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+        protected override async prepareRequest(request: RequestInit) {
+          previousAuthorization = new Headers(request.headers).get('Authorization');
+          request.headers = new HeadersConstructor(
+            replacement === null ? {} : { Authorization: replacement },
+          ) as unknown as Headers;
+        }
+
+        override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+          const [, request] = args;
+        if (!request) {
+          throw new Error('Expected request initialization');
+        }
+          const headers = request.headers as Headers;
+          headers.set('Authorization', previousAuthorization ?? '');
+          request.headers = new HeadersConstructor(headers) as unknown as Headers;
+          return super.fetchWithTimeout(...args);
+        }
+      }
+      let requests = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        requests += 1;
+        return requests === 1
+          ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(requests).toBe(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
 });
