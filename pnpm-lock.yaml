@@ -117,7 +117,7 @@ importers:
         version: 18.1.0
       zod:
         specifier: ^3.25 || ^4.0
-        version: 4.4.3
+        version: 4.5.4
 
   examples:
     dependencies:
@@ -132,13 +132,13 @@ importers:
         version: 4.22.2
       openai:
         specifier: file:..
-        version: file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.2)(undici@8.9.0)(ws@8.21.3)(zod@4.4.3)
+        version: file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.2)(undici@8.9.0)(ws@8.21.3)(zod@4.5.4)
       undici:
         specifier: ^8.9.0
         version: 8.9.0
       zod:
         specifier: ^3.25 || ^4.0
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/express':
         specifier: ^4.17.19
@@ -2738,6 +2738,10 @@ packages:
     resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
     engines: {node: '>=12'}
 
+  picomatch@4.0.7:
+    resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
+    engines: {node: '>=12'}
+
   pirates@4.0.7:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
@@ -3392,8 +3396,8 @@ packages:
     resolution: {integrity: sha512-xYqdZFUK/VYazNl/oCDYN+3WloWQwMfZxBoiNt6qNyk+xfOdi598muWE42rNZFp1kNOiqW936q5RhUdnpqElSg==}
     engines: {node: '>=18'}
 
-  zod@4.4.3:
-    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+  zod@4.5.4:
+    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
 
 snapshots:
 
@@ -6036,14 +6040,14 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
-  openai@file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.2)(undici@8.9.0)(ws@8.21.3)(zod@4.4.3):
+  openai@file:(@aws-sdk/credential-provider-node@3.972.78)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.2)(undici@8.9.0)(ws@8.21.3)(zod@4.5.4):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.78
       '@smithy/hash-node': 4.5.2
       '@smithy/signature-v4': 5.7.2
       undici: 8.9.0
       ws: 8.21.3
-      zod: 4.4.3
+      zod: 4.5.4
 
   oxfmt@0.62.0:
     dependencies:
@@ -6158,6 +6162,8 @@ snapshots:
   picomatch@2.3.2: {}
 
   picomatch@4.0.5: {}
+
+  picomatch@4.0.7: {}
 
   pirates@4.0.7: {}
 
@@ -6572,7 +6578,7 @@ snapshots:
       resolve.exports: 2.0.3
       string-width: 8.2.2
       yaml: 2.9.0
-      zod: 4.4.3
+      zod: 4.5.4
     optionalDependencies:
       oxfmt: 0.62.0
       oxlint: 1.79.0
@@ -6637,7 +6643,7 @@ snapshots:
   vite@8.1.5(@types/node@26.2.0)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.23
       rolldown: 1.1.5
       tinyglobby: 0.2.17
@@ -6773,4 +6779,4 @@ snapshots:
 
   yoctocolors@2.2.0: {}
 
-  zod@4.4.3: {}
+  zod@4.5.4: {}
