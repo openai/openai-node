@@ -160,7 +160,7 @@ describe('Workload identity request and dispatch hooks', () => {
       ),
     ),
   )(
-    'guards consumed headers through legacy buildRequest: %j',
+    'preserves header ownership through legacy buildRequest: %j',
     async ({ copy, forward, frozen, authorization, foreign }) => {
       class LegacyClient extends OpenAI {
         override async buildRequest(
@@ -206,32 +206,131 @@ describe('Workload identity request and dispatch hooks', () => {
         headers,
       };
       const request = client.request(frozen ? Object.freeze(options) : options);
-      await (copy && !forward
-        ? expect(request).rejects.toThrow('must forward credentialContext')
-        : expect(request).rejects.toMatchObject({ status: 401 }));
-      expect(calls).toBe(copy && !forward ? 0 : 1);
+      await expect(request).rejects.toMatchObject({ status: 401 });
+      expect(calls).toBe(1);
       expect(transport.exchanges).toBe(0);
     },
   );
 
-  test('releases consumed-source guards after a copying build hook throws', async () => {
-    class LegacyClient extends OpenAI {
-      override async buildRequest(options: FinalRequestOptions, { retryCount = 0 } = {}) {
-        return super.buildRequest({ ...options }, { retryCount });
-      }
-    }
+  test('releases consumed-source guards after a nested build and body serialization throw', async () => {
     let rows = [['Authorization', null] as const][Symbol.iterator]();
     const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
     const transport = createWorkloadIdentityTransport(() => {
       throw new Error('The guarded request must not dispatch');
     });
-    const client = new LegacyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
-    const options: FinalRequestOptions = { method: 'get', path: '/synthetic', headers };
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+    const options: FinalRequestOptions = { method: 'post', path: '/synthetic', headers };
+    let nested: Promise<unknown> | undefined;
+    options.body = {
+      toJSON() {
+        nested = (async () => {
+          try {
+            return await client.buildRequest({ ...options });
+          } catch (error) {
+            return error;
+          }
+        })();
+        throw new Error('Synthetic body serialization failure');
+      },
+    };
 
-    await expect(client.request(options)).rejects.toThrow('must forward credentialContext');
+    await expect(client.request(options)).rejects.toThrow('Synthetic body serialization failure');
+    expect(await nested).toMatchObject({
+      message: expect.stringContaining('must forward credentialContext'),
+    });
     rows = [['Authorization', null] as const][Symbol.iterator]();
+    options.body = { synthetic: true };
     const built = await client.buildRequest(options);
     expect(built.req.headers.get('Authorization')).toBeNull();
+    expect(transport.exchanges).toBe(0);
+  });
+
+  test.each([false, true])(
+    'keeps build hooks first access to one-shot native header copies, context: %s',
+    async (forward) => {
+      class CopyClient extends OpenAI {
+        override async buildRequest(
+          options: FinalRequestOptions,
+          settings: { retryCount?: number; credentialContext?: object } = {},
+        ) {
+          return super.buildRequest(
+            { ...options, headers: new Headers(options.headers as HeadersInit) },
+            forward ? settings : { retryCount: settings.retryCount ?? 0 },
+          );
+        }
+      }
+      const rows = [['Authorization', ''] as const][Symbol.iterator]();
+      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        expect(new Headers(init?.headers).get('Authorization')).toBe('');
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await expect(
+        client.get('https://independent.example.test/synthetic', { headers }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
+  test.each([
+    'record',
+    'Headers',
+    'array',
+    'one-shot object',
+    'one-shot array',
+    'retained one-shot',
+  ] as const)('retries copied build header inputs only when replayable or retained: %s', async (kind) => {
+    class OneShotHeaders extends Array<[string, string]> {
+      private iterator = super[Symbol.iterator]();
+      override [Symbol.iterator]() {
+        return this.iterator;
+      }
+    }
+    class CopyClient extends OpenAI {
+      override async buildRequest(
+        options: FinalRequestOptions,
+        settings: { retryCount?: number; credentialContext?: object } = {},
+      ) {
+        const headers = new Headers(options.headers as HeadersInit);
+        if (kind === 'retained one-shot') {
+          options.headers = headers;
+        }
+        return super.buildRequest({ ...options, headers }, settings);
+      }
+    }
+    const rows: [string, string][] = [['Authorization', '']];
+    const iterator = rows[Symbol.iterator]();
+    let headers: HeadersInit;
+    if (kind === 'record') {
+      headers = { Authorization: '' };
+    } else if (kind === 'Headers') {
+      headers = new Headers(rows);
+    } else if (kind === 'array') {
+      headers = rows;
+    } else if (kind === 'one-shot array') {
+      headers = new OneShotHeaders(...rows);
+    } else {
+      headers = { [Symbol.iterator]: () => iterator } as unknown as Headers;
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      calls += 1;
+      expect(new Headers(init?.headers).get('Authorization')).toBe('');
+      return calls === 1
+        ? Response.json({ error: 'synthetic retry' }, { status: 500 })
+        : Response.json({ data: [] });
+    });
+    const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 1 });
+    const request = client.get('https://independent.example.test/synthetic', { headers });
+    if (kind === 'one-shot object' || kind === 'one-shot array') {
+      await expect(request).rejects.toThrow('must retain parsed headers');
+      expect(calls).toBe(1);
+    } else {
+      await request;
+      expect(calls).toBe(2);
+    }
     expect(transport.exchanges).toBe(0);
   });
 
