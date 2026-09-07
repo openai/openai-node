@@ -2,6 +2,7 @@
 import OpenAI from 'openai';
 import { test } from 'vitest';
 import type { HeadersInit } from 'openai/internal/builtin-types';
+import { buildHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
@@ -42,9 +43,15 @@ describe('Workload identity raw build input retries', () => {
     expect(transport.exchanges).toBe(2);
   });
 
-  test.each([null, '', 'Bearer independent'])(
-    'fails closed when a buildRequest wrapper drops a one-shot credential carrier: %j',
-    async (authorization) => {
+  test.each(
+    [null, '', 'Bearer independent'].flatMap((authorization) =>
+      [false, true].flatMap((forwardContext) =>
+        [false, true].map((canonical) => ({ authorization, forwardContext, canonical })),
+      ),
+    ),
+  )(
+    'fails closed when a buildRequest wrapper drops one-shot credential state: %j',
+    async ({ authorization, forwardContext, canonical }) => {
       class OneShotHeaders {
         private rows = [['Authorization', authorization] as const][Symbol.iterator]();
         private authorization = authorization;
@@ -70,9 +77,12 @@ describe('Workload identity raw build input retries', () => {
       class ReconstructingClient extends OpenAI {
         override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
           const [options, settings] = args;
+          const headers = canonical
+            ? buildHeaders([options.headers])
+            : new Headers(options.headers as HeadersInit);
           const built = await super.buildRequest(
-            { ...options, headers: new Headers(options.headers as HeadersInit) },
-            settings,
+            { ...options, headers },
+            forwardContext ? settings : { retryCount: settings?.retryCount },
           );
           return { ...built, req: Object.fromEntries(Object.entries(built.req)) } as typeof built;
         }
@@ -92,7 +102,7 @@ describe('Workload identity raw build input retries', () => {
         client.models.list({ headers: new OneShotHeaders() as unknown as Headers }),
       ).rejects.toThrow('must retain');
 
-      expect(sent).toEqual([authorization === null ? 'null' : authorization]);
+      expect(sent).toEqual([authorization === null && !canonical ? 'null' : authorization]);
       expect(transport.exchanges).toBe(0);
     },
   );

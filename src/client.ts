@@ -1331,6 +1331,20 @@ export class OpenAI {
           this.#workloadTokenProvenance.takeHeaders(candidate) ??
           workloadIdentityAuthScope?.headers ??
           workloadHeaders;
+        if (
+          !workloadHeaders &&
+          this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
+          this.buildRequest !== OpenAI.prototype.buildRequest
+        ) {
+          // A legacy hook may delegate without credentialContext and then reconstruct the returned request,
+          // dropping both paths that carry parsed snapshots. Retain a deferred outer guard without reading
+          // the hook's one-shot input a second time.
+          workloadHeaders = createWorkloadHeaderSnapshots(buildInputHeaders, buildInputDefaults, {
+            deferRequest: true,
+            deferDefault: true,
+          });
+          workloadIdentityAuthScope?.captureHeaders(workloadHeaders);
+        }
         if (needsBuildRetryGuard && !ownedBuild) {
           throw new Errors.OpenAIError(
             'A custom buildRequest hook must retain original options or forward credentialContext on every retry of a one-shot source.',
