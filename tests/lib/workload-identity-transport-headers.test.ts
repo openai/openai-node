@@ -7,8 +7,7 @@ import { createTestClientOptions, createWorkloadIdentityTransport } from './work
 test('materializes a self-deleting header getter before transport dispatch', async () => {
   let reads = 0;
   class HookClient extends OpenAI {
-    // oxlint-disable-next-line class-methods-use-this -- The fixture supplies a stateful transport header.
-    protected override async prepareRequest(request: RequestInit) {
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
       const headers: Record<string, string> = {};
       Object.defineProperty(headers, 'Authorization', {
         enumerable: true,
@@ -19,7 +18,8 @@ test('materializes a self-deleting header getter before transport dispatch', asy
           return 'Bearer independent';
         },
       });
-      request.headers = headers;
+      args[1].headers = headers;
+      return super.fetchWithAuth(...args);
     }
   }
   let calls = 0;
@@ -28,7 +28,12 @@ test('materializes a self-deleting header getter before transport dispatch', asy
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer independent');
     return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
   });
-  const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
 
   await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
   expect(reads).toBe(1);
