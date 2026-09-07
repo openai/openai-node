@@ -455,7 +455,13 @@ describe('OpenAI with Workload Identity', () => {
     'supports request options protected with Object.%s',
     async (kind) => {
       const options: FinalRequestOptions = { method: 'get', path: '/models' };
-      Object[kind](options);
+      if (kind === 'freeze') {
+        Object.freeze(options);
+      } else if (kind === 'seal') {
+        Object.seal(options);
+      } else {
+        Object.preventExtensions(options);
+      }
       const client = new OpenAI({
         ...createTestClientOptions(),
         fetch: async (url, init) => {
@@ -483,7 +489,11 @@ describe('OpenAI with Workload Identity', () => {
     async (kind) => {
       class HookClient extends OpenAI {
         override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
-          Object[kind](args[0]);
+          if (kind === 'freeze') {
+            Object.freeze(args[0]);
+          } else {
+            Object.seal(args[0]);
+          }
           return super.buildRequest(...args);
         }
       }
@@ -808,7 +818,7 @@ describe('OpenAI with Workload Identity', () => {
         timeout: number,
         controller: AbortController,
       ) {
-        const headers = new Headers(init?.headers).entries();
+        const headers = new Headers(init?.headers).entries() as unknown as HeadersInit;
         return super.fetchWithTimeout(url, { ...init, headers }, timeout, controller);
       }
     }
