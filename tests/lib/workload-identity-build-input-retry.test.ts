@@ -162,6 +162,13 @@ describe('Workload identity raw build input retries', () => {
         maxRetries: status === 500 ? 1 : 0,
       });
 
+      if (kind === 'foreign') {
+        await expect(client.models.list({ headers })).rejects.toThrow('must retain parsed headers');
+        expect(sent).toEqual([credential === 'independent' ? 'Bearer independent' : 'Bearer access-token-1']);
+        expect(transport.exchanges).toBe(credential === 'independent' ? 0 : 1);
+        return;
+      }
+
       await client.models.list({ headers });
 
       expect(sent).toEqual(
@@ -171,5 +178,54 @@ describe('Workload identity raw build input retries', () => {
       );
       expect(transport.exchanges).toBe(credential === 'independent' ? 0 : 2);
     });
+  });
+
+  test('rejects a retry after a Headers-shaped one-shot build input is consumed', async () => {
+    class SpoofedHeaders {
+      private readonly rows = [['Authorization', 'Bearer independent'] as const].values();
+
+      entries() {
+        return this.rows;
+      }
+
+      // oxlint-disable-next-line class-methods-use-this -- A spoofed platform getter returns its fixed credential.
+      get() {
+        return 'Bearer independent';
+      }
+    }
+    Object.defineProperties(SpoofedHeaders.prototype, {
+      [Symbol.iterator]: { value: SpoofedHeaders.prototype.entries },
+      [Symbol.toStringTag]: { value: 'Headers' },
+      constructor: {
+        // oxlint-disable-next-line prefer-arrow-callback -- The platform classifier requires a prototype-owning constructor.
+        value: Object.defineProperty(function Headers() {}, 'prototype', {
+          value: SpoofedHeaders.prototype,
+        }),
+      },
+    });
+    class CopyClient extends OpenAI {
+      override async buildRequest(
+        options: FinalRequestOptions,
+        settings: Parameters<OpenAI['buildRequest']>[1] = {},
+      ) {
+        return super.buildRequest(
+          { ...options, headers: new Headers(options.headers as HeadersInit) },
+          settings,
+        );
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return Response.json({ error: 'synthetic retry' }, { status: 500 });
+    });
+    const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 1 });
+
+    await expect(client.models.list({ headers: new SpoofedHeaders() as unknown as Headers })).rejects.toThrow(
+      'must retain parsed headers',
+    );
+
+    expect(sent).toEqual(['Bearer independent']);
+    expect(transport.exchanges).toBe(0);
   });
 });
