@@ -1,10 +1,18 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected dispatch hooks. */
-import OpenAI from 'openai';
 import { test, vi } from 'vitest';
-import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import OpenAI from 'openai';
+import type { Fetch, HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { buildHeaders } from 'openai/internal/headers';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
+
+class CloningBuildRequestClient extends OpenAI {
+  override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+    const built = await super.buildRequest(...args);
+    built.req.headers = new Headers(built.req.headers);
+    return built;
+  }
+}
 
 function normalizeBearerScheme(init: RequestInit) {
   const headers = new Headers(init.headers);
@@ -22,14 +30,23 @@ describe('Workload identity request and dispatch hooks', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENAI_ADMIN_KEY'];
   });
 
-  test.each([null, '', 'Bearer replacement'])(
-    'does not refresh a workload token replaced by a request hook: %j',
-    async (authorization) => {
-      class HookClient extends OpenAI {
+  test.each([
+    [null, false],
+    [null, true],
+    ['', false],
+    ['', true],
+    ['Bearer replacement', false],
+    ['Bearer replacement', true],
+  ] as const)(
+    'does not refresh a workload token replaced by a request hook: %j (cloned headers: %s)',
+    async (authorization, cloneHeaders) => {
+      const Client = cloneHeaders ? CloningBuildRequestClient : OpenAI;
+      class HookClient extends Client {
         // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
         protected override async prepareRequest(request: RequestInit): Promise<void> {
           if (!(request.headers instanceof Headers)) {
@@ -59,34 +76,54 @@ describe('Workload identity request and dispatch hooks', () => {
     },
   );
 
-  test('retains workload provenance when buildRequest clones the final headers', async () => {
-    class HookClient extends OpenAI {
-      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
-        const built = await super.buildRequest(...args);
-        built.req.headers = new Headers(built.req.headers);
-        return built;
-      }
-    }
-    const headers: Headers[] = [];
-    const transport = createWorkloadIdentityTransport((_url, init) => {
-      headers.push(new Headers(init?.headers));
-      return headers.length === 1
-        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
-        : Response.json({ data: [] });
-    });
-    const client = new HookClient({
-      ...createTestClientOptions(),
-      maxRetries: 0,
-      fetch: transport.fetch,
-    });
+  describe.each([undefined, 0])('retry budget %j', (maxRetries) => {
+    test.each(['none', 'prepareRequest', 'buildRequest'])(
+      'refreshes a rejected workload token with %s header cloning',
+      async (hook) => {
+        const headers: Headers[] = [];
+        const transport = createWorkloadIdentityTransport((_url, init) => {
+          headers.push(new Headers(init?.headers));
+          return headers.length === 1
+            ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+            : Response.json({ data: [] });
+        });
+        const Client = hook === 'buildRequest' ? CloningBuildRequestClient : OpenAI;
+        const client = new Client({ ...createTestClientOptions(), maxRetries, fetch: transport.fetch });
+        if (hook === 'prepareRequest') {
+          Object.defineProperty(client, 'prepareRequest', {
+            value: async (request: RequestInit) => {
+              request.headers = new Headers(request.headers);
+            },
+          });
+        }
 
-    await client.models.list();
+        const result = await client.models.list();
 
-    expect(headers.map((value) => value.get('Authorization'))).toEqual([
-      'Bearer access-token-1',
-      'Bearer access-token-2',
-    ]);
-    expect(transport.exchanges).toBe(2);
+        expect(result).toBeDefined();
+        expect(headers.map((value) => value.get('Authorization'))).toEqual([
+          'Bearer access-token-1',
+          'Bearer access-token-2',
+        ]);
+        expect(transport.exchanges).toBe(2);
+      },
+    );
+
+    test.each([OpenAI, CloningBuildRequestClient])('refreshes at most once with %s', async (Client) => {
+      const headers: Headers[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        headers.push(new Headers(init?.headers));
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      });
+      const client = new Client({ ...createTestClientOptions(), maxRetries, fetch: transport.fetch });
+
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+      expect(headers.map((value) => value.get('Authorization'))).toEqual([
+        'Bearer access-token-1',
+        'Bearer access-token-2',
+      ]);
+      expect(transport.exchanges).toBe(2);
+    });
   });
 
   test('preserves a one-shot removal through bodyless custom-auth retries', async () => {
@@ -430,33 +467,6 @@ describe('Workload identity request and dispatch hooks', () => {
     },
   );
 
-  test.each([false, true])(
-    'refreshes a rejected workload token (cloned headers: %s)',
-    async (cloneHeaders) => {
-      let apiCallCount = 0;
-      const transport = createWorkloadIdentityTransport(() => {
-        apiCallCount += 1;
-        return apiCallCount === 1
-          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
-          : Response.json({ data: [] });
-      });
-      const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
-      if (cloneHeaders) {
-        Object.defineProperty(client, 'prepareRequest', {
-          value: async (request: RequestInit) => {
-            request.headers = new Headers(request.headers);
-          },
-        });
-      }
-
-      const result = await client.models.list();
-
-      expect(result).toBeDefined();
-      expect(apiCallCount).toBe(2);
-      expect(transport.exchanges).toBe(2);
-    },
-  );
-
   test.each([
     ['fetchWithAuth', false],
     ['fetchWithAuth', true],
@@ -623,36 +633,73 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
-  test('forwards the same materialized header snapshot after a hook supplies an iterator', async () => {
-    class HookClient extends OpenAI {
-      override async fetchWithTimeout(
-        url: RequestInfo,
-        init: RequestInit | undefined,
-        timeout: number,
-        controller: AbortController,
-      ) {
-        const headers = new Headers(init?.headers).entries() as unknown as NonNullable<HeadersInit>;
-        return super.fetchWithTimeout(url, { ...init, headers }, timeout, controller);
+  test.each(['default', 'custom', 'reset'] as const)(
+    'refreshes rejected workload credentials through a %s fetch clone',
+    async (mode) => {
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      vi.stubGlobal('fetch', transport.fetch);
+      const customFetch: Fetch = (url, init) => transport.fetch(url, init);
+      const parent = new OpenAI({
+        ...createTestClientOptions(),
+        maxRetries: 0,
+        ...(mode === 'reset' ? { fetch: customFetch } : {}),
+      });
+      const cloneOptions = {
+        default: {},
+        custom: { fetch: customFetch },
+        reset: { fetch: undefined },
+      };
+      const client = parent.withOptions(cloneOptions[mode]);
+
+      await client.models.list();
+
+      expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
+
+  test.each(['direct', 'wrapped'] as const)(
+    'forwards the same materialized header snapshot after a hook supplies a %s iterator',
+    async (kind) => {
+      class HookClient extends OpenAI {
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+        ) {
+          const iterator = new Headers(init?.headers).entries();
+          const headers = (kind === 'direct'
+            ? iterator
+            : { [Symbol.iterator]: () => iterator }) as unknown as NonNullable<HeadersInit>;
+          return super.fetchWithTimeout(url, { ...init, headers }, timeout, controller);
+        }
       }
-    }
-    const authorizations: (string | null)[] = [];
-    const transport = createWorkloadIdentityTransport((_url, init) => {
-      authorizations.push(new Headers(init?.headers).get('Authorization'));
-      return authorizations.length === 1
-        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
-        : Response.json({ data: [] });
-    });
-    const client = new HookClient({
-      ...createTestClientOptions(),
-      maxRetries: 0,
-      fetch: transport.fetch,
-    });
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        maxRetries: 0,
+        fetch: transport.fetch,
+      });
 
-    await client.models.list();
+      await client.models.list();
 
-    expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-    expect(transport.exchanges).toBe(2);
-  });
+      expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
 
   test.each(['fetchWithAuth', 'fetchWithTimeout'] as const)(
     'does not infer workload usage when %s owns dispatch without calling super',

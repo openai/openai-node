@@ -197,95 +197,6 @@ describe('OpenAI with Workload Identity', () => {
     expect(exchanges).toBe(1);
   });
 
-  test('preserves reusable headers changed during async subject-token acquisition', async () => {
-    const headers: { Authorization?: string | null; 'X-Credential-Context': string } = {
-      'X-Credential-Context': 'before',
-    };
-    const identity = createTestWorkloadIdentity();
-    identity.provider.getToken = async () => {
-      await Promise.resolve();
-      headers['X-Credential-Context'] = 'after';
-      headers.Authorization = null;
-      return 'subject-token';
-    };
-    let apiHeaders: Headers | undefined;
-    const client = new OpenAI({
-      ...createTestClientOptions(),
-      workloadIdentity: identity,
-      fetch: async (url, init) => {
-        if (url.toString().endsWith('/oauth/token')) {
-          return Response.json({
-            access_token: 'access-token',
-            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-            token_type: 'Bearer',
-            expires_in: 3600,
-          });
-        }
-        apiHeaders = new Headers(init?.headers);
-        return Response.json({ data: [] });
-      },
-    });
-
-    await client.models.list({ headers });
-
-    expect(apiHeaders?.get('X-Credential-Context')).toBe('after');
-    expect(apiHeaders?.get('Authorization')).toBeNull();
-  });
-
-  test('consumes iterable Authorization overrides once without exchanging credentials', async () => {
-    const requestHeaders = [
-      ['aUtHoRiZaTiOn', null],
-      ['X-Custom', 'test'],
-    ];
-    const iterator = requestHeaders.values();
-    const iterate = vi.spyOn(requestHeaders, Symbol.iterator).mockReturnValue(iterator);
-    const identity = createTestWorkloadIdentity();
-    identity.provider.getToken = vi.fn(async () => {
-      throw new Error('Unused subject token provider is unavailable');
-    });
-    const client = new OpenAI({
-      ...createTestClientOptions(),
-      workloadIdentity: identity,
-      fetch: async (_url, init) => {
-        const headers = new Headers(init?.headers);
-        expect(headers.has('Authorization')).toBe(false);
-        expect(headers.get('X-Custom')).toBe('test');
-        return Response.json({ data: [] });
-      },
-    });
-
-    await client.models.list({ headers: requestHeaders });
-    expect(iterate).toHaveBeenCalledTimes(1);
-    expect(identity.provider.getToken).not.toHaveBeenCalled();
-  });
-
-  test('retains non-authentication headers from a one-use iterator during credential acquisition', async () => {
-    const requestHeaders = [['X-Custom', 'test']];
-    const iterator = requestHeaders.values();
-    const iterate = vi.spyOn(requestHeaders, Symbol.iterator).mockReturnValue(iterator);
-    const client = new OpenAI({
-      ...createTestClientOptions(),
-      fetch: async (url, init) => {
-        if (url.toString().endsWith('/oauth/token')) {
-          return Response.json({
-            access_token: 'access-token',
-            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-            token_type: 'Bearer',
-            expires_in: 3600,
-          });
-        }
-        const headers = new Headers(init?.headers);
-        expect(headers.get('Authorization')).toBe('Bearer access-token');
-        expect(headers.get('X-Custom')).toBe('test');
-        return Response.json({ data: [] });
-      },
-    });
-
-    await client.models.list({ headers: requestHeaders });
-
-    expect(iterate).toHaveBeenCalledTimes(1);
-  });
-
   test('reuses cached token across multiple requests', async () => {
     let tokenExchangeCallCount = 0;
 
@@ -319,42 +230,6 @@ describe('OpenAI with Workload Identity', () => {
     await client.models.list();
 
     expect(tokenExchangeCallCount).toBe(1);
-  });
-
-  test('only retries once for 401 errors', async () => {
-    let apiCallCount = 0;
-    let tokenExchangeCallCount = 0;
-
-    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
-      const urlStr = url.toString();
-
-      if (urlStr.includes('/oauth/token')) {
-        tokenExchangeCallCount++;
-        return Response.json(
-          {
-            access_token: 'access-token',
-            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-            token_type: 'Bearer',
-            expires_in: 3600,
-          },
-          { status: 200 },
-        );
-      }
-
-      if (urlStr.includes('/models')) {
-        apiCallCount++;
-        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
-      }
-
-      return new Response('Not found', { status: 404 });
-    }) as typeof fetch;
-
-    const client = new OpenAI(createTestClientOptions());
-
-    await expect(client.models.list()).rejects.toThrow();
-
-    expect(apiCallCount).toBe(2);
-    expect(tokenExchangeCallCount).toBe(2);
   });
 
   test('does not retry 401 errors with streaming request body', async () => {
