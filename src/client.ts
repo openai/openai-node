@@ -256,6 +256,7 @@ import {
   HeadersLike,
   NullableHeaders,
   buildHeaders,
+  captureHeaderReads,
   snapshotHeaders,
   getRequestHeaders,
   createWorkloadHeaderSnapshots,
@@ -1203,21 +1204,32 @@ export class OpenAI {
 
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
-    await this.prepareOptions(options);
     const credentialContext = {};
-    workloadHeaders?.defaultHeaders.refresh(this._options.defaultHeaders);
-    workloadHeaders?.requestHeaders.refresh(options.headers);
-    if (
-      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
-      this.#canPreflightWorkloadIdentityHeaders(options)
-    ) {
-      // Caller preparation owns its input; SDK snapshots remain private to this request and its retries.
-      workloadHeaders ??= createWorkloadHeaderSnapshots(options.headers, this._options.defaultHeaders);
+    const preparation = captureHeaderReads(() => this.prepareOptions(options));
+    await preparation.result;
+    if (this._workloadIdentityAuth instanceof WorkloadIdentityAuth) {
+      // Hook reads captured before their first await remain private to this request and its retries.
+      workloadHeaders ??= createWorkloadHeaderSnapshots(options.headers, this._options.defaultHeaders, {
+        captured: preparation.captured,
+        deferRequest: !this.#canPreflightWorkloadIdentityHeaders(options) && !('body' in options),
+        deferDefault: !this.#canPreflightWorkloadIdentityHeaders(options),
+      });
     }
     const workloadIdentityAuthScope =
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth
         ? this.#workloadTokenProvenance.begin(options, credentialContext, workloadHeaders)
         : undefined;
+    try {
+      if (workloadHeaders?.defaultHeaders.initialized) {
+        workloadHeaders.defaultHeaders.refresh(this._options.defaultHeaders);
+      }
+      if (workloadHeaders?.requestHeaders.initialized) {
+        workloadHeaders.requestHeaders.refresh(options.headers);
+      }
+    } catch (error) {
+      workloadIdentityAuthScope?.dispose();
+      throw error;
+    }
 
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
@@ -1816,6 +1828,10 @@ export class OpenAI {
     inputOptions: FinalRequestOptions,
     { retryCount = 0, credentialContext }: { retryCount?: number; credentialContext?: object } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
+    credentialContext ??= this.#workloadTokenProvenance.scopeForHeaderSources(
+      inputOptions.headers,
+      this._options.defaultHeaders,
+    )?.context;
     if (this.#x509Authentication && !this.#x509Authentication.inRequest(this)) {
       const authentication = this.#x509Authentication;
       return await authentication.runRequest(async () => {
@@ -1837,9 +1853,10 @@ export class OpenAI {
       }
       // Standalone builds own their header replay until every authentication hook returns.
       const context = {};
-      const headers = this.#canPreflightWorkloadIdentityHeaders(inputOptions)
-        ? createWorkloadHeaderSnapshots(inputOptions.headers, this._options.defaultHeaders)
-        : undefined;
+      const headers = createWorkloadHeaderSnapshots(inputOptions.headers, this._options.defaultHeaders, {
+        deferRequest: !this.#canPreflightWorkloadIdentityHeaders(inputOptions) && !('body' in inputOptions),
+        deferDefault: !this.#canPreflightWorkloadIdentityHeaders(inputOptions),
+      });
       const scope = this.#workloadTokenProvenance.begin(inputOptions, context, headers);
       try {
         return await OpenAI.prototype.buildRequest.call(this, inputOptions, {
@@ -1883,17 +1900,12 @@ export class OpenAI {
       }
     }
     const requestHeaderSnapshot =
-      this._workloadIdentityAuth &&
-      !x509Authentication &&
-      (this.#canPreflightWorkloadIdentityHeaders(inputOptions) || 'body' in options)
+      this._workloadIdentityAuth && !x509Authentication
         ? (this.#workloadTokenProvenance.scopeFor(inputOptions, credentialContext)?.headers?.requestHeaders ??
           snapshotHeaders(options.headers))
         : undefined;
-    if (requestHeaderSnapshot) {
-      options.headers =
-        requestHeaderSnapshot.source === inputOptions.headers
-          ? requestHeaderSnapshot.snapshot
-          : requestHeaderSnapshot.refresh(inputOptions.headers);
+    if (requestHeaderSnapshot && (requestHeaderSnapshot.initialized || 'body' in options)) {
+      options.headers = requestHeaderSnapshot.refresh(inputOptions.headers);
     }
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
@@ -1986,6 +1998,7 @@ export class OpenAI {
         (authorization !== null && authorization !== `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`)
       );
     };
+    const preferredHeaders: { source: HeadersLike; snapshot: NullableHeaders }[] = [];
     if (
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
       (this.#canPreflightWorkloadIdentityHeaders(options) || requestHeaderSnapshot)
@@ -2000,6 +2013,13 @@ export class OpenAI {
       refreshSuppliedHeaders = () => {
         const existingDefaultLayer = defaultLayer;
         defaultLayer ??= snapshotHeaders(this._options.defaultHeaders);
+        if (
+          !defaultLayer.initialized &&
+          !requestLayer.initialized &&
+          defaultLayer.source === requestLayer.source
+        ) {
+          requestLayer.seed(requestLayer.source, defaultLayer.snapshot);
+        }
         const result = buildHeaders([
           (initialized && existingDefaultLayer) || defaultLayer.source !== this._options.defaultHeaders
             ? defaultLayer.refresh(this._options.defaultHeaders)
@@ -2018,14 +2038,40 @@ export class OpenAI {
           authenticationSecurity = { ...security, bearerAuth: false };
         }
       }
+      if (defaultLayer?.initialized) {
+        preferredHeaders.push({ source: defaultLayer.source, snapshot: defaultLayer.snapshot });
+      }
+      if (requestLayer.initialized) {
+        preferredHeaders.push({ source: requestLayer.source, snapshot: requestLayer.snapshot });
+      }
     }
-    let authenticationHeaders =
-      this._provider || this.#x509Authentication?.isPlanningRequest()
-        ? undefined
-        : await this.#workloadTokenProvenance.invoke(options, credentialContext, () =>
-            this.authHeaders(options, authenticationSecurity, credentialContext),
-          );
+    const authentication = captureHeaderReads(
+      () =>
+        this._provider || this.#x509Authentication?.isPlanningRequest()
+          ? undefined
+          : this.#workloadTokenProvenance.invoke(options, credentialContext, () =>
+              this.authHeaders(options, authenticationSecurity, credentialContext),
+            ),
+      preferredHeaders,
+    );
+    let authenticationHeaders = await authentication.result;
     if (refreshSuppliedHeaders) {
+      const defaultHeaderSnapshot = this.#workloadTokenProvenance.scopeFor(options, credentialContext)
+        ?.headers?.defaultHeaders;
+      if (defaultHeaderSnapshot && !defaultHeaderSnapshot.initialized) {
+        const captured =
+          typeof this._options.defaultHeaders === 'object' && this._options.defaultHeaders !== null
+            ? authentication.captured.get(this._options.defaultHeaders)
+            : undefined;
+        defaultHeaderSnapshot.seed(this._options.defaultHeaders, captured);
+      }
+      if (requestHeaderSnapshot && !requestHeaderSnapshot.initialized) {
+        const captured =
+          typeof options.headers === 'object' && options.headers !== null
+            ? authentication.captured.get(options.headers)
+            : undefined;
+        requestHeaderSnapshot.seed(options.headers, captured);
+      }
       suppliedHeaders = refreshSuppliedHeaders();
       if (!this._provider && authenticationSecurity !== security && !suppliesAuthorization(suppliedHeaders)) {
         // A caller may remove its override while the skipped authentication promise yields.

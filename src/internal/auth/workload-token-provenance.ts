@@ -43,6 +43,7 @@ export class WorkloadTokenProvenance {
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
+  private readonly headerSources = new WeakMap<object, Set<TokenScope>>();
   private readonly results = new WeakMap<object, string | null>();
   private invocation: TokenScope | undefined;
 
@@ -150,6 +151,7 @@ export class WorkloadTokenProvenance {
     const tokens = new Set<string>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     const consumedSources = new Set<object>();
+    const headerSourceScopes: { source: object; scopes: Set<TokenScope> }[] = [];
     let disposed = false;
     const scope: TokenScope = {
       context,
@@ -183,6 +185,12 @@ export class WorkloadTokenProvenance {
         if (scopes.size === 0) {
           this.options.delete(options);
         }
+        for (const entry of headerSourceScopes) {
+          entry.scopes.delete(scope);
+          if (entry.scopes.size === 0) {
+            this.headerSources.delete(entry.source);
+          }
+        }
       },
     };
     scopes.add(scope);
@@ -197,7 +205,40 @@ export class WorkloadTokenProvenance {
       owners.add(scope);
       this.consumedHeaders.set(snapshot.source, owners);
     }
+    for (const source of new Set([headers?.requestHeaders.source, headers?.defaultHeaders.source])) {
+      if (typeof source !== 'object' || source === null) {
+        continue;
+      }
+      const sourceScopes = this.headerSources.get(source) ?? new Set<TokenScope>();
+      sourceScopes.add(scope);
+      this.headerSources.set(source, sourceScopes);
+      headerSourceScopes.push({ source, scopes: sourceScopes });
+    }
     return scope;
+  }
+
+  /** Recovers an unambiguous request from the original header-layer identities copied by legacy hooks. */
+  scopeForHeaderSources(...sources: unknown[]): TokenScope | undefined {
+    let candidates: Set<TokenScope> | undefined;
+    for (const source of sources) {
+      if (typeof source !== 'object' || source === null) {
+        continue;
+      }
+      const scopes = this.headerSources.get(source);
+      if (!scopes) {
+        continue;
+      }
+      if (candidates) {
+        for (const candidate of candidates) {
+          if (!scopes.has(candidate)) {
+            candidates.delete(candidate);
+          }
+        }
+      } else {
+        candidates = new Set(scopes);
+      }
+    }
+    return candidates?.size === 1 ? candidates.values().next().value : undefined;
   }
 
   /** Resolves explicit ownership or the unambiguous original-options path used by legacy hooks. */

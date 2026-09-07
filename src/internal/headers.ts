@@ -99,6 +99,19 @@ const hasNativeHeadersBrand = (headers: object): boolean => {
   }
 };
 
+const hasIndexedAccessor = (values: readonly unknown[]) => {
+  for (let index = 0; index < values.length; index += 1) {
+    let owner: object | null = values;
+    let descriptor: PropertyDescriptor | undefined;
+    while (owner && !descriptor) {
+      descriptor = Object.getOwnPropertyDescriptor(owner, String(index));
+      owner = Object.getPrototypeOf(owner);
+    }
+    if (descriptor && !('value' in descriptor)) return true;
+  }
+  return false;
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: HeaderReplay,
@@ -139,7 +152,7 @@ function* iterateHeaders(
     replay.refreshable =
       !hasIterator ||
       (typeof iterator === 'function' &&
-        ((Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
+        ((Array.isArray(headers) && iterator === getArrayIterator(headers) && !hasIndexedAccessor(headers)) ||
           (!Array.isArray(headers) && iterator === nativeHeadersIterator)));
   }
   if (typeof iterator === 'function') {
@@ -174,9 +187,29 @@ function* iterateHeaders(
     }
   }
   for (let row of iter) {
+    if (replay && Array.isArray(row) && hasIndexedAccessor(row)) replay.refreshable = false;
     const name = row[0];
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
-    const values = isReadonlyArray(row[1]) ? row[1] : [row[1]];
+    const rawValues = row[1];
+    let values: Iterable<HeaderValue>;
+    if (isReadonlyArray(rawValues)) {
+      const headerValues = rawValues as readonly HeaderValue[];
+      const iterator = headerValues[Symbol.iterator];
+      if (
+        replay &&
+        (typeof iterator !== 'function' ||
+          iterator !== getArrayIterator(headerValues) ||
+          hasIndexedAccessor(headerValues))
+      ) {
+        replay.refreshable = false;
+      }
+      values =
+        typeof iterator === 'function'
+          ? { [Symbol.iterator]: () => iterator.call(headerValues) }
+          : headerValues;
+    } else {
+      values = [rawValues];
+    }
     let didClear = false;
     for (const value of values) {
       if (
@@ -255,40 +288,106 @@ const mergeHeaderEntries = (
   return result;
 };
 
-export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
-  mergeHeaderEntries(
-    newHeaders.map((source) => {
+interface HeaderReadContext {
+  captured: WeakMap<object, NullableHeaders>;
+  preferred: WeakMap<object, NullableHeaders>;
+}
+
+let headerReadContext: HeaderReadContext | undefined;
+
+/** Captures synchronous protected-hook reads without leaving request state ambient across an await. */
+export function captureHeaderReads<T>(
+  operation: () => T,
+  preferred: { source: HeadersLike; snapshot: NullableHeaders }[] = [],
+): { result: T; captured: WeakMap<object, NullableHeaders> } {
+  const previous = headerReadContext;
+  const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap() };
+  for (const { source, snapshot } of preferred) {
+    if (typeof source === 'object' && source !== null) context.preferred.set(source, snapshot);
+  }
+  headerReadContext = context;
+  try {
+    return { result: operation(), captured: context.captured };
+  } finally {
+    headerReadContext = previous;
+  }
+}
+
+export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
+  const result = mergeHeaderEntries(
+    newHeaders.map((originalSource) => {
+      const source =
+        typeof originalSource === 'object' && originalSource !== null
+          ? (headerReadContext?.preferred.get(originalSource) ?? originalSource)
+          : originalSource;
       const provenance = { unknown: false };
       return { source, provenance, entries: iterateHeaders(source, undefined, provenance) };
     }),
   );
+  if (newHeaders.length === 1) {
+    const source = newHeaders[0];
+    if (typeof source === 'object' && source !== null) headerReadContext?.captured.set(source, result);
+  }
+  return result;
+};
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
-export const snapshotHeaders = (initialSource: HeadersLike) => {
+export interface HeaderSnapshot {
+  readonly source: HeadersLike;
+  readonly snapshot: NullableHeaders;
+  readonly refreshable: boolean;
+  readonly replayable: boolean;
+  readonly initialized: boolean;
+  refresh: (...sources: [] | [HeadersLike]) => NullableHeaders;
+  seed: (source: HeadersLike, snapshot: NullableHeaders | undefined) => void;
+  fork: () => HeaderSnapshot;
+}
+
+const createHeaderSnapshot = (
+  initialSource: HeadersLike,
+  initial?: { snapshot?: NullableHeaders; refreshable?: boolean; deferred?: boolean },
+): HeaderSnapshot => {
   let source = initialSource;
-  let replay: HeaderReplay = { refreshable: true };
-  const provenance = { unknown: false };
-  let snapshot = mergeHeaderEntries([
-    { source, provenance, entries: iterateHeaders(source, replay, provenance) },
-  ]);
+  let replay: HeaderReplay = { refreshable: initial?.refreshable ?? true };
+  let snapshot = initial?.snapshot;
+  const initialize = () => {
+    if (snapshot) return snapshot;
+    const provenance = { unknown: false };
+    snapshot = mergeHeaderEntries([
+      { source, provenance, entries: iterateHeaders(source, replay, provenance) },
+    ]);
+    return snapshot;
+  };
+  if (!initial?.deferred) initialize();
   return {
     get source() {
       return source;
     },
     get snapshot() {
-      return snapshot;
+      return initialize();
+    },
+    get refreshable() {
+      return replay.refreshable;
+    },
+    get initialized() {
+      return snapshot !== undefined;
     },
     get replayable() {
       return replay.refreshable && !replay.unverifiedHeaders;
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       const currentSource = sources.length === 0 ? source : sources[0];
-      if (currentSource === snapshot) return snapshot;
-      if (currentSource !== source || replay.refreshable) {
+      if (snapshot && currentSource === snapshot) return snapshot;
+      if (!snapshot || currentSource !== source || replay.refreshable) {
+        const priorSnapshot = snapshot;
         const nextReplay: HeaderReplay = {
           refreshable: true,
           ...(currentSource === source
-            ? { iterator: replay.iterator, iterations: replay.iterations, snapshot }
+            ? {
+                iterator: replay.iterator,
+                iterations: replay.iterations,
+                ...(priorSnapshot ? { snapshot: priorSnapshot } : {}),
+              }
             : undefined),
         };
         const nextProvenance = { unknown: false };
@@ -302,36 +401,75 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
         if (
           currentSource === source &&
           nextReplay.unverifiedHeaders &&
-          [...snapshot.values.keys(), ...snapshot.nulls].some(
+          priorSnapshot &&
+          [...priorSnapshot.values.keys(), ...priorSnapshot.nulls].some(
             (name) => !nextSnapshot.values.has(name) && !nextSnapshot.nulls.has(name),
           )
         ) {
           // Missing foreign rows may come from a partially exhausted cursor, not an intentional deletion.
           replay.refreshable = false;
-          return snapshot;
+          return priorSnapshot;
         }
         source = currentSource;
         replay = nextReplay;
         snapshot = nextSnapshot;
       }
-      return snapshot;
+      return initialize();
     },
+    seed: (currentSource, captured) => {
+      if (!snapshot && currentSource === source && captured) {
+        snapshot = captured;
+        replay.refreshable = false;
+      }
+    },
+    fork: () => createHeaderSnapshot(source, { snapshot: initialize(), refreshable: replay.refreshable }),
   };
 };
 
+/** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
+export const snapshotHeaders = (initialSource: HeadersLike): HeaderSnapshot =>
+  createHeaderSnapshot(initialSource);
+
 /** Parsed header layers shared by preparation and automatic retries. */
 export interface WorkloadHeaderSnapshots {
-  requestHeaders: ReturnType<typeof snapshotHeaders>;
-  defaultHeaders: ReturnType<typeof snapshotHeaders>;
+  requestHeaders: HeaderSnapshot;
+  defaultHeaders: HeaderSnapshot;
 }
 
 /** Materializes each source once within one request, without sharing credentials between requests. */
 export function createWorkloadHeaderSnapshots(
   request: HeadersLike,
   defaults: HeadersLike,
+  {
+    captured,
+    deferRequest = false,
+    deferDefault = false,
+  }: {
+    captured?: WeakMap<object, NullableHeaders>;
+    deferRequest?: boolean;
+    deferDefault?: boolean;
+  } = {},
 ): WorkloadHeaderSnapshots {
-  const defaultHeaders = snapshotHeaders(defaults);
-  return { defaultHeaders, requestHeaders: request === defaults ? defaultHeaders : snapshotHeaders(request) };
+  const capturedSnapshot = (source: HeadersLike) =>
+    typeof source === 'object' && source !== null ? captured?.get(source) : undefined;
+  const capturedDefault = capturedSnapshot(defaults);
+  const defaultHeaders = createHeaderSnapshot(defaults, {
+    ...(capturedDefault ? { snapshot: capturedDefault } : {}),
+    refreshable: false,
+    deferred: deferDefault && !capturedDefault,
+  });
+  const capturedRequest = capturedSnapshot(request);
+  return {
+    defaultHeaders,
+    requestHeaders:
+      request === defaults
+        ? defaultHeaders.fork()
+        : createHeaderSnapshot(request, {
+            ...(capturedRequest ? { snapshot: capturedRequest } : {}),
+            refreshable: false,
+            deferred: deferRequest && !capturedRequest,
+          }),
+  };
 }
 
 export const isEmptyHeaders = (headers: HeadersLike) => {
