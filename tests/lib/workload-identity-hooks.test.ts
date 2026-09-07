@@ -125,6 +125,63 @@ describe('Workload identity request and dispatch hooks', () => {
     },
   );
 
+  test('refreshes a bearer credential separated by multiple spaces', async () => {
+    class HookClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+      protected override async prepareRequest(init: RequestInit) {
+        const headers = new Headers(init.headers);
+        headers.set('Authorization', (headers.get('Authorization') ?? '').replace(/^Bearer /u, 'bearer  '));
+        init.headers = headers;
+      }
+    }
+    const authorizations: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      authorizations.push(new Headers(init?.headers).get('Authorization'));
+      return authorizations.length === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(authorizations).toEqual(['bearer  access-token-1', 'bearer  access-token-2']);
+    expect(transport.exchanges).toBe(2);
+  });
+
+  test('preserves Request headers when a transport hook delegates without init', async () => {
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(
+        url: RequestInfo,
+        init: RequestInit | undefined,
+        timeout: number,
+        controller: AbortController,
+        context?: object,
+      ) {
+        return super.fetchWithTimeout(
+          new Request(url, init as globalThis.RequestInit),
+          undefined,
+          timeout,
+          controller,
+          context,
+        );
+      }
+    }
+    const authorizations: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      authorizations.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+      return authorizations.length === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
+  });
+
   test.each([false, true])(
     'refreshes a rejected workload token (cloned headers: %s)',
     async (cloneHeaders) => {

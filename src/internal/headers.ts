@@ -28,42 +28,42 @@ export type NullableHeaders = {
 };
 
 const getArrayIterator = (headers: readonly unknown[]) => {
-  let arrayPrototype: readonly unknown[] | undefined;
-  let prototype: object | null = Object.getPrototypeOf(headers);
+  let platformIterator: (() => Iterator<HeaderEntry>) | undefined;
+  let prototype: object | null = headers;
   const seen = new Set<object>();
   while (prototype) {
     if (seen.has(prototype)) return undefined;
     seen.add(prototype);
-    // Array.prototype is itself an array, including in another realm. Subclass
-    // prototypes are ordinary objects; intermediate array instances do not win.
-    if (Array.isArray(prototype)) arrayPrototype = prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+    if (descriptor) {
+      // Array.prototype is itself an array, including in another realm. Any
+      // earlier protocol descriptor is a caller override and may be one-shot.
+      if (platformIterator || !Array.isArray(prototype) || typeof descriptor.value !== 'function') {
+        return undefined;
+      }
+      platformIterator = descriptor.value as () => Iterator<HeaderEntry>;
+    }
     prototype = Object.getPrototypeOf(prototype);
   }
-  return arrayPrototype?.[Symbol.iterator];
+  return platformIterator;
 };
 
 const getHeadersIterator = (headers: object) => {
+  let platformIterator: (() => Iterator<HeaderEntry>) | undefined;
   const seen = new Set<object>();
-  for (
-    let prototype = Object.getPrototypeOf(headers);
-    prototype;
-    prototype = Object.getPrototypeOf(prototype)
-  ) {
+  for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
     if (seen.has(prototype)) return undefined;
     seen.add(prototype);
-    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-    if (
-      typeof constructor === 'function' &&
-      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
-      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
-      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers'
-    ) {
-      const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value;
-      const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
-      if (typeof entries === 'function' && iterator === entries) return iterator;
+    const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+    const entries = Object.getOwnPropertyDescriptor(prototype, 'entries');
+    if (iterator || entries) {
+      if (platformIterator || typeof iterator?.value !== 'function' || iterator.value !== entries?.value) {
+        return undefined;
+      }
+      platformIterator = iterator.value as () => Iterator<HeaderEntry>;
     }
   }
-  return undefined;
+  return platformIterator;
 };
 
 function* iterateHeaders(
@@ -91,8 +91,7 @@ function* iterateHeaders(
     // are reusable across realms, where instanceof cannot identify them.
     replay.refreshable =
       typeof iterator !== 'function' ||
-      (Array.isArray(headers) &&
-        (iterator === Array.prototype[Symbol.iterator] || iterator === getArrayIterator(headers))) ||
+      (Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
       (!Array.isArray(headers) && iterator === getHeadersIterator(headers));
   }
   if (typeof iterator === 'function') {

@@ -1,6 +1,13 @@
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
 export function bearerToken(authorization: string | null): string | undefined {
-  return authorization?.slice(0, 7).toLowerCase() === 'bearer ' ? authorization.slice(7) : undefined;
+  if (authorization?.slice(0, 7).toLowerCase() !== 'bearer ') {
+    return undefined;
+  }
+  let tokenStart = 7;
+  while (authorization[tokenStart] === ' ') {
+    tokenStart += 1;
+  }
+  return tokenStart === authorization.length ? undefined : authorization.slice(tokenStart);
 }
 
 interface TokenScope {
