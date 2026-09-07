@@ -19,17 +19,42 @@ interface HeaderCredential {
 }
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
+const headerCredentialMarker = Symbol('workload.headerCredential');
+const markedHeaderCredentials = new WeakMap<object, HeaderCredential | null>();
 const observedHeaders = new WeakSet<Headers>();
 const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
 
 /** Reads the credential capability attached to an SDK-produced header layer. */
 export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
-  return headerCredentials.get(headers);
+  const credential = headerCredentials.get(headers);
+  if (credential !== undefined) {
+    return credential;
+  }
+  const marker = Object.getOwnPropertyDescriptor(headers, headerCredentialMarker);
+  return marker && typeof marker.value === 'object' && marker.value !== null
+    ? markedHeaderCredentials.get(marker.value)
+    : undefined;
+}
+
+/** Gives a parsed copy independent mutation state while retaining its credential owner and bytes. */
+export function copyWorkloadHeaderCredential(credential: HeaderCredential | null): HeaderCredential | null {
+  return credential && { ...credential };
 }
 
 /** Carries the capability belonging to the last layer that supplied Authorization. */
 export function rememberWorkloadHeaderCredential(headers: object, credential: HeaderCredential | null): void {
   headerCredentials.set(headers, credential);
+  try {
+    const marker = {};
+    markedHeaderCredentials.set(marker, credential);
+    Object.defineProperty(headers, headerCredentialMarker, {
+      configurable: true,
+      enumerable: true,
+      value: marker,
+    });
+  } catch {
+    // WeakMap ownership remains sufficient for non-extensible SDK-local objects.
+  }
   if (credential && headers instanceof Headers && !observedHeaders.has(headers)) {
     observedHeaders.add(headers);
     for (const method of ['set', 'append', 'delete'] as const) {
@@ -128,12 +153,15 @@ export class WorkloadTokenProvenance {
 
   /** Recovers an unmarked rebuilt result only from its own active authentication invocation. */
   recover(headers: { values: Headers } | undefined, options: object, context: object | undefined): void {
-    if (!headers || workloadHeaderCredential(headers) !== undefined) {
+    if (!headers) {
       return;
     }
     const credential = workloadHeaderCredential(headers.values);
     if (credential !== undefined) {
       rememberWorkloadHeaderCredential(headers, credential);
+      return;
+    }
+    if (workloadHeaderCredential(headers) !== undefined) {
       return;
     }
     const authorization = headers.values.get('authorization');

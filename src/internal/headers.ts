@@ -1,5 +1,9 @@
 import { isReadonlyArray } from './utils/values';
-import { rememberWorkloadHeaderCredential, workloadHeaderCredential } from './auth/workload-token-provenance';
+import {
+  copyWorkloadHeaderCredential,
+  rememberWorkloadHeaderCredential,
+  workloadHeaderCredential,
+} from './auth/workload-token-provenance';
 
 type HeaderValue = string | undefined | null;
 type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
@@ -140,10 +144,7 @@ export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<obje
           if (!Object.getOwnPropertyDescriptor(headers, String(index))) return false;
         }
       } else {
-        return (
-          descriptor.value === getHeadersIterator(headers) &&
-          (hasNativeHeadersBrand(headers) || getPlatformHeader(headers, 'authorization') !== undefined)
-        );
+        return hasNativeHeadersBrand(headers) && descriptor.value === Headers.prototype[Symbol.iterator];
       }
     }
     return Object.entries(Object.getOwnPropertyDescriptors(headers)).every(([key, property]) => {
@@ -495,8 +496,9 @@ const mergeHeaderEntries = (
   }
   const result = { [brand_privateNullableHeaders]: true as const, values: targetHeaders, nulls: nullHeaders };
   if (credential !== undefined) {
-    rememberWorkloadHeaderCredential(result, credential);
-    rememberWorkloadHeaderCredential(targetHeaders, credential);
+    const resultCredential = copyWorkloadHeaderCredential(credential);
+    rememberWorkloadHeaderCredential(result, resultCredential);
+    rememberWorkloadHeaderCredential(targetHeaders, resultCredential);
   }
   return result;
 };
