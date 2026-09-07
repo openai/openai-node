@@ -404,45 +404,64 @@ describe('Workload credential ownership after native header mutations', () => {
     },
   );
 
-  test.skipIf(Number(process.versions.node.split('.')[0]) < 24).each([false, true])(
-    'tracks SDK-observed foreign Headers, overwritten=%s',
-    async (overwrite) => {
-      const { Headers: ForeignHeaders } = await import('undici');
-      class HookClient extends OpenAI {
-        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
-          const result = await super.buildRequest(...args);
-          result.req.headers = new ForeignHeaders(result.req.headers) as unknown as Headers;
-          return result;
+  test.each(
+    (['native', 'foreign'] as const).flatMap((realm) =>
+      (['buildRequest', 'prepareRequest'] as const).flatMap((boundary) =>
+        [false, true].map((overwrite) => ({ realm, boundary, overwrite })),
+      ),
+    ),
+  )('tracks SDK-observed platform Headers: %j', async ({ realm, boundary, overwrite }, context) => {
+    if (realm === 'foreign' && Number(process.versions.node.split('.')[0]) < 24) {
+      context.skip();
+    }
+    const HeadersConstructor = realm === 'foreign' ? (await import('undici')).Headers : Headers;
+    class HookClient extends OpenAI {
+      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+        const result = await super.buildRequest(...args);
+        if (boundary === 'buildRequest') {
+          result.req.headers = new HeadersConstructor(result.req.headers) as unknown as Headers;
         }
+        return result;
+      }
 
-        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
-        protected override async prepareRequest(request: RequestInit) {
-          if (overwrite) {
-            const headers = request.headers as Headers;
-            headers.set('Authorization', headers.get('Authorization') ?? '');
-            request.headers = new ForeignHeaders(headers) as unknown as Headers;
-          }
+      // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+      protected override async prepareRequest(request: RequestInit) {
+        if (boundary === 'prepareRequest') {
+          request.headers = new HeadersConstructor(request.headers) as unknown as Headers;
         }
       }
-      let requests = 0;
-      const transport = createWorkloadIdentityTransport(() => {
-        requests += 1;
-        return requests === 1
-          ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
-          : Response.json({ data: [] });
-      });
-      const client = new HookClient({
-        ...createTestClientOptions(),
-        apiKey: null,
-        adminAPIKey: null,
-        fetch: transport.fetch,
-        maxRetries: 0,
-      });
-      await (overwrite
-        ? expect(client.models.list()).rejects.toMatchObject({ status: 401 })
-        : client.models.list());
-      expect(requests).toBe(overwrite ? 1 : 2);
-      expect(transport.exchanges).toBe(overwrite ? 1 : 2);
-    },
-  );
+
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [, request] = args;
+        if (!request) {
+          throw new Error('Expected request initialization');
+        }
+        if (overwrite) {
+          const headers = request.headers as Headers;
+          headers.set('Authorization', headers.get('Authorization') ?? '');
+          request.headers = new HeadersConstructor(headers) as unknown as Headers;
+        }
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    let requests = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      requests += 1;
+      return requests === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+    await (overwrite
+      ? expect(client.models.list()).rejects.toMatchObject({ status: 401 })
+      : client.models.list());
+    expect(requests).toBe(overwrite ? 1 : 2);
+    expect(transport.exchanges).toBe(overwrite ? 1 : 2);
+  });
 });

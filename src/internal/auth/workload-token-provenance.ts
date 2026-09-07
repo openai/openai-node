@@ -22,6 +22,7 @@ interface HeaderCredential {
 export interface WorkloadCredentialUsage {
   isCurrent: () => boolean;
   revoke: () => void;
+  adopt: (headers: Headers) => void;
 }
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
@@ -212,6 +213,9 @@ export class WorkloadTokenProvenance {
       revoke: () => {
         issued.revoked = true;
       },
+      adopt: (values) => {
+        rememberWorkloadHeaderValues(values, issued);
+      },
     };
   }
 
@@ -332,6 +336,11 @@ export class WorkloadTokenProvenance {
       revoke: () => {
         if (credential) {
           credential.revoked = true;
+        }
+      },
+      adopt: (headers) => {
+        if (credential) {
+          rememberWorkloadHeaderValues(headers, credential);
         }
       },
     };

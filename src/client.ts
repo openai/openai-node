@@ -2264,12 +2264,17 @@ export class OpenAI {
     headers: object | undefined,
     authorization: string | undefined,
   ): void {
-    if (
-      credential &&
-      authorization !== undefined &&
-      this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false
-    ) {
+    if (!credential || authorization === undefined) {
+      return;
+    }
+    const matches = this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization);
+    if (matches === false) {
       credential.revoke();
+    } else if (matches === undefined && headers && credential.isCurrent()) {
+      const platformHeader = getPlatformHeader(headers as Headers, 'Authorization');
+      if (platformHeader && bearerToken(platformHeader.value) === bearerToken(authorization)) {
+        credential.adopt(headers as Headers);
+      }
     }
   }
 
