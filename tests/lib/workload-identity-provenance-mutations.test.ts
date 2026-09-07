@@ -147,3 +147,72 @@ test.each(['authHeaders', 'bearerAuth'] as const)(
     expect(transport.exchanges).toBe(1);
   },
 );
+
+test('does not invalidate an unchanged credential when an unused parsed copy is overwritten', async () => {
+  class HookClient extends OpenAI {
+    protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+      const headers = await super.authHeaders(...args);
+      buildHeaders([headers]).values.set('Authorization', 'Bearer independent');
+      return headers;
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((url, init) => {
+    sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+    return sent.length === 1
+      ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+      : Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    maxRetries: 0,
+    fetch: transport.fetch,
+  });
+
+  await client.models.list();
+
+  expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+  expect(transport.exchanges).toBe(2);
+});
+
+test.each(['authHeaders', 'bearerAuth'] as const)(
+  'does not restore %s ownership by cloning after an equal-byte overwrite',
+  async (hook) => {
+    class HookClient extends OpenAI {
+      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+        const headers = await super.authHeaders(...args);
+        if (hook === 'authHeaders' && headers) {
+          headers.values.set('Authorization', 'Bearer access-token-1');
+          return { ...headers, values: new Headers(headers.values) };
+        }
+        return headers;
+      }
+
+      protected override async bearerAuth(...args: Parameters<OpenAI['bearerAuth']>) {
+        const headers = await super.bearerAuth(...args);
+        if (hook === 'bearerAuth' && headers) {
+          headers.values.set('Authorization', 'Bearer access-token-1');
+          return { ...headers, values: new Headers(headers.values) };
+        }
+        return headers;
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      maxRetries: 0,
+      fetch: transport.fetch,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(sent).toEqual(['Bearer access-token-1']);
+    expect(transport.exchanges).toBe(1);
+  },
+);

@@ -19,17 +19,37 @@ interface HeaderCredential {
 }
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
+const headerCredentialMarker = Symbol('workload.headerCredential');
 const observedHeaders = new WeakSet<Headers>();
 const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
 
 /** Reads the credential capability attached to an SDK-produced header layer. */
 export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
-  return headerCredentials.get(headers);
+  const credential = headerCredentials.get(headers);
+  if (credential !== undefined) {
+    return credential;
+  }
+  const marker = Object.getOwnPropertyDescriptor(headers, headerCredentialMarker);
+  return marker ? (marker.value as HeaderCredential | null) : undefined;
+}
+
+/** Gives a parsed copy independent mutation state while retaining its credential owner and bytes. */
+export function copyWorkloadHeaderCredential(credential: HeaderCredential | null): HeaderCredential | null {
+  return credential && { ...credential };
 }
 
 /** Carries the capability belonging to the last layer that supplied Authorization. */
 export function rememberWorkloadHeaderCredential(headers: object, credential: HeaderCredential | null): void {
   headerCredentials.set(headers, credential);
+  try {
+    Object.defineProperty(headers, headerCredentialMarker, {
+      configurable: true,
+      enumerable: true,
+      value: credential,
+    });
+  } catch {
+    // WeakMap ownership remains sufficient for non-extensible SDK-local objects.
+  }
   if (credential && headers instanceof Headers && !observedHeaders.has(headers)) {
     observedHeaders.add(headers);
     for (const method of ['set', 'append', 'delete'] as const) {
