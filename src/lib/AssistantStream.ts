@@ -102,6 +102,7 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
 function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
   event: AssistantStreamEvent;
   exposedEvent: AssistantStreamEvent;
+  runStepDeltaData: RunStepStreamEvent['data'] | undefined;
 } {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
@@ -132,20 +133,6 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       }) as AssistantStreamEvent['data'];
     }
   }
-  if (eventType === 'thread.run.step.delta') {
-    const delta = Reflect.get(stableData, 'delta', stableData) as RunStepDelta;
-    // Reject even nonenumerable identity fields before reading any delta values.
-    if (delta && hasOwn(delta, 'id')) {
-      throw new OpenAIError('Run-step deltas must not contain an id field');
-    }
-    // Capture root keys and values before validation; keep nested tool-call objects shared.
-    // Copy descriptors so an accessor-backed delta is read only once, even on frozen data.
-    stableData = Object.create(Object.getPrototypeOf(stableData), {
-      ...Object.getOwnPropertyDescriptors(stableData),
-      delta: { configurable: true, enumerable: true, writable: true, value: delta && { ...delta } },
-    }) as AssistantStreamEvent['data'];
-  }
-  const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
   const ordinaryEvent =
     eventDescriptor !== undefined &&
     'value' in eventDescriptor &&
@@ -154,10 +141,33 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     'value' in dataDescriptor &&
     dataDescriptor.value === data &&
     stableData === data;
+  const exposedEvent = ordinaryEvent
+    ? event
+    : ({ event: eventType, data: stableData } as AssistantStreamEvent);
+  let runStepDeltaData: RunStepStreamEvent['data'] | undefined;
+
+  if (eventType === 'thread.run.step.delta') {
+    // Track listener-created envelope aliases on the original data, independently of delta content.
+    runStepDeltaData = stableData as RunStepStreamEvent['data'];
+    const delta = Reflect.get(stableData, 'delta', stableData) as RunStepDelta;
+    // Reject even nonenumerable identity fields before reading any delta values.
+    if (delta && hasOwn(delta, 'id')) {
+      throw new OpenAIError('Run-step deltas must not contain an id field');
+    }
+    // Keep the captured root private so raw listeners cannot change the validated identity fields.
+    // Preserve the original public event and share nested tool-call objects for listener mutations.
+    // Copy descriptors so an accessor-backed delta is read only once, even on frozen data.
+    stableData = Object.create(Object.getPrototypeOf(stableData), {
+      ...Object.getOwnPropertyDescriptors(stableData),
+      delta: { configurable: true, enumerable: true, writable: true, value: delta && { ...delta } },
+    }) as AssistantStreamEvent['data'];
+  }
+  const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
 
   return {
     event: stableEvent,
-    exposedEvent: ordinaryEvent ? event : ({ event: eventType, data: stableData } as AssistantStreamEvent),
+    exposedEvent,
+    runStepDeltaData,
   };
 }
 
@@ -405,7 +415,7 @@ export class AssistantStream
       return;
     }
 
-    const { event: stableEvent, exposedEvent } = stabilizeAssistantStreamEvent(event);
+    const { event: stableEvent, exposedEvent, runStepDeltaData } = stabilizeAssistantStreamEvent(event);
 
     let messageID: string | undefined;
     let messageData: MessageStreamEvent['data'] | undefined;
@@ -429,7 +439,7 @@ export class AssistantStream
       case 'thread.run.step.cancelled':
       case 'thread.run.step.expired': {
         runStepID = this.#validateRunStepEvent(stableEvent);
-        runStepData = stableEvent.data;
+        runStepData = runStepDeltaData ?? stableEvent.data;
         break;
       }
     }
