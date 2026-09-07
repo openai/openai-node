@@ -157,6 +157,87 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test.each(['request', 'default'] as const)(
+    'preserves one-shot %s authorization through a legacy copied buildRequest wrapper',
+    async (location) => {
+      class HookClient extends OpenAI {
+        override async buildRequest(
+          options: FinalRequestOptions,
+          { retryCount = 0 }: { retryCount?: number } = {},
+        ) {
+          await Promise.resolve();
+          return super.buildRequest({ ...options }, { retryCount });
+        }
+      }
+      const rows: [string, string | null][] = [['Authorization', null]];
+      const iterator = rows.values();
+      rows[Symbol.iterator] = () => iterator;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+        return Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        defaultHeaders: location === 'default' ? rows : undefined,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list({ headers: location === 'request' ? rows : undefined });
+
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
+  test('preserves a one-shot removal through bodyless custom-auth retries', async () => {
+    class HookClient extends OpenAI {
+      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+        return super.authHeaders(...args);
+      }
+    }
+    const rows: [string, string | null][] = [['Authorization', null]];
+    const iterator = rows.values();
+    rows[Symbol.iterator] = () => iterator;
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return sent.length === 1
+        ? Response.json({ error: { message: 'retry' } }, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 1 });
+
+    await client.models.list({ headers: rows });
+
+    expect(sent).toEqual([null, null]);
+    expect(transport.exchanges).toBe(1);
+  });
+
+  test('lets a later authentication hook retain a one-shot removal by materializing it', async () => {
+    class HookClient extends OpenAI {
+      protected override async authHeaders(
+        options: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        context?: object,
+      ) {
+        options.headers = buildHeaders([options.headers]);
+        return super.authHeaders(options, schemes, context);
+      }
+    }
+    const rows: [string, string | null][] = [['Authorization', null]];
+    const iterator = rows.values();
+    rows[Symbol.iterator] = () => iterator;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+      return Response.json({ ok: true });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.post('/synthetic', { body: { synthetic: true }, headers: rows });
+
+    expect(transport.exchanges).toBe(1);
+  });
+
   test('strips SDK provenance from configured fetch while preserving caller extensions', async () => {
     const extension = Symbol('caller extension');
     class FrozenClient extends OpenAI {
