@@ -63,6 +63,56 @@ describe('workload identity header iteration', () => {
   });
 
   test.each(['own', 'inherited'] as const)(
+    'does not treat aligned %s Headers iterator overrides as reusable',
+    async (location) => {
+      const headers = new Headers({ 'X-Custom': 'test' });
+      const iterator = headers.entries();
+      const iterate = vi.fn(() => iterator);
+      const target = location === 'own' ? headers : Object.create(Object.getPrototypeOf(headers));
+      Object.defineProperties(target, {
+        entries: { value: iterate },
+        [Symbol.iterator]: { value: iterate },
+      });
+      if (location === 'inherited') {
+        Object.setPrototypeOf(headers, target);
+      }
+      const client = createClient(
+        async () => 'subject-token',
+        (sent) => {
+          expect(sent.get('X-Custom')).toBe('test');
+          expect(sent.get('Authorization')).toBe('Bearer access-token');
+        },
+      );
+
+      await client.models.list({ headers });
+
+      expect(iterate).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('reads an accessor-backed native Headers iterator once', async () => {
+    const headers = new Headers({ 'X-Custom': 'test' });
+    const nativeIterator = headers[Symbol.iterator];
+    const iterator = headers.entries();
+    const readIterator = vi
+      .fn<() => typeof nativeIterator>()
+      .mockReturnValueOnce(nativeIterator)
+      .mockReturnValue(() => iterator);
+    Object.defineProperty(headers, Symbol.iterator, { get: readIterator });
+    const client = createClient(
+      async () => 'subject-token',
+      (sent) => {
+        expect(sent.get('X-Custom')).toBe('test');
+        expect(sent.get('Authorization')).toBe('Bearer access-token');
+      },
+    );
+
+    await client.models.list({ headers });
+
+    expect(readIterator).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['own', 'inherited'] as const)(
     'consumes iterable Authorization overrides once without exchanging credentials (%s protocol)',
     async (location) => {
       const headers = [
