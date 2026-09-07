@@ -1,5 +1,5 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected dispatch hooks. */
-import { vi } from 'vitest';
+import { test, vi } from 'vitest';
 import OpenAI from 'openai';
 import type { Fetch, HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
@@ -313,6 +313,51 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
     expect(transport.exchanges).toBe(2);
   });
+
+  test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
+    'preserves foreign Request headers when a transport hook delegates without init',
+    async () => {
+      const { Request: ForeignRequest } = await import('undici');
+      class HookClient extends OpenAI {
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+          context?: object,
+        ) {
+          return super.fetchWithTimeout(
+            new ForeignRequest(
+              url as ConstructorParameters<typeof ForeignRequest>[0],
+              init as ConstructorParameters<typeof ForeignRequest>[1],
+            ) as unknown as RequestInfo,
+            undefined,
+            timeout,
+            controller,
+            context,
+          );
+        }
+      }
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        authorizations.push(
+          new ForeignRequest(
+            url as ConstructorParameters<typeof ForeignRequest>[0],
+            init as ConstructorParameters<typeof ForeignRequest>[1],
+          ).headers.get('Authorization'),
+        );
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await client.models.list();
+
+      expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
 
   test.each([
     ['fetchWithAuth', false],
