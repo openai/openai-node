@@ -320,7 +320,7 @@ describe('Workload identity raw build input retries', () => {
   );
 
   test.each(['deleting getter', 'deleting coercion', 'nonenumerable tuple', 'inherited value'] as const)(
-    'retains the original replayability decision for %s',
+    'does not upgrade credentials after a custom retry of %s',
     async (kind) => {
       let reads = 0;
       const record: Record<string, unknown> = {};
@@ -368,11 +368,16 @@ describe('Workload identity raw build input retries', () => {
       });
       const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 1 });
 
-      await expect(client.models.list({ headers: input as HeadersInit })).rejects.toThrow(
-        'must retain parsed headers',
-      );
-      expect(sent).toEqual(['Bearer independent']);
-      expect(reads).toBe(1);
+      const request = client.models.list({ headers: input as HeadersInit });
+      if (kind === 'nonenumerable tuple') {
+        await expect(request).rejects.toMatchObject({ status: 500 });
+        expect(sent).toEqual(['Bearer independent', 'Bearer independent']);
+        expect(reads).toBe(2);
+      } else {
+        await expect(request).rejects.toThrow('must retain parsed headers');
+        expect(sent).toEqual(['Bearer independent']);
+        expect(reads).toBe(1);
+      }
       expect(transport.exchanges).toBe(0);
     },
   );

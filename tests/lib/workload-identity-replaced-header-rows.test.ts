@@ -1,0 +1,219 @@
+import OpenAI from 'openai';
+import { createWorkloadHeaderSnapshots, snapshotHeaders } from 'openai/internal/headers';
+import { vi } from 'vitest';
+import {
+  createTestClientOptions,
+  createTestWorkloadIdentity,
+  createWorkloadIdentityTransport,
+} from './workload-identity-fixtures';
+
+describe.each(['name', 'value'] as const)('retained row %s getter', (field) => {
+  describe.each(['request', 'default'] as const)('%s headers', (layer) => {
+    test.each([null, 'Bearer independent'] as const)(
+      'observes a new row value %j during token acquisition',
+      async (authorization) => {
+        const row: (string | null | undefined)[] = ['Authorization', undefined];
+        const read = vi.fn(() => {
+          if (read.mock.calls.length > 1) {
+            throw new Error('Row getter was read twice');
+          }
+          return field === 'name' ? 'Authorization' : undefined;
+        });
+        Object.defineProperty(row, field === 'name' ? 0 : 1, { configurable: true, get: read });
+        const headers = [row];
+        const identity = createTestWorkloadIdentity();
+        identity.provider.getToken = async () => {
+          Object.defineProperty(row, 1, { value: authorization });
+          return 'subject-token';
+        };
+        const sent: (string | null)[] = [];
+        const transport = createWorkloadIdentityTransport((_url, init) => {
+          sent.push(new Headers(init?.headers).get('Authorization'));
+          return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+        });
+        const client = new OpenAI({
+          ...createTestClientOptions(),
+          apiKey: null,
+          adminAPIKey: null,
+          workloadIdentity: identity,
+          ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+          fetch: transport.fetch,
+          maxRetries: 0,
+        });
+
+        await expect(
+          client.get('https://independent.example.test/synthetic', layer === 'request' ? { headers } : {}),
+        ).rejects.toMatchObject({ status: 401 });
+
+        expect(sent).toEqual([authorization]);
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(transport.exchanges).toBe(1);
+      },
+    );
+  });
+});
+
+describe.each(['nested', 'coercion'] as const)('stateful %s row value', (kind) => {
+  describe.each(['request', 'default'] as const)('%s headers', (layer) => {
+    test.each([null, 'Bearer independent'] as const)(
+      'refreshes a separate Authorization row to %j',
+      async (authorization) => {
+        const read = vi.fn(() => 'preserved');
+        const values = ['preserved'];
+        Object.defineProperty(values, 0, { get: read });
+        const authorizationRow: (string | null | undefined)[] = ['Authorization', undefined];
+        const headers = [
+          ['X-Custom', kind === 'nested' ? values : { toString: read }],
+          authorizationRow,
+        ] as unknown as string[][];
+        const identity = createTestWorkloadIdentity();
+        identity.provider.getToken = async () => {
+          authorizationRow[1] = authorization;
+          return 'subject-token';
+        };
+        const sent: (string | null)[] = [];
+        const transport = createWorkloadIdentityTransport((_url, init) => {
+          const actual = new Headers(init?.headers);
+          sent.push(actual.get('Authorization'));
+          expect(actual.get('X-Custom')).toBe('preserved');
+          return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+        });
+        const client = new OpenAI({
+          ...createTestClientOptions(),
+          apiKey: null,
+          adminAPIKey: null,
+          workloadIdentity: identity,
+          ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+          fetch: transport.fetch,
+          maxRetries: 0,
+        });
+
+        await expect(
+          client.get('https://independent.example.test/synthetic', layer === 'request' ? { headers } : {}),
+        ).rejects.toMatchObject({ status: 401 });
+
+        expect(sent).toEqual([authorization]);
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(transport.exchanges).toBe(1);
+      },
+    );
+  });
+});
+
+test('retains a value getter when the ordinary row name changes', () => {
+  const read = vi.fn(() => 'preserved');
+  const row = ['X-Original', ''];
+  Object.defineProperty(row, 1, { get: read });
+  const snapshot = snapshotHeaders([row]);
+  row[0] = 'X-Replacement';
+
+  expect(snapshot.refresh().values.get('X-Replacement')).toBe('preserved');
+  expect(snapshot.refresh().values.has('X-Original')).toBe(false);
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+test('refreshes deleted ordinary values beside a retained name getter', () => {
+  const read = vi.fn(() => 'Authorization');
+  const row = ['Authorization', 'Bearer original'];
+  Object.defineProperty(row, 0, { get: read });
+  const snapshot = snapshotHeaders([row]);
+  delete row[1];
+
+  expect(snapshot.refresh().values.has('Authorization')).toBe(false);
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+test('does not freeze consumed columns because of an unused accessor', () => {
+  const unused = vi.fn(() => 'unused');
+  const row = ['Authorization', 'Bearer original'];
+  Object.defineProperty(row, 2, { get: unused });
+  const snapshot = snapshotHeaders([row]);
+  row[1] = 'Bearer replacement';
+
+  expect(snapshot.refresh().values.get('Authorization')).toBe('Bearer replacement');
+  expect(unused).not.toHaveBeenCalled();
+});
+
+test('observes replacement of an inherited row accessor without rereading it', () => {
+  const read = vi.fn(() => 'Bearer original');
+  const prototype = Object.create(Array.prototype) as object;
+  Object.defineProperty(prototype, 1, { configurable: true, get: read });
+  const row: (string | null)[] = ['Authorization'];
+  row.length = 2;
+  Object.setPrototypeOf(row, prototype);
+  const snapshot = snapshotHeaders([row]);
+  Object.defineProperty(prototype, 1, { value: null });
+
+  expect(snapshot.refresh().nulls.has('authorization')).toBe(true);
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+test('keeps stateful row caches local through concurrent requests and later reuse', async () => {
+  let reads = 0;
+  const shared = ['X-Custom', ''];
+  Object.defineProperty(shared, 1, {
+    get() {
+      reads += 1;
+      return `preserved-${reads}`;
+    },
+  });
+  const firstAuthorization: (string | null | undefined)[] = ['Authorization', undefined];
+  const secondAuthorization: (string | null | undefined)[] = ['Authorization', undefined];
+  const inputs = [
+    [shared, firstAuthorization],
+    [shared, secondAuthorization],
+  ] as const;
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    firstAuthorization[1] = null;
+    secondAuthorization[1] = 'Bearer independent';
+    return 'subject-token';
+  };
+  const sent: Headers[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers));
+    return Response.json({ ok: true });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    workloadIdentity: identity,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await Promise.all(inputs.map((headers) => client.get('/synthetic', { headers })));
+  expect(new Set(sent.map((headers) => headers.get('X-Custom')))).toEqual(
+    new Set(['preserved-1', 'preserved-2']),
+  );
+  expect(sent.map((headers) => headers.get('Authorization'))).toEqual(
+    expect.arrayContaining([null, 'Bearer independent']),
+  );
+  await client.get('/synthetic', { headers: inputs[0] });
+  expect(sent[2]?.get('X-Custom')).toBe('preserved-3');
+  expect(reads).toBe(3);
+  expect(transport.exchanges).toBe(1);
+});
+
+test.each(['requestHeaders', 'defaultHeaders'] as const)(
+  'keeps the other aliased layer intact when %s is replaced',
+  (layer) => {
+    const read = vi.fn(() => 'preserved');
+    const row = ['X-Shared', ''];
+    Object.defineProperty(row, 1, { get: read });
+    const shared = [row];
+    const snapshots = createWorkloadHeaderSnapshots(shared, shared, {
+      deferRequest: true,
+      deferDefault: true,
+    });
+    expect(snapshots[layer].snapshot.values.get('X-Shared')).toBe('preserved');
+    snapshots[layer].refresh([['X-Replacement', 'replacement']]);
+    const other = layer === 'requestHeaders' ? 'defaultHeaders' : 'requestHeaders';
+
+    expect(snapshots[other].refresh().values.get('X-Shared')).toBe('preserved');
+    expect(snapshots[other].snapshot.values.has('X-Replacement')).toBe(false);
+    expect(snapshots[layer].snapshot.values.has('X-Shared')).toBe(false);
+    expect(read).toHaveBeenCalledTimes(1);
+  },
+);
