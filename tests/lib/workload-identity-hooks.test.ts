@@ -1,6 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected dispatch hooks. */
 import OpenAI from 'openai';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { buildHeaders } from 'openai/internal/headers';
@@ -248,7 +248,7 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
-  test('preserves Request headers when a transport hook delegates without init', async () => {
+  test.each([false, true])('preserves native Request headers (throwing tag getter: %s)', async (throwTag) => {
     class HookClient extends OpenAI {
       override async fetchWithTimeout(
         url: RequestInfo,
@@ -257,13 +257,15 @@ describe('Workload identity request and dispatch hooks', () => {
         controller: AbortController,
         context?: object,
       ) {
-        return super.fetchWithTimeout(
-          new Request(url, init as globalThis.RequestInit),
-          undefined,
-          timeout,
-          controller,
-          context,
-        );
+        const request = new Request(url, init as globalThis.RequestInit);
+        if (throwTag) {
+          Object.defineProperty(request, Symbol.toStringTag, {
+            get() {
+              throw new Error('Unrelated Request tag getter must not run');
+            },
+          });
+        }
+        return super.fetchWithTimeout(request, undefined, timeout, controller, context);
       }
     }
     const authorizations: (string | null)[] = [];
@@ -304,7 +306,7 @@ describe('Workload identity request and dispatch hooks', () => {
 
     await client.models.list();
 
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   test('refreshes a resolved workload identity placeholder', async () => {
@@ -323,9 +325,9 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
-  test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
-    'preserves foreign Request headers when a transport hook delegates without init',
-    async () => {
+  test.skipIf(Number(process.versions.node.split('.')[0]) < 24).each([false, true])(
+    'preserves foreign Request headers (throwing tag getter: %s)',
+    async (throwTag) => {
       const { Request: ForeignRequest } = await import('undici');
       class HookClient extends OpenAI {
         override async fetchWithTimeout(
@@ -335,11 +337,19 @@ describe('Workload identity request and dispatch hooks', () => {
           controller: AbortController,
           context?: object,
         ) {
+          const request = new ForeignRequest(
+            url as ConstructorParameters<typeof ForeignRequest>[0],
+            init as ConstructorParameters<typeof ForeignRequest>[1],
+          );
+          if (throwTag) {
+            Object.defineProperty(request, Symbol.toStringTag, {
+              get() {
+                throw new Error('Unrelated foreign Request tag getter must not run');
+              },
+            });
+          }
           return super.fetchWithTimeout(
-            new ForeignRequest(
-              url as ConstructorParameters<typeof ForeignRequest>[0],
-              init as ConstructorParameters<typeof ForeignRequest>[1],
-            ) as unknown as RequestInfo,
+            request as unknown as RequestInfo,
             undefined,
             timeout,
             controller,

@@ -24,7 +24,13 @@ export const createWorkloadIdentityTransport = (
       return exchanges;
     },
     fetch: async (url: RequestInfo, init?: RequestInit) => {
-      if (url.toString().endsWith('/oauth/token')) {
+      let requestURL: string;
+      if (typeof url === 'string') {
+        requestURL = url;
+      } else {
+        requestURL = url instanceof URL ? url.href : url.url;
+      }
+      if (requestURL.endsWith('/oauth/token')) {
         exchanges += 1;
         return Response.json({
           access_token: `access-token-${exchanges}`,
