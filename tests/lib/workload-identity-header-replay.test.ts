@@ -145,3 +145,45 @@ test.each(['Headers', 'array'] as const)(
     expect(readIterator).toHaveBeenCalledTimes(1);
   },
 );
+
+test
+  .skipIf(Number(process.versions.node.split('.')[0]) < 24)
+  .each(['before exchange', 'during exchange'] as const)(
+  'keeps newly observed foreign credentials when another header disappears %s',
+  async (phase) => {
+    const { Headers: ForeignHeaders } = await import('undici');
+    const headers = new ForeignHeaders({ 'X-Removed': 'initial' });
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      headers.delete('X-Removed');
+      if (phase === 'before exchange') {
+        headers.set('Authorization', 'Bearer independent');
+      }
+      return 'subject-token';
+    };
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      calls += 1;
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer independent');
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      workloadIdentity: identity,
+      fetch: async (url, init) => {
+        const response = await transport.fetch(url, init);
+        if (phase === 'during exchange' && String(url).includes('/oauth/token')) {
+          headers.set('Authorization', 'Bearer independent');
+        }
+        return response;
+      },
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list({ headers: headers as unknown as Headers })).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(calls).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);

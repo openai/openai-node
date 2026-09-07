@@ -280,8 +280,8 @@ Hooks that consume one-shot header iterables must keep the parsed headers if lat
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
 caller-owned header sources before `prepareOptions` or bodyless custom authentication hooks run.
 
-Foreign Headers-shaped implementations that remove previously observed header names during replay
-are treated as exhausted one-shot sources. To intentionally delete headers in such an implementation,
+Foreign Headers-shaped implementations retain previously observed header names missing during replay,
+while applying every newly observed value. To intentionally delete headers in such an implementation,
 replace the header layer, or use an explicit record with `Authorization: null`; missing rows alone
 cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
 arrays, and data records retain live refresh behavior.

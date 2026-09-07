@@ -1,3 +1,4 @@
+/* oxlint-disable max-classes-per-file -- Independent fixtures exercise copying build hooks. */
 import OpenAI from 'openai';
 import type { HeadersInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
@@ -9,6 +10,26 @@ describe('Workload identity raw build input retries', () => {
     delete process.env['OPENAI_ADMIN_KEY'];
   });
 
+  test('releases copied-header recovery after a legacy request completes', async () => {
+    class LegacyClient extends OpenAI {
+      override async buildRequest(options: FinalRequestOptions, { retryCount = 0 } = {}) {
+        return super.buildRequest({ ...options }, { retryCount });
+      }
+    }
+    let rows = [['Authorization', null] as const][Symbol.iterator]();
+    const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+    const transport = createWorkloadIdentityTransport(() => Response.json({ data: [] }));
+    const client = new LegacyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+    const options: FinalRequestOptions = { method: 'get', path: '/synthetic', headers };
+
+    await client.request(options);
+    rows = [['Authorization', null] as const][Symbol.iterator]();
+    const built = await client.buildRequest(options);
+
+    expect(built.req.headers.get('Authorization')).toBeNull();
+    expect(transport.exchanges).toBe(0);
+  });
+
   test.each(['deleting getter', 'deleting coercion', 'nonenumerable tuple', 'inherited value'] as const)(
     'retains the original replayability decision for %s',
     async (kind) => {
@@ -16,7 +37,7 @@ describe('Workload identity raw build input retries', () => {
       const record: Record<string, unknown> = {};
       const credential = () => {
         reads += 1;
-        delete record.Authorization;
+        delete record['Authorization'];
         return 'Bearer independent';
       };
       let input: unknown = record;
@@ -27,7 +48,7 @@ describe('Workload identity raw build input retries', () => {
           get: credential,
         });
       } else if (kind === 'deleting coercion') {
-        record.Authorization = { toString: credential };
+        record['Authorization'] = { toString: credential };
       } else if (kind === 'nonenumerable tuple') {
         const row: unknown[] = ['Authorization'];
         Object.defineProperty(row, '1', { value: { toString: credential }, enumerable: false });
@@ -38,7 +59,7 @@ describe('Workload identity raw build input retries', () => {
         const prototype = Object.create(Array.prototype);
         Object.defineProperty(prototype, '0', { get: credential });
         Object.setPrototypeOf(values, prototype);
-        record.Authorization = values;
+        record['Authorization'] = values;
       }
       class CopyClient extends OpenAI {
         override async buildRequest(
