@@ -2,6 +2,7 @@ import { isReadonlyArray } from './utils/values';
 import { getHeadersIterator, getPlatformHeader } from './platform-headers';
 export { getPlatformHeader } from './platform-headers';
 import {
+  copyWorkloadHeaderCredential,
   rememberWorkloadHeaderCredential,
   rememberWorkloadHeaderValues,
   workloadHeaderCredential,
@@ -525,8 +526,9 @@ const mergeHeaderEntries = (
   }
   const result = { [brand_privateNullableHeaders]: true as const, values: targetHeaders, nulls: nullHeaders };
   if (credential !== undefined) {
-    rememberWorkloadHeaderCredential(result, credential);
-    rememberWorkloadHeaderValues(targetHeaders, credential);
+    const copiedCredential = copyWorkloadHeaderCredential(credential);
+    rememberWorkloadHeaderCredential(result, copiedCredential, targetHeaders);
+    rememberWorkloadHeaderValues(targetHeaders, copiedCredential);
   }
   return result;
 };
