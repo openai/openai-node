@@ -302,6 +302,7 @@ type WorkloadIdentityRequest = {
   context: object;
   bindings: Set<object>;
   authorization: string | undefined;
+  originalHeaders: object | undefined;
   used: boolean;
 };
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
@@ -1250,6 +1251,7 @@ export class OpenAI {
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     let initialWorkloadAuthorization: string | undefined;
+    let initialWorkloadHeaders: object | undefined;
     try {
       let candidate: Awaited<ReturnType<OpenAI['buildRequest']>>;
       try {
@@ -1268,12 +1270,13 @@ export class OpenAI {
             replayable: buildInputReplayable,
           };
         }
-        const authorization = candidate.req.headers.get('authorization');
+        const authorization = getPlatformHeader(candidate.req.headers, 'Authorization')?.value ?? null;
         if (
           authorization !== null &&
           this.#workloadTokenProvenance.matchesResult(candidate, authorization, workloadIdentityAuthScope)
         ) {
           initialWorkloadAuthorization = authorization;
+          initialWorkloadHeaders = candidate.req.headers;
         }
       } finally {
         workloadIdentityAuthScope?.dispose();
@@ -1382,8 +1385,10 @@ export class OpenAI {
       context: credentialContext,
       bindings: new Set<object>(),
       authorization: initialWorkloadAuthorization,
+      originalHeaders: initialWorkloadHeaders,
       used: false,
     };
+    this.#observeWorkloadIdentityHeaders(workloadRequest, req.headers);
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(req, workloadRequest);
@@ -1695,6 +1700,7 @@ export class OpenAI {
         this.#workloadTokenProvenance.issue({ values: authenticatedHeaders }, token);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
+          workloadRequest.originalHeaders = authenticatedHeaders;
         }
       }
     }
@@ -2088,6 +2094,7 @@ export class OpenAI {
         preferredHeaders.push({ source: requestLayer.source, snapshot: requestLayer.snapshot });
       }
     }
+    const workloadScope = this.#workloadTokenProvenance.scopeFor(options, credentialContext);
     const authentication = captureHeaderReads(
       () =>
         this._provider || this.#x509Authentication?.isPlanningRequest()
@@ -2096,6 +2103,13 @@ export class OpenAI {
               this.authHeaders(options, authenticationSecurity, credentialContext),
             ),
       preferredHeaders,
+      (source, snapshot) => {
+        const captured = workloadScope?.headers;
+        if (!captured) return;
+        captured.defaultHeaders.seed(source, snapshot);
+        captured.requestHeaders.seed(source, snapshot);
+        workloadScope.captureHeaders(captured);
+      },
     );
     let authenticationHeaders = await authentication.result;
     if (refreshSuppliedHeaders) {
@@ -2159,9 +2173,26 @@ export class OpenAI {
       const requests = this.#workloadIdentityRequests.get(key);
       return requests?.size === 1 ? requests.values().next().value : undefined;
     };
-    if (context !== undefined) return lookup(context);
     const carrier = init && this.#workloadTokenProvenance.requestCarrier(init);
-    return (init && lookup(init)) ?? (carrier && lookup(carrier)) ?? lookup(controller);
+    const request =
+      context !== undefined
+        ? lookup(context)
+        : ((init && lookup(init)) ?? (carrier && lookup(carrier)) ?? lookup(controller));
+    if (request) this.#observeWorkloadIdentityHeaders(request, init?.headers);
+    return request;
+  }
+
+  #observeWorkloadIdentityHeaders(request: WorkloadIdentityRequest, headers: object | undefined) {
+    const authorization = request.authorization;
+    if (
+      authorization !== undefined &&
+      [request.originalHeaders, headers].some(
+        (source) => this.#workloadTokenProvenance.matchesHeaderCredential(source, authorization) === false,
+      )
+    ) {
+      // Once an SDK hook exposes an independent credential, later unmarked clones cannot reclaim it.
+      request.authorization = undefined;
+    }
   }
 
   #bindWorkloadIdentityRequest(key: object, request: WorkloadIdentityRequest) {

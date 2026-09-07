@@ -262,6 +262,8 @@ class WrappedClient extends OpenAI {
 `bearerAuth` receives the context as its second argument. `buildRequest` overrides can forward the
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
+An in-place Authorization overwrite has the same effect; subsequent header copies do not restore
+SDK ownership.
 
 Immediate delegating calls also retain ownership when copying both options and native headers. A hook
 that awaits before delegating, copies its options, and reconstructs the authentication result with

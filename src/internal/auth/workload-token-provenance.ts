@@ -15,9 +15,11 @@ export function bearerToken(authorization: string | null): string | undefined {
 interface HeaderCredential {
   owner: object;
   token: string;
+  invalidated?: boolean;
 }
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
+const observedHeaders = new WeakSet<Headers>();
 const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
 
 /** Reads the credential capability attached to an SDK-produced header layer. */
@@ -28,6 +30,32 @@ export function workloadHeaderCredential(headers: object): HeaderCredential | nu
 /** Carries the capability belonging to the last layer that supplied Authorization. */
 export function rememberWorkloadHeaderCredential(headers: object, credential: HeaderCredential | null): void {
   headerCredentials.set(headers, credential);
+  if (credential && headers instanceof Headers && !observedHeaders.has(headers)) {
+    observedHeaders.add(headers);
+    for (const method of ['set', 'append', 'delete'] as const) {
+      const mutate = Headers.prototype[method];
+      Object.defineProperty(headers, method, {
+        configurable: true,
+        writable: true,
+        value(this: Headers, ...args: [string, string?]) {
+          const previous = Headers.prototype.get.call(this, 'Authorization');
+          const result = Reflect.apply(mutate, this, args);
+          if (typeof args[0] !== 'string' || args[0].toLowerCase() === 'authorization') {
+            const current = Headers.prototype.get.call(this, 'Authorization');
+            // A scheme-casing-only rewrite retains the credential; an explicit overwrite does not.
+            if (method !== 'set' || previous === current || bearerToken(previous) !== bearerToken(current)) {
+              const previousCredential = headerCredentials.get(this);
+              if (previousCredential) {
+                previousCredential.invalidated = true;
+              }
+              headerCredentials.set(this, null);
+            }
+          }
+          return result;
+        },
+      });
+    }
+  }
 }
 
 interface TokenScope {
@@ -46,7 +74,7 @@ export class WorkloadTokenProvenance {
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
   private readonly results = new WeakMap<
     object,
-    { token: string | null; headers?: WorkloadHeaderSnapshots }
+    { credential: HeaderCredential | null; headers?: WorkloadHeaderSnapshots }
   >();
   private invocation: TokenScope | undefined;
 
@@ -55,6 +83,9 @@ export class WorkloadTokenProvenance {
     const previous = this.invocation;
     this.invocation = this.scopeFor(options, context);
     try {
+      if (this.invocation?.headers) {
+        this.invocation.captureHeaders(this.invocation.headers);
+      }
       return operation();
     } finally {
       this.invocation = previous;
@@ -123,7 +154,7 @@ export class WorkloadTokenProvenance {
     // An opaque, secret-free carrier survives ordinary object spread of SDK-owned requests.
     Object.defineProperty(result.req, requestCredentialCarrier, { value: carrier, enumerable: true });
     this.results.set(carrier, {
-      token: credential?.owner === this ? credential.token : null,
+      credential: credential?.owner === this ? credential : null,
       ...(headers ? { headers } : undefined),
     });
     return result;
@@ -150,7 +181,10 @@ export class WorkloadTokenProvenance {
       return undefined;
     }
     return (
-      credential !== null && credential.owner === this && bearerToken(authorization) === credential.token
+      credential !== null &&
+      !credential.invalidated &&
+      credential.owner === this &&
+      bearerToken(authorization) === credential.token
     );
   }
 
@@ -166,8 +200,8 @@ export class WorkloadTokenProvenance {
     }
     const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
     if (typeof carrier === 'object' && carrier !== null) {
-      const token = this.results.get(carrier)?.token;
-      return token !== undefined && token !== null && bearerToken(authorization) === token;
+      const credential = this.results.get(carrier)?.credential;
+      return !!credential && !credential.invalidated && bearerToken(authorization) === credential.token;
     }
     return scope?.matches(authorization) ?? false;
   }

@@ -83,6 +83,7 @@ const getHeadersIterator = (headers: object) => {
 };
 
 interface HeaderPropertySnapshot {
+  descriptor?: PropertyDescriptor | undefined;
   entry?: readonly [string, string | readonly string[] | null];
 }
 
@@ -139,7 +140,10 @@ export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<obje
           if (!Object.getOwnPropertyDescriptor(headers, String(index))) return false;
         }
       } else {
-        return hasNativeHeadersBrand(headers) && descriptor.value === Headers.prototype[Symbol.iterator];
+        return (
+          descriptor.value === getHeadersIterator(headers) &&
+          (hasNativeHeadersBrand(headers) || getPlatformHeader(headers, 'authorization') !== undefined)
+        );
       }
     }
     return Object.entries(Object.getOwnPropertyDescriptors(headers)).every(([key, property]) => {
@@ -237,6 +241,7 @@ function* iterateHeaders(
   let shouldClear = false;
   let iter: Iterable<HeaderEntry>;
   const accessorProperties = new Set<string>();
+  const propertyDescriptors = new Map<string, PropertyDescriptor>();
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
   const hasIterator = !replay?.record && (replay?.iterator !== undefined || Symbol.iterator in headers);
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
@@ -312,6 +317,17 @@ function* iterateHeaders(
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
         if (!descriptor?.enumerable) continue;
+        propertyDescriptors.set(key, descriptor);
+        const previous = replay.properties.get(key)?.descriptor;
+        if (
+          previous &&
+          ('value' in descriptor
+            ? !('value' in previous) || descriptor.value !== previous.value
+            : 'value' in previous || descriptor.get !== previous.get)
+        ) {
+          // A captured one-shot value belongs to its property, not a later replacement.
+          replay.properties.delete(key);
+        }
         if (!('value' in descriptor)) accessorProperties.add(key);
         entries.push([key, replay.properties.has(key) ? undefined : Reflect.get(headers, key)]);
       }
@@ -369,7 +385,8 @@ function* iterateHeaders(
       : shouldClear && replay
         ? { refreshable: !accessorProperties.has(name) }
         : replay;
-    const property: HeaderPropertySnapshot | undefined = shouldClear && replay ? {} : undefined;
+    const property: HeaderPropertySnapshot | undefined =
+      shouldClear && replay ? { descriptor: propertyDescriptors.get(name) } : undefined;
     if (property && replay) replay.property = property;
     const headerValue = row[1];
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
@@ -485,6 +502,7 @@ const mergeHeaderEntries = (
 };
 
 interface HeaderReadContext {
+  onCapture?: ((source: HeadersLike, snapshot: NullableHeaders) => void) | undefined;
   captured: WeakMap<object, NullableHeaders>;
   preferred: WeakMap<object, NullableHeaders>;
 }
@@ -502,9 +520,10 @@ const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
 export function captureHeaderReads<T>(
   operation: () => T,
   preferred: { source: HeadersLike; snapshot: NullableHeaders }[] = [],
+  onCapture?: (source: HeadersLike, snapshot: NullableHeaders) => void,
 ): { result: T; captured: WeakMap<object, NullableHeaders> } {
   const previous = headerReadContext;
-  const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap() };
+  const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap(), onCapture };
   for (const { source, snapshot } of preferred) {
     if (typeof source === 'object' && source !== null) context.preferred.set(source, snapshot);
   }
@@ -548,6 +567,7 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
       headerReadContext.captured.set(source, result);
       if (capturedReplay)
         capturedHeaderReplays.set(result, { source, replay: copyHeaderReplay(capturedReplay) });
+      headerReadContext.onCapture?.(source, result);
     }
   }
   return result;
