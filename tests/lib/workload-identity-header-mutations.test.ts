@@ -490,9 +490,9 @@ describe('Workload credential ownership after native header mutations', () => {
 
         override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
           const [, request] = args;
-        if (!request) {
-          throw new Error('Expected request initialization');
-        }
+          if (!request) {
+            throw new Error('Expected request initialization');
+          }
           const headers = request.headers as Headers;
           headers.set('Authorization', previousAuthorization ?? '');
           request.headers = new HeadersConstructor(headers) as unknown as Headers;
