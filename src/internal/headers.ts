@@ -96,6 +96,7 @@ interface HeaderReplay {
   properties?: Map<string, HeaderPropertySnapshot>;
   propertyOrder?: string[];
   property?: HeaderPropertySnapshot;
+  rows?: WeakMap<object, readonly (readonly [string, string | null])[]>;
 }
 
 const hasNativeHeadersBrand = (headers: object): boolean => {
@@ -282,9 +283,13 @@ function* iterateHeaders(
     }
   }
   for (let row of iter) {
-    if (replay?.refreshable && !shouldClear && hasStatefulArrayProperties(row)) {
-      replay.refreshable = false;
+    const retainedRow = !shouldClear && replay?.rows?.get(row);
+    if (retainedRow) {
+      yield* retainedRow;
+      continue;
     }
+    const statefulRow = replay?.refreshable && !shouldClear && hasStatefulArrayProperties(row);
+    const capturedRow: (readonly [string, string | null])[] | undefined = statefulRow ? [] : undefined;
     const name = row[0];
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
     const retained = shouldClear ? replay?.properties?.get(name) : undefined;
@@ -300,7 +305,11 @@ function* iterateHeaders(
       }
       continue;
     }
-    const rowReplay = shouldClear && replay ? { refreshable: !accessorProperties.has(name) } : replay;
+    const rowReplay = statefulRow
+      ? { refreshable: false }
+      : shouldClear && replay
+        ? { refreshable: !accessorProperties.has(name) }
+        : replay;
     const property: HeaderPropertySnapshot | undefined = shouldClear && replay ? {} : undefined;
     if (property && replay) replay.property = property;
     const headerValue = row[1];
@@ -335,9 +344,16 @@ function* iterateHeaders(
       // Yield a null to clear the header before adding the new values.
       if (shouldClear && !didClear) {
         didClear = true;
+        capturedRow?.push([name, null]);
         yield [name, null];
       }
-      yield [name, value];
+      const capturedValue = capturedRow && value !== null ? new Headers([[name, value]]).get(name)! : value;
+      capturedRow?.push([name, capturedValue]);
+      yield [name, capturedValue];
+    }
+    if (capturedRow && replay) {
+      replay.rows ??= new WeakMap();
+      replay.rows.set(row, capturedRow);
     }
     if (property && replay) {
       if (!rowReplay?.refreshable) replay.properties!.set(name, property);
@@ -551,7 +567,7 @@ const createHeaderSnapshot = (
       return snapshot !== undefined;
     },
     get replayable() {
-      return replay.refreshable && !replay.unverifiedHeaders && !replay.properties?.size;
+      return replay.refreshable && !replay.unverifiedHeaders && !replay.properties?.size && !replay.rows;
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       inheritMaterialization();
@@ -569,6 +585,7 @@ const createHeaderSnapshot = (
                 record: replay.record,
                 properties: replay.properties,
                 propertyOrder: replay.propertyOrder,
+                rows: replay.rows,
               }
             : undefined),
         };
