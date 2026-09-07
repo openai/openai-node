@@ -1,5 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise ownership and retry selection. */
 import OpenAI from 'openai';
+import type { HeadersInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
 describe.each(['context', 'original', 'discarded'] as const)('%s request ownership', (ownership) => {
@@ -68,6 +69,43 @@ describe.each(['context', 'original', 'discarded'] as const)('%s request ownersh
     },
   );
 });
+
+test.each(['lost context', 'copied default'] as const)(
+  'does not dispatch an upgraded retry after %s',
+  async (kind) => {
+    const rows = [['Authorization', '']][Symbol.iterator]();
+    const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+    class HookClient extends OpenAI {
+      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+        const source = kind === 'copied default' ? this._options.defaultHeaders : args[0].headers;
+        const selected = new Headers(source as HeadersInit);
+        return super.buildRequest(
+          { ...args[0], headers: selected },
+          kind === 'lost context' && args[1]?.retryCount ? {} : args[1],
+        );
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      ...(kind === 'copied default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await expect(client.models.list(kind === 'copied default' ? {} : { headers })).rejects.toThrow(
+      kind === 'lost context' ? 'forward credentialContext' : 'must retain parsed headers',
+    );
+    expect(sent).toEqual(['']);
+    expect(transport.exchanges).toBe(kind === 'lost context' ? 1 : 0);
+  },
+);
 
 test.each(['nested', 'default'] as const)(
   'retains the effective retry credential boundary: %s',

@@ -287,6 +287,8 @@ The hook may run and read its input again on a retry; retain parsed one-shot lay
 needed again. Before acquiring credentials, the owned base build rejects a retry that loses a previously
 selected independent Authorization value or removal. Stable replacements, including genuine foreign
 `Headers` copies, can retry without treating an ignored raw input as consumed.
+If a hook drops ownership on a later retry, the SDK rejects its returned request before dispatch; any
+standalone credential acquisition performed inside that hook may already have occurred.
 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace

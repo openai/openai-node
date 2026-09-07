@@ -1222,8 +1222,11 @@ export class OpenAI {
     const previousBuildInput = workloadHeaders?.customBuildInput;
     const needsBuildRetryGuard =
       previousBuildInput &&
-      previousBuildInput.source === options.headers &&
-      (!previousBuildInput.replayable || !canReplayHeaderInput(previousBuildInput.source));
+      ((previousBuildInput.source === options.headers &&
+        (!previousBuildInput.replayable || !canReplayHeaderInput(previousBuildInput.source))) ||
+        (previousBuildInput.defaultSource === this._options.defaultHeaders &&
+          (!previousBuildInput.defaultReplayable ||
+            !canReplayHeaderInput(previousBuildInput.defaultSource))));
     if (needsBuildRetryGuard && !previousBuildInput.owned) {
       throw new Errors.OpenAIError(
         'A custom buildRequest hook must retain original options or forward credentialContext before retrying a one-shot source.',
@@ -1234,10 +1237,16 @@ export class OpenAI {
         !!needsBuildRetryGuard && previousBuildInput.independentAuthorization;
     }
     const buildInputHeaders = options.headers;
+    const buildInputDefaults = this._options.defaultHeaders;
     const buildInputReplayable =
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
       this.buildRequest !== OpenAI.prototype.buildRequest
         ? canReplayHeaderInput(buildInputHeaders)
+        : true;
+    const buildDefaultReplayable =
+      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
+      this.buildRequest !== OpenAI.prototype.buildRequest
+        ? canReplayHeaderInput(buildInputDefaults)
         : true;
     const credentialContext = {};
     if (this.buildRequest === OpenAI.prototype.buildRequest && workloadHeaders?.defaultHeaders.initialized) {
@@ -1275,14 +1284,27 @@ export class OpenAI {
         });
         const ownedBuild = this.#workloadTokenProvenance.ownsResult(candidate, credentialContext);
         workloadHeaders = this.#workloadTokenProvenance.takeHeaders(candidate) ?? workloadHeaders;
+        if (needsBuildRetryGuard && !ownedBuild) {
+          throw new Errors.OpenAIError(
+            'A custom buildRequest hook must retain original options or forward credentialContext on every retry of a one-shot source.',
+          );
+        }
         if (workloadHeaders && this.buildRequest !== OpenAI.prototype.buildRequest) {
           workloadHeaders.customBuildInput = {
             source: buildInputHeaders,
+            defaultSource: buildInputDefaults,
             replayable: buildInputReplayable,
+            defaultReplayable: buildDefaultReplayable,
             owned: ownedBuild,
             independentAuthorization:
+              workloadHeaders.defaultHeaders.initialized &&
               workloadHeaders.requestHeaders.initialized &&
-              suppliesWorkloadAuthorization(workloadHeaders.requestHeaders.snapshot),
+              suppliesWorkloadAuthorization(
+                buildHeaders([
+                  workloadHeaders.defaultHeaders.snapshot,
+                  workloadHeaders.requestHeaders.snapshot,
+                ]),
+              ),
             preventCredentialUpgrade: false,
           };
         }
