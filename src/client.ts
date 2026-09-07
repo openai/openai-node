@@ -767,8 +767,8 @@ export class OpenAI {
 
   /**
    * Resolves authentication headers for one request attempt.
-   * Forward the opaque context when delegating from a hook that copies options
-   * or shares them across concurrent requests, so workload refresh stays request-local.
+   * SDK-produced results carry workload-token ownership through delegating hooks.
+   * Forward the opaque context when reconstructing results outside SDK header helpers.
    */
   protected async authHeaders(
     opts: FinalRequestOptions,
@@ -787,6 +787,7 @@ export class OpenAI {
       return await this.adminAPIKeyAuth(opts);
     }
     const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, context) : undefined;
+    this.#workloadTokenProvenance.recover(bearerHeaders, opts, context);
     const headers = buildHeaders([
       bearerHeaders,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
@@ -800,7 +801,7 @@ export class OpenAI {
     context?: object,
   ): Promise<NullableHeaders | undefined> {
     const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
-    const workloadScope = this.#workloadTokenProvenance.find(opts, context);
+    const workloadScope = this.#workloadTokenProvenance.scopeFor(opts, context);
     if (authentication) {
       if (authentication instanceof X509WorkloadIdentityAuth) {
         if (
@@ -836,6 +837,7 @@ export class OpenAI {
       const headers = buildHeaders([{ Authorization: `Bearer ${token}` }]);
       if (!(authentication instanceof X509WorkloadIdentityAuth)) {
         workloadScope?.record(token);
+        this.#workloadTokenProvenance.issue(headers, token);
       }
       return headers;
     }
@@ -1202,7 +1204,10 @@ export class OpenAI {
           credentialContext,
         });
         const authorization = candidate.req.headers.get('authorization');
-        if (authorization !== null && workloadIdentityAuthScope?.matches(authorization)) {
+        if (
+          authorization !== null &&
+          this.#workloadTokenProvenance.matchesResult(candidate, authorization, workloadIdentityAuthScope)
+        ) {
           initialWorkloadAuthorization = authorization;
         }
       } finally {
@@ -1852,7 +1857,7 @@ export class OpenAI {
       ...(((x509Authentication ? x509RequestFetchOptions : options.fetchOptions) as any) ?? {}),
     };
 
-    return { req, url, timeout: options.timeout };
+    return this.#workloadTokenProvenance.bindResult({ req, url, timeout: options.timeout });
   }
 
   #canPreflightWorkloadIdentityHeaders(options: FinalRequestOptions) {
@@ -1920,6 +1925,7 @@ export class OpenAI {
       this._provider || this.#x509Authentication?.isPlanningRequest()
         ? undefined
         : await this.authHeaders(options, authenticationSecurity, credentialContext);
+    this.#workloadTokenProvenance.recover(authenticationHeaders, options, credentialContext);
     if (suppliedHeaders && authenticationSecurity.bearerAuth && suppliedHeaderLayers) {
       const currentRequestHeaders = options.headers;
       if (
@@ -2000,6 +2006,10 @@ export class OpenAI {
       // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
       request.used =
         request.authorization !== undefined &&
+        this.#workloadTokenProvenance.matchesHeaderCredential(
+          init.headers ?? requestHeaders,
+          request.authorization,
+        ) !== false &&
         bearerToken(headers?.get('Authorization') ?? null) === bearerToken(request.authorization);
     }
     return init.headers === undefined || headers === init.headers ? init : ({ ...init, headers } as T);

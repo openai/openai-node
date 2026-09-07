@@ -1,4 +1,5 @@
 import { isReadonlyArray } from './utils/values';
+import { rememberWorkloadHeaderCredential, workloadHeaderCredential } from './auth/workload-token-provenance';
 
 type HeaderValue = string | undefined | null;
 type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
@@ -119,16 +120,22 @@ function* iterateHeaders(
   }
 }
 
-const mergeHeaderEntries = (newHeaders: Iterable<readonly [string, string | null]>[]): NullableHeaders => {
+const mergeHeaderEntries = (
+  newHeaders: { source: HeadersLike; entries: Iterable<readonly [string, string | null]> }[],
+): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
-  for (const headers of newHeaders) {
+  let credential: ReturnType<typeof workloadHeaderCredential>;
+  for (const { source, entries } of newHeaders) {
     const seenHeaders = new Set<string>();
-    for (const [name, value] of headers) {
+    for (const [name, value] of entries) {
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
       }
       const lowerName = name.toLowerCase();
+      if (lowerName === 'authorization') {
+        credential = source ? (workloadHeaderCredential(source) ?? null) : null;
+      }
       if (!seenHeaders.has(lowerName)) {
         targetHeaders.delete(lowerName);
         seenHeaders.add(lowerName);
@@ -142,16 +149,21 @@ const mergeHeaderEntries = (newHeaders: Iterable<readonly [string, string | null
       }
     }
   }
-  return { [brand_privateNullableHeaders]: true, values: targetHeaders, nulls: nullHeaders };
+  const result = { [brand_privateNullableHeaders]: true as const, values: targetHeaders, nulls: nullHeaders };
+  if (credential !== undefined) {
+    rememberWorkloadHeaderCredential(result, credential);
+    rememberWorkloadHeaderCredential(targetHeaders, credential);
+  }
+  return result;
 };
 
 export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
-  mergeHeaderEntries(newHeaders.map((headers) => iterateHeaders(headers)));
+  mergeHeaderEntries(newHeaders.map((source) => ({ source, entries: iterateHeaders(source) })));
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
 export const snapshotHeaders = (source: HeadersLike) => {
   const replay = { refreshable: true };
-  const snapshot = mergeHeaderEntries([iterateHeaders(source, replay)]);
+  const snapshot = mergeHeaderEntries([{ source, entries: iterateHeaders(source, replay) }]);
   return {
     source,
     snapshot,

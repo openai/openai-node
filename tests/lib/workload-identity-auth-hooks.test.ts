@@ -72,7 +72,6 @@ describe('Workload identity authentication hook provenance', () => {
               protected override async authHeaders(
                 received: FinalRequestOptions,
                 schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-                context?: object,
               ) {
                 if (!received.__metadata?.['workloadIdentityTokenRefreshed']) {
                   expect(received).toBe(options);
@@ -80,18 +79,16 @@ describe('Workload identity authentication hook provenance', () => {
                 const headers = await super.authHeaders(
                   hook === 'authHeaders' && cloneOptions ? { ...received } : received,
                   schemes,
-                  context,
                 );
                 return hook === 'authHeaders' ? buildHeaders([headers, extraHeaders]) : headers;
               }
 
-              protected override async bearerAuth(received: FinalRequestOptions, context?: object) {
+              protected override async bearerAuth(received: FinalRequestOptions) {
                 if (hook === 'bearerAuth' && !received.__metadata?.['workloadIdentityTokenRefreshed']) {
                   expect(received).toBe(options);
                 }
                 const headers = await super.bearerAuth(
                   hook === 'bearerAuth' && cloneOptions ? { ...received } : received,
-                  context,
                 );
                 return hook === 'bearerAuth' ? buildHeaders([headers, extraHeaders]) : headers;
               }
@@ -138,12 +135,12 @@ describe('Workload identity authentication hook provenance', () => {
       protected override async authHeaders(
         received: FinalRequestOptions,
         schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-        context?: object,
       ) {
         if (authCalls < 2) {
           expect(received).toBe(options);
         }
-        const headers = await super.authHeaders({ ...received }, schemes, context);
+        await Promise.resolve();
+        const headers = await super.authHeaders({ ...received }, schemes);
         authCalls += 1;
         if (authCalls === 2) {
           bothHeadersReady.release();
@@ -267,7 +264,7 @@ describe('Workload identity authentication hook provenance', () => {
     expect(transport.exchanges).toBe(4);
   });
 
-  test('does not reuse a failed attempt context for later authentication', async () => {
+  test('does not reuse a failed attempt context for later independent authentication', async () => {
     let failedContext: object | undefined;
     let fail = true;
     const failure = new Error('Synthetic hook failure');
@@ -282,7 +279,8 @@ describe('Workload identity authentication hook provenance', () => {
           await super.authHeaders(options, schemes, context);
           throw failure;
         }
-        return super.authHeaders(options, schemes, failedContext);
+        await super.authHeaders(options, schemes, failedContext);
+        return buildHeaders([{ Authorization: 'Bearer access-token-1' }]);
       }
     }
     let apiCalls = 0;
@@ -300,7 +298,7 @@ describe('Workload identity authentication hook provenance', () => {
   });
 
   test.each([false, true])(
-    'legacy hooks without context refresh only with original options (copy: %s)',
+    'legacy hooks without context refresh with original or copied options (copy: %s)',
     async (copyOptions) => {
       class HookClient extends OpenAI {
         protected override async authHeaders(options: FinalRequestOptions) {
@@ -315,13 +313,32 @@ describe('Workload identity authentication hook provenance', () => {
           : Response.json({ data: [] });
       });
       const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
-      const request = client.models.list();
-      await (copyOptions ? expect(request).rejects.toMatchObject({ status: 401 }) : request);
+      await client.models.list();
 
-      expect(apiCalls).toBe(copyOptions ? 1 : 2);
-      expect(transport.exchanges).toBe(copyOptions ? 1 : 2);
+      expect(apiCalls).toBe(2);
+      expect(transport.exchanges).toBe(2);
     },
   );
+
+  test('does not replay an independent equal-byte Authorization layer added by an auth hook', async () => {
+    class HookClient extends OpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        const headers = await super.authHeaders(options);
+        return buildHeaders([headers, { Authorization: 'Bearer access-token-1' }]);
+      }
+    }
+    let apiCalls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      apiCalls += 1;
+      return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(apiCalls).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  });
 
   test('keeps copied-option provenance independent across clients sharing options', async () => {
     const options: FinalRequestOptions = { method: 'get', path: '/models' };
@@ -331,15 +348,11 @@ describe('Workload identity authentication hook provenance', () => {
       protected override async authHeaders(
         received: FinalRequestOptions,
         schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-        context?: object,
       ) {
         if (this.waitForFirst) {
           await firstComplete.promise;
         }
-        return buildHeaders([
-          await super.authHeaders({ ...received }, schemes, context),
-          { 'X-Custom': 'wrapped' },
-        ]);
+        return buildHeaders([await super.authHeaders({ ...received }, schemes), { 'X-Custom': 'wrapped' }]);
       }
     }
     const createClient = () => {
@@ -375,9 +388,8 @@ describe('Workload identity authentication hook provenance', () => {
       protected override async authHeaders(
         options: FinalRequestOptions,
         schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
-        context?: object,
       ) {
-        const headers = await super.authHeaders({ ...options }, schemes, context);
+        const headers = await super.authHeaders({ ...options }, schemes);
         if (options.path === '/models/held' && !options.__metadata?.['workloadIdentityTokenRefreshed']) {
           cachedHeadersReady.release();
           await refreshed.promise;

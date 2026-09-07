@@ -1,6 +1,8 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected dispatch hooks. */
 import OpenAI from 'openai';
 import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import type { FinalRequestOptions } from 'openai/internal/request-options';
+import { buildHeaders } from 'openai/internal/headers';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
 function normalizeBearerScheme(init: RequestInit) {
@@ -85,6 +87,98 @@ describe('Workload identity request and dispatch hooks', () => {
     ]);
     expect(transport.exchanges).toBe(2);
   });
+
+  test('preserves legacy buildRequest wrappers that copy options and pass only retryCount', async () => {
+    class HookClient extends OpenAI {
+      override async buildRequest(
+        options: FinalRequestOptions,
+        { retryCount = 0 }: { retryCount?: number } = {},
+      ) {
+        await Promise.resolve();
+        const result = await super.buildRequest({ ...options }, { retryCount });
+        result.req.headers = new Headers(result.req.headers);
+        return { ...result };
+      }
+    }
+    let apiCalls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      apiCalls += 1;
+      return apiCalls === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(apiCalls).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  });
+
+  test.each([false, true])(
+    'does not replay independent equal-byte final headers (copied request: %s)',
+    async (copyRequest) => {
+      class HookClient extends OpenAI {
+        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+          const built = await super.buildRequest(...args);
+          const headers = buildHeaders([{ Authorization: 'Bearer access-token-1' }]).values;
+          if (copyRequest) {
+            return { ...built, req: { ...built.req, headers } };
+          }
+          built.req.headers = headers;
+          return built;
+        }
+      }
+      let apiCalls = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        apiCalls += 1;
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+      expect(apiCalls).toBe(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+
+  test.each(['prepareRequest', 'fetchWithTimeout'] as const)(
+    'does not replay independent equal-byte headers from %s',
+    async (hook) => {
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+        protected override async prepareRequest(init: RequestInit) {
+          if (hook === 'prepareRequest') {
+            init.headers = buildHeaders([{ Authorization: 'Bearer access-token-1' }]).values;
+          }
+        }
+
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+        ) {
+          if (hook === 'fetchWithTimeout' && init) {
+            init.headers = buildHeaders([{ Authorization: 'Bearer access-token-1' }]).values;
+          }
+          return super.fetchWithTimeout(url, init, timeout, controller);
+        }
+      }
+      let apiCalls = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        apiCalls += 1;
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+      expect(apiCalls).toBe(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
 
   test.each(['prepareRequest', 'fetchWithTimeout'] as const)(
     'refreshes the same credential when %s normalizes the bearer scheme',

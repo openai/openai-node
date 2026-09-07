@@ -139,6 +139,27 @@ test('uses a request header layer replaced during token acquisition', async () =
   expect(transport.exchanges).toBe(1);
 });
 
+test.each(['Headers', 'array'] as const)('reads a changing %s iterator getter only once', async (kind) => {
+  const headers = kind === 'Headers' ? new Headers({ 'X-Custom': 'preserved' }) : [['X-Custom', 'preserved']];
+  const iterator = headers[Symbol.iterator];
+  let reads = 0;
+  Object.defineProperty(headers, Symbol.iterator, {
+    get() {
+      reads += 1;
+      return reads === 1 ? iterator : () => [][Symbol.iterator]();
+    },
+  });
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await client.models.list({ headers });
+
+  expect(reads).toBe(1);
+});
+
 test.each(['authHeaders', 'bearerAuth'] as const)(
   'retains one-shot authorization removal through a delegating %s hook',
   async (hook) => {

@@ -10,6 +10,23 @@ export function bearerToken(authorization: string | null): string | undefined {
   return tokenStart === authorization.length ? undefined : authorization.slice(tokenStart);
 }
 
+interface HeaderCredential {
+  owner: object;
+  token: string;
+}
+
+const headerCredentials = new WeakMap<object, HeaderCredential | null>();
+
+/** Reads the credential capability attached to an SDK-produced header layer. */
+export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
+  return headerCredentials.get(headers);
+}
+
+/** Carries the capability belonging to the last layer that supplied Authorization. */
+export function rememberWorkloadHeaderCredential(headers: object, credential: HeaderCredential | null): void {
+  headerCredentials.set(headers, credential);
+}
+
 interface TokenScope {
   context: object;
   record: (token: string) => void;
@@ -21,6 +38,69 @@ interface TokenScope {
 export class WorkloadTokenProvenance {
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
+  private readonly results = new WeakMap<object, string | null>();
+
+  /** Marks the concrete authentication result issued by this client. */
+  issue(headers: { values: Headers }, token: string): void {
+    const credential = { owner: this, token };
+    rememberWorkloadHeaderCredential(headers, credential);
+    rememberWorkloadHeaderCredential(headers.values, credential);
+  }
+
+  /** Recovers an unmarked rebuilt result only from its own active authentication invocation. */
+  recover(headers: { values: Headers } | undefined, options: object, context: object | undefined): void {
+    if (!headers || workloadHeaderCredential(headers) !== undefined) {
+      return;
+    }
+    const credential = workloadHeaderCredential(headers.values);
+    if (credential !== undefined) {
+      rememberWorkloadHeaderCredential(headers, credential);
+      return;
+    }
+    const authorization = headers.values.get('authorization');
+    const token = bearerToken(authorization);
+    if (
+      token !== undefined &&
+      authorization !== null &&
+      this.scopeFor(options, context)?.matches(authorization)
+    ) {
+      this.issue(headers, token);
+    }
+  }
+
+  /** Binds provenance to a completed SDK request result independently of caller options. */
+  bindResult<T extends { req: { headers: Headers } }>(result: T): T {
+    const credential = workloadHeaderCredential(result.req.headers);
+    this.results.set(result.req, credential?.owner === this ? credential.token : null);
+    return result;
+  }
+
+  /** An explicitly replaced header capability is authoritative, including at dispatch. */
+  matchesHeaderCredential(headers: object | undefined, authorization: string): boolean | undefined {
+    const credential = headers && workloadHeaderCredential(headers);
+    if (credential === undefined) {
+      return undefined;
+    }
+    return (
+      credential !== null && credential.owner === this && bearerToken(authorization) === credential.token
+    );
+  }
+
+  /** Checks result-owned provenance before using explicit-context recovery for rebuilt results. */
+  matchesResult(
+    result: { req: { headers: Headers } },
+    authorization: string,
+    scope: TokenScope | undefined,
+  ): boolean {
+    const headerMatch = this.matchesHeaderCredential(result.req.headers, authorization);
+    if (headerMatch !== undefined) {
+      return headerMatch;
+    }
+    const token = this.results.get(result.req);
+    return token === undefined
+      ? (scope?.matches(authorization) ?? false)
+      : token !== null && bearerToken(authorization) === token;
+  }
 
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
   begin(options: object, context: object = {}): TokenScope {
@@ -58,7 +138,7 @@ export class WorkloadTokenProvenance {
   }
 
   /** Resolves explicit ownership or the unambiguous original-options path used by legacy hooks. */
-  find(options: object, context: object | undefined): TokenScope | undefined {
+  scopeFor(options: object, context: object | undefined): TokenScope | undefined {
     if (context !== undefined) {
       return this.contexts.get(context);
     }
