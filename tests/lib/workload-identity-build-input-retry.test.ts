@@ -30,6 +30,47 @@ describe('Workload identity raw build input retries', () => {
     expect(transport.exchanges).toBe(0);
   });
 
+  test.each(['authentication', 'build'] as const)(
+    'does not assign shared defaults to an unrelated nested %s build',
+    async (hook) => {
+      let nested = false;
+      class AuthClient extends OpenAI {
+        protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+          if (hook === 'authentication' && !nested) {
+            nested = true;
+            await this.buildRequest({ method: 'get', path: '/nested', headers: { 'X-Nested': 'yes' } });
+          }
+          return super.authHeaders(...args);
+        }
+      }
+      class BuildClient extends OpenAI {
+        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+          if (!nested) {
+            nested = true;
+            await super.buildRequest({ method: 'get', path: '/nested', headers: { 'X-Nested': 'yes' } });
+          }
+          return super.buildRequest(...args);
+        }
+      }
+      const rows = [['Authorization', null] as const][Symbol.iterator]();
+      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+        return Response.json({ data: [] });
+      });
+      const Client = hook === 'authentication' ? AuthClient : BuildClient;
+      const client = new Client({
+        ...createTestClientOptions(),
+        defaultHeaders: { 'X-Default': 'shared' },
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.post('https://independent.example.test/synthetic', { body: { synthetic: true }, headers });
+      expect(nested).toBe(true);
+    },
+  );
+
   test.each(['deleting getter', 'deleting coercion', 'nonenumerable tuple', 'inherited value'] as const)(
     'retains the original replayability decision for %s',
     async (kind) => {

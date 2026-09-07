@@ -4,6 +4,43 @@ import { test } from 'vitest';
 import type { RequestInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
+test('materializes a self-deleting header getter before transport dispatch', async () => {
+  let reads = 0;
+  class HookClient extends OpenAI {
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      const headers: Record<string, string> = {};
+      Object.defineProperty(headers, 'Authorization', {
+        enumerable: true,
+        configurable: true,
+        get() {
+          reads += 1;
+          delete headers['Authorization'];
+          return 'Bearer independent';
+        },
+      });
+      args[1].headers = headers;
+      return super.fetchWithAuth(...args);
+    }
+  }
+  let calls = 0;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    calls += 1;
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer independent');
+    return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+  expect(reads).toBe(1);
+  expect(calls).toBe(1);
+  expect(transport.exchanges).toBe(1);
+});
+
 describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identity', (hook) => {
   describe.each(['record', 'array', 'native', 'foreign'] as const)('%s', (kind) => {
     test.skipIf(kind === 'foreign' && Number(process.versions.node.split('.')[0]) < 24)(

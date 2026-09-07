@@ -82,12 +82,20 @@ const getHeadersIterator = (headers: object) => {
   return undefined;
 };
 
+interface HeaderPropertySnapshot {
+  entry?: readonly [string, string | readonly string[] | null];
+}
+
 interface HeaderReplay {
   refreshable: boolean;
   unverifiedHeaders?: boolean;
   iterator?: () => Iterator<HeaderEntry>;
   iterations?: WeakSet<object>;
   snapshot?: NullableHeaders;
+  record?: boolean;
+  properties?: Map<string, HeaderPropertySnapshot>;
+  propertyOrder?: string[];
+  property?: HeaderPropertySnapshot;
 }
 
 const hasNativeHeadersBrand = (headers: object): boolean => {
@@ -188,8 +196,9 @@ function* iterateHeaders(
 
   let shouldClear = false;
   let iter: Iterable<HeaderEntry>;
+  const accessorProperties = new Set<string>();
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
-  const hasIterator = replay?.iterator !== undefined || Symbol.iterator in headers;
+  const hasIterator = !replay?.record && (replay?.iterator !== undefined || Symbol.iterator in headers);
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
     replay?.iterator ?? (hasIterator ? Reflect.get(headers, Symbol.iterator) : undefined);
   const nativeHeadersIterator =
@@ -231,15 +240,38 @@ function* iterateHeaders(
   } else {
     shouldClear = true;
     if (replay) {
+      replay.record = true;
       // Match Object.entries' eager descriptor/get order while recognizing one-shot accessors.
-      const entries: HeaderEntry[] = [];
+      let entries: HeaderEntry[] = [];
+      replay.properties ??= new Map();
       for (const key of Reflect.ownKeys(headers)) {
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
         if (!descriptor?.enumerable) continue;
-        if (!('value' in descriptor)) replay.refreshable = false;
-        entries.push([key, Reflect.get(headers, key)]);
+        if (!('value' in descriptor)) accessorProperties.add(key);
+        entries.push([key, replay.properties.has(key) ? undefined : Reflect.get(headers, key)]);
       }
+      // A getter may remove itself during its first read. Retain its position before surviving aliases.
+      let nextKey: string | undefined;
+      const present = new Set(entries.map((entry) => entry[0]));
+      const missing = new Map<string | undefined, HeaderEntry[]>();
+      for (const key of [...(replay.propertyOrder ?? [])].reverse()) {
+        if (present.has(key)) {
+          nextKey = key;
+        } else if (replay.properties.has(key)) {
+          const bucket = missing.get(nextKey) ?? [];
+          bucket.push([key, undefined]);
+          missing.set(nextKey, bucket);
+        }
+      }
+      const ordered: HeaderEntry[] = [];
+      for (const entry of entries) {
+        for (const retained of missing.get(entry[0] as string)?.reverse() ?? []) ordered.push(retained);
+        ordered.push(entry);
+      }
+      for (const retained of missing.get(undefined)?.reverse() ?? []) ordered.push(retained);
+      entries = ordered;
+      replay.propertyOrder = entries.map((entry) => entry[0] as string);
       iter = entries;
     } else {
       iter = Object.entries(headers);
@@ -251,23 +283,38 @@ function* iterateHeaders(
     }
     const name = row[0];
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
+    const retained = shouldClear ? replay?.properties?.get(name) : undefined;
+    if (retained) {
+      if (retained.entry) {
+        yield [name, null];
+        const value = retained.entry[1];
+        if (isReadonlyArray(value)) {
+          for (const item of value) yield [name, item];
+        } else if (value !== null) {
+          yield [name, value];
+        }
+      }
+      continue;
+    }
+    const rowReplay = shouldClear && replay ? { refreshable: !accessorProperties.has(name) } : replay;
+    const property: HeaderPropertySnapshot | undefined = shouldClear && replay ? {} : undefined;
+    if (property && replay) replay.property = property;
     const headerValue = row[1];
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
     const statefulValues =
-      replay?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
+      rowReplay?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
     const valueIterator = values[Symbol.iterator];
     if (
-      statefulValues ||
-      (replay?.refreshable &&
-        isReadonlyArray(headerValue) &&
-        hasStatefulArrayProperties(values, valueIterator))
+      rowReplay?.refreshable &&
+      isReadonlyArray(headerValue) &&
+      (statefulValues || hasStatefulArrayProperties(values, valueIterator))
     ) {
-      replay.refreshable = false;
+      rowReplay.refreshable = false;
     }
     let didClear = false;
     for (const value of { [Symbol.iterator]: () => Reflect.apply(valueIterator, values, []) }) {
-      if (replay && value !== null && (typeof value === 'object' || typeof value === 'function')) {
-        replay.refreshable = false;
+      if (rowReplay && value !== null && (typeof value === 'object' || typeof value === 'function')) {
+        rowReplay.refreshable = false;
       }
       if (
         replay &&
@@ -288,6 +335,10 @@ function* iterateHeaders(
       }
       yield [name, value];
     }
+    if (property && replay) {
+      if (!rowReplay?.refreshable) replay.properties!.set(name, property);
+      delete replay.property;
+    }
   }
 }
 
@@ -296,13 +347,14 @@ const mergeHeaderEntries = (
     source: HeadersLike;
     entries: Iterable<readonly [string, string | null]>;
     provenance: { unknown: boolean };
+    replay?: HeaderReplay;
   }[],
 ): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
   let credential: ReturnType<typeof workloadHeaderCredential>;
   let hasAuthorizationLayer = false;
-  for (const { source, entries, provenance } of newHeaders) {
+  for (const { source, entries, provenance, replay } of newHeaders) {
     const seenHeaders = new Set<string>();
     let suppliesAuthorization = false;
     for (const [name, value] of entries) {
@@ -334,6 +386,14 @@ const mergeHeaderEntries = (
         targetHeaders.append(lowerName, value);
         nullHeaders.delete(lowerName);
       }
+      if (replay?.property) {
+        replay.property.entry = [
+          name,
+          value !== null && lowerName === 'set-cookie'
+            ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
+            : targetHeaders.get(lowerName),
+        ];
+      }
     }
     hasAuthorizationLayer ||= suppliesAuthorization;
   }
@@ -351,6 +411,13 @@ interface HeaderReadContext {
 }
 
 let headerReadContext: HeaderReadContext | undefined;
+const capturedHeaderReplays = new WeakMap<NullableHeaders, { source: HeadersLike; replay: HeaderReplay }>();
+
+const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
+  ...replay,
+  ...(replay.properties ? { properties: new Map(replay.properties) } : {}),
+  ...(replay.propertyOrder ? { propertyOrder: [...replay.propertyOrder] } : {}),
+});
 
 /** Captures synchronous protected-hook reads without leaving request state ambient across an await. */
 export function captureHeaderReads<T>(
@@ -371,6 +438,7 @@ export function captureHeaderReads<T>(
 }
 
 export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
+  let capturedReplay: HeaderReplay | undefined;
   const result = mergeHeaderEntries(
     newHeaders.map((originalSource) => {
       const source =
@@ -378,12 +446,30 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
           ? (headerReadContext?.preferred.get(originalSource) ?? originalSource)
           : originalSource;
       const provenance = { unknown: false };
-      return { source, provenance, entries: iterateHeaders(source, undefined, provenance) };
+      const replay =
+        headerReadContext && newHeaders.length === 1 && source === originalSource
+          ? { refreshable: true }
+          : undefined;
+      capturedReplay =
+        replay ??
+        (source && brand_privateNullableHeaders in source
+          ? capturedHeaderReplays.get(source)?.replay
+          : undefined);
+      return {
+        source,
+        provenance,
+        ...(replay ? { replay } : {}),
+        entries: iterateHeaders(source, replay, provenance),
+      };
     }),
   );
   if (newHeaders.length === 1) {
     const source = newHeaders[0];
-    if (typeof source === 'object' && source !== null) headerReadContext?.captured.set(source, result);
+    if (typeof source === 'object' && source !== null && headerReadContext) {
+      headerReadContext.captured.set(source, result);
+      if (capturedReplay)
+        capturedHeaderReplays.set(result, { source, replay: copyHeaderReplay(capturedReplay) });
+    }
   }
   return result;
 };
@@ -405,14 +491,20 @@ const createHeaderSnapshot = (
   initial?: { snapshot?: NullableHeaders; refreshable?: boolean; deferred?: boolean; replay?: HeaderReplay },
 ): HeaderSnapshot => {
   let source = initialSource;
-  let replay: HeaderReplay = initial?.replay ?? { refreshable: initial?.refreshable ?? true };
+  const captured = initial?.snapshot ? capturedHeaderReplays.get(initial.snapshot) : undefined;
+  let replay: HeaderReplay =
+    initial?.replay ??
+    (captured && captured.source === source
+      ? copyHeaderReplay(captured.replay)
+      : { refreshable: initial?.refreshable ?? true });
   let snapshot = initial?.snapshot;
   const initialize = () => {
     if (snapshot) return snapshot;
     const provenance = { unknown: false };
     snapshot = mergeHeaderEntries([
-      { source, provenance, entries: iterateHeaders(source, replay, provenance) },
+      { source, provenance, replay, entries: iterateHeaders(source, replay, provenance) },
     ]);
+    capturedHeaderReplays.set(snapshot, { source, replay: copyHeaderReplay(replay) });
     return snapshot;
   };
   if (!initial?.deferred) initialize();
@@ -430,7 +522,7 @@ const createHeaderSnapshot = (
       return snapshot !== undefined;
     },
     get replayable() {
-      return replay.refreshable && !replay.unverifiedHeaders;
+      return replay.refreshable && !replay.unverifiedHeaders && !replay.properties?.size;
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       const currentSource = sources.length === 0 ? source : sources[0];
@@ -444,6 +536,9 @@ const createHeaderSnapshot = (
                 iterator: replay.iterator,
                 iterations: replay.iterations,
                 ...(priorSnapshot ? { snapshot: priorSnapshot } : {}),
+                record: replay.record,
+                properties: replay.properties,
+                propertyOrder: replay.propertyOrder,
               }
             : undefined),
         };
@@ -452,6 +547,7 @@ const createHeaderSnapshot = (
           {
             source: currentSource,
             provenance: nextProvenance,
+            replay: nextReplay,
             entries: iterateHeaders(currentSource, nextReplay, nextProvenance),
           },
         ]);
@@ -469,20 +565,23 @@ const createHeaderSnapshot = (
         source = currentSource;
         replay = nextReplay;
         snapshot = nextSnapshot;
+        capturedHeaderReplays.set(snapshot, { source, replay: copyHeaderReplay(replay) });
       }
       return initialize();
     },
     seed: (currentSource, captured) => {
       if (!snapshot && currentSource === source && captured) {
         snapshot = captured;
-        replay.refreshable = false;
+        const metadata = capturedHeaderReplays.get(captured);
+        replay =
+          metadata && metadata.source === source ? copyHeaderReplay(metadata.replay) : { refreshable: false };
       }
     },
     fork: () =>
       createHeaderSnapshot(source, {
         ...(snapshot ? { snapshot } : {}),
         deferred: !snapshot,
-        replay: { ...replay },
+        replay: copyHeaderReplay(replay),
       }),
   };
 };

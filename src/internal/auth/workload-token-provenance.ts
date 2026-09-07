@@ -181,7 +181,7 @@ export class WorkloadTokenProvenance {
         }
         scope.headers = captured;
         for (const snapshot of [captured.defaultHeaders, captured.requestHeaders]) {
-          if (!snapshot.source || snapshot.replayable) {
+          if (!snapshot.initialized || !snapshot.source || snapshot.replayable) {
             continue;
           }
           consumedSources.add(snapshot.source);
