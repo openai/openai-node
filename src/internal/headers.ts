@@ -132,7 +132,11 @@ export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<obje
           if (!Object.getOwnPropertyDescriptor(headers, String(index))) return false;
         }
       } else {
-        return hasNativeHeadersBrand(headers) && descriptor.value === Headers.prototype[Symbol.iterator];
+        const platformHeader = getPlatformHeader(headers, 'Authorization');
+        return (
+          platformHeader !== undefined &&
+          (platformHeader.value === null || typeof platformHeader.value === 'string')
+        );
       }
     }
     return Object.entries(Object.getOwnPropertyDescriptors(headers)).every(([key, property]) => {
@@ -408,6 +412,7 @@ const mergeHeaderEntries = (
 interface HeaderReadContext {
   captured: WeakMap<object, NullableHeaders>;
   preferred: WeakMap<object, NullableHeaders>;
+  onRead?: ((source: NonNullable<HeadersLike>, snapshot: NullableHeaders) => void) | undefined;
 }
 
 let headerReadContext: HeaderReadContext | undefined;
@@ -423,9 +428,10 @@ const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
 export function captureHeaderReads<T>(
   operation: () => T,
   preferred: { source: HeadersLike; snapshot: NullableHeaders }[] = [],
+  onRead?: (source: NonNullable<HeadersLike>, snapshot: NullableHeaders) => void,
 ): { result: T; captured: WeakMap<object, NullableHeaders> } {
   const previous = headerReadContext;
-  const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap() };
+  const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap(), onRead };
   for (const { source, snapshot } of preferred) {
     if (typeof source === 'object' && source !== null) context.preferred.set(source, snapshot);
   }
@@ -469,6 +475,7 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
       headerReadContext.captured.set(source, result);
       if (capturedReplay)
         capturedHeaderReplays.set(result, { source, replay: copyHeaderReplay(capturedReplay) });
+      headerReadContext.onRead?.(source, result);
     }
   }
   return result;

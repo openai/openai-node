@@ -2096,6 +2096,15 @@ export class OpenAI {
               this.authHeaders(options, authenticationSecurity, credentialContext),
             ),
       preferredHeaders,
+      (source, snapshot) => {
+        const scope = this.#workloadTokenProvenance.scopeFor(options, credentialContext);
+        if (!scope?.headers) return;
+        for (const layer of [scope.headers.defaultHeaders, scope.headers.requestHeaders]) {
+          layer.seed(source, snapshot);
+        }
+        // A canonical hook read can consume a deferred source before the hook enters a nested build.
+        scope.captureHeaders(scope.headers);
+      },
     );
     let authenticationHeaders = await authentication.result;
     if (refreshSuppliedHeaders) {
