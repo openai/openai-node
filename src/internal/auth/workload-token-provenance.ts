@@ -226,7 +226,7 @@ export class WorkloadTokenProvenance {
       }
       const scopes = this.headerSources.get(source);
       if (!scopes) {
-        continue;
+        return undefined;
       }
       if (candidates) {
         for (const candidate of candidates) {
