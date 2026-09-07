@@ -826,7 +826,7 @@ export class OpenAI {
       bearerHeaders,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
     ]);
-    this.#workloadTokenProvenance.recover(headers, opts, context);
+    this.#workloadTokenProvenance.recover(headers, opts, credentialContext);
     return headers;
   }
 
