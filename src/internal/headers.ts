@@ -29,57 +29,66 @@ export type NullableHeaders = {
 };
 
 const getArrayIterator = <T>(headers: readonly T[]) => {
-  let platformIterator: (() => Iterator<T>) | undefined;
-  let prototype: object | null = headers;
-  const seen = new Set<object>();
-  while (prototype) {
-    if (seen.has(prototype)) return undefined;
-    seen.add(prototype);
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-    if (descriptor && Array.isArray(prototype)) {
-      // Array.prototype is itself an array, including in another realm. Match
-      // the captured function without evaluating an intervening iterator getter.
-      if (typeof descriptor.value !== 'function') {
-        prototype = Object.getPrototypeOf(prototype);
-        continue;
+  try {
+    let platformIterator: (() => Iterator<T>) | undefined;
+    let prototype: object | null = headers;
+    const seen = new Set<object>();
+    while (prototype) {
+      if (seen.has(prototype)) return undefined;
+      seen.add(prototype);
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+      if (descriptor && Array.isArray(prototype)) {
+        // Array.prototype is itself an array, including in another realm. Match
+        // the captured function without evaluating an intervening iterator getter.
+        if (typeof descriptor.value !== 'function') {
+          prototype = Object.getPrototypeOf(prototype);
+          continue;
+        }
+        const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+        if (
+          typeof constructor !== 'function' ||
+          Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
+        ) {
+          prototype = Object.getPrototypeOf(prototype);
+          continue;
+        }
+        if (platformIterator) return undefined;
+        platformIterator = descriptor.value as () => Iterator<T>;
       }
-      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-      if (
-        typeof constructor !== 'function' ||
-        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
-      ) {
-        prototype = Object.getPrototypeOf(prototype);
-        continue;
-      }
-      if (platformIterator) return undefined;
-      platformIterator = descriptor.value as () => Iterator<T>;
+      prototype = Object.getPrototypeOf(prototype);
     }
-    prototype = Object.getPrototypeOf(prototype);
+    return platformIterator;
+  } catch {
+    return undefined;
   }
-  return platformIterator;
 };
 
 const getHeadersIterator = (headers: object) => {
-  const seen = new Set<object>();
-  for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-    if (seen.has(prototype)) return undefined;
-    seen.add(prototype);
-    const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-    if (!iterator) continue;
-    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-    const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
-    if (
-      typeof constructor === 'function' &&
-      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
-      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
-      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers' &&
-      typeof iterator.value === 'function' &&
-      iterator.value === entries
-    ) {
-      return iterator.value as () => Iterator<HeaderEntry>;
+  try {
+    const seen = new Set<object>();
+    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+      if (seen.has(prototype)) return undefined;
+      seen.add(prototype);
+      const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+      if (!iterator) continue;
+      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+      const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
+      if (
+        typeof constructor === 'function' &&
+        Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
+        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers' &&
+        typeof iterator.value === 'function' &&
+        iterator.value === entries
+      ) {
+        return iterator.value as () => Iterator<HeaderEntry>;
+      }
     }
+    return undefined;
+  } catch {
+    // Structural inspection is optional; a membrane may still expose a valid iterator.
+    return undefined;
   }
-  return undefined;
 };
 
 interface HeaderPropertySnapshot {
@@ -707,31 +716,35 @@ export const getPlatformHeader = (
   headers: HeadersLike,
   name: string,
 ): { value: string | null } | undefined => {
-  if (!headers) return undefined;
-  const platformIterator = getHeadersIterator(headers);
-  if (!platformIterator) return undefined;
-  const seen = new Set<object>();
-  let actualIterator: PropertyDescriptor | undefined;
-  for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-    if (seen.has(prototype)) return undefined;
-    seen.add(prototype);
-    actualIterator ??= Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-    if (actualIterator && actualIterator.value !== platformIterator) return undefined;
-    if (Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value !== platformIterator) continue;
-    const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-    if (
-      typeof constructor !== 'function' ||
-      Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Headers' ||
-      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype ||
-      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value !== 'Headers'
-    )
-      continue;
-    const getter = Object.getOwnPropertyDescriptor(prototype, 'get')?.value;
-    if (typeof getter === 'function') {
-      return { value: Reflect.apply(getter, headers, [name]) };
+  try {
+    if (!headers) return undefined;
+    const platformIterator = getHeadersIterator(headers);
+    if (!platformIterator) return undefined;
+    const seen = new Set<object>();
+    let actualIterator: PropertyDescriptor | undefined;
+    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+      if (seen.has(prototype)) return undefined;
+      seen.add(prototype);
+      actualIterator ??= Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+      if (actualIterator && actualIterator.value !== platformIterator) return undefined;
+      if (Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value !== platformIterator) continue;
+      const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+      if (
+        typeof constructor !== 'function' ||
+        Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Headers' ||
+        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype ||
+        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value !== 'Headers'
+      )
+        continue;
+      const getter = Object.getOwnPropertyDescriptor(prototype, 'get')?.value;
+      if (typeof getter === 'function') {
+        return { value: Reflect.apply(getter, headers, [name]) };
+      }
     }
+    return undefined;
+  } catch {
+    return undefined;
   }
-  return undefined;
 };
 
 /** Reads Request internal headers through its defining getter, bypassing caller property shadows. */
