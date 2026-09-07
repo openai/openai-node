@@ -45,10 +45,13 @@ describe('partial parsing', () => {
     ['[1, 2e]', [1, 2]],
     ['[1, 2e+, 3]', [1, 2, 3]],
     ['[1, 2e-, 3]', [1, 2, 3]],
-    ['[1, 2e, "else"]', [1, 2, 'else']],
     ['[1, 2e, 3e2]', [1, 2, 300]],
   ])('preserves exponent recovery for %s', (input, expected) => {
     expect(partialParse(input)).toEqual(expected);
+  });
+
+  test('bounds exponent recovery before a later string', () => {
+    expect(partialParse('[1, 2e, "else"]')).toEqual([1, 2, 'else']);
   });
 
   test('preserves partial arrays while recovering from malformed numeric tokens', () => {
