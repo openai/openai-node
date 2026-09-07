@@ -400,6 +400,80 @@ describe('OpenAI with Workload Identity', () => {
     expect(exchanges).toBeLessThanOrEqual(3);
   });
 
+  test('retains workload provenance when buildRequest clones the final headers', async () => {
+    class HookClient extends OpenAI {
+      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+        const built = await super.buildRequest(...args);
+        built.req.headers = new Headers(built.req.headers);
+        return built;
+      }
+    }
+    const headers: Headers[] = [];
+    let exchanges = 0;
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      maxRetries: 0,
+      fetch: async (url, init) => {
+        if (url.toString().endsWith('/oauth/token')) {
+          exchanges++;
+          return Response.json({
+            access_token: `access-token-${exchanges}`,
+            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          });
+        }
+        headers.push(new Headers(init?.headers));
+        return headers.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      },
+    });
+
+    await client.models.list();
+
+    expect(headers.map((value) => value.get('Authorization'))).toEqual([
+      'Bearer access-token-1',
+      'Bearer access-token-2',
+    ]);
+    expect(exchanges).toBe(2);
+  });
+
+  test('preserves reusable headers changed during async subject-token acquisition', async () => {
+    const headers: { Authorization?: string | null; 'X-Credential-Context': string } = {
+      'X-Credential-Context': 'before',
+    };
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      await Promise.resolve();
+      headers['X-Credential-Context'] = 'after';
+      headers.Authorization = null;
+      return 'subject-token';
+    };
+    let apiHeaders: Headers | undefined;
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      workloadIdentity: identity,
+      fetch: async (url, init) => {
+        if (url.toString().endsWith('/oauth/token')) {
+          return Response.json({
+            access_token: 'access-token',
+            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          });
+        }
+        apiHeaders = new Headers(init?.headers);
+        return Response.json({ data: [] });
+      },
+    });
+
+    await client.models.list({ headers });
+
+    expect(apiHeaders?.get('X-Credential-Context')).toBe('after');
+    expect(apiHeaders?.get('Authorization')).toBeNull();
+  });
+
   test('consumes iterable Authorization overrides once without exchanging credentials', async () => {
     const requestHeaders = [
       ['aUtHoRiZaTiOn', null],
@@ -425,6 +499,33 @@ describe('OpenAI with Workload Identity', () => {
     await client.models.list({ headers: requestHeaders });
     expect(iterate).toHaveBeenCalledTimes(1);
     expect(identity.provider.getToken).not.toHaveBeenCalled();
+  });
+
+  test('retains non-authentication headers from a one-use iterator during credential acquisition', async () => {
+    const requestHeaders = [['X-Custom', 'test']];
+    const iterator = requestHeaders.values();
+    const iterate = vi.spyOn(requestHeaders, Symbol.iterator).mockReturnValue(iterator);
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      fetch: async (url, init) => {
+        if (url.toString().endsWith('/oauth/token')) {
+          return Response.json({
+            access_token: 'access-token',
+            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          });
+        }
+        const headers = new Headers(init?.headers);
+        expect(headers.get('Authorization')).toBe('Bearer access-token');
+        expect(headers.get('X-Custom')).toBe('test');
+        return Response.json({ data: [] });
+      },
+    });
+
+    await client.models.list({ headers: requestHeaders });
+
+    expect(iterate).toHaveBeenCalledTimes(1);
   });
 
   test('reuses cached token across multiple requests', async () => {

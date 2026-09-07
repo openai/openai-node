@@ -1180,9 +1180,19 @@ export class OpenAI {
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     try {
-      const candidate = await this.buildRequest(options, {
-        retryCount: maxRetries - retriesRemaining,
-      });
+      const workloadIdentityAuthScope = this.#beginWorkloadIdentityAuthScope(options);
+      let candidate: Awaited<ReturnType<OpenAI['buildRequest']>>;
+      try {
+        candidate = await this.buildRequest(options, {
+          retryCount: maxRetries - retriesRemaining,
+        });
+        const authorization = candidate.req.headers.get('authorization');
+        if (authorization !== null && workloadIdentityAuthScope?.authorizations.has(authorization)) {
+          this.#workloadIdentityAuthorizations.set(candidate.req.headers, authorization);
+        }
+      } finally {
+        this.#endWorkloadIdentityAuthScope(options, workloadIdentityAuthScope);
+      }
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
@@ -1814,6 +1824,9 @@ export class OpenAI {
     const security = options.__security ?? { bearerAuth: true };
     let authenticationSecurity = security;
     let suppliedHeaders: NullableHeaders | undefined;
+    let suppliedHeaderLayers:
+      | Array<{ source: HeadersLike; snapshot: NullableHeaders; refreshable: boolean }>
+      | undefined;
     if (
       this._workloadIdentityAuth &&
       !this.#x509Authentication &&
@@ -1823,7 +1836,16 @@ export class OpenAI {
       (!security.adminAPIKeyAuth || this.adminAPIKeyAuth === OpenAI.prototype.adminAPIKeyAuth)
     ) {
       // Custom auth hooks own credential resolution and may mutate the original header layers.
-      suppliedHeaders = buildHeaders([this._options.defaultHeaders, bodyHeaders, options.headers]);
+      suppliedHeaderLayers = [this._options.defaultHeaders, bodyHeaders, options.headers].map((source) => ({
+        source,
+        snapshot: buildHeaders([source]),
+        refreshable:
+          source == null ||
+          source instanceof Headers ||
+          (Array.isArray(source) && !hasOwn(source, Symbol.iterator)) ||
+          !(Symbol.iterator in source),
+      }));
+      suppliedHeaders = buildHeaders(suppliedHeaderLayers.map(({ snapshot }) => snapshot));
       const authorization = suppliedHeaders.values.get('authorization');
       if (
         suppliedHeaders.nulls.has('authorization') ||
@@ -1832,7 +1854,15 @@ export class OpenAI {
         authenticationSecurity = { ...security, bearerAuth: false };
       }
     }
-    let authenticationHeaders: NullableHeaders | undefined;
+    const authenticationHeaders =
+      this._provider || this.#x509Authentication?.isPlanningRequest()
+        ? undefined
+        : await this.#resolveAuthHeaders(options, authenticationSecurity);
+    if (suppliedHeaders && authenticationSecurity.bearerAuth && suppliedHeaderLayers) {
+      suppliedHeaders = buildHeaders(
+        suppliedHeaderLayers.map(({ source, snapshot, refreshable }) => (refreshable ? source : snapshot)),
+      );
+    }
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1845,10 +1875,7 @@ export class OpenAI {
         'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
         'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
-      (authenticationHeaders =
-        this._provider || this.#x509Authentication?.isPlanningRequest()
-          ? undefined
-          : await this.#resolveAuthHeaders(options, authenticationSecurity)),
+      authenticationHeaders,
       suppliedHeaders ?? x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       suppliedHeaders ? undefined : bodyHeaders,
       suppliedHeaders ? undefined : (x509Headers?.requestHeaders ?? options.headers),
@@ -1874,6 +1901,23 @@ export class OpenAI {
     if (!this._workloadIdentityAuth || this.#x509Authentication) {
       return await this.authHeaders(options, security);
     }
+    const scope = this.#beginWorkloadIdentityAuthScope(options);
+    try {
+      const headers = await this.authHeaders(options, security);
+      const authorization = headers?.values.get('authorization');
+      if (headers && authorization != null && scope?.authorizations.has(authorization)) {
+        this.#workloadIdentityAuthorizations.set(headers.values, authorization);
+      }
+      return headers;
+    } finally {
+      this.#endWorkloadIdentityAuthScope(options, scope);
+    }
+  }
+
+  #beginWorkloadIdentityAuthScope(options: FinalRequestOptions) {
+    if (!this._workloadIdentityAuth || this.#x509Authentication) {
+      return undefined;
+    }
     // Track tokens across rebuilt hook results, including overlapping calls with shared options.
     const scope = this.#workloadIdentityAuthScopes.get(options) ?? {
       pending: 0,
@@ -1881,17 +1925,15 @@ export class OpenAI {
     };
     this.#workloadIdentityAuthScopes.set(options, scope);
     scope.pending++;
-    try {
-      const headers = await this.authHeaders(options, security);
-      const authorization = headers?.values.get('authorization');
-      if (headers && authorization != null && scope.authorizations.has(authorization)) {
-        this.#workloadIdentityAuthorizations.set(headers.values, authorization);
-      }
-      return headers;
-    } finally {
-      if (--scope.pending === 0) {
-        this.#workloadIdentityAuthScopes.delete(options);
-      }
+    return scope;
+  }
+
+  #endWorkloadIdentityAuthScope(
+    options: FinalRequestOptions,
+    scope: { pending: number; authorizations: Set<string> } | undefined,
+  ) {
+    if (scope && --scope.pending === 0) {
+      this.#workloadIdentityAuthScopes.delete(options);
     }
   }
 
