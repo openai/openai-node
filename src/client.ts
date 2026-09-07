@@ -252,7 +252,13 @@ import {
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
-import { HeadersLike, NullableHeaders, buildHeaders, snapshotHeaders } from './internal/headers';
+import {
+  HeadersLike,
+  NullableHeaders,
+  buildHeaders,
+  snapshotHeaders,
+  getRequestHeaders,
+} from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import {
@@ -2054,14 +2060,7 @@ export class OpenAI {
     url: RequestInfo,
     init: T,
   ): T {
-    const requestHeaders =
-      init.headers === undefined &&
-      typeof url === 'object' &&
-      url !== null &&
-      ((typeof Request !== 'undefined' && url instanceof Request) ||
-        Object.prototype.toString.call(url) === '[object Request]')
-        ? (url as Request).headers
-        : undefined;
+    const requestHeaders = init.headers === undefined ? getRequestHeaders(url) : undefined;
     const headers =
       init.headers === undefined
         ? requestHeaders

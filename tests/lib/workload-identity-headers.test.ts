@@ -2,7 +2,7 @@
 import { runInNewContext } from 'node:vm';
 import OpenAI from 'openai';
 import { test, vi } from 'vitest';
-import { buildHeaders, snapshotHeaders } from 'openai/internal/headers';
+import { buildHeaders, snapshotHeaders, getRequestHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import {
   createTestClientOptions,
@@ -15,6 +15,17 @@ beforeEach(() => {
   vi.stubEnv('OPENAI_API_KEY', undefined);
   // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit undefined unsets the variable until unstubAllEnvs restores it.
   vi.stubEnv('OPENAI_ADMIN_KEY', undefined);
+});
+
+test('does not classify URL inputs by evaluating their tag', () => {
+  const url = new URL('https://api.example.test/models');
+  Object.defineProperty(url, Symbol.toStringTag, {
+    get() {
+      throw new Error('Unrelated URL tag getter must not run');
+    },
+  });
+  expect(getRequestHeaders(url)).toBeUndefined();
+  expect(getRequestHeaders(url.href)).toBeUndefined();
 });
 
 afterEach(() => {
