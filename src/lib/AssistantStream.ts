@@ -99,6 +99,19 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
+function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: PropertyDescriptor | undefined) {
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+  if (left.configurable !== right.configurable || left.enumerable !== right.enumerable) {
+    return false;
+  }
+  if ('value' in left) {
+    return 'value' in right && left.writable === right.writable && Object.is(left.value, right.value);
+  }
+  return !('value' in right) && left.get === right.get && left.set === right.set;
+}
+
 function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
   event: AssistantStreamEvent;
   exposedEvent: AssistantStreamEvent;
@@ -152,7 +165,10 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
 
   if (eventType === 'thread.run.step.delta') {
     // Track listener-created envelope aliases on the original data, independently of delta content.
-    runStepDeltaData = stableData as RunStepStreamEvent['data'];
+    const exposedData = stableData as RunStepStreamEvent['data'];
+    runStepDeltaData = exposedData;
+    // Capture the envelope identity before a user-defined delta getter can mutate it.
+    const idDescriptor = Object.getOwnPropertyDescriptor(stableData, 'id');
     const deltaDescriptor = Object.getOwnPropertyDescriptor(stableData, 'delta');
     const delta = Reflect.get(stableData, 'delta', stableData) as RunStepDelta;
     // Reject even nonenumerable identity fields before reading any delta values.
@@ -162,19 +178,40 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     // Keep the captured root private so raw listeners cannot change the validated identity fields.
     // Preserve the original public event and share nested tool-call objects for listener mutations.
     // Copy descriptors so an accessor-backed delta is read only once, even on frozen data.
-    const capturedData = Object.create(Object.getPrototypeOf(stableData), {
-      ...Object.getOwnPropertyDescriptors(stableData),
-      delta: { configurable: true, enumerable: true, writable: true, value: delta && { ...delta } },
-    }) as AssistantStreamEvent['data'] & { delta: unknown };
+    const capturedDescriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(stableData);
+    if (idDescriptor) {
+      capturedDescriptors['id'] = idDescriptor;
+    } else {
+      delete capturedDescriptors['id'];
+    }
+    capturedDescriptors['delta'] = {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: delta && { ...delta },
+    };
+    const capturedData = Object.create(
+      Object.getPrototypeOf(stableData),
+      capturedDescriptors,
+    ) as AssistantStreamEvent['data'] & { delta: unknown };
     stableData = capturedData;
     if (delta && typeof delta === 'object') {
+      let observedDescriptor = deltaDescriptor;
+      let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = () => {
-        const currentDescriptor = Object.getOwnPropertyDescriptor(runStepDeltaData, 'delta');
-        if (currentDescriptor && 'value' in currentDescriptor) {
-          return currentDescriptor.value as RunStepDelta;
+        const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
+        if (samePropertyDescriptor(currentDescriptor, observedDescriptor)) {
+          return observedDelta;
         }
-        // Keep the original accessor value stable without invoking the getter again.
-        return deltaDescriptor && 'value' in deltaDescriptor ? undefined : delta;
+        observedDescriptor = currentDescriptor;
+        if (currentDescriptor && 'value' in currentDescriptor) {
+          observedDelta = currentDescriptor.value as RunStepDelta;
+        } else {
+          observedDelta = currentDescriptor
+            ? (Reflect.get(exposedData, 'delta', exposedData) as RunStepDelta)
+            : undefined;
+        }
+        return observedDelta;
       };
       getRunStepDelta = readCurrentDelta;
       refreshRunStepDelta = () => {

@@ -371,6 +371,101 @@ describe('AssistantStream run-step deltas', () => {
     },
   );
 
+  test('validates the captured envelope ID before invoking its delta getter', async () => {
+    const step = runStep('step_trusted');
+    const data = Object.defineProperty({ id: 'step_foreign' }, 'delta', {
+      enumerable: true,
+      get() {
+        data.id = step.id;
+        return toolCallDelta(step.id).data.delta;
+      },
+    });
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      { event: 'thread.run.step.delta', data },
+      completedRun(),
+    ]);
+    const rawEvent = vi.fn();
+    const stepDelta = vi.fn();
+    runner.on('event', rawEvent);
+    runner.on('runStepDelta', stepDelta);
+
+    await expect(runner.done()).rejects.toThrow(
+      'Received thread.run.step.delta for run step "step_foreign", which does not match the active run step "step_trusted"',
+    );
+
+    expect(rawEvent).toHaveBeenCalledTimes(1);
+    expect(stepDelta).not.toHaveBeenCalled();
+    expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"}');
+  });
+
+  test('retains a proxy-provided delta until the property is actually replaced', async () => {
+    const step = runStep('step_original');
+    const descriptorDelta = { metadata: { source: 'descriptor' } };
+    const proxyDelta = toolCallDelta(step.id).data.delta;
+    const data = new Proxy(
+      { id: step.id, delta: descriptorDelta },
+      {
+        get(target, property, receiver) {
+          return property === 'delta' ? proxyDelta : Reflect.get(target, property, receiver);
+        },
+      },
+    );
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      { event: 'thread.run.step.delta', data },
+      completedRun(),
+    ]);
+    const stepDelta = vi.fn();
+    runner.on('runStepDelta', stepDelta);
+
+    await runner.done();
+
+    expect(stepDelta.mock.calls[0]?.[0]).toBe(proxyDelta);
+    expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+  });
+
+  test.each(['event', 'toolCallCreated'] as const)(
+    'uses a replacement accessor installed by a %s listener',
+    async (listener) => {
+      const step = runStep('step_original');
+      const replacement = {
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+        },
+      };
+      const readReplacement = vi.fn(() => replacement);
+      const runner = publicAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        toolCallDelta(step.id),
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      runner.on(listener, () => {
+        const event = runner.currentEvent();
+        if (event?.event === 'thread.run.step.delta') {
+          Object.defineProperty(event.data, 'delta', {
+            configurable: true,
+            enumerable: true,
+            get: readReplacement,
+          });
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(readReplacement).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).toBe(replacement);
+      const snapshot = stepDelta.mock.calls[0]?.[1];
+      expect(snapshot).toMatchObject({ id: step.id });
+      expect(snapshot.step_details.tool_calls[0]?.function.arguments).toBe(
+        listener === 'event' ? '{"to":"trusted"} replacement' : '{"to":"trusted"} updated',
+      );
+    },
+  );
+
   test('uses a raw listener value replacement of a configurable delta getter', async () => {
     const step = runStep('step_original');
     const { delta } = toolCallDelta(step.id).data;
