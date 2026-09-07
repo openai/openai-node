@@ -451,6 +451,62 @@ describe('OpenAI with Workload Identity', () => {
     expect(second.authorizations).toEqual(first.authorizations);
   });
 
+  test.each(['freeze', 'seal', 'preventExtensions'] as const)(
+    'supports request options protected with Object.%s',
+    async (kind) => {
+      const options: FinalRequestOptions = { method: 'get', path: '/models' };
+      Object[kind](options);
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        fetch: async (url, init) => {
+          if (url.toString().endsWith('/oauth/token')) {
+            return Response.json({
+              access_token: 'access-token',
+              issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+              token_type: 'Bearer',
+              expires_in: 3600,
+            });
+          }
+          expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access-token');
+          return Response.json({ data: [] });
+        },
+      });
+
+      await client.request(options);
+
+      expect(Reflect.ownKeys(options)).toEqual(['method', 'path']);
+    },
+  );
+
+  test.each(['freeze', 'seal'] as const)(
+    'supports a buildRequest hook that applies Object.%s to request options',
+    async (kind) => {
+      class HookClient extends OpenAI {
+        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+          Object[kind](args[0]);
+          return super.buildRequest(...args);
+        }
+      }
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        fetch: async (url, init) => {
+          if (url.toString().endsWith('/oauth/token')) {
+            return Response.json({
+              access_token: 'access-token',
+              issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+              token_type: 'Bearer',
+              expires_in: 3600,
+            });
+          }
+          expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access-token');
+          return Response.json({ data: [] });
+        },
+      });
+
+      await client.models.list();
+    },
+  );
+
   test('retains workload provenance when buildRequest clones the final headers', async () => {
     class HookClient extends OpenAI {
       override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
@@ -743,6 +799,46 @@ describe('OpenAI with Workload Identity', () => {
       );
     },
   );
+
+  test('forwards the same materialized header snapshot after a hook supplies an iterator', async () => {
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(
+        url: RequestInfo,
+        init: RequestInit | undefined,
+        timeout: number,
+        controller: AbortController,
+      ) {
+        const headers = new Headers(init?.headers).entries();
+        return super.fetchWithTimeout(url, { ...init, headers }, timeout, controller);
+      }
+    }
+    const authorizations: (string | null)[] = [];
+    let exchanges = 0;
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      maxRetries: 0,
+      fetch: async (url, init) => {
+        if (url.toString().endsWith('/oauth/token')) {
+          exchanges++;
+          return Response.json({
+            access_token: `access-token-${exchanges}`,
+            issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          });
+        }
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      },
+    });
+
+    await client.models.list();
+
+    expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(exchanges).toBe(2);
+  });
 
   test('only retries once for 401 errors', async () => {
     let apiCallCount = 0;

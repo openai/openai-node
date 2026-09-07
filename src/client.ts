@@ -488,6 +488,7 @@ export class OpenAI {
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
   // An opaque, client-owned scope key follows option spreads without exposing credentials.
   #workloadIdentityAuthScopeKey = Symbol('workloadIdentityAuthScope');
+  #workloadIdentityAuthScopeAliases = new WeakMap<object, object>();
   #workloadIdentityRequests = new WeakMap<
     AbortController,
     { authorization: string | undefined; used: boolean }
@@ -827,7 +828,10 @@ export class OpenAI {
           : await authentication.getToken();
       const headers = buildHeaders([{ Authorization: `Bearer ${token}` }]);
       if (!(authentication instanceof X509WorkloadIdentityAuth)) {
-        const scopeKey = (opts as WorkloadIdentityScopedOptions)[this.#workloadIdentityAuthScopeKey];
+        const scopedOptions = opts as WorkloadIdentityScopedOptions;
+        const scopeKey =
+          scopedOptions[this.#workloadIdentityAuthScopeKey] ??
+          this.#workloadIdentityAuthScopeAliases.get(scopedOptions);
         if (scopeKey) {
           this.#workloadIdentityAuthScopes.get(scopeKey)?.authorizations.add(`Bearer ${token}`);
         }
@@ -1585,8 +1589,8 @@ export class OpenAI {
     }
 
     const fetchWithTimeout = this.#x509Fetch ? OpenAI.prototype.fetchWithTimeout : this.fetchWithTimeout;
-    this.#snapshotWorkloadIdentityUsage(controller, init);
-    const response = await fetchWithTimeout.call(this, url, init, timeout, controller);
+    const dispatchInit = this.#snapshotWorkloadIdentityUsage(controller, init);
+    const response = await fetchWithTimeout.call(this, url, dispatchInit, timeout, controller);
 
     return response;
   }
@@ -1621,9 +1625,9 @@ export class OpenAI {
     }
 
     try {
-      this.#snapshotWorkloadIdentityUsage(controller, fetchOptions);
+      const dispatchOptions = this.#snapshotWorkloadIdentityUsage(controller, fetchOptions);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, dispatchOptions);
     } catch (err) {
       if (signal && !composed) signal.removeEventListener('abort', abort);
       throw err;
@@ -1902,14 +1906,21 @@ export class OpenAI {
     if (!this._workloadIdentityAuth || this.#x509Authentication) {
       return undefined;
     }
-    const key = options[this.#workloadIdentityAuthScopeKey] ?? {};
+    const key =
+      options[this.#workloadIdentityAuthScopeKey] ??
+      this.#workloadIdentityAuthScopeAliases.get(options) ??
+      {};
     const scope = this.#workloadIdentityAuthScopes.get(key) ?? {
       key,
       pending: 0,
       authorizations: new Set<string>(),
     };
     // Preserve options identity while allowing auth hooks to delegate with shallow copies.
-    options[this.#workloadIdentityAuthScopeKey] = key;
+    if (Object.isExtensible(options)) {
+      options[this.#workloadIdentityAuthScopeKey] = key;
+    } else {
+      this.#workloadIdentityAuthScopeAliases.set(options, key);
+    }
     this.#workloadIdentityAuthScopes.set(key, scope);
     scope.pending++;
     return scope;
@@ -1921,18 +1932,28 @@ export class OpenAI {
   ) {
     if (scope && --scope.pending === 0) {
       this.#workloadIdentityAuthScopes.delete(scope.key);
-      delete options[this.#workloadIdentityAuthScopeKey];
+      this.#workloadIdentityAuthScopeAliases.delete(options);
+      if (options[this.#workloadIdentityAuthScopeKey] === scope.key) {
+        try {
+          delete options[this.#workloadIdentityAuthScopeKey];
+        } catch {
+          // A hook may freeze the options after the scope was attached. Reusing the inert key is safe.
+        }
+      }
     }
   }
 
-  #snapshotWorkloadIdentityUsage(controller: AbortController, init: RequestInit) {
+  #snapshotWorkloadIdentityUsage<T extends RequestInit>(controller: AbortController, init: T): T {
     const request = this.#workloadIdentityRequests.get(controller);
-    if (request) {
-      // The controller owns dispatch state across copied options/headers and async hook returns.
-      request.used =
-        request.authorization !== undefined &&
-        new Headers(init.headers).get('Authorization') === request.authorization;
+    if (!request) {
+      return init;
     }
+    // Materialize one-use iterators exactly once and forward that same snapshot to the next dispatch layer.
+    const headers = init.headers instanceof Headers ? init.headers : new Headers(init.headers);
+    // The controller owns dispatch state across copied options/headers and async hook returns.
+    request.used =
+      request.authorization !== undefined && headers.get('Authorization') === request.authorization;
+    return (headers === init.headers ? init : { ...init, headers }) as T;
   }
 
   private _makeAbort(controller: AbortController) {
