@@ -28,8 +28,8 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
-const getArrayIterator = (headers: readonly unknown[]) => {
-  let platformIterator: (() => Iterator<HeaderEntry>) | undefined;
+const getArrayIterator = <T>(headers: readonly T[]) => {
+  let platformIterator: (() => Iterator<T>) | undefined;
   let prototype: object | null = headers;
   const seen = new Set<object>();
   while (prototype) {
@@ -52,7 +52,7 @@ const getArrayIterator = (headers: readonly unknown[]) => {
         continue;
       }
       if (platformIterator) return undefined;
-      platformIterator = descriptor.value as () => Iterator<HeaderEntry>;
+      platformIterator = descriptor.value as () => Iterator<T>;
     }
     prototype = Object.getPrototypeOf(prototype);
   }
@@ -253,11 +253,14 @@ function* iterateHeaders(
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
     const headerValue = row[1];
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
+    const statefulValues =
+      replay?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
     const valueIterator = values[Symbol.iterator];
     if (
-      replay?.refreshable &&
-      isReadonlyArray(headerValue) &&
-      hasStatefulArrayProperties(values, valueIterator)
+      statefulValues ||
+      (replay?.refreshable &&
+        isReadonlyArray(headerValue) &&
+        hasStatefulArrayProperties(values, valueIterator))
     ) {
       replay.refreshable = false;
     }
@@ -568,7 +571,7 @@ export const getPlatformHeader = (
   return undefined;
 };
 
-/** Reads Request internal headers through its platform getter, without evaluating shadowing accessors. */
+/** Reads Request internal headers through its defining getter, bypassing caller property shadows. */
 export const getRequestHeaders = (request: unknown): Headers | undefined => {
   if (typeof request !== 'object' || request === null) return undefined;
   if (typeof Request !== 'undefined' && request instanceof Request) {
