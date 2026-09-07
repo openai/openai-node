@@ -1,7 +1,52 @@
 /* oxlint-disable max-classes-per-file -- Separate fixtures exercise independent alias replacement paths. */
 import OpenAI from 'openai';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
+import { buildHeaders } from 'openai/internal/headers';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
+
+test.each(['iterator', 'iterator getter'] as const)(
+  'does not read an obsolete shared %s after both header layers change',
+  async (kind) => {
+    const read = vi.fn(() => {
+      throw new Error('Obsolete shared headers must not be read');
+    });
+    const shared = Object.defineProperty(
+      {},
+      Symbol.iterator,
+      kind === 'iterator' ? { value: read } : { get: read },
+    ) as Headers;
+    class HookClient extends OpenAI {
+      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+        this._options.defaultHeaders = { 'X-Default': 'replacement' };
+        args[0].headers = { 'X-Request': 'replacement', Authorization: 'Bearer independent' };
+        return buildHeaders([]);
+      }
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      calls += 1;
+      const headers = new Headers(init?.headers);
+      expect(headers.get('X-Default')).toBe('replacement');
+      expect(headers.get('X-Request')).toBe('replacement');
+      expect(headers.get('Authorization')).toBe('Bearer independent');
+      return Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      defaultHeaders: shared,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list({ headers: shared });
+
+    expect(read).not.toHaveBeenCalled();
+    expect(calls).toBe(1);
+    expect(transport.exchanges).toBe(0);
+  },
+);
 
 test.each(
   [401, 500].flatMap((status) =>
