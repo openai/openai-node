@@ -1,4 +1,5 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected header hooks. */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { runInNewContext } from 'node:vm';
 import OpenAI from 'openai';
 import { test, vi } from 'vitest';
@@ -39,6 +40,70 @@ class OneShotHeaders extends Array<[string, string | null]> {
     return (this.#iterator ??= super[Symbol.iterator]());
   }
 }
+
+test.each(['same client', 'separate clients'] as const)(
+  'does not share accessor-backed default header snapshots between concurrent requests: %s',
+  async (kind) => {
+    const authorization = new AsyncLocalStorage<string | null | undefined>();
+    const defaultHeaders = {
+      get Authorization() {
+        return authorization.getStore();
+      },
+    };
+    const sent: { url: string; authorization: string | null }[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      sent.push({ url: url.toString(), authorization: new Headers(init?.headers).get('Authorization') });
+      return Response.json({ data: [] });
+    });
+    const createClient = () =>
+      new OpenAI({ ...createTestClientOptions(), defaultHeaders, fetch: transport.fetch, maxRetries: 0 });
+    const firstClient = createClient();
+    const secondClient = kind === 'same client' ? firstClient : createClient();
+
+    await Promise.all([
+      authorization.run('Bearer tenant-a', () => firstClient.models.list()),
+      authorization.run(null, () =>
+        secondClient.post('https://synthetic.example.test/resource', { body: { synthetic: true } }),
+      ),
+    ]);
+
+    expect(sent).toEqual([
+      { url: 'https://api.openai.com/v1/models', authorization: 'Bearer tenant-a' },
+      { url: 'https://synthetic.example.test/resource', authorization: null },
+    ]);
+    expect(transport.exchanges).toBe(0);
+  },
+);
+
+test('does not share accessor-backed request header snapshots between concurrent hooks', async () => {
+  const credential = new AsyncLocalStorage<string>();
+  const requestHeaders = {
+    get 'X-Credential'() {
+      return credential.getStore();
+    },
+  };
+  class HookClient extends OpenAI {
+    // oxlint-disable-next-line class-methods-use-this -- This fixture derives authentication from request headers.
+    protected override async authHeaders(options: FinalRequestOptions) {
+      const value = buildHeaders([options.headers]).values.get('X-Credential');
+      return buildHeaders([{ Authorization: `Bearer ${value}` }]);
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('Authorization'));
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await Promise.all([
+    credential.run('tenant-a', () => client.models.list({ headers: requestHeaders })),
+    credential.run('tenant-b', () => client.models.list({ headers: requestHeaders })),
+  ]);
+
+  expect(sent).toEqual(['Bearer tenant-a', 'Bearer tenant-b']);
+  expect(transport.exchanges).toBe(0);
+});
 
 test('keeps tagged array subclasses with inherited one-shot iterators snapshot-only', async () => {
   class TaggedHeaders extends OneShotHeaders {}
