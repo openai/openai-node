@@ -1535,7 +1535,7 @@ export class OpenAI {
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
-      if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
+      if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
         headers.set('Authorization', `Bearer ${token}`);
       }

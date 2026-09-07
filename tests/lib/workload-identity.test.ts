@@ -110,6 +110,69 @@ describe('OpenAI with Workload Identity', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  test.each([
+    { defaults: undefined, request: undefined, expected: 'Bearer exchanged-access-token' },
+    { defaults: undefined, request: null, expected: null },
+    { defaults: null, request: undefined, expected: null },
+    { defaults: undefined, request: '', expected: '' },
+    { defaults: '', request: undefined, expected: '' },
+    { defaults: undefined, request: 'Bearer replacement', expected: 'Bearer replacement' },
+    {
+      defaults: undefined,
+      request: 'Bearer workload-identity-auth',
+      expected: 'Bearer exchanged-access-token',
+    },
+    { defaults: 'Bearer replacement', request: null, expected: null },
+    { defaults: null, request: 'Bearer replacement', expected: 'Bearer replacement' },
+  ])('preserves Authorization overrides: %j', async ({ defaults, request, expected }) => {
+    const headers: Headers[] = [];
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.toString().endsWith('/oauth/token')) {
+        return Response.json({
+          access_token: 'exchanged-access-token',
+          issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        });
+      }
+      expect(url.toString()).toBe('https://public.example/file');
+      headers.push(new Headers(init?.headers));
+      return Response.json({ ok: true });
+    }) as typeof fetch;
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      defaultHeaders: { Authorization: defaults },
+    });
+
+    await client.get('https://public.example/file', { headers: { Authorization: request } });
+
+    expect(headers).toHaveLength(1);
+    expect(headers[0]?.get('Authorization')).toBe(expected);
+  });
+
+  test('preserves a removed Authorization header across a workload identity retry', async () => {
+    const headers: Headers[] = [];
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.toString().endsWith('/oauth/token')) {
+        return Response.json({
+          access_token: 'exchanged-access-token',
+          issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        });
+      }
+      headers.push(new Headers(init?.headers));
+      return headers.length === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ ok: true });
+    }) as typeof fetch;
+    const client = new OpenAI(createTestClientOptions());
+
+    await client.get('https://public.example/file', { headers: { Authorization: null } });
+
+    expect(headers.map((value) => value.get('Authorization'))).toEqual([null, null]);
+  });
+
   test('reuses cached token across multiple requests', async () => {
     let tokenExchangeCallCount = 0;
 
