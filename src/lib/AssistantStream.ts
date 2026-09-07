@@ -177,11 +177,20 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           capturedData.delta = currentDelta;
           return;
         }
-        const descriptors = Object.getOwnPropertyDescriptors(currentDelta);
-        delete descriptors['id'];
-        capturedData.delta = {
-          ...Object.create(Object.getPrototypeOf(currentDelta), descriptors),
-        } as RunStepDelta;
+        const accumulationDelta: Record<PropertyKey, unknown> = {};
+        for (const key of Reflect.ownKeys(currentDelta)) {
+          if (key === 'id' || !Object.getOwnPropertyDescriptor(currentDelta, key)?.enumerable) {
+            continue;
+          }
+          // Read accessors on their original receiver, without ever evaluating an excluded identity field.
+          Object.defineProperty(accumulationDelta, key, {
+            configurable: true,
+            enumerable: true,
+            writable: true,
+            value: Reflect.get(currentDelta, key, currentDelta),
+          });
+        }
+        capturedData.delta = accumulationDelta as RunStepDelta;
         return currentDelta as RunStepDelta;
       };
     }

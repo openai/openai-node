@@ -349,6 +349,53 @@ describe('AssistantStream run-step identity security', () => {
     },
   );
 
+  test.each([false, true])(
+    'reads delta properties on the original receiver (listener adds id: %s)',
+    async (addIdentity) => {
+      const step = runStep('step_original');
+      const event = toolCallDelta(step.id);
+      const { delta } = event.data;
+      const details = new WeakMap([[delta, delta.step_details]]);
+      const readDetails = vi.fn(function readOriginalDetails(this: typeof delta) {
+        if (this !== delta) {
+          throw new Error('Delta getter received a reconstructed object');
+        }
+        return details.get(this);
+      });
+      Object.defineProperty(delta, 'step_details', { enumerable: true, get: readDetails });
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        event,
+        completedRun(),
+      ]);
+      const readID = vi.fn(() => {
+        throw new Error('A listener-added identity field must not be read');
+      });
+      if (addIdentity) {
+        runner.on('event', (received) => {
+          if (received.event === 'thread.run.step.delta') {
+            Object.defineProperty(delta, 'id', { enumerable: true, get: readID });
+          }
+        });
+      }
+      const stepDelta = vi.fn();
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(readDetails).toHaveBeenCalled();
+      expect(readID).not.toHaveBeenCalled();
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      if (addIdentity) {
+        expect(stepDelta.mock.calls[0]?.[0]).not.toHaveProperty('id');
+      } else {
+        expect(stepDelta.mock.calls[0]?.[0]).toBe(delta);
+      }
+      expect(step.id).toBe('step_original');
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+    },
+  );
+
   test.each(['accessor', 'proxy'] as const)(
     'captures a changing %s delta once for accumulation',
     async (kind) => {
