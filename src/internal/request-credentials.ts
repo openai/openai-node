@@ -9,8 +9,6 @@ import type { OpenAI } from '../client';
  */
 export interface RequestCredentialContext {
   apiKey?: string | null;
-  /** Resolved workload bearer, retained even when request hooks clone headers. */
-  workloadAuthorization?: string;
 }
 
 /** Resolves once per attempt while retaining the existing credential-hook contract. @internal */
