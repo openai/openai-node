@@ -83,6 +83,7 @@ const getHeadersIterator = (headers: object) => {
 };
 
 interface HeaderPropertySnapshot {
+  descriptor: PropertyDescriptor;
   entry?: readonly [string, string | readonly string[] | null];
 }
 
@@ -201,7 +202,7 @@ function* iterateHeaders(
 
   let shouldClear = false;
   let iter: Iterable<HeaderEntry>;
-  const accessorProperties = new Set<string>();
+  const propertyDescriptors = new Map<string, PropertyDescriptor>();
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
   const hasIterator = !replay?.record && (replay?.iterator !== undefined || Symbol.iterator in headers);
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
@@ -252,8 +253,18 @@ function* iterateHeaders(
       for (const key of Reflect.ownKeys(headers)) {
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
+        const retained = replay.properties.get(key);
+        if (
+          retained &&
+          descriptor &&
+          ('value' in descriptor
+            ? !('value' in retained.descriptor) || descriptor.value !== retained.descriptor.value
+            : 'value' in retained.descriptor || descriptor.get !== retained.descriptor.get)
+        ) {
+          replay.properties.delete(key);
+        }
         if (!descriptor?.enumerable) continue;
-        if (!('value' in descriptor)) accessorProperties.add(key);
+        propertyDescriptors.set(key, descriptor);
         entries.push([key, replay.properties.has(key) ? undefined : Reflect.get(headers, key)]);
       }
       // A getter may remove itself during its first read. Retain its position before surviving aliases.
@@ -305,12 +316,14 @@ function* iterateHeaders(
       }
       continue;
     }
+    const descriptor = propertyDescriptors.get(name);
     const rowReplay = statefulRow
       ? { refreshable: false }
       : shouldClear && replay
-        ? { refreshable: !accessorProperties.has(name) }
+        ? { refreshable: !descriptor || 'value' in descriptor }
         : replay;
-    const property: HeaderPropertySnapshot | undefined = shouldClear && replay ? {} : undefined;
+    const property: HeaderPropertySnapshot | undefined =
+      shouldClear && replay && descriptor ? { descriptor } : undefined;
     if (property && replay) replay.property = property;
     const headerValue = row[1];
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
