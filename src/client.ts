@@ -1979,6 +1979,13 @@ export class OpenAI {
     let authenticationSecurity = security;
     let suppliedHeaders: NullableHeaders | undefined;
     let refreshSuppliedHeaders: (() => NullableHeaders) | undefined;
+    const suppliesAuthorization = (headers: NullableHeaders) => {
+      const authorization = headers.values.get('authorization');
+      return (
+        headers.nulls.has('authorization') ||
+        (authorization !== null && authorization !== `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`)
+      );
+    };
     if (
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
       (this.#canPreflightWorkloadIdentityHeaders(options) || requestHeaderSnapshot)
@@ -2007,27 +2014,28 @@ export class OpenAI {
       };
       if (canPreflight) {
         suppliedHeaders = refreshSuppliedHeaders();
-        const authorization = suppliedHeaders.values.get('authorization');
-        if (
-          suppliedHeaders.nulls.has('authorization') ||
-          (authorization !== null && authorization !== `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`)
-        ) {
+        if (suppliesAuthorization(suppliedHeaders)) {
           authenticationSecurity = { ...security, bearerAuth: false };
-          // Stock authentication and dispatch must use the same explicit-override snapshot.
-          refreshSuppliedHeaders = undefined;
         }
       }
     }
-    const authenticationHeaders =
+    let authenticationHeaders =
       this._provider || this.#x509Authentication?.isPlanningRequest()
         ? undefined
         : await this.#workloadTokenProvenance.invoke(options, credentialContext, () =>
             this.authHeaders(options, authenticationSecurity, credentialContext),
           );
-    this.#workloadTokenProvenance.recover(authenticationHeaders, options, credentialContext);
     if (refreshSuppliedHeaders) {
       suppliedHeaders = refreshSuppliedHeaders();
+      if (!this._provider && authenticationSecurity !== security && !suppliesAuthorization(suppliedHeaders)) {
+        // A caller may remove its override while the skipped authentication promise yields.
+        authenticationHeaders = await this.#workloadTokenProvenance.invoke(options, credentialContext, () =>
+          this.authHeaders(options, security, credentialContext),
+        );
+        suppliedHeaders = refreshSuppliedHeaders();
+      }
     }
+    this.#workloadTokenProvenance.recover(authenticationHeaders, options, credentialContext);
     const headers = buildHeaders([
       idempotencyHeaders,
       {
