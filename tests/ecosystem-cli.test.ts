@@ -269,10 +269,16 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
-    { name: 'sequential', options: [], packageOption: '--fromNpm' },
-    { name: 'explicit worker count', options: ['--jobs=2'], packageOption: '--fromNpm' },
-    { name: 'parallel', options: ['--parallel'], packageOption: '--from-npm' },
-  ])('installs the selected local package in $name mode', ({ options, packageOption }) => {
+    { name: 'sequential', options: [], packageOption: '--fromNpm', retryDelay: 7 },
+    { name: 'explicit worker count', options: ['--jobs=2'], packageOption: '--fromNpm', retryDelay: 25 },
+    { name: 'parallel', options: ['--parallel'], packageOption: '--from-npm', retryDelay: 0 },
+    {
+      name: 'default-delay parallel',
+      options: ['--parallel'],
+      packageOption: '--from-npm',
+      retryDelay: undefined,
+    },
+  ])('installs and retries a local package in $name mode', ({ options, packageOption, retryDelay }) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
     const dependency = path.join(fixture, 'selected package = fixture');
     const projects = ['node-js', 'cloudflare-worker'];
@@ -317,18 +323,30 @@ describe('ecosystem test CLI', () => {
           [
             "const fs = require('node:fs');",
             "const { version } = require('openai/package.json');",
+            "const firstAttempt = !fs.existsSync('installed-version.txt');",
             "fs.writeFileSync('installed-version.txt', version);",
+            'if (firstAttempt) process.exit(1);',
           ].join('\n'),
         );
       }
 
       const result = runCli(
-        [...projects, `${packageOption}=${dependency}`, '--noCleanup', ...options],
+        [
+          ...projects,
+          `${packageOption}=${dependency}`,
+          '--noCleanup',
+          '--retry=1',
+          ...(retryDelay === undefined ? [] : [`--retryDelay=${retryDelay}`]),
+          ...options,
+        ],
         fixture,
       );
 
       expect(result.error, result.stdout + result.stderr).toBeUndefined();
       expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect((result.stdout + result.stderr).match(/next retry in \d+ms/gu)).toEqual(
+        projects.map(() => `next retry in ${retryDelay ?? 1000}ms`),
+      );
       for (const project of projects) {
         expect(
           readFileSync(path.join(fixture, 'ecosystem-tests', project, 'installed-version.txt'), 'utf-8'),
