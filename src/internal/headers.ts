@@ -28,8 +28,8 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
-const getArrayIterator = (headers: readonly unknown[]) => {
-  let platformIterator: (() => Iterator<HeaderEntry>) | undefined;
+const getArrayIterator = <T>(headers: readonly T[]) => {
+  let platformIterator: (() => Iterator<T>) | undefined;
   let prototype: object | null = headers;
   const seen = new Set<object>();
   while (prototype) {
@@ -52,7 +52,7 @@ const getArrayIterator = (headers: readonly unknown[]) => {
         continue;
       }
       if (platformIterator) return undefined;
-      platformIterator = descriptor.value as () => Iterator<HeaderEntry>;
+      platformIterator = descriptor.value as () => Iterator<T>;
     }
     prototype = Object.getPrototypeOf(prototype);
   }
@@ -242,7 +242,7 @@ function* iterateHeaders(
     if (replay) {
       replay.record = true;
       // Match Object.entries' eager descriptor/get order while recognizing one-shot accessors.
-      const entries: HeaderEntry[] = [];
+      let entries: HeaderEntry[] = [];
       replay.properties ??= new Map();
       for (const key of Reflect.ownKeys(headers)) {
         if (typeof key !== 'string') continue;
@@ -254,16 +254,23 @@ function* iterateHeaders(
       // A getter may remove itself during its first read. Retain its position before surviving aliases.
       let nextKey: string | undefined;
       const present = new Set(entries.map((entry) => entry[0]));
+      const missing = new Map<string | undefined, HeaderEntry[]>();
       for (const key of [...(replay.propertyOrder ?? [])].reverse()) {
         if (present.has(key)) {
           nextKey = key;
         } else if (replay.properties.has(key)) {
-          const index =
-            nextKey === undefined ? entries.length : entries.findIndex((entry) => entry[0] === nextKey);
-          entries.splice(index, 0, [key, undefined]);
-          nextKey = key;
+          const bucket = missing.get(nextKey) ?? [];
+          bucket.push([key, undefined]);
+          missing.set(nextKey, bucket);
         }
       }
+      const ordered: HeaderEntry[] = [];
+      for (const entry of entries) {
+        for (const retained of missing.get(entry[0] as string)?.reverse() ?? []) ordered.push(retained);
+        ordered.push(entry);
+      }
+      for (const retained of missing.get(undefined)?.reverse() ?? []) ordered.push(retained);
+      entries = ordered;
       replay.propertyOrder = entries.map((entry) => entry[0] as string);
       iter = entries;
     } else {
@@ -663,7 +670,7 @@ export const getPlatformHeader = (
   return undefined;
 };
 
-/** Reads Request internal headers through its platform getter, without evaluating shadowing accessors. */
+/** Reads Request internal headers through its defining getter, bypassing caller property shadows. */
 export const getRequestHeaders = (request: unknown): Headers | undefined => {
   if (typeof request !== 'object' || request === null) return undefined;
   if (typeof Request !== 'undefined' && request instanceof Request) {
