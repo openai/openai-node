@@ -91,6 +91,50 @@ describe('workload identity header iteration', () => {
     },
   );
 
+  test('shares a one-use Authorization removal between body encoding and authentication', async () => {
+    const headers = [
+      ['Authorization', null],
+      ['X-Custom', 'test'],
+    ];
+    const iterator = headers.values();
+    const iterate = vi.fn(() => iterator);
+    Object.defineProperty(headers, Symbol.iterator, { value: iterate });
+    const getToken = vi.fn(async () => {
+      throw new Error('Unused subject token provider is unavailable');
+    });
+    const client = createClient(getToken, (sent) => {
+      expect(sent.has('Authorization')).toBe(false);
+      expect(sent.get('X-Custom')).toBe('test');
+    });
+
+    await client.post('/synthetic', { body: { synthetic: true }, headers });
+
+    expect(iterate).toHaveBeenCalledTimes(1);
+    expect(getToken).not.toHaveBeenCalled();
+  });
+
+  test('refreshes a foreign Headers implementation after credential acquisition', async () => {
+    if (Number(process.versions.node.split('.')[0]) < 24) {
+      return;
+    }
+    const { Headers: ForeignHeaders } = await import('undici');
+    const headers = new ForeignHeaders({ 'X-Credential-Context': 'before' });
+    const client = createClient(
+      async () => {
+        await Promise.resolve();
+        headers.set('X-Credential-Context', 'after');
+        headers.set('Authorization', 'Bearer independent');
+        return 'subject-token';
+      },
+      (sent) => {
+        expect(sent.get('X-Credential-Context')).toBe('after');
+        expect(sent.get('Authorization')).toBe('Bearer independent');
+      },
+    );
+
+    await client.models.list({ headers: headers as unknown as Headers });
+  });
+
   test.each(['record', 'array', 'Headers'] as const)(
     'preserves reusable %s changes during async subject-token acquisition',
     async (kind) => {

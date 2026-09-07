@@ -27,9 +27,24 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
+const getArrayIterator = (headers: readonly unknown[]) => {
+  let arrayPrototype: readonly unknown[] | undefined;
+  let prototype: object | null = Object.getPrototypeOf(headers);
+  const seen = new Set<object>();
+  while (prototype) {
+    if (seen.has(prototype)) return undefined;
+    seen.add(prototype);
+    // Array.prototype is itself an array, including in another realm. Subclass
+    // prototypes are ordinary objects; intermediate array instances do not win.
+    if (Array.isArray(prototype)) arrayPrototype = prototype;
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return arrayPrototype?.[Symbol.iterator];
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
-  replay?: { reusable: boolean },
+  replay?: { refreshable: boolean },
 ): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
@@ -51,9 +66,10 @@ function* iterateHeaders(
     if (replay) {
       // Custom iterable protocols may return the same exhausted iterator on every call.
       // Recognize the actual method, including inherited overrides, before reusing a source.
-      replay.reusable =
-        (Array.isArray(headers) && iterator === Array.prototype[Symbol.iterator]) ||
-        (headers instanceof Headers && iterator === Headers.prototype[Symbol.iterator]);
+      replay.refreshable =
+        (Array.isArray(headers) &&
+          (iterator === Array.prototype[Symbol.iterator] || iterator === getArrayIterator(headers))) ||
+        (Object.prototype.toString.call(headers) === '[object Headers]' && iterator === headers.entries);
     }
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
@@ -79,7 +95,7 @@ function* iterateHeaders(
   }
 }
 
-const mergeHeaders = (newHeaders: HeadersLike[], replay?: { reusable: boolean }): NullableHeaders => {
+const mergeHeaders = (newHeaders: HeadersLike[], replay?: { refreshable: boolean }): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
   for (const headers of newHeaders) {
@@ -109,9 +125,9 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => merg
 
 /** Snapshot one-use iterables while allowing reusable headers to change during async authentication. */
 export const prepareHeaders = (headers: HeadersLike) => {
-  const replay = { reusable: true };
+  const replay = { refreshable: true };
   const snapshot = mergeHeaders([headers], replay);
-  return { snapshot, refresh: () => (replay.reusable ? headers : snapshot) };
+  return { snapshot, refresh: () => (replay.refreshable ? buildHeaders([headers]) : snapshot) };
 };
 
 export const isEmptyHeaders = (headers: HeadersLike) => {
