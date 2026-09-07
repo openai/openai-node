@@ -439,12 +439,12 @@ describe('.stream()', () => {
     it.each(['delta', 'done'] as const)(
       'rejects an array-like command collection before %s',
       async (type) => {
-      const stream = shellStream({ length: 4, 3: 'echo test' }, 3, type);
-      const emitted = vi.fn();
-      stream.on(`response.shell_call_output_content.${type}`, emitted);
+        const stream = shellStream({ length: 4, 3: 'echo test' }, 3, type);
+        const emitted = vi.fn();
+        stream.on(`response.shell_call_output_content.${type}`, emitted);
 
-      await expect(stream.finalResponse()).rejects.toThrow('missing command at index 3');
-      expect(emitted).not.toHaveBeenCalled();
+        await expect(stream.finalResponse()).rejects.toThrow('missing command at index 3');
+        expect(emitted).not.toHaveBeenCalled();
       },
     );
 
