@@ -35,6 +35,24 @@ describe('partial parsing', () => {
     expect(partialParse('[1, 2e')).toEqual([1]);
   });
 
+  test.each<[string, number[]]>([
+    ['[1, 2e', [1]],
+    ['[1, 2e+', [1]],
+    ['[1, 2e-', [1]],
+    ['[1, 2e3]', [1, 2000]],
+    ['[1, 2E3]', [1, 2000]],
+    ['[1, 2e-2 ]', [1, 0.02]],
+    ['[1, 2e]', [1, 2]],
+    ['[1, 2e+, 3]', [1, 2, 3]],
+    ['[1, 2e-, 3]', [1, 2, 3]],
+  ])('preserves exponent recovery for %s', (input, expected) => {
+    expect(partialParse(input)).toEqual(expected);
+  });
+
+  test('preserves partial arrays while recovering from malformed numeric tokens', () => {
+    expect(partialParse(`[${'[x,'.repeat(100)}]`)).toEqual(Array.from({ length: 100 }, () => []));
+  });
+
   test('should only throw errors parsing numbers', () =>
     assert(
       property(json({ depthSize: 'large', noUnicodeString: false }), (jsonString) => {
