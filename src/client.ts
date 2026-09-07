@@ -1652,6 +1652,7 @@ export class OpenAI {
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
         headers.set('Authorization', `Bearer ${token}`);
+        this.#workloadTokenProvenance.issue({ values: headers }, token);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
         }
@@ -2057,7 +2058,8 @@ export class OpenAI {
       init.headers === undefined &&
       typeof url === 'object' &&
       url !== null &&
-      Object.prototype.toString.call(url) === '[object Request]'
+      ((typeof Request !== 'undefined' && url instanceof Request) ||
+        Object.prototype.toString.call(url) === '[object Request]')
         ? (url as Request).headers
         : undefined;
     const headers =
