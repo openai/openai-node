@@ -52,7 +52,9 @@ describe.each(['native', 'foreign'] as const)('%s build-result Headers accessors
     const authorizations: (string | null)[] = [];
     const transport = createWorkloadIdentityTransport((_url, init) => {
       expect(init?.headers).toBe(builtHeaders[authorizations.length]);
-      if (!init?.headers) {throw new Error('Expected the built headers at dispatch');}
+      if (!init?.headers) {
+        throw new Error('Expected the built headers at dispatch');
+      }
       expect(Reflect.get(init.headers, Symbol.iterator)).toBe(intrinsicIterator);
       authorizations.push(Reflect.apply(intrinsicGet, init?.headers, ['Authorization']));
       return workload && authorizations.length === 1
