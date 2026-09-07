@@ -260,8 +260,10 @@ import {
   snapshotHeaders,
   getRequestHeaders,
   getPlatformHeader,
+  hasNativeHeadersBrand,
   createWorkloadHeaderSnapshots,
   canReplayHeaderInput,
+  canPreserveHeaderInput,
   type WorkloadHeaderSnapshots,
 } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
@@ -1309,6 +1311,9 @@ export class OpenAI {
             replayable: buildInputReplayable,
           };
         }
+        if (workloadIdentityAuthScope && !canPreserveHeaderInput(candidate.req.headers)) {
+          candidate.req.headers = buildHeaders([candidate.req.headers]).values;
+        }
         const platformHeader = getPlatformHeader(candidate.req.headers, 'Authorization');
         const authorization =
           platformHeader === undefined ? candidate.req.headers.get('Authorization') : platformHeader.value;
@@ -1726,8 +1731,11 @@ export class OpenAI {
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
     }
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
-      const platformHeader = getPlatformHeader(init.headers, 'Authorization');
-      const replayable = platformHeader !== undefined || canReplayHeaderInput(init.headers);
+      const platformHeader =
+        init.headers && hasNativeHeadersBrand(init.headers)
+          ? getPlatformHeader(init.headers, 'Authorization')
+          : undefined;
+      const replayable = platformHeader !== undefined || canPreserveHeaderInput(init.headers);
       const headers = platformHeader ? undefined : new Headers(init.headers);
       if (headers && !replayable) init.headers = headers;
       const authHeader = platformHeader ? platformHeader.value : headers?.get('Authorization');
@@ -2242,9 +2250,12 @@ export class OpenAI {
   ): T {
     if (!request || request.authorization === undefined) return init;
     const requestHeaders = init.headers === undefined ? getRequestHeaders(url) : undefined;
-    const platformHeader = getPlatformHeader(init.headers ?? requestHeaders, 'Authorization');
+    const platformHeader =
+      init.headers === undefined || hasNativeHeadersBrand(init.headers)
+        ? getPlatformHeader(init.headers ?? requestHeaders, 'Authorization')
+        : undefined;
     const preserveHeaders =
-      init.headers === undefined || platformHeader !== undefined || canReplayHeaderInput(init.headers);
+      init.headers === undefined || platformHeader !== undefined || canPreserveHeaderInput(init.headers);
     const headers = platformHeader
       ? undefined
       : init.headers === undefined

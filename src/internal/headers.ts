@@ -109,7 +109,7 @@ interface HeaderReplay {
   rows?: WeakMap<object, readonly (readonly [string, string | null])[]>;
 }
 
-const hasNativeHeadersBrand = (headers: object): boolean => {
+export const hasNativeHeadersBrand = (headers: object): boolean => {
   try {
     Headers.prototype.has.call(headers, 'authorization');
     return true;
@@ -162,6 +162,19 @@ export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<obje
     return false;
   } finally {
     inputs.delete(headers);
+  }
+};
+
+/** Unknown iterable implementations must dispatch the same snapshot used for credential attribution. */
+export const canPreserveHeaderInput = (headers: HeadersLike): boolean => {
+  if (!headers) return true;
+  try {
+    if (!Array.isArray(headers) && Symbol.iterator in headers) {
+      return hasNativeHeadersBrand(headers) && getPlatformHeader(headers, 'Authorization') !== undefined;
+    }
+    return canReplayHeaderInput(headers);
+  } catch {
+    return false;
   }
 };
 
