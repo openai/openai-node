@@ -172,12 +172,11 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     const deltaDescriptor = Object.getOwnPropertyDescriptor(stableData, 'delta');
     const delta = Reflect.get(stableData, 'delta', stableData) as RunStepDelta;
     // Reject even nonenumerable identity fields before reading any delta values.
-    if (delta && hasOwn(delta, 'id')) {
+    if (delta && (hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id'))) {
       throw new OpenAIError('Run-step deltas must not contain an id field');
     }
-    // Keep the captured root private so raw listeners cannot change the validated identity fields.
-    // Preserve the original public event and share nested tool-call objects for listener mutations.
-    // Copy descriptors so an accessor-backed delta is read only once, even on frozen data.
+    // Capture the envelope without rereading an accessor-backed delta, even on frozen data.
+    // Delta content is projected privately for accumulation after raw listeners run.
     const capturedDescriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(stableData);
     if (idDescriptor) {
       capturedDescriptors['id'] = idDescriptor;
@@ -188,7 +187,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       configurable: true,
       enumerable: true,
       writable: true,
-      value: delta && { ...delta },
+      value: delta,
     };
     const capturedData = Object.create(
       Object.getPrototypeOf(stableData),
@@ -880,7 +879,8 @@ export class AssistantStream
         break;
       }
       case 'thread.run.step.delta': {
-        const delta = event.data.delta;
+        // Tool callbacks use ordinary property lookup; accumulation only uses enumerable own fields.
+        const delta = getRunStepDelta?.() ?? event.data.delta;
         if (
           delta.step_details &&
           delta.step_details.type === 'tool_calls' &&

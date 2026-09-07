@@ -504,13 +504,18 @@ describe('AssistantStream run-step deltas', () => {
     expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} replacement');
   });
 
-  test('rejects a proxy delta that reveals an id only during enumeration', async () => {
-    const step = runStep('step_original');
-    const originalStep = structuredClone(step);
-    let enumerated = false;
-    const delta = new Proxy(
-      { id: ' appended', ...toolCallDelta(step.id).data.delta },
-      {
+  test.each(['enumerable', 'nonenumerable'] as const)(
+    'rejects a proxy delta that reveals a hidden %s id only during enumeration',
+    async (visibility) => {
+      const step = runStep('step_original');
+      const originalStep = structuredClone(step);
+      let enumerated = false;
+      const source = Object.defineProperty(toolCallDelta(step.id).data.delta, 'id', {
+        configurable: true,
+        enumerable: visibility === 'enumerable',
+        value: ' appended',
+      });
+      const delta = new Proxy(source, {
         ownKeys(target) {
           enumerated = true;
           return Reflect.ownKeys(target);
@@ -520,23 +525,75 @@ describe('AssistantStream run-step deltas', () => {
             ? undefined
             : Reflect.getOwnPropertyDescriptor(target, property);
         },
-      },
-    );
+      });
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data: Object.freeze({ id: step.id, delta }) },
+        completedRun(),
+      ]);
+      const rawEvent = vi.fn();
+      const stepDelta = vi.fn();
+      const toolCreated = vi.fn();
+      runner.on('event', rawEvent);
+      runner.on('runStepDelta', stepDelta);
+      runner.on('toolCallCreated', toolCreated);
+
+      await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+      expect(rawEvent).toHaveBeenCalledTimes(1);
+      expect(stepDelta).not.toHaveBeenCalled();
+      expect(toolCreated).not.toHaveBeenCalled();
+      expect(step).toEqual(originalStep);
+    },
+  );
+
+  test.each([
+    ['inherited', 'toolCallCreated'],
+    ['inherited', 'toolCallDelta'],
+    ['nonenumerable', 'toolCallCreated'],
+    ['nonenumerable', 'toolCallDelta'],
+  ] as const)('dispatches %s step details to %s without accumulating them', async (visibility, listener) => {
+    const step = runStep('step_original');
+    const primingDeltas = listener === 'toolCallDelta' ? [toolCallDelta(step.id)] : [];
+    const { step_details: details } = toolCallDelta(step.id).data.delta;
+    const delta = {};
+    const detailsByDelta = new WeakMap([[delta, details]]);
+    const readDetails = vi.fn(function readOriginalDetails(this: object) {
+      expect(detailsByDelta.has(this)).toBe(true);
+      return detailsByDelta.get(this);
+    });
+    if (visibility === 'inherited') {
+      Object.setPrototypeOf(delta, Object.defineProperty({}, 'step_details', { get: readDetails }));
+    } else {
+      Object.defineProperty(delta, 'step_details', { get: readDetails });
+    }
     const runner = unencodedAssistantStream([
       { event: 'thread.run.step.created', data: step },
-      { event: 'thread.run.step.delta', data: Object.freeze({ id: step.id, delta }) },
+      ...primingDeltas,
+      { event: 'thread.run.step.delta', data: { id: step.id, delta } },
       completedRun(),
     ]);
-    const rawEvent = vi.fn();
+    const toolCallback = vi.fn();
     const stepDelta = vi.fn();
-    runner.on('event', rawEvent);
+    runner.on(listener, toolCallback);
     runner.on('runStepDelta', stepDelta);
 
-    await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+    await runner.done();
 
-    expect(rawEvent).toHaveBeenCalledTimes(1);
-    expect(stepDelta).not.toHaveBeenCalled();
-    expect(step).toEqual(originalStep);
+    expect(toolCallback).toHaveBeenCalledTimes(1);
+    if (listener === 'toolCallDelta') {
+      expect(toolCallback.mock.calls[0]?.[0]).toBe(details.tool_calls[0]);
+      expect(toolCallback.mock.calls[0]?.[1]).toBe(step.step_details.tool_calls[0]);
+    } else {
+      expect(toolCallback.mock.calls[0]?.[0]).toBe(step.step_details.tool_calls[0]);
+    }
+    expect(readDetails).toHaveBeenCalled();
+    expect(stepDelta).toHaveBeenCalledTimes(primingDeltas.length + 1);
+    expect(stepDelta.mock.calls[primingDeltas.length]?.[0]).toBe(delta);
+    expect(step.id).toBe('step_original');
+    expect(step.step_details.tool_calls[0]?.function.arguments).toBe(
+      `{"to":"trusted"}${' updated'.repeat(primingDeltas.length)}`,
+    );
   });
 
   test('rejects a nonenumerable delta id without reading it', async () => {
