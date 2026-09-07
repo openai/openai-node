@@ -32,8 +32,10 @@ async function requestImplementation(kind: 'native' | 'foreign'): Promise<Reques
       if (!(request instanceof ForeignRequest)) {
         throw new Error('Expected the foreign Request from the hook');
       }
-      // The transport receives no init.headers, so the Request's internal headers are authoritative.
-      return new ForeignRequest(request, { method: init?.method ?? 'GET' }).headers.get('Authorization');
+      return new ForeignRequest(request, {
+        method: init?.method ?? 'GET',
+        ...(init?.headers ? { headers: new Headers(init.headers) } : {}),
+      }).headers.get('Authorization');
     },
   };
 }
@@ -76,7 +78,11 @@ describe.each(['native', 'foreign'] as const)('%s Request header provenance', (k
     const authorizations: (string | null)[] = [];
     const transport = createWorkloadIdentityTransport((url, init) => {
       expect(url).toBe(requests[authorizations.length]);
-      expect(init?.headers).toBeUndefined();
+      if (kind === 'native') {
+        expect(init?.headers).toBeUndefined();
+      } else {
+        expect(init?.headers).toBeInstanceOf(Headers);
+      }
       authorizations.push(implementation.dispatchedAuthorization(url, init));
       return authorizations.length === 1
         ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })

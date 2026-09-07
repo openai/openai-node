@@ -307,7 +307,9 @@ plain-record, and ordinary tuple-array identity. Other iterable implementations,
 `Headers` collections, are materialized once and that same snapshot is passed to the transport.
 Structural constructor/tag descriptors cannot establish that a custom `get()` method agrees with its
 iterator. Foreign collection identity and custom properties are therefore not retained on this path;
-header values and workload refresh remain supported. Native `Request` delegation is unchanged.
+header values and workload refresh remain supported. Headers from a foreign `Request` are also
+materialized into the dispatch snapshot while the `Request` object retains its identity.
+Native `Request` delegation is unchanged.
 
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Ordinary object
 spread retains the SDK request carrier, including when a legacy wrapper also replaces the controller.

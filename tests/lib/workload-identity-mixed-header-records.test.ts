@@ -177,6 +177,44 @@ test('retains an empty accessor snapshot while refreshing other keys', () => {
   expect(read).toHaveBeenCalledTimes(1);
 });
 
+test.each(['request', 'default'] as const)(
+  'uses a data property replacing a self-deleting %s Authorization accessor',
+  async (layer) => {
+    const headers: Record<string, string | undefined> = {};
+    const read = vi.fn(() => {
+      delete headers['Authorization'];
+    });
+    Object.defineProperty(headers, 'Authorization', { configurable: true, enumerable: true, get: read });
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      headers['Authorization'] = 'Bearer independent';
+      return 'subject-token';
+    };
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      workloadIdentity: identity,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list(layer === 'request' ? { headers } : {})).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(sent).toEqual(['Bearer independent']);
+    expect(transport.exchanges).toBe(1);
+    expect(read).toHaveBeenCalledTimes(1);
+  },
+);
+
 test('preserves a self-deleting accessor before a live case-insensitive alias', () => {
   const headers = { 'X-Custom': 'initial', 'x-custom': 'winning' };
   const read = vi.fn(() => {

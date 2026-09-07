@@ -376,6 +376,7 @@ describe('Workload identity request and dispatch hooks', () => {
     'preserves foreign Request headers (throwing tag getter: %s)',
     async (throwTag) => {
       const { Request: ForeignRequest } = await import('undici');
+      const requests: object[] = [];
       class HookClient extends OpenAI {
         override async fetchWithTimeout(
           url: RequestInfo,
@@ -396,6 +397,7 @@ describe('Workload identity request and dispatch hooks', () => {
               },
             });
           }
+          requests.push(request);
           return super.fetchWithTimeout(
             request as unknown as RequestInfo,
             undefined,
@@ -407,11 +409,14 @@ describe('Workload identity request and dispatch hooks', () => {
       }
       const authorizations: (string | null)[] = [];
       const transport = createWorkloadIdentityTransport((url, init) => {
-        expect(init?.headers).toBeUndefined();
+        expect(url).toBe(requests[authorizations.length]);
+        expect(init?.headers).toBeInstanceOf(Headers);
         if (!(url instanceof ForeignRequest)) {
           throw new Error('Expected the foreign Request from the hook');
         }
-        authorizations.push(url.headers.get('Authorization'));
+        const headers = new Headers(init?.headers);
+        expect([...headers]).toEqual([...url.headers]);
+        authorizations.push(headers.get('Authorization'));
         return authorizations.length === 1
           ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
           : Response.json({ data: [] });

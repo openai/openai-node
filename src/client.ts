@@ -2265,24 +2265,20 @@ export class OpenAI {
   ): T {
     if (!request || request.authorization === undefined) return init;
     const requestHeaders = init.headers === undefined ? getRequestHeaders(url) : undefined;
+    const sourceHeaders = init.headers ?? requestHeaders;
     const platformHeader =
-      init.headers === undefined || hasNativeHeadersBrand(init.headers)
-        ? getPlatformHeader(init.headers ?? requestHeaders, 'Authorization')
+      sourceHeaders && hasNativeHeadersBrand(sourceHeaders)
+        ? getPlatformHeader(sourceHeaders, 'Authorization')
         : undefined;
     const preserveHeaders =
-      init.headers === undefined || platformHeader !== undefined || canPreserveHeaderInput(init.headers);
-    const headers = platformHeader
-      ? undefined
-      : init.headers === undefined
-        ? requestHeaders
-        : new Headers(init.headers);
+      sourceHeaders === undefined ||
+      platformHeader !== undefined ||
+      (init.headers !== undefined && canPreserveHeaderInput(init.headers));
+    const headers = platformHeader ? undefined : new Headers(sourceHeaders);
     // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
     request.used =
       (request.credential?.isCurrent() ?? false) &&
-      this.#workloadTokenProvenance.matchesHeaderCredential(
-        init.headers ?? requestHeaders,
-        request.authorization,
-      ) !== false &&
+      this.#workloadTokenProvenance.matchesHeaderCredential(sourceHeaders, request.authorization) !== false &&
       bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
         bearerToken(request.authorization);
     return preserveHeaders ? init : ({ ...init, headers } as T);

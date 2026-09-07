@@ -56,8 +56,16 @@ describe.each(['native', 'foreign'] as const)('%s Request header accessors', (re
         const sent: (string | null)[] = [];
         const transport = createWorkloadIdentityTransport((url, init) => {
           expect(url).toBe(requests[sent.length]);
-          expect(init?.headers).toBeUndefined();
-          sent.push((readHeaders.call(url) as Headers).get('Authorization'));
+          let headers: Headers = readHeaders.call(url);
+          if (realm === 'foreign') {
+            expect(init?.headers).toBeInstanceOf(Headers);
+            const dispatched = new Headers(init?.headers);
+            expect([...dispatched]).toEqual([...headers]);
+            headers = dispatched;
+          } else {
+            expect(init?.headers).toBeUndefined();
+          }
+          sent.push(headers.get('Authorization'));
           return sent.length === 1
             ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
             : Response.json({ data: [] });

@@ -65,9 +65,16 @@ describe.each(['native', 'foreign'] as const)('%s Request header accessors', (re
       const authorizations: (string | null)[] = [];
       const transport = createWorkloadIdentityTransport((url, init) => {
         expect(url).toBe(requests[authorizations.length]);
-        expect(init?.headers).toBeUndefined();
         // Model the transport's Request-internal view, independent of public property shadows.
-        const headers: Headers = intrinsicHeaders.call(url);
+        let headers: Headers = intrinsicHeaders.call(url);
+        if (realm === 'foreign' && workloadIdentity) {
+          expect(init?.headers).toBeInstanceOf(Headers);
+          const dispatched = new Headers(init?.headers);
+          expect([...dispatched]).toEqual([...headers]);
+          headers = dispatched;
+        } else {
+          expect(init?.headers).toBeUndefined();
+        }
         authorizations.push(headers.get('Authorization'));
         return workloadIdentity && authorizations.length === 1
           ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
