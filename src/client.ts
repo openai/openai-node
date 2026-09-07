@@ -1327,7 +1327,10 @@ export class OpenAI {
           credentialContext,
         });
         const ownedBuild = this.#workloadTokenProvenance.ownsResult(candidate, credentialContext);
-        workloadHeaders = this.#workloadTokenProvenance.takeHeaders(candidate) ?? workloadHeaders;
+        workloadHeaders =
+          this.#workloadTokenProvenance.takeHeaders(candidate) ??
+          workloadIdentityAuthScope?.headers ??
+          workloadHeaders;
         if (needsBuildRetryGuard && !ownedBuild) {
           throw new Errors.OpenAIError(
             'A custom buildRequest hook must retain original options or forward credentialContext on every retry of a one-shot source.',
