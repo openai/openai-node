@@ -2021,7 +2021,9 @@ export class OpenAI {
           requestLayer.seed(requestLayer.source, defaultLayer.snapshot);
         }
         const result = buildHeaders([
-          (initialized && existingDefaultLayer) || defaultLayer.source !== this._options.defaultHeaders
+          (initialized && existingDefaultLayer) ||
+          !canPreflight ||
+          defaultLayer.source !== this._options.defaultHeaders
             ? defaultLayer.refresh(this._options.defaultHeaders)
             : defaultLayer.snapshot,
           bodyLayer.snapshot,
