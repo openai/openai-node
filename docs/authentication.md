@@ -284,9 +284,21 @@ that awaits before delegating, copies its options, and reconstructs the authenti
 native `Headers` must forward the context. Once both identities are discarded across an asynchronous
 boundary, ownership cannot be inferred safely from matching credential strings.
 
+A `buildRequest` override that copies options containing an already consumed one-shot or foreign
+Headers-shaped source
+must forward the complete settings argument, including `credentialContext`. Without that owner, the
+SDK rejects the build before acquiring or dispatching credentials. Delegating with the original
+options retains the existing request's snapshot without requiring a new argument.
+
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
 caller-owned header sources before `prepareOptions` or bodyless custom authentication hooks run.
+
+Foreign Headers-shaped implementations that remove previously observed header names during replay
+are treated as exhausted one-shot sources. To intentionally delete headers in such an implementation,
+replace the header layer, or use an explicit record with `Authorization: null`; missing rows alone
+cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
+arrays, and data records retain live refresh behavior.
 
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Forward it when
 a transport wrapper replaces both the request object and its abort controller. Changing either one
