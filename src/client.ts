@@ -2083,7 +2083,7 @@ export class OpenAI {
     const security = options.__security ?? { bearerAuth: true };
     let authenticationSecurity = security;
     let suppliedHeaders: NullableHeaders | undefined;
-    let refreshSuppliedHeaders: (() => NullableHeaders) | undefined;
+    let refreshSuppliedHeaders: ((afterAuthentication?: boolean) => NullableHeaders) | undefined;
     const suppliesAuthorization = (headers: NullableHeaders) => {
       const authorization = headers.values.get('authorization');
       return (
@@ -2103,8 +2103,9 @@ export class OpenAI {
       const bodyLayer = snapshotHeaders(bodyHeaders);
       const requestLayer = requestHeaderSnapshot ?? snapshotHeaders(options.headers);
       let initialized = false;
-      refreshSuppliedHeaders = () => {
+      refreshSuppliedHeaders = (afterAuthentication = false) => {
         const existingDefaultLayer = defaultLayer;
+        const refreshDefault = (initialized || afterAuthentication) && existingDefaultLayer?.initialized;
         defaultLayer ??= snapshotHeaders(this._options.defaultHeaders);
         if (
           !defaultLayer.initialized &&
@@ -2114,7 +2115,7 @@ export class OpenAI {
           requestLayer.seed(requestLayer.source, defaultLayer.snapshot);
         }
         const result = buildHeaders([
-          (initialized && existingDefaultLayer) || defaultLayer.source !== this._options.defaultHeaders
+          refreshDefault || defaultLayer.source !== this._options.defaultHeaders
             ? defaultLayer.refresh(this._options.defaultHeaders)
             : defaultLayer.snapshot,
           bodyLayer.snapshot,
@@ -2165,7 +2166,7 @@ export class OpenAI {
             : undefined;
         requestHeaderSnapshot.seed(options.headers, captured);
       }
-      suppliedHeaders = refreshSuppliedHeaders();
+      suppliedHeaders = refreshSuppliedHeaders(true);
       if (!this._provider && authenticationSecurity !== security && !suppliesAuthorization(suppliedHeaders)) {
         // A caller may remove its override while the skipped authentication promise yields.
         authenticationHeaders = await this.#workloadTokenProvenance.invoke(options, credentialContext, () =>
