@@ -83,6 +83,34 @@ function toolCallDelta(id: string) {
 }
 
 describe('AssistantStream run-step identity security', () => {
+  describe.each([
+    ['SSE', publicAssistantStream],
+    ['serialized stream', assistantStream],
+  ] as const)('%s run-step deltas', (_transport, createStream) => {
+    test.each([' appended', '', null, 123])('rejects an own id field containing %j', async (id) => {
+      const step = runStep('step_original');
+      const created = { event: 'thread.run.step.created', data: step };
+      const runner = createStream([
+        created,
+        {
+          event: 'thread.run.step.delta',
+          data: { id: step.id, delta: { id, metadata: { changed: true } } },
+        },
+        completedRun(),
+      ]);
+      const rawEvent = vi.fn();
+      const stepDelta = vi.fn();
+      runner.on('event', rawEvent);
+      runner.on('runStepDelta', stepDelta);
+
+      await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+      expect(rawEvent).toHaveBeenCalledTimes(1);
+      expect(stepDelta).not.toHaveBeenCalled();
+      expect(runner.currentRunStepSnapshot()).toEqual(step);
+    });
+  });
+
   test.each(['step_trusted', 'step_foreign'])(
     'rejects creation of %s while a trusted run step remains active',
     async (injectedID) => {

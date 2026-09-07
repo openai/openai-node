@@ -525,6 +525,10 @@ export class AssistantStream
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
     }
 
+    if (event.event === 'thread.run.step.delta' && event.data.delta && hasOwn(event.data.delta, 'id')) {
+      throw new OpenAIError('Run-step deltas must not contain an id field');
+    }
+
     if (event.event === 'thread.run.step.created') {
       if (this.#activeRunStepID !== undefined) {
         throw new OpenAIError(
