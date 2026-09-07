@@ -1,5 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise copying build hooks. */
 import OpenAI from 'openai';
+import { test } from 'vitest';
 import type { HeadersInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
@@ -381,4 +382,47 @@ describe('Workload identity raw build input retries', () => {
       expect(transport.exchanges).toBe(0);
     },
   );
+  describe.each(['native', 'foreign'] as const)('copied %s Headers', (kind) => {
+    test.skipIf(kind === 'foreign' && Number(process.versions.node.split('.')[0]) < 24).each([
+      ['independent', 500],
+      ['workload', 401],
+    ] as const)('retries %s credentials after %s', async (credential, status) => {
+      const implementation = kind === 'foreign' ? await import('undici') : { Headers };
+      const headers = new implementation.Headers(
+        credential === 'independent' ? { Authorization: 'Bearer independent' } : undefined,
+      );
+      class CopyClient extends OpenAI {
+        override async buildRequest(
+          options: FinalRequestOptions,
+          settings: Parameters<OpenAI['buildRequest']>[1] = {},
+        ) {
+          return super.buildRequest(
+            { ...options, headers: new Headers(options.headers as HeadersInit) },
+            settings,
+          );
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return sent.length === 1
+          ? Response.json({ error: 'synthetic retry' }, { status })
+          : Response.json({ data: [] });
+      });
+      const client = new CopyClient({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: status === 500 ? 1 : 0,
+      });
+
+      await client.models.list({ headers });
+
+      expect(sent).toEqual(
+        credential === 'independent'
+          ? ['Bearer independent', 'Bearer independent']
+          : ['Bearer access-token-1', 'Bearer access-token-2'],
+      );
+      expect(transport.exchanges).toBe(credential === 'independent' ? 0 : 2);
+    });
+  });
 });

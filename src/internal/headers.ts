@@ -1,5 +1,5 @@
 import { isReadonlyArray } from './utils/values';
-import { getHeadersIterator } from './platform-headers';
+import { getHeadersIterator, getPlatformHeader } from './platform-headers';
 export { getPlatformHeader } from './platform-headers';
 import {
   rememberWorkloadHeaderCredential,

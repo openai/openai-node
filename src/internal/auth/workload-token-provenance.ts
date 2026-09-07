@@ -170,6 +170,9 @@ export class WorkloadTokenProvenance {
     const previous = this.invocation;
     this.invocation = this.scopeFor(options, context);
     try {
+      if (this.invocation?.headers) {
+        this.invocation.captureHeaders(this.invocation.headers);
+      }
       return operation();
     } finally {
       this.invocation = previous;
