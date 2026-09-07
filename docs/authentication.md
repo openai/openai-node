@@ -231,6 +231,8 @@ a `401`, the SDK also invalidates the cached token and retries once with a fresh
 For subject-token workload identity, an independent `Authorization` header override in `defaultHeaders`
 or request `headers` skips token acquisition, including `null` to remove the header or an empty string.
 Subclasses that override authentication hooks retain control of credential resolution.
+Automatic `401` refresh requires dispatch through the SDK's `fetchWithTimeout` implementation so it can
+identify the credential sent. Overrides that dispatch requests directly own their credential refresh.
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
 

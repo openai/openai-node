@@ -27,7 +27,10 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
-function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [string, string | null]> {
+function* iterateHeaders(
+  headers: HeadersLike,
+  replay?: { reusable: boolean },
+): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
   if (brand_privateNullableHeaders in headers) {
@@ -45,6 +48,13 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
     Symbol.iterator in headers ? headers[Symbol.iterator] : undefined;
   if (typeof iterator === 'function') {
+    if (replay) {
+      // Custom iterable protocols may return the same exhausted iterator on every call.
+      // Recognize the actual method, including inherited overrides, before reusing a source.
+      replay.reusable =
+        (Array.isArray(headers) && iterator === Array.prototype[Symbol.iterator]) ||
+        (headers instanceof Headers && iterator === Headers.prototype[Symbol.iterator]);
+    }
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
     shouldClear = true;
@@ -69,12 +79,12 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   }
 }
 
-export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
+const mergeHeaders = (newHeaders: HeadersLike[], replay?: { reusable: boolean }): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
   for (const headers of newHeaders) {
     const seenHeaders = new Set<string>();
-    for (const [name, value] of iterateHeaders(headers)) {
+    for (const [name, value] of iterateHeaders(headers, replay)) {
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
       }
@@ -93,6 +103,15 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
     }
   }
   return { [brand_privateNullableHeaders]: true, values: targetHeaders, nulls: nullHeaders };
+};
+
+export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => mergeHeaders(newHeaders);
+
+/** Snapshot one-use iterables while allowing reusable headers to change during async authentication. */
+export const prepareHeaders = (headers: HeadersLike) => {
+  const replay = { reusable: true };
+  const snapshot = mergeHeaders([headers], replay);
+  return { snapshot, refresh: () => (replay.reusable ? headers : snapshot) };
 };
 
 export const isEmptyHeaders = (headers: HeadersLike) => {
