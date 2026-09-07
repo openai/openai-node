@@ -1,5 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected dispatch hooks. */
 import OpenAI from 'openai';
+import { test } from 'vitest';
 import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { buildHeaders } from 'openai/internal/headers';
@@ -289,7 +290,10 @@ describe('Workload identity request and dispatch hooks', () => {
           context?: object,
         ) {
           return super.fetchWithTimeout(
-            new ForeignRequest(url, init as globalThis.RequestInit) as unknown as RequestInfo,
+            new ForeignRequest(
+              url as ConstructorParameters<typeof ForeignRequest>[0],
+              init as ConstructorParameters<typeof ForeignRequest>[1],
+            ) as unknown as RequestInfo,
             undefined,
             timeout,
             controller,
@@ -299,7 +303,12 @@ describe('Workload identity request and dispatch hooks', () => {
       }
       const authorizations: (string | null)[] = [];
       const transport = createWorkloadIdentityTransport((url, init) => {
-        authorizations.push(new ForeignRequest(url, init).headers.get('Authorization'));
+        authorizations.push(
+          new ForeignRequest(
+            url as ConstructorParameters<typeof ForeignRequest>[0],
+            init as ConstructorParameters<typeof ForeignRequest>[1],
+          ).headers.get('Authorization'),
+        );
         return authorizations.length === 1
           ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
           : Response.json({ data: [] });

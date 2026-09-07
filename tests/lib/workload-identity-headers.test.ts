@@ -2,7 +2,7 @@
 import { runInNewContext } from 'node:vm';
 import OpenAI from 'openai';
 import { test, vi } from 'vitest';
-import { buildHeaders } from 'openai/internal/headers';
+import { buildHeaders, snapshotHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import {
   createTestClientOptions,
@@ -335,7 +335,113 @@ test('retains inherited one-shot header iterators during credential acquisition'
   expect(transport.exchanges).toBe(1);
 });
 
+test.each(['own', 'inherited'] as const)(
+  'reads a non-callable %s iterator getter only once',
+  async (location) => {
+    const headers = { 'X-Custom': 'preserved' };
+    let reads = 0;
+    const target = location === 'own' ? headers : Object.create(Object.getPrototypeOf(headers));
+    Object.defineProperty(target, Symbol.iterator, {
+      get() {
+        expect(this).toBe(headers);
+        reads += 1;
+        if (reads > 1) {
+          throw new Error('Iterator getter was evaluated twice');
+        }
+        // oxlint-disable-next-line no-useless-return -- This getter intentionally supplies no callable protocol.
+        return;
+      },
+    });
+    if (location === 'inherited') {
+      Object.setPrototypeOf(headers, target);
+    }
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+    await client.models.list({ headers });
+
+    expect(reads).toBe(1);
+  },
+);
+
+test('reads record getters eagerly before validating header names', () => {
+  const read = vi.fn(() => 'preserved');
+  const headers = {
+    'invalid name': 'invalid',
+    get 'X-Custom'() {
+      return read();
+    },
+  };
+
+  expect(() => snapshotHeaders(headers)).toThrow(TypeError);
+
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
 for (const location of ['request', 'default'] as const) {
+  test.each(['throw', 'delete'] as const)(
+    `reads accessor-backed ${location} headers once (getter: %s)`,
+    async (behavior) => {
+      const headers: Record<string, string> = {};
+      let reads = 0;
+      Object.defineProperty(headers, 'X-Custom', {
+        enumerable: true,
+        configurable: true,
+        get() {
+          expect(this).toBe(headers);
+          reads += 1;
+          if (reads > 1) {
+            throw new Error('Header getter was evaluated twice');
+          }
+          if (behavior === 'delete') {
+            delete headers['X-Custom'];
+          }
+          return 'preserved';
+        },
+      });
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        defaultHeaders: location === 'default' ? headers : undefined,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list({ headers: location === 'request' ? headers : undefined });
+
+      expect(reads).toBe(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+
+  test(`refreshes mutable data-only ${location} header records after credential acquisition`, async () => {
+    const headers = { 'X-Custom': 'before' };
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      headers['X-Custom'] = 'after';
+      return 'subject-token';
+    };
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('after');
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      workloadIdentity: identity,
+      defaultHeaders: location === 'default' ? headers : undefined,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list({ headers: location === 'request' ? headers : undefined });
+  });
+
   test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
     `refreshes reusable foreign Headers from ${location} options after credential acquisition`,
     async () => {

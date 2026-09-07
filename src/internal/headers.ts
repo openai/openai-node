@@ -91,21 +91,37 @@ function* iterateHeaders(
   let shouldClear = false;
   let iter: Iterable<HeaderEntry>;
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
-  const iterator: (() => Iterator<HeaderEntry>) | undefined =
-    Symbol.iterator in headers ? headers[Symbol.iterator] : undefined;
+  const hasIterator = Symbol.iterator in headers;
+  const iterator: (() => Iterator<HeaderEntry>) | undefined = hasIterator
+    ? headers[Symbol.iterator]
+    : undefined;
   if (replay) {
     // Custom iterators may be one-shot whether inherited or owned. Platform Headers
     // are reusable across realms, where instanceof cannot identify them.
     replay.refreshable =
-      typeof iterator !== 'function' ||
-      (Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
-      (!Array.isArray(headers) && iterator === getHeadersIterator(headers));
+      !hasIterator ||
+      (typeof iterator === 'function' &&
+        ((Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
+          (!Array.isArray(headers) && iterator === getHeadersIterator(headers))));
   }
   if (typeof iterator === 'function') {
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
     shouldClear = true;
-    iter = Object.entries(headers ?? {});
+    if (replay) {
+      // Match Object.entries' eager descriptor/get order while recognizing one-shot accessors.
+      const entries: HeaderEntry[] = [];
+      for (const key of Reflect.ownKeys(headers)) {
+        if (typeof key !== 'string') continue;
+        const descriptor = Object.getOwnPropertyDescriptor(headers, key);
+        if (!descriptor?.enumerable) continue;
+        if (!('value' in descriptor)) replay.refreshable = false;
+        entries.push([key, Reflect.get(headers, key)]);
+      }
+      iter = entries;
+    } else {
+      iter = Object.entries(headers);
+    }
   }
   for (let row of iter) {
     const name = row[0];
