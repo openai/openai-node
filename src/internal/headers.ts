@@ -230,6 +230,7 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       const currentSource = sources.length === 0 ? source : sources[0];
+      if (currentSource === snapshot) return snapshot;
       if (currentSource !== source || replay.refreshable) {
         const nextReplay = { refreshable: true };
         const nextProvenance = { unknown: false };
