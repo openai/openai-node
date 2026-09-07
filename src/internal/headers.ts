@@ -654,7 +654,7 @@ export const getPlatformHeader = (
     actualIterator ??= Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
     if (actualIterator && actualIterator.value !== platformIterator) return undefined;
     if (Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value !== platformIterator) continue;
-    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
     if (
       typeof constructor !== 'function' ||
       Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Headers' ||
