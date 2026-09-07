@@ -19,6 +19,7 @@ async function main() {
 
   const agents = new Map<string, string>();
   let currentItemID: string | undefined;
+  let coordinatorCompleted = false;
   for await (const event of stream) {
     if (event.type === 'response.output_item.added' && event.item.type === 'message') {
       agents.set(event.item.id, event.item.agent?.agent_name ?? '/root');
@@ -31,12 +32,17 @@ async function main() {
         process.stdout.write(`${separator}━━━ ${role}: ${name} ━━━\n\n`);
       }
       process.stdout.write(event.delta);
+    } else if (event.type === 'response.completed' && (!event.agent || event.agent.agent_name === '/root')) {
+      coordinatorCompleted = true;
     } else if (
       (event.type === 'response.failed' || event.type === 'response.incomplete') &&
       (!event.agent || event.agent.agent_name === '/root')
     ) {
       throw new Error(`Response ended with ${event.type}.`);
     }
+  }
+  if (!coordinatorCompleted) {
+    throw new Error('Stream ended before the coordinator response completed.');
   }
   process.stdout.write('\n');
 }
