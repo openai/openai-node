@@ -1,7 +1,20 @@
+const nativeHeadersPrototype = globalThis.Headers?.prototype;
+const nativeHeadersHas = nativeHeadersPrototype?.has;
+const nativeHeadersGet = nativeHeadersPrototype?.get;
+const nativeHeadersIterator = nativeHeadersPrototype?.[Symbol.iterator];
+
 const getHeadersProtocol = (
   headers: object,
 ): { iterator: () => Iterator<unknown>; prototype: object } | undefined => {
   let protocol: { iterator: () => Iterator<unknown>; prototype: object } | undefined;
+  if (nativeHeadersPrototype && nativeHeadersHas && nativeHeadersIterator) {
+    try {
+      Reflect.apply(nativeHeadersHas, headers, ['authorization']);
+      return { iterator: nativeHeadersIterator, prototype: nativeHeadersPrototype };
+    } catch {
+      // Other realms may require their own platform reader.
+    }
+  }
   try {
     const seen = new Set<object>();
     for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
@@ -62,7 +75,10 @@ export const getPlatformHeader = (
       if (prototype !== platform.prototype) {
         continue;
       }
-      const getter = Object.getOwnPropertyDescriptor(prototype, 'get')?.value;
+      const getter =
+        prototype === nativeHeadersPrototype
+          ? nativeHeadersGet
+          : Object.getOwnPropertyDescriptor(prototype, 'get')?.value;
       if (typeof getter === 'function') {
         return { value: Reflect.apply(getter, headers, [name]), prototype };
       }

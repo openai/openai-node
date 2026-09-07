@@ -316,7 +316,7 @@ type WorkloadIdentityRequest = {
   bindings: Set<object>;
   authorization: string | undefined;
   credential: WorkloadCredentialUsage | undefined;
-  used: boolean;
+  responses: WeakMap<Response, boolean>;
 };
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
@@ -1455,7 +1455,7 @@ export class OpenAI {
       bindings: new Set<object>(),
       authorization: initialWorkloadAuthorization,
       credential: workloadCredential,
-      used: false,
+      responses: new WeakMap<Response, boolean>(),
     };
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
@@ -1475,7 +1475,8 @@ export class OpenAI {
         }
         workloadRequest.bindings.clear();
       });
-    const usedWorkloadToken = workloadRequest.used;
+    const usedWorkloadToken =
+      !(response instanceof globalThis.Error) && workloadRequest.responses.get(response) === true;
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1824,13 +1825,19 @@ export class OpenAI {
     try {
       // Only this dispatch owner can attest to the headers passed to the configured fetch.
       // Hooks that send independently own their authentication retries.
-      const dispatchOptions = this.#snapshotWorkloadIdentityUsage(workloadRequest, url, fetchOptions);
+      const { init: dispatchOptions, used } = this.#snapshotWorkloadIdentityUsage(
+        workloadRequest,
+        url,
+        fetchOptions,
+      );
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await (this.#x509Fetch ?? this.fetch).call(
+      const response = await (this.#x509Fetch ?? this.fetch).call(
         undefined,
         url,
         WorkloadTokenProvenance.forDispatch(dispatchOptions),
       );
+      workloadRequest?.responses.set(response, used);
+      return response;
     } catch (err) {
       if (signal && !composed) signal.removeEventListener('abort', abort);
       throw err;
@@ -2175,10 +2182,10 @@ export class OpenAI {
           authenticationSecurity = { ...security, bearerAuth: false };
         }
       }
-      if (defaultLayer?.initialized) {
+      if (defaultLayer?.initialized && !defaultLayer.replayable) {
         preferredHeaders.push({ source: defaultLayer.source, snapshot: defaultLayer.snapshot });
       }
-      if (requestLayer.initialized) {
+      if (requestLayer.initialized && !requestLayer.replayable) {
         preferredHeaders.push({ source: requestLayer.source, snapshot: requestLayer.snapshot });
       }
     }
@@ -2282,8 +2289,8 @@ export class OpenAI {
     request: WorkloadIdentityRequest | undefined,
     url: RequestInfo,
     init: T,
-  ): T {
-    if (!request || request.authorization === undefined) return init;
+  ): { init: T; used: boolean } {
+    if (!request || request.authorization === undefined) return { init, used: false };
     const requestHeaders = init.headers === undefined ? getRequestHeaders(url) : undefined;
     const sourceHeaders = init.headers ?? requestHeaders;
     const platformHeader =
@@ -2296,12 +2303,12 @@ export class OpenAI {
       (init.headers !== undefined && canPreserveHeaderInput(init.headers));
     const headers = platformHeader ? undefined : new Headers(sourceHeaders);
     // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
-    request.used =
+    const used =
       (request.credential?.isCurrent() ?? false) &&
       this.#workloadTokenProvenance.matchesHeaderCredential(sourceHeaders, request.authorization) !== false &&
       bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
         bearerToken(request.authorization);
-    return preserveHeaders ? init : ({ ...init, headers } as T);
+    return { init: preserveHeaders ? init : ({ ...init, headers } as T), used };
   }
 
   #observeWorkloadHeaderReplacement(

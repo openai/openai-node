@@ -269,7 +269,7 @@ export class WorkloadTokenProvenance {
       this.scopeFor(options, context)?.select(credential);
       return;
     }
-    const authorization = values.get('authorization');
+    const authorization = getPlatformHeader(values, 'authorization')?.value ?? null;
     const token = bearerToken(authorization);
     if (
       token !== undefined &&

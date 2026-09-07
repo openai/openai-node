@@ -234,6 +234,7 @@ Subclasses that override authentication hooks retain control of credential resol
 For subject-token workload identity, a transport hook that dispatches without delegating to the SDK's
 `fetchWithTimeout` owns its authentication retries. The SDK records token usage immediately before
 calling the configured `fetch`; it cannot verify which credential an independent transport sent.
+When a hook makes several delegated sends, authentication retry follows the response the hook returns.
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
 

@@ -72,6 +72,7 @@ const getArrayIterator = <T>(headers: readonly T[]) => {
 
 interface HeaderPropertySnapshot {
   descriptor: PropertyDescriptor;
+  capture?: () => void;
   entry?: readonly [string, string | readonly string[] | null];
 }
 
@@ -458,7 +459,11 @@ function* iterateHeaders(
       }
     }
     if (property && replay) {
-      if (!rowReplay?.refreshable) replay.properties!.set(name, property);
+      if (!rowReplay?.refreshable) {
+        property.capture?.();
+        delete property.capture;
+        replay.properties!.set(name, property);
+      }
       delete replay.property;
     }
   }
@@ -516,12 +521,18 @@ const mergeHeaderEntries = (
         nullHeaders.delete(lowerName);
       }
       if (replay?.property) {
-        replay.property.entry = [
-          name,
-          value !== null && lowerName === 'set-cookie'
-            ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
-            : targetHeaders.get(lowerName),
-        ];
+        const property = replay.property;
+        // Capture once after the property finishes, preserving platform normalization without rescanning
+        // an expanding Set-Cookie collection after every append.
+        property.capture ??= () => {
+          const value = targetHeaders.get(lowerName);
+          property.entry = [
+            name,
+            value !== null && lowerName === 'set-cookie'
+              ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
+              : value,
+          ];
+        };
       }
     }
     hasAuthorizationLayer ||= suppliesAuthorization;
