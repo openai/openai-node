@@ -103,7 +103,8 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
   event: AssistantStreamEvent;
   exposedEvent: AssistantStreamEvent;
   runStepDeltaData: RunStepStreamEvent['data'] | undefined;
-  refreshRunStepDelta: (() => RunStepDelta | undefined) | undefined;
+  refreshRunStepDelta: (() => void) | undefined;
+  getRunStepDelta: (() => RunStepDelta | undefined) | undefined;
 } {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
@@ -146,7 +147,8 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     ? event
     : ({ event: eventType, data: stableData } as AssistantStreamEvent);
   let runStepDeltaData: RunStepStreamEvent['data'] | undefined;
-  let refreshRunStepDelta: (() => RunStepDelta | undefined) | undefined;
+  let refreshRunStepDelta: (() => void) | undefined;
+  let getRunStepDelta: (() => RunStepDelta | undefined) | undefined;
 
   if (eventType === 'thread.run.step.delta') {
     // Track listener-created envelope aliases on the original data, independently of delta content.
@@ -166,13 +168,17 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     }) as AssistantStreamEvent['data'] & { delta: unknown };
     stableData = capturedData;
     if (delta && typeof delta === 'object') {
-      refreshRunStepDelta = () => {
-        let currentDelta: unknown = delta;
-        if (deltaDescriptor && 'value' in deltaDescriptor) {
-          const currentDescriptor = Object.getOwnPropertyDescriptor(runStepDeltaData, 'delta');
-          currentDelta =
-            currentDescriptor && 'value' in currentDescriptor ? currentDescriptor.value : undefined;
+      const readCurrentDelta = () => {
+        const currentDescriptor = Object.getOwnPropertyDescriptor(runStepDeltaData, 'delta');
+        if (currentDescriptor && 'value' in currentDescriptor) {
+          return currentDescriptor.value as RunStepDelta;
         }
+        // Keep the original accessor value stable without invoking the getter again.
+        return deltaDescriptor && 'value' in deltaDescriptor ? undefined : delta;
+      };
+      getRunStepDelta = readCurrentDelta;
+      refreshRunStepDelta = () => {
+        const currentDelta = readCurrentDelta();
         if (!currentDelta || typeof currentDelta !== 'object') {
           capturedData.delta = currentDelta;
           return;
@@ -191,7 +197,6 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           });
         }
         capturedData.delta = accumulationDelta as RunStepDelta;
-        return currentDelta as RunStepDelta;
       };
     }
   }
@@ -202,6 +207,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     exposedEvent,
     runStepDeltaData,
     refreshRunStepDelta,
+    getRunStepDelta,
   };
 }
 
@@ -454,6 +460,7 @@ export class AssistantStream
       exposedEvent,
       runStepDeltaData,
       refreshRunStepDelta,
+      getRunStepDelta,
     } = stabilizeAssistantStreamEvent(event);
 
     let messageID: string | undefined;
@@ -492,7 +499,7 @@ export class AssistantStream
     if (runStepID !== undefined && runStepData !== undefined) {
       this.#reserveRunStepAlias(runStepData, runStepID);
     }
-    const exposedRunStepDelta = refreshRunStepDelta?.();
+    refreshRunStepDelta?.();
     if (runStepID === undefined && this.#activeRunStepID !== undefined && this.#currentRunStepSnapshot) {
       this.#reserveRunStepAlias(this.#currentRunStepSnapshot, this.#activeRunStepID);
     }
@@ -531,7 +538,7 @@ export class AssistantStream
         if (activeRunStep) {
           this.#reserveRunStepAlias(activeRunStep, runStepID);
         }
-        this.#handleRunStep(stableEvent, runStepID, exposedRunStepDelta);
+        this.#handleRunStep(stableEvent, runStepID, getRunStepDelta);
         if (runStepData !== undefined) {
           this.#reserveRunStepAlias(runStepData, runStepID);
         }
@@ -823,7 +830,7 @@ export class AssistantStream
     this: AssistantStream,
     event: RunStepStreamEvent,
     runStepID: string,
-    exposedDelta: RunStepDelta | undefined,
+    getRunStepDelta: (() => RunStepDelta | undefined) | undefined,
   ) {
     const accumulatedRunStep = this.#accumulateRunStep(event, runStepID);
     this.#currentRunStepSnapshot = accumulatedRunStep;
@@ -864,7 +871,8 @@ export class AssistantStream
           }
         }
 
-        // Preserve callback identity unless a listener added an identity field, including tool listeners above.
+        // Select listener replacements after tool callbacks without changing the accumulated snapshot.
+        const exposedDelta = getRunStepDelta?.();
         this.#emitExposed(
           'runStepDelta',
           exposedDelta && !hasOwn(exposedDelta, 'id') ? exposedDelta : event.data.delta,
