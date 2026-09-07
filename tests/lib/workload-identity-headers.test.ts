@@ -2,6 +2,7 @@
 import { runInNewContext } from 'node:vm';
 import OpenAI from 'openai';
 import { test, vi } from 'vitest';
+import { buildHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import {
   createTestClientOptions,
@@ -48,6 +49,94 @@ test('keeps tagged array subclasses with inherited one-shot iterators snapshot-o
   const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
 
   await client.models.list({ headers: new TaggedHeaders(['Authorization', null]) });
+});
+
+test.each(['local', 'foreign'] as const)(
+  'reads an accessor-backed native %s array iterator once',
+  async (realm) => {
+    const headers: string[][] =
+      realm === 'local' ? [['X-Custom', 'preserved']] : runInNewContext("[['X-Custom', 'preserved']]");
+    const nativeIterator = headers[Symbol.iterator];
+    const readIterator = vi.fn(() => nativeIterator);
+    Object.defineProperty(headers, Symbol.iterator, { get: readIterator });
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+    await client.models.list({ headers });
+
+    expect(readIterator).toHaveBeenCalledTimes(1);
+  },
+);
+
+test.each(['own', 'inherited'] as const)(
+  'reads an accessor-backed native Headers iterator once (%s protocol)',
+  async (location) => {
+    const headers = new Headers({ 'X-Custom': 'preserved' });
+    const nativeIterator = headers[Symbol.iterator];
+    const readIterator = vi.fn(() => nativeIterator);
+    const target = location === 'own' ? headers : Object.create(Object.getPrototypeOf(headers));
+    Object.defineProperty(target, Symbol.iterator, { get: readIterator });
+    if (location === 'inherited') {
+      Object.setPrototypeOf(headers, target);
+    }
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+    await client.models.list({ headers });
+
+    expect(readIterator).toHaveBeenCalledTimes(1);
+  },
+);
+
+test('lets a custom auth hook read one-shot headers on a bodyless request', async () => {
+  class HookClient extends OpenAI {
+    // oxlint-disable-next-line class-methods-use-this -- This fixture derives authentication from request headers.
+    protected override async authHeaders(options: FinalRequestOptions) {
+      const credential = buildHeaders([options.headers]).values.get('X-Credential');
+      return buildHeaders([{ Authorization: `Bearer ${credential ?? 'fallback'}` }]);
+    }
+  }
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer intended');
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await client.models.list({ headers: new OneShotHeaders(['X-Credential', 'intended']) });
+});
+
+test('uses a request header layer replaced during token acquisition', async () => {
+  const options: FinalRequestOptions = {
+    method: 'get',
+    path: '/synthetic',
+    headers: { 'X-Custom': 'original' },
+  };
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    options.headers = { Authorization: 'Bearer independent', 'X-Custom': 'replacement' };
+    return 'subject-token';
+  };
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    const sent = new Headers(init?.headers);
+    expect(sent.get('Authorization')).toBe('Bearer independent');
+    expect(sent.get('X-Custom')).toBe('replacement');
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    workloadIdentity: identity,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.request(options);
+  expect(transport.exchanges).toBe(1);
 });
 
 test.each(['authHeaders', 'bearerAuth'] as const)(

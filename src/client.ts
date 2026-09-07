@@ -1700,7 +1700,7 @@ export class OpenAI {
     try {
       // Only this dispatch owner can attest to the headers passed to the configured fetch.
       // Hooks that send independently own their authentication retries.
-      const dispatchOptions = this.#snapshotWorkloadIdentityUsage(workloadRequest, fetchOptions);
+      const dispatchOptions = this.#snapshotWorkloadIdentityUsage(workloadRequest, url, fetchOptions);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       return await (this.#x509Fetch ?? this.fetch).call(undefined, url, dispatchOptions);
     } catch (err) {
@@ -1863,7 +1863,11 @@ export class OpenAI {
       }
     }
     const requestHeaderSnapshot =
-      this._workloadIdentityAuth && !x509Authentication ? snapshotHeaders(options.headers) : undefined;
+      this._workloadIdentityAuth &&
+      !x509Authentication &&
+      (this.#canPreflightWorkloadIdentityHeaders(inputOptions) || 'body' in options)
+        ? snapshotHeaders(options.headers)
+        : undefined;
     if (requestHeaderSnapshot) {
       options.headers = requestHeaderSnapshot.snapshot;
     }
@@ -1969,6 +1973,14 @@ export class OpenAI {
         ? undefined
         : await this.authHeaders(options, authenticationSecurity, credentialContext);
     if (suppliedHeaders && authenticationSecurity.bearerAuth && suppliedHeaderLayers) {
+      const currentRequestHeaders = options.headers;
+      if (
+        requestHeaderSnapshot &&
+        currentRequestHeaders !== requestHeaderSnapshot.source &&
+        currentRequestHeaders !== requestHeaderSnapshot.snapshot
+      ) {
+        suppliedHeaderLayers[2] = snapshotHeaders(currentRequestHeaders);
+      }
       suppliedHeaders = buildHeaders(suppliedHeaderLayers.map(({ refresh }) => refresh()));
     }
     const headers = buildHeaders([
@@ -2023,18 +2035,26 @@ export class OpenAI {
 
   #snapshotWorkloadIdentityUsage<T extends RequestInit>(
     request: WorkloadIdentityRequest | undefined,
+    url: RequestInfo,
     init: T,
   ): T {
-    if (!request) {
-      return init;
+    const requestHeaders =
+      init.headers === undefined && typeof Request !== 'undefined' && url instanceof Request
+        ? url.headers
+        : undefined;
+    const headers =
+      init.headers === undefined
+        ? requestHeaders
+        : init.headers instanceof Headers
+          ? init.headers
+          : new Headers(init.headers);
+    if (request) {
+      // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
+      request.used =
+        request.authorization !== undefined &&
+        bearerToken(headers?.get('Authorization') ?? null) === bearerToken(request.authorization);
     }
-    // Materialize one-use iterators exactly once and forward that same snapshot to the next dispatch layer.
-    const headers = init.headers instanceof Headers ? init.headers : new Headers(init.headers);
-    // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
-    request.used =
-      request.authorization !== undefined &&
-      bearerToken(headers.get('Authorization')) === bearerToken(request.authorization);
-    return (headers === init.headers ? init : { ...init, headers }) as T;
+    return init.headers === undefined || headers === init.headers ? init : ({ ...init, headers } as T);
   }
 
   private _makeAbort(controller: AbortController) {
