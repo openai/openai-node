@@ -44,7 +44,7 @@ test('materializes a self-deleting header getter before transport dispatch', asy
 describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identity', (hook) => {
   describe.each(['record', 'array', 'native', 'foreign'] as const)('%s', (kind) => {
     test.skipIf(kind === 'foreign' && Number(process.versions.node.split('.')[0]) < 24)(
-      'preserves a replayable collection and its extensions through workload refresh',
+      'preserves workload refresh and collection identity where verifiable',
       async () => {
         const supplied: NonNullable<RequestInit['headers']>[] = [];
         const retainHeaders = async (request: RequestInit) => {
@@ -86,10 +86,15 @@ describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identi
         }
         const sent: (string | null)[] = [];
         const transport = createWorkloadIdentityTransport((_url, init) => {
-          expect(init?.headers).toBe(supplied[sent.length]);
-          expect(Object.getOwnPropertyDescriptor(init?.headers, 'transportMetadata')?.value).toBe(
-            'synthetic-extension',
-          );
+          if (kind === 'foreign') {
+            expect(init?.headers).not.toBe(supplied[sent.length]);
+            expect(init?.headers).toBeInstanceOf(Headers);
+          } else {
+            expect(init?.headers).toBe(supplied[sent.length]);
+            expect(Object.getOwnPropertyDescriptor(init?.headers, 'transportMetadata')?.value).toBe(
+              'synthetic-extension',
+            );
+          }
           sent.push(new Headers(init?.headers).get('Authorization'));
           return sent.length === 1
             ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })

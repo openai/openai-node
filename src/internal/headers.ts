@@ -667,7 +667,6 @@ export const snapshotHeaders = (initialSource: HeadersLike): HeaderSnapshot =>
 export interface WorkloadHeaderSnapshots {
   requestHeaders: ReturnType<typeof snapshotHeaders>;
   defaultHeaders: ReturnType<typeof snapshotHeaders>;
-  customBuildInput?: { source: HeadersLike; replayable: boolean };
 }
 
 /** Materializes each source once within one request, without sharing credentials between requests. */
@@ -711,34 +710,26 @@ export const isEmptyHeaders = (headers: HeadersLike) => {
   return true;
 };
 
-/** Reads platform collections without consuming the iterable later handed to custom fetch. */
+/** Reads proven native collections without consuming the iterable later handed to custom fetch. */
 export const getPlatformHeader = (
   headers: HeadersLike,
   name: string,
 ): { value: string | null } | undefined => {
-  if (!headers) return undefined;
-  const platformIterator = getHeadersIterator(headers);
-  if (!platformIterator) return undefined;
-  const seen = new Set<object>();
-  let actualIterator: PropertyDescriptor | undefined;
-  for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-    if (seen.has(prototype)) return undefined;
-    seen.add(prototype);
-    actualIterator ??= Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-    if (actualIterator && actualIterator.value !== platformIterator) return undefined;
-    if (Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value !== platformIterator) continue;
-    const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-    if (
-      typeof constructor !== 'function' ||
-      Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Headers' ||
-      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype ||
-      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value !== 'Headers'
-    )
-      continue;
-    const getter = Object.getOwnPropertyDescriptor(prototype, 'get')?.value;
-    if (typeof getter === 'function') {
-      return { value: Reflect.apply(getter, headers, [name]) };
+  if (!headers || !hasNativeHeadersBrand(headers)) return undefined;
+  try {
+    const seen = new Set<object>();
+    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+      if (seen.has(prototype)) return undefined;
+      seen.add(prototype);
+      const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+      if (iterator) {
+        if (iterator.value !== Headers.prototype[Symbol.iterator]) return undefined;
+        return { value: Headers.prototype.get.call(headers, name) };
+      }
     }
+  } catch {
+    // Structural lookalikes and uninspectable collections must share one materialization with dispatch.
+    return undefined;
   }
   return undefined;
 };

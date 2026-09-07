@@ -288,9 +288,11 @@ A `buildRequest` override keeps first access to its original inputs before SDK s
 delegation can copy options and native input headers without forwarding a new argument. A nested build
 that reuses a source already consumed by an active request must forward the complete settings argument,
 including `credentialContext`; without that owner, the SDK rejects the build before acquiring or
-dispatching credentials. A custom hook materializing a one-shot input must retain its parsed layer
-(for example, in `options.headers`) before an automatic retry; otherwise the SDK rejects the repeat
-instead of letting an exhausted input silently remove an independent credential.
+dispatching credentials. Custom build hooks receive their original inputs first on every attempt,
+including retries. A hook materializing a one-shot input before delegating must retain its parsed layer
+(for example, in `options.headers`) for later attempts. The SDK cannot observe that private consumption:
+the hook owns replay of those inputs and must prevent an exhausted source from removing an independent
+credential. Inputs the hook ignores remain unread, and reusable foreign headers may be copied again.
 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
@@ -301,6 +303,12 @@ while applying every newly observed value. To intentionally delete headers in su
 replace the header layer, or use an explicit record with `Authorization: null`; missing rows alone
 cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
 arrays, and data records retain live refresh behavior.
+
+At workload-identity dispatch, native `Headers` with their native iterator retain their identity.
+Foreign and structurally compatible header collections whose platform brand cannot be verified are
+materialized once into native `Headers`. Credential classification and the transport use that same
+snapshot, including when the headers originate from a foreign `Request`. Extra properties attached to
+the original unverified collection are not forwarded; the `Request` object itself retains its identity.
 
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Ordinary object
 spread retains the SDK request carrier, including when a legacy wrapper also replaces the controller.

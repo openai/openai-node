@@ -1249,26 +1249,10 @@ export class OpenAI {
     x509Authentication?.beginRequestPreparation();
     const preparation = captureHeaderReads(() => this.prepareOptions(options, credentialContext));
     await preparation.result;
-    const previousBuildInput = workloadHeaders?.customBuildInput;
-    if (
-      previousBuildInput &&
-      previousBuildInput.source === options.headers &&
-      (!previousBuildInput.replayable || !canReplayHeaderInput(previousBuildInput.source))
-    ) {
-      throw new Errors.OpenAIError(
-        'A custom buildRequest hook must retain parsed headers before retrying a one-shot source.',
-      );
-    }
-    const buildInputHeaders = options.headers;
-    const buildInputReplayable =
-      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
-      this.buildRequest !== OpenAI.prototype.buildRequest
-        ? canReplayHeaderInput(buildInputHeaders)
-        : true;
     if (workloadHeaders?.defaultHeaders.initialized) {
       workloadHeaders.defaultHeaders.refresh(this._options.defaultHeaders);
     }
-    if (workloadHeaders?.requestHeaders.initialized) {
+    if (workloadHeaders?.requestHeaders.initialized && this.buildRequest === OpenAI.prototype.buildRequest) {
       workloadHeaders.requestHeaders.refresh(options.headers);
     }
     if (
@@ -1290,6 +1274,7 @@ export class OpenAI {
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     let initialWorkloadAuthorization: string | undefined;
+    let completedWorkloadScope: { matches: (authorization: string) => boolean } | undefined;
     try {
       let candidate: Awaited<ReturnType<OpenAI['buildRequest']>>;
       const releaseCredentialContext = this.#requestCredentialContexts.register(options, credentialContext);
@@ -1299,18 +1284,12 @@ export class OpenAI {
           credentialContext,
         });
         workloadHeaders = this.#workloadTokenProvenance.takeHeaders(candidate) ?? workloadHeaders;
-        if (
-          workloadHeaders &&
-          this.buildRequest !== OpenAI.prototype.buildRequest &&
-          workloadHeaders.requestHeaders.source !== buildInputHeaders
-        ) {
-          workloadHeaders.customBuildInput = {
-            source: buildInputHeaders,
-            replayable: buildInputReplayable,
-          };
+        const authorization = getPlatformHeader(candidate.req.headers, 'authorization')?.value;
+        if (authorization === undefined) {
+          completedWorkloadScope = workloadIdentityAuthScope?.snapshot();
         }
-        const authorization = candidate.req.headers.get('authorization');
         if (
+          authorization !== undefined &&
           authorization !== null &&
           this.#workloadTokenProvenance.matchesResult(candidate, authorization, workloadIdentityAuthScope)
         ) {
@@ -1420,10 +1399,34 @@ export class OpenAI {
     const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
     x509Authentication?.releaseRequestBody(req.body);
+    if (
+      this._workloadIdentityAuth &&
+      !x509Authentication &&
+      initialWorkloadAuthorization === undefined &&
+      completedWorkloadScope
+    ) {
+      // Unverified build-result collections remain available to preparation before dispatch materializes them.
+      const platformHeader = getPlatformHeader(req.headers, 'Authorization');
+      const headers = platformHeader ? undefined : new Headers(req.headers);
+      const authorization = platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null);
+      if (
+        authorization !== null &&
+        this.#workloadTokenProvenance.matchesResult(built, authorization, completedWorkloadScope)
+      ) {
+        initialWorkloadAuthorization = authorization;
+      }
+      if (headers) req.headers = headers;
+    }
+    completedWorkloadScope = undefined;
     const workloadRequest = {
       context: credentialContext,
       bindings: new Set<object>(),
-      authorization: initialWorkloadAuthorization,
+      authorization:
+        initialWorkloadAuthorization !== undefined &&
+        this.#workloadTokenProvenance.matchesHeaderCredential(req.headers, initialWorkloadAuthorization) !==
+          false
+          ? initialWorkloadAuthorization
+          : undefined,
       used: false,
     };
     if (this._workloadIdentityAuth && !x509Authentication) {
@@ -2112,7 +2115,8 @@ export class OpenAI {
         if (
           !defaultLayer.initialized &&
           !requestLayer.initialized &&
-          defaultLayer.source === requestLayer.source
+          defaultLayer.source === requestLayer.source &&
+          (defaultLayer.source === this._options.defaultHeaders || requestLayer.source === options.headers)
         ) {
           requestLayer.seed(requestLayer.source, defaultLayer.snapshot);
         }
@@ -2231,20 +2235,16 @@ export class OpenAI {
   ): T {
     if (!request || request.authorization === undefined) return init;
     const requestHeaders = init.headers === undefined ? getRequestHeaders(url) : undefined;
-    const platformHeader = getPlatformHeader(init.headers ?? requestHeaders, 'Authorization');
+    const sourceHeaders = init.headers ?? requestHeaders;
+    const platformHeader = getPlatformHeader(sourceHeaders, 'Authorization');
     const preserveHeaders =
-      init.headers === undefined || platformHeader !== undefined || canReplayHeaderInput(init.headers);
-    const headers = platformHeader
-      ? undefined
-      : init.headers === undefined
-        ? requestHeaders
-        : new Headers(init.headers);
+      sourceHeaders === undefined ||
+      platformHeader !== undefined ||
+      (init.headers !== undefined && canReplayHeaderInput(init.headers));
+    const headers = platformHeader ? undefined : new Headers(sourceHeaders);
     // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
     request.used =
-      this.#workloadTokenProvenance.matchesHeaderCredential(
-        init.headers ?? requestHeaders,
-        request.authorization,
-      ) !== false &&
+      this.#workloadTokenProvenance.matchesHeaderCredential(sourceHeaders, request.authorization) !== false &&
       bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
         bearerToken(request.authorization);
     return preserveHeaders ? init : ({ ...init, headers } as T);

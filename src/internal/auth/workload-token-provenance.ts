@@ -36,6 +36,7 @@ interface TokenScope {
   captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
   record: (token: string) => void;
   matches: (authorization: string) => boolean;
+  snapshot: () => Pick<TokenScope, 'matches'>;
   dispose: () => void;
 }
 
@@ -158,7 +159,7 @@ export class WorkloadTokenProvenance {
   matchesResult(
     result: { req: { headers: Headers } },
     authorization: string,
-    scope: TokenScope | undefined,
+    scope: Pick<TokenScope, 'matches'> | undefined,
   ): boolean {
     const headerMatch = this.matchesHeaderCredential(result.req.headers, authorization);
     if (headerMatch !== undefined) {
@@ -216,6 +217,16 @@ export class WorkloadTokenProvenance {
       matches: (authorization) => {
         const token = bearerToken(authorization);
         return token !== undefined && tokens.has(token);
+      },
+      snapshot: () => {
+        // Retain completed-build evidence without extending active hook or header-source ownership.
+        const issued = new Set(tokens);
+        return {
+          matches: (authorization) => {
+            const token = bearerToken(authorization);
+            return token !== undefined && issued.has(token);
+          },
+        };
       },
       dispose: () => {
         if (disposed) {

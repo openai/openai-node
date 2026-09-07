@@ -1,5 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise copying build hooks. */
 import OpenAI from 'openai';
+import { test } from 'vitest';
 import type { HeadersInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
@@ -8,6 +9,342 @@ describe('Workload identity raw build input retries', () => {
   beforeEach(() => {
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENAI_ADMIN_KEY'];
+  });
+
+  test.each([500, 401])('retries a build hook that ignores a one-shot input after %s', async (status) => {
+    let reads = 0;
+    const rows = [['Authorization', 'Bearer unused'] as const][Symbol.iterator]();
+    const headers = {
+      [Symbol.iterator]() {
+        reads += 1;
+        return rows;
+      },
+    } as unknown as Headers;
+    const options: FinalRequestOptions = { method: 'get', path: '/synthetic', headers };
+    let builds = 0;
+    class IgnoringClient extends OpenAI {
+      override async buildRequest(
+        received: FinalRequestOptions,
+        settings: Parameters<OpenAI['buildRequest']>[1] = {},
+      ) {
+        if (!received.__metadata?.['workloadIdentityTokenRefreshed']) {
+          expect(received).toBe(options);
+        }
+        expect(received.headers).toBe(headers);
+        builds += 1;
+        const replacement =
+          status === 401 ? { 'X-Custom': 'replacement' } : { Authorization: 'Bearer independent' };
+        return super.buildRequest({ ...received, headers: replacement }, settings);
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic retry' }, { status, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new IgnoringClient({
+      ...createTestClientOptions(),
+      fetch: transport.fetch,
+      maxRetries: status === 401 ? 0 : 1,
+    });
+
+    await client.request(options);
+
+    expect(sent).toEqual(
+      status === 401
+        ? ['Bearer access-token-1', 'Bearer access-token-2']
+        : ['Bearer independent', 'Bearer independent'],
+    );
+    expect(transport.exchanges).toBe(status === 401 ? 2 : 0);
+    expect(builds).toBe(2);
+    expect(reads).toBe(0);
+    expect(options.headers).toBe(headers);
+    expect(Reflect.ownKeys(options)).toEqual(['method', 'path', 'headers']);
+  });
+
+  test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
+    'retries a build hook that copies genuine foreign Headers on each attempt',
+    async () => {
+      const { Headers: ForeignHeaders } = await import('undici');
+      const headers = new ForeignHeaders({ Authorization: 'Bearer independent' });
+      const options: FinalRequestOptions = { method: 'get', path: '/synthetic', headers };
+      let builds = 0;
+      class CopyClient extends OpenAI {
+        override async buildRequest(
+          received: FinalRequestOptions,
+          settings: Parameters<OpenAI['buildRequest']>[1] = {},
+        ) {
+          expect(received).toBe(options);
+          builds += 1;
+          return super.buildRequest(
+            { ...received, headers: new Headers(received.headers as HeadersInit) },
+            settings,
+          );
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return sent.length === 1
+          ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+          : Response.json({ data: [] });
+      });
+      const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 1 });
+
+      await client.request(options);
+
+      expect(sent).toEqual(['Bearer independent', 'Bearer independent']);
+      expect(transport.exchanges).toBe(0);
+      expect(builds).toBe(2);
+      expect(options.headers).toBe(headers);
+    },
+  );
+
+  test('preserves legacy buildRequest wrappers that copy options and pass only retryCount', async () => {
+    class HookClient extends OpenAI {
+      override async buildRequest(
+        options: FinalRequestOptions,
+        { retryCount = 0 }: { retryCount?: number } = {},
+      ) {
+        await Promise.resolve();
+        const result = await super.buildRequest({ ...options }, { retryCount });
+        const carriers = Object.getOwnPropertySymbols(result.req).map(
+          (key) => Object.getOwnPropertyDescriptor(result.req, key)?.value,
+        );
+        expect(carriers).toEqual([{}]);
+        result.req.headers = new Headers(result.req.headers);
+        return { ...result, req: { ...result.req, headers: new Headers(result.req.headers) } };
+      }
+    }
+    let apiCalls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      apiCalls += 1;
+      return apiCalls === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(apiCalls).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  });
+
+  test.each(['request', 'default'] as const)(
+    'preserves one-shot %s authorization through a legacy copied buildRequest wrapper',
+    async (location) => {
+      class HookClient extends OpenAI {
+        override async buildRequest(
+          options: FinalRequestOptions,
+          { retryCount = 0 }: { retryCount?: number } = {},
+        ) {
+          await Promise.resolve();
+          return super.buildRequest({ ...options }, { retryCount });
+        }
+      }
+      const rows: [string, string | null][] = [['Authorization', null]];
+      const iterator = rows.values();
+      rows[Symbol.iterator] = () => iterator;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+        return Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        defaultHeaders: location === 'default' ? rows : undefined,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list({ headers: location === 'request' ? rows : undefined });
+
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
+  test.each(
+    [false, true].flatMap((copy) =>
+      [false, true].flatMap((forward) =>
+        [false, true].flatMap((frozen) =>
+          [null, '', 'Bearer independent'].flatMap((authorization) =>
+            [false, true].map((foreign) => ({ copy, forward, frozen, authorization, foreign })),
+          ),
+        ),
+      ),
+    ),
+  )(
+    'preserves header ownership through legacy buildRequest: %j',
+    async ({ copy, forward, frozen, authorization, foreign }) => {
+      class LegacyClient extends OpenAI {
+        override async buildRequest(
+          options: FinalRequestOptions,
+          { retryCount = 0, credentialContext }: { retryCount?: number; credentialContext?: object } = {},
+        ) {
+          return super.buildRequest(copy ? { ...options } : options, {
+            retryCount,
+            ...(forward ? { credentialContext } : undefined),
+          });
+        }
+      }
+      const rows = [['Authorization', authorization] as const][Symbol.iterator]();
+      const ForeignHeaders = class Headers {
+        // oxlint-disable-next-line class-methods-use-this -- A fresh wrapper intentionally shares the outer cursor.
+        *entries() {
+          yield ['X-Custom', 'fixed'];
+          yield* rows;
+        }
+      };
+      Object.defineProperties(ForeignHeaders.prototype, {
+        [Symbol.toStringTag]: { value: 'Headers' },
+        [Symbol.iterator]: { value: ForeignHeaders.prototype.entries },
+      });
+      const headers = (foreign
+        ? new ForeignHeaders()
+        : { [Symbol.iterator]: () => rows }) as unknown as Headers;
+      let calls = 0;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        calls += 1;
+        expect(new Headers(init?.headers).get('Authorization')).toBe(authorization);
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new LegacyClient({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      const options: FinalRequestOptions = {
+        method: 'get',
+        path: 'https://independent.example.test/synthetic',
+        headers,
+      };
+      const request = client.request(frozen ? Object.freeze(options) : options);
+      await expect(request).rejects.toMatchObject({ status: 401 });
+      expect(calls).toBe(1);
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
+  test('releases consumed-source guards after a nested build and body serialization throw', async () => {
+    let rows = [['Authorization', null] as const][Symbol.iterator]();
+    const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+    const transport = createWorkloadIdentityTransport(() => {
+      throw new Error('The guarded request must not dispatch');
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+    const options: FinalRequestOptions = { method: 'post', path: '/synthetic', headers };
+    let nested: Promise<unknown> | undefined;
+    options.body = {
+      toJSON() {
+        nested = (async () => {
+          try {
+            return await client.buildRequest({ ...options });
+          } catch (error) {
+            return error;
+          }
+        })();
+        throw new Error('Synthetic body serialization failure');
+      },
+    };
+
+    await expect(client.request(options)).rejects.toThrow('Synthetic body serialization failure');
+    expect(await nested).toMatchObject({
+      message: expect.stringContaining('must forward credentialContext'),
+    });
+    rows = [['Authorization', null] as const][Symbol.iterator]();
+    options.body = { synthetic: true };
+    const built = await client.buildRequest(options);
+    expect(built.req.headers.get('Authorization')).toBeNull();
+    expect(transport.exchanges).toBe(0);
+  });
+
+  test.each([false, true])(
+    'keeps build hooks first access to one-shot native header copies, context: %s',
+    async (forward) => {
+      class CopyClient extends OpenAI {
+        override async buildRequest(
+          options: FinalRequestOptions,
+          settings: { retryCount?: number; credentialContext?: object } = {},
+        ) {
+          return super.buildRequest(
+            { ...options, headers: new Headers(options.headers as HeadersInit) },
+            forward ? settings : { retryCount: settings.retryCount ?? 0 },
+          );
+        }
+      }
+      const rows = [['Authorization', ''] as const][Symbol.iterator]();
+      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        expect(new Headers(init?.headers).get('Authorization')).toBe('');
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await expect(
+        client.get('https://independent.example.test/synthetic', { headers }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
+  test.each([
+    'record',
+    'Headers',
+    'array',
+    'one-shot object',
+    'one-shot array',
+    'hook-retained one-shot',
+  ] as const)('retries live or explicitly retained copied build inputs: %s', async (kind) => {
+    class OneShotHeaders extends Array<[string, string]> {
+      private iterator = super[Symbol.iterator]();
+      override [Symbol.iterator]() {
+        return this.iterator;
+      }
+    }
+    const retainedHeaders = new WeakMap<FinalRequestOptions, Headers>();
+    class CopyClient extends OpenAI {
+      override async buildRequest(
+        options: FinalRequestOptions,
+        settings: { retryCount?: number; credentialContext?: object } = {},
+      ) {
+        const headers = retainedHeaders.get(options) ?? new Headers(options.headers as HeadersInit);
+        if (kind === 'hook-retained one-shot') {
+          retainedHeaders.set(options, headers);
+        } else if (kind === 'one-shot object' || kind === 'one-shot array') {
+          options.headers = headers;
+        }
+        return super.buildRequest({ ...options, headers }, settings);
+      }
+    }
+    const rows: [string, string][] = [['Authorization', '']];
+    const iterator = rows[Symbol.iterator]();
+    let headers: HeadersInit;
+    if (kind === 'record') {
+      headers = { Authorization: '' };
+    } else if (kind === 'Headers') {
+      headers = new Headers(rows);
+    } else if (kind === 'array') {
+      headers = rows;
+    } else if (kind === 'one-shot array') {
+      headers = new OneShotHeaders(...rows);
+    } else {
+      headers = { [Symbol.iterator]: () => iterator } as unknown as Headers;
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      calls += 1;
+      expect(new Headers(init?.headers).get('Authorization')).toBe('');
+      return calls === 1
+        ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 1 });
+    await client.get('https://independent.example.test/synthetic', { headers });
+    expect(calls).toBe(2);
+    expect(transport.exchanges).toBe(0);
   });
 
   test('releases copied-header recovery after a legacy request completes', async () => {
@@ -72,7 +409,7 @@ describe('Workload identity raw build input retries', () => {
   );
 
   test.each(['deleting getter', 'deleting coercion', 'nonenumerable tuple', 'inherited value'] as const)(
-    'retains the original replayability decision for %s',
+    'retains parsed %s input in the build hook across retries',
     async (kind) => {
       let reads = 0;
       const record: Record<string, unknown> = {};
@@ -107,23 +444,21 @@ describe('Workload identity raw build input retries', () => {
           options: FinalRequestOptions,
           settings: Parameters<OpenAI['buildRequest']>[1] = {},
         ) {
-          return super.buildRequest(
-            { ...options, headers: new Headers(options.headers as HeadersInit) },
-            settings,
-          );
+          options.headers = new Headers(options.headers as HeadersInit);
+          return super.buildRequest({ ...options }, settings);
         }
       }
       const sent: (string | null)[] = [];
       const transport = createWorkloadIdentityTransport((_url, init) => {
         sent.push(new Headers(init?.headers).get('Authorization'));
-        return Response.json({ error: 'synthetic retry' }, { status: 500 });
+        return sent.length === 1
+          ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+          : Response.json({ data: [] });
       });
       const client = new CopyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 1 });
 
-      await expect(client.models.list({ headers: input as HeadersInit })).rejects.toThrow(
-        'must retain parsed headers',
-      );
-      expect(sent).toEqual(['Bearer independent']);
+      await client.models.list({ headers: input as HeadersInit });
+      expect(sent).toEqual(['Bearer independent', 'Bearer independent']);
       expect(reads).toBe(1);
       expect(transport.exchanges).toBe(0);
     },
