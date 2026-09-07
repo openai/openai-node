@@ -103,6 +103,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
   event: AssistantStreamEvent;
   exposedEvent: AssistantStreamEvent;
   runStepDeltaData: RunStepStreamEvent['data'] | undefined;
+  refreshRunStepDelta: (() => void) | undefined;
 } {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
@@ -145,10 +146,12 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     ? event
     : ({ event: eventType, data: stableData } as AssistantStreamEvent);
   let runStepDeltaData: RunStepStreamEvent['data'] | undefined;
+  let refreshRunStepDelta: (() => void) | undefined;
 
   if (eventType === 'thread.run.step.delta') {
     // Track listener-created envelope aliases on the original data, independently of delta content.
     runStepDeltaData = stableData as RunStepStreamEvent['data'];
+    const deltaDescriptor = Object.getOwnPropertyDescriptor(stableData, 'delta');
     const delta = Reflect.get(stableData, 'delta', stableData) as RunStepDelta;
     // Reject even nonenumerable identity fields before reading any delta values.
     if (delta && hasOwn(delta, 'id')) {
@@ -157,10 +160,30 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     // Keep the captured root private so raw listeners cannot change the validated identity fields.
     // Preserve the original public event and share nested tool-call objects for listener mutations.
     // Copy descriptors so an accessor-backed delta is read only once, even on frozen data.
-    stableData = Object.create(Object.getPrototypeOf(stableData), {
+    const capturedData = Object.create(Object.getPrototypeOf(stableData), {
       ...Object.getOwnPropertyDescriptors(stableData),
       delta: { configurable: true, enumerable: true, writable: true, value: delta && { ...delta } },
     }) as AssistantStreamEvent['data'];
+    stableData = capturedData;
+    if (delta && typeof delta === 'object') {
+      refreshRunStepDelta = () => {
+        let currentDelta: unknown = delta;
+        if (deltaDescriptor && 'value' in deltaDescriptor) {
+          const currentDescriptor = Object.getOwnPropertyDescriptor(runStepDeltaData, 'delta');
+          currentDelta =
+            currentDescriptor && 'value' in currentDescriptor ? currentDescriptor.value : undefined;
+        }
+        if (!currentDelta || typeof currentDelta !== 'object') {
+          capturedData.delta = currentDelta;
+          return;
+        }
+        const descriptors = Object.getOwnPropertyDescriptors(currentDelta);
+        delete descriptors.id;
+        capturedData.delta = {
+          ...Object.create(Object.getPrototypeOf(currentDelta), descriptors),
+        } as RunStepDelta;
+      };
+    }
   }
   const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
 
@@ -168,6 +191,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     event: stableEvent,
     exposedEvent,
     runStepDeltaData,
+    refreshRunStepDelta,
   };
 }
 
@@ -415,7 +439,12 @@ export class AssistantStream
       return;
     }
 
-    const { event: stableEvent, exposedEvent, runStepDeltaData } = stabilizeAssistantStreamEvent(event);
+    const {
+      event: stableEvent,
+      exposedEvent,
+      runStepDeltaData,
+      refreshRunStepDelta,
+    } = stabilizeAssistantStreamEvent(event);
 
     let messageID: string | undefined;
     let messageData: MessageStreamEvent['data'] | undefined;
@@ -453,6 +482,7 @@ export class AssistantStream
     if (runStepID !== undefined && runStepData !== undefined) {
       this.#reserveRunStepAlias(runStepData, runStepID);
     }
+    refreshRunStepDelta?.();
     if (runStepID === undefined && this.#activeRunStepID !== undefined && this.#currentRunStepSnapshot) {
       this.#reserveRunStepAlias(this.#currentRunStepSnapshot, this.#activeRunStepID);
     }
@@ -492,6 +522,9 @@ export class AssistantStream
           this.#reserveRunStepAlias(activeRunStep, runStepID);
         }
         this.#handleRunStep(stableEvent, runStepID);
+        if (runStepData !== undefined) {
+          this.#reserveRunStepAlias(runStepData, runStepID);
+        }
         this.#reserveRunStepAlias(stableEvent.data, runStepID);
         const retainedRunStep = this.#runStepSnapshots[runStepID];
         if (retainedRunStep) {

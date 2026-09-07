@@ -146,6 +146,49 @@ describe('AssistantStream run-step identity security', () => {
       const finalSteps = await runner.finalRunSteps();
       expect(finalSteps.map((snapshot) => snapshot.id)).toEqual([step.id, alias.id]);
     });
+
+    test.each(['replace-details', 'delete-details', 'replace-delta'] as const)(
+      'preserves a raw listener %s mutation',
+      async (kind) => {
+        const step = runStep('step_original');
+        const runner = createStream([
+          { event: 'thread.run.step.created', data: step },
+          toolCallDelta(step.id),
+          completedRun(),
+        ]);
+        runner.on('event', (event) => {
+          if (event.event === 'thread.run.step.delta') {
+            if (kind === 'delete-details') {
+              delete event.data.delta.step_details;
+            } else if (kind === 'replace-details') {
+              event.data.delta.step_details = {
+                type: 'tool_calls',
+                tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+              };
+            } else {
+              event.data.delta = {
+                step_details: {
+                  type: 'tool_calls',
+                  tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+                },
+              };
+            }
+          }
+        });
+
+        await runner.done();
+
+        expect(runner.currentRunStepSnapshot()?.step_details).toMatchObject({
+          tool_calls: [
+            {
+              function: {
+                arguments: `{"to":"trusted"}${kind.startsWith('delete') ? '' : ' replacement'}`,
+              },
+            },
+          ],
+        });
+      },
+    );
   });
 
   test('reserves a run-step envelope alias added by a raw delta listener', async () => {
@@ -174,6 +217,29 @@ describe('AssistantStream run-step identity security', () => {
     expect(stepDelta).toHaveBeenCalledTimes(1);
     expect(stepDelta.mock.calls[0]?.[1].id).toBe(step.id);
   });
+
+  test.each(['toolCallCreated', 'runStepDelta'] as const)(
+    'reserves a run-step envelope alias added by a %s listener',
+    async (listener) => {
+      const step = runStep('step_original');
+      const alias = runStep('step_envelope_alias');
+      const runner = publicAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        toolCallDelta(step.id),
+        { event: 'thread.run.step.completed', data: { ...step, status: 'completed' } },
+        { event: 'thread.run.step.created', data: alias },
+        completedRun(),
+      ]);
+      runner.on(listener, () => {
+        const current = runner.currentEvent();
+        if (current?.event === 'thread.run.step.delta') {
+          current.data.id = alias.id;
+        }
+      });
+
+      await expect(runner.done()).rejects.toThrow(/already been created/u);
+    },
+  );
 
   test.each(['ordinary', 'frozen with a custom prototype'] as const)(
     'preserves the %s raw delta event from a custom transport',
