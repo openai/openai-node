@@ -26,6 +26,7 @@ export interface WorkloadCredentialUsage {
 }
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
+const headerValueSources = new WeakMap<object, Headers>();
 const observedHeaderMutations = new WeakSet<object>();
 const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
 
@@ -125,18 +126,39 @@ const observeHeaderMutations = (headers: Headers, credential: HeaderCredential):
 
 /** Reads the credential capability attached to an SDK-produced header layer. */
 export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
-  const credential = headerCredentials.get(headers);
+  const source = headerValueSources.get(headers);
+  let credential = headerCredentials.get(headers);
+  if (source) {
+    const values = Object.getOwnPropertyDescriptor(headers, 'values')?.value;
+    if (typeof values !== 'object' || values === null) {
+      return undefined;
+    }
+    const selected = headerCredentials.get(values);
+    if (selected !== undefined || values !== source) {
+      credential = selected;
+    }
+  }
   return credential?.revoked ? null : credential;
 }
 
+/** Parsed copies own their mutations independently of the source snapshot. */
+export function copyWorkloadHeaderCredential(credential: HeaderCredential | null): HeaderCredential | null {
+  return credential && { ...credential };
+}
+
 /** Carries the capability belonging to the last layer that supplied Authorization. */
-export function rememberWorkloadHeaderCredential(headers: object, credential: HeaderCredential | null): void {
+export function rememberWorkloadHeaderCredential(
+  headers: object,
+  credential: HeaderCredential | null,
+  values: Headers,
+): void {
   headerCredentials.set(headers, credential);
+  headerValueSources.set(headers, values);
 }
 
 /** Native header values additionally own observable Authorization mutations. */
 export function rememberWorkloadHeaderValues(headers: Headers, credential: HeaderCredential | null): void {
-  rememberWorkloadHeaderCredential(headers, credential);
+  headerCredentials.set(headers, credential);
   if (credential) {
     observeHeaderMutations(headers, credential);
   }
@@ -148,6 +170,7 @@ interface TokenScope {
   headers: WorkloadHeaderSnapshots | undefined;
   captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
   record: (token: string) => HeaderCredential;
+  select: (credential: HeaderCredential) => void;
   credential: (authorization: string) => HeaderCredential | undefined;
   revoke: () => void;
   matches: (authorization: string) => boolean;
@@ -208,8 +231,8 @@ export class WorkloadTokenProvenance {
 
   /** Marks the concrete authentication result issued by this client. */
   issue(headers: { values: Headers }, token: string, credential?: HeaderCredential): WorkloadCredentialUsage {
-    const issued = credential ?? { owner: this, token, revoked: false };
-    rememberWorkloadHeaderCredential(headers, issued);
+    let issued = credential ?? { owner: this, token, revoked: false };
+    rememberWorkloadHeaderCredential(headers, issued, headers.values);
     rememberWorkloadHeaderValues(headers.values, issued);
     return {
       isCurrent: () => !issued.revoked,
@@ -217,6 +240,7 @@ export class WorkloadTokenProvenance {
         issued.revoked = true;
       },
       adopt: (values) => {
+        issued = { ...issued };
         rememberWorkloadHeaderValues(values, issued);
       },
     };
@@ -227,18 +251,20 @@ export class WorkloadTokenProvenance {
     if (!headers) {
       return;
     }
+    const { values } = headers;
     const outerCredential = workloadHeaderCredential(headers);
-    const credential =
-      outerCredential === undefined ? workloadHeaderCredential(headers.values) : outerCredential;
+    const valueCredential = workloadHeaderCredential(values);
+    const credential = valueCredential === undefined ? outerCredential : valueCredential;
     if (credential === null) {
       this.scopeFor(options, context)?.revoke();
       return;
     }
     if (credential !== undefined) {
-      rememberWorkloadHeaderCredential(headers, credential);
+      rememberWorkloadHeaderCredential(headers, credential, values);
+      this.scopeFor(options, context)?.select(credential);
       return;
     }
-    const authorization = headers.values.get('authorization');
+    const authorization = values.get('authorization');
     const token = bearerToken(authorization);
     if (
       token !== undefined &&
@@ -343,6 +369,7 @@ export class WorkloadTokenProvenance {
       },
       adopt: (headers) => {
         if (credential) {
+          credential = { ...credential };
           rememberWorkloadHeaderValues(headers, credential);
         }
       },
@@ -375,12 +402,16 @@ export class WorkloadTokenProvenance {
         }
       },
       record: (token) => {
-        const previous = tokens.get(token);
-        const credential = previous && !previous.revoked ? previous : { owner: this, token, revoked: false };
+        const credential = { owner: this, token, revoked: false };
         if (!disposed) {
           tokens.set(token, credential);
         }
         return credential;
+      },
+      select: (credential) => {
+        if (!disposed && credential.owner === this) {
+          tokens.set(credential.token, credential);
+        }
       },
       credential: (authorization) => {
         const token = bearerToken(authorization);
