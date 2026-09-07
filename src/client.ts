@@ -1681,8 +1681,9 @@ export class OpenAI {
     }
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
       const platformHeader = getPlatformHeader(init.headers, 'Authorization');
+      const replayable = platformHeader !== undefined || canReplayHeaderInput(init.headers);
       const headers = platformHeader ? undefined : new Headers(init.headers);
-      if (headers && !canReplayHeaderInput(init.headers)) init.headers = headers;
+      if (headers && !replayable) init.headers = headers;
       const authHeader = platformHeader ? platformHeader.value : headers?.get('Authorization');
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
