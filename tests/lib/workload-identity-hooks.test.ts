@@ -149,6 +149,77 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test.each(
+    [false, true].flatMap((copy) =>
+      [false, true].flatMap((forward) =>
+        [false, true].flatMap((frozen) =>
+          [null, ''].map((authorization) => ({ copy, forward, frozen, authorization })),
+        ),
+      ),
+    ),
+  )(
+    'guards consumed headers through legacy buildRequest: %j',
+    async ({ copy, forward, frozen, authorization }) => {
+      class LegacyClient extends OpenAI {
+        override async buildRequest(
+          options: FinalRequestOptions,
+          { retryCount = 0, credentialContext }: { retryCount?: number; credentialContext?: object } = {},
+        ) {
+          return super.buildRequest(copy ? { ...options } : options, {
+            retryCount,
+            ...(forward ? { credentialContext } : undefined),
+          });
+        }
+      }
+      const rows = [['Authorization', authorization] as const][Symbol.iterator]();
+      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      let calls = 0;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        calls += 1;
+        expect(new Headers(init?.headers).get('Authorization')).toBe(authorization);
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new LegacyClient({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      const options: FinalRequestOptions = {
+        method: 'get',
+        path: 'https://independent.example.test/synthetic',
+        headers,
+      };
+      const request = client.request(frozen ? Object.freeze(options) : options);
+      await (copy && !forward
+        ? expect(request).rejects.toThrow('must forward credentialContext')
+        : expect(request).rejects.toMatchObject({ status: 401 }));
+      expect(calls).toBe(copy && !forward ? 0 : 1);
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
+  test('releases consumed-source guards after a copying build hook throws', async () => {
+    class LegacyClient extends OpenAI {
+      override async buildRequest(options: FinalRequestOptions, { retryCount = 0 } = {}) {
+        return super.buildRequest({ ...options }, { retryCount });
+      }
+    }
+    let rows = [['Authorization', null] as const][Symbol.iterator]();
+    const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+    const transport = createWorkloadIdentityTransport(() => {
+      throw new Error('The guarded request must not dispatch');
+    });
+    const client = new LegacyClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+    const options: FinalRequestOptions = { method: 'get', path: '/synthetic', headers };
+
+    await expect(client.request(options)).rejects.toThrow('must forward credentialContext');
+    rows = [['Authorization', null] as const][Symbol.iterator]();
+    const built = await client.buildRequest(options);
+    expect(built.req.headers.get('Authorization')).toBeNull();
+    expect(transport.exchanges).toBe(0);
+  });
+
   test.each([false, true])(
     'does not replay independent equal-byte final headers (copied request: %s)',
     async (copyRequest) => {

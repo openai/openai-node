@@ -159,12 +159,23 @@ function* iterateHeaders(
       iter = Object.entries(headers);
     }
   }
+  let sawRow = false;
   for (let row of iter) {
+    sawRow = true;
     const name = row[0];
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
     const values = isReadonlyArray(row[1]) ? row[1] : [row[1]];
     let didClear = false;
     for (const value of values) {
+      if (
+        replay &&
+        nativeHeadersIterator !== undefined &&
+        iterator === nativeHeadersIterator &&
+        typeof value !== 'string'
+      ) {
+        // Platform Headers only yields strings; a nullable source is a custom one-shot candidate.
+        replay.refreshable = false;
+      }
       if (value === undefined) continue;
 
       // Objects keys always overwrite older headers, they never append.
@@ -175,6 +186,18 @@ function* iterateHeaders(
       }
       yield [name, value];
     }
+  }
+  if (
+    replay?.snapshot &&
+    nativeHeadersIterator !== undefined &&
+    iterator === nativeHeadersIterator &&
+    !(headers instanceof Headers) &&
+    !sawRow &&
+    (!isEmptyHeaders(replay.snapshot.values) || replay.snapshot.nulls.size > 0)
+  ) {
+    // Empty foreign replay is indistinguishable from a fresh wrapper over an exhausted cursor.
+    replay.refreshable = false;
+    yield* iterateHeaders(replay.snapshot, undefined, provenance);
   }
 }
 
@@ -254,6 +277,9 @@ export const snapshotHeaders = (initialSource: HeadersLike) => {
     },
     get snapshot() {
       return snapshot;
+    },
+    get replayable() {
+      return replay.refreshable;
     },
     refresh: (...sources: [] | [HeadersLike]) => {
       const currentSource = sources.length === 0 ? source : sources[0];

@@ -1205,6 +1205,8 @@ export class OpenAI {
     x509Authentication?.beginRequestPreparation();
     await this.prepareOptions(options);
     const credentialContext = {};
+    workloadHeaders?.defaultHeaders.refresh(this._options.defaultHeaders);
+    workloadHeaders?.requestHeaders.refresh(options.headers);
     if (
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
       this.#canPreflightWorkloadIdentityHeaders(options)
@@ -1216,13 +1218,6 @@ export class OpenAI {
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth
         ? this.#workloadTokenProvenance.begin(options, credentialContext, workloadHeaders)
         : undefined;
-    try {
-      workloadHeaders?.defaultHeaders.refresh(this._options.defaultHeaders);
-      workloadHeaders?.requestHeaders.refresh(options.headers);
-    } catch (error) {
-      workloadIdentityAuthScope?.dispose();
-      throw error;
-    }
 
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
@@ -1831,9 +1826,15 @@ export class OpenAI {
     }
     if (
       this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
-      (credentialContext === undefined ||
-        !this.#workloadTokenProvenance.scopeFor(inputOptions, credentialContext))
+      !this.#workloadTokenProvenance.scopeFor(inputOptions, credentialContext)
     ) {
+      if (
+        this.#workloadTokenProvenance.hasConsumedHeaders(inputOptions.headers, this._options.defaultHeaders)
+      ) {
+        throw new Errors.OpenAIError(
+          'A buildRequest override copying consumed one-shot headers must forward credentialContext.',
+        );
+      }
       // Standalone builds own their header replay until every authentication hook returns.
       const context = {};
       const headers = this.#canPreflightWorkloadIdentityHeaders(inputOptions)
@@ -1889,7 +1890,10 @@ export class OpenAI {
           snapshotHeaders(options.headers))
         : undefined;
     if (requestHeaderSnapshot) {
-      options.headers = requestHeaderSnapshot.refresh(inputOptions.headers);
+      options.headers =
+        requestHeaderSnapshot.source === inputOptions.headers
+          ? requestHeaderSnapshot.snapshot
+          : requestHeaderSnapshot.refresh(inputOptions.headers);
     }
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
@@ -1985,13 +1989,21 @@ export class OpenAI {
         ?.defaultHeaders;
       const bodyLayer = snapshotHeaders(bodyHeaders);
       const requestLayer = requestHeaderSnapshot ?? snapshotHeaders(options.headers);
+      let initialized = false;
       refreshSuppliedHeaders = () => {
+        const existingDefaultLayer = defaultLayer;
         defaultLayer ??= snapshotHeaders(this._options.defaultHeaders);
-        return buildHeaders([
-          defaultLayer.refresh(this._options.defaultHeaders),
-          bodyLayer.refresh(bodyHeaders),
-          requestLayer.refresh(options.headers),
+        const result = buildHeaders([
+          (initialized && existingDefaultLayer) || defaultLayer.source !== this._options.defaultHeaders
+            ? defaultLayer.refresh(this._options.defaultHeaders)
+            : defaultLayer.snapshot,
+          bodyLayer.snapshot,
+          initialized || !canPreflight || requestLayer.source !== options.headers
+            ? requestLayer.refresh(options.headers)
+            : requestLayer.snapshot,
         ]);
+        initialized = true;
+        return result;
       };
       if (canPreflight) {
         suppliedHeaders = refreshSuppliedHeaders();
