@@ -42,6 +42,61 @@ describe('Workload identity raw build input retries', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test.each([null, '', 'Bearer independent'])(
+    'fails closed when a buildRequest wrapper drops a one-shot credential carrier: %j',
+    async (authorization) => {
+      class OneShotHeaders {
+        private rows = [['Authorization', authorization] as const][Symbol.iterator]();
+        private authorization = authorization;
+
+        entries() {
+          return this.rows;
+        }
+
+        get() {
+          return this.authorization;
+        }
+      }
+      Object.defineProperties(OneShotHeaders.prototype, {
+        [Symbol.toStringTag]: { value: 'Headers' },
+        [Symbol.iterator]: { value: OneShotHeaders.prototype.entries },
+        constructor: {
+          // oxlint-disable-next-line prefer-arrow-callback -- A constructor-shaped fixture needs a prototype.
+          value: Object.defineProperty(function Headers() {}, 'prototype', {
+            value: OneShotHeaders.prototype,
+          }),
+        },
+      });
+      class ReconstructingClient extends OpenAI {
+        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+          const [options, settings] = args;
+          const built = await super.buildRequest(
+            { ...options, headers: new Headers(options.headers as HeadersInit) },
+            settings,
+          );
+          return { ...built, req: Object.fromEntries(Object.entries(built.req)) } as typeof built;
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ error: 'synthetic retry' }, { status: 500 });
+      });
+      const client = new ReconstructingClient({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: 1,
+      });
+
+      await expect(
+        client.models.list({ headers: new OneShotHeaders() as unknown as Headers }),
+      ).rejects.toThrow('must retain');
+
+      expect(sent).toEqual([authorization === null ? 'null' : authorization]);
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
   test.each(['request', 'default'] as const)(
     'preserves one-shot %s authorization through a legacy copied buildRequest wrapper',
     async (location) => {
