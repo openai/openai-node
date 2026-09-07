@@ -179,7 +179,8 @@ describeOnUnix('monthly Node review proposal boundary', () => {
   });
 
   test.each(['"body":"first",', '"\\u0062ody":"first",'])('rejects duplicate envelope keys %s', (key) => {
-    rejects(JSON.stringify(proposal()).replace('{', `{${key}`));
+    const raw = JSON.stringify(proposal());
+    rejects(`{${key}${raw.slice(1)}`);
   });
 
   test.each(['NaN', 'Infinity', '-Infinity'])('rejects nonstandard JSON %s', (constant) => {
