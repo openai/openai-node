@@ -86,6 +86,11 @@ interface HeaderPropertySnapshot {
   entry?: readonly [string, string | readonly string[] | null];
 }
 
+interface HeaderArraySlotSnapshot {
+  descriptor: PropertyDescriptor;
+  entry: HeaderEntry;
+}
+
 interface HeaderReplay {
   refreshable: boolean;
   unverifiedHeaders?: boolean;
@@ -97,7 +102,7 @@ interface HeaderReplay {
   propertyOrder?: string[];
   property?: HeaderPropertySnapshot;
   rows?: WeakMap<object, readonly (readonly [string, string | null])[]>;
-  arraySlots?: Map<number, HeaderEntry>;
+  arraySlots?: Map<number, HeaderArraySlotSnapshot>;
 }
 
 const hasNativeHeadersBrand = (headers: object): boolean => {
@@ -197,6 +202,21 @@ const getArrayIndexDescriptor = (array: readonly unknown[], index: number) => {
   return undefined;
 };
 
+const isSameArraySlot = (
+  retained: HeaderArraySlotSnapshot,
+  descriptor: PropertyDescriptor | undefined,
+): boolean => {
+  if (!descriptor || 'value' in descriptor) return false;
+  const previous = retained.descriptor;
+  return (
+    !('value' in previous) &&
+    previous.get === descriptor.get &&
+    previous.set === descriptor.set &&
+    previous.enumerable === descriptor.enumerable &&
+    previous.configurable === descriptor.configurable
+  );
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: HeaderReplay,
@@ -253,14 +273,17 @@ function* iterateHeaders(
     replay.arraySlots ??= new Map();
     const rows: HeaderEntry[] = [];
     for (let index = 0; index < headers.length; index += 1) {
+      const descriptor = getArrayIndexDescriptor(headers, index);
       const retained = replay.arraySlots.get(index);
-      if (retained) {
-        rows.push(retained);
+      if (retained && isSameArraySlot(retained, descriptor)) {
+        rows.push(retained.entry);
         continue;
       }
-      const descriptor = getArrayIndexDescriptor(headers, index);
+      replay.arraySlots.delete(index);
       const row = Reflect.get(headers, String(index)) as HeaderEntry;
-      if (descriptor && !('value' in descriptor)) replay.arraySlots.set(index, row);
+      if (descriptor && !('value' in descriptor)) {
+        replay.arraySlots.set(index, { descriptor, entry: row });
+      }
       rows.push(row);
     }
     iter = rows;
