@@ -3,6 +3,7 @@ import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
+import type { RequestCredentialContext } from './internal/request-credentials';
 import { hasOwn, isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
@@ -177,6 +178,8 @@ export class AzureOpenAI extends OpenAI {
     props: {
       /** Number of retries already attempted for the current request. */
       retryCount?: number;
+      /** Forward this internal context when overriding request construction. @internal */
+      credentialContext?: RequestCredentialContext | undefined;
     } = {},
   ): Promise<{
     /** Fetch request options after authentication, headers, and the body are prepared. */
@@ -222,12 +225,13 @@ export class AzureOpenAI extends OpenAI {
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
       return buildHeaders([{ 'api-key': this.apiKey }]);
     }
-    return super.authHeaders(opts, security);
+    return super.authHeaders(opts, security, credentialContext);
   }
 }
 
