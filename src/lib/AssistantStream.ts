@@ -163,7 +163,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     const capturedData = Object.create(Object.getPrototypeOf(stableData), {
       ...Object.getOwnPropertyDescriptors(stableData),
       delta: { configurable: true, enumerable: true, writable: true, value: delta && { ...delta } },
-    }) as AssistantStreamEvent['data'];
+    }) as AssistantStreamEvent['data'] & { delta: unknown };
     stableData = capturedData;
     if (delta && typeof delta === 'object') {
       refreshRunStepDelta = () => {
@@ -178,7 +178,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           return;
         }
         const descriptors = Object.getOwnPropertyDescriptors(currentDelta);
-        delete descriptors.id;
+        delete descriptors['id'];
         capturedData.delta = {
           ...Object.create(Object.getPrototypeOf(currentDelta), descriptors),
         } as RunStepDelta;

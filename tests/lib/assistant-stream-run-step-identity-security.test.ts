@@ -163,13 +163,13 @@ describe('AssistantStream run-step identity security', () => {
             } else if (kind === 'replace-details') {
               event.data.delta.step_details = {
                 type: 'tool_calls',
-                tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+                tool_calls: [{ index: 0, type: 'function', function: { arguments: ' replacement' } }],
               };
             } else {
               event.data.delta = {
                 step_details: {
                   type: 'tool_calls',
-                  tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+                  tool_calls: [{ index: 0, type: 'function', function: { arguments: ' replacement' } }],
                 },
               };
             }
