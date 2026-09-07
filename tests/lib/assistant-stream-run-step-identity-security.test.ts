@@ -111,6 +111,104 @@ describe('AssistantStream run-step identity security', () => {
     });
   });
 
+  test.each(['accessor', 'proxy'] as const)(
+    'captures a changing %s delta once before dispatch and accumulation',
+    async (kind) => {
+      const step = runStep('step_original');
+      const originalDelta = toolCallDelta(step.id).data.delta;
+      const readDelta = vi
+        .fn()
+        .mockReturnValueOnce(originalDelta)
+        .mockReturnValueOnce(originalDelta)
+        .mockReturnValue({ id: ' appended' });
+      const data =
+        kind === 'accessor'
+          ? Object.defineProperty({ id: step.id }, 'delta', { enumerable: true, get: readDelta })
+          : new Proxy(
+              { id: step.id, delta: originalDelta },
+              {
+                get(target, property, receiver) {
+                  return property === 'delta' ? readDelta() : Reflect.get(target, property, receiver);
+                },
+              },
+            );
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const rawEvent = vi.fn();
+      const stepDelta = vi.fn();
+      runner.on('event', rawEvent);
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(step.id).toBe('step_original');
+      expect(readDelta).toHaveBeenCalledTimes(1);
+      const emittedDelta = stepDelta.mock.calls[0]?.[0];
+      expect(emittedDelta).toEqual(originalDelta);
+      expect(emittedDelta.step_details).toBe(originalDelta.step_details);
+      expect(rawEvent.mock.calls[1]?.[0].data.delta).toBe(emittedDelta);
+      expect(stepDelta.mock.calls[0]?.[1]).toBe(step);
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+    },
+  );
+
+  test('rejects a proxy delta that reveals an id only during enumeration', async () => {
+    const step = runStep('step_original');
+    const originalStep = structuredClone(step);
+    let enumerated = false;
+    const delta = new Proxy(
+      { id: ' appended', ...toolCallDelta(step.id).data.delta },
+      {
+        ownKeys(target) {
+          enumerated = true;
+          return Reflect.ownKeys(target);
+        },
+        getOwnPropertyDescriptor(target, property) {
+          return property === 'id' && !enumerated
+            ? undefined
+            : Reflect.getOwnPropertyDescriptor(target, property);
+        },
+      },
+    );
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      { event: 'thread.run.step.delta', data: Object.freeze({ id: step.id, delta }) },
+      completedRun(),
+    ]);
+    const rawEvent = vi.fn();
+    const stepDelta = vi.fn();
+    runner.on('event', rawEvent);
+    runner.on('runStepDelta', stepDelta);
+
+    await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+    expect(rawEvent).toHaveBeenCalledTimes(1);
+    expect(stepDelta).not.toHaveBeenCalled();
+    expect(step).toEqual(originalStep);
+  });
+
+  test('rejects a nonenumerable delta id without reading it', async () => {
+    const step = runStep('step_original');
+    const readID = vi.fn(() => ' appended');
+    const delta = Object.defineProperty(toolCallDelta(step.id).data.delta, 'id', { get: readID });
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      { event: 'thread.run.step.delta', data: { id: step.id, delta } },
+      completedRun(),
+    ]);
+    const rawEvent = vi.fn();
+    runner.on('event', rawEvent);
+
+    await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+    expect(rawEvent).toHaveBeenCalledTimes(1);
+    expect(readID).not.toHaveBeenCalled();
+    expect(step.id).toBe('step_original');
+  });
+
   test.each(['step_trusted', 'step_foreign'])(
     'rejects creation of %s while a trusted run step remains active',
     async (injectedID) => {
