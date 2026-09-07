@@ -1,4 +1,4 @@
-import type { WorkloadHeaderSnapshots } from '../headers';
+import type { HeadersLike, NullableHeaders, WorkloadHeaderSnapshots } from '../headers';
 
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
 export function bearerToken(authorization: string | null): string | undefined {
@@ -19,6 +19,19 @@ interface HeaderCredential {
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
 const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
+const headerConsumptionListeners = new WeakMap<object, Set<() => void>>();
+
+/** Active requests observe consumption, never another request's serialized header values. */
+export function observesWorkloadHeaderConsumption(source: object): boolean {
+  return headerConsumptionListeners.has(source);
+}
+
+/** Records a completed canonical parse of a source that cannot safely be consumed again. */
+export function notifyWorkloadHeaderConsumption(source: object): void {
+  for (const listener of headerConsumptionListeners.get(source) ?? []) {
+    listener();
+  }
+}
 
 /** Reads the credential capability attached to an SDK-produced header layer. */
 export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
@@ -34,6 +47,9 @@ interface TokenScope {
   context: object;
   headers: WorkloadHeaderSnapshots | undefined;
   captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
+  captureHeaderRead: (source: HeadersLike, snapshot: NullableHeaders) => void;
+  recordHeaderConsumption: (source: object) => void;
+  hasConsumedHeaders: (source: object | null | undefined) => boolean;
   record: (token: string) => void;
   matches: (authorization: string) => boolean;
   snapshot: () => Pick<TokenScope, 'matches'>;
@@ -179,6 +195,28 @@ export class WorkloadTokenProvenance {
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     const consumedSources = new Set<object>();
     const releaseSnapshots = new Set<() => void>();
+    const sourceSubscriptions = new Map<object, () => void>();
+    const recordConsumption = (source: object, owner: TokenScope) => {
+      consumedSources.add(source);
+      const owners = this.consumedHeaders.get(source) ?? new Set<TokenScope>();
+      owners.add(owner);
+      this.consumedHeaders.set(source, owners);
+    };
+    const observeSource = (source: HeadersLike, owner: TokenScope) => {
+      if (!source || sourceSubscriptions.has(source)) {
+        return;
+      }
+      const listeners = headerConsumptionListeners.get(source) ?? new Set<() => void>();
+      const listener = () => recordConsumption(source, owner);
+      listeners.add(listener);
+      headerConsumptionListeners.set(source, listeners);
+      sourceSubscriptions.set(source, () => {
+        listeners.delete(listener);
+        if (!listeners.size) {
+          headerConsumptionListeners.delete(source);
+        }
+      });
+    };
     const detachSnapshots = () => {
       for (const release of releaseSnapshots) {
         release();
@@ -196,19 +234,32 @@ export class WorkloadTokenProvenance {
         detachSnapshots();
         scope.headers = captured;
         for (const snapshot of [captured.defaultHeaders, captured.requestHeaders]) {
+          observeSource(snapshot.source, scope);
           releaseSnapshots.add(
             snapshot.onMaterialize(() => {
+              observeSource(snapshot.source, scope);
               if (!snapshot.source || snapshot.replayable) {
                 return;
               }
-              consumedSources.add(snapshot.source);
-              const owners = this.consumedHeaders.get(snapshot.source) ?? new Set<TokenScope>();
-              owners.add(scope);
-              this.consumedHeaders.set(snapshot.source, owners);
+              recordConsumption(snapshot.source, scope);
             }),
           );
         }
       },
+      captureHeaderRead: (source, snapshot) => {
+        if (disposed) {
+          return;
+        }
+        // Canonical hook reads must establish ownership before a synchronous nested build can start.
+        scope.headers?.defaultHeaders.seed(source, snapshot);
+        scope.headers?.requestHeaders.seed(source, snapshot);
+      },
+      recordHeaderConsumption: (source) => {
+        if (!disposed) {
+          recordConsumption(source, scope);
+        }
+      },
+      hasConsumedHeaders: (source) => source !== null && source !== undefined && consumedSources.has(source),
       record: (token) => {
         if (!disposed) {
           tokens.add(token);
@@ -235,6 +286,10 @@ export class WorkloadTokenProvenance {
         disposed = true;
         tokens.clear();
         detachSnapshots();
+        for (const release of sourceSubscriptions.values()) {
+          release();
+        }
+        sourceSubscriptions.clear();
         for (const source of consumedSources) {
           const owners = this.consumedHeaders.get(source);
           owners?.delete(scope);

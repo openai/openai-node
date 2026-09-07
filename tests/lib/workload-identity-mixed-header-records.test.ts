@@ -126,6 +126,62 @@ describe.each(['request', 'default'] as const)('mixed %s header records', (layer
   });
 });
 
+describe.each(['request', 'default'] as const)('retained %s data properties', (layer) => {
+  describe.each(['nested', 'coercion'] as const)('%s value', (kind) => {
+    test.each([false, true])('observes outer property replacement: %s', async (replace) => {
+      const name = kind === 'nested' ? 'Authorization' : 'X-Custom';
+      const read = vi.fn(() => (kind === 'nested' ? undefined : 'before'));
+      const headers: Record<string, string | readonly (string | undefined)[] | undefined> = {};
+      if (kind === 'nested') {
+        const values = [undefined];
+        Object.defineProperty(values, '0', { get: read });
+        headers[name] = values;
+      } else {
+        // @ts-expect-error JavaScript callers can supply values coerced by Headers.append.
+        headers[name] = { toString: read };
+      }
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        if (replace) {
+          headers[name] = kind === 'nested' ? 'Bearer independent' : 'after';
+        }
+        return 'subject-token';
+      };
+      const sent: Headers[] = [];
+      const rejected = kind === 'nested' && replace;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers));
+        return rejected
+          ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        workloadIdentity: identity,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+      const request = client.get(
+        'https://independent.example.test/synthetic',
+        layer === 'request' ? { headers } : {},
+      );
+
+      await (rejected ? expect(request).rejects.toMatchObject({ status: 401 }) : request);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.get('Authorization')).toBe(rejected ? 'Bearer independent' : 'Bearer access-token-1');
+      if (kind === 'coercion') {
+        expect(sent[0]?.get('X-Custom')).toBe(replace ? 'after' : 'before');
+      }
+      expect(transport.exchanges).toBe(1);
+      expect(read).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
 test.each(['direct', 'nested', 'coercion'] as const)(
   'refreshes ordinary data additions and deletions alongside a retained %s value',
   (kind) => {

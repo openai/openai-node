@@ -272,7 +272,11 @@ import {
   type RequestCredentialContext,
 } from './internal/request-credentials';
 import { readEnv } from './internal/utils/env';
-import { WorkloadTokenProvenance, bearerToken } from './internal/auth/workload-token-provenance';
+import {
+  WorkloadTokenProvenance,
+  bearerToken,
+  workloadHeaderCredential,
+} from './internal/auth/workload-token-provenance';
 import {
   type LogLevel,
   type Logger,
@@ -1359,8 +1363,18 @@ export class OpenAI {
     let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
     if (!x509Authentication) {
+      const headersBeforePreparation = req.headers;
       await this.prepareRequest(req, { url, options });
       await this._provider?.prepareRequest?.(req, { url, options });
+      if (
+        this._workloadIdentityAuth &&
+        req.headers !== headersBeforePreparation &&
+        workloadHeaderCredential(req.headers) === undefined
+      ) {
+        // Preparation replacements need explicit provenance; equal bytes do not establish ownership.
+        initialWorkloadAuthorization = undefined;
+        completedWorkloadScope = undefined;
+      }
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -1954,6 +1968,21 @@ export class OpenAI {
       }
     }
     const workloadScope = this.#workloadTokenProvenance.scopeFor(inputOptions, credentialContext);
+    if (workloadScope?.headers) {
+      for (const [source, snapshot] of [
+        [inputOptions.headers, workloadScope.headers.requestHeaders],
+        [this._options.defaultHeaders, workloadScope.headers.defaultHeaders],
+      ] as const) {
+        if (
+          workloadScope.hasConsumedHeaders(source) &&
+          (!snapshot.initialized || snapshot.source !== source)
+        ) {
+          throw new Errors.OpenAIError(
+            'A hook consuming one-shot headers must retain parsed headers before building a request.',
+          );
+        }
+      }
+    }
     if (workloadScope && !workloadScope.headers) {
       workloadScope.captureHeaders(
         createWorkloadHeaderSnapshots(inputOptions.headers, this._options.defaultHeaders, {
@@ -2153,6 +2182,8 @@ export class OpenAI {
               this.authHeaders(options, authenticationSecurity, credentialContext),
             ),
       preferredHeaders,
+      this.#workloadTokenProvenance.scopeFor(options, credentialContext)?.captureHeaderRead,
+      this.#workloadTokenProvenance.scopeFor(options, credentialContext)?.recordHeaderConsumption,
     );
     let authenticationHeaders = await authentication.result;
     if (refreshSuppliedHeaders) {

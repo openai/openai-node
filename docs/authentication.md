@@ -279,10 +279,17 @@ class WrappedClient extends OpenAI {
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
 
-Immediate delegating calls also retain ownership when copying both options and native headers. A hook
-that awaits before delegating, copies its options, and reconstructs the authentication result with
-native `Headers` must forward the context. Once both identities are discarded across an asynchronous
-boundary, ownership cannot be inferred safely from matching credential strings.
+Immediate delegating authentication calls also retain ownership when copying both options and native
+headers. A hook that awaits before delegating, copies its options, and reconstructs the authentication
+result with native `Headers` must forward the context. Once both identities are discarded across an
+asynchronous boundary, ownership cannot be inferred safely from matching credential strings.
+
+During `prepareRequest`, mutate the SDK-produced header object in place when adding unrelated headers
+to preserve automatic workload refresh. An unmarked replacement, including `new Headers(req.headers)`
+or a raw record, is treated as independently authenticated even when its Authorization bytes match the
+workload token. It does not trigger workload-token refresh after a 401. Explicit SDK provenance is
+required because a copied token and an independently supplied equal-byte credential are
+indistinguishable.
 
 A `buildRequest` override keeps first access to its original inputs before SDK snapshotting. Ordinary
 delegation can copy options and native input headers without forwarding a new argument. A nested build
@@ -297,6 +304,9 @@ credential. Inputs the hook ignores remain unread, and reusable foreign headers 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
 caller-owned header sources before `prepareOptions` or bodyless custom authentication hooks run.
+Forwarding the context alone cannot recover inputs consumed after an await or as part of a multi-layer
+parse; pass the retained parsed headers to subsequent builds. This also applies to unverified foreign
+collections whose replayability cannot be established.
 
 Foreign Headers-shaped implementations retain previously observed header names missing during replay,
 while applying every newly observed value. To intentionally delete headers in such an implementation,

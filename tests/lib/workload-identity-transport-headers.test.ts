@@ -44,7 +44,7 @@ test('materializes a self-deleting header getter before transport dispatch', asy
 describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identity', (hook) => {
   describe.each(['record', 'array', 'native', 'foreign'] as const)('%s', (kind) => {
     test.skipIf(kind === 'foreign' && Number(process.versions.node.split('.')[0]) < 24)(
-      'preserves workload refresh and collection identity where verifiable',
+      'keeps preparation replacements independent and preserves transport collection identity',
       async () => {
         const supplied: NonNullable<RequestInit['headers']>[] = [];
         const retainHeaders = async (request: RequestInit) => {
@@ -108,10 +108,15 @@ describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identi
           fetch: transport.fetch,
         });
 
-        await client.models.list();
+        const request = client.models.list();
+        await (hook === 'prepareRequest' ? expect(request).rejects.toMatchObject({ status: 401 }) : request);
 
-        expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-        expect(transport.exchanges).toBe(2);
+        expect(sent).toEqual(
+          hook === 'prepareRequest'
+            ? ['Bearer access-token-1']
+            : ['Bearer access-token-1', 'Bearer access-token-2'],
+        );
+        expect(transport.exchanges).toBe(hook === 'prepareRequest' ? 1 : 2);
       },
     );
   });

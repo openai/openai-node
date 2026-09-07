@@ -60,6 +60,171 @@ describe('workload identity request provenance', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   test.each(
+    (['get', 'post'] as const).flatMap((method) =>
+      (['request', 'defaults', 'shared'] as const).flatMap((source) =>
+        [false, true].map((forward) => ({ method, source, forward })),
+      ),
+    ),
+  )(
+    'guards copied nested builds immediately after direct parser reads: %j',
+    async ({ method, source, forward }) => {
+      let rows = [['Authorization', null] as const][Symbol.iterator]();
+      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      let nested = false;
+      const nestedAuthorizations: (string | null)[] = [];
+      class HookClient extends OpenAI {
+        protected override async authHeaders(
+          options: FinalRequestOptions,
+          _schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          credentialContext?: RequestCredentialContext,
+        ) {
+          if (!nested) {
+            nested = true;
+            expect(
+              buildHeaders([
+                source === 'defaults' ? this._options.defaultHeaders : options.headers,
+              ]).nulls.has('authorization'),
+            ).toBe(true);
+            const built = await this.buildRequest({ ...options }, forward ? { credentialContext } : {});
+            nestedAuthorizations.push(built.req.headers.get('Authorization'));
+          }
+          return buildHeaders([{ Authorization: 'Bearer synthetic-hook-credential' }]);
+        }
+      }
+      const transport = createTransport(() => false);
+      const client = new HookClient({
+        ...clientOptions,
+        fetch: transport.fetch,
+        ...(source === 'request' ? {} : { defaultHeaders: headers }),
+      });
+      const options: FinalRequestOptions = {
+        method,
+        path: '/models',
+        ...(method === 'post' ? { body: {} } : {}),
+        ...(source === 'defaults' ? {} : { headers }),
+      };
+      const request = client.request(options);
+      if (forward) {
+        await request;
+        expect(nestedAuthorizations).toEqual([null]);
+        expect(transport.requests.map((entry) => entry.authorization)).toEqual([null]);
+      } else {
+        await expect(request).rejects.toThrow('must forward credentialContext');
+        expect(transport.requests).toHaveLength(0);
+      }
+      expect(transport.exchanges).toBe(0);
+
+      rows = [['Authorization', null] as const][Symbol.iterator]();
+      const next = await client.buildRequest({ ...options });
+      expect(next.req.headers.get('Authorization')).toBeNull();
+    },
+  );
+
+  test.each(
+    (['request', 'defaults', 'shared'] as const).flatMap((source) =>
+      (['omitted', 'forwarded', 'retained'] as const).map((mode) => ({ source, mode })),
+    ),
+  )('guards direct parser consumption after an await: %j', async ({ source, mode }) => {
+    let rows = [['Authorization', null] as const][Symbol.iterator]();
+    const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+    let nested = false;
+    class HookClient extends OpenAI {
+      protected override async authHeaders(
+        options: FinalRequestOptions,
+        _schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        credentialContext?: RequestCredentialContext,
+      ) {
+        if (!nested) {
+          nested = true;
+          await Promise.resolve();
+          const parsed = buildHeaders([
+            source === 'defaults' ? this._options.defaultHeaders : options.headers,
+          ]);
+          expect(parsed.nulls.has('authorization')).toBe(true);
+          if (mode === 'retained') {
+            if (source !== 'defaults') {
+              options.headers = parsed;
+            }
+            if (source !== 'request') {
+              this._options.defaultHeaders = parsed;
+            }
+          }
+          const built = await this.buildRequest(
+            { ...options },
+            mode === 'omitted' ? {} : { credentialContext },
+          );
+          expect(built.req.headers.get('Authorization')).toBeNull();
+        }
+        return buildHeaders([{ Authorization: 'Bearer synthetic-hook-credential' }]);
+      }
+    }
+    const transport = createTransport(() => false);
+    const client = new HookClient({
+      ...clientOptions,
+      fetch: transport.fetch,
+      ...(source === 'request' ? {} : { defaultHeaders: headers }),
+    });
+    const options: FinalRequestOptions = {
+      method: 'get',
+      path: '/models',
+      ...(source === 'defaults' ? {} : { headers }),
+    };
+    const request = client.request(options);
+    if (mode === 'retained') {
+      await request;
+      expect(transport.requests.map((entry) => entry.authorization)).toEqual([null]);
+    } else {
+      await expect(request).rejects.toThrow(
+        mode === 'omitted' ? 'must forward credentialContext' : 'must retain parsed headers',
+      );
+      expect(transport.requests).toHaveLength(0);
+    }
+    expect(transport.exchanges).toBe(0);
+
+    rows = [['Authorization', null] as const][Symbol.iterator]();
+    const next = await client.buildRequest({ ...options });
+    expect(next.req.headers.get('Authorization')).toBeNull();
+  });
+
+  test.each([false, true])(
+    'guards a one-shot source parsed with additional header layers (retained: %s)',
+    async (retain) => {
+      const rows = [['Authorization', null] as const][Symbol.iterator]();
+      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      let nested = false;
+      class HookClient extends OpenAI {
+        protected override async authHeaders(
+          options: FinalRequestOptions,
+          _schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          credentialContext?: RequestCredentialContext,
+        ) {
+          if (!nested) {
+            nested = true;
+            const parsed = buildHeaders([options.headers, { 'X-Extra': 'preserved' }]);
+            if (retain) {
+              options.headers = parsed;
+            }
+            const built = await this.buildRequest({ ...options }, retain ? { credentialContext } : {});
+            expect(built.req.headers.get('Authorization')).toBeNull();
+          }
+          return buildHeaders([{ Authorization: 'Bearer synthetic-hook-credential' }]);
+        }
+      }
+      const transport = createTransport(() => false);
+      const client = new HookClient({ ...clientOptions, fetch: transport.fetch });
+      const request = client.request({ method: 'get', path: '/models', headers });
+      if (retain) {
+        await request;
+        expect(transport.requests.map((entry) => entry.authorization)).toEqual([null]);
+      } else {
+        await expect(request).rejects.toThrow('must forward credentialContext');
+        expect(transport.requests).toHaveLength(0);
+      }
+      expect(transport.exchanges).toBe(0);
+    },
+  );
+
+  test.each(
     (['request', 'defaults', 'shared'] as const).flatMap((source) =>
       [false, true].flatMap((forward) =>
         [false, true].map((readInHook) => ({ source, forward, readInHook })),

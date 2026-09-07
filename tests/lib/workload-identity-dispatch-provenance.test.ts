@@ -171,3 +171,63 @@ test.each([false, true])(
     expect(transport.exchanges).toBe(1);
   },
 );
+
+test.each(
+  (['record replacement', 'Headers replacement', 'same object', 'SDK helper copy'] as const).flatMap((kind) =>
+    [false, true].map((clone) => ({ kind, clone })),
+  ),
+)('refreshes preparation credentials only with preserved header ownership: %j', async ({ kind, clone }) => {
+  const preservesOwnership = kind === 'same object' || kind === 'SDK helper copy';
+  class HookClient extends OpenAI {
+    protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+      const [request] = args;
+      if (!(request.headers instanceof Headers)) {
+        throw new Error('Expected native built request headers');
+      }
+      const authorization = request.headers.get('Authorization');
+      if (authorization === null) {
+        throw new Error('Expected the resolved workload credential');
+      }
+      request.headers.set('X-Custom', 'prepared');
+      if (kind === 'record replacement') {
+        request.headers = { Authorization: authorization, 'X-Custom': 'prepared' };
+      } else if (kind === 'Headers replacement') {
+        request.headers = new Headers(request.headers);
+      } else if (kind === 'SDK helper copy') {
+        request.headers = buildHeaders([request.headers]).values;
+      }
+      return super.prepareRequest(...args);
+    }
+
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      if (clone) {
+        args[1] = { ...args[1], headers: new Headers(args[1].headers) } satisfies RequestInit;
+      }
+      return super.fetchWithAuth(...args);
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    const headers = new Headers(init?.headers);
+    sent.push(headers.get('Authorization'));
+    expect(headers.get('X-Custom')).toBe('prepared');
+    return sent.length === 1
+      ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+      : Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  const request = client.models.list();
+  await (preservesOwnership ? request : expect(request).rejects.toMatchObject({ status: 401 }));
+
+  expect(sent).toEqual(
+    preservesOwnership ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer access-token-1'],
+  );
+  expect(transport.exchanges).toBe(preservesOwnership ? 2 : 1);
+});

@@ -1,5 +1,10 @@
 import { isReadonlyArray } from './utils/values';
-import { rememberWorkloadHeaderCredential, workloadHeaderCredential } from './auth/workload-token-provenance';
+import {
+  notifyWorkloadHeaderConsumption,
+  observesWorkloadHeaderConsumption,
+  rememberWorkloadHeaderCredential,
+  workloadHeaderCredential,
+} from './auth/workload-token-provenance';
 
 type HeaderValue = string | undefined | null;
 type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
@@ -93,7 +98,7 @@ const getHeadersIterator = (headers: object) => {
 };
 
 interface HeaderPropertySnapshot {
-  accessor?: PropertyDescriptor;
+  descriptor?: PropertyDescriptor;
   entry?: readonly [string, string | readonly string[] | null];
 }
 
@@ -207,7 +212,7 @@ function* iterateHeaders(
 
   let shouldClear = false;
   let iter: Iterable<HeaderEntry>;
-  const accessorProperties = new Map<string, PropertyDescriptor>();
+  const propertyDescriptors = new Map<string, PropertyDescriptor>();
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
   const hasIterator = !replay?.record && (replay?.iterator !== undefined || Symbol.iterator in headers);
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
@@ -258,17 +263,21 @@ function* iterateHeaders(
       for (const key of Reflect.ownKeys(headers)) {
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
-        const accessor = replay.properties.get(key)?.accessor;
+        const previousDescriptor = replay.properties.get(key)?.descriptor;
         if (
-          accessor &&
+          previousDescriptor &&
           descriptor &&
-          ('value' in descriptor || descriptor.get !== accessor.get || descriptor.set !== accessor.set)
+          ('value' in previousDescriptor
+            ? !('value' in descriptor) || descriptor.value !== previousDescriptor.value
+            : 'value' in descriptor ||
+              descriptor.get !== previousDescriptor.get ||
+              descriptor.set !== previousDescriptor.set)
         ) {
-          // A replacement property owns its current value, rather than the earlier accessor snapshot.
+          // A replacement property owns its current value, rather than the earlier materialization.
           replay.properties.delete(key);
         }
         if (!descriptor?.enumerable) continue;
-        if (!('value' in descriptor)) accessorProperties.set(key, descriptor);
+        propertyDescriptors.set(key, descriptor);
         entries.push([key, replay.properties.has(key) ? undefined : Reflect.get(headers, key)]);
       }
       // A getter may remove itself during its first read. Retain its position before surviving aliases.
@@ -316,10 +325,11 @@ function* iterateHeaders(
       }
       continue;
     }
-    const rowReplay = shouldClear && replay ? { refreshable: !accessorProperties.has(name) } : replay;
-    const accessor = accessorProperties.get(name);
+    const descriptor = propertyDescriptors.get(name);
+    const rowReplay =
+      shouldClear && replay ? { refreshable: descriptor === undefined || 'value' in descriptor } : replay;
     const property: HeaderPropertySnapshot | undefined =
-      shouldClear && replay ? { ...(accessor ? { accessor } : {}) } : undefined;
+      shouldClear && replay ? { ...(descriptor ? { descriptor } : {}) } : undefined;
     if (property && replay) replay.property = property;
     const headerValue = row[1];
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
@@ -430,6 +440,8 @@ const mergeHeaderEntries = (
 interface HeaderReadContext {
   captured: WeakMap<object, NullableHeaders>;
   preferred: WeakMap<object, NullableHeaders>;
+  onRead: ((source: HeadersLike, snapshot: NullableHeaders) => void) | undefined;
+  onConsume: ((source: object) => void) | undefined;
 }
 
 let headerReadContext: HeaderReadContext | undefined;
@@ -445,9 +457,11 @@ const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
 export function captureHeaderReads<T>(
   operation: () => T,
   preferred: { source: HeadersLike; snapshot: NullableHeaders }[] = [],
+  onRead?: (source: HeadersLike, snapshot: NullableHeaders) => void,
+  onConsume?: (source: object) => void,
 ): { result: T; captured: WeakMap<object, NullableHeaders> } {
   const previous = headerReadContext;
-  const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap() };
+  const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap(), onRead, onConsume };
   for (const { source, snapshot } of preferred) {
     if (typeof source === 'object' && source !== null) context.preferred.set(source, snapshot);
   }
@@ -468,8 +482,9 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
           ? (headerReadContext?.preferred.get(originalSource) ?? originalSource)
           : originalSource;
       const provenance = { unknown: false };
+      const observed = source && source === originalSource && observesWorkloadHeaderConsumption(source);
       const replay =
-        headerReadContext && newHeaders.length === 1 && source === originalSource
+        (headerReadContext && newHeaders.length === 1 && source === originalSource) || observed
           ? { refreshable: true }
           : undefined;
       capturedReplay =
@@ -481,7 +496,15 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
         source,
         provenance,
         ...(replay ? { replay } : {}),
-        entries: iterateHeaders(source, replay, provenance),
+        entries:
+          observed && replay
+            ? observeHeaderConsumption(
+                source,
+                iterateHeaders(source, replay, provenance),
+                replay,
+                headerReadContext?.onConsume,
+              )
+            : iterateHeaders(source, replay, provenance),
       };
     }),
   );
@@ -491,10 +514,26 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
       headerReadContext.captured.set(source, result);
       if (capturedReplay)
         capturedHeaderReplays.set(result, { source, replay: copyHeaderReplay(capturedReplay) });
+      headerReadContext.onRead?.(source, result);
     }
   }
   return result;
 };
+
+function* observeHeaderConsumption(
+  source: object,
+  entries: Iterable<readonly [string, string | null]>,
+  replay: HeaderReplay,
+  onConsume: ((source: object) => void) | undefined,
+): IterableIterator<readonly [string, string | null]> {
+  try {
+    yield* entries;
+  } finally {
+    if (!replay.refreshable || replay.unverifiedHeaders || replay.properties?.size) {
+      (onConsume ?? notifyWorkloadHeaderConsumption)(source);
+    }
+  }
+}
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
 export interface HeaderSnapshot {

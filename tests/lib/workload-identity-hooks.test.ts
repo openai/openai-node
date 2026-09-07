@@ -14,8 +14,7 @@ class CloningBuildRequestClient extends OpenAI {
   }
 }
 
-function normalizeBearerScheme(init: RequestInit) {
-  const headers = new Headers(init.headers);
+function normalizeBearerScheme(init: RequestInit, headers = new Headers(init.headers)) {
   const authorization = headers.get('Authorization');
   if (authorization !== null) {
     headers.set('Authorization', authorization.replace(/^Bearer /u, 'bEaReR '));
@@ -92,7 +91,7 @@ describe('Workload identity request and dispatch hooks', () => {
         if (hook === 'prepareRequest') {
           Object.defineProperty(client, 'prepareRequest', {
             value: async (request: RequestInit) => {
-              request.headers = new Headers(request.headers);
+              request.headers = buildHeaders([request.headers]).values;
             },
           });
         }
@@ -276,7 +275,7 @@ describe('Workload identity request and dispatch hooks', () => {
         // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
         protected override async prepareRequest(init: RequestInit) {
           if (hook === 'prepareRequest') {
-            normalizeBearerScheme(init);
+            normalizeBearerScheme(init, buildHeaders([init.headers]).values);
           }
         }
 
@@ -312,7 +311,7 @@ describe('Workload identity request and dispatch hooks', () => {
     class HookClient extends OpenAI {
       // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
       protected override async prepareRequest(init: RequestInit) {
-        const headers = new Headers(init.headers);
+        const headers = buildHeaders([init.headers]).values;
         headers.set('Authorization', (headers.get('Authorization') ?? '').replace(/^Bearer /u, 'bearer  '));
         init.headers = headers;
       }
