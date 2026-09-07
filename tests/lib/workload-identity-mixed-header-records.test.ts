@@ -252,6 +252,43 @@ test.each(['request', 'default'] as const)(
   },
 );
 
+test.each(['request', 'default'] as const)(
+  'refreshes an ordinary %s Authorization tuple beside a retained outer slot',
+  async (layer) => {
+    const authorizationRow: [string, string | undefined] = ['Authorization', undefined];
+    const headers = [['X-Custom', 'initial'], authorizationRow];
+    const read = vi.fn(() => ['X-Custom', 'preserved']);
+    Object.defineProperty(headers, 0, { get: read });
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      authorizationRow[1] = 'Bearer independent';
+      return 'subject-token';
+    };
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const actual = new Headers(init?.headers);
+      expect(actual.get('Authorization')).toBe('Bearer independent');
+      expect(actual.get('X-Custom')).toBe('preserved');
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      workloadIdentity: identity,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list(layer === 'request' ? { headers } : {})).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test('retains distinct Set-Cookie values from a stateful property', () => {
   const read = vi.fn(() => ['a=1', 'b=2']);
   const snapshot = snapshotHeaders({
@@ -265,3 +302,41 @@ test('retains distinct Set-Cookie values from a stateful property', () => {
   expect(snapshot.refresh().values.getSetCookie()).toEqual(['a=1', 'b=2']);
   expect(read).toHaveBeenCalledTimes(1);
 });
+
+test.each(['request', 'default'] as const)(
+  'refreshes an ordinary %s Authorization tuple beside a retained stateful row',
+  async (layer) => {
+    const customRow = ['X-Custom', 'initial'];
+    const read = vi.fn(() => 'preserved');
+    Object.defineProperty(customRow, 1, { get: read });
+    const authorizationRow: [string, string | undefined] = ['Authorization', undefined];
+    const headers = [customRow, authorizationRow];
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      authorizationRow[1] = 'Bearer independent';
+      return 'subject-token';
+    };
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const actual = new Headers(init?.headers);
+      expect(actual.get('Authorization')).toBe('Bearer independent');
+      expect(actual.get('X-Custom')).toBe('preserved');
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      workloadIdentity: identity,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list(layer === 'request' ? { headers } : {})).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
