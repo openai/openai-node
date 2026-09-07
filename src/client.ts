@@ -2000,6 +2000,8 @@ export class OpenAI {
           (authorization !== null && authorization !== `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`))
       ) {
         authenticationSecurity = { ...security, bearerAuth: false };
+        // Stock authentication and dispatch must use the same explicit-override snapshot.
+        refreshSuppliedHeaders = undefined;
       }
     }
     const authenticationHeaders =
