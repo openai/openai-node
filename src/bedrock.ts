@@ -253,6 +253,7 @@ export class BedrockOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
     credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
+    credentialContext = this._requestCredentialContext(opts, credentialContext);
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     const credential = credentialContext?.apiKey === undefined ? this.apiKey : credentialContext.apiKey;
     if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {

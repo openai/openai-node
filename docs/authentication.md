@@ -54,7 +54,11 @@ forward the optional credential context to `super`. A forwarding `prepareOptions
 override can replace the current attempt's credential by assigning
 `credentialContext.apiKey` after awaiting `super.prepareOptions`. Updating
 `this.apiKey` changes the shared client property, not a captured function result.
-Legacy overrides that omit the context retain their shared-key behavior.
+Legacy `prepareOptions` overrides that omit the context retain their shared-key
+behavior. During request building, legacy delegating hooks can recover a captured
+credential from the original options object when it belongs to one active attempt.
+Hooks that copy options or reuse the same options concurrently should forward the
+context to preserve function-key isolation.
 
 ### Environment and client configuration
 

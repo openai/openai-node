@@ -4,6 +4,7 @@ import OpenAI, { AzureOpenAI, BedrockOpenAI } from 'openai';
 import type { ClientOptions } from 'openai';
 import type { Fetch } from 'openai/internal/builtin-types';
 import type { NullableHeaders } from 'openai/internal/headers';
+import { RequestCredentialContexts } from 'openai/internal/request-credentials';
 import type { RequestCredentialContext } from 'openai/internal/request-credentials';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
 
@@ -240,7 +241,101 @@ class ForwardingClient extends OpenAI {
   }
 }
 
+class OriginalOptionsClient extends OpenAI {
+  override async buildRequest(options: FinalRequestOptions) {
+    await Promise.resolve();
+    return super.buildRequest(options);
+  }
+
+  protected override async authHeaders(options: FinalRequestOptions, security?: Security) {
+    await Promise.resolve();
+    return super.authHeaders(options, security);
+  }
+
+  protected override async bearerAuth(options: FinalRequestOptions) {
+    await Promise.resolve();
+    return super.bearerAuth(options);
+  }
+}
+
 describe('HTTP credential hook compatibility', () => {
+  test.each(['mutable', 'frozen', 'sealed', 'non-extensible'] as const)(
+    'isolates legacy hooks using original %s options',
+    async (kind) => {
+      const { fetch, sent } = recordRequests();
+      const provider = rotatingProvider();
+      const client = new OriginalOptionsClient({ apiKey: provider, fetch });
+      const options: FinalRequestOptions[] = ['first', 'second'].map((request) => {
+        const value: FinalRequestOptions = {
+          method: 'get',
+          path: '/models',
+          headers: { 'x-synthetic-request': request },
+        };
+        if (kind === 'frozen') {
+          return Object.freeze(value);
+        }
+        if (kind === 'sealed') {
+          return Object.seal(value);
+        }
+        if (kind === 'non-extensible') {
+          return Object.preventExtensions(value);
+        }
+        return value;
+      });
+
+      await Promise.all(options.map((value) => client.request(value)));
+
+      expect(
+        Object.fromEntries(
+          sent.map((headers) => [headers.get('x-synthetic-request'), headers.get('authorization')]),
+        ),
+      ).toEqual({ first: 'Bearer synthetic-token-1', second: 'Bearer synthetic-token-2' });
+      expect(provider).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  test('keeps original-options fallback separate across clients', async () => {
+    const first = recordRequests();
+    const second = recordRequests();
+    const firstClient = new OriginalOptionsClient({
+      apiKey: async () => 'synthetic-first',
+      fetch: first.fetch,
+    });
+    const secondClient = new OriginalOptionsClient({
+      apiKey: async () => 'synthetic-second',
+      fetch: second.fetch,
+    });
+    const shared: FinalRequestOptions = Object.freeze({ method: 'get', path: '/models' });
+
+    await Promise.all([firstClient.request(shared), secondClient.request(shared)]);
+
+    expect(tokens(first.sent)).toEqual(['Bearer synthetic-first']);
+    expect(tokens(second.sent)).toEqual(['Bearer synthetic-second']);
+  });
+
+  test('does not select another active attempt for reused options or stale cleanup', () => {
+    const contexts = new RequestCredentialContexts();
+    const options = Object.freeze({ method: 'get', path: '/models' });
+    const first = { apiKey: 'synthetic-first' };
+    const second = { apiKey: 'synthetic-second' };
+    const releaseFirst = contexts.register(options, first);
+    const releaseSecond = contexts.register(options, second);
+
+    expect(contexts.get(options)).toBeUndefined();
+    releaseFirst();
+    expect(contexts.get(options)).toBe(second);
+    releaseFirst();
+    expect(contexts.get(options)).toBe(second);
+    releaseSecond();
+    expect(contexts.get(options)).toBeUndefined();
+
+    const releaseLater = contexts.register(options, first);
+    releaseSecond();
+    expect(contexts.get(options)).toBe(first);
+    releaseLater();
+    expect(contexts.get(options)).toBeUndefined();
+  });
+
   test.each([false, true])(
     'isolates reused raw options while forwarding every hook (promised: %s)',
     async (promised) => {
@@ -470,7 +565,24 @@ describe.each([
       }
     },
   },
-])('$name preparation credential changes', ({ Base }) => {
+])('$name credential hooks', ({ Base }) => {
+  test('isolates legacy authentication hooks using original options', async () => {
+    class AuthenticationClient extends Base {
+      protected override async authHeaders(options: FinalRequestOptions, security?: Security) {
+        await Promise.resolve();
+        return super.authHeaders(options, security);
+      }
+    }
+    const { fetch, sent } = recordRequests();
+    const provider = rotatingProvider();
+    const client = new AuthenticationClient(provider, fetch);
+
+    await Promise.all([client.models.list(), client.models.list()]);
+
+    expect(tokens(sent)).toEqual(['Bearer synthetic-token-1', 'Bearer synthetic-token-2']);
+    expect(provider).toHaveBeenCalledTimes(2);
+  });
+
   test.each(['legacy', 'forwarded', 'transformed'] as const)('%s context contract', async (mode) => {
     class PreparationClient extends Base {
       protected override async prepareOptions(

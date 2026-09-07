@@ -255,7 +255,11 @@ import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders, snapshotHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
-import { prepareRequestAPIKey, type RequestCredentialContext } from './internal/request-credentials';
+import {
+  prepareRequestAPIKey,
+  RequestCredentialContexts,
+  type RequestCredentialContext,
+} from './internal/request-credentials';
 import { readEnv } from './internal/utils/env';
 import { WorkloadTokenProvenance, bearerToken } from './internal/auth/workload-token-provenance';
 import {
@@ -494,6 +498,7 @@ export class OpenAI {
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
   #workloadIdentityRequests = new WeakMap<object, Set<WorkloadIdentityRequest>>();
   #workloadTokenProvenance = new WorkloadTokenProvenance();
+  #requestCredentialContexts = new RequestCredentialContexts();
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -779,6 +784,7 @@ export class OpenAI {
     },
     credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
+    credentialContext = this._requestCredentialContext(opts, credentialContext);
     const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
     if (
       authentication instanceof X509WorkloadIdentityAuth &&
@@ -800,6 +806,7 @@ export class OpenAI {
     opts: FinalRequestOptions,
     credentialContext?: RequestCredentialContext,
   ): Promise<NullableHeaders | undefined> {
+    credentialContext = this._requestCredentialContext(opts, credentialContext);
     const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
     const workloadScope = this.#workloadTokenProvenance.find(opts, credentialContext);
     if (authentication) {
@@ -940,6 +947,14 @@ export class OpenAI {
     }
 
     return url.toString();
+  }
+
+  /** Recovers a captured credential for an unambiguous legacy delegating hook. @internal */
+  protected _requestCredentialContext(
+    options: FinalRequestOptions,
+    context?: RequestCredentialContext,
+  ): RequestCredentialContext | undefined {
+    return context ?? this.#requestCredentialContexts.get(options);
   }
 
   /**
@@ -1220,6 +1235,7 @@ export class OpenAI {
           ? this.#workloadTokenProvenance.begin(options, credentialContext)
           : undefined;
       let candidate: Awaited<ReturnType<OpenAI['buildRequest']>>;
+      const releaseCredentialContext = this.#requestCredentialContexts.register(options, credentialContext);
       try {
         candidate = await this.buildRequest(options, {
           retryCount: maxRetries - retriesRemaining,
@@ -1230,6 +1246,7 @@ export class OpenAI {
           initialWorkloadAuthorization = authorization;
         }
       } finally {
+        releaseCredentialContext();
         workloadIdentityAuthScope?.dispose();
       }
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
@@ -1801,6 +1818,7 @@ export class OpenAI {
       credentialContext?: RequestCredentialContext | undefined;
     } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
+    credentialContext = this._requestCredentialContext(inputOptions, credentialContext);
     if (this.#x509Authentication && !this.#x509Authentication.inRequest(this)) {
       const authentication = this.#x509Authentication;
       return await authentication.runRequest(async () => {
