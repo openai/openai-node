@@ -129,7 +129,12 @@ export function workloadHeaderCredential(headers: object): HeaderCredential | nu
   const source = headerValueSources.get(headers);
   let credential = headerCredentials.get(headers);
   if (source) {
-    const values = Object.getOwnPropertyDescriptor(headers, 'values')?.value;
+    let values: unknown;
+    try {
+      values = Object.getOwnPropertyDescriptor(headers, 'values')?.value;
+    } catch {
+      return undefined;
+    }
     if (typeof values !== 'object' || values === null) {
       return undefined;
     }
