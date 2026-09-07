@@ -239,13 +239,14 @@ const hasStatefulArrayProperties = (
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: HeaderReplay,
-  provenance?: { unknown: boolean },
+  provenance?: { unknown: boolean; values?: Headers },
 ): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
   if (brand_privateNullableHeaders in headers) {
     if (provenance) provenance.unknown = true;
     const { values, nulls } = headers;
+    if (provenance) provenance.values = values;
     yield* values.entries();
     for (const name of nulls) {
       yield [name, null];
@@ -473,7 +474,7 @@ const mergeHeaderEntries = (
   newHeaders: {
     source: HeadersLike;
     entries: Iterable<readonly [string, string | null]>;
-    provenance: { unknown: boolean };
+    provenance: { unknown: boolean; values?: Headers };
     replay?: HeaderReplay;
   }[],
 ): NullableHeaders => {
@@ -491,7 +492,8 @@ const mergeHeaderEntries = (
       const lowerName = name.toLowerCase();
       if (lowerName === 'authorization') {
         suppliesAuthorization = true;
-        const sourceCredential = source ? workloadHeaderCredential(source) : undefined;
+        const credentialSource = provenance.values ?? source;
+        const sourceCredential = credentialSource ? workloadHeaderCredential(credentialSource) : undefined;
         // Native copies lose metadata; raw record/tuple layers explicitly supply independent credentials.
         credential =
           sourceCredential !== undefined
