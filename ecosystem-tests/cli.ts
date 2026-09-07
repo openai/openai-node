@@ -870,6 +870,7 @@ async function main() {
                       '--skip-pack',
                       '--noCleanup',
                       `--retry=${args.retry}`,
+                      `--retryDelay=${args.retryDelay}`,
                       ...(args.live ? ['--live'] : []),
                       ...(args.verbose ? ['--verbose'] : []),
                       ...(args.deploy ? ['--deploy'] : []),
