@@ -32,57 +32,68 @@ const getArrayIterator = <T>(headers: readonly T[]) => {
   let platformIterator: (() => Iterator<T>) | undefined;
   let prototype: object | null = headers;
   const seen = new Set<object>();
-  while (prototype) {
-    if (seen.has(prototype)) return undefined;
-    seen.add(prototype);
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-    if (descriptor && Array.isArray(prototype)) {
-      // Array.prototype is itself an array, including in another realm. Match
-      // the captured function without evaluating an intervening iterator getter.
-      if (typeof descriptor.value !== 'function') {
-        prototype = Object.getPrototypeOf(prototype);
-        continue;
+  try {
+    while (prototype) {
+      if (seen.has(prototype)) return undefined;
+      seen.add(prototype);
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+      if (descriptor && Array.isArray(prototype)) {
+        // Array.prototype is itself an array, including in another realm. Match
+        // the captured function without evaluating an intervening iterator getter.
+        if (typeof descriptor.value !== 'function') {
+          prototype = Object.getPrototypeOf(prototype);
+          continue;
+        }
+        const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+        if (
+          typeof constructor !== 'function' ||
+          Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
+        ) {
+          prototype = Object.getPrototypeOf(prototype);
+          continue;
+        }
+        if (platformIterator) return undefined;
+        platformIterator = descriptor.value as () => Iterator<T>;
       }
-      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-      if (
-        typeof constructor !== 'function' ||
-        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
-      ) {
-        prototype = Object.getPrototypeOf(prototype);
-        continue;
-      }
-      if (platformIterator) return undefined;
-      platformIterator = descriptor.value as () => Iterator<T>;
+      prototype = Object.getPrototypeOf(prototype);
     }
-    prototype = Object.getPrototypeOf(prototype);
+  } catch {
+    // A proxy can allow iteration while denying structural inspection. Keep it snapshot-only.
+    return undefined;
   }
   return platformIterator;
 };
 
 const getHeadersIterator = (headers: object) => {
   const seen = new Set<object>();
-  for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-    if (seen.has(prototype)) return undefined;
-    seen.add(prototype);
-    const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-    if (!iterator) continue;
-    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-    const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
-    if (
-      typeof constructor === 'function' &&
-      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
-      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
-      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers' &&
-      typeof iterator.value === 'function' &&
-      iterator.value === entries
-    ) {
-      return iterator.value as () => Iterator<HeaderEntry>;
+  try {
+    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+      if (seen.has(prototype)) return undefined;
+      seen.add(prototype);
+      const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+      if (!iterator) continue;
+      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+      const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
+      if (
+        typeof constructor === 'function' &&
+        Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
+        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers' &&
+        typeof iterator.value === 'function' &&
+        iterator.value === entries
+      ) {
+        return iterator.value as () => Iterator<HeaderEntry>;
+      }
     }
+  } catch {
+    // Classification is optional; the captured iterable protocol still determines valid headers.
+    return undefined;
   }
   return undefined;
 };
 
 interface HeaderPropertySnapshot {
+  accessor?: PropertyDescriptor;
   entry?: readonly [string, string | readonly string[] | null];
 }
 
@@ -196,7 +207,7 @@ function* iterateHeaders(
 
   let shouldClear = false;
   let iter: Iterable<HeaderEntry>;
-  const accessorProperties = new Set<string>();
+  const accessorProperties = new Map<string, PropertyDescriptor>();
   // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
   const hasIterator = !replay?.record && (replay?.iterator !== undefined || Symbol.iterator in headers);
   const iterator: (() => Iterator<HeaderEntry>) | undefined =
@@ -247,8 +258,17 @@ function* iterateHeaders(
       for (const key of Reflect.ownKeys(headers)) {
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
+        const accessor = replay.properties.get(key)?.accessor;
+        if (
+          accessor &&
+          descriptor &&
+          ('value' in descriptor || descriptor.get !== accessor.get || descriptor.set !== accessor.set)
+        ) {
+          // A replacement property owns its current value, rather than the earlier accessor snapshot.
+          replay.properties.delete(key);
+        }
         if (!descriptor?.enumerable) continue;
-        if (!('value' in descriptor)) accessorProperties.add(key);
+        if (!('value' in descriptor)) accessorProperties.set(key, descriptor);
         entries.push([key, replay.properties.has(key) ? undefined : Reflect.get(headers, key)]);
       }
       // A getter may remove itself during its first read. Retain its position before surviving aliases.
@@ -297,7 +317,9 @@ function* iterateHeaders(
       continue;
     }
     const rowReplay = shouldClear && replay ? { refreshable: !accessorProperties.has(name) } : replay;
-    const property: HeaderPropertySnapshot | undefined = shouldClear && replay ? {} : undefined;
+    const accessor = accessorProperties.get(name);
+    const property: HeaderPropertySnapshot | undefined =
+      shouldClear && replay ? { ...(accessor ? { accessor } : {}) } : undefined;
     if (property && replay) replay.property = property;
     const headerValue = row[1];
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
@@ -484,6 +506,7 @@ export interface HeaderSnapshot {
   refresh: (...sources: [] | [HeadersLike]) => NullableHeaders;
   seed: (source: HeadersLike, snapshot: NullableHeaders | undefined) => void;
   fork: () => HeaderSnapshot;
+  onMaterialize: (listener: () => void) => () => void;
 }
 
 const createHeaderSnapshot = (
@@ -493,12 +516,20 @@ const createHeaderSnapshot = (
     refreshable?: boolean;
     deferred?: boolean;
     replay?: HeaderReplay;
-    materialization?: { source: HeadersLike; snapshot?: NullableHeaders };
+    materialization?: {
+      source: HeadersLike;
+      snapshot?: NullableHeaders;
+      listeners: Set<() => void>;
+    };
   },
 ): HeaderSnapshot => {
   let source = initialSource;
   // Forks share only their first materialization; source replacement and replay state stay layer-local.
-  const materialization = initial?.materialization ?? { source: initialSource };
+  const materialization = initial?.materialization ?? {
+    source: initialSource,
+    listeners: new Set<() => void>(),
+  };
+  const listeners = new Set<() => void>();
   const captured = initial?.snapshot ? capturedHeaderReplays.get(initial.snapshot) : undefined;
   let replay: HeaderReplay =
     initial?.replay ??
@@ -516,6 +547,9 @@ const createHeaderSnapshot = (
   const rememberMaterialization = () => {
     if (snapshot && source === materialization.source && !materialization.snapshot) {
       materialization.snapshot = snapshot;
+      for (const listener of materialization.listeners) listener();
+    } else {
+      for (const listener of listeners) listener();
     }
   };
   const initialize = () => {
@@ -609,6 +643,19 @@ const createHeaderSnapshot = (
         replay: copyHeaderReplay(replay),
         materialization,
       }),
+    onMaterialize: (callback) => {
+      const listener = () => {
+        inheritMaterialization();
+        if (snapshot) callback();
+      };
+      listeners.add(listener);
+      materialization.listeners.add(listener);
+      listener();
+      return () => {
+        listeners.delete(listener);
+        materialization.listeners.delete(listener);
+      };
+    },
   };
 };
 

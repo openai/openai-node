@@ -59,6 +59,65 @@ function createTransport(reject: (path: string, call: number) => boolean) {
 describe('workload identity request provenance', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  test.each(
+    (['request', 'defaults', 'shared'] as const).flatMap((source) =>
+      [false, true].flatMap((forward) =>
+        [false, true].map((readInHook) => ({ source, forward, readInHook })),
+      ),
+    ),
+  )(
+    'guards copied nested builds after deferred headers materialize: %j',
+    async ({ source, forward, readInHook }) => {
+      let rows = [['Authorization', null] as const][Symbol.iterator]();
+      const headers = { [Symbol.iterator]: () => rows } as unknown as Headers;
+      class HookClient extends OpenAI {
+        private materializing = false;
+
+        protected override async authHeaders(
+          options: FinalRequestOptions,
+          _schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          credentialContext?: RequestCredentialContext,
+        ) {
+          if (!this.materializing) {
+            this.materializing = true;
+            const first = await this.buildRequest(options, { credentialContext });
+            expect(first.req.headers.get('Authorization')).toBeNull();
+            await this.buildRequest({ ...options }, forward ? { credentialContext } : {});
+          } else if (readInHook) {
+            buildHeaders([source === 'defaults' ? this._options.defaultHeaders : options.headers]);
+          }
+          return buildHeaders([{ Authorization: 'Bearer synthetic-hook-credential' }]);
+        }
+      }
+      const transport = createTransport(() => false);
+      const client = new HookClient({
+        ...clientOptions,
+        fetch: transport.fetch,
+        ...(source === 'request' ? {} : { defaultHeaders: headers }),
+      });
+      const options: FinalRequestOptions = {
+        method: 'get',
+        path: '/models',
+        ...(source === 'defaults' ? {} : { headers }),
+      };
+
+      const request = client.request(options);
+      if (forward) {
+        await request;
+        expect(transport.requests.map((entry) => entry.authorization)).toEqual([null]);
+      } else {
+        await expect(request).rejects.toThrow('must forward credentialContext');
+        expect(transport.requests).toHaveLength(0);
+      }
+      expect(transport.exchanges).toBe(0);
+
+      // Disposing either a successful or failed request releases consumed-source ownership.
+      rows = [['Authorization', null] as const][Symbol.iterator]();
+      const next = await client.buildRequest({ ...options });
+      expect(next.req.headers.get('Authorization')).toBeNull();
+    },
+  );
+
   test.each([false, true])(
     "does not attribute another request's copied-option credential (frozen: %s)",
     async (frozen) => {

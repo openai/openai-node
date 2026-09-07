@@ -177,6 +177,13 @@ export class WorkloadTokenProvenance {
     const tokens = new Set<string>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     const consumedSources = new Set<object>();
+    const releaseSnapshots = new Set<() => void>();
+    const detachSnapshots = () => {
+      for (const release of releaseSnapshots) {
+        release();
+      }
+      releaseSnapshots.clear();
+    };
     let disposed = false;
     const scope: TokenScope = {
       context,
@@ -185,15 +192,20 @@ export class WorkloadTokenProvenance {
         if (disposed) {
           return;
         }
+        detachSnapshots();
         scope.headers = captured;
         for (const snapshot of [captured.defaultHeaders, captured.requestHeaders]) {
-          if (!snapshot.initialized || !snapshot.source || snapshot.replayable) {
-            continue;
-          }
-          consumedSources.add(snapshot.source);
-          const owners = this.consumedHeaders.get(snapshot.source) ?? new Set<TokenScope>();
-          owners.add(scope);
-          this.consumedHeaders.set(snapshot.source, owners);
+          releaseSnapshots.add(
+            snapshot.onMaterialize(() => {
+              if (!snapshot.source || snapshot.replayable) {
+                return;
+              }
+              consumedSources.add(snapshot.source);
+              const owners = this.consumedHeaders.get(snapshot.source) ?? new Set<TokenScope>();
+              owners.add(scope);
+              this.consumedHeaders.set(snapshot.source, owners);
+            }),
+          );
         }
       },
       record: (token) => {
@@ -211,6 +223,7 @@ export class WorkloadTokenProvenance {
         }
         disposed = true;
         tokens.clear();
+        detachSnapshots();
         for (const source of consumedSources) {
           const owners = this.consumedHeaders.get(source);
           owners?.delete(scope);
