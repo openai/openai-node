@@ -1,3 +1,4 @@
+import { getPlatformHeader } from '../platform-headers';
 import type { HeadersLike, NullableHeaders, WorkloadHeaderSnapshots } from '../headers';
 
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
@@ -15,9 +16,18 @@ export function bearerToken(authorization: string | null): string | undefined {
 interface HeaderCredential {
   owner: object;
   token: string;
+  revoked: boolean;
+}
+
+export interface WorkloadCredentialUsage {
+  isCurrent: () => boolean;
+  revoke: () => void;
+  adopt: (headers: Headers) => void;
 }
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
+const headerValueSources = new WeakMap<object, Headers>();
+const observedHeaderMutations = new WeakSet<object>();
 const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
 const headerConsumptionListeners = new WeakMap<object, Set<() => void>>();
 
@@ -26,33 +36,165 @@ export function observesWorkloadHeaderConsumption(source: object): boolean {
   return headerConsumptionListeners.has(source);
 }
 
-/** Records a completed canonical parse of a source that cannot safely be consumed again. */
+/** Records a canonical parse of a source that cannot safely be consumed again. */
 export function notifyWorkloadHeaderConsumption(source: object): void {
   for (const listener of headerConsumptionListeners.get(source) ?? []) {
     listener();
   }
 }
 
+const mutateHeaders = (headers: Headers, mutation: (...args: string[]) => void, args: unknown[]): void => {
+  let name: string | undefined;
+  if (args.length > 0) {
+    const [input] = args;
+    if (typeof input === 'string') {
+      name = input;
+    } else {
+      // Let the platform retain receiver validation, coercion order, and ByteString validation.
+      args[0] = {
+        [Symbol.toPrimitive]() {
+          name = `${input}`;
+          return name;
+        },
+      };
+    }
+  }
+  Reflect.apply(mutation, headers, args);
+  if (name?.toLowerCase() === 'authorization') {
+    const credential = headerCredentials.get(headers);
+    if (credential) {
+      credential.revoked = true;
+    }
+  }
+};
+
+const observeHeaderMutations = (headers: Headers, credential: HeaderCredential): void => {
+  if (observedHeaderMutations.has(headers)) {
+    return;
+  }
+  let platform: object | undefined;
+  try {
+    Headers.prototype.has.call(headers, 'authorization');
+    platform = Headers.prototype;
+  } catch {
+    try {
+      platform = getPlatformHeader(headers, 'authorization')?.prototype;
+    } catch {
+      credential.revoked = true;
+    }
+  }
+  if (!platform) {
+    credential.revoked = true;
+    return;
+  }
+  try {
+    const names = ['set', 'append', 'delete'] as const;
+    const mutations = new Map<string, (...args: string[]) => void>();
+    for (const name of names) {
+      let descriptor: PropertyDescriptor | undefined;
+      const seen = new Set<object>();
+      for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+        if (seen.has(prototype)) {
+          break;
+        }
+        seen.add(prototype);
+        descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+        if (descriptor) {
+          break;
+        }
+      }
+      const native = Object.getOwnPropertyDescriptor(platform, name)?.value;
+      if (!descriptor || descriptor.value !== native || typeof native !== 'function') {
+        credential.revoked = true;
+        return;
+      }
+      mutations.set(name, native);
+    }
+    if (
+      !Object.isExtensible(headers) ||
+      names.some((name) => Object.getOwnPropertyDescriptor(headers, name)?.configurable === false)
+    ) {
+      credential.revoked = true;
+      return;
+    }
+    for (const [name, mutation] of mutations) {
+      const observedMutation = function observedMutation(this: Headers, ...args: string[]) {
+        mutateHeaders(this, mutation, args);
+      };
+      Object.defineProperties(observedMutation, {
+        name: { value: name },
+        length: { value: name === 'delete' ? 1 : 2 },
+      });
+      Object.defineProperty(headers, name, {
+        configurable: true,
+        writable: true,
+        value: observedMutation,
+      });
+    }
+    observedHeaderMutations.add(headers);
+  } catch {
+    credential.revoked = true;
+  }
+};
+
 /** Reads the credential capability attached to an SDK-produced header layer. */
 export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
-  return headerCredentials.get(headers);
+  const source = headerValueSources.get(headers);
+  let credential = headerCredentials.get(headers);
+  if (source) {
+    let values: unknown;
+    try {
+      values = Object.getOwnPropertyDescriptor(headers, 'values')?.value;
+    } catch {
+      return undefined;
+    }
+    if (typeof values !== 'object' || values === null) {
+      return undefined;
+    }
+    const selected = headerCredentials.get(values);
+    if (selected !== undefined || values !== source) {
+      credential = selected;
+    }
+  }
+  return credential?.revoked ? null : credential;
+}
+
+/** Parsed copies own their mutations independently of the source snapshot. */
+export function copyWorkloadHeaderCredential(credential: HeaderCredential | null): HeaderCredential | null {
+  return credential && { ...credential };
 }
 
 /** Carries the capability belonging to the last layer that supplied Authorization. */
-export function rememberWorkloadHeaderCredential(headers: object, credential: HeaderCredential | null): void {
+export function rememberWorkloadHeaderCredential(
+  headers: object,
+  credential: HeaderCredential | null,
+  values: Headers,
+): void {
   headerCredentials.set(headers, credential);
+  headerValueSources.set(headers, values);
+}
+
+/** Native header values additionally own observable Authorization mutations. */
+export function rememberWorkloadHeaderValues(headers: Headers, credential: HeaderCredential | null): void {
+  headerCredentials.set(headers, credential);
+  if (credential) {
+    observeHeaderMutations(headers, credential);
+  }
 }
 
 interface TokenScope {
   context: object;
+  resultOwner: object;
   headers: WorkloadHeaderSnapshots | undefined;
   captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
-  captureHeaderRead: (source: HeadersLike, snapshot: NullableHeaders) => void;
+  captureHeaderRead: (source: NonNullable<HeadersLike>, snapshot: NullableHeaders) => void;
   recordHeaderConsumption: (source: object) => void;
   hasConsumedHeaders: (source: object | null | undefined) => boolean;
-  record: (token: string) => void;
+  record: (token: string) => HeaderCredential;
+  select: (credential: HeaderCredential) => void;
+  credential: (authorization: string) => HeaderCredential | undefined;
+  revoke: () => void;
   matches: (authorization: string) => boolean;
-  snapshot: () => Pick<TokenScope, 'matches'>;
   dispose: () => void;
 }
 
@@ -63,7 +205,7 @@ export class WorkloadTokenProvenance {
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
   private readonly results = new WeakMap<
     object,
-    { token: string | null; headers?: WorkloadHeaderSnapshots }
+    { credential: HeaderCredential | null; owner?: object; headers?: WorkloadHeaderSnapshots }
   >();
   private invocation: TokenScope | undefined;
 
@@ -72,6 +214,9 @@ export class WorkloadTokenProvenance {
     const previous = this.invocation;
     this.invocation = this.scopeFor(options, context);
     try {
+      if (this.invocation?.headers) {
+        this.invocation.captureHeaders(this.invocation.headers);
+      }
       return operation();
     } finally {
       this.invocation = previous;
@@ -106,44 +251,74 @@ export class WorkloadTokenProvenance {
   }
 
   /** Marks the concrete authentication result issued by this client. */
-  issue(headers: { values: Headers }, token: string): void {
-    const credential = { owner: this, token };
-    rememberWorkloadHeaderCredential(headers, credential);
-    rememberWorkloadHeaderCredential(headers.values, credential);
+  issue(headers: { values: Headers }, token: string, credential?: HeaderCredential): WorkloadCredentialUsage {
+    let issued = credential ?? { owner: this, token, revoked: false };
+    rememberWorkloadHeaderCredential(headers, issued, headers.values);
+    rememberWorkloadHeaderValues(headers.values, issued);
+    return {
+      isCurrent: () => !issued.revoked,
+      revoke: () => {
+        issued.revoked = true;
+      },
+      adopt: (values) => {
+        issued = { ...issued };
+        rememberWorkloadHeaderValues(values, issued);
+      },
+    };
   }
 
   /** Recovers an unmarked rebuilt result only from its own active authentication invocation. */
   recover(headers: { values: Headers } | undefined, options: object, context: object | undefined): void {
-    if (!headers || workloadHeaderCredential(headers) !== undefined) {
+    if (!headers) {
       return;
     }
-    const credential = workloadHeaderCredential(headers.values);
+    const { values } = headers;
+    const outerCredential = workloadHeaderCredential(headers);
+    const valueCredential = workloadHeaderCredential(values);
+    const credential = valueCredential === undefined ? outerCredential : valueCredential;
+    if (credential === null) {
+      this.scopeFor(options, context)?.revoke();
+      return;
+    }
     if (credential !== undefined) {
-      rememberWorkloadHeaderCredential(headers, credential);
+      rememberWorkloadHeaderCredential(headers, credential, values);
+      this.scopeFor(options, context)?.select(credential);
       return;
     }
-    const authorization = headers.values.get('authorization');
+    const authorization = values.get('authorization');
     const token = bearerToken(authorization);
     if (
       token !== undefined &&
       authorization !== null &&
       this.scopeFor(options, context)?.matches(authorization)
     ) {
-      this.issue(headers, token);
+      this.issue(headers, token, this.scopeFor(options, context)?.credential(authorization));
     }
   }
 
   /** Binds provenance to a completed SDK request result independently of caller options. */
-  bindResult<T extends { req: { headers: Headers } }>(result: T, headers?: WorkloadHeaderSnapshots): T {
+  bindResult<T extends { req: { headers: Headers } }>(
+    result: T,
+    headers?: WorkloadHeaderSnapshots,
+    context?: object,
+  ): T {
     const credential = workloadHeaderCredential(result.req.headers);
     const carrier = {};
+    const owner = context ? this.contexts.get(context)?.resultOwner : undefined;
     // An opaque, secret-free carrier survives ordinary object spread of SDK-owned requests.
     Object.defineProperty(result.req, requestCredentialCarrier, { value: carrier, enumerable: true });
     this.results.set(carrier, {
-      token: credential?.owner === this ? credential.token : null,
+      credential: credential?.owner === this ? credential : null,
+      ...(owner ? { owner } : {}),
       ...(headers ? { headers } : undefined),
     });
     return result;
+  }
+
+  ownsResult(result: { req: object }, context: object): boolean {
+    const carrier = this.requestCarrier(result.req);
+    const owner = this.contexts.get(context)?.resultOwner;
+    return owner !== undefined && carrier !== undefined && this.results.get(carrier)?.owner === owner;
   }
 
   /** Transfers snapshots to retry bookkeeping without retaining them on a held request result. */
@@ -156,6 +331,7 @@ export class WorkloadTokenProvenance {
     const headers = state?.headers;
     if (state) {
       delete state.headers;
+      delete state.owner;
     }
     return headers;
   }
@@ -175,26 +351,57 @@ export class WorkloadTokenProvenance {
   matchesResult(
     result: { req: { headers: Headers } },
     authorization: string,
-    scope: Pick<TokenScope, 'matches'> | undefined,
+    scope: TokenScope | undefined,
   ): boolean {
+    return this.retainResultCredential(result, authorization, scope).isCurrent();
+  }
+
+  /** Keeps revocation effective after native copies lose their per-object metadata. */
+  retainResultCredential(
+    result: { req: { headers: Headers } },
+    authorization: string,
+    scope: TokenScope | undefined,
+  ): WorkloadCredentialUsage {
     const headerMatch = this.matchesHeaderCredential(result.req.headers, authorization);
-    if (headerMatch !== undefined) {
-      return headerMatch;
+    let credential: HeaderCredential | null | undefined;
+    if (headerMatch === undefined) {
+      const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
+      credential =
+        typeof carrier === 'object' && carrier !== null
+          ? this.results.get(carrier)?.credential
+          : scope?.credential(authorization);
+    } else {
+      credential = headerMatch ? workloadHeaderCredential(result.req.headers) : null;
     }
-    const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
-    if (typeof carrier === 'object' && carrier !== null) {
-      const token = this.results.get(carrier)?.token;
-      return token !== undefined && token !== null && bearerToken(authorization) === token;
+    if (credential && headerMatch === undefined) {
+      rememberWorkloadHeaderValues(result.req.headers, credential);
     }
-    return scope?.matches(authorization) ?? false;
+    return {
+      isCurrent: () =>
+        credential !== undefined &&
+        credential !== null &&
+        !credential.revoked &&
+        credential.owner === this &&
+        bearerToken(authorization) === credential.token,
+      revoke: () => {
+        if (credential) {
+          credential.revoked = true;
+        }
+      },
+      adopt: (headers) => {
+        if (credential) {
+          credential = { ...credential };
+          rememberWorkloadHeaderValues(headers, credential);
+        }
+      },
+    };
   }
 
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
   begin(options: object, context: object = {}, headers?: WorkloadHeaderSnapshots): TokenScope {
-    const tokens = new Set<string>();
+    const tokens = new Map<string, HeaderCredential>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     const consumedSources = new Set<object>();
-    const releaseSnapshots = new Set<() => void>();
     const sourceSubscriptions = new Map<object, () => void>();
     const recordConsumption = (source: object, owner: TokenScope) => {
       consumedSources.add(source);
@@ -217,42 +424,32 @@ export class WorkloadTokenProvenance {
         }
       });
     };
-    const detachSnapshots = () => {
-      for (const release of releaseSnapshots) {
-        release();
-      }
-      releaseSnapshots.clear();
-    };
     let disposed = false;
     const scope: TokenScope = {
       context,
+      resultOwner: {},
       headers,
       captureHeaders: (captured) => {
         if (disposed) {
           return;
         }
-        detachSnapshots();
         scope.headers = captured;
         for (const snapshot of [captured.defaultHeaders, captured.requestHeaders]) {
           observeSource(snapshot.source, scope);
-          releaseSnapshots.add(
-            snapshot.onMaterialize(() => {
-              observeSource(snapshot.source, scope);
-              if (!snapshot.source || snapshot.replayable) {
-                return;
-              }
-              recordConsumption(snapshot.source, scope);
-            }),
-          );
+          if (!snapshot.initialized || !snapshot.source || snapshot.replayable) {
+            continue;
+          }
+          recordConsumption(snapshot.source, scope);
         }
       },
       captureHeaderRead: (source, snapshot) => {
-        if (disposed) {
+        if (disposed || !scope.headers) {
           return;
         }
-        // Canonical hook reads must establish ownership before a synchronous nested build can start.
-        scope.headers?.defaultHeaders.seed(source, snapshot);
-        scope.headers?.requestHeaders.seed(source, snapshot);
+        // Each canonical layer belongs to this synchronous hook invocation, never another source's merge.
+        scope.headers.defaultHeaders.seed(source, snapshot);
+        scope.headers.requestHeaders.seed(source, snapshot);
+        scope.captureHeaders(scope.headers);
       },
       recordHeaderConsumption: (source) => {
         if (!disposed) {
@@ -261,31 +458,34 @@ export class WorkloadTokenProvenance {
       },
       hasConsumedHeaders: (source) => source !== null && source !== undefined && consumedSources.has(source),
       record: (token) => {
+        const credential = { owner: this, token, revoked: false };
         if (!disposed) {
-          tokens.add(token);
+          tokens.set(token, credential);
+        }
+        return credential;
+      },
+      select: (credential) => {
+        if (!disposed && credential.owner === this) {
+          tokens.set(credential.token, credential);
         }
       },
-      matches: (authorization) => {
+      credential: (authorization) => {
         const token = bearerToken(authorization);
-        return token !== undefined && tokens.has(token);
+        const credential = token === undefined ? undefined : tokens.get(token);
+        return credential?.revoked ? undefined : credential;
       },
-      snapshot: () => {
-        // Retain completed-build evidence without extending active hook or header-source ownership.
-        const issued = new Set(tokens);
-        return {
-          matches: (authorization) => {
-            const token = bearerToken(authorization);
-            return token !== undefined && issued.has(token);
-          },
-        };
+      revoke: () => {
+        for (const credential of tokens.values()) {
+          credential.revoked = true;
+        }
       },
+      matches: (authorization) => scope.credential(authorization) !== undefined,
       dispose: () => {
         if (disposed) {
           return;
         }
         disposed = true;
         tokens.clear();
-        detachSnapshots();
         for (const release of sourceSubscriptions.values()) {
           release();
         }

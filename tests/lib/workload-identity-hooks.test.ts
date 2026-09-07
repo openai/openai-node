@@ -269,7 +269,7 @@ describe('Workload identity request and dispatch hooks', () => {
   );
 
   test.each(['prepareRequest', 'fetchWithTimeout'] as const)(
-    'refreshes the same credential when %s normalizes the bearer scheme',
+    'preserves bearer-scheme bytes through %s normalization',
     async (hook) => {
       class HookClient extends OpenAI {
         // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
@@ -300,14 +300,19 @@ describe('Workload identity request and dispatch hooks', () => {
       });
       const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
 
-      await client.models.list();
+      const request = client.models.list();
+      await (hook === 'prepareRequest' ? expect(request).rejects.toMatchObject({ status: 401 }) : request);
 
-      expect(authorizations).toEqual(['bEaReR access-token-1', 'bEaReR access-token-2']);
-      expect(transport.exchanges).toBe(2);
+      expect(authorizations).toEqual(
+        hook === 'prepareRequest'
+          ? ['bEaReR access-token-1']
+          : ['bEaReR access-token-1', 'bEaReR access-token-2'],
+      );
+      expect(transport.exchanges).toBe(hook === 'prepareRequest' ? 1 : 2);
     },
   );
 
-  test('refreshes a bearer credential separated by multiple spaces', async () => {
+  test('does not refresh an observed Authorization overwrite that adds bearer spaces', async () => {
     class HookClient extends OpenAI {
       // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
       protected override async prepareRequest(init: RequestInit) {
@@ -325,10 +330,10 @@ describe('Workload identity request and dispatch hooks', () => {
     });
     const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
 
-    await client.models.list();
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-    expect(authorizations).toEqual(['bearer  access-token-1', 'bearer  access-token-2']);
-    expect(transport.exchanges).toBe(2);
+    expect(authorizations).toEqual(['bearer  access-token-1']);
+    expect(transport.exchanges).toBe(1);
   });
 
   test.each([false, true])('preserves native Request headers (throwing tag getter: %s)', async (throwTag) => {

@@ -278,6 +278,18 @@ class WrappedClient extends OpenAI {
 `bearerAuth` receives the context as its second argument. `buildRequest` overrides can forward the
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
+An in-place Authorization overwrite has the same effect; subsequent header copies do not restore
+SDK ownership.
+
+Successful `set`, `append`, and `delete` calls on an SDK-owned native `Headers` revoke that header layer's
+refresh ownership when they target Authorization, even if the resulting bytes are unchanged. An
+independent header layer observed between SDK hook calls also remains independent after a later copy.
+Parsed copies have independent mutation state; changing an unused copy does not invalidate the selected request.
+Reconstructed headers whose mutators cannot be observed retain their normal operations, but do not
+enable automatic authentication refresh. Calling native prototype methods directly, or creating and
+overwriting a native copy entirely inside a hook before delegating, bypasses this observation. Express
+independent credentials as a record or tuple layer through `buildHeaders` and return that layer to the
+SDK before further copying it.
 
 Immediate delegating authentication calls also retain ownership when copying both options and native
 headers. A hook that awaits before delegating, copies its options, and reconstructs the authentication
@@ -295,18 +307,21 @@ A `buildRequest` override keeps first access to its original inputs before SDK s
 delegation can copy options and native input headers without forwarding a new argument. A nested build
 that reuses a source already consumed by an active request must forward the complete settings argument,
 including `credentialContext`; without that owner, the SDK rejects the build before acquiring or
-dispatching credentials. Custom build hooks receive their original inputs first on every attempt,
-including retries. A hook materializing a one-shot input before delegating must retain its parsed layer
-(for example, in `options.headers`) for later attempts. The SDK cannot observe that private consumption:
-the hook owns replay of those inputs and must prevent an exhausted source from removing an independent
-credential. Inputs the hook ignores remain unread, and reusable foreign headers may be copied again.
+dispatching credentials. Retrying non-replayable inputs requires retaining the original options or
+forwarding `credentialContext`, including when the hook ignores the input and selects replacement headers.
+The hook may run and read its input again on a retry; retain parsed one-shot layers when their values are
+needed again. Before acquiring credentials, the owned base build rejects a retry that loses a previously
+selected independent Authorization value or removal. Stable replacements, including genuine foreign
+`Headers` copies, can retry without treating an ignored raw input as consumed.
+If a hook drops ownership on a later retry, the SDK rejects its returned request before dispatch; any
+standalone credential acquisition performed inside that hook may already have occurred.
 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
 caller-owned header sources before `prepareOptions` or bodyless custom authentication hooks run.
-Forwarding the context alone cannot recover inputs consumed after an await or as part of a multi-layer
-parse; pass the retained parsed headers to subsequent builds. This also applies to unverified foreign
-collections whose replayability cannot be established.
+Forwarding the context alone cannot recover inputs consumed after an await; pass the retained parsed
+headers to subsequent builds. This also applies to unverified foreign collections whose replayability
+cannot be established.
 
 Foreign Headers-shaped implementations retain previously observed header names missing during replay,
 while applying every newly observed value. To intentionally delete headers in such an implementation,
@@ -314,11 +329,15 @@ replace the header layer, or use an explicit record with `Authorization: null`; 
 cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
 arrays, and data records retain live refresh behavior.
 
-At workload-identity dispatch, native `Headers` with their native iterator retain their identity.
-Foreign and structurally compatible header collections whose platform brand cannot be verified are
-materialized once into native `Headers`. Credential classification and the transport use that same
-snapshot, including when the headers originate from a foreign `Request`. Extra properties attached to
-the original unverified collection are not forwarded; the `Request` object itself retains its identity.
+When attributing a workload credential at dispatch, the SDK preserves local native `Headers`,
+plain-record, and ordinary tuple-array identity. Other iterable implementations, including foreign
+`Headers` collections, are materialized once and that same snapshot is passed to the transport.
+Structural constructor/tag descriptors cannot establish that a custom `get()` method agrees with its
+iterator. Foreign collection identity and custom properties are therefore not retained on this path.
+Header values remain supported, as does workload refresh when SDK credential ownership is retained.
+Headers from a foreign `Request` are also materialized into the dispatch snapshot while the `Request`
+object retains its identity.
+Native `Request` delegation is unchanged.
 
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Ordinary object
 spread retains the SDK request carrier, including when a legacy wrapper also replaces the controller.
