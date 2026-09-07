@@ -76,7 +76,8 @@ describeBash('scripts/test mock-server cleanup', () => {
 const http = require('node:http');
 const root = process.env.FIXTURE_ROOT;
 fs.writeFileSync(root + '/server.pid', String(process.pid));
-const server = http.createServer((_request, response) => {
+const server = http.createServer((request, response) => {
+  fs.appendFileSync(root + '/health.requests', request.url + '\\n');
   response.writeHead(Number(process.env.HEALTH_STATUS));
   response.end();
 });
@@ -136,15 +137,16 @@ child.once('message', () => {
   }
 
   function useNativeHealthProbe(): void {
-    rmSync(path.join(fixture, 'bin/curl'));
-    const scriptPath = path.join(fixture, 'scripts/test');
-    const script = readFileSync(scriptPath, 'utf-8');
-    writeFileSync(
-      scriptPath,
-      script.replace(
-        'http://127.0.0.1:4010/_x-steady/health',
-        readFileSync(path.join(fixture, 'health.url'), 'utf-8'),
-      ),
+    const curl = spawnSync('bash', ['-c', 'command -v curl'], { encoding: 'utf-8' });
+    expect(curl.error).toBeUndefined();
+    expect(curl.status).toBe(0);
+    env['NATIVE_CURL'] = curl.stdout.trim();
+    env['HEALTH_PORT'] = new URL(readFileSync(path.join(fixture, 'health.url'), 'utf-8')).port;
+    // Keep the wrapper and its curl options intact, redirecting only the connection to our isolated server.
+    writeExecutable(
+      'bin/curl',
+      'bash',
+      `exec "$NATIVE_CURL" --disable --noproxy '*' --max-time 5 --connect-to "127.0.0.1:4010:127.0.0.1:$HEALTH_PORT" "$@"`,
     );
   }
 
@@ -184,6 +186,7 @@ child.once('message', () => {
 
     runTests(exitCode);
 
+    expect(readFileSync(path.join(fixture, 'health.requests'), 'utf-8')).toContain('/_x-steady/health\n');
     expect(existsSync(path.join(fixture, 'mock.called'))).toBe(startsMock);
     expect(existsSync(path.join(fixture, 'jest.called'))).toBe(runsJest);
     expect(existsSync(path.join(fixture, 'lsof.called'))).toBe(false);
