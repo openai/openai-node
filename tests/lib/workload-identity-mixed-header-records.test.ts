@@ -26,17 +26,20 @@ describe.each(['prepareOptions', 'authHeaders', 'bearerAuth'] as const)('capture
         class InspectClient extends OpenAI {
           // oxlint-disable-next-line class-methods-use-this -- The fixture inspects a supplied record before authentication.
           protected override async prepareOptions() {
-            if (hook === 'prepareOptions')
-              {expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');}
+            if (hook === 'prepareOptions') {
+              expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');
+            }
           }
           protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
-            if (hook === 'authHeaders')
-              {expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');}
+            if (hook === 'authHeaders') {
+              expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');
+            }
             return super.authHeaders(...args);
           }
           protected override async bearerAuth(...args: Parameters<OpenAI['bearerAuth']>) {
-            if (hook === 'bearerAuth')
-              {expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');}
+            if (hook === 'bearerAuth') {
+              expect(buildHeaders([headers]).values.get('X-Custom')).toBe('preserved');
+            }
             return super.bearerAuth(...args);
           }
         }

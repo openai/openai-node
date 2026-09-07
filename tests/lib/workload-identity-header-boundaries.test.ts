@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { vi } from 'vitest';
 import { buildHeaders } from 'openai/internal/headers';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
+import type { HeadersInit } from 'openai/internal/builtin-types';
 import {
   createTestClientOptions,
   createTestWorkloadIdentity,
@@ -186,14 +187,14 @@ test.each(
       protected override async prepareOptions(options: FinalRequestOptions) {
         if (stage.startsWith('prepare')) {
           buildHeaders([stage.endsWith('default') ? this._options.defaultHeaders : options.headers]);
-          headers.Authorization = authorization;
+          headers['Authorization'] = authorization;
         }
       }
 
       protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
         if (stage.startsWith('auth')) {
           buildHeaders([stage.endsWith('default') ? this._options.defaultHeaders : args[0].headers]);
-          headers.Authorization = authorization;
+          headers['Authorization'] = authorization;
         }
         return super.authHeaders(...args);
       }
