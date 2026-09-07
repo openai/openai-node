@@ -3,6 +3,15 @@ import OpenAI from 'openai';
 import type { HeadersInit, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
+function normalizeBearerScheme(init: RequestInit) {
+  const headers = new Headers(init.headers);
+  const authorization = headers.get('Authorization');
+  if (authorization !== null) {
+    headers.set('Authorization', authorization.replace(/^Bearer /u, 'bEaReR '));
+  }
+  init.headers = headers;
+}
+
 describe('Workload identity request and dispatch hooks', () => {
   beforeEach(() => {
     delete process.env['OPENAI_API_KEY'];
@@ -77,6 +86,45 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test.each(['prepareRequest', 'fetchWithTimeout'] as const)(
+    'refreshes the same credential when %s normalizes the bearer scheme',
+    async (hook) => {
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+        protected override async prepareRequest(init: RequestInit) {
+          if (hook === 'prepareRequest') {
+            normalizeBearerScheme(init);
+          }
+        }
+
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+        ) {
+          if (hook === 'fetchWithTimeout' && init) {
+            normalizeBearerScheme(init);
+          }
+          return super.fetchWithTimeout(url, init, timeout, controller);
+        }
+      }
+      const authorizations: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return authorizations.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await client.models.list();
+
+      expect(authorizations).toEqual(['bEaReR access-token-1', 'bEaReR access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
+
   test.each([false, true])(
     'refreshes a rejected workload token (cloned headers: %s)',
     async (cloneHeaders) => {
@@ -100,6 +148,65 @@ describe('Workload identity request and dispatch hooks', () => {
 
       expect(result).toBeDefined();
       expect(apiCallCount).toBe(2);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
+
+  test.each([
+    ['fetchWithAuth', false],
+    ['fetchWithAuth', true],
+    ['fetchWithTimeout', false],
+    ['fetchWithTimeout', true],
+  ] as const)(
+    'refreshes after a delegating %s hook replaces the controller (copied request with context: %s)',
+    async (hook, copyRequest) => {
+      class HookClient extends OpenAI {
+        protected override async fetchWithAuth(
+          url: RequestInfo,
+          init: RequestInit,
+          timeout: number,
+          controller: AbortController,
+          schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          context?: object,
+        ) {
+          return super.fetchWithAuth(
+            url,
+            copyRequest ? { ...init } : init,
+            timeout,
+            hook === 'fetchWithAuth' ? new AbortController() : controller,
+            schemes,
+            copyRequest ? context : undefined,
+          );
+        }
+
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+          context?: object,
+        ) {
+          return super.fetchWithTimeout(
+            url,
+            copyRequest ? { ...init } : init,
+            timeout,
+            hook === 'fetchWithTimeout' ? new AbortController() : controller,
+            copyRequest ? context : undefined,
+          );
+        }
+      }
+      let apiCalls = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        apiCalls += 1;
+        return apiCalls === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await client.models.list();
+
+      expect(apiCalls).toBe(2);
       expect(transport.exchanges).toBe(2);
     },
   );
@@ -174,6 +281,42 @@ describe('Workload identity request and dispatch hooks', () => {
       );
     },
   );
+
+  test('retains provenance through a legacy controller wrapper followed by a request-copy wrapper', async () => {
+    class HookClient extends OpenAI {
+      protected override async fetchWithAuth(
+        url: RequestInfo,
+        init: RequestInit,
+        timeout: number,
+        _controller: AbortController,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+      ) {
+        return super.fetchWithAuth(url, init, timeout, new AbortController(), schemes);
+      }
+
+      override async fetchWithTimeout(
+        url: RequestInfo,
+        init: RequestInit | undefined,
+        timeout: number,
+        controller: AbortController,
+      ) {
+        return super.fetchWithTimeout(url, { ...init }, timeout, controller);
+      }
+    }
+    let apiCalls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      apiCalls += 1;
+      return apiCalls === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(apiCalls).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  });
 
   test('forwards the same materialized header snapshot after a hook supplies an iterator', async () => {
     class HookClient extends OpenAI {

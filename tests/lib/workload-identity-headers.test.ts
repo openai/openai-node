@@ -1,6 +1,8 @@
+/* oxlint-disable max-classes-per-file -- Independent fixtures exercise protected header hooks. */
 import { runInNewContext } from 'node:vm';
 import OpenAI from 'openai';
 import { test, vi } from 'vitest';
+import type { FinalRequestOptions } from 'openai/internal/request-options';
 import {
   createTestClientOptions,
   createTestWorkloadIdentity,
@@ -25,6 +27,137 @@ class OneShotHeaders extends Array<[string, string | null]> {
     return (this.#iterator ??= super[Symbol.iterator]());
   }
 }
+
+test('keeps tagged array subclasses with inherited one-shot iterators snapshot-only', async () => {
+  class TaggedHeaders extends OneShotHeaders {}
+  const iterator = TaggedHeaders.prototype[Symbol.iterator];
+  Object.defineProperties(TaggedHeaders.prototype, {
+    [Symbol.toStringTag]: { value: 'Headers' },
+    [Symbol.iterator]: { value: iterator },
+    entries: { value: iterator },
+  });
+  class HookClient extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      return super.authHeaders(options);
+    }
+  }
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await client.models.list({ headers: new TaggedHeaders(['Authorization', null]) });
+});
+
+test.each(['authHeaders', 'bearerAuth'] as const)(
+  'retains one-shot authorization removal through a delegating %s hook',
+  async (hook) => {
+    class HookClient extends OpenAI {
+      protected override async authHeaders(
+        options: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+      ) {
+        return super.authHeaders(options, schemes);
+      }
+
+      protected override async bearerAuth(options: FinalRequestOptions) {
+        return super.bearerAuth(options);
+      }
+    }
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const sent = new Headers(init?.headers);
+      expect(sent.has('Authorization')).toBe(false);
+      expect(sent.get('X-Custom')).toBe('keep-me');
+      return Response.json({ ok: true });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+    // Exercise each hook independently while preserving the subclass delegation.
+    Object.defineProperty(client, hook === 'authHeaders' ? 'bearerAuth' : 'authHeaders', {
+      value: Object.getOwnPropertyDescriptor(
+        OpenAI.prototype,
+        hook === 'authHeaders' ? 'bearerAuth' : 'authHeaders',
+      )?.value,
+    });
+
+    await client.post('https://example.test/synthetic', {
+      body: { synthetic: true },
+      headers: new OneShotHeaders(['Authorization', null], ['X-Custom', 'keep-me']),
+    });
+  },
+);
+
+test('uses a complete request header replacement made by a delegating auth hook', async () => {
+  class HookClient extends OpenAI {
+    protected override async authHeaders(
+      options: FinalRequestOptions,
+      schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+      context?: object,
+    ) {
+      const headers = await super.authHeaders(options, schemes, context);
+      options.headers = { Authorization: 'Bearer independent', 'X-Custom': 'replacement' };
+      return headers;
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    const headers = new Headers(init?.headers);
+    sent.push(headers.get('Authorization'));
+    expect(headers.get('X-Custom')).toBe('replacement');
+    return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+  });
+  const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await expect(
+    client.post('/synthetic', {
+      body: { synthetic: true },
+      headers: new OneShotHeaders(['X-Custom', 'original']),
+    }),
+  ).rejects.toMatchObject({ status: 401 });
+  expect(sent).toEqual(['Bearer independent']);
+});
+
+test('preserves removal of the request header layer by an auth hook', async () => {
+  class HookClient extends OpenAI {
+    protected override async authHeaders(
+      options: FinalRequestOptions,
+      schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+      context?: object,
+    ) {
+      const headers = await super.authHeaders(options, schemes, context);
+      delete options.headers;
+      return headers;
+    }
+  }
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    const headers = new Headers(init?.headers);
+    expect(headers.has('X-Custom')).toBe(false);
+    expect(headers.get('Authorization')).toBe('Bearer access-token-1');
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+  await client.models.list({ headers: { 'X-Custom': 'removed' } });
+});
+
+test.each(['entries', Symbol.toStringTag])(
+  'does not evaluate the overridden %s getter on platform Headers',
+  async (property) => {
+    const headers = new Headers({ 'X-Custom': 'preserved' });
+    Object.defineProperty(headers, property, {
+      get() {
+        throw new Error('Unrelated getter must not run');
+      },
+    });
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+    await client.models.list({ headers });
+  },
+);
 
 test('retains inherited one-shot header iterators during credential acquisition', async () => {
   const headers = new OneShotHeaders(['X-Custom', 'keep-me']);

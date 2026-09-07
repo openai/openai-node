@@ -237,6 +237,38 @@ calling the configured `fetch`; it cannot verify which credential an independent
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
 
+### Authentication and transport hooks
+
+Delegating `authHeaders` and `bearerAuth` overrides should forward the optional opaque request context.
+This keeps workload-token ownership with the request when hooks copy options, including frozen options,
+or use one options object for concurrent requests:
+
+```ts
+import OpenAI from 'openai';
+import type { FinalRequestOptions } from 'openai/internal/request-options';
+
+class WrappedClient extends OpenAI {
+  protected override async authHeaders(
+    options: FinalRequestOptions,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    context?: object,
+  ) {
+    return super.authHeaders({ ...options }, schemes, context);
+  }
+}
+```
+
+`bearerAuth` receives the context as its second argument. `buildRequest` overrides should forward the
+complete second argument, including `credentialContext`. Hooks that discard options identity without
+forwarding context still supply their headers, but the SDK cannot establish workload-token ownership
+and will not perform the automatic `401` replay. Legacy hooks using the original options object retain
+refresh when those options identify one active attempt.
+
+`fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Forward it when
+a transport wrapper replaces both the request object and its abort controller. Changing either one
+alone preserves the original request's identity. Forward the same context object; copying it loses
+request ownership.
+
 ## Third-party providers
 
 The `provider` client option configures a third-party endpoint and its

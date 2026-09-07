@@ -72,6 +72,7 @@ describe('Workload identity authentication hook provenance', () => {
               protected override async authHeaders(
                 received: FinalRequestOptions,
                 schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+                context?: object,
               ) {
                 if (!received.__metadata?.['workloadIdentityTokenRefreshed']) {
                   expect(received).toBe(options);
@@ -79,16 +80,18 @@ describe('Workload identity authentication hook provenance', () => {
                 const headers = await super.authHeaders(
                   hook === 'authHeaders' && cloneOptions ? { ...received } : received,
                   schemes,
+                  context,
                 );
                 return hook === 'authHeaders' ? buildHeaders([headers, extraHeaders]) : headers;
               }
 
-              protected override async bearerAuth(received: FinalRequestOptions) {
+              protected override async bearerAuth(received: FinalRequestOptions, context?: object) {
                 if (hook === 'bearerAuth' && !received.__metadata?.['workloadIdentityTokenRefreshed']) {
                   expect(received).toBe(options);
                 }
                 const headers = await super.bearerAuth(
                   hook === 'bearerAuth' && cloneOptions ? { ...received } : received,
+                  context,
                 );
                 return hook === 'bearerAuth' ? buildHeaders([headers, extraHeaders]) : headers;
               }
@@ -132,11 +135,15 @@ describe('Workload identity authentication hook provenance', () => {
     const bothHeadersReady = createBarrier();
     let authCalls = 0;
     class HookClient extends OpenAI {
-      protected override async authHeaders(received: FinalRequestOptions) {
+      protected override async authHeaders(
+        received: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        context?: object,
+      ) {
         if (authCalls < 2) {
           expect(received).toBe(options);
         }
-        const headers = await super.authHeaders({ ...received });
+        const headers = await super.authHeaders({ ...received }, schemes, context);
         authCalls += 1;
         if (authCalls === 2) {
           bothHeadersReady.release();
@@ -169,16 +176,170 @@ describe('Workload identity authentication hook provenance', () => {
     expect(transport.exchanges).toBeLessThanOrEqual(3);
   });
 
+  test.each([false, true])(
+    'does not attribute another request token to an independent hook (forward context: %s)',
+    async (forwardContext) => {
+      const independentWaiting = createBarrier();
+      const tokenIssued = createBarrier();
+      class HookClient extends OpenAI {
+        protected override async authHeaders(
+          options: FinalRequestOptions,
+          schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+          context?: object,
+        ) {
+          if (options.path === '/independent') {
+            independentWaiting.release();
+            await tokenIssued.promise;
+            return buildHeaders([{ Authorization: 'Bearer access-token-1' }]);
+          }
+          await independentWaiting.promise;
+          const headers = await super.authHeaders(
+            { ...options },
+            schemes,
+            forwardContext ? context : undefined,
+          );
+          tokenIssued.release();
+          return buildHeaders([headers]);
+        }
+      }
+      const paths: string[] = [];
+      const transport = createWorkloadIdentityTransport((url) => {
+        const path = new URL(url.toString()).pathname;
+        paths.push(path);
+        return path.endsWith('/independent')
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await Promise.all([
+        expect(client.get('/independent')).rejects.toMatchObject({ status: 401 }),
+        client.request(Object.freeze({ method: 'get', path: '/issued' })),
+      ]);
+
+      expect(paths.filter((path) => path.endsWith('/independent'))).toHaveLength(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+
+  test('keeps a stalled independent hook separate while another request rotates credentials', async () => {
+    const waiting = createBarrier();
+    const rotated = createBarrier();
+    class HookClient extends OpenAI {
+      protected override async authHeaders(
+        options: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        context?: object,
+      ) {
+        if (options.path === '/independent') {
+          waiting.release();
+          await rotated.promise;
+          return buildHeaders([{ Authorization: 'Bearer access-token-4' }]);
+        }
+        return super.authHeaders({ ...options }, schemes, context);
+      }
+    }
+    let independentCalls = 0;
+    const seenPaths = new Set<string>();
+    const transport = createWorkloadIdentityTransport((url) => {
+      const path = new URL(url.toString()).pathname;
+      if (path.endsWith('/independent')) {
+        independentCalls += 1;
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      }
+      const first = !seenPaths.has(path);
+      seenPaths.add(path);
+      return first
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+    const independent = expect(client.get('/independent')).rejects.toMatchObject({ status: 401 });
+    await waiting.promise;
+    for (let index = 0; index < 3; index += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- Each completed refresh must precede the next token rotation.
+      await client.get(`/rotate/${index}`);
+    }
+    rotated.release();
+    await independent;
+
+    expect(independentCalls).toBe(1);
+    expect(transport.exchanges).toBe(4);
+  });
+
+  test('does not reuse a failed attempt context for later authentication', async () => {
+    let failedContext: object | undefined;
+    let fail = true;
+    const failure = new Error('Synthetic hook failure');
+    class HookClient extends OpenAI {
+      protected override async authHeaders(
+        options: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        context?: object,
+      ) {
+        if (fail) {
+          failedContext = context;
+          await super.authHeaders(options, schemes, context);
+          throw failure;
+        }
+        return super.authHeaders(options, schemes, failedContext);
+      }
+    }
+    let apiCalls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      apiCalls += 1;
+      return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+    await expect(client.models.list()).rejects.toBe(failure);
+    fail = false;
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(apiCalls).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  });
+
+  test.each([false, true])(
+    'legacy hooks without context refresh only with original options (copy: %s)',
+    async (copyOptions) => {
+      class HookClient extends OpenAI {
+        protected override async authHeaders(options: FinalRequestOptions) {
+          return super.authHeaders(copyOptions ? { ...options } : options);
+        }
+      }
+      let apiCalls = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        apiCalls += 1;
+        return apiCalls === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+      const request = client.models.list();
+      await (copyOptions ? expect(request).rejects.toMatchObject({ status: 401 }) : request);
+
+      expect(apiCalls).toBe(copyOptions ? 1 : 2);
+      expect(transport.exchanges).toBe(copyOptions ? 1 : 2);
+    },
+  );
+
   test('keeps copied-option provenance independent across clients sharing options', async () => {
     const options: FinalRequestOptions = { method: 'get', path: '/models' };
     const firstComplete = createBarrier();
     class HookClient extends OpenAI {
       waitForFirst = false;
-      protected override async authHeaders(received: FinalRequestOptions) {
+      protected override async authHeaders(
+        received: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        context?: object,
+      ) {
         if (this.waitForFirst) {
           await firstComplete.promise;
         }
-        return buildHeaders([await super.authHeaders({ ...received }), { 'X-Custom': 'wrapped' }]);
+        return buildHeaders([
+          await super.authHeaders({ ...received }, schemes, context),
+          { 'X-Custom': 'wrapped' },
+        ]);
       }
     }
     const createClient = () => {
@@ -211,8 +372,12 @@ describe('Workload identity authentication hook provenance', () => {
     const cachedHeadersReady = createBarrier();
     const refreshed = createBarrier();
     class HookClient extends OpenAI {
-      protected override async authHeaders(options: FinalRequestOptions) {
-        const headers = await super.authHeaders({ ...options });
+      protected override async authHeaders(
+        options: FinalRequestOptions,
+        schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+        context?: object,
+      ) {
+        const headers = await super.authHeaders({ ...options }, schemes, context);
         if (options.path === '/models/held' && !options.__metadata?.['workloadIdentityTokenRefreshed']) {
           cachedHeadersReady.release();
           await refreshed.promise;

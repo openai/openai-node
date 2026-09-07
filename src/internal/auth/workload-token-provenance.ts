@@ -1,73 +1,61 @@
-import type { WorkloadIdentityAuth } from '../../auth/workload-identity-auth';
-
-interface TokenState {
-  cached: { authorization: string; expiresAt: number } | undefined;
-  observers: Set<Set<string>>;
+/** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
+export function bearerToken(authorization: string | null): string | undefined {
+  return authorization?.slice(0, 7).toLowerCase() === 'bearer ' ? authorization.slice(7) : undefined;
 }
 
-// Authentication owns the cached credential; each preparing request owns its observed tokens.
-const states = new WeakMap<WorkloadIdentityAuth, TokenState>();
-
-function stateFor(authentication: WorkloadIdentityAuth): TokenState {
-  let state = states.get(authentication);
-  if (!state) {
-    state = { cached: undefined, observers: new Set() };
-    states.set(authentication, state);
-  }
-  return state;
+interface TokenScope {
+  context: object;
+  record: (token: string) => void;
+  matches: (authorization: string) => boolean;
+  dispose: () => void;
 }
 
-/** Records one validated exchange, including a result returned after its cache generation retired. */
-export function recordWorkloadToken(
-  authentication: WorkloadIdentityAuth,
-  token: string,
-  expiresAt: number,
-  cached: boolean,
-): void {
-  const state = stateFor(authentication);
-  const authorization = `Bearer ${token}`;
-  if (cached) {
-    state.cached = { authorization, expiresAt };
-  }
-  for (const tokens of state.observers) {
-    tokens.add(authorization);
-  }
-}
+/** Owns authentication provenance for individual request attempts without retaining a token cache. */
+export class WorkloadTokenProvenance {
+  private readonly contexts = new WeakMap<object, TokenScope>();
+  private readonly options = new WeakMap<object, Set<TokenScope>>();
 
-/** Retires the cached marker without discarding tokens already held by preparing requests. */
-export function invalidateWorkloadToken(authentication: WorkloadIdentityAuth): void {
-  const state = states.get(authentication);
-  if (!state) {
-    return;
+  /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
+  begin(options: object, context: object = {}): TokenScope {
+    const tokens = new Set<string>();
+    const scopes = this.options.get(options) ?? new Set<TokenScope>();
+    let disposed = false;
+    const scope: TokenScope = {
+      context,
+      record: (token) => {
+        if (!disposed) {
+          tokens.add(token);
+        }
+      },
+      matches: (authorization) => {
+        const token = bearerToken(authorization);
+        return token !== undefined && tokens.has(token);
+      },
+      dispose: () => {
+        if (disposed) {
+          return;
+        }
+        disposed = true;
+        tokens.clear();
+        this.contexts.delete(scope.context);
+        scopes.delete(scope);
+        if (scopes.size === 0) {
+          this.options.delete(options);
+        }
+      },
+    };
+    scopes.add(scope);
+    this.options.set(options, scopes);
+    this.contexts.set(scope.context, scope);
+    return scope;
   }
-  state.cached = undefined;
-  if (state.observers.size === 0) {
-    states.delete(authentication);
-  }
-}
 
-/** Observes issued credentials until this request finishes building its final headers. */
-export function observeWorkloadTokens(authentication: WorkloadIdentityAuth) {
-  const state = stateFor(authentication);
-  if (state.cached && Date.now() >= state.cached.expiresAt) {
-    state.cached = undefined;
+  /** Resolves explicit ownership or the unambiguous original-options path used by legacy hooks. */
+  find(options: object, context: object | undefined): TokenScope | undefined {
+    if (context !== undefined) {
+      return this.contexts.get(context);
+    }
+    const scopes = this.options.get(options);
+    return scopes?.size === 1 ? scopes.values().next().value : undefined;
   }
-  const tokens = new Set(state.cached === undefined ? [] : [state.cached.authorization]);
-  state.observers.add(tokens);
-  return {
-    /** Matches final headers independently of hook options and header object identities. */
-    matches(authorization: string | null): boolean {
-      return authorization !== null && tokens.has(authorization);
-    },
-    /** Releases credentials on completion or any preparation failure; safe to repeat. */
-    dispose(): void {
-      if (!state.observers.delete(tokens)) {
-        return;
-      }
-      tokens.clear();
-      if (state.cached === undefined && state.observers.size === 0) {
-        states.delete(authentication);
-      }
-    },
-  };
 }

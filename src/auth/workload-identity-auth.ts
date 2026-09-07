@@ -1,7 +1,6 @@
 import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
-import { invalidateWorkloadToken, recordWorkloadToken } from '../internal/auth/workload-token-provenance';
 import { APIError, OAuthError, OpenAIError } from '../core/error';
 
 interface CachedToken {
@@ -294,7 +293,6 @@ export class WorkloadIdentityAuth {
         refreshAt: calculateRefreshAt(expiresAt, expiresIn, this.config.refreshBufferSeconds),
       };
     }
-    recordWorkloadToken(this, accessToken, expiresAt, this.tokenGeneration === generation);
 
     return accessToken;
   }
@@ -312,6 +310,5 @@ export class WorkloadIdentityAuth {
     this.tokenGeneration += 1;
     this.cachedToken = null;
     this.refreshPromise = null;
-    invalidateWorkloadToken(this);
   }
 }

@@ -42,6 +42,30 @@ const getArrayIterator = (headers: readonly unknown[]) => {
   return arrayPrototype?.[Symbol.iterator];
 };
 
+const getHeadersIterator = (headers: object) => {
+  const seen = new Set<object>();
+  for (
+    let prototype = Object.getPrototypeOf(headers);
+    prototype;
+    prototype = Object.getPrototypeOf(prototype)
+  ) {
+    if (seen.has(prototype)) return undefined;
+    seen.add(prototype);
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    if (
+      typeof constructor === 'function' &&
+      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Headers' &&
+      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Headers'
+    ) {
+      const iterator = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator)?.value;
+      const entries = Object.getOwnPropertyDescriptor(prototype, 'entries')?.value;
+      if (typeof entries === 'function' && iterator === entries) return iterator;
+    }
+  }
+  return undefined;
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: { refreshable: boolean },
@@ -69,7 +93,7 @@ function* iterateHeaders(
       typeof iterator !== 'function' ||
       (Array.isArray(headers) &&
         (iterator === Array.prototype[Symbol.iterator] || iterator === getArrayIterator(headers))) ||
-      (Object.prototype.toString.call(headers) === '[object Headers]' && iterator === headers.entries);
+      (!Array.isArray(headers) && iterator === getHeadersIterator(headers));
   }
   if (typeof iterator === 'function') {
     iter = { [Symbol.iterator]: () => iterator.call(headers) };
@@ -129,7 +153,11 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders =>
 export const snapshotHeaders = (source: HeadersLike) => {
   const replay = { refreshable: true };
   const snapshot = mergeHeaderEntries([iterateHeaders(source, replay)]);
-  return { snapshot, refresh: () => (replay.refreshable ? buildHeaders([source]) : snapshot) };
+  return {
+    source,
+    snapshot,
+    refresh: () => (replay.refreshable ? buildHeaders([source]) : snapshot),
+  };
 };
 
 export const isEmptyHeaders = (headers: HeadersLike) => {
