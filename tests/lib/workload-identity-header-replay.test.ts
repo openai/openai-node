@@ -19,6 +19,116 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+test.each(['record value', 'outer tuple', 'tuple name', 'tuple value'] as const)(
+  'reads a nested %s accessor once',
+  async (kind) => {
+    const values = ['preserved'];
+    const row = ['X-Custom', 'preserved'];
+    const pairs = [row];
+    const headers = kind === 'record value' ? { 'X-Custom': values } : pairs;
+    const target = { 'record value': values, 'outer tuple': pairs, 'tuple name': row, 'tuple value': row }[
+      kind
+    ];
+    const index = kind === 'tuple value' ? 1 : 0;
+    const firstValue = target[index];
+    const read = vi
+      .fn<() => typeof firstValue>()
+      .mockReturnValueOnce(firstValue)
+      .mockImplementation(() => {
+        throw new Error('Nested header accessor was read twice');
+      });
+    Object.defineProperty(target, index, { get: read });
+    let sent: Headers | undefined;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent = new Headers(init?.headers);
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+    await client.models.list({ headers });
+
+    expect(sent?.get('X-Custom')).toBe('preserved');
+    expect(sent?.get('Authorization')).toBe('Bearer access-token-1');
+    expect(read).toHaveBeenCalledTimes(1);
+  },
+);
+
+test.each(['one-shot', 'getter'] as const)('reads a nested %s value iterator once', async (kind) => {
+  const values = ['preserved'];
+  const iterator = values.values();
+  const iterate = vi.fn(() => iterator);
+  const readIterator = vi
+    .fn<() => typeof values.values>()
+    .mockReturnValueOnce(Array.prototype.values)
+    .mockImplementation(() => {
+      throw new Error('Nested header iterator was read twice');
+    });
+  Object.defineProperty(
+    values,
+    Symbol.iterator,
+    kind === 'getter' ? { get: readIterator } : { value: iterate },
+  );
+  let sent: Headers | undefined;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent = new Headers(init?.headers);
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+  await client.models.list({ headers: { 'X-Custom': values } });
+
+  expect(sent?.get('X-Custom')).toBe('preserved');
+  expect(kind === 'getter' ? readIterator : iterate).toHaveBeenCalledTimes(1);
+});
+
+test('coerces a nested JavaScript header value once', async () => {
+  const coerce = vi
+    .fn<() => string>()
+    .mockReturnValueOnce('preserved')
+    .mockImplementation(() => {
+      throw new Error('Header value was coerced twice');
+    });
+  const headers = { 'X-Custom': [{ toString: coerce }] };
+  let sent: Headers | undefined;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent = new Headers(init?.headers);
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch });
+
+  // @ts-expect-error JavaScript callers can supply values that rely on Headers' string coercion.
+  await client.models.list({ headers });
+
+  expect(sent?.get('X-Custom')).toBe('preserved');
+  expect(coerce).toHaveBeenCalledTimes(1);
+});
+
+test.each(['record values', 'tuple row'] as const)('refreshes ordinary mutable nested %s', async (kind) => {
+  const values = ['before'];
+  const row = ['X-Custom', 'before'];
+  const headers = kind === 'record values' ? { 'X-Custom': values } : [row];
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    values[0] = 'after';
+    row[1] = 'after';
+    return 'subject-token';
+  };
+  let sent: Headers | undefined;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent = new Headers(init?.headers);
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    workloadIdentity: identity,
+    fetch: transport.fetch,
+  });
+
+  await client.models.list({ headers });
+
+  expect(sent?.get('X-Custom')).toBe('after');
+});
+
 class OneShotHeaders extends Array<[string, string | null]> {
   #iterator: ReturnType<[string, string | null][]['values']> | undefined;
 

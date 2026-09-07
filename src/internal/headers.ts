@@ -28,8 +28,8 @@ export type NullableHeaders = {
   nulls: Set<string>;
 };
 
-const getArrayIterator = (headers: readonly unknown[]) => {
-  let platformIterator: (() => Iterator<HeaderEntry>) | undefined;
+const getArrayIterator = <T>(headers: readonly T[]) => {
+  let platformIterator: (() => Iterator<T>) | undefined;
   let prototype: object | null = headers;
   const seen = new Set<object>();
   while (prototype) {
@@ -52,7 +52,7 @@ const getArrayIterator = (headers: readonly unknown[]) => {
         continue;
       }
       if (platformIterator) return undefined;
-      platformIterator = descriptor.value as () => Iterator<HeaderEntry>;
+      platformIterator = descriptor.value as () => Iterator<T>;
     }
     prototype = Object.getPrototypeOf(prototype);
   }
@@ -99,6 +99,24 @@ const hasNativeHeadersBrand = (headers: object): boolean => {
   }
 };
 
+const hasAccessor = (value: object, key: PropertyKey): boolean => {
+  const seen = new Set<object>();
+  for (let current: object | null = value; current; current = Object.getPrototypeOf(current)) {
+    if (seen.has(current)) return true;
+    seen.add(current);
+    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+    if (descriptor) return !('value' in descriptor);
+  }
+  return false;
+};
+
+const hasArrayElementAccessor = (values: readonly unknown[]): boolean => {
+  for (let index = 0; index < values.length; index += 1) {
+    if (hasAccessor(values, String(index))) return true;
+  }
+  return false;
+};
+
 function* iterateHeaders(
   headers: HeadersLike,
   replay?: HeaderReplay,
@@ -141,6 +159,7 @@ function* iterateHeaders(
       (typeof iterator === 'function' &&
         ((Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
           (!Array.isArray(headers) && iterator === nativeHeadersIterator)));
+    if (Array.isArray(headers) && hasArrayElementAccessor(headers)) replay.refreshable = false;
   }
   if (typeof iterator === 'function') {
     const iteration = iterator.call(headers);
@@ -174,11 +193,28 @@ function* iterateHeaders(
     }
   }
   for (let row of iter) {
+    if (replay && (hasAccessor(row, '0') || hasAccessor(row, '1'))) replay.refreshable = false;
     const name = row[0];
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
-    const values = isReadonlyArray(row[1]) ? row[1] : [row[1]];
+    const rawValue = row[1];
+    let values: Iterable<HeaderValue>;
+    if (isReadonlyArray(rawValue)) {
+      // Inspect before getters can replace themselves, then consume the captured protocol once.
+      if (replay && (hasAccessor(rawValue, Symbol.iterator) || hasArrayElementAccessor(rawValue))) {
+        replay.refreshable = false;
+      }
+      const valueIterator = rawValue[Symbol.iterator];
+      if (replay && valueIterator !== getArrayIterator(rawValue)) replay.refreshable = false;
+      values = { [Symbol.iterator]: () => valueIterator.call(rawValue) };
+    } else {
+      values = [rawValue];
+    }
     let didClear = false;
     for (const value of values) {
+      if (replay && value !== null && (typeof value === 'object' || typeof value === 'function')) {
+        // Let Headers.append perform stateful coercion only for the first materialization.
+        replay.refreshable = false;
+      }
       if (
         replay &&
         nativeHeadersIterator !== undefined &&
@@ -339,10 +375,12 @@ export const isEmptyHeaders = (headers: HeadersLike) => {
   return true;
 };
 
-/** Extracts native and foreign Request headers without evaluating caller-controlled tag getters. */
+/** Reads Request internal headers through its defining getter, bypassing caller property shadows. */
 export const getRequestHeaders = (request: unknown): Headers | undefined => {
   if (typeof request !== 'object' || request === null) return undefined;
-  if (typeof Request !== 'undefined' && request instanceof Request) return request.headers;
+  if (typeof Request !== 'undefined' && request instanceof Request) {
+    return Object.getOwnPropertyDescriptor(Request.prototype, 'headers')?.get?.call(request);
+  }
   const seen = new Set<object>();
   for (
     let prototype = Object.getPrototypeOf(request);
@@ -358,7 +396,7 @@ export const getRequestHeaders = (request: unknown): Headers | undefined => {
       Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
       Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Request'
     ) {
-      return (request as Request).headers;
+      return Object.getOwnPropertyDescriptor(prototype, 'headers')?.get?.call(request);
     }
   }
   return undefined;
