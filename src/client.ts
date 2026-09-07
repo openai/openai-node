@@ -1258,7 +1258,8 @@ export class OpenAI {
       throw error;
     }
     const { req, url } = built;
-    const initialWorkloadAuthorization = this.#workloadIdentityAuthorizations.get(req.headers);
+    const initialWorkloadAuthorization =
+      credentialContext.workloadAuthorization ?? this.#workloadIdentityAuthorizations.get(req.headers);
     this.#workloadIdentityAuthorizations.delete(req.headers);
     const timeout = x509Authentication
       ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
@@ -1893,6 +1894,9 @@ export class OpenAI {
       authenticationHeaders && this.#workloadIdentityAuthorizations.get(authenticationHeaders.values);
     if (workloadAuthorization !== undefined) {
       this.#workloadIdentityAuthorizations.set(headers.values, workloadAuthorization);
+      if (credentialContext) {
+        credentialContext.workloadAuthorization = workloadAuthorization;
+      }
     }
 
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {

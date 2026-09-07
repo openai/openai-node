@@ -1,3 +1,4 @@
+/* oxlint-disable max-classes-per-file -- Separate construction and preparation overrides exercise distinct SDK hook contracts. */
 import { vi } from 'vitest';
 import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
 import type { RequestInit } from 'openai/internal/builtin-types';
@@ -19,6 +20,14 @@ const createTestClientOptions = () => ({
   organization: 'test-org-id',
   project: 'test-project-id',
 });
+
+class CloningBuildRequestClient extends OpenAI {
+  override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+    const built = await super.buildRequest(...args);
+    built.req.headers = new Headers(built.req.headers);
+    return built;
+  }
+}
 
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {
@@ -213,9 +222,9 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test.each([null, '', 'Bearer replacement'])(
-    'does not refresh a workload token replaced by a request hook: %j',
+    'does not refresh a workload token replaced by a request hook after cloning headers: %j',
     async (authorization) => {
-      class HookClient extends OpenAI {
+      class HookClient extends CloningBuildRequestClient {
         // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
         protected override async prepareRequest(request: RequestInit): Promise<void> {
           if (!(request.headers instanceof Headers)) {
@@ -347,11 +356,12 @@ describe('OpenAI with Workload Identity', () => {
     expect(tokenExchangeCallCount).toBe(1);
   });
 
-  test.each([false, true])(
-    'refreshes a rejected workload token (cloned headers: %s)',
-    async (cloneHeaders) => {
+  test.each(['none', 'prepareRequest', 'buildRequest'])(
+    'refreshes a rejected workload token (header cloning hook: %s)',
+    async (cloneHeadersHook) => {
       let apiCallCount = 0;
       let tokenExchangeCallCount = 0;
+      const authorizations: (string | null)[] = [];
 
       global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
         const urlStr = url.toString();
@@ -371,6 +381,7 @@ describe('OpenAI with Workload Identity', () => {
 
         if (urlStr.includes('/models')) {
           apiCallCount++;
+          authorizations.push(new Headers(init?.headers).get('Authorization'));
           if (apiCallCount === 1) {
             return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
           }
@@ -380,8 +391,9 @@ describe('OpenAI with Workload Identity', () => {
         return new Response('Not found', { status: 404 });
       }) as typeof fetch;
 
-      const client = new OpenAI(createTestClientOptions());
-      if (cloneHeaders) {
+      const Client = cloneHeadersHook === 'buildRequest' ? CloningBuildRequestClient : OpenAI;
+      const client = new Client(createTestClientOptions());
+      if (cloneHeadersHook === 'prepareRequest') {
         Object.defineProperty(client, 'prepareRequest', {
           value: async (request: RequestInit) => {
             request.headers = new Headers(request.headers);
@@ -394,10 +406,11 @@ describe('OpenAI with Workload Identity', () => {
       expect(result).toBeDefined();
       expect(apiCallCount).toBe(2);
       expect(tokenExchangeCallCount).toBe(2);
+      expect(authorizations).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
     },
   );
 
-  test('only retries once for 401 errors', async () => {
+  test.each([false, true])('only retries once for 401 errors (cloned headers: %s)', async (cloneHeaders) => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
@@ -425,7 +438,8 @@ describe('OpenAI with Workload Identity', () => {
       return new Response('Not found', { status: 404 });
     }) as typeof fetch;
 
-    const client = new OpenAI(createTestClientOptions());
+    const Client = cloneHeaders ? CloningBuildRequestClient : OpenAI;
+    const client = new Client(createTestClientOptions());
 
     await expect(client.models.list()).rejects.toThrow();
 

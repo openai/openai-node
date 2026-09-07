@@ -1,7 +1,7 @@
 import type { OpenAI } from '../client';
 
 /**
- * One HTTP attempt's resolved function credential, kept separate from caller
+ * One HTTP attempt's resolved credentials, kept separate from caller
  * options and request metadata. Overrides of preparation and authentication
  * hooks must forward this context to preserve per-attempt credentials. Legacy
  * overrides that omit it retain their shared `client.apiKey` behavior.
@@ -9,6 +9,8 @@ import type { OpenAI } from '../client';
  */
 export interface RequestCredentialContext {
   apiKey?: string | null;
+  /** Resolved workload bearer, retained even when request hooks clone headers. */
+  workloadAuthorization?: string;
 }
 
 /** Resolves once per attempt while retaining the existing credential-hook contract. @internal */
