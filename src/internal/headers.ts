@@ -473,40 +473,41 @@ export function captureHeaderReads<T>(
 }
 
 export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
-  let capturedReplay: HeaderReplay | undefined;
+  const context = headerReadContext;
   const result = mergeHeaderEntries(
     newHeaders.map((originalSource) => {
       const source =
         typeof originalSource === 'object' && originalSource !== null
-          ? (headerReadContext?.preferred.get(originalSource) ?? originalSource)
+          ? (context?.preferred.get(originalSource) ?? originalSource)
           : originalSource;
       const provenance = { unknown: false };
-      const replay =
-        headerReadContext && newHeaders.length === 1 && source === originalSource
-          ? { refreshable: true }
-          : undefined;
-      capturedReplay =
+      const replay = context && source === originalSource ? { refreshable: true } : undefined;
+      const capturedReplay =
         replay ??
         (source && brand_privateNullableHeaders in source
           ? capturedHeaderReplays.get(source)?.replay
           : undefined);
-      return {
+      const entry = {
         source,
         provenance,
         ...(replay ? { replay } : {}),
         entries: iterateHeaders(source, replay, provenance),
       };
+      if (!context || typeof originalSource !== 'object' || originalSource === null) return entry;
+
+      // Capture each raw layer separately; merged hook headers cannot seed one source's snapshot.
+      const snapshot = mergeHeaderEntries([entry]);
+      context.captured.set(originalSource, snapshot);
+      if (capturedReplay) {
+        capturedHeaderReplays.set(snapshot, {
+          source: originalSource,
+          replay: copyHeaderReplay(capturedReplay),
+        });
+      }
+      context.onRead?.(originalSource, snapshot);
+      return { source: snapshot, provenance: { unknown: true }, entries: iterateHeaders(snapshot) };
     }),
   );
-  if (newHeaders.length === 1) {
-    const source = newHeaders[0];
-    if (typeof source === 'object' && source !== null && headerReadContext) {
-      headerReadContext.captured.set(source, result);
-      if (capturedReplay)
-        capturedHeaderReplays.set(result, { source, replay: copyHeaderReplay(capturedReplay) });
-      headerReadContext.onRead?.(source, result);
-    }
-  }
   return result;
 };
 

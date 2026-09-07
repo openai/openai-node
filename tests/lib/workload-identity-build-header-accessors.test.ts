@@ -27,7 +27,9 @@ describe.each(['native', 'foreign'] as const)('%s build-result Headers accessors
     const intrinsicGet = HeadersClass.prototype.get;
     const intrinsicIterator = HeadersClass.prototype[Symbol.iterator];
     const shadowGet = vi.fn(() => {
-      if (kind === 'throwing') {throw new Error('The Headers.get shadow must not be evaluated');}
+      if (kind === 'throwing') {
+        throw new Error('The Headers.get shadow must not be evaluated');
+      }
       return 'Bearer synthetic-shadow';
     });
     const builtHeaders: object[] = [];
@@ -50,7 +52,7 @@ describe.each(['native', 'foreign'] as const)('%s build-result Headers accessors
     const authorizations: (string | null)[] = [];
     const transport = createWorkloadIdentityTransport((_url, init) => {
       expect(init?.headers).toBe(builtHeaders[authorizations.length]);
-      if (!init?.headers) throw new Error('Expected the built headers at dispatch');
+      if (!init?.headers) {throw new Error('Expected the built headers at dispatch');}
       expect(Reflect.get(init.headers, Symbol.iterator)).toBe(intrinsicIterator);
       authorizations.push(Reflect.apply(intrinsicGet, init?.headers, ['Authorization']));
       return workload && authorizations.length === 1
