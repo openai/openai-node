@@ -2061,7 +2061,8 @@ export class OpenAI {
         if (
           !defaultLayer.initialized &&
           !requestLayer.initialized &&
-          defaultLayer.source === requestLayer.source
+          defaultLayer.source === requestLayer.source &&
+          (defaultLayer.source === this._options.defaultHeaders || requestLayer.source === options.headers)
         ) {
           requestLayer.seed(requestLayer.source, defaultLayer.snapshot);
         }
