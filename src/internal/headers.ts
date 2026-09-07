@@ -96,6 +96,40 @@ interface HeaderPropertySnapshot {
   entry?: readonly [string, string | readonly string[] | null];
 }
 
+interface HeaderRowSnapshot {
+  name: string;
+  nameDescriptor: PropertyDescriptor | undefined;
+  nameStateful: boolean;
+  valueDescriptor: PropertyDescriptor | undefined;
+  valueStateful: boolean;
+  entries: readonly (readonly [string, string | null])[];
+}
+
+const sameHeaderProperty = (
+  current: PropertyDescriptor | undefined,
+  previous: PropertyDescriptor | undefined,
+) =>
+  current && previous
+    ? 'value' in current
+      ? 'value' in previous && current.value === previous.value
+      : !('value' in previous) && current.get === previous.get
+    : current === previous;
+
+const getHeaderRowDescriptor = (row: HeaderEntry, key: string): PropertyDescriptor | undefined => {
+  const seen = new Set<object>();
+  try {
+    for (let object: object | null = row; object; object = Object.getPrototypeOf(object)) {
+      if (seen.has(object)) return undefined;
+      seen.add(object);
+      const descriptor = Object.getOwnPropertyDescriptor(object, key);
+      if (descriptor) return descriptor;
+    }
+  } catch {
+    // Preserve the first actual read when a proxy cannot expose its descriptor.
+  }
+  return undefined;
+};
+
 interface HeaderReplay {
   refreshable: boolean;
   unverifiedHeaders?: boolean;
@@ -106,7 +140,7 @@ interface HeaderReplay {
   properties?: Map<string, HeaderPropertySnapshot>;
   propertyOrder?: string[];
   property?: HeaderPropertySnapshot;
-  rows?: WeakMap<object, readonly (readonly [string, string | null])[]>;
+  rows?: WeakMap<object, HeaderRowSnapshot>;
 }
 
 const hasNativeHeadersBrand = (headers: object): boolean => {
@@ -263,13 +297,7 @@ function* iterateHeaders(
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
         const retained = replay.properties.get(key);
-        if (
-          retained &&
-          descriptor &&
-          ('value' in descriptor
-            ? !('value' in retained.descriptor) || descriptor.value !== retained.descriptor.value
-            : 'value' in retained.descriptor || descriptor.get !== retained.descriptor.get)
-        ) {
+        if (retained && descriptor && !sameHeaderProperty(descriptor, retained.descriptor)) {
           replay.properties.delete(key);
         }
         if (!descriptor?.enumerable) continue;
@@ -303,15 +331,33 @@ function* iterateHeaders(
     }
   }
   for (let row of iter) {
+    // Replacing one tuple column must not reread an unchanged getter in the other.
     const retainedRow = !shouldClear && replay?.rows?.get(row);
-    if (retainedRow) {
-      yield* retainedRow;
+    const trackRow = !shouldClear && (retainedRow || replay?.refreshable);
+    const nameDescriptor = trackRow ? getHeaderRowDescriptor(row, '0') : undefined;
+    const retainName =
+      retainedRow &&
+      retainedRow.nameStateful &&
+      (!nameDescriptor || sameHeaderProperty(nameDescriptor, retainedRow.nameDescriptor));
+    const name = retainName ? retainedRow.name : row[0];
+    if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
+    const nameStateful = retainName || !nameDescriptor || !('value' in nameDescriptor);
+    const valueDescriptor = trackRow ? getHeaderRowDescriptor(row, '1') : undefined;
+    if (
+      retainedRow &&
+      retainedRow.valueStateful &&
+      (!valueDescriptor || sameHeaderProperty(valueDescriptor, retainedRow.valueDescriptor))
+    ) {
+      replay?.rows?.set(row, {
+        ...retainedRow,
+        name,
+        nameDescriptor: retainName ? retainedRow.nameDescriptor : nameDescriptor,
+        nameStateful,
+      });
+      for (const [, value] of retainedRow.entries) yield [name, value];
       continue;
     }
-    const statefulRow = replay?.refreshable && !shouldClear && hasStatefulArrayProperties(row);
-    const capturedRow: (readonly [string, string | null])[] | undefined = statefulRow ? [] : undefined;
-    const name = row[0];
-    if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
+    const capturedRow: (readonly [string, string | null])[] | undefined = trackRow ? [] : undefined;
     const retained = shouldClear ? replay?.properties?.get(name) : undefined;
     if (retained) {
       if (retained.entry) {
@@ -326,8 +372,8 @@ function* iterateHeaders(
       continue;
     }
     const descriptor = propertyDescriptors.get(name);
-    const rowReplay = statefulRow
-      ? { refreshable: false }
+    const rowReplay = trackRow
+      ? { refreshable: !!valueDescriptor && 'value' in valueDescriptor }
       : shouldClear && replay
         ? { refreshable: !descriptor || 'value' in descriptor }
         : replay;
@@ -369,13 +415,27 @@ function* iterateHeaders(
         capturedRow?.push([name, null]);
         yield [name, null];
       }
-      const capturedValue = capturedRow && value !== null ? new Headers([[name, value]]).get(name)! : value;
+      const capturedValue =
+        capturedRow && !rowReplay?.refreshable && value !== null
+          ? new Headers([[name, value]]).get(name)!
+          : value;
       capturedRow?.push([name, capturedValue]);
       yield [name, capturedValue];
     }
     if (capturedRow && replay) {
-      replay.rows ??= new WeakMap();
-      replay.rows.set(row, capturedRow);
+      if (nameStateful || !rowReplay?.refreshable) {
+        replay.rows ??= new WeakMap();
+        replay.rows.set(row, {
+          name,
+          nameDescriptor: retainName ? retainedRow.nameDescriptor : nameDescriptor,
+          nameStateful,
+          valueDescriptor,
+          valueStateful: !rowReplay?.refreshable,
+          entries: capturedRow,
+        });
+      } else {
+        replay.rows?.delete(row);
+      }
     }
     if (property && replay) {
       if (!rowReplay?.refreshable) replay.properties!.set(name, property);
