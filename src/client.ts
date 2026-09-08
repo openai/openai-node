@@ -1947,7 +1947,11 @@ export class OpenAI {
     }
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
       const source = WorkloadTokenProvenance.requestHeaderData(init);
-      const platform = getVerifiedPlatformHeader(source, 'Authorization');
+      // Foreign readers may disagree with iteration; resolve those from the final dispatch snapshot.
+      const platform =
+        source && hasNativeHeadersBrand(source)
+          ? getVerifiedPlatformHeader(source, 'Authorization')
+          : undefined;
       if (source && platform?.value === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         await this.#resolveWorkloadPlaceholder(workloadRequest, source as Headers, platform.prototype);
       }
