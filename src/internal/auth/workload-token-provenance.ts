@@ -1,4 +1,4 @@
-import { getPlatformHeader } from '../platform-headers';
+import { getHeadersPrototype, getPlatformHeader, hasNativeHeadersBrand } from '../platform-headers';
 import type { HeadersLike, NullableHeaders, WorkloadHeaderSnapshots } from '../headers';
 
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
@@ -78,7 +78,7 @@ const observeHeaderMutations = (headers: Headers, credential: HeaderCredential):
     platform = Headers.prototype;
   } catch {
     try {
-      platform = getPlatformHeader(headers, 'authorization')?.prototype;
+      platform = getHeadersPrototype(headers);
     } catch {
       credential.revoked = true;
     }
@@ -268,9 +268,13 @@ export class WorkloadTokenProvenance {
   }
 
   /** Recovers an unmarked rebuilt result only from its own active authentication invocation. */
-  recover(headers: { values: Headers } | undefined, options: object, context: object | undefined): void {
+  recover(
+    headers: NullableHeaders | undefined,
+    options: object,
+    context: object | undefined,
+  ): NullableHeaders | undefined {
     if (!headers) {
-      return;
+      return headers;
     }
     const { values } = headers;
     const outerCredential = workloadHeaderCredential(headers);
@@ -278,22 +282,40 @@ export class WorkloadTokenProvenance {
     const credential = valueCredential === undefined ? outerCredential : valueCredential;
     if (credential === null) {
       this.scopeFor(options, context)?.revoke();
-      return;
+      return headers;
     }
     if (credential !== undefined) {
       rememberWorkloadHeaderCredential(headers, credential, values);
       this.scopeFor(options, context)?.select(credential);
-      return;
+      return headers;
     }
-    const authorization = values.get('authorization');
+    const platformHeader = hasNativeHeadersBrand(values)
+      ? getPlatformHeader(values, 'authorization')
+      : undefined;
+    // Recovery and the final header merge must consume the same serialized values.
+    const recovered = platformHeader === undefined ? { ...headers, values: new Headers(values) } : headers;
+    const authorization =
+      platformHeader === undefined
+        ? Headers.prototype.get.call(recovered.values, 'authorization')
+        : platformHeader.value;
     const token = bearerToken(authorization);
     if (
       token !== undefined &&
       authorization !== null &&
       this.scopeFor(options, context)?.matches(authorization)
     ) {
-      this.issue(headers, token, this.scopeFor(options, context)?.credential(authorization));
+      const usage = this.issue(headers, token, this.scopeFor(options, context)?.credential(authorization));
+      if (recovered !== headers) {
+        // Retain mutation eligibility from the original collection before adopting its serialized copy.
+        usage.adopt(recovered.values);
+        rememberWorkloadHeaderCredential(
+          recovered,
+          workloadHeaderCredential(recovered.values) ?? null,
+          recovered.values,
+        );
+      }
     }
+    return recovered;
   }
 
   /** Binds provenance to a completed SDK request result independently of caller options. */

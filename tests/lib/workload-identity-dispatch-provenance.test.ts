@@ -176,8 +176,7 @@ test.each(
   (['record replacement', 'Headers replacement', 'same object', 'SDK helper copy'] as const).flatMap((kind) =>
     [false, true].map((clone) => ({ kind, clone })),
   ),
-)('refreshes preparation credentials only with preserved header ownership: %j', async ({ kind, clone }) => {
-  const preservesOwnership = kind === 'same object' || kind === 'SDK helper copy';
+)('refreshes unchanged preparation credentials across supported copies: %j', async ({ kind, clone }) => {
   class HookClient extends OpenAI {
     protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
       const [request] = args;
@@ -223,11 +222,8 @@ test.each(
     maxRetries: 0,
   });
 
-  const request = client.models.list();
-  await (preservesOwnership ? request : expect(request).rejects.toMatchObject({ status: 401 }));
+  await client.models.list();
 
-  expect(sent).toEqual(
-    preservesOwnership ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer access-token-1'],
-  );
-  expect(transport.exchanges).toBe(preservesOwnership ? 2 : 1);
+  expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+  expect(transport.exchanges).toBe(2);
 });

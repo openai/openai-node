@@ -1,6 +1,6 @@
 import { isReadonlyArray } from './utils/values';
-import { getHeadersIterator, getPlatformHeader } from './platform-headers';
-export { getPlatformHeader } from './platform-headers';
+import { getHeadersIterator, getPlatformHeader, hasNativeHeadersBrand } from './platform-headers';
+export { getPlatformHeader, hasNativeHeadersBrand } from './platform-headers';
 import {
   copyWorkloadHeaderCredential,
   notifyWorkloadHeaderConsumption,
@@ -137,7 +137,7 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
     }
     replay.arraySlots?.delete(index);
     const row = headers[index]!;
-    if (!descriptor || !('value' in descriptor)) {
+    if (!descriptor || !('value' in descriptor) || row !== descriptor.value) {
       replay.arraySlots ??= new Map();
       replay.arraySlots.set(index, { descriptor, row });
     }
@@ -147,15 +147,6 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
     if (slot >= index) replay.arraySlots?.delete(slot);
   }
 }
-
-export const hasNativeHeadersBrand = (headers: object): boolean => {
-  try {
-    Headers.prototype.has.call(headers, 'authorization');
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /** Checks retryable hook inputs without invoking their iterable protocol or value getters. */
 export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<object>()): boolean => {
@@ -487,7 +478,25 @@ const mergeHeaderEntries = (
   for (const { source, entries, provenance, replay } of newHeaders) {
     const seenHeaders = new Set<string>();
     let suppliesAuthorization = false;
+    let property: HeaderPropertySnapshot | undefined;
+    let propertyName = '';
+    const captureProperty = () => {
+      if (!property) return;
+      const value = targetHeaders.get(propertyName);
+      property.entry = [
+        propertyName,
+        value !== null && propertyName.toLowerCase() === 'set-cookie'
+          ? [...targetHeaders.entries()].filter(([key]) => key === 'set-cookie').map(([, entry]) => entry)
+          : value,
+      ];
+    };
     for (const [name, value] of entries) {
+      // Capture a property's final normalized values once, before the next property can replace them.
+      if (property !== replay?.property) {
+        captureProperty();
+        property = replay?.property;
+        propertyName = name;
+      }
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
       }
@@ -517,15 +526,8 @@ const mergeHeaderEntries = (
         targetHeaders.append(lowerName, value);
         nullHeaders.delete(lowerName);
       }
-      if (replay?.property) {
-        replay.property.entry = [
-          name,
-          value !== null && lowerName === 'set-cookie'
-            ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
-            : targetHeaders.get(lowerName),
-        ];
-      }
     }
+    captureProperty();
     hasAuthorizationLayer ||= suppliesAuthorization;
   }
   const result = { [brand_privateNullableHeaders]: true as const, values: targetHeaders, nulls: nullHeaders };
@@ -539,7 +541,7 @@ const mergeHeaderEntries = (
 
 interface HeaderReadContext {
   captured: WeakMap<object, NullableHeaders>;
-  preferred: WeakMap<object, NullableHeaders>;
+  preferred: WeakMap<object, () => NullableHeaders>;
   onRead?: ((source: NonNullable<HeadersLike>, snapshot: NullableHeaders) => void) | undefined;
   onConsume?: ((source: object) => void) | undefined;
 }
@@ -557,14 +559,17 @@ const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
 /** Captures synchronous protected-hook reads without leaving request state ambient across an await. */
 export function captureHeaderReads<T>(
   operation: () => T,
-  preferred: { source: HeadersLike; snapshot: NullableHeaders }[] = [],
+  preferred: HeaderSnapshot[] = [],
   onRead?: (source: NonNullable<HeadersLike>, snapshot: NullableHeaders) => void,
   onConsume?: (source: object) => void,
 ): { result: T; captured: WeakMap<object, NullableHeaders> } {
   const previous = headerReadContext;
   const context: HeaderReadContext = { captured: new WeakMap(), preferred: new WeakMap(), onRead, onConsume };
-  for (const { source, snapshot } of preferred) {
-    if (typeof source === 'object' && source !== null) context.preferred.set(source, snapshot);
+  for (const snapshot of preferred) {
+    const { source } = snapshot;
+    if (typeof source === 'object' && source !== null) {
+      context.preferred.set(source, () => snapshot.refresh());
+    }
   }
   headerReadContext = context;
   try {
@@ -580,7 +585,7 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
     newHeaders.map((originalSource) => {
       const source =
         typeof originalSource === 'object' && originalSource !== null
-          ? (context?.preferred.get(originalSource) ?? originalSource)
+          ? (context?.preferred.get(originalSource)?.() ?? originalSource)
           : originalSource;
       const provenance = { unknown: false };
       const observed = source && source === originalSource && observesWorkloadHeaderConsumption(source);

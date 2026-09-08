@@ -296,12 +296,11 @@ headers. A hook that awaits before delegating, copies its options, and reconstru
 result with native `Headers` must forward the context. Once both identities are discarded across an
 asynchronous boundary, ownership cannot be inferred safely from matching credential strings.
 
-During `prepareRequest`, mutate the SDK-produced header object in place when adding unrelated headers
-to preserve automatic workload refresh. An unmarked replacement, including `new Headers(req.headers)`
-or a raw record, is treated as independently authenticated even when its Authorization bytes match the
-workload token. It does not trigger workload-token refresh after a 401. Explicit SDK provenance is
-required because a copied token and an independently supplied equal-byte credential are
-indistinguishable.
+A `prepareRequest` hook may copy headers with `new Headers(req.headers)` and add unrelated headers
+while retaining automatic workload refresh. As at transport hooks, an unmarked replacement with
+unchanged Authorization bytes retains this compatibility behavior. Explicit independent provenance
+and observed Authorization writes still disable refresh. An arbitrary unmarked equal-byte
+replacement cannot be distinguished from a legitimate copy.
 
 A `buildRequest` override keeps first access to its original inputs before SDK snapshotting. Ordinary
 delegation can copy options and native input headers without forwarding a new argument. A nested build

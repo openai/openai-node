@@ -186,14 +186,10 @@ describe('Workload credential ownership after native header mutations', () => {
       maxRetries: 0,
     });
 
-    await (operation === 'copy'
-      ? expect(client.models.list()).rejects.toMatchObject({ status: 401 })
-      : client.models.list());
+    await client.models.list();
 
-    expect(sent).toEqual(
-      operation === 'copy' ? ['Bearer access-token-1'] : ['Bearer access-token-1', 'Bearer access-token-2'],
-    );
-    expect(transport.exchanges).toBe(operation === 'copy' ? 1 : 2);
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
   });
 
   test('does not revoke a simultaneous attempt using the same cached token', async () => {
@@ -463,7 +459,7 @@ describe('Workload credential ownership after native header mutations', () => {
       fetch: transport.fetch,
       maxRetries: 0,
     });
-    const independent = overwrite || boundary === 'prepareRequest';
+    const independent = overwrite;
     await (independent
       ? expect(client.models.list()).rejects.toMatchObject({ status: 401 })
       : client.models.list());

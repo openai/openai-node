@@ -80,7 +80,7 @@ test.each(['record', 'array', 'structural'] as const)(
 );
 
 test.each(['getter', 'iterator'] as const)(
-  'keeps an unmarked preparation copy independent through an observed %s',
+  'materializes an unmarked preparation copy once per attempt through an observed %s',
   async (kind) => {
     let reads = 0;
     class HookClient extends OpenAI {
@@ -117,12 +117,13 @@ test.each(['getter', 'iterator'] as const)(
       maxRetries: 0,
     });
 
-    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+    await client.models.list();
 
-    expect(sent).toEqual(['Bearer access-token-1']);
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
     expect(snapshots[0]?.headers).toBeInstanceOf(Headers);
     expect(snapshots[0]?.reads).toBe(1);
-    expect(reads).toBe(1);
-    expect(transport.exchanges).toBe(1);
+    expect(snapshots[1]?.reads).toBe(2);
+    expect(reads).toBe(2);
+    expect(transport.exchanges).toBe(2);
   },
 );

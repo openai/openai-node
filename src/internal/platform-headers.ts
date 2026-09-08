@@ -1,3 +1,12 @@
+export const hasNativeHeadersBrand = (headers: object): boolean => {
+  try {
+    Headers.prototype.has.call(headers, 'authorization');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const getHeadersProtocol = (
   headers: object,
 ): { iterator: () => Iterator<unknown>; prototype: object } | undefined => {
@@ -34,6 +43,9 @@ const getHeadersProtocol = (
 };
 
 export const getHeadersIterator = (headers: object) => getHeadersProtocol(headers)?.iterator;
+
+/** Identifies mutation descriptors without calling a credential reader. */
+export const getHeadersPrototype = (headers: object) => getHeadersProtocol(headers)?.prototype;
 
 /** Reads platform collections without consuming the iterable later handed to custom fetch. */
 export const getPlatformHeader = (

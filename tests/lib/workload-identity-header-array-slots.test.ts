@@ -221,3 +221,85 @@ test('keeps aliased layer slot caches independent after one source is replaced',
   expect(snapshots.requestHeaders.snapshot.values.get('X-Request')).toBe('replacement');
   expect(read).toHaveBeenCalledTimes(1);
 });
+
+describe.each(['request', 'default'] as const)('%s proxy array headers', (layer) => {
+  test.each(['throw', 'replace authorization'] as const)(
+    'retains the observed row across authentication and retry when later reads would %s',
+    async (behavior) => {
+      const target: (string | undefined)[][] = [['Authorization', undefined]];
+      let reads = 0;
+      const headers = new Proxy(target, {
+        get(array, key, receiver) {
+          if (key !== '0') {
+            return Reflect.get(array, key, receiver);
+          }
+          reads += 1;
+          if (reads > 1 && behavior === 'throw') {
+            throw new Error('Proxy slot was read twice');
+          }
+          return ['Authorization', reads === 1 ? undefined : 'Bearer independent'];
+        },
+      });
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return sent.length === 1
+          ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+      expect(reads).toBe(1);
+    },
+  );
+});
+
+test('observes a data slot replacement after retaining a proxy-provided row', async () => {
+  const initial: (string | undefined)[] = ['Authorization', undefined];
+  const target = [initial];
+  let reads = 0;
+  const headers = new Proxy(target, {
+    get(array, key, receiver) {
+      if (key !== '0') {
+        return Reflect.get(array, key, receiver);
+      }
+      reads += 1;
+      return array[0] === initial ? ['Authorization', undefined] : array[0];
+    },
+  });
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    target[0] = ['Authorization', 'Bearer independent'];
+    return 'subject-token';
+  };
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('Authorization'));
+    return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    workloadIdentity: identity,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list({ headers })).rejects.toMatchObject({ status: 401 });
+
+  expect(sent).toEqual(['Bearer independent']);
+  expect(transport.exchanges).toBe(1);
+  expect(reads).toBe(2);
+});
