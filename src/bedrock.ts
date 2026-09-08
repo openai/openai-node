@@ -219,6 +219,7 @@ export class BedrockOpenAI extends OpenAI {
 
     this.bedrockTokenProvider = bedrockTokenProvider;
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
+    this.markCredentialHooksSafe(BedrockOpenAI.prototype.prepareOptions, BedrockOpenAI.prototype.authHeaders);
   }
 
   /** Builds and validates the request URL before preparing its body or resolving credentials. */
@@ -232,10 +233,12 @@ export class BedrockOpenAI extends OpenAI {
     return url;
   }
 
-  protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
+  protected override validateOptionsBeforePreparation(options: FinalRequestOptions): void {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
+  }
 
+  protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
     const security = options.__security ?? { bearerAuth: true };
     if (security.adminAPIKeyAuth && !security.bearerAuth) {
       await this.prepareAPIKey(options);

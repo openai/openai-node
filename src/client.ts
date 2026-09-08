@@ -287,6 +287,24 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
+const preparedAPIKeyContext = Symbol('preparedAPIKeyContext');
+type PreparedAPIKey = {
+  apiKey: string | null;
+  tracksClientValue: boolean;
+  allowClientOverride: boolean;
+  explicitCapture: boolean;
+};
+
+type APIKeyPreparationAttempt = { prepared?: PreparedAPIKey };
+type APIKeyBuildContext = {
+  owner: OpenAI;
+  prepared: PreparedAPIKey | undefined;
+  active: boolean;
+};
+type InternalBuildProperties = {
+  retryCount?: number;
+  [preparedAPIKeyContext]?: APIKeyBuildContext;
+};
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
 
 export type ApiKeySetter = () => Promise<string>;
@@ -480,11 +498,17 @@ export class OpenAI {
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
-  #apiKeyResolution = 0;
-  #preparedAPIKeys = new WeakMap<
-    FinalRequestOptions,
-    { apiKey: string | null; resolution: number; tracksClientValue: boolean }
-  >();
+  #lastProviderAPIKey: string | null | undefined;
+  #capturingBaseAPIKey = false;
+  #preparedAPIKeys = new WeakMap<FinalRequestOptions, PreparedAPIKey>();
+  #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
+  #safeCredentialHooks = new Set<Function>([
+    OpenAI.prototype._callApiKey,
+    OpenAI.prototype.prepareOptions,
+    OpenAI.prototype.authHeaders,
+    OpenAI.prototype.bearerAuth,
+    OpenAI.prototype.buildRequest,
+  ]);
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
@@ -866,38 +890,102 @@ export class OpenAI {
   async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
     const apiKey = this._options.apiKey;
     if (this._provider || typeof apiKey !== 'function') {
-      capture?.(this.apiKey);
+      this.captureBaseAPIKey(capture, this.apiKey);
       return false;
     }
 
-    this.apiKey = await this.resolveAPIKeyProvider(apiKey);
-    this.#apiKeyResolution += 1;
-    capture?.(this.apiKey);
+    const resolved = await this.resolveAPIKeyProvider(apiKey);
+    this.apiKey = resolved;
+    this.#lastProviderAPIKey = this.apiKey;
+    this.captureBaseAPIKey(capture, this.apiKey);
     return true;
   }
 
+  private captureBaseAPIKey(
+    capture: ((apiKey: string | null) => void) | undefined,
+    apiKey: string | null,
+  ): void {
+    if (!capture) return;
+    this.#capturingBaseAPIKey = true;
+    try {
+      capture(apiKey);
+    } finally {
+      this.#capturingBaseAPIKey = false;
+    }
+  }
+
+  protected markCredentialHooksSafe(...hooks: Function[]): void {
+    for (const hook of hooks) this.#safeCredentialHooks.add(hook);
+  }
+
+  private hasCustomCredentialHooks(): boolean {
+    return ![
+      this._callApiKey,
+      this.prepareOptions,
+      this.authHeaders,
+      this.bearerAuth,
+      this.buildRequest,
+    ].every((hook) => this.#safeCredentialHooks.has(hook));
+  }
+
+  private hasCustomRequestCredentialHooks(): boolean {
+    return ![this.prepareOptions, this.authHeaders, this.bearerAuth, this.buildRequest].every((hook) =>
+      this.#safeCredentialHooks.has(hook),
+    );
+  }
+
   protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
+    const attempt = this.#synchronousCredentialAttempt;
+    const remember = (prepared: PreparedAPIKey) => {
+      if (attempt) {
+        attempt.prepared = prepared;
+      } else {
+        this.#preparedAPIKeys.set(options, prepared);
+      }
+    };
     let captured = false;
     await this._callApiKey((apiKey) => {
       captured = true;
-      this.#preparedAPIKeys.set(options, {
+      const capturedByBase = this.#capturingBaseAPIKey;
+      remember({
         apiKey,
-        resolution: this.#apiKeyResolution,
         tracksClientValue: apiKey === this.apiKey,
+        allowClientOverride: this.hasCustomRequestCredentialHooks(),
+        explicitCapture: !this.#safeCredentialHooks.has(this._callApiKey) && !capturedByBase,
       });
     });
     if (!captured) {
-      this.#preparedAPIKeys.set(options, {
+      remember({
         apiKey: this.apiKey,
-        resolution: this.#apiKeyResolution,
         tracksClientValue: true,
+        allowClientOverride: this.hasCustomRequestCredentialHooks(),
+        explicitCapture: false,
       });
     }
   }
 
   protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
     const prepared = this.#preparedAPIKeys.get(options);
-    if (prepared) return prepared.apiKey;
+    if (prepared) {
+      if (prepared.explicitCapture) return prepared.apiKey;
+      if (
+        prepared.allowClientOverride &&
+        prepared.tracksClientValue &&
+        this.apiKey !== this.#lastProviderAPIKey
+      ) {
+        return this.apiKey;
+      }
+      return prepared.apiKey;
+    }
+    if (
+      this.hasCustomRequestCredentialHooks() &&
+      this.apiKey !== null &&
+      this.apiKey !== this.#lastProviderAPIKey
+    ) {
+      // Direct builds historically let credential hooks select `this.apiKey` without
+      // invoking the configured provider through `prepareOptions`.
+      return this.apiKey;
+    }
 
     let resolved = this.apiKey;
     let captured = false;
@@ -907,6 +995,8 @@ export class OpenAI {
     });
     return captured ? resolved : this.apiKey;
   }
+
+  protected validateOptionsBeforePreparation(options: FinalRequestOptions): void {}
 
   private async resolveAPIKeyProvider(apiKey: ApiKeySetter): Promise<string> {
     let token: unknown;
@@ -1211,24 +1301,52 @@ export class OpenAI {
 
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
-    await this.prepareOptions(options);
-    const preparedAPIKey = this.#preparedAPIKeys.get(options);
-    if (
-      preparedAPIKey?.tracksClientValue &&
-      preparedAPIKey.resolution === this.#apiKeyResolution &&
-      preparedAPIKey.apiKey !== this.apiKey
-    ) {
-      // Preserve subclasses that assign `this.apiKey` after `super.prepareOptions()`.
-      this.#preparedAPIKeys.set(options, { ...preparedAPIKey, apiKey: this.apiKey });
+    const preparationAttempt: APIKeyPreparationAttempt = {};
+    let preparation: Promise<void>;
+    try {
+      this.validateOptionsBeforePreparation(options);
+      const previousAttempt = this.#synchronousCredentialAttempt;
+      this.#synchronousCredentialAttempt = preparationAttempt;
+      try {
+        preparation = this.prepareOptions(options);
+      } finally {
+        this.#synchronousCredentialAttempt = previousAttempt;
+      }
+      await preparation;
+    } catch (error) {
+      this.#preparedAPIKeys.delete(options);
+      throw error;
+    }
+    let preparedAPIKey = preparationAttempt.prepared ?? this.#preparedAPIKeys.get(options);
+    try {
+      if (!preparedAPIKey && this.hasCustomCredentialHooks()) {
+        preparedAPIKey = {
+          apiKey: this.apiKey,
+          tracksClientValue: true,
+          allowClientOverride: true,
+          explicitCapture: false,
+        };
+      }
+    } catch (error) {
+      this.#preparedAPIKeys.delete(options);
+      throw error;
     }
 
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
+    const apiKeyBuildContext: APIKeyBuildContext = { owner: this, prepared: preparedAPIKey, active: true };
     try {
+      if (preparedAPIKey && this.hasCustomRequestCredentialHooks()) {
+        // Preserve one-argument overrides that delegate the original options object.
+        this.#preparedAPIKeys.set(options, preparedAPIKey);
+      }
       const candidate = await this.buildRequest(options, {
         retryCount: maxRetries - retriesRemaining,
-      });
+        [preparedAPIKeyContext]: apiKeyBuildContext,
+      } as InternalBuildProperties);
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
+      apiKeyBuildContext.active = false;
+      this.#preparedAPIKeys.delete(options);
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
         x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout);
@@ -1264,6 +1382,8 @@ export class OpenAI {
         this.validateHeaders(buildHeaders([supplied, built.req.headers]), security);
       }
     } catch (error) {
+      apiKeyBuildContext.active = false;
+      this.#preparedAPIKeys.delete(options);
       x509Authentication?.retireRequestBody();
       if (
         x509Authentication &&
@@ -1747,8 +1867,13 @@ export class OpenAI {
 
   async buildRequest(
     inputOptions: FinalRequestOptions,
-    { retryCount = 0 }: { retryCount?: number } = {},
+    properties: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
+    const { retryCount = 0 } = properties;
+    const internalProperties = properties as InternalBuildProperties;
+    const apiKeyContext = internalProperties[preparedAPIKeyContext];
+    const preparedAPIKey =
+      apiKeyContext?.owner === this && apiKeyContext.active ? apiKeyContext.prepared : undefined;
     if (this.#x509Authentication && !this.#x509Authentication.inRequest(this)) {
       const authentication = this.#x509Authentication;
       return await authentication.runRequest(async () => {
@@ -1804,6 +1929,7 @@ export class OpenAI {
       method,
       bodyHeaders,
       retryCount,
+      preparedAPIKey,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
       x509Tenant,
@@ -1834,6 +1960,7 @@ export class OpenAI {
     method,
     bodyHeaders,
     retryCount,
+    preparedAPIKey,
     x509Headers,
     x509Timeout,
     x509Tenant,
@@ -1842,6 +1969,7 @@ export class OpenAI {
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
     retryCount: number;
+    preparedAPIKey: PreparedAPIKey | undefined;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
     x509Tenant?: { organization: string | null; project: string | null } | undefined;
@@ -1854,6 +1982,17 @@ export class OpenAI {
 
     const helperMethod = options.__metadata?.['helperMethod'];
     const timeout = x509Headers ? x509Timeout : options.timeout;
+    let authenticationHeaders: NullableHeaders | undefined;
+    if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
+      if (preparedAPIKey) this.#preparedAPIKeys.set(options, preparedAPIKey);
+      try {
+        authenticationHeaders = await this.authHeaders(options, options.__security ?? { bearerAuth: true });
+      } finally {
+        if (this.#preparedAPIKeys.get(options) === preparedAPIKey) {
+          this.#preparedAPIKeys.delete(options);
+        }
+      }
+    }
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -1866,9 +2005,7 @@ export class OpenAI {
         'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
         'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
-      this._provider || this.#x509Authentication?.isPlanningRequest()
-        ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+      authenticationHeaders,
       x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       bodyHeaders,
       x509Headers?.requestHeaders ?? options.headers,

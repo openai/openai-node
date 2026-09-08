@@ -1,3 +1,4 @@
+/* oxlint-disable eslint/max-classes-per-file -- Separate subclass fixtures cover independent compatibility paths. */
 import { vi } from 'vitest';
 
 import { BedrockOpenAI } from 'openai';
@@ -71,4 +72,26 @@ test('validates the exact direct-build URL without resolving query values again'
   expect(readCursor).toHaveBeenCalledTimes(1);
   expect(req.headers.get('authorization')).toBe('Bearer synthetic-direct');
   expect(provider).toHaveBeenCalledTimes(1);
+});
+
+test('releases credential preparation after a subclass API-key getter failure', async () => {
+  class AlternatingCredentials extends BedrockOpenAI {
+    preparations = 0;
+
+    protected override async prepareOptions() {
+      this.preparations += 1;
+      this.apiKey = this.preparations === 1 ? 'synthetic\ninvalid' : 'synthetic-valid';
+    }
+  }
+  const client = new AlternatingCredentials({
+    baseURL,
+    apiKey: 'synthetic-configured',
+    fetch: async () => Response.json({ ok: true }),
+  });
+  const options = { method: 'get' as const, path: '/items' };
+
+  await expect(client.request(options)).rejects.toThrow('invalid HTTP header value');
+  await expect(client.request(options)).resolves.toEqual({ ok: true });
+
+  expect(client.preparations).toBe(2);
 });

@@ -148,6 +148,7 @@ export class AzureOpenAI extends OpenAI {
 
     this.apiVersion = apiVersion;
     this.deploymentName = deployment;
+    this.markCredentialHooksSafe(AzureOpenAI.prototype.authHeaders, AzureOpenAI.prototype.buildRequest);
   }
 
   /** Clones this client with Azure options; OpenAI data residency remains unsupported. */
