@@ -114,7 +114,7 @@ function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: Pro
 
 interface RunStepDeltaState {
   refreshRunStepDelta?: (afterListeners?: boolean) => void;
-  getRunStepDelta?: (afterListeners?: boolean) => RunStepDelta | undefined;
+  getRunStepDelta?: (afterCallbacks?: boolean) => RunStepDelta | undefined;
 }
 
 function getInheritedDeltaDescriptor(data: object): PropertyDescriptor | undefined {
@@ -206,8 +206,8 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       capturedData.delta = delta;
       let observedDescriptor = deltaDescriptor;
       let observedDelta: RunStepDelta | undefined = delta;
-      const readCurrentDelta = (afterListeners = false) => {
-        if (!afterListeners) {
+      const readCurrentDelta = (afterCallbacks = false) => {
+        if (!afterCallbacks) {
           return observedDelta;
         }
         const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
@@ -239,14 +239,16 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           return;
         }
         const accumulationDelta: Record<PropertyKey, unknown> = {};
+        let getterRan = false;
         for (const key of Reflect.ownKeys(currentDelta)) {
-          if (
-            typeof key === 'symbol' ||
-            key === 'id' ||
-            !Object.getOwnPropertyDescriptor(currentDelta, key)?.enumerable
-          ) {
+          if (typeof key === 'symbol' || key === 'id') {
             continue;
           }
+          const descriptor = Object.getOwnPropertyDescriptor(currentDelta, key);
+          if (!descriptor?.enumerable) {
+            continue;
+          }
+          getterRan ||= descriptor.get !== undefined;
           // Read accessors on their original receiver, without ever evaluating an excluded identity field.
           Object.defineProperty(accumulationDelta, key, {
             configurable: true,
@@ -256,6 +258,8 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           });
         }
         capturedData.delta = accumulationDelta as RunStepDelta;
+        // Getters can replace the public delta, while accumulation keeps the content just projected.
+        readCurrentDelta(getterRan);
       };
       return { getRunStepDelta: readCurrentDelta, refreshRunStepDelta };
     };
@@ -549,6 +553,9 @@ export class AssistantStream
     }
 
     const { refreshRunStepDelta, getRunStepDelta } = initializeRunStepDelta?.() ?? {};
+    if (runStepID !== undefined && runStepDeltaData !== undefined) {
+      this.#reserveRunStepAlias(runStepDeltaData, runStepID);
+    }
     this.#currentEvent = exposedEvent;
 
     const rawEventListenersRan = this.#handleEvent(exposedEvent);
