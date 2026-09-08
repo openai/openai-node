@@ -7,6 +7,9 @@ import { type HeadersLike } from './headers';
 
 export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
 
+/** Names internal credential preparation without claiming a string-named subclass hook. */
+export const prepareAPIKey = Symbol('openai.prepareAPIKey');
+
 export type RequestOptions = {
   /**
    * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').

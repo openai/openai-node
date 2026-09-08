@@ -12,6 +12,7 @@ import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import type { FinalRequestOptions, RequestOptions } from './internal/request-options';
+import { prepareAPIKey } from './internal/request-options';
 import { readEnv } from './internal/utils';
 import { addOutputText } from './lib/ResponsesParser';
 import type { ResponseStreamParams } from './lib/responses/ResponseStream';
@@ -250,7 +251,7 @@ export class BedrockOpenAI extends OpenAI {
   protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
     const security = options.__security ?? { bearerAuth: true };
     if (security.adminAPIKeyAuth && !security.bearerAuth) {
-      await this.prepareAPIKey(options);
+      await this[prepareAPIKey](options);
     }
     await super.prepareOptions(options);
   }

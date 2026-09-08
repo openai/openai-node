@@ -295,6 +295,51 @@ test('uses a Bedrock callback once when both security schemes are requested', as
   expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-bedrock');
 });
 
+test.each(clients)('%s ignores an unrelated subclass prepareAPIKey helper', async (kind) => {
+  const unrelatedHelper = vi.fn(async (_options: FinalRequestOptions) => {
+    throw new Error('synthetic unrelated subclass helper');
+  });
+  class CustomOpenAI extends OpenAI {
+    // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK authentication.
+    protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
+      await unrelatedHelper(options);
+    }
+  }
+  class CustomAzureOpenAI extends AzureOpenAI {
+    // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK authentication.
+    protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
+      await unrelatedHelper(options);
+    }
+  }
+  class CustomBedrockOpenAI extends BedrockOpenAI {
+    // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK authentication.
+    protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
+      await unrelatedHelper(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const fetch = mockFetch();
+  const options = { baseURL: 'https://credentials.example/v1', fetch, maxRetries: 0 };
+  let client: OpenAI;
+  if (kind === 'Azure') {
+    client = new CustomAzureOpenAI({
+      ...options,
+      azureADTokenProvider: provider,
+      apiVersion: '2024-10-01-preview',
+    });
+  } else if (kind === 'OpenAI') {
+    client = new CustomOpenAI({ ...options, apiKey: provider, adminAPIKey: null });
+  } else {
+    client = new CustomBedrockOpenAI({ ...options, bedrockTokenProvider: provider });
+  }
+
+  await expect(client.get('/items', { __security: securityFor(kind) })).resolves.toEqual({ ok: true });
+
+  expect(unrelatedHelper).not.toHaveBeenCalled();
+  expect(provider).toHaveBeenCalledTimes(1);
+  expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-provider');
+});
+
 test('supports _callApiKey overrides returning concurrent credentials without mutating apiKey', async () => {
   class CustomCredentials extends OpenAI {
     resolutions = 0;

@@ -977,7 +977,7 @@ export class OpenAI {
     if (attempts.length === 0) this.#apiKeyPreparationAttempts.delete(options);
   }
 
-  protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
+  protected async [Opts.prepareAPIKey](options: FinalRequestOptions): Promise<void> {
     const attempt = this.#synchronousCredentialAttempt ?? this.currentAPIKeyPreparationAttempt(options);
     const remember = (prepared: PreparedAPIKey) => {
       if (attempt) {
@@ -1092,7 +1092,7 @@ export class OpenAI {
 
     const security = options.__security ?? { bearerAuth: true };
     if (security.bearerAuth) {
-      await this.prepareAPIKey(options);
+      await this[Opts.prepareAPIKey](options);
     }
   }
 
