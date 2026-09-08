@@ -7,6 +7,16 @@ import { readEnv } from './utils';
 /** Identifies legacy Bedrock clients without importing the client class into WebSocket modules. */
 export const brand_privateBedrockClient = Symbol.for('openai.privateBedrockClient');
 
+// The configured origin is fixed for the lifetime of each legacy client.
+const bedrockClientOrigins = new WeakMap<object, string>();
+
+/** Records the constructor-configured origin once, independently of overridable client hooks. */
+export function registerBedrockClientOrigin(client: object, baseURL: string): void {
+  if (!bedrockClientOrigins.has(client)) {
+    bedrockClientOrigins.set(client, new URL(baseURL).origin);
+  }
+}
+
 /** Selects the regional Amazon Bedrock endpoint and its matching SigV4 service. */
 export type BedrockEndpoint = 'mantle' | 'runtime';
 
@@ -241,6 +251,14 @@ export function assertBedrockRequestOrigin(baseURL: string, requestURL: string):
     throw new Errors.OpenAIError(
       `Bedrock request origin \`${requestOrigin}\` does not match the configured base URL origin \`${expectedOrigin}\`.`,
     );
+  }
+}
+
+/** Enforces the registered Bedrock origin at the final HTTP construction boundary. */
+export function assertBedrockClientRequestOrigin(client: object, requestURL: string): void {
+  const baseURL = bedrockClientOrigins.get(client);
+  if (baseURL !== undefined) {
+    assertBedrockRequestOrigin(baseURL, requestURL);
   }
 }
 

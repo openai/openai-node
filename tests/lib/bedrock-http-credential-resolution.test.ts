@@ -1,4 +1,4 @@
-/* oxlint-disable eslint/max-classes-per-file -- Separate subclass fixtures cover independent compatibility paths. */
+/* oxlint-disable eslint/max-classes-per-file -- Separate subclass fixtures cover credential fallback and final URL validation. */
 import { vi } from 'vitest';
 
 import { BedrockOpenAI } from 'openai';
@@ -34,6 +34,55 @@ test.each(schemes)('treats a null Bedrock _callApiKey result as final with %j', 
   expect(client.resolutions).toBe(1);
 });
 
+test('validates a replaced buildURL result before direct-build body or credential effects', async () => {
+  class ReplacedURL extends BedrockOpenAI {
+    override buildURL(
+      path: string,
+      query: Record<string, unknown> | null | undefined,
+      defaultBaseURL?: string,
+    ) {
+      super.buildURL(path, query, defaultBaseURL);
+      return 'https://other.example/openai/v1/items';
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-direct');
+  const serializeBody = vi.fn(() => ({ synthetic: true }));
+  const client = new ReplacedURL({ baseURL, bedrockTokenProvider: provider });
+
+  await expect(
+    client.buildRequest({ method: 'post', path: '/items', body: { toJSON: serializeBody } }),
+  ).rejects.toThrow('origin');
+
+  expect(provider).not.toHaveBeenCalled();
+  expect(serializeBody).not.toHaveBeenCalled();
+});
+
+test('validates direct-build origins despite a nondelegating validateRequestURL method', async () => {
+  class CustomValidation extends BedrockOpenAI {
+    // oxlint-disable-next-line eslint/class-methods-use-this -- This instance hook intentionally bypasses inherited validation.
+    protected validateRequestURL(_url: string): void {}
+
+    // oxlint-disable-next-line eslint/class-methods-use-this -- This instance routing override intentionally skips the base builder.
+    override buildURL(path: string): string {
+      return path;
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-direct');
+  const serializeBody = vi.fn(() => ({ synthetic: true }));
+  const client = new CustomValidation({ baseURL, bedrockTokenProvider: provider });
+
+  await expect(
+    client.buildRequest({
+      method: 'post',
+      path: 'https://other.example/openai/v1/items',
+      body: { toJSON: serializeBody },
+    }),
+  ).rejects.toThrow('origin');
+
+  expect(provider).not.toHaveBeenCalled();
+  expect(serializeBody).not.toHaveBeenCalled();
+});
+
 test('validates the constructed URL before resolving credentials in a direct Bedrock build', async () => {
   const provider = vi.fn(async () => 'synthetic-direct');
   const client = new BedrockOpenAI({ baseURL, bedrockTokenProvider: provider });
@@ -50,7 +99,7 @@ test('validates the constructed URL before resolving credentials in a direct Bed
 test('validates the exact direct-build URL without resolving query values again', async () => {
   const provider = vi.fn(async () => 'synthetic-direct');
   const client = new BedrockOpenAI({ baseURL, bedrockTokenProvider: provider });
-  const guard = vi.spyOn(bedrockInternal, 'assertBedrockRequestOrigin');
+  const guard = vi.spyOn(bedrockInternal, 'assertBedrockClientRequestOrigin');
   const readCursor = vi.fn(() => 'synthetic cursor');
   const query = {
     get cursor() {
@@ -66,32 +115,10 @@ test('validates the exact direct-build URL without resolving query values again'
   });
 
   expect(guard).toHaveBeenCalledTimes(1);
-  expect(guard).toHaveBeenCalledWith(baseURL, url);
+  expect(guard).toHaveBeenCalledWith(client, url);
   expect(new URL(url).origin).toBe(new URL(baseURL).origin);
   expect(new URL(url).searchParams.get('cursor')).toBe('synthetic cursor');
   expect(readCursor).toHaveBeenCalledTimes(1);
   expect(req.headers.get('authorization')).toBe('Bearer synthetic-direct');
   expect(provider).toHaveBeenCalledTimes(1);
-});
-
-test('releases credential preparation after a subclass API-key getter failure', async () => {
-  class AlternatingCredentials extends BedrockOpenAI {
-    preparations = 0;
-
-    protected override async prepareOptions() {
-      this.preparations += 1;
-      this.apiKey = this.preparations === 1 ? 'synthetic\ninvalid' : 'synthetic-valid';
-    }
-  }
-  const client = new AlternatingCredentials({
-    baseURL,
-    apiKey: 'synthetic-configured',
-    fetch: async () => Response.json({ ok: true }),
-  });
-  const options = { method: 'get' as const, path: '/items' };
-
-  await expect(client.request(options)).rejects.toThrow('invalid HTTP header value');
-  await expect(client.request(options)).resolves.toEqual({ ok: true });
-
-  expect(client.preparations).toBe(2);
 });

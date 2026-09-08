@@ -6,6 +6,7 @@ import {
   assertBedrockRequestOrigin,
   assertValidBedrockBearerCredential,
   brand_privateBedrockClient,
+  registerBedrockClientOrigin,
 } from './internal/bedrock';
 import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
@@ -180,13 +181,16 @@ export class BedrockOpenAI extends OpenAI {
     }
 
     const configuredBaseURL = baseURL?.trim() ? baseURL : deriveBedrockBaseURL(awsRegion);
+    const normalizedBaseURL = normalizeBedrockBaseURL(configuredBaseURL);
 
     super({
       apiKey: bedrockTokenProvider ?? apiKey,
       adminAPIKey: null,
-      baseURL: normalizeBedrockBaseURL(configuredBaseURL),
+      baseURL: normalizedBaseURL,
       ...opts,
     });
+
+    registerBedrockClientOrigin(this, normalizedBaseURL);
 
     let currentApiKey = this.apiKey;
     Object.defineProperty(this, 'apiKey', {
@@ -219,7 +223,11 @@ export class BedrockOpenAI extends OpenAI {
 
     this.bedrockTokenProvider = bedrockTokenProvider;
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
-    this.markCredentialHooksSafe(BedrockOpenAI.prototype.prepareOptions, BedrockOpenAI.prototype.authHeaders);
+    this.markCredentialHooksSafe(
+      BedrockOpenAI.prototype.prepareOptions,
+      BedrockOpenAI.prototype.authHeaders,
+      BedrockOpenAI.prototype.prepareRequest,
+    );
   }
 
   /** Builds and validates the request URL before preparing its body or resolving credentials. */

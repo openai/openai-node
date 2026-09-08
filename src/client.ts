@@ -251,6 +251,7 @@ import {
   ChatCompletionsPage,
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
+import { assertBedrockClientRequestOrigin } from './internal/bedrock';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
@@ -315,8 +316,8 @@ export interface ClientOptions {
    *
    * - Accepts either a static string or an async function that resolves to a string.
    * - Defaults to process.env['OPENAI_API_KEY'].
-   * - When a function is provided, it is invoked while building authentication headers
-   *   for each request attempt, including retries, so you can rotate credentials.
+   * - When a function is provided, it is invoked for each request attempt, including
+   *   retries, so you can rotate or refresh credentials at runtime.
    * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
    * - If the function throws, the error is wrapped in an OpenAIError with the original
    *   error available as `cause`.
@@ -500,8 +501,7 @@ export class OpenAI {
   >();
   #lastProviderAPIKey: string | null | undefined;
   #baseAPIKeyCapture: ((apiKey: string | null) => void) | undefined;
-  #preparedAPIKeys = new WeakMap<FinalRequestOptions, PreparedAPIKey>();
-  #activeCredentialOptions = new WeakSet<FinalRequestOptions>();
+  #apiKeyPreparationAttempts = new WeakMap<FinalRequestOptions, APIKeyPreparationAttempt[]>();
   #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
   #safeCredentialHooks = new Set<Function>([
     OpenAI.prototype._callApiKey,
@@ -509,6 +509,7 @@ export class OpenAI {
     OpenAI.prototype.authHeaders,
     OpenAI.prototype.bearerAuth,
     OpenAI.prototype.buildRequest,
+    OpenAI.prototype.prepareRequest,
   ]);
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
@@ -891,14 +892,19 @@ export class OpenAI {
   async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
     const apiKey = this._options.apiKey;
     if (this._provider || typeof apiKey !== 'function') {
-      this.captureBaseAPIKey(capture, this.apiKey);
+      if (capture) this.captureBaseAPIKey(capture, this.apiKey);
       return false;
     }
 
     const resolved = await this.resolveAPIKeyProvider(apiKey);
     this.apiKey = resolved;
-    this.#lastProviderAPIKey = this.apiKey;
-    this.captureBaseAPIKey(capture, this.apiKey);
+    if (capture) {
+      const currentAPIKey = this.apiKey;
+      this.#lastProviderAPIKey = currentAPIKey;
+      this.captureBaseAPIKey(capture, currentAPIKey);
+    } else {
+      this.#lastProviderAPIKey = resolved;
+    }
     return true;
   }
 
@@ -927,28 +933,57 @@ export class OpenAI {
       this.authHeaders,
       this.bearerAuth,
       this.buildRequest,
+      this.prepareRequest,
     ].every((hook) => this.#safeCredentialHooks.has(hook));
   }
 
   private hasCustomRequestCredentialHooks(): boolean {
-    return ![this.prepareOptions, this.authHeaders, this.bearerAuth, this.buildRequest].every((hook) =>
-      this.#safeCredentialHooks.has(hook),
-    );
+    return ![
+      this.prepareOptions,
+      this.authHeaders,
+      this.bearerAuth,
+      this.buildRequest,
+      this.prepareRequest,
+    ].every((hook) => this.#safeCredentialHooks.has(hook));
+  }
+
+  private addAPIKeyPreparationAttempt(options: FinalRequestOptions, attempt: APIKeyPreparationAttempt): void {
+    const attempts = this.#apiKeyPreparationAttempts.get(options);
+    if (attempts) {
+      attempts.push(attempt);
+    } else {
+      this.#apiKeyPreparationAttempts.set(options, [attempt]);
+    }
+  }
+
+  private currentAPIKeyPreparationAttempt(
+    options: FinalRequestOptions,
+  ): APIKeyPreparationAttempt | undefined {
+    return this.#apiKeyPreparationAttempts.get(options)?.at(-1);
+  }
+
+  private removeAPIKeyPreparationAttempt(
+    options: FinalRequestOptions,
+    attempt: APIKeyPreparationAttempt,
+  ): void {
+    const attempts = this.#apiKeyPreparationAttempts.get(options);
+    const index = attempts?.lastIndexOf(attempt) ?? -1;
+    if (!attempts || index < 0) return;
+    attempts.splice(index, 1);
+    if (attempts.length === 0) this.#apiKeyPreparationAttempts.delete(options);
   }
 
   protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
-    const attempt = this.#synchronousCredentialAttempt;
+    const attempt = this.#synchronousCredentialAttempt ?? this.currentAPIKeyPreparationAttempt(options);
     const remember = (prepared: PreparedAPIKey) => {
       if (attempt) {
         attempt.prepared = prepared;
-      } else {
-        this.#preparedAPIKeys.set(options, prepared);
       }
     };
     let captured = false;
     const captureAPIKey = (apiKey: string | null) => {
       captured = true;
-      const capturedByBase = this.#baseAPIKeyCapture === captureAPIKey;
+      const capturedByBase = this.#baseAPIKeyCapture !== undefined && apiKey === this.#lastProviderAPIKey;
       remember({
         apiKey,
         tracksClientValue: apiKey === this.apiKey,
@@ -968,7 +1003,7 @@ export class OpenAI {
   }
 
   protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
-    const prepared = this.#preparedAPIKeys.get(options);
+    const prepared = this.currentAPIKeyPreparationAttempt(options)?.prepared;
     if (prepared) {
       if (prepared.explicitCapture) return prepared.apiKey;
       if (
@@ -1296,26 +1331,16 @@ export class OpenAI {
     retriesRemaining: number | null,
     retryOfRequestLogID: string | undefined,
   ): Promise<APIResponseProps> {
-    const inputOptions = await optionsInput;
-    // A request hook may recursively or concurrently reuse its caller's options.
-    // Give only those overlapping attempts a distinct WeakMap identity while
-    // forwarding all reads and writes to the original object.
-    const options =
-      this.hasCustomCredentialHooks() && this.#activeCredentialOptions.has(inputOptions)
-        ? new Proxy(inputOptions, {
-            get: (target, property) => Reflect.get(target, property, target),
-            set: (target, property, value) => Reflect.set(target, property, value, target),
-          })
-        : inputOptions;
+    const options = await optionsInput;
     const maxRetries = options.maxRetries ?? this.maxRetries;
     if (retriesRemaining == null) {
       retriesRemaining = maxRetries;
     }
 
-    this.#activeCredentialOptions.add(options);
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
     const preparationAttempt: APIKeyPreparationAttempt = {};
+    this.addAPIKeyPreparationAttempt(options, preparationAttempt);
     let preparation: Promise<void>;
     try {
       this.validateOptionsBeforePreparation(options);
@@ -1328,11 +1353,10 @@ export class OpenAI {
       }
       await preparation;
     } catch (error) {
-      this.#preparedAPIKeys.delete(options);
-      this.#activeCredentialOptions.delete(options);
+      this.removeAPIKeyPreparationAttempt(options, preparationAttempt);
       throw error;
     }
-    let preparedAPIKey = preparationAttempt.prepared ?? this.#preparedAPIKeys.get(options);
+    let preparedAPIKey = preparationAttempt.prepared;
     try {
       if (!preparedAPIKey && this.hasCustomCredentialHooks()) {
         preparedAPIKey = {
@@ -1341,28 +1365,27 @@ export class OpenAI {
           allowClientOverride: true,
           explicitCapture: false,
         };
+        preparationAttempt.prepared = preparedAPIKey;
       }
     } catch (error) {
-      this.#preparedAPIKeys.delete(options);
-      this.#activeCredentialOptions.delete(options);
+      this.removeAPIKeyPreparationAttempt(options, preparationAttempt);
       throw error;
     }
 
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     const apiKeyBuildContext: APIKeyBuildContext = { owner: this, prepared: preparedAPIKey, active: true };
+    const finishCredentialPreparation = () => {
+      apiKeyBuildContext.active = false;
+      this.removeAPIKeyPreparationAttempt(options, preparationAttempt);
+    };
     try {
-      if (preparedAPIKey && this.hasCustomRequestCredentialHooks()) {
-        // Preserve one-argument overrides that delegate the original options object.
-        this.#preparedAPIKeys.set(options, preparedAPIKey);
-      }
       const candidate = await this.buildRequest(options, {
         retryCount: maxRetries - retriesRemaining,
         [preparedAPIKeyContext]: apiKeyBuildContext,
       } as InternalBuildProperties);
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
       apiKeyBuildContext.active = false;
-      this.#preparedAPIKeys.delete(options);
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
         x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout);
@@ -1398,9 +1421,7 @@ export class OpenAI {
         this.validateHeaders(buildHeaders([supplied, built.req.headers]), security);
       }
     } catch (error) {
-      apiKeyBuildContext.active = false;
-      this.#preparedAPIKeys.delete(options);
-      this.#activeCredentialOptions.delete(options);
+      finishCredentialPreparation();
       x509Authentication?.retireRequestBody();
       if (
         x509Authentication &&
@@ -1417,7 +1438,7 @@ export class OpenAI {
       }
       throw error;
     }
-    this.#activeCredentialOptions.delete(options);
+    if (x509Authentication) finishCredentialPreparation();
     const { req, url } = built;
     const timeout = x509Authentication
       ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
@@ -1426,8 +1447,12 @@ export class OpenAI {
     let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
     if (!x509Authentication) {
-      await this.prepareRequest(req, { url, options });
-      await this._provider?.prepareRequest?.(req, { url, options });
+      try {
+        await this.prepareRequest(req, { url, options });
+        await this._provider?.prepareRequest?.(req, { url, options });
+      } finally {
+        finishCredentialPreparation();
+      }
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -1916,6 +1941,7 @@ export class OpenAI {
     const { method, path, query, defaultBaseURL } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
+    assertBedrockClientRequestOrigin(this, url);
     x509Authentication?.snapshotAPIURL(url);
     const explicitTimeout = 'timeout' in options;
     if (explicitTimeout) validatePositiveInteger('timeout', options.timeout);
@@ -2002,13 +2028,16 @@ export class OpenAI {
     const timeout = x509Headers ? x509Timeout : options.timeout;
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
-      if (preparedAPIKey) this.#preparedAPIKeys.set(options, preparedAPIKey);
+      const currentAttempt = this.currentAPIKeyPreparationAttempt(options);
+      const temporaryAttempt =
+        preparedAPIKey && currentAttempt?.prepared !== preparedAPIKey
+          ? { prepared: preparedAPIKey }
+          : undefined;
+      if (temporaryAttempt) this.addAPIKeyPreparationAttempt(options, temporaryAttempt);
       try {
         authenticationHeaders = await this.authHeaders(options, options.__security ?? { bearerAuth: true });
       } finally {
-        if (this.#preparedAPIKeys.get(options) === preparedAPIKey) {
-          this.#preparedAPIKeys.delete(options);
-        }
+        if (temporaryAttempt) this.removeAPIKeyPreparationAttempt(options, temporaryAttempt);
       }
     }
     const headers = buildHeaders([

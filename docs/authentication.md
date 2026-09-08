@@ -44,8 +44,8 @@ const client = new OpenAI({
 This also works with an OAuth bearer-token provider for a compatible endpoint;
 see the [Azure v1 example](azure.md#v1-api).
 
-For HTTP requests, the SDK keeps each credential resolution associated with its
-request and uses that invocation's result directly. Each retry resolves a fresh
+With the SDK's default HTTP authentication hooks, each function-credential result
+stays associated with its request. Each retry resolves a fresh
 credential. `client.apiKey` still exposes the most recently resolved value, but it
 is shared across requests and must not be used to select a concurrent request's
 credential. Static credentials continue to use the current `client.apiKey` value.
@@ -59,8 +59,15 @@ Default and request headers retain their existing precedence over SDK authentica
 Existing bearer-token subclasses that customize `_callApiKey`, or assign
 `this.apiKey` after `super.prepareOptions()`, remain supported. Overrides of
 `authHeaders` or `bearerAuth` can continue to return custom authentication headers.
-Delegating hooks keep their existing arguments; no request context needs to be
-forwarded.
+Preparation hooks that supply a credential without delegating to `super` retain
+control of that credential. Changes to `this.apiKey` inside authentication hooks
+are also honored.
+
+`_callApiKey` overrides can forward the existing optional `capture` callback to
+preserve the credential belonging to their invocation. Legacy overrides that omit
+it retain their shared-property behavior. Custom hooks that write `this.apiKey`
+remain responsible for coordinating concurrent writes. Prepared credentials are
+discarded when request construction finishes or fails.
 
 `AzureOpenAI` uses the inherited function-credential lifecycle for
 `azureADTokenProvider`, but a static `apiKey` uses Azure's `api-key` header. For
