@@ -1,20 +1,30 @@
 const nativeHeadersPrototype = globalThis.Headers?.prototype;
-const nativeHeadersHas = nativeHeadersPrototype?.has;
 const nativeHeadersGet = nativeHeadersPrototype?.get;
-const nativeHeadersIterator = nativeHeadersPrototype?.[Symbol.iterator];
+const nativeHeadersProtocol = nativeHeadersPrototype
+  ? {
+      has: nativeHeadersPrototype.has,
+      iterator: nativeHeadersPrototype[Symbol.iterator],
+      prototype: nativeHeadersPrototype,
+    }
+  : undefined;
+
+const hasNativeHeadersBrand = (headers: object): boolean => {
+  if (!nativeHeadersProtocol) {
+    return false;
+  }
+  try {
+    Reflect.apply(nativeHeadersProtocol.has, headers, ['authorization']);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const getHeadersProtocol = (
   headers: object,
 ): { iterator: () => Iterator<unknown>; prototype: object } | undefined => {
   let protocol: { iterator: () => Iterator<unknown>; prototype: object } | undefined;
-  if (nativeHeadersPrototype && nativeHeadersHas && nativeHeadersIterator) {
-    try {
-      Reflect.apply(nativeHeadersHas, headers, ['authorization']);
-      return { iterator: nativeHeadersIterator, prototype: nativeHeadersPrototype };
-    } catch {
-      // Other realms may require their own platform reader.
-    }
-  }
+  const native = hasNativeHeadersBrand(headers);
   try {
     const seen = new Set<object>();
     for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
@@ -37,13 +47,18 @@ const getHeadersProtocol = (
         iterator.value === entries
       ) {
         protocol = { iterator: iterator.value as () => Iterator<unknown>, prototype };
-        break;
+        // A branded native subclass can forge the structural protocol at an outer prototype. Keep
+        // walking to select its realm's intrinsic Headers prototype; structural inputs retain the
+        // original nearest-protocol behavior.
+        if (!native) {
+          break;
+        }
       }
     }
   } catch {
     // Caller-controlled descriptors can leave a collection's protocol unknown.
   }
-  return protocol;
+  return protocol ?? (native ? nativeHeadersProtocol : undefined);
 };
 
 export const getHeadersIterator = (headers: object) => getHeadersProtocol(headers)?.iterator;

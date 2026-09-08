@@ -260,6 +260,7 @@ import {
   snapshotHeaders,
   getRequestHeaders,
   getPlatformHeader,
+  hasCustomNativeHeadersIterator,
   hasNativeHeadersBrand,
   createWorkloadHeaderSnapshots,
   canReplayHeaderInput,
@@ -317,6 +318,7 @@ type WorkloadIdentityRequest = {
   authorization: string | undefined;
   credential: WorkloadCredentialUsage | undefined;
   responses: WeakMap<Response, boolean>;
+  allResponsesUsedWorkloadToken: boolean | undefined;
 };
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
@@ -1456,6 +1458,7 @@ export class OpenAI {
       authorization: initialWorkloadAuthorization,
       credential: workloadCredential,
       responses: new WeakMap<Response, boolean>(),
+      allResponsesUsedWorkloadToken: undefined,
     };
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
@@ -1476,7 +1479,8 @@ export class OpenAI {
         workloadRequest.bindings.clear();
       });
     const usedWorkloadToken =
-      !(response instanceof globalThis.Error) && workloadRequest.responses.get(response) === true;
+      !(response instanceof globalThis.Error) &&
+      (workloadRequest.responses.get(response) ?? workloadRequest.allResponsesUsedWorkloadToken) === true;
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1836,7 +1840,14 @@ export class OpenAI {
         url,
         WorkloadTokenProvenance.forDispatch(dispatchOptions),
       );
-      workloadRequest?.responses.set(response, used);
+      if (workloadRequest) {
+        const prior = workloadRequest.responses.get(response);
+        workloadRequest.responses.set(response, prior === undefined ? used : prior && used);
+        workloadRequest.allResponsesUsedWorkloadToken =
+          workloadRequest.allResponsesUsedWorkloadToken === undefined
+            ? used
+            : workloadRequest.allResponsesUsedWorkloadToken && used;
+      }
       return response;
     } catch (err) {
       if (signal && !composed) signal.removeEventListener('abort', abort);
@@ -2237,6 +2248,11 @@ export class OpenAI {
         );
         suppliedHeaders = refreshSuppliedHeaders();
       }
+    }
+    if (authenticationHeaders?.values && hasCustomNativeHeadersIterator(authenticationHeaders.values)) {
+      // Attribute the same one-time canonical serialization that is handed to the request. This
+      // preserves forwarding native iterators without trusting them as intrinsic readers.
+      authenticationHeaders = buildHeaders([authenticationHeaders]);
     }
     this.#workloadTokenProvenance.recover(authenticationHeaders, options, credentialContext);
     const headers = buildHeaders([

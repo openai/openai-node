@@ -2,6 +2,10 @@
 import OpenAI from 'openai';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
+function* forwardNativeHeadersIterator(this: Headers) {
+  yield* Headers.prototype.entries.call(this);
+}
+
 test.each(['ordinary subclass', 'Headers-shaped subclass', 'custom iterator'] as const)(
   'reads the serialized credential from a native %s',
   async (kind) => {
@@ -98,6 +102,52 @@ test.each(['own', 'inherited'] as const)(
 
     expect(reads).toBe(0);
     expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
+  },
+);
+
+test.each(['instance', 'subclass'] as const)(
+  'recovers workload provenance from a native %s forwarding iterator',
+  async (kind) => {
+    class ForwardingHeaders extends Headers {
+      override *[Symbol.iterator]() {
+        yield* Headers.prototype.entries.call(this);
+      }
+    }
+    class HookClient extends OpenAI {
+      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+        const result = await super.authHeaders(...args);
+        if (!result) {
+          return result;
+        }
+        const values =
+          kind === 'subclass' ? new ForwardingHeaders(result.values) : new Headers(result.values);
+        if (kind === 'instance') {
+          Object.defineProperty(values, Symbol.iterator, {
+            value: forwardNativeHeadersIterator,
+          });
+        }
+        return { ...result, values };
+      }
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      calls += 1;
+      return calls === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list();
+
+    expect(calls).toBe(2);
     expect(transport.exchanges).toBe(2);
   },
 );
