@@ -6,6 +6,7 @@ import {
   assertBedrockRequestOrigin,
   assertValidBedrockBearerCredential,
   brand_privateBedrockClient,
+  registerBedrockClientOrigin,
 } from './internal/bedrock';
 import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
@@ -180,13 +181,16 @@ export class BedrockOpenAI extends OpenAI {
     }
 
     const configuredBaseURL = baseURL?.trim() ? baseURL : deriveBedrockBaseURL(awsRegion);
+    const normalizedBaseURL = normalizeBedrockBaseURL(configuredBaseURL);
 
     super({
       apiKey: bedrockTokenProvider ?? apiKey,
       adminAPIKey: null,
-      baseURL: normalizeBedrockBaseURL(configuredBaseURL),
+      baseURL: normalizedBaseURL,
       ...opts,
     });
+
+    registerBedrockClientOrigin(this, normalizedBaseURL);
 
     let currentApiKey = this.apiKey;
     Object.defineProperty(this, 'apiKey', {
@@ -228,14 +232,8 @@ export class BedrockOpenAI extends OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const url = super.buildURL(path, query, defaultBaseURL);
-    this.validateRequestURL(url);
-    return url;
-  }
-
-  /** Validates the final URL returned by request construction, including subclass overrides. */
-  protected override validateRequestURL(url: string): void {
-    super.validateRequestURL(url);
     assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, url);
+    return url;
   }
 
   protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {

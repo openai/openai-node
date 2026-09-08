@@ -251,6 +251,7 @@ import {
   ChatCompletionsPage,
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
+import { assertBedrockClientRequestOrigin } from './internal/bedrock';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
@@ -746,9 +747,6 @@ export class OpenAI {
   protected defaultQuery(): Record<string, string | undefined> | undefined {
     return this._options.defaultQuery;
   }
-
-  /** Validates the final routed URL before constructing a body or authentication headers. */
-  protected validateRequestURL(url: string): void {}
 
   protected validateHeaders(
     { values, nulls }: NullableHeaders,
@@ -1814,7 +1812,7 @@ export class OpenAI {
     const { method, path, query, defaultBaseURL } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
-    this.validateRequestURL(url);
+    assertBedrockClientRequestOrigin(this, url);
     x509Authentication?.snapshotAPIURL(url);
     const explicitTimeout = 'timeout' in options;
     if (explicitTimeout) validatePositiveInteger('timeout', options.timeout);

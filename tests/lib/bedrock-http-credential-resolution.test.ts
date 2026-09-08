@@ -57,6 +57,32 @@ test('validates a replaced buildURL result before direct-build body or credentia
   expect(serializeBody).not.toHaveBeenCalled();
 });
 
+test('validates direct-build origins despite a nondelegating validateRequestURL method', async () => {
+  class CustomValidation extends BedrockOpenAI {
+    // oxlint-disable-next-line eslint/class-methods-use-this -- This instance hook intentionally bypasses inherited validation.
+    protected validateRequestURL(_url: string): void {}
+
+    // oxlint-disable-next-line eslint/class-methods-use-this -- This instance routing override intentionally skips the base builder.
+    override buildURL(path: string): string {
+      return path;
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-direct');
+  const serializeBody = vi.fn(() => ({ synthetic: true }));
+  const client = new CustomValidation({ baseURL, bedrockTokenProvider: provider });
+
+  await expect(
+    client.buildRequest({
+      method: 'post',
+      path: 'https://other.example/openai/v1/items',
+      body: { toJSON: serializeBody },
+    }),
+  ).rejects.toThrow('origin');
+
+  expect(provider).not.toHaveBeenCalled();
+  expect(serializeBody).not.toHaveBeenCalled();
+});
+
 test('validates the constructed URL before resolving credentials in a direct Bedrock build', async () => {
   const provider = vi.fn(async () => 'synthetic-direct');
   const client = new BedrockOpenAI({ baseURL, bedrockTokenProvider: provider });
@@ -73,7 +99,7 @@ test('validates the constructed URL before resolving credentials in a direct Bed
 test('validates the exact direct-build URL without resolving query values again', async () => {
   const provider = vi.fn(async () => 'synthetic-direct');
   const client = new BedrockOpenAI({ baseURL, bedrockTokenProvider: provider });
-  const guard = vi.spyOn(bedrockInternal, 'assertBedrockRequestOrigin');
+  const guard = vi.spyOn(bedrockInternal, 'assertBedrockClientRequestOrigin');
   const readCursor = vi.fn(() => 'synthetic cursor');
   const query = {
     get cursor() {
@@ -88,8 +114,8 @@ test('validates the exact direct-build URL without resolving query values again'
     defaultBaseURL: 'https://default.example/v1',
   });
 
-  expect(guard).toHaveBeenCalledTimes(2);
-  expect(guard).toHaveBeenCalledWith(baseURL, url);
+  expect(guard).toHaveBeenCalledTimes(1);
+  expect(guard).toHaveBeenCalledWith(client, url);
   expect(new URL(url).origin).toBe(new URL(baseURL).origin);
   expect(new URL(url).searchParams.get('cursor')).toBe('synthetic cursor');
   expect(readCursor).toHaveBeenCalledTimes(1);
