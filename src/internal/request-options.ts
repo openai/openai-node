@@ -10,6 +10,9 @@ export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: s
 /** Names internal credential preparation without claiming a string-named subclass hook. */
 export const prepareAPIKey = Symbol('openai.prepareAPIKey');
 
+/** Names internal credential resolution without claiming a string-named subclass hook. */
+export const resolvedAPIKey = Symbol('openai.resolvedAPIKey');
+
 export type RequestOptions = {
   /**
    * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').
