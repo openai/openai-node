@@ -614,8 +614,73 @@ test.each([200, 401].flatMap((status) => [false, true].map((bound) => ({ status,
   },
 );
 
+test.each([200, 401].flatMap((status) => ['iterator', 'record'].map((kind) => ({ status, kind }))))(
+  'forwards an unreadable $kind wrapper to its configured transport (status: $status)',
+  async ({ status, kind }) => {
+    const targets = new WeakMap<object, Headers>();
+    let supplied: NonNullable<RequestInit['headers']> | undefined;
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [, request] = args;
+        if (!request) {
+          throw new Error('Expected request init');
+        }
+        const target = new Headers(request.headers);
+        const wrapper =
+          kind === 'iterator'
+            ? {
+                [Symbol.iterator]() {
+                  throw new TypeError('Synthetic wrapper requires transport unwrapping');
+                },
+              }
+            : new Proxy(
+                {},
+                {
+                  ownKeys() {
+                    throw new Error('Synthetic wrapper requires transport unwrapping');
+                  },
+                },
+              );
+        targets.set(wrapper, target);
+        supplied = wrapper as NonNullable<RequestInit['headers']>;
+        request.headers = supplied;
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      expect(init?.headers).toBe(supplied);
+      const target = init?.headers && targets.get(init.headers);
+      if (!target) {
+        throw new Error('Expected a wrapper known to this transport');
+      }
+      const request = new Request(url, { ...init, headers: target } as globalThis.RequestInit);
+      expect(request.method).toBe('POST');
+      sent.push(request.headers.get('Authorization'));
+      return Response.json({ ok: true }, { status });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+      logLevel: 'debug',
+      logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    });
+
+    const result = client.post('/synthetic', { body: { value: 1 } });
+    await (status === 200
+      ? expect(result).resolves.toEqual({ ok: true })
+      : expect(result).rejects.toMatchObject({ status: 401 }));
+
+    expect(sent).toEqual(['Bearer access-token-1']);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test.each(['native iterator', 'record', 'array'] as const)(
-  'retains materialization errors from invalid %s headers',
+  'retains configured-transport validation errors from invalid %s headers',
   async (kind) => {
     const diagnostic = new TypeError('Synthetic iterator diagnostic');
     class HookClient extends OpenAI {
@@ -639,9 +704,11 @@ test.each(['native iterator', 'record', 'array'] as const)(
         return super.fetchWithTimeout(...args);
       }
     }
-    let sends = 0;
-    const transport = createWorkloadIdentityTransport(() => {
-      sends += 1;
+    let transportCalls = 0;
+    const sends: Request[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      transportCalls += 1;
+      sends.push(new Request(url, init as globalThis.RequestInit));
       return Response.json({ data: [] });
     });
     const client = new HookClient({
@@ -655,7 +722,8 @@ test.each(['native iterator', 'record', 'array'] as const)(
     await expect(client.models.list()).rejects.toMatchObject({
       cause: kind === 'native iterator' ? diagnostic : expect.any(TypeError),
     });
-    expect(sends).toBe(0);
+    expect(transportCalls).toBe(1);
+    expect(sends).toHaveLength(0);
     expect(transport.exchanges).toBe(1);
   },
 );

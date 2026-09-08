@@ -19,6 +19,98 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+describe.each(['request', 'default'] as const)('%s record iterable protocol', (layer) => {
+  test.each(
+    (['own addition', 'inherited addition', 'getter replacement'] as const).flatMap((change) =>
+      [null, 'Bearer independent'].map((authorization) => ({ change, authorization })),
+    ),
+  )('uses an observed $change during acquisition: $authorization', async ({ change, authorization }) => {
+    const readRecord = vi.fn(() => 'record');
+    const headers = {
+      get 'X-Record'() {
+        return readRecord();
+      },
+    };
+    const readInitialIterator = vi.fn<() => undefined>();
+    if (change === 'getter replacement') {
+      Object.defineProperty(headers, Symbol.iterator, { configurable: true, get: readInitialIterator });
+    }
+    const rows = [
+      ['Authorization', authorization],
+      ['X-Protocol', 'iterable'],
+    ][Symbol.iterator]();
+    const iterate = vi.fn(() => rows);
+    const readIterator = vi.fn(() => iterate);
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      if (change === 'inherited addition') {
+        const prototype = Object.create(Object.getPrototypeOf(headers));
+        Object.defineProperty(prototype, Symbol.iterator, { get: readIterator });
+        Object.setPrototypeOf(headers, prototype);
+      } else {
+        Object.defineProperty(headers, Symbol.iterator, { configurable: true, value: iterate });
+      }
+      return 'subject-token';
+    };
+    const sent: Headers[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      sent.push(new Request(url, init as globalThis.RequestInit).headers);
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      workloadIdentity: identity,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list(layer === 'request' ? { headers } : {});
+
+    expect(sent.map((value) => value.get('Authorization'))).toEqual([authorization, authorization]);
+    expect(sent.map((value) => value.get('X-Protocol'))).toEqual(['iterable', 'iterable']);
+    expect(sent.every((value) => !value.has('X-Record'))).toBe(true);
+    expect(readRecord).toHaveBeenCalledTimes(1);
+    expect(readInitialIterator).toHaveBeenCalledTimes(change === 'getter replacement' ? 1 : 0);
+    expect(readIterator).toHaveBeenCalledTimes(change === 'inherited addition' ? 1 : 0);
+    expect(iterate).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  });
+
+  test.each([false, true])('retains a non-iterable accessor that removes itself: %s', async (remove) => {
+    const headers = { 'X-Record': 'record' };
+    const readIterator = vi.fn(() => {
+      if (remove) {
+        Reflect.deleteProperty(headers, Symbol.iterator);
+      }
+    });
+    Object.defineProperty(headers, Symbol.iterator, { configurable: true, get: readIterator });
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      const request = new Request(url, init as globalThis.RequestInit);
+      sent.push(request.headers.get('Authorization'));
+      expect(request.headers.get('X-Record')).toBe('record');
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list(layer === 'request' ? { headers } : {});
+
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(readIterator).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(2);
+  });
+});
+
 test.each(['record value', 'outer tuple', 'tuple name', 'tuple value'] as const)(
   'reads a nested %s accessor once',
   async (kind) => {

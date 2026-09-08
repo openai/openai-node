@@ -114,7 +114,7 @@ interface HeaderReplayState {
   iterator?: () => Iterator<HeaderEntry>;
   iterations?: WeakSet<object>;
   snapshot?: NullableHeaders;
-  record?: boolean;
+  record?: HeaderDescriptorHistory;
   properties?: Map<string, HeaderPropertySnapshot>;
   propertyOrder?: Map<string, HeaderRecordSnapshot>;
   changedAliases?: Map<string, string>;
@@ -335,15 +335,27 @@ export const hasStatefulArrayProperties = (
   return false;
 };
 
+const captureHeaderIterator = (headers: HeaderSource, replay?: HeaderReplayState) => {
+  // Snapshot the iterable protocol without rereading a caller-controlled getter.
+  const record =
+    replay && !replay.iterator
+      ? new HeaderDescriptorRead(observeHeaderDescriptor(headers, Symbol.iterator), replay.record)
+      : undefined;
+  const hasIterator = !record?.retained && (replay?.iterator !== undefined || Symbol.iterator in headers);
+  const iterator: (() => Iterator<HeaderEntry>) | undefined =
+    replay?.iterator ?? (hasIterator ? Reflect.get(headers, Symbol.iterator) : undefined);
+  if (replay && typeof iterator === 'function') {
+    delete replay.record;
+  }
+  return { iterator, record };
+};
+
 const captureHeaderProtocol = (
   headers: HeaderSource,
   callbacks: HeaderReplayCallbacks,
   replay?: HeaderReplayState,
 ) => {
-  // Snapshot the iterable protocol without rereading a caller-controlled getter.
-  const hasIterator = !replay?.record && (replay?.iterator !== undefined || Symbol.iterator in headers);
-  const iterator: (() => Iterator<HeaderEntry>) | undefined =
-    replay?.iterator ?? (hasIterator ? Reflect.get(headers, Symbol.iterator) : undefined);
+  const { iterator, record } = captureHeaderIterator(headers, replay);
   const nativeIterator =
     (replay || callbacks.onIterator) && typeof iterator === 'function' && !Array.isArray(headers)
       ? getHeadersIterator(headers)
@@ -354,11 +366,10 @@ const captureHeaderProtocol = (
     replay.unverifiedHeaders = native && !hasNativeHeadersBrand(headers);
     // Custom iterators may be one-shot whether inherited or owned.
     replay.refreshable =
-      !hasIterator ||
-      (typeof iterator === 'function' &&
-        (Array.isArray(headers) ? iterator === getArrayIterator(headers) : native));
+      typeof iterator !== 'function' ||
+      (Array.isArray(headers) ? iterator === getArrayIterator(headers) : native);
   }
-  return { iterator, native };
+  return { iterator, native, record };
 };
 
 const captureRecordEntries = (
@@ -367,7 +378,6 @@ const captureRecordEntries = (
   descriptors: Map<string, PropertyDescriptor>,
   present: Set<string>,
 ): HeaderEntry[] => {
-  replay.record = true;
   replay.properties ??= new Map();
   const entries: HeaderEntry[] = [];
   // Records read getters eagerly, matching Object.entries before any row is validated.
@@ -857,7 +867,7 @@ function* replayHeaderEntries(
   callbacks: HeaderReplayCallbacks,
   replay?: HeaderReplayState,
 ): IterableIterator<readonly [string, string | null]> {
-  const { iterator, native } = captureHeaderProtocol(headers, callbacks, replay);
+  const { iterator, native, record } = captureHeaderProtocol(headers, callbacks, replay);
   const clear = typeof iterator !== 'function';
   const descriptors = new Map<string, PropertyDescriptor>();
   const presentProperties = new Set<string>();
@@ -896,6 +906,10 @@ function* replayHeaderEntries(
     }
     const read = readRow(row, occurrence, clear, replay);
     yield* replayRow(read, headers, descriptors.get(read.name), clear, native, callbacks, replay);
+  }
+  if (clear && replay && record) {
+    // Getter and coercion side effects belong to this record read; later protocol changes do not.
+    replay.record = record.complete(observeHeaderDescriptor(headers, Symbol.iterator));
   }
   pruneRows(occurrences, replay);
 }

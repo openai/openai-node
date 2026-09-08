@@ -2564,15 +2564,8 @@ export class OpenAI {
     if (sourceHeaders !== undefined && !(platformHeader && preserveHeaders)) {
       try {
         headers = new Headers(sourceHeaders);
-      } catch (error) {
-        if (
-          !(error instanceof TypeError) ||
-          !(sourceHeaders instanceof Headers) ||
-          hasNativeHeadersBrand(sourceHeaders)
-        ) {
-          throw error;
-        }
-        // A native Headers membrane can require unwrapping by its configured transport.
+      } catch {
+        // Opaque headers can require unwrapping or validation by their configured transport.
         return { init, used: false, unreadable: true };
       }
     }
