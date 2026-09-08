@@ -13,6 +13,12 @@ export const prepareAPIKey = Symbol('openai.prepareAPIKey');
 /** Names internal credential resolution without claiming a string-named subclass hook. */
 export const resolvedAPIKey = Symbol('openai.resolvedAPIKey');
 
+/** Names internal request validation without claiming a string-named subclass hook. */
+export const validateOptionsBeforePreparation = Symbol('openai.validateOptionsBeforePreparation');
+
+/** Names internal credential-hook registration without claiming a string-named subclass helper. */
+export const markCredentialHooksSafe = Symbol('openai.markCredentialHooksSafe');
+
 export type RequestOptions = {
   /**
    * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').

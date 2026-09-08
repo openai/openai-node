@@ -923,7 +923,7 @@ export class OpenAI {
     }
   }
 
-  protected markCredentialHooksSafe(...hooks: Function[]): void {
+  protected [Opts.markCredentialHooksSafe](...hooks: Function[]): void {
     for (const hook of hooks) this.#safeCredentialHooks.add(hook);
   }
 
@@ -1050,7 +1050,7 @@ export class OpenAI {
     return apiKey;
   }
 
-  protected validateOptionsBeforePreparation(options: FinalRequestOptions): void {}
+  protected [Opts.validateOptionsBeforePreparation](options: FinalRequestOptions): void {}
 
   private async resolveAPIKeyProvider(apiKey: ApiKeySetter): Promise<string> {
     let token: unknown;
@@ -1359,7 +1359,7 @@ export class OpenAI {
     this.addAPIKeyPreparationAttempt(options, preparationAttempt);
     let preparation: Promise<void>;
     try {
-      this.validateOptionsBeforePreparation(options);
+      this[Opts.validateOptionsBeforePreparation](options);
       const previousAttempt = this.#synchronousCredentialAttempt;
       this.#synchronousCredentialAttempt = preparationAttempt;
       try {

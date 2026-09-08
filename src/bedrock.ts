@@ -12,7 +12,12 @@ import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import type { FinalRequestOptions, RequestOptions } from './internal/request-options';
-import { prepareAPIKey, resolvedAPIKey } from './internal/request-options';
+import {
+  markCredentialHooksSafe,
+  prepareAPIKey,
+  resolvedAPIKey,
+  validateOptionsBeforePreparation,
+} from './internal/request-options';
 import { readEnv } from './internal/utils';
 import { addOutputText } from './lib/ResponsesParser';
 import type { ResponseStreamParams } from './lib/responses/ResponseStream';
@@ -224,7 +229,7 @@ export class BedrockOpenAI extends OpenAI {
 
     this.bedrockTokenProvider = bedrockTokenProvider;
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
-    this.markCredentialHooksSafe(
+    super[markCredentialHooksSafe](
       BedrockOpenAI.prototype.buildURL,
       BedrockOpenAI.prototype.prepareOptions,
       BedrockOpenAI.prototype.authHeaders,
@@ -243,7 +248,7 @@ export class BedrockOpenAI extends OpenAI {
     return url;
   }
 
-  protected override validateOptionsBeforePreparation(options: FinalRequestOptions): void {
+  protected override [validateOptionsBeforePreparation](options: FinalRequestOptions): void {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
   }

@@ -311,6 +311,11 @@ test.each(clients.flatMap((kind) => ['HTTP', 'direct'].map((mode) => ({ kind, mo
       protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
         return unrelatedHelper(options);
       }
+
+      // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK request validation.
+      protected validateOptionsBeforePreparation(options: FinalRequestOptions): void {
+        throw new Error(`synthetic unrelated validation helper for ${options.path}`);
+      }
     }
     class CustomAzureOpenAI extends AzureOpenAI {
       // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK authentication.
@@ -322,6 +327,11 @@ test.each(clients.flatMap((kind) => ['HTTP', 'direct'].map((mode) => ({ kind, mo
       protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
         return unrelatedHelper(options);
       }
+
+      // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK request validation.
+      protected validateOptionsBeforePreparation(options: FinalRequestOptions): void {
+        throw new Error(`synthetic unrelated validation helper for ${options.path}`);
+      }
     }
     class CustomBedrockOpenAI extends BedrockOpenAI {
       // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK authentication.
@@ -332,6 +342,11 @@ test.each(clients.flatMap((kind) => ['HTTP', 'direct'].map((mode) => ({ kind, mo
       // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK authentication.
       protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
         return unrelatedHelper(options);
+      }
+
+      // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must remain independent of SDK request validation.
+      protected validateOptionsBeforePreparation(options: FinalRequestOptions): void {
+        throw new Error(`synthetic unrelated validation helper for ${options.path}`);
       }
     }
     const provider = vi.fn(async () => 'synthetic-provider');
@@ -365,6 +380,44 @@ test.each(clients.flatMap((kind) => ['HTTP', 'direct'].map((mode) => ({ kind, mo
 
     expect(unrelatedHelper).not.toHaveBeenCalled();
     expect(provider).toHaveBeenCalledTimes(1);
+  },
+);
+
+test.each(['Azure', 'Bedrock'] as const)(
+  '%s construction ignores unrelated subclass credential-hook registration',
+  async (kind) => {
+    const unrelatedRegistration = vi.fn((_hooks: unknown[]) => {
+      throw new Error('synthetic unrelated registration helper');
+    });
+    class CustomAzureOpenAI extends AzureOpenAI {
+      // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must not be invoked by the base constructor.
+      protected markCredentialHooksSafe(...hooks: unknown[]): void {
+        unrelatedRegistration(hooks);
+      }
+    }
+    class CustomBedrockOpenAI extends BedrockOpenAI {
+      // oxlint-disable-next-line eslint/class-methods-use-this -- An existing instance helper must not be invoked by the base constructor.
+      protected markCredentialHooksSafe(...hooks: unknown[]): void {
+        unrelatedRegistration(hooks);
+      }
+    }
+    const provider = vi.fn(async () => 'synthetic-provider');
+    const fetch = mockFetch();
+    const options = { baseURL: 'https://credentials.example/v1', fetch, maxRetries: 0 };
+    const client =
+      kind === 'Azure'
+        ? new CustomAzureOpenAI({
+            ...options,
+            azureADTokenProvider: provider,
+            apiVersion: '2024-10-01-preview',
+          })
+        : new CustomBedrockOpenAI({ ...options, bedrockTokenProvider: provider });
+
+    await expect(client.get('/items')).resolves.toEqual({ ok: true });
+
+    expect(unrelatedRegistration).not.toHaveBeenCalled();
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-provider');
   },
 );
 

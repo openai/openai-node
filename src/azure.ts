@@ -3,6 +3,7 @@ import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
+import { markCredentialHooksSafe } from './internal/request-options';
 import { hasOwn, isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
@@ -148,7 +149,7 @@ export class AzureOpenAI extends OpenAI {
 
     this.apiVersion = apiVersion;
     this.deploymentName = deployment;
-    this.markCredentialHooksSafe(AzureOpenAI.prototype.authHeaders, AzureOpenAI.prototype.buildRequest);
+    super[markCredentialHooksSafe](AzureOpenAI.prototype.authHeaders, AzureOpenAI.prototype.buildRequest);
   }
 
   /** Clones this client with Azure options; OpenAI data residency remains unsupported. */
