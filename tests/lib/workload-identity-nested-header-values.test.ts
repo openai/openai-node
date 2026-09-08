@@ -282,3 +282,62 @@ test('rejects a non-callable nested iterator even when it has a call method', ()
   expect(() => snapshotHeaders({ 'X-Custom': values })).toThrow(TypeError);
   expect(call).not.toHaveBeenCalled();
 });
+
+describe.each(['request', 'default'] as const)('nested %s Authorization deletion', (layer) => {
+  test.each(['accessor', 'data', 'self-removing accessor'] as const)(
+    'refreshes a deleted %s between retries',
+    async (kind) => {
+      const values = ['Bearer synthetic-independent'];
+      const read = vi.fn(() => {
+        if (kind === 'self-removing accessor') {
+          delete values[0];
+        }
+        return 'Bearer synthetic-independent';
+      });
+      if (kind !== 'data') {
+        Object.defineProperty(values, 0, { configurable: true, get: read });
+      }
+      const headers = { Authorization: values };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        delete values[0];
+        return sent.length === 1
+          ? Response.json({}, { status: 500, headers: { 'retry-after-ms': '0' } })
+          : Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        maxRetries: 1,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+      });
+      await client.models.list(layer === 'request' ? { headers } : {});
+      expect(sent).toEqual([
+        'Bearer synthetic-independent',
+        kind === 'self-removing accessor' ? 'Bearer synthetic-independent' : 'Bearer access-token-1',
+      ]);
+      expect(read).toHaveBeenCalledTimes(kind === 'data' ? 0 : 1);
+      expect(transport.exchanges).toBe(kind === 'self-removing accessor' ? 0 : 1);
+    },
+  );
+});
+
+test('leaves tuple descriptor inspection out of ordinary static-credential requests', async () => {
+  const inspect = vi.fn(() => {
+    throw new Error('Tuple descriptors are unavailable');
+  });
+  const row = new Proxy(['X-Custom', 'preserved'], { getOwnPropertyDescriptor: inspect });
+  const client = new OpenAI({
+    apiKey: 'test-static-key',
+    maxRetries: 0,
+    fetch: async (_url, init) => {
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('preserved');
+      return Response.json({ data: [] });
+    },
+  });
+  await client.models.list({ headers: [row] });
+  expect(inspect).not.toHaveBeenCalled();
+});

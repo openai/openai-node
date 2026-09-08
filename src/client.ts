@@ -11,6 +11,7 @@ import { addRequestID, defaultParseResponse, type APIResponseProps } from './int
 import { getPlatformHeaders } from './internal/detect-platform';
 import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
+import { replaceRequestHeaders } from './internal/request-view';
 import { stringifyQuery } from './internal/utils/query';
 import { VERSION } from './version';
 import { resolveDataResidency, type DataResidency } from './internal/data-residency';
@@ -1656,7 +1657,7 @@ export class OpenAI {
         if (workloadIdentityAuthScope && !canPreserveHeaderInput(candidate.req.headers)) {
           candidate = {
             ...candidate,
-            req: { ...candidate.req, headers: buildHeaders([candidate.req.headers]).values },
+            req: replaceRequestHeaders(candidate.req, buildHeaders([candidate.req.headers]).values),
           };
         }
         const platformHeader = getPlatformHeader(candidate.req.headers, 'Authorization');
@@ -2095,13 +2096,19 @@ export class OpenAI {
           : undefined;
       const materialized = platformHeader ? undefined : materializeHeaderInput(init.headers);
       const headers = materialized?.values;
-      if (headers && !materialized?.preserve) init = { ...init, headers };
+      if (headers && !materialized?.preserve) init = replaceRequestHeaders(init, headers);
       const authHeader = platformHeader ? platformHeader.value : headers?.get('Authorization');
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
-        const authenticatedHeaders = headers ?? new Headers(init.headers);
-        authenticatedHeaders.set('Authorization', `Bearer ${token}`);
-        init = { ...init, headers: authenticatedHeaders };
+        let authenticatedHeaders = headers ?? (init.headers as Headers);
+        try {
+          Headers.prototype.set.call(authenticatedHeaders, 'Authorization', `Bearer ${token}`);
+        } catch {
+          // An immutable Headers guard requires a copy; freezing its enclosing init does not.
+          authenticatedHeaders = new Headers(authenticatedHeaders);
+          authenticatedHeaders.set('Authorization', `Bearer ${token}`);
+        }
+        if (authenticatedHeaders !== init.headers) init = replaceRequestHeaders(init, authenticatedHeaders);
         const credential = this.#workloadTokenProvenance.issue({ values: authenticatedHeaders }, token);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
@@ -2674,7 +2681,7 @@ export class OpenAI {
       this.#workloadTokenProvenance.matchesHeaderCredential(sourceHeaders, request.authorization) !== false &&
       bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
         bearerToken(request.authorization);
-    return { init: preserveHeaders ? init : { ...init, headers }, used };
+    return { init: preserveHeaders ? init : replaceRequestHeaders(init, headers), used };
   }
 
   #observeWorkloadHeaderReplacement<T extends RequestInit>(
@@ -2698,76 +2705,7 @@ export class OpenAI {
     const materialized = platformHeader ? undefined : materializeHeaderInput(headers);
     if (materialized && !materialized.preserve) {
       headers = materialized.values;
-      const originalRequest = request;
-      const normalizedRequest = Object.create(Object.getPrototypeOf(request), {
-        ...Object.getOwnPropertyDescriptors(request),
-        headers: { value: headers, enumerable: true, configurable: true, writable: true },
-      }) as T;
-      // Only headers have separate state. Other properties and their accessor receivers
-      // belong to the original request, including mutations made by later hooks.
-      const owner = (property: PropertyKey) => (property === 'headers' ? normalizedRequest : originalRequest);
-      const sync = (property: PropertyKey) => {
-        if (property === 'headers') return;
-        const descriptor = Reflect.getOwnPropertyDescriptor(originalRequest, property);
-        if (descriptor) Reflect.defineProperty(normalizedRequest, property, descriptor);
-        else Reflect.deleteProperty(normalizedRequest, property);
-      };
-      const syncKeys = () => {
-        Reflect.setPrototypeOf(normalizedRequest, Reflect.getPrototypeOf(originalRequest));
-        for (const property of new Set([
-          ...Reflect.ownKeys(originalRequest),
-          ...Reflect.ownKeys(normalizedRequest),
-        ])) {
-          sync(property);
-        }
-      };
-      request = new Proxy(normalizedRequest, {
-        get(_target, property) {
-          sync(property);
-          return Reflect.get(owner(property), property);
-        },
-        set(_target, property, value) {
-          const changed = Reflect.set(owner(property), property, value);
-          sync(property);
-          return changed;
-        },
-        defineProperty(_target, property, descriptor) {
-          const changed = Reflect.defineProperty(owner(property), property, descriptor);
-          sync(property);
-          return changed;
-        },
-        deleteProperty(_target, property) {
-          const changed = Reflect.deleteProperty(owner(property), property);
-          sync(property);
-          return changed;
-        },
-        has(_target, property) {
-          return Reflect.has(owner(property), property);
-        },
-        getOwnPropertyDescriptor(target, property) {
-          sync(property);
-          return Reflect.getOwnPropertyDescriptor(target, property);
-        },
-        ownKeys(target) {
-          syncKeys();
-          return Reflect.ownKeys(target);
-        },
-        getPrototypeOf(target) {
-          const prototype = Reflect.getPrototypeOf(originalRequest);
-          Reflect.setPrototypeOf(target, prototype);
-          return prototype;
-        },
-        setPrototypeOf(target, prototype) {
-          return (
-            Reflect.setPrototypeOf(originalRequest, prototype) && Reflect.setPrototypeOf(target, prototype)
-          );
-        },
-        preventExtensions(target) {
-          if (!Reflect.preventExtensions(originalRequest)) return false;
-          syncKeys();
-          return Reflect.preventExtensions(target);
-        },
-      });
+      request = replaceRequestHeaders(request, headers);
     }
     const native = hasNativeHeadersBrand(headers);
     const value = platformHeader ? platformHeader.value : (materialized?.values.get('Authorization') ?? null);

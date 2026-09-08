@@ -68,9 +68,11 @@ describe.each(['native', 'foreign'] as const)('%s prepared headers', (realm) => 
       expect(cancelled).toBe(1);
       expect(client.prepared).toHaveLength(2);
       if (frozen) {
-        for (const request of client.prepared) {
+        for (const [index, request] of client.prepared.entries()) {
           expect(Object.isFrozen(request)).toBe(true);
-          expect(new Headers(request.headers).get('Authorization')).toBe('Bearer workload-identity-auth');
+          expect(new Headers(request.headers).get('Authorization')).toBe(
+            realm === 'native' ? `Bearer access-token-${index + 1}` : 'Bearer workload-identity-auth',
+          );
         }
       }
     },

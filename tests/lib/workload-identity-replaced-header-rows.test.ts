@@ -304,3 +304,36 @@ test.each(['requestHeaders', 'defaultHeaders'] as const)(
     expect(read).toHaveBeenCalledTimes(1);
   },
 );
+
+describe.each(['request', 'default'] as const)('%s duplicate outer accessor', (layer) => {
+  test.each([false, true])('invalidates removed occurrences with accessor slot: %s', async (accessor) => {
+    const read = vi.fn(() => (read.mock.calls.length === 1 ? 'A' : 'B'));
+    const row = ['X-Custom', ''];
+    Object.defineProperty(row, 1, { get: read });
+    const headers = [row, row];
+    const outerRead = vi.fn(() => row);
+    if (accessor) {
+      Object.defineProperty(headers, 1, { get: outerRead });
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('X-Custom'));
+      headers[0] = ['X-Replacement', 'new'];
+      return sent.length === 1
+        ? Response.json({}, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      maxRetries: 1,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+    });
+    await client.models.list(layer === 'request' ? { headers } : {});
+    expect(sent).toEqual(['A, B', 'B']);
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(outerRead).toHaveBeenCalledTimes(accessor ? 1 : 0);
+  });
+});
