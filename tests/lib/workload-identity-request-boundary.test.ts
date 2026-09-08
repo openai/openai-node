@@ -247,9 +247,14 @@ test.each(['data', 'accessor', 'array'] as const)(
   },
 );
 
-test.each(['record', 'array'] as const)(
-  'does not let an unrelated %s accessor hide an independent Authorization',
-  async (shape) => {
+test.each([
+  ['record', 'value'],
+  ['array', 'value'],
+  ['array', 'name'],
+  ['array', 'slot'],
+] as const)(
+  'does not let an unrelated %s %s accessor hide an independent Authorization',
+  async (shape, accessor) => {
     let authorization = '';
     let record: Record<string, string> = {};
     let rows: [string, string][] = [];
@@ -263,9 +268,16 @@ test.each(['record', 'array'] as const)(
           enumerable: true,
           get: () => 'marker',
         });
-        const note = ['X-Note', 'unused'] as [string, string];
-        Object.defineProperty(note, '1', { get: () => 'marker' });
+        const note = ['X-Note', 'marker'] as [string, string];
+        if (accessor !== 'slot') {
+          Object.defineProperty(note, accessor === 'name' ? '0' : '1', {
+            get: () => (accessor === 'name' ? 'X-Note' : 'marker'),
+          });
+        }
         rows = [['Authorization', 'Bearer independent'], note];
+        if (accessor === 'slot') {
+          Object.defineProperty(rows, '1', { get: () => note });
+        }
         request.headers = shape === 'record' ? record : rows;
       }
       protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
@@ -300,6 +312,121 @@ test.each(['record', 'array'] as const)(
     expect(transport.exchanges).toBe(1);
   },
 );
+
+test.each(['outer', 'row'] as const)(
+  'keeps a custom %s array iterator pending until dispatch proves workload ownership',
+  async (location) => {
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        await super.prepareRequest(...args);
+        const [request] = args;
+        const authorization = new Headers(request.headers).get('Authorization') ?? '';
+        if (location === 'outer') {
+          const rows: [string, string][] = [];
+          rows[Symbol.iterator] = function* iterator() {
+            yield ['Authorization', authorization];
+          };
+          request.headers = rows;
+        } else {
+          const row = ['Authorization', 'Bearer independent'] as [string, string];
+          row[Symbol.iterator] = function* iterator() {
+            yield 'Authorization';
+            yield authorization;
+          };
+          request.headers = [row];
+        }
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      return sends === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list();
+
+    expect(sends).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  },
+);
+
+test.each(['delete', 'undefined'] as const)(
+  'revokes workload ownership when request headers become %s before being restored',
+  async (kind) => {
+    let original: Headers | undefined;
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        await super.prepareRequest(...args);
+        const [request] = args;
+        original = request.headers as Headers;
+        if (kind === 'delete') {
+          Reflect.deleteProperty(request, 'headers');
+        } else {
+          request.headers = undefined;
+        }
+      }
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        if (!original) {
+          throw new Error('Expected prepared workload headers');
+        }
+        args[1].headers = original;
+        return super.fetchWithAuth(...args);
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(sends).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
+test('retains workload ownership when a native Request supplies the effective fallback headers', async () => {
+  class HookClient extends OpenAI {
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      args[0] = new Request(args[0], { headers: args[1].headers });
+      Reflect.deleteProperty(args[1], 'headers');
+      return super.fetchWithAuth(...args);
+    }
+  }
+  let sends = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    sends += 1;
+    return sends === 1
+      ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+      : Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list();
+
+  expect(sends).toBe(2);
+  expect(transport.exchanges).toBe(2);
+});
 
 test('does not restore workload ownership after removing an independent case alias', async () => {
   let headers: Record<string, string> = {};

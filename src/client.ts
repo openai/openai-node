@@ -1685,9 +1685,19 @@ export class OpenAI {
 
     if (!x509Authentication) {
       await this.prepareRequest(req, { url, options });
-      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(
+        workloadCredential,
+        req,
+        initialWorkloadAuthorization,
+        getRequestHeaders(url),
+      );
       await this._provider?.prepareRequest?.(req, { url, options });
-      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(
+        workloadCredential,
+        req,
+        initialWorkloadAuthorization,
+        getRequestHeaders(url),
+      );
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -2039,6 +2049,7 @@ export class OpenAI {
         workloadRequest.credential,
         init,
         workloadRequest.authorization,
+        getRequestHeaders(url),
       );
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
@@ -2712,9 +2723,16 @@ export class OpenAI {
     credential: WorkloadCredentialUsage | undefined,
     request: T,
     authorization: string | undefined,
+    fallbackHeaders?: object,
   ): T {
     if (!credential || authorization === undefined) return request;
-    const headers = WorkloadTokenProvenance.requestHeaderData(request);
+    const headerState = WorkloadTokenProvenance.requestHeaderDataState(request);
+    if (!headerState) return request;
+    const headers = headerState.value ?? fallbackHeaders;
+    if (!headers) {
+      credential.revoke();
+      return request;
+    }
     const marked = this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization);
     const pending = this.#pendingWorkloadHeaders.get(credential);
     if (marked === false || (pending && pending !== headers && marked !== true)) {

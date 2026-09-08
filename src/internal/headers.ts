@@ -110,39 +110,70 @@ export const getStructuralHeaderValue = (
     }
     const requested = requestedName.toLowerCase();
     const entries: [string, HeaderValue][] = [];
+    let unknown = false;
     const copyInput = (input: unknown): { value: HeaderValue } | undefined =>
       input === null || input === undefined || typeof input === 'string' ? { value: input } : undefined;
+    const hasNativeIterator = (input: readonly unknown[]): boolean => {
+      let descriptor: PropertyDescriptor | undefined;
+      const seen = new Set<object>();
+      for (let source: object | null = input; source; source = Object.getPrototypeOf(source)) {
+        if (seen.has(source)) return false;
+        seen.add(source);
+        descriptor = Object.getOwnPropertyDescriptor(source, Symbol.iterator);
+        if (descriptor) break;
+      }
+      return !!descriptor && 'value' in descriptor && descriptor.value === getArrayIterator(input);
+    };
     if (Array.isArray(headers)) {
+      if (!hasNativeIterator(headers)) return undefined;
       const length = Object.getOwnPropertyDescriptor(headers, 'length')?.value;
       if (typeof length !== 'number') return undefined;
       for (let index = 0; index < length; index += 1) {
         const rowDescriptor = Object.getOwnPropertyDescriptor(headers, String(index));
-        if (!rowDescriptor || !('value' in rowDescriptor) || !Array.isArray(rowDescriptor.value)) {
-          return undefined;
+        if (
+          !rowDescriptor ||
+          !('value' in rowDescriptor) ||
+          !Array.isArray(rowDescriptor.value) ||
+          !hasNativeIterator(rowDescriptor.value)
+        ) {
+          unknown = true;
+          continue;
         }
         const nameDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '0');
         const valueDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '1');
         if (!nameDescriptor || !('value' in nameDescriptor) || typeof nameDescriptor.value !== 'string') {
-          return undefined;
+          unknown = true;
+          continue;
         }
         if (nameDescriptor.value.toLowerCase() !== requested) continue;
         if (!valueDescriptor || !('value' in valueDescriptor)) {
-          return undefined;
+          unknown = true;
+          continue;
         }
         const input = copyInput(valueDescriptor.value);
-        if (!input) return undefined;
+        if (!input) {
+          unknown = true;
+          continue;
+        }
         entries.push([nameDescriptor.value, input.value]);
       }
     } else {
       for (const key of Reflect.ownKeys(headers)) {
         if (typeof key !== 'string' || key.toLowerCase() !== requested) continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
-        if (!descriptor || !('value' in descriptor)) return undefined;
+        if (!descriptor || !('value' in descriptor)) {
+          unknown = true;
+          continue;
+        }
         const input = copyInput(descriptor.value);
-        if (!input) return undefined;
+        if (!input) {
+          unknown = true;
+          continue;
+        }
         entries.push([key, input.value]);
       }
     }
+    if (unknown && entries.length === 0) return undefined;
     return {
       value: new Headers(entries as unknown as [string, string][]).get(requestedName),
     };

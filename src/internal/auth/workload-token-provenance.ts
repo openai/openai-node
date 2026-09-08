@@ -236,6 +236,11 @@ export class WorkloadTokenProvenance {
 
   /** Observes data-valued request headers without invoking caller-owned accessors. */
   static requestHeaderData(request: object): object | undefined {
+    return WorkloadTokenProvenance.requestHeaderDataState(request)?.value;
+  }
+
+  /** Distinguishes a definite missing header input from an unreadable accessor. */
+  static requestHeaderDataState(request: object): { value: object | undefined } | undefined {
     try {
       const seen = new Set<object>();
       for (let source: object | null = request; source; source = Object.getPrototypeOf(source)) {
@@ -247,9 +252,13 @@ export class WorkloadTokenProvenance {
         if (!descriptor) {
           continue;
         }
-        const value: unknown = 'value' in descriptor ? descriptor.value : undefined;
-        return typeof value === 'object' && value !== null ? value : undefined;
+        if (!('value' in descriptor)) {
+          return undefined;
+        }
+        const value: unknown = descriptor.value;
+        return { value: typeof value === 'object' && value !== null ? value : undefined };
       }
+      return { value: undefined };
     } catch {
       // Opaque request representations retain their normal reads at dispatch.
     }
