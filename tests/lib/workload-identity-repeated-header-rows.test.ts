@@ -74,7 +74,7 @@ test('validates a repeated occurrence before advancing to a later getter', () =>
   expect(later).not.toHaveBeenCalled();
 });
 
-test('forgets a removed occurrence before the row is appended again', () => {
+test('invalidates duplicate occurrence snapshots on shrink before the row is appended again', () => {
   const read = vi.fn(() => String(read.mock.calls.length));
   const row = ['X-Repeated', 'initial'];
   Object.defineProperty(row, 1, { get: read });
@@ -83,9 +83,10 @@ test('forgets a removed occurrence before the row is appended again', () => {
   expect(snapshot.snapshot.values.get('X-Repeated')).toBe('1, 2');
 
   headers.length = 1;
-  expect(snapshot.refresh().values.get('X-Repeated')).toBe('1');
+  // A lower multiplicity cannot identify which duplicate survived, so both cached ordinals are invalidated.
+  expect(snapshot.refresh().values.get('X-Repeated')).toBe('3');
   headers.push(row);
 
-  expect(snapshot.refresh().values.get('X-Repeated')).toBe('1, 3');
-  expect(read).toHaveBeenCalledTimes(3);
+  expect(snapshot.refresh().values.get('X-Repeated')).toBe('3, 4');
+  expect(read).toHaveBeenCalledTimes(4);
 });

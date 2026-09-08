@@ -7,6 +7,53 @@ import {
   createWorkloadIdentityTransport,
 } from './workload-identity-fixtures';
 
+test.each(['duplicate', 'unrelated'] as const)(
+  'refreshes tuple occurrences after removing a %s row before a retry',
+  async (removed) => {
+    const read = vi.fn(() => {
+      if (removed === 'unrelated' && read.mock.calls.length > 2) {
+        throw new Error('Unchanged tuple occurrences must not be reread');
+      }
+      return read.mock.calls.length === 1 ? 'A' : 'B';
+    });
+    const row = ['X-Custom', ''];
+    Object.defineProperty(row, 1, { get: read });
+    const headers = [row, row];
+    if (removed === 'unrelated') {
+      headers.push(['X-Unrelated', 'remove']);
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('X-Custom'));
+      if (sent.length === 1) {
+        if (removed === 'duplicate') {
+          headers.shift();
+        } else {
+          headers.pop();
+        }
+        return Response.json(
+          { error: 'synthetic retry' },
+          { status: 500, headers: { 'retry-after-ms': '1' } },
+        );
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list({ headers });
+
+    expect(sent).toEqual(['A, B', removed === 'duplicate' ? 'B' : 'A, B']);
+    expect(read).toHaveBeenCalledTimes(removed === 'duplicate' ? 3 : 2);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test('refreshes aliased row accessor replacements independently for each header layer', async () => {
   const row: (string | null | undefined)[] = ['Authorization', undefined];
   const original = vi.fn<() => undefined>();

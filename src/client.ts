@@ -330,9 +330,47 @@ const responseCloneTrackers = new WeakMap<Response, ResponseCloneTracker>();
 const nativeResponseBodyGetter = globalThis.Response
   ? Object.getOwnPropertyDescriptor(globalThis.Response.prototype, 'body')?.get
   : undefined;
+const foreignResponseBodyGetter = (response: Response): ((this: Response) => unknown) | undefined => {
+  let getter: ((this: Response) => unknown) | undefined;
+  const seen = new Set<object>();
+  for (
+    let prototype: object | null = Object.getPrototypeOf(response);
+    prototype;
+    prototype = Object.getPrototypeOf(prototype)
+  ) {
+    if (seen.has(prototype)) {
+      return undefined;
+    }
+    seen.add(prototype);
+    const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    const body = Object.getOwnPropertyDescriptor(prototype, 'body')?.get;
+    if (
+      typeof constructor === 'function' &&
+      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Response' &&
+      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Response' &&
+      typeof Object.getOwnPropertyDescriptor(prototype, 'clone')?.value === 'function' &&
+      typeof Object.getOwnPropertyDescriptor(prototype, 'status')?.get === 'function' &&
+      typeof Object.getOwnPropertyDescriptor(prototype, 'headers')?.get === 'function' &&
+      typeof body === 'function'
+    ) {
+      // Continue past subclasses to use the defining platform's getter, never a caller shadow.
+      getter = body;
+    }
+  }
+  return getter;
+};
 const responseBodyIdentity = (response: Response): object | undefined => {
   try {
-    const body = nativeResponseBodyGetter?.call(response);
+    if (nativeResponseBodyGetter) {
+      try {
+        const body = nativeResponseBodyGetter.call(response);
+        return typeof body === 'object' && body !== null ? body : undefined;
+      } catch {
+        // A response from another platform has its own branded body reader.
+      }
+    }
+    const body = foreignResponseBodyGetter(response)?.call(response);
     return typeof body === 'object' && body !== null ? body : undefined;
   } catch {
     return undefined;
@@ -1638,7 +1676,8 @@ export class OpenAI {
       }
       throw error;
     }
-    const { req, url } = built;
+    const { url } = built;
+    let { req } = built;
     const timeout = x509Authentication
       ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
       : built.timeout;
@@ -1647,9 +1686,9 @@ export class OpenAI {
 
     if (!x509Authentication) {
       await this.prepareRequest(req, { url, options });
-      this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
       await this._provider?.prepareRequest?.(req, { url, options });
-      this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -1995,7 +2034,11 @@ export class OpenAI {
   ): Promise<Response> {
     const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
     if (workloadRequest) {
-      this.#observeWorkloadHeaderReplacement(workloadRequest.credential, init, workloadRequest.authorization);
+      init = this.#observeWorkloadHeaderReplacement(
+        workloadRequest.credential,
+        init,
+        workloadRequest.authorization,
+      );
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
     }
@@ -2560,23 +2603,28 @@ export class OpenAI {
     return { init: preserveHeaders ? init : ({ ...init, headers } as T), used };
   }
 
-  #observeWorkloadHeaderReplacement(
+  #observeWorkloadHeaderReplacement<T extends RequestInit>(
     credential: WorkloadCredentialUsage | undefined,
-    request: RequestInit,
+    request: T,
     authorization: string | undefined,
-  ): void {
-    if (!credential || authorization === undefined || request.headers === undefined) {
-      return;
+  ): T {
+    if (!credential || authorization === undefined) {
+      return request;
     }
-    if (this.#workloadTokenProvenance.matchesHeaderCredential(request.headers, authorization) === false) {
+    let headers = request.headers;
+    if (headers === undefined) return request;
+    if (this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false) {
       credential.revoke();
-      return;
+      return request;
     }
-    if (!credential.isCurrent()) return;
-    if (!canPreserveHeaderInput(request.headers)) {
-      request.headers = new Headers(request.headers);
+    if (!credential.isCurrent()) return request;
+    if (!canPreserveHeaderInput(headers)) {
+      headers = new Headers(headers);
+      request = Object.create(Object.getPrototypeOf(request), {
+        ...Object.getOwnPropertyDescriptors(request),
+        headers: { value: headers, enumerable: true, configurable: true, writable: true },
+      }) as T;
     }
-    const headers = request.headers;
     const native = hasNativeHeadersBrand(headers);
     const platformHeader = native ? getPlatformHeader(headers, 'Authorization') : undefined;
     const value = platformHeader ? platformHeader.value : new Headers(headers).get('Authorization');
@@ -2588,6 +2636,7 @@ export class OpenAI {
     } else if (native) {
       credential.adopt(headers as Headers);
     }
+    return request;
   }
 
   private _makeAbort(controller: AbortController) {

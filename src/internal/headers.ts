@@ -122,9 +122,29 @@ interface HeaderReplay {
   property?: HeaderPropertySnapshot;
   rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, { descriptor: PropertyDescriptor | undefined; row: HeaderEntry }>;
+  arrayLength?: number;
 }
 
 function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderReplay): Generator<HeaderEntry> {
+  const length = getHeaderRowDescriptor(headers, 'length')?.value;
+  if (typeof length === 'number' && replay.arrayLength !== undefined && length < replay.arrayLength) {
+    const duplicates = new Map(
+      [...(replay.rows ?? [])].filter(([, occurrences]) => occurrences.size > 1).map(([row]) => [row, 0]),
+    );
+    // Removing an occurrence invalidates its ordinal. Inspect ordinary slots without rereading row getters.
+    for (let index = 0; duplicates.size && index < length; index += 1) {
+      const descriptor = getHeaderRowDescriptor(headers, String(index));
+      if (!descriptor || !('value' in descriptor) || replay.arraySlots?.has(index)) {
+        duplicates.clear();
+        break;
+      }
+      const count = duplicates.get(descriptor.value);
+      if (count !== undefined) duplicates.set(descriptor.value, count + 1);
+    }
+    for (const [row, count] of duplicates) {
+      if (count < replay.rows!.get(row)!.size) replay.rows!.delete(row);
+    }
+  }
   let index = 0;
   // Match native array iteration's live length, with each row validated before reading the next slot.
   for (; index < Math.min(Math.floor(headers.length), Number.MAX_SAFE_INTEGER); index += 1) {
@@ -145,6 +165,7 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
   for (const slot of replay.arraySlots?.keys() ?? []) {
     if (slot >= index) replay.arraySlots?.delete(slot);
   }
+  replay.arrayLength = index;
 }
 
 export const hasNativeHeadersBrand = (headers: object): boolean => {
@@ -734,6 +755,7 @@ const createHeaderSnapshot = (
                 propertyOrder: replay.propertyOrder,
                 rows: replay.rows,
                 arraySlots: replay.arraySlots,
+                arrayLength: replay.arrayLength,
               }
             : undefined),
         };
@@ -847,26 +869,30 @@ export const isEmptyHeaders = (headers: HeadersLike) => {
 /** Reads Request internal headers through its defining getter, bypassing caller property shadows. */
 export const getRequestHeaders = (request: unknown): Headers | undefined => {
   if (typeof request !== 'object' || request === null) return undefined;
-  if (typeof Request !== 'undefined' && request instanceof Request) {
-    return Object.getOwnPropertyDescriptor(Request.prototype, 'headers')?.get?.call(request);
-  }
-  const seen = new Set<object>();
-  for (
-    let prototype = Object.getPrototypeOf(request);
-    prototype;
-    prototype = Object.getPrototypeOf(prototype)
-  ) {
-    if (seen.has(prototype)) return undefined;
-    seen.add(prototype);
-    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-    if (
-      typeof constructor === 'function' &&
-      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Request' &&
-      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
-      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Request'
-    ) {
-      return Object.getOwnPropertyDescriptor(prototype, 'headers')?.get?.call(request);
+  try {
+    if (typeof Request !== 'undefined' && request instanceof Request) {
+      return Object.getOwnPropertyDescriptor(Request.prototype, 'headers')?.get?.call(request);
     }
+    const seen = new Set<object>();
+    for (
+      let prototype = Object.getPrototypeOf(request);
+      prototype;
+      prototype = Object.getPrototypeOf(prototype)
+    ) {
+      if (seen.has(prototype)) return undefined;
+      seen.add(prototype);
+      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+      if (
+        typeof constructor === 'function' &&
+        Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Request' &&
+        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+        Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Request'
+      ) {
+        return Object.getOwnPropertyDescriptor(prototype, 'headers')?.get?.call(request);
+      }
+    }
+  } catch {
+    // A Request-shaped proxy can pass instanceof without satisfying the platform's internal brand.
   }
   return undefined;
 };

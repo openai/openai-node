@@ -128,8 +128,43 @@ describe('Workload identity authentication hook provenance', () => {
   );
 
   describe.each(['authHeaders', 'bearerAuth'] as const)('native %s result copies', (hook) => {
+    test('refreshes an immediately delegated native result copy', async () => {
+      class HookClient extends OpenAI {
+        protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+          const headers = await super.authHeaders(...args);
+          return hook === 'authHeaders' && headers
+            ? { ...headers, values: new Headers(headers.values) }
+            : headers;
+        }
+
+        protected override async bearerAuth(...args: Parameters<OpenAI['bearerAuth']>) {
+          const headers = await super.bearerAuth(...args);
+          return hook === 'bearerAuth' && headers
+            ? { ...headers, values: new Headers(headers.values) }
+            : headers;
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return sent.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list();
+
+      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    });
+
     test.each([undefined, 'record', 'native'] as const)(
-      'does not restore discarded ownership for a native copy (independent layer: %s)',
+      'refreshes a native copy unless an independent layer replaces it (independent layer: %s)',
       async (independent) => {
         const replacementRecord = independent ? { Authorization: 'Bearer access-token-1' } : undefined;
         const replacement = independent === 'native' ? new Headers(replacementRecord) : replacementRecord;
@@ -163,9 +198,10 @@ describe('Workload identity authentication hook provenance', () => {
           fetch: transport.fetch,
           maxRetries: 0,
         });
-        await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-        expect(apiCalls).toBe(1);
-        expect(transport.exchanges).toBe(1);
+        const result = client.models.list();
+        await (independent ? expect(result).rejects.toMatchObject({ status: 401 }) : result);
+        expect(apiCalls).toBe(independent ? 1 : 2);
+        expect(transport.exchanges).toBe(independent ? 1 : 2);
       },
     );
   });
@@ -176,7 +212,7 @@ describe('Workload identity authentication hook provenance', () => {
     [true, false],
     [true, true],
   ] as const)(
-    'retains marked auth results after await (context: %s, marked: %s)',
+    'requires marked values or forwarded context after delayed copied-option delegation (context: %s, marked: %s)',
     async (forwardContext, marked) => {
       class DelayedClient extends OpenAI {
         protected override async authHeaders(
@@ -206,9 +242,47 @@ describe('Workload identity authentication hook provenance', () => {
         maxRetries: 0,
       });
       const result = client.models.list();
-      await (marked ? result : expect(result).rejects.toMatchObject({ status: 401 }));
-      expect(calls).toBe(marked ? 2 : 1);
-      expect(transport.exchanges).toBe(marked ? 2 : 1);
+      const refreshes = marked || forwardContext;
+      await (refreshes ? result : expect(result).rejects.toMatchObject({ status: 401 }));
+      expect(calls).toBe(refreshes ? 2 : 1);
+      expect(transport.exchanges).toBe(refreshes ? 2 : 1);
+    },
+  );
+
+  test.each([false, true])(
+    'recovers only the last same-byte issuance when its native copy is returned (revoked: %s)',
+    async (revokeSelected) => {
+      class HookClient extends OpenAI {
+        protected override async bearerAuth(...args: Parameters<OpenAI['bearerAuth']>) {
+          const previous = await super.bearerAuth(...args);
+          const selected = await super.bearerAuth(...args);
+          if (!previous || !selected) {
+            throw new Error('Expected both synthetic SDK issuances');
+          }
+          expect(previous.values.get('Authorization')).toBe(selected.values.get('Authorization'));
+          const overwritten = revokeSelected ? selected : previous;
+          overwritten.values.set('Authorization', overwritten.values.get('Authorization') ?? '');
+          return { ...selected, values: new Headers(selected.values) };
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return sent.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+      const result = client.models.list();
+      await (revokeSelected ? expect(result).rejects.toMatchObject({ status: 401 }) : result);
+      expect(sent).toEqual(
+        revokeSelected ? ['Bearer access-token-1'] : ['Bearer access-token-1', 'Bearer access-token-2'],
+      );
+      expect(transport.exchanges).toBe(revokeSelected ? 1 : 2);
     },
   );
 

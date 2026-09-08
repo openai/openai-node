@@ -176,6 +176,7 @@ interface TokenScope {
   captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
   record: (token: string) => HeaderCredential;
   select: (credential: HeaderCredential) => void;
+  recoverCopy: (authorization: string | null) => HeaderCredential | undefined;
   revoke: () => void;
   dispose: () => void;
 }
@@ -256,7 +257,7 @@ export class WorkloadTokenProvenance {
     };
   }
 
-  /** Preserves authentication ownership only through marked result or value identities. */
+  /** Preserves marked results and immediate native copies within their own authentication scope. */
   recover(
     headers: NullableHeaders | undefined,
     options: object,
@@ -294,8 +295,23 @@ export class WorkloadTokenProvenance {
       this.scopeFor(options, context)?.select(credential);
       return selected;
     }
-    // An unmarked native copy can equally represent an independent credential. Token bytes and
-    // the request context identify an exchange, not ownership of this reconstructed result.
+    const scope = this.scopeFor(options, context);
+    const recovered = scope?.recoverCopy(
+      platformHeader ? platformHeader.value : selected.values.get('authorization'),
+    );
+    if (recovered) {
+      // Native copies are ambiguous by contract. Recover only the last identity selected by this
+      // request's hook; an earlier same-byte issuance must not revive a revoked selected result.
+      this.issue(headers, recovered.token, recovered);
+      if (selected !== headers) {
+        const copied = copyWorkloadHeaderCredential(workloadHeaderCredential(values) ?? null);
+        rememberWorkloadHeaderCredential(selected, copied, selected.values);
+        rememberWorkloadHeaderValues(selected.values, copied);
+        if (copied) {
+          scope?.select(copied);
+        }
+      }
+    }
     return selected;
   }
 
@@ -399,6 +415,7 @@ export class WorkloadTokenProvenance {
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     const consumedSources = new Set<object>();
     let disposed = false;
+    let selectedCredential: HeaderCredential | undefined;
     const scope: TokenScope = {
       context,
       resultOwner: {},
@@ -422,14 +439,20 @@ export class WorkloadTokenProvenance {
         const credential = { owner: this, token, revoked: false };
         if (!disposed) {
           credentials.add(credential);
+          selectedCredential = credential;
         }
         return credential;
       },
       select: (credential) => {
         if (!disposed && credential.owner === this) {
           credentials.add(credential);
+          selectedCredential = credential;
         }
       },
+      recoverCopy: (authorization) =>
+        !selectedCredential?.revoked && selectedCredential?.token === bearerToken(authorization)
+          ? selectedCredential
+          : undefined,
       revoke: () => {
         for (const credential of credentials) {
           credential.revoked = true;
@@ -441,6 +464,7 @@ export class WorkloadTokenProvenance {
         }
         disposed = true;
         credentials.clear();
+        selectedCredential = undefined;
         for (const source of consumedSources) {
           const owners = this.consumedHeaders.get(source);
           owners?.delete(scope);
