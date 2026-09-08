@@ -216,6 +216,140 @@ describe.each(clients)('%s HTTP credentials', (kind) => {
   );
 });
 
+test.each([
+  { kind: 'OpenAI', hook: 'authHeaders' },
+  { kind: 'OpenAI', hook: 'bearerAuth' },
+  { kind: 'Azure', hook: 'authHeaders' },
+  { kind: 'Azure', hook: 'bearerAuth' },
+] as const)('honors an initial null assignment in a direct $kind $hook hook', async ({ kind, hook }) => {
+  class NullOpenAI extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      if (hook === 'authHeaders') {
+        this.apiKey = null;
+      }
+      return super.authHeaders(options);
+    }
+
+    protected override async bearerAuth(options: FinalRequestOptions) {
+      if (hook === 'bearerAuth') {
+        this.apiKey = null;
+      }
+      return super.bearerAuth(options);
+    }
+  }
+  class NullAzure extends AzureOpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      if (hook === 'authHeaders') {
+        this.apiKey = null;
+      }
+      return super.authHeaders(options);
+    }
+
+    protected override async bearerAuth(options: FinalRequestOptions) {
+      if (hook === 'bearerAuth') {
+        this.apiKey = null;
+      }
+      return super.bearerAuth(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const fetch = mockFetch();
+  const options = { baseURL: 'https://credentials.example/v1', adminAPIKey: null, fetch };
+  const client =
+    kind === 'Azure'
+      ? new NullAzure({ ...options, azureADTokenProvider: provider, apiVersion: '2024-10-01-preview' })
+      : new NullOpenAI({ ...options, apiKey: provider });
+
+  await expect(
+    client.buildRequest({ method: 'get', path: '/items', __security: { bearerAuth: true } }),
+  ).rejects.toThrow('Could not resolve authentication method.');
+
+  expect(client.apiKey).toBeNull();
+  expect(provider).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test('honors an initial null assignment through the Bedrock credential accessor', async () => {
+  class NullBedrock extends BedrockOpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      this.apiKey = null;
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const fetch = mockFetch();
+  const client = new NullBedrock({
+    baseURL: 'https://credentials.example/v1',
+    bedrockTokenProvider: provider,
+    fetch,
+  });
+
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+
+  expect(client.apiKey).toBeNull();
+  expect(provider).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test('observes null writes after a subclass initializes its own apiKey field', async () => {
+  class NullCredentials extends OpenAI {
+    override apiKey: string | null = null;
+
+    protected override async authHeaders(options: FinalRequestOptions) {
+      this.apiKey = null;
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const client = new NullCredentials({ apiKey: provider, adminAPIKey: null });
+
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+
+  expect(provider).not.toHaveBeenCalled();
+  expect(client.apiKey).toBeNull();
+});
+
+test('preserves a custom credential accessor while observing null writes across direct builds', async () => {
+  class NullCredentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      this.apiKey = null;
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const client = new NullCredentials({ apiKey: provider, adminAPIKey: null });
+  let value: string | null = null;
+  const getter = vi.fn(() => value);
+  const setter = vi.fn(function setter(this: OpenAI, nextValue: string | null) {
+    expect(this).toBe(client);
+    value = nextValue;
+  });
+  Object.defineProperty(client, 'apiKey', {
+    configurable: true,
+    enumerable: true,
+    get: getter,
+    set: setter,
+  });
+
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+  expect(setter).toHaveBeenCalledTimes(1);
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+
+  expect(setter).toHaveBeenCalledTimes(2);
+  expect(getter).toHaveBeenCalled();
+  expect(Object.getOwnPropertyDescriptor(client, 'apiKey')?.get).toBe(getter);
+  expect(provider).not.toHaveBeenCalled();
+  expect(client.apiKey).toBeNull();
+});
+
 test('preserves the credential failure when upload cleanup throws during a direct build', async () => {
   const failure = new OpenAIError('synthetic provider failure');
   const release = vi.fn(() => {
