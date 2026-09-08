@@ -110,6 +110,94 @@ test.each(
   expect(reads).toBe(1);
 });
 
+test.each(['outer', 'nested'] as const)(
+  'does not evict duplicate %s getter snapshots when one descriptor probe is unavailable',
+  async (location) => {
+    let reads = 0;
+    let blockFirstDescriptor = false;
+    const target: unknown[] = [];
+    const read = vi.fn(() => {
+      reads += 1;
+      if (reads > 2) {
+        throw new Error('duplicate getter was reread');
+      }
+      return location === 'outer'
+        ? ['X-Note', reads === 1 ? 'A' : 'B']
+        : { toString: () => (reads === 1 ? 'A' : 'B') };
+    });
+    const descriptor = { configurable: true, get: read };
+    Object.defineProperty(target, 0, descriptor);
+    Object.defineProperty(target, 1, descriptor);
+    const exposed = new Proxy(target, {
+      getOwnPropertyDescriptor(object, key) {
+        if (blockFirstDescriptor && key === '0') {
+          throw new Error('descriptor unavailable');
+        }
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+    });
+    const headers = location === 'outer' ? exposed : { 'X-Note': exposed };
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('X-Note'));
+      blockFirstDescriptor = true;
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list({ headers: headers as never });
+
+    expect(sent).toEqual(['A, B', 'A, B']);
+    expect(read).toHaveBeenCalledTimes(2);
+  },
+);
+
+test.each(['outer', 'nested'] as const)(
+  'invalidates a recovered %s slot after confirmed external deletion',
+  (location) => {
+    let reads = 0;
+    let failedPostRead = false;
+    const target =
+      location === 'outer' ? ([['X-Note', 'preserved']] as unknown[]) : (['preserved'] as unknown[]);
+    const [input] = target;
+    Object.defineProperty(target, 0, {
+      configurable: true,
+      get() {
+        reads += 1;
+        return input;
+      },
+    });
+    const exposed = new Proxy(target, {
+      getOwnPropertyDescriptor(object, key) {
+        if (key === '0' && reads === 1 && !failedPostRead) {
+          failedPostRead = true;
+          throw new Error('initial post-read descriptor unavailable');
+        }
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+    });
+    const snapshot = snapshotHeaders((location === 'outer' ? exposed : { 'X-Note': exposed }) as never);
+
+    expect(snapshot.refresh().values.get('X-Note')).toBe('preserved');
+    Reflect.deleteProperty(target, 0);
+
+    if (location === 'outer') {
+      expect(() => snapshot.refresh()).toThrow(TypeError);
+    } else {
+      expect(snapshot.refresh().values.has('X-Note')).toBe(false);
+    }
+    expect(reads).toBe(1);
+  },
+);
+
 test.each(['request', 'default'] as const)(
   'drops an accessor-backed nested %s value deleted between retry attempts',
   async (layer) => {

@@ -211,11 +211,14 @@ const countHeaderOccurrences = <T>(
   for (let index = 0; (duplicates.size || accessors.size) && index < length; index += 1) {
     const descriptorState = getHeaderRowDescriptorState(headers, String(index));
     const descriptor = descriptorState?.descriptor;
-    const accessorCount = descriptor?.get && accessors.get(descriptor.get);
+    const retained = slots?.get(index);
+    // An unavailable probe is not evidence that a retained accessor occurrence disappeared.
+    // Count its captured identity until a readable descriptor proves removal or replacement.
+    const getter = descriptor?.get ?? (descriptorState ? undefined : retained?.descriptor?.get);
+    const accessorCount = getter && accessors.get(getter);
     if (accessorCount) {
       accessorCount.current += 1;
     }
-    const retained = slots?.get(index);
     let input: T;
     if (retainsHeaderSlot(descriptorState, retained)) {
       ({ input } = retained);
@@ -267,6 +270,18 @@ const invalidateHeaderSlots = <T>(
   return invalidated;
 };
 
+const recoverHeaderSlotEvidence = <T extends HeaderSlotSnapshot>(
+  retained: T,
+  descriptorState: { descriptor: PropertyDescriptor | undefined } | undefined,
+  afterRead: { descriptor: PropertyDescriptor | undefined } | undefined,
+): T => {
+  if (retained.afterRead) {
+    return retained;
+  }
+  const recovered = afterRead ?? descriptorState;
+  return recovered ? ({ ...retained, afterRead: recovered } as T) : retained;
+};
+
 function* iterateHeaderArray(
   headers: readonly HeaderEntry[],
   replay: HeaderReplayState,
@@ -286,7 +301,7 @@ function* iterateHeaderArray(
     yield row;
     const afterRead = getHeaderRowDescriptorState(headers, String(index));
     if (observed) {
-      replay.arraySlots?.set(index, retained);
+      replay.arraySlots?.set(index, recoverHeaderSlotEvidence(retained, descriptorState, afterRead));
     } else if (headerSlotChanged(descriptor, row, afterRead, false)) {
       replay.arraySlots ??= new Map();
       replay.arraySlots.set(index, {
@@ -331,6 +346,8 @@ function* iterateHeaderValues(
     const retained = slots.get(index);
     if (retainsHeaderSlot(descriptorState, retained)) {
       yield retained.value;
+      const afterRead = getHeaderRowDescriptorState(source, String(index));
+      slots.set(index, recoverHeaderSlotEvidence(retained, descriptorState, afterRead));
       continue;
     }
     slots.delete(index);
@@ -653,7 +670,15 @@ function* renameEntries(
 }
 
 const retainedRowEntries = (row: RowRead) => {
-  const { retained, valueDescriptorState, name, nameDescriptor, nameStateful } = row;
+  const {
+    retained,
+    valueDescriptor,
+    valueDescriptorState,
+    name,
+    nameDescriptor,
+    nameDescriptorState,
+    nameStateful,
+  } = row;
   if (
     !retained?.valueStateful ||
     retained.values ||
@@ -666,7 +691,29 @@ const retainedRowEntries = (row: RowRead) => {
   ) {
     return;
   }
-  row.retainedRows?.set(row.occurrence, { ...retained, name, nameDescriptor, nameStateful });
+  const nameState = nextDescriptorState(
+    retainedNameDescriptorState(row),
+    nameDescriptor,
+    !!nameDescriptorState,
+    getHeaderRowDescriptorState(row.row, '0'),
+  );
+  const valueState = nextDescriptorState(
+    retainedValueDescriptorState(row),
+    valueDescriptor,
+    !!valueDescriptorState,
+    getHeaderRowDescriptorState(row.row, '1'),
+  );
+  row.retainedRows?.set(row.occurrence, {
+    ...retained,
+    name,
+    nameDescriptor: nameState.descriptor,
+    nameDescriptorKnown: nameState.known,
+    ...(nameState.afterRead ? { nameAfterRead: nameState.afterRead } : {}),
+    nameStateful,
+    valueDescriptor: valueState.descriptor,
+    valueDescriptorKnown: valueState.known,
+    ...(valueState.afterRead ? { valueAfterRead: valueState.afterRead } : {}),
+  });
   return renameEntries(name, retained.entries);
 };
 
