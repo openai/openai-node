@@ -240,6 +240,11 @@ When a hook makes several delegated sends, authentication retry follows the resp
 Native `response.clone()` calls made inside a transport hook are caller-owned and do not carry automatic
 workload-token retry attribution. A subclass can use the protected `this.cloneResponse(response)` helper
 when it intentionally returns a clone of a delegated response and wants to preserve that attribution.
+For retry cleanup, the helper recognizes shared branches when it directly invokes the global
+`Response.prototype.clone` captured when the SDK loads. Cancellation of bodies without established
+sharing is awaited, and cancellation failures propagate. Hooks using custom, bound, or foreign clone
+implementations must release retained siblings before awaiting the retried request, unless an SDK
+helper already established their shared-body ownership.
 The SDK does not replace native `Response` or `Headers` methods. An exact same-byte mutation of a native
 `Headers` object is therefore treated as unchanged; return an independent header record or `buildHeaders`
 result when the same bytes must carry independent credential ownership.
