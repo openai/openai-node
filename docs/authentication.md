@@ -242,8 +242,8 @@ Requests with streamed upload bodies cannot be replayed; see the
 
 SDK-produced authentication and request results retain workload-token ownership when delegating hooks
 copy options, including frozen options, or rebuild headers with the SDK's `buildHeaders` helper.
-Existing overrides that return those results do not need a new argument. Hooks that reconstruct result
-objects can also forward the optional opaque request context:
+Existing overrides that retain those marked header values do not need a new argument. Hooks that
+reconstruct request options can also forward the optional opaque request context:
 
 ```ts
 import OpenAI from 'openai';
@@ -276,10 +276,13 @@ overwriting a native copy entirely inside a hook before delegating, bypasses thi
 independent credentials as a record or tuple layer through `buildHeaders` and return that layer to the
 SDK before further copying it.
 
-Immediate delegating calls also retain ownership when copying both options and native headers. A hook
-that awaits before delegating, copies its options, and reconstructs the authentication result with
-native `Headers` must forward the context. Once both identities are discarded across an asynchronous
-boundary, ownership cannot be inferred safely from matching credential strings.
+Return the SDK-produced authentication result, retain its marked header values, or rebuild it with
+`buildHeaders([result, additionalHeaders])` to preserve ownership. Copying both the result container and
+its values with native `Headers` discards that ownership, even for an immediate delegation. Such a
+result keeps its original `401` without a workload-token refresh. Forwarding the request context
+preserves request ownership but does not restore an unmarked credential's ownership from equal bytes.
+Rebuilt request results likewise need marked headers or their SDK request carrier to retain credential
+ownership; ordinary request object spread preserves that carrier.
 
 A `buildRequest` override keeps first access to its original inputs before SDK snapshotting. Ordinary
 delegation can copy options and native input headers without forwarding a new argument. A nested build

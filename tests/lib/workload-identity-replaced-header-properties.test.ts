@@ -21,6 +21,51 @@ class CapturingClient extends OpenAI {
   }
 }
 
+test.each(['request', 'default'] as const)(
+  'omits a retained %s accessor made non-enumerable during token acquisition',
+  async (layer) => {
+    const read = vi.fn(() => 'Bearer workload-identity-auth');
+    const headers = {};
+    Object.defineProperty(headers, 'Authorization', {
+      configurable: true,
+      enumerable: true,
+      get: read,
+    });
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      Object.defineProperty(headers, 'Authorization', { enumerable: false });
+      return 'subject-token';
+    };
+    const prepared: (string | null)[] = [];
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      workloadIdentity: identity,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+    Object.defineProperty(client, 'prepareRequest', {
+      value: (request: RequestInit) => {
+        prepared.push(new Headers(request.headers).get('Authorization'));
+      },
+    });
+
+    await client.models.list(layer === 'request' ? { headers } : {});
+
+    expect(prepared).toEqual(['Bearer access-token-1']);
+    expect(sent).toEqual(['Bearer access-token-1']);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 describe.each(['standard', 'prepareOptions', 'authHeaders', 'bearerAuth'] as const)(
   '%s property replacement',
   (hook) => {
@@ -218,6 +263,7 @@ test('preserves descriptor and Get ordering with the original proxy receiver', (
     'get:Authorization',
     'descriptor:X-After',
     'get:X-After',
+    'descriptor:Authorization',
   ]);
   events.length = 0;
   Object.defineProperty(target, 'Authorization', { value: null });

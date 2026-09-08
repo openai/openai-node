@@ -136,7 +136,7 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
     }
     replay.arraySlots?.delete(index);
     const row = headers[index]!;
-    if (!descriptor || !('value' in descriptor)) {
+    if (!descriptor || !('value' in descriptor) || descriptor.value !== row) {
       replay.arraySlots ??= new Map();
       replay.arraySlots.set(index, { descriptor, row });
     }
@@ -310,7 +310,12 @@ function* iterateHeaders(
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
         const retained = replay.properties.get(key);
-        if (retained && descriptor && !sameHeaderProperty(descriptor, retained.descriptor)) {
+        if (
+          retained &&
+          descriptor &&
+          (!sameHeaderProperty(descriptor, retained.descriptor) ||
+            descriptor.enumerable !== retained.descriptor.enumerable)
+        ) {
           replay.properties.delete(key);
         }
         if (!descriptor?.enumerable) continue;
@@ -462,6 +467,15 @@ function* iterateHeaders(
       if (!rowReplay?.refreshable) {
         property.capture?.();
         delete property.capture;
+        try {
+          const current = Object.getOwnPropertyDescriptor(headers, name);
+          if (current && sameHeaderProperty(current, property.descriptor)) {
+            // A first read can hide itself; later visibility changes must still invalidate its replay.
+            property.descriptor = { ...property.descriptor, enumerable: current.enumerable === true };
+          }
+        } catch {
+          // A proxy may stop exposing descriptors after its first value was consumed.
+        }
         replay.properties!.set(name, property);
       }
       delete replay.property;

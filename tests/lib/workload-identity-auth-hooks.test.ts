@@ -129,7 +129,7 @@ describe('Workload identity authentication hook provenance', () => {
 
   describe.each(['authHeaders', 'bearerAuth'] as const)('native %s result copies', (hook) => {
     test.each([undefined, 'record', 'native'] as const)(
-      'refreshes only SDK-owned copies (independent layer: %s)',
+      'does not restore discarded ownership for a native copy (independent layer: %s)',
       async (independent) => {
         const replacementRecord = independent ? { Authorization: 'Bearer access-token-1' } : undefined;
         const replacement = independent === 'native' ? new Headers(replacementRecord) : replacementRecord;
@@ -163,17 +163,21 @@ describe('Workload identity authentication hook provenance', () => {
           fetch: transport.fetch,
           maxRetries: 0,
         });
-        const result = client.models.list();
-        await (independent ? expect(result).rejects.toMatchObject({ status: 401 }) : result);
-        expect(apiCalls).toBe(independent ? 1 : 2);
-        expect(transport.exchanges).toBe(independent ? 1 : 2);
+        await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+        expect(apiCalls).toBe(1);
+        expect(transport.exchanges).toBe(1);
       },
     );
   });
 
-  test.each([false, true])(
-    'requires explicit context for native copies delegated after await: %s',
-    async (forwardContext) => {
+  test.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ] as const)(
+    'retains marked auth results after await (context: %s, marked: %s)',
+    async (forwardContext, marked) => {
       class DelayedClient extends OpenAI {
         protected override async authHeaders(
           options: FinalRequestOptions,
@@ -186,7 +190,7 @@ describe('Workload identity authentication hook provenance', () => {
             schemes,
             forwardContext ? context : undefined,
           );
-          return buildHeaders([new Headers(headers?.values)]);
+          return buildHeaders([marked ? headers : new Headers(headers?.values)]);
         }
       }
       let calls = 0;
@@ -202,9 +206,9 @@ describe('Workload identity authentication hook provenance', () => {
         maxRetries: 0,
       });
       const result = client.models.list();
-      await (forwardContext ? result : expect(result).rejects.toMatchObject({ status: 401 }));
-      expect(calls).toBe(forwardContext ? 2 : 1);
-      expect(transport.exchanges).toBe(forwardContext ? 2 : 1);
+      await (marked ? result : expect(result).rejects.toMatchObject({ status: 401 }));
+      expect(calls).toBe(marked ? 2 : 1);
+      expect(transport.exchanges).toBe(marked ? 2 : 1);
     },
   );
 

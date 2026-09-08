@@ -317,9 +317,9 @@ type WorkloadIdentityRequest = {
   authorization: string | undefined;
   credential: WorkloadCredentialUsage | undefined;
   responses: WeakMap<Response, boolean>;
+  responseBodies: WeakMap<object, boolean>;
   cloneTrackedResponses: Set<Response>;
   finished: boolean;
-  allResponsesUsedWorkloadToken: boolean | undefined;
 };
 type ResponseCloneTracker = {
   previous: PropertyDescriptor | undefined;
@@ -327,6 +327,25 @@ type ResponseCloneTracker = {
   requests: Set<WorkloadIdentityRequest>;
 };
 const responseCloneTrackers = new WeakMap<Response, ResponseCloneTracker>();
+const nativeResponseBodyGetter = globalThis.Response
+  ? Object.getOwnPropertyDescriptor(globalThis.Response.prototype, 'body')?.get
+  : undefined;
+const responseBodyIdentity = (response: Response): object | undefined => {
+  try {
+    const body = nativeResponseBodyGetter?.call(response);
+    return typeof body === 'object' && body !== null ? body : undefined;
+  } catch {
+    return undefined;
+  }
+};
+const responseUsedWorkloadToken = (request: WorkloadIdentityRequest, response: Response): boolean => {
+  const used = request.responses.get(response);
+  if (used !== undefined) {
+    return used;
+  }
+  const body = responseBodyIdentity(response);
+  return body !== undefined && request.responseBodies.get(body) === true;
+};
 
 const hasInstalledResponseClone = (response: Response, tracker: ResponseCloneTracker): boolean => {
   const current = Object.getOwnPropertyDescriptor(response, 'clone');
@@ -342,7 +361,12 @@ const recordWorkloadIdentityResponse = (
 ) => {
   if (request.finished) return;
   const prior = request.responses.get(response);
-  request.responses.set(response, prior === undefined ? usedWorkloadToken : prior && usedWorkloadToken);
+  const selectedUsage = prior === undefined ? usedWorkloadToken : prior && usedWorkloadToken;
+  request.responses.set(response, selectedUsage);
+  const body = responseBodyIdentity(response);
+  if (body) {
+    request.responseBodies.set(body, selectedUsage && request.responseBodies.get(body) !== false);
+  }
   let trackedRequests = new Set<WorkloadIdentityRequest>([request]);
   const existing = responseCloneTrackers.get(response);
   try {
@@ -1450,7 +1474,7 @@ export class OpenAI {
           workloadHeaders;
         if (usesCustomWorkloadBuildRequest) {
           if (!hasBuildInputValue || (!previousBuildInput && buildInputHeaders === undefined)) {
-            buildInputHeaders = workloadHeaders?.requestHeaders.source ?? options.headers;
+            buildInputHeaders = workloadHeaders?.requestHeaders.source;
             buildInputReplayable = canReplayHeaderInput(buildInputHeaders);
           }
           if (buildInputDefaults === undefined) {
@@ -1504,21 +1528,17 @@ export class OpenAI {
           };
         }
         if (workloadIdentityAuthScope && !canPreserveHeaderInput(candidate.req.headers)) {
-          candidate.req.headers = buildHeaders([candidate.req.headers]).values;
+          candidate = {
+            ...candidate,
+            req: { ...candidate.req, headers: buildHeaders([candidate.req.headers]).values },
+          };
         }
         const platformHeader = getPlatformHeader(candidate.req.headers, 'Authorization');
         const authorization =
           platformHeader === undefined ? candidate.req.headers.get('Authorization') : platformHeader.value;
-        if (
-          authorization !== null &&
-          this.#workloadTokenProvenance.matchesResult(candidate, authorization, workloadIdentityAuthScope)
-        ) {
+        if (authorization !== null && this.#workloadTokenProvenance.matchesResult(candidate, authorization)) {
           initialWorkloadAuthorization = authorization;
-          workloadCredential = this.#workloadTokenProvenance.retainResultCredential(
-            candidate,
-            authorization,
-            workloadIdentityAuthScope,
-          );
+          workloadCredential = this.#workloadTokenProvenance.retainResultCredential(candidate, authorization);
         }
       } finally {
         workloadIdentityAuthScope?.dispose();
@@ -1631,9 +1651,9 @@ export class OpenAI {
       authorization: initialWorkloadAuthorization,
       credential: workloadCredential,
       responses: new WeakMap<Response, boolean>(),
+      responseBodies: new WeakMap<object, boolean>(),
       cloneTrackedResponses: new Set<Response>(),
       finished: false,
-      allResponsesUsedWorkloadToken: undefined,
     };
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
@@ -1656,8 +1676,7 @@ export class OpenAI {
         releaseWorkloadIdentityResponseClones(workloadRequest);
       });
     const usedWorkloadToken =
-      !(response instanceof globalThis.Error) &&
-      (workloadRequest.responses.get(response) ?? workloadRequest.allResponsesUsedWorkloadToken) === true;
+      !(response instanceof globalThis.Error) && responseUsedWorkloadToken(workloadRequest, response);
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1944,13 +1963,13 @@ export class OpenAI {
           : undefined;
       const replayable = platformHeader !== undefined || canPreserveHeaderInput(init.headers);
       const headers = platformHeader ? undefined : new Headers(init.headers);
-      if (headers && !replayable) init.headers = headers;
+      if (headers && !replayable) init = { ...init, headers };
       const authHeader = platformHeader ? platformHeader.value : headers?.get('Authorization');
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
         const authenticatedHeaders = headers ?? new Headers(init.headers);
         authenticatedHeaders.set('Authorization', `Bearer ${token}`);
-        init.headers = authenticatedHeaders;
+        init = { ...init, headers: authenticatedHeaders };
         const credential = this.#workloadTokenProvenance.issue({ values: authenticatedHeaders }, token);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
@@ -2019,10 +2038,6 @@ export class OpenAI {
       );
       if (workloadRequest) {
         recordWorkloadIdentityResponse(workloadRequest, response, used);
-        workloadRequest.allResponsesUsedWorkloadToken =
-          workloadRequest.allResponsesUsedWorkloadToken === undefined
-            ? used
-            : workloadRequest.allResponsesUsedWorkloadToken && used;
       }
       return response;
     } catch (err) {

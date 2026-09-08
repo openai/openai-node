@@ -64,7 +64,7 @@ test.each(['ordinary subclass', 'Headers-shaped subclass', 'custom iterator'] as
 );
 
 test.each(['own', 'inherited'] as const)(
-  'bypasses %s get overrides on cloned authentication values',
+  'bypasses %s get overrides without recovering unmarked authentication values',
   async (kind) => {
     let reads = 0;
     class HookClient extends OpenAI {
@@ -101,16 +101,16 @@ test.each(['own', 'inherited'] as const)(
       fetch: transport.fetch,
     });
 
-    await client.models.list();
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
     expect(reads).toBe(0);
-    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-    expect(transport.exchanges).toBe(2);
+    expect(sent).toEqual(['Bearer access-token-1']);
+    expect(transport.exchanges).toBe(1);
   },
 );
 
 test.each(['instance', 'subclass'] as const)(
-  'recovers workload provenance from a native %s forwarding iterator',
+  'does not infer workload ownership from an unmarked native %s forwarding iterator',
   async (kind) => {
     class ForwardingHeaders extends Headers {}
     Object.defineProperty(ForwardingHeaders.prototype, Symbol.iterator, {
@@ -147,71 +147,85 @@ test.each(['instance', 'subclass'] as const)(
       maxRetries: 0,
     });
 
-    await client.models.list();
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-    expect(calls).toBe(2);
-    expect(transport.exchanges).toBe(2);
+    expect(calls).toBe(1);
+    expect(transport.exchanges).toBe(1);
   },
 );
 
 describe.each(['native', 'transparent iterator', 'one-shot iterator'] as const)(
   'recovering cloned authentication values with a %s',
   (kind) => {
-    test.each([false, true])('reuses the selected snapshot (frozen result: %s)', async (frozen) => {
-      let iterations = 0;
-      class HookClient extends OpenAI {
-        protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
-          const headers = await super.authHeaders(...args);
-          if (!headers) {
-            return headers;
-          }
-          const values = new Headers(headers.values);
-          if (kind !== 'native') {
-            const iterator = Headers.prototype.entries.call(values);
-            Object.defineProperty(values, Symbol.iterator, {
-              value() {
-                iterations += 1;
-                return kind === 'one-shot iterator' ? iterator : Headers.prototype.entries.call(values);
+    test.each([
+      [false, false],
+      [false, true],
+      [true, false],
+      [true, true],
+    ] as const)(
+      'retains ownership only for marked values (frozen: %s, marked: %s)',
+      async (frozen, marked) => {
+        let iterations = 0;
+        class HookClient extends OpenAI {
+          protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+            const headers = await super.authHeaders(...args);
+            if (!headers) {
+              return headers;
+            }
+            const values = marked ? headers.values : new Headers(headers.values);
+            if (kind !== 'native') {
+              const iterator = Headers.prototype.entries.call(values);
+              Object.defineProperty(values, Symbol.iterator, {
+                value() {
+                  iterations += 1;
+                  return kind === 'one-shot iterator' ? iterator : Headers.prototype.entries.call(values);
+                },
+              });
+            }
+            Object.defineProperty(values, 'get', {
+              get() {
+                throw new Error('Synthetic diagnostic getter must not run');
               },
             });
+            const result = { ...headers, values };
+            return frozen ? Object.freeze(result) : result;
           }
-          Object.defineProperty(values, 'get', {
-            get() {
-              throw new Error('Synthetic diagnostic getter must not run');
-            },
-          });
-          const result = { ...headers, values };
-          return frozen ? Object.freeze(result) : result;
         }
-      }
-      const sent: (string | null)[] = [];
-      const transport = createWorkloadIdentityTransport((url, init) => {
-        sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
-        return sent.length === 1
-          ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
-          : Response.json({ data: [] });
-      });
-      const client = new HookClient({
-        ...createTestClientOptions(),
-        apiKey: null,
-        maxRetries: 0,
-        fetch: transport.fetch,
-      });
+        const sent: (string | null)[] = [];
+        const transport = createWorkloadIdentityTransport((url, init) => {
+          sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+          return sent.length === 1
+            ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+            : Response.json({ data: [] });
+        });
+        const client = new HookClient({
+          ...createTestClientOptions(),
+          apiKey: null,
+          maxRetries: 0,
+          fetch: transport.fetch,
+        });
 
-      await client.models.list();
+        const response = client.models.list();
+        await (marked ? response : expect(response).rejects.toMatchObject({ status: 401 }));
 
-      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-      expect(transport.exchanges).toBe(2);
-      expect(iterations).toBe(kind === 'native' ? 0 : 2);
-    });
+        expect(sent).toEqual(
+          marked ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer access-token-1'],
+        );
+        expect(transport.exchanges).toBe(marked ? 2 : 1);
+        expect(iterations).toBe(kind === 'native' ? 0 : sent.length);
+      },
+    );
   },
 );
 
-test.each(['unmarked', 'SDK-owned', 'explicitly independent'] as const)(
+test.each(['unmarked', 'unmarked equal-byte', 'SDK-owned', 'explicitly independent'] as const)(
   'keeps a %s custom iterator replacement independent',
   async (kind) => {
     let iterations = 0;
-    const authorization = kind === 'explicitly independent' ? 'Bearer access-token-1' : 'Bearer independent';
+    const authorization =
+      kind === 'explicitly independent' || kind === 'unmarked equal-byte'
+        ? 'Bearer access-token-1'
+        : 'Bearer independent';
     class HookClient extends OpenAI {
       protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
         const headers = await super.authHeaders(...args);

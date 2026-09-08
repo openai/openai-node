@@ -410,3 +410,88 @@ describe.each(['sdk', 'independent'] as const)('single %s dispatch', (credential
     }
   });
 });
+
+test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
+  'leaves an independently returned %s response untracked',
+  async (hook) => {
+    let independentSends = 0;
+    const independentFetch = () => {
+      independentSends += 1;
+      return Response.json({ error: 'independent unauthorized' }, { status: 401 });
+    };
+    class IndependentResponseClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        if (hook !== 'fetchWithTimeout') {
+          return response;
+        }
+        await response.body?.cancel();
+        return independentFetch();
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const response = await super.fetchWithAuth(...args);
+        if (hook !== 'fetchWithAuth') {
+          return response;
+        }
+        await response.body?.cancel();
+        return independentFetch();
+      }
+    }
+    let delegatedSends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      delegatedSends += 1;
+      return Response.json({ ok: true });
+    });
+    const client = new IndependentResponseClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.post('/synthetic', { body: { synthetic: true } })).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(independentSends).toBe(1);
+    expect(delegatedSends).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
+test('does not restore wrapped-body ownership after mixed delegated credentials share a body', async () => {
+  const { body } = Response.json({ error: 'shared unauthorized' });
+  class SharedBodyClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      const [url, init, timeout, , context] = args;
+      await super.fetchWithTimeout(url, init, timeout, new AbortController(), context);
+      await super.fetchWithTimeout(
+        url,
+        { ...init, headers: { Authorization: 'Bearer independent' } },
+        timeout,
+        new AbortController(),
+        context,
+      );
+      return wrapResponse(await super.fetchWithTimeout(url, init, timeout, new AbortController(), context));
+    }
+  }
+  let sends = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    sends += 1;
+    return new Response(body, { status: 401 });
+  });
+  const client = new SharedBodyClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.post('/synthetic', { body: { synthetic: true } })).rejects.toMatchObject({
+    status: 401,
+  });
+  expect(sends).toBe(3);
+  expect(transport.exchanges).toBe(1);
+});

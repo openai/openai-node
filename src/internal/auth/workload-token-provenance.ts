@@ -176,9 +176,7 @@ interface TokenScope {
   captureHeaders: (headers: WorkloadHeaderSnapshots) => void;
   record: (token: string) => HeaderCredential;
   select: (credential: HeaderCredential) => void;
-  credential: (authorization: string) => HeaderCredential | undefined;
   revoke: () => void;
-  matches: (authorization: string) => boolean;
   dispose: () => void;
 }
 
@@ -258,7 +256,7 @@ export class WorkloadTokenProvenance {
     };
   }
 
-  /** Recovers an unmarked rebuilt result only from its own active authentication invocation. */
+  /** Preserves authentication ownership only through marked result or value identities. */
   recover(
     headers: NullableHeaders | undefined,
     options: object,
@@ -296,21 +294,8 @@ export class WorkloadTokenProvenance {
       this.scopeFor(options, context)?.select(credential);
       return selected;
     }
-    const authorization = platformHeader ? platformHeader.value : selected.values.get('authorization');
-    const token = bearerToken(authorization);
-    if (
-      token !== undefined &&
-      authorization !== null &&
-      this.scopeFor(options, context)?.matches(authorization)
-    ) {
-      this.issue(headers, token, this.scopeFor(options, context)?.credential(authorization));
-      if (selected !== headers) {
-        // Parsing must not remove the source's mutation-observability restriction.
-        const recovered = copyWorkloadHeaderCredential(workloadHeaderCredential(values) ?? null);
-        rememberWorkloadHeaderCredential(selected, recovered, selected.values);
-        rememberWorkloadHeaderValues(selected.values, recovered);
-      }
-    }
+    // An unmarked native copy can equally represent an independent credential. Token bytes and
+    // the request context identify an exchange, not ownership of this reconstructed result.
     return selected;
   }
 
@@ -365,29 +350,22 @@ export class WorkloadTokenProvenance {
     );
   }
 
-  /** Checks result-owned provenance before using explicit-context recovery for rebuilt results. */
-  matchesResult(
-    result: { req: { headers: Headers } },
-    authorization: string,
-    scope: TokenScope | undefined,
-  ): boolean {
-    return this.retainResultCredential(result, authorization, scope).isCurrent();
+  /** Checks provenance retained by the header values or SDK request carrier. */
+  matchesResult(result: { req: { headers: Headers } }, authorization: string): boolean {
+    return this.retainResultCredential(result, authorization).isCurrent();
   }
 
   /** Keeps revocation effective after native copies lose their per-object metadata. */
   retainResultCredential(
     result: { req: { headers: Headers } },
     authorization: string,
-    scope: TokenScope | undefined,
   ): WorkloadCredentialUsage {
     const headerMatch = this.matchesHeaderCredential(result.req.headers, authorization);
     let credential: HeaderCredential | null | undefined;
     if (headerMatch === undefined) {
       const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
       credential =
-        typeof carrier === 'object' && carrier !== null
-          ? this.results.get(carrier)?.credential
-          : scope?.credential(authorization);
+        typeof carrier === 'object' && carrier !== null ? this.results.get(carrier)?.credential : undefined;
     } else {
       credential = headerMatch ? workloadHeaderCredential(result.req.headers) : null;
     }
@@ -417,7 +395,7 @@ export class WorkloadTokenProvenance {
 
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
   begin(options: object, context: object = {}, headers?: WorkloadHeaderSnapshots): TokenScope {
-    const tokens = new Map<string, HeaderCredential>();
+    const credentials = new Set<HeaderCredential>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     const consumedSources = new Set<object>();
     let disposed = false;
@@ -443,32 +421,26 @@ export class WorkloadTokenProvenance {
       record: (token) => {
         const credential = { owner: this, token, revoked: false };
         if (!disposed) {
-          tokens.set(token, credential);
+          credentials.add(credential);
         }
         return credential;
       },
       select: (credential) => {
         if (!disposed && credential.owner === this) {
-          tokens.set(credential.token, credential);
+          credentials.add(credential);
         }
       },
-      credential: (authorization) => {
-        const token = bearerToken(authorization);
-        const credential = token === undefined ? undefined : tokens.get(token);
-        return credential?.revoked ? undefined : credential;
-      },
       revoke: () => {
-        for (const credential of tokens.values()) {
+        for (const credential of credentials) {
           credential.revoked = true;
         }
       },
-      matches: (authorization) => scope.credential(authorization) !== undefined,
       dispose: () => {
         if (disposed) {
           return;
         }
         disposed = true;
-        tokens.clear();
+        credentials.clear();
         for (const source of consumedSources) {
           const owners = this.consumedHeaders.get(source);
           owners?.delete(scope);
