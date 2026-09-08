@@ -527,10 +527,10 @@ describe('Workload identity request and dispatch hooks', () => {
   );
 
   describe.each(['fetch', 'fetchWithAuth', 'fetchWithTimeout'] as const)(
-    'authorization snapshot at %s dispatch',
+    'authorization cleanup at the %s boundary',
     (hook) => {
       test.each([undefined, 'Bearer independent'])(
-        'refreshes only the sent workload token (replacement: %j)',
+        'refreshes only when configured-fetch headers remain unchanged (replacement: %j)',
         async (replacement) => {
           class HookClient extends OpenAI {
             protected override async fetchWithAuth(
@@ -572,6 +572,7 @@ describe('Workload identity request and dispatch hooks', () => {
             const sent = new Request(url, init as globalThis.RequestInit);
             authorizations.push(sent.headers.get('Authorization'));
             if (hook === 'fetch' && init?.headers instanceof Headers) {
+              // Even after a simulated send, this cleanup is observable when configured fetch returns.
               init.headers.delete('Authorization');
             }
             return authorizations.length === 1
@@ -585,13 +586,14 @@ describe('Workload identity request and dispatch hooks', () => {
           });
 
           const request = client.models.list();
-          await (replacement === undefined
-            ? request
-            : expect(request).rejects.toMatchObject({ status: 401 }));
-          expect(authorizations).toEqual(
-            replacement === undefined ? ['Bearer access-token-1', 'Bearer access-token-2'] : [replacement],
-          );
-          expect(transport.exchanges).toBe(replacement === undefined ? 2 : 1);
+          const refreshes = replacement === undefined && hook !== 'fetch';
+          await (refreshes ? request : expect(request).rejects.toMatchObject({ status: 401 }));
+          const expected = [replacement ?? 'Bearer access-token-1'];
+          if (refreshes) {
+            expected.push('Bearer access-token-2');
+          }
+          expect(authorizations).toEqual(expected);
+          expect(transport.exchanges).toBe(refreshes ? 2 : 1);
         },
       );
     },

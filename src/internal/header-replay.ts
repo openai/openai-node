@@ -15,6 +15,13 @@ export { getArrayIterator, hasNativeHeadersBrand } from './header-source-protoco
 /** Values accepted by the canonical header parser, including explicit removal. */
 export type HeaderValue = string | undefined | null;
 type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
+
+const assertAuthorizationEvidence = (name: string, verificationLost: boolean) => {
+  if (verificationLost && name.toLowerCase() === 'authorization') {
+    throw new TypeError('Cannot replay Authorization after header descriptor evidence is lost');
+  }
+};
+
 /** Raw header sources whose occurrence history can be retained across attempts. */
 export type HeaderSource =
   | Headers
@@ -168,6 +175,7 @@ const invalidateHeaderSlots = <T>(
 function* iterateHeaderArray(
   headers: readonly HeaderEntry[],
   replay: HeaderReplayState,
+  observeVerification: (lost: boolean) => void,
 ): Generator<HeaderEntry> {
   const counts = new Map([...(replay.rows ?? [])].map(([row, occurrences]) => [row, occurrences.size]));
   for (const row of invalidateHeaderSlots(headers, counts, replay.arraySlots)) {
@@ -179,6 +187,7 @@ function* iterateHeaderArray(
     const descriptorState = observeHeaderDescriptor(headers, String(index));
     const retained = replay.arraySlots?.get(index);
     const read = new HeaderDescriptorRead(descriptorState, retained?.history);
+    observeVerification(read.verificationLost);
     const observed = retained && read.retained;
     const row: HeaderEntry = observed ? retained.input : Reflect.get(headers, String(index));
     yield row;
@@ -225,6 +234,7 @@ function* iterateHeaderValues(
     const descriptorState = observeHeaderDescriptor(source, String(index));
     const retained = slots.get(index);
     const read = new HeaderDescriptorRead(descriptorState, retained?.history);
+    assertAuthorizationEvidence(name, read.verificationLost);
     if (retained && read.retained) {
       yield retained.value;
       const afterRead = observeHeaderDescriptor(source, String(index));
@@ -548,6 +558,7 @@ const readHeaderValues = (
       ? (retained ?? { source: values, protocol: new HeaderSourceProtocol<HeaderValue>(), slots: new Map() })
       : undefined;
   const protocol = (nested?.protocol ?? new HeaderSourceProtocol<HeaderValue>(false)).capture(values);
+  assertAuthorizationEvidence(row.name, protocol.verificationLost);
   if (protocol.kind !== 'iterable') {
     throw new TypeError('Header value arrays must be iterable');
   }
@@ -811,18 +822,27 @@ function* replayHeaderEntries(
     replay.unverifiedHeaders = protocol.unverifiedHeaders;
   }
   const clear = protocol.kind === 'record';
+  let slotVerificationLost = false;
   const descriptors = new Map<string, PropertyDescriptor>();
   const presentProperties = new Set<string>();
   let entries: Iterable<HeaderEntry>;
   if (protocol.kind === 'iterable') {
     const { iteration, reused } = protocol.iterate(
-      replay && Array.isArray(headers) ? () => iterateHeaderArray(headers, replay) : undefined,
+      replay && Array.isArray(headers)
+        ? () =>
+            iterateHeaderArray(headers, replay, (lost) => {
+              slotVerificationLost = lost;
+            })
+        : undefined,
     );
     if (reused) {
       if (replay) {
         replay.refreshable = false;
       }
-      yield* callbacks.previous(replay?.snapshot);
+      for (const entry of callbacks.previous(replay?.snapshot)) {
+        assertAuthorizationEvidence(entry[0], protocol.verificationLost);
+        yield entry;
+      }
       return;
     }
     entries = { [Symbol.iterator]: () => iteration };
@@ -843,6 +863,13 @@ function* replayHeaderEntries(
       occurrences.set(row, occurrence + 1);
     }
     const read = readRow(row, occurrence, clear, replay);
+    assertAuthorizationEvidence(
+      read.name,
+      protocol.verificationLost ||
+        slotVerificationLost ||
+        read.nameRead.verificationLost ||
+        read.valueRead.verificationLost,
+    );
     yield* replayRow(read, headers, descriptors.get(read.name), clear, protocol.native, callbacks, replay);
   }
   protocol.finish();

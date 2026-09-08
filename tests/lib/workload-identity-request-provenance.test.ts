@@ -218,9 +218,9 @@ describe('workload identity request provenance', () => {
     },
   );
 
-  describe.each([false, true])('custom fetch (copied options: %s)', (copyOptions) => {
+  describe.each([false, true])('configured fetch (private header copy: %s)', (copyOptions) => {
     test.each([null, '', 'Bearer independent'])(
-      'preserves SDK-handoff refresh when an opaque wrapper later sets Authorization to %j',
+      'distinguishes observable and private Authorization mutations to %j',
       async (authorization) => {
         const transport = createTransport(() => true);
         const customFetch: Fetch = (url, init) => {
@@ -231,6 +231,7 @@ describe('workload identity request provenance', () => {
           if (!(forwarded?.headers instanceof Headers)) {
             throw new Error('Expected normalized headers');
           }
+          expect(forwarded.headers === init?.headers).toBe(!copyOptions);
           if (authorization === null) {
             forwarded.headers.delete('Authorization');
           } else {
@@ -242,12 +243,13 @@ describe('workload identity request provenance', () => {
 
         await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-        // The SDK cannot observe a configured transport's private request after the handoff.
-        expect(transport.requests).toEqual([
-          { path: '/v1/models', authorization },
-          { path: '/v1/models', authorization },
-        ]);
-        expect(transport.exchanges).toBe(2);
+        // Shared-header mutations are observable when fetch returns; private copies remain unobservable.
+        const expected = [{ path: '/v1/models', authorization }];
+        if (copyOptions) {
+          expected.push({ path: '/v1/models', authorization });
+        }
+        expect(transport.requests).toEqual(expected);
+        expect(transport.exchanges).toBe(copyOptions ? 2 : 1);
       },
     );
   });

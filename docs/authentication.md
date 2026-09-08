@@ -233,7 +233,9 @@ or request `headers` skips token acquisition, including `null` to remove the hea
 Subclasses that override authentication hooks retain control of credential resolution.
 For subject-token workload identity, a transport hook that dispatches without delegating to the SDK's
 `fetchWithTimeout` owns its authentication retries. The SDK records token usage immediately before
-calling the configured `fetch`; it cannot verify which credential an independent transport sent.
+calling the configured `fetch`, then conservatively revokes retry ownership if the supplied request's
+observable Authorization state changes before `fetch` resolves. This also applies to header changes
+during post-send cleanup; the SDK cannot verify which credential an independent transport sent.
 When a hook makes several delegated sends, authentication retry follows the response the hook returns.
 Native `response.clone()` calls made inside a transport hook are caller-owned and do not carry automatic
 workload-token retry attribution. A subclass can use the protected `this.cloneResponse(response)` helper
@@ -311,6 +313,10 @@ accessor values because the remaining occurrence cannot be identified reliably, 
 are added at the same time.
 Within a native array-valued header, accessor slots are retained individually while ordinary data
 slots continue to refresh, including when a credential provider updates them during acquisition.
+If previously available property-descriptor evidence becomes unavailable while replaying an
+`Authorization` source, row, or nested value, the SDK rejects the request before dispatch. Keep that
+evidence available or provide a new header layer; the SDK does not consume a one-shot getter again to
+recover lost evidence.
 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
