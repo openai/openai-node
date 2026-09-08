@@ -147,7 +147,7 @@ export class HeaderSourceProtocol<T> {
       kind: 'iterable',
       refreshable,
       iterate: (array) => {
-        const iteration = refreshable && array ? array() : factory.call(source);
+        const iteration = refreshable && array ? array() : Reflect.apply(factory, source, []);
         if (!refreshable || !read) {
           return { iteration, reused: false };
         }

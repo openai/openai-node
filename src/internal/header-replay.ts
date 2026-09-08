@@ -54,7 +54,7 @@ interface HeaderSlotSnapshot<T = unknown> {
 
 interface HeaderValuesSnapshot {
   source: readonly HeaderValue[];
-  iterator: () => Iterator<HeaderValue>;
+  protocol: HeaderSourceProtocol<HeaderValue>;
   slots: Map<number, HeaderSlotSnapshot & { value: HeaderValue }>;
 }
 
@@ -541,19 +541,20 @@ const readHeaderValues = (
   const headerValue = retained?.source ?? row.row[1];
   const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
   const stateful = refresh?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
-  const iterator = retained?.iterator ?? values[Symbol.iterator];
-  const snapshot =
-    replay && isReadonlyArray(headerValue) && iterator === getArrayIterator(values)
-      ? (retained ?? { source: values, iterator, slots: new Map() })
+  const nested =
+    replay && isReadonlyArray(headerValue)
+      ? (retained ?? { source: values, protocol: new HeaderSourceProtocol<HeaderValue>(), slots: new Map() })
       : undefined;
-  if (
-    refresh?.refreshable &&
-    isReadonlyArray(headerValue) &&
-    (stateful || hasStatefulArrayProperties(values, iterator))
-  ) {
+  const protocol = (nested?.protocol ?? new HeaderSourceProtocol<HeaderValue>(false)).capture(values);
+  if (protocol.kind !== 'iterable') {
+    throw new TypeError('Header value arrays must be iterable');
+  }
+  const snapshot = protocol.refreshable ? nested : undefined;
+  if (refresh?.refreshable && isReadonlyArray(headerValue) && (stateful || !protocol.refreshable)) {
     refresh.refreshable = false;
   }
-  return { values, iterator, snapshot };
+  // Record the completed array value even when its new protocol becomes snapshot-only.
+  return { protocol, snapshot, observed: !!nested };
 };
 
 function* captureRowValues(
@@ -693,12 +694,13 @@ const rememberParsedRow = (
   row: RowRead,
   headers: HeaderSource,
   property: HeaderPropertySnapshot | undefined,
-  snapshot: HeaderValuesSnapshot | undefined,
+  values: ReturnType<typeof readHeaderValues>,
   refresh: { refreshable: boolean } | undefined,
   emitted: boolean,
   callbacks: HeaderReplayCallbacks,
   replay?: HeaderReplayState,
 ) => {
+  const { snapshot } = values;
   if (snapshot?.slots.size && refresh) {
     refresh.refreshable = false;
   }
@@ -709,7 +711,7 @@ const rememberParsedRow = (
   if (emitted && (snapshot || !refresh?.refreshable)) {
     property.entry = callbacks.capture(row.name);
   }
-  if (snapshot) {
+  if (values.observed) {
     rememberRecordValue(row.name, emitted ? property.entry : null, replay, callbacks.layer);
   }
   if (!refresh?.refreshable) {
@@ -743,20 +745,25 @@ function* replayRow(
   const refresh = rowRefreshState(row, descriptor, clear, replay);
   const property: HeaderPropertySnapshot | undefined =
     clear && replay && descriptor ? { descriptor } : undefined;
-  const { values, iterator, snapshot } = readHeaderValues(
-    row,
-    retainedRowValues(row, retainedProperty),
-    refresh,
-    replay,
-  );
+  const values = readHeaderValues(row, retainedRowValues(row, retainedProperty), refresh, replay);
+  const { protocol, snapshot } = values;
   if (property && snapshot) {
     property.values = snapshot;
   }
-  const iteration = snapshot
-    ? iterateHeaderValues(row.name, snapshot, callbacks.normalize)
-    : { [Symbol.iterator]: () => Reflect.apply(iterator, values, []) };
-  const didClear = yield* captureRowValues(row, iteration, refresh, clear, native, callbacks, replay);
-  rememberParsedRow(row, headers, property, snapshot, refresh, didClear, callbacks, replay);
+  const { iteration } = protocol.iterate(
+    snapshot ? () => iterateHeaderValues(row.name, snapshot, callbacks.normalize) : undefined,
+  );
+  const didClear = yield* captureRowValues(
+    row,
+    { [Symbol.iterator]: () => iteration },
+    refresh,
+    clear,
+    native,
+    callbacks,
+    replay,
+  );
+  protocol.finish();
+  rememberParsedRow(row, headers, property, values, refresh, didClear, callbacks, replay);
 }
 
 const pruneRows = (occurrences: Map<HeaderEntry, number>, replay?: HeaderReplayState) => {
@@ -827,7 +834,15 @@ function* replayHeaderEntries(
 
 const copyHeaderValues = <T extends { values?: HeaderValuesSnapshot }>(snapshot: T): T => ({
   ...snapshot,
-  ...(snapshot.values ? { values: { ...snapshot.values, slots: new Map(snapshot.values.slots) } } : {}),
+  ...(snapshot.values
+    ? {
+        values: {
+          ...snapshot.values,
+          protocol: snapshot.values.protocol.fork(),
+          slots: new Map(snapshot.values.slots),
+        },
+      }
+    : {}),
 });
 
 const copyHeaderReplay = (replay: HeaderReplayState): HeaderReplayState => ({
