@@ -178,7 +178,7 @@ test.each(
 );
 
 test.each([false, true])(
-  'does not refresh a copied response after mixed sends (independent pending: %s)',
+  'refreshes the selected response clone after mixed sends (independent pending: %s)',
   async (pending) => {
     const discarded: Promise<Response>[] = [];
     const releases: (() => void)[] = [];
@@ -225,8 +225,8 @@ test.each([false, true])(
 
     try {
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-      expect(sends).toBe(2);
-      expect(transport.exchanges).toBe(1);
+      expect(sends).toBe(4);
+      expect(transport.exchanges).toBe(2);
     } finally {
       for (const release of releases) {
         release();

@@ -7,6 +7,40 @@ import {
   createWorkloadIdentityTransport,
 } from './workload-identity-fixtures';
 
+test('refreshes aliased row accessor replacements independently for each header layer', async () => {
+  const row: (string | null | undefined)[] = ['Authorization', undefined];
+  const original = vi.fn<() => undefined>();
+  const replacement = vi.fn(() => (replacement.mock.calls.length === 1 ? undefined : null));
+  Object.defineProperty(row, 1, { configurable: true, get: original });
+  const headers = [row];
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    Object.defineProperty(row, 1, { get: replacement });
+    return 'subject-token';
+  };
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('Authorization'));
+    return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    workloadIdentity: identity,
+    defaultHeaders: headers,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list({ headers })).rejects.toMatchObject({ status: 401 });
+
+  expect(sent).toEqual([null]);
+  expect(original).toHaveBeenCalledTimes(1);
+  expect(replacement).toHaveBeenCalledTimes(2);
+  expect(transport.exchanges).toBe(1);
+});
+
 describe.each(['name', 'value'] as const)('retained row %s getter', (field) => {
   describe.each(['request', 'default'] as const)('%s headers', (layer) => {
     test.each([null, 'Bearer independent'] as const)(

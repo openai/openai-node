@@ -101,7 +101,7 @@ test('does not invoke a build-result get accessor before prepareRequest removes 
 });
 
 test.skipIf(Number(process.versions.node.split('.')[0]) < 24).each([false, true])(
-  'refreshes a foreign Headers build-result copy with its SDK request carrier removed: %s',
+  'requires the SDK request carrier to refresh a foreign Headers copy, carrier removed: %s',
   async (removeCarrier) => {
     const { Headers: ForeignHeaders } = await import('undici');
     class HookClient extends OpenAI {
@@ -129,10 +129,15 @@ test.skipIf(Number(process.versions.node.split('.')[0]) < 24).each([false, true]
       maxRetries: 0,
     });
 
-    await client.models.list();
-
-    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-    expect(transport.exchanges).toBe(2);
+    if (removeCarrier) {
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(sent).toEqual(['Bearer access-token-1']);
+      expect(transport.exchanges).toBe(1);
+    } else {
+      await client.models.list();
+      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    }
   },
 );
 
