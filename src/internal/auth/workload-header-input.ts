@@ -63,7 +63,7 @@ export const materializeWorkloadHeaders = (source: HeaderInput): Headers | undef
     if (iterator === undefined || iterator === null) {
       // A Proxy can return a nullish selection despite a callable data descriptor. Preserve that
       // single selection while retaining the source's Proxy record-conversion semantics.
-      return materializeSelectedRecord(source, iterator);
+      return materializeSelectedRecord(source, iterator as null | undefined);
     }
     const nativeIterator = isNativeHeadersIterator(iterator);
     let input: HeaderInput;
