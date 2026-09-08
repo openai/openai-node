@@ -1,4 +1,5 @@
 import { isReadonlyArray } from './utils/values';
+import type { HeadersInit } from './builtin-types';
 import { getHeadersIterator, getPlatformHeader, hasNativeHeadersBrand } from './platform-headers';
 export { getPlatformHeader, hasNativeHeadersBrand } from './platform-headers';
 import {
@@ -83,8 +84,10 @@ interface HeaderRowSnapshot {
   name: string;
   nameDescriptor: PropertyDescriptor | undefined;
   nameStateful: boolean;
+  nameOmittedDuringRead: boolean;
   valueDescriptor: PropertyDescriptor | undefined;
   valueStateful: boolean;
+  valueOmittedDuringRead: boolean;
   entries: readonly (readonly [string, string | null])[];
 }
 
@@ -379,7 +382,9 @@ function* iterateHeaders(
     const retainName =
       retainedRow &&
       retainedRow.nameStateful &&
-      (!nameDescriptor || sameHeaderProperty(nameDescriptor, retainedRow.nameDescriptor));
+      (nameDescriptor
+        ? sameHeaderProperty(nameDescriptor, retainedRow.nameDescriptor)
+        : retainedRow.nameOmittedDuringRead);
     const name = retainName ? retainedRow.name : row[0];
     if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
     const nameStateful = retainName || !nameDescriptor || !('value' in nameDescriptor);
@@ -387,13 +392,16 @@ function* iterateHeaders(
     if (
       retainedRow &&
       retainedRow.valueStateful &&
-      (!valueDescriptor || sameHeaderProperty(valueDescriptor, retainedRow.valueDescriptor))
+      (valueDescriptor
+        ? sameHeaderProperty(valueDescriptor, retainedRow.valueDescriptor)
+        : retainedRow.valueOmittedDuringRead)
     ) {
       retainedRows?.set(occurrence, {
         ...retainedRow,
         name,
         nameDescriptor: retainName ? retainedRow.nameDescriptor : nameDescriptor,
         nameStateful,
+        nameOmittedDuringRead: nameStateful && !getHeaderRowDescriptor(row, '0'),
       });
       for (const [, value] of retainedRow.entries) yield [name, value];
       continue;
@@ -422,6 +430,10 @@ function* iterateHeaders(
       shouldClear && replay && descriptor ? { descriptor } : undefined;
     if (property && replay) replay.property = property;
     const headerValue = row[1];
+    if (shouldClear && rowReplay && descriptor && 'value' in descriptor && headerValue !== descriptor.value) {
+      // A proxy's ordinary data descriptor cannot authorize rereading a different observed value.
+      rowReplay.refreshable = false;
+    }
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
     const statefulValues =
       rowReplay?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
@@ -471,8 +483,10 @@ function* iterateHeaders(
           name,
           nameDescriptor: retainName ? retainedRow.nameDescriptor : nameDescriptor,
           nameStateful,
+          nameOmittedDuringRead: nameStateful && !getHeaderRowDescriptor(row, '0'),
           valueDescriptor,
           valueStateful: !rowReplay?.refreshable,
+          valueOmittedDuringRead: !rowReplay?.refreshable && !getHeaderRowDescriptor(row, '1'),
           entries: capturedRow,
         });
         replay.rows.set(row, rows);
@@ -845,6 +859,33 @@ const createHeaderSnapshot = (
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
 export const snapshotHeaders = (initialSource: HeadersLike): HeaderSnapshot =>
   createHeaderSnapshot(initialSource);
+
+/** Observes native transport serialization before deciding whether its source can be reused. */
+export const materializeHeaderInput = (
+  source: HeadersInit | undefined,
+): { values: Headers; preserve: boolean } => {
+  let preserve = canPreserveHeaderInput(source);
+  const descriptors = new Map<PropertyKey, PropertyDescriptor | undefined>();
+  const observed =
+    source && preserve && !Array.isArray(source) && !(Symbol.iterator in source)
+      ? new Proxy(source, {
+          getOwnPropertyDescriptor(target, key) {
+            const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+            descriptors.set(key, descriptor);
+            return descriptor;
+          },
+          get(target, key) {
+            const value = Reflect.get(target, key, target);
+            if (typeof key === 'string') {
+              const descriptor = descriptors.get(key);
+              if (!descriptor || !('value' in descriptor) || descriptor.value !== value) preserve = false;
+            }
+            return value;
+          },
+        })
+      : source;
+  return { values: new Headers(observed), preserve };
+};
 
 /** Parsed header layers shared by preparation and automatic retries. */
 export interface WorkloadHeaderSnapshots {

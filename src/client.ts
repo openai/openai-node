@@ -264,6 +264,7 @@ import {
   createWorkloadHeaderSnapshots,
   canReplayHeaderInput,
   canPreserveHeaderInput,
+  materializeHeaderInput,
   type WorkloadHeaderSnapshots,
 } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
@@ -1683,7 +1684,8 @@ export class OpenAI {
       }
       throw error;
     }
-    const { req, url } = built;
+    const { url } = built;
+    let { req } = built;
     const timeout = x509Authentication
       ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
       : built.timeout;
@@ -1692,9 +1694,9 @@ export class OpenAI {
 
     if (!x509Authentication) {
       await this.prepareRequest(req, { url, options });
-      this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
       await this._provider?.prepareRequest?.(req, { url, options });
-      this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -2040,7 +2042,11 @@ export class OpenAI {
   ): Promise<Response> {
     const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
     if (workloadRequest) {
-      this.#observeWorkloadHeaderReplacement(workloadRequest.credential, init, workloadRequest.authorization);
+      init = this.#observeWorkloadHeaderReplacement(
+        workloadRequest.credential,
+        init,
+        workloadRequest.authorization,
+      );
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
     }
@@ -2049,9 +2055,9 @@ export class OpenAI {
         init.headers && hasNativeHeadersBrand(init.headers)
           ? getPlatformHeader(init.headers, 'Authorization')
           : undefined;
-      const replayable = platformHeader !== undefined || canPreserveHeaderInput(init.headers);
-      const headers = platformHeader ? undefined : new Headers(init.headers);
-      if (headers && !replayable) init = { ...init, headers };
+      const materialized = platformHeader ? undefined : materializeHeaderInput(init.headers);
+      const headers = materialized?.values;
+      if (headers && !materialized?.preserve) init = { ...init, headers };
       const authHeader = platformHeader ? platformHeader.value : headers?.get('Authorization');
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
@@ -2618,11 +2624,12 @@ export class OpenAI {
       sourceHeaders && hasNativeHeadersBrand(sourceHeaders)
         ? getPlatformHeader(sourceHeaders, 'Authorization')
         : undefined;
+    const materialized = platformHeader ? undefined : materializeHeaderInput(sourceHeaders);
     const preserveHeaders =
       sourceHeaders === undefined ||
       platformHeader !== undefined ||
-      (init.headers !== undefined && canPreserveHeaderInput(init.headers));
-    const headers = platformHeader ? undefined : new Headers(sourceHeaders);
+      (init.headers !== undefined && materialized?.preserve);
+    const headers = materialized?.values;
     // Record what the SDK hands to fetch before asynchronous transport callbacks can mutate it.
     const used =
       (request.credential?.isCurrent() ?? false) &&
@@ -2632,26 +2639,27 @@ export class OpenAI {
     return { init: preserveHeaders ? init : { ...init, headers }, used };
   }
 
-  #observeWorkloadHeaderReplacement(
+  #observeWorkloadHeaderReplacement<T extends RequestInit>(
     credential: WorkloadCredentialUsage | undefined,
-    request: RequestInit,
+    request: T,
     authorization: string | undefined,
-  ): void {
+  ): T {
     if (!credential || authorization === undefined || request.headers === undefined) {
-      return;
+      return request;
     }
     if (this.#workloadTokenProvenance.matchesHeaderCredential(request.headers, authorization) === false) {
       credential.revoke();
-      return;
+      return request;
     }
-    if (!credential.isCurrent()) return;
-    if (!canPreserveHeaderInput(request.headers)) {
-      request.headers = new Headers(request.headers);
-    }
-    const headers = request.headers;
+    if (!credential.isCurrent()) return request;
+    const platformHeader = hasNativeHeadersBrand(request.headers)
+      ? getPlatformHeader(request.headers, 'Authorization')
+      : undefined;
+    const materialized = platformHeader ? undefined : materializeHeaderInput(request.headers);
+    const headers = materialized && !materialized.preserve ? materialized.values : request.headers;
+    if (headers !== request.headers) request = { ...request, headers };
     const native = hasNativeHeadersBrand(headers);
-    const platformHeader = native ? getPlatformHeader(headers, 'Authorization') : undefined;
-    const value = platformHeader ? platformHeader.value : new Headers(headers).get('Authorization');
+    const value = platformHeader ? platformHeader.value : (materialized?.values.get('Authorization') ?? null);
     if (
       this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false ||
       bearerToken(value) !== bearerToken(authorization)
@@ -2660,6 +2668,7 @@ export class OpenAI {
     } else if (native) {
       credential.adopt(headers as Headers);
     }
+    return request;
   }
 
   private _makeAbort(controller: AbortController) {
