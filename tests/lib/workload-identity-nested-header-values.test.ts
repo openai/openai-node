@@ -383,6 +383,63 @@ describe.each(['request', 'default'] as const)('%s duplicate nested values', (la
   });
 });
 
+describe.each(['request', 'default'] as const)('%s shared nested accessor', (layer) => {
+  test.each(['truncate', 'replace', 'unrelated', 'unchanged'] as const)(
+    'tracks getter occurrences after %s',
+    async (change) => {
+      const read = vi.fn(() => {
+        if ((change === 'unchanged' || change === 'unrelated') && read.mock.calls.length > 2) {
+          throw new Error('An unchanged accessor occurrence was read twice');
+        }
+        return read.mock.calls.length === 1 ? 'A' : 'B';
+      });
+      const descriptor = { configurable: true, get: read };
+      const values: string[] = [];
+      Object.defineProperty(values, 0, descriptor);
+      Object.defineProperty(values, 1, descriptor);
+      const headers = { 'X-Custom': values };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('X-Custom'));
+        if (sent.length === 1) {
+          if (change === 'truncate' || change === 'replace') {
+            Object.defineProperty(values, 0, descriptor);
+            values.length = 1;
+            if (change === 'replace') {
+              values.push('tail');
+            }
+          }
+          if (change === 'unrelated') {
+            Object.defineProperty(values, 2, { get: () => 'tail' });
+          }
+          return Response.json(
+            { error: 'synthetic retry' },
+            { status: 500, headers: { 'retry-after-ms': '0' } },
+          );
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 1,
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual([
+        'A, B',
+        { truncate: 'B', replace: 'B, tail', unrelated: 'A, B, tail', unchanged: 'A, B' }[change],
+      ]);
+      expect(read).toHaveBeenCalledTimes(change === 'truncate' || change === 'replace' ? 3 : 2);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
+
 test('rejects a non-callable nested iterator even when it has a call method', () => {
   const values = ['preserved'];
   const call = vi.fn(() => ['unexpected'][Symbol.iterator]());

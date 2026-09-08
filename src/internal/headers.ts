@@ -131,38 +131,62 @@ interface HeaderReplay {
   snapshot?: NullableHeaders;
   record?: boolean;
   properties?: Map<string, HeaderPropertySnapshot>;
-  propertyOrder?: string[];
+  propertyOrder?: Map<string, PropertyDescriptor | undefined>;
   property?: HeaderPropertySnapshot;
   rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, HeaderSlotSnapshot<HeaderEntry>>;
 }
 
-const invalidatedHeaderInputs = <T>(
+const invalidateHeaderSlots = <T>(
   headers: readonly T[],
   previous: ReadonlyMap<T, number>,
-  slots: ReadonlyMap<number, HeaderSlotSnapshot<T>> | undefined,
+  slots: Map<number, HeaderSlotSnapshot<T>> | undefined,
 ): Set<T> => {
   const duplicates = new Map([...previous].filter(([, count]) => count > 1).map(([input]) => [input, 0]));
   const length = getHeaderRowDescriptor(headers, 'length')?.value;
   if (typeof length !== 'number') return new Set();
+  const previousAccessors = new Map<() => unknown, number>();
+  for (const { descriptor } of slots?.values() ?? []) {
+    if (descriptor?.get)
+      previousAccessors.set(descriptor.get, (previousAccessors.get(descriptor.get) ?? 0) + 1);
+  }
+  const accessors = new Map(
+    [...previousAccessors].filter(([, count]) => count > 1).map(([getter]) => [getter, 0]),
+  );
+  let unreadable = false;
   // Removing a duplicate changes its ordinal. Count captured opaque slots without rereading getters.
-  for (let index = 0; duplicates.size && index < length; index += 1) {
+  for (let index = 0; (duplicates.size || accessors.size) && index < length; index += 1) {
     const descriptor = getHeaderRowDescriptor(headers, String(index));
+    const accessorCount = descriptor?.get && accessors.get(descriptor.get);
+    if (accessorCount !== undefined && descriptor?.get) accessors.set(descriptor.get, accessorCount + 1);
     const retained = slots?.get(index);
     const observed = retained && sameHeaderProperty(descriptor, retained.descriptor);
-    if (!observed && (!descriptor || !('value' in descriptor))) return new Set(duplicates.keys());
+    if (!observed && (!descriptor || !('value' in descriptor))) {
+      unreadable = true;
+      continue;
+    }
     const input = observed ? retained.input : descriptor!.value;
     const count = duplicates.get(input);
     if (count !== undefined) duplicates.set(input, count + 1);
   }
-  return new Set(
-    [...duplicates].filter(([input, count]) => count < previous.get(input)!).map(([input]) => input),
+  const invalidated = new Set(
+    [...duplicates]
+      .filter(([input, count]) => unreadable || count < previous.get(input)!)
+      .map(([input]) => input),
   );
+  for (const [index, slot] of slots ?? []) {
+    const getter = slot.descriptor?.get;
+    if (getter && accessors.has(getter) && accessors.get(getter)! < previousAccessors.get(getter)!) {
+      slots!.delete(index);
+      invalidated.add(slot.input);
+    }
+  }
+  return invalidated;
 };
 
 function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderReplay): Generator<HeaderEntry> {
   const counts = new Map([...(replay.rows ?? [])].map(([row, occurrences]) => [row, occurrences.size]));
-  for (const row of invalidatedHeaderInputs(headers, counts, replay.arraySlots)) replay.rows?.delete(row);
+  for (const row of invalidateHeaderSlots(headers, counts, replay.arraySlots)) replay.rows?.delete(row);
   let index = 0;
   // Match native array iteration's live length, with each row validated before reading the next slot.
   for (; index < Math.min(Math.floor(headers.length), Number.MAX_SAFE_INTEGER); index += 1) {
@@ -197,7 +221,7 @@ function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Gen
     if (input !== null && (typeof input === 'object' || typeof input === 'function'))
       counts.set(input, (counts.get(input) ?? 0) + 1);
   }
-  const invalidated = invalidatedHeaderInputs(source, counts, slots);
+  const invalidated = invalidateHeaderSlots(source, counts, slots);
   for (const [index, slot] of slots) if (invalidated.has(slot.input)) slots.delete(index);
   let index = 0;
   for (; index < Math.min(Math.floor(source.length), Number.MAX_SAFE_INTEGER); index += 1) {
@@ -404,19 +428,18 @@ function* iterateHeaders(
       // A getter may remove itself during its first read. Retain its position before surviving aliases.
       let nextKey: string | undefined;
       const present = new Set(entries.map((entry) => entry[0]));
-      const previousKeys = new Set(replay.propertyOrder);
       const liveAliases = new Map<string, string>();
       for (const [key] of entries) {
         const name = key as string;
-        if (previousKeys.has(name)) continue;
+        if (sameHeaderProperty(propertyDescriptors.get(name), replay.propertyOrder?.get(name))) continue;
         if (!liveAliases.has(name.toLowerCase())) liveAliases.set(name.toLowerCase(), name);
       }
       const missing = new Map<string | undefined, HeaderEntry[]>();
-      for (const key of [...(replay.propertyOrder ?? [])].reverse()) {
+      for (const key of [...(replay.propertyOrder?.keys() ?? [])].reverse()) {
         if (present.has(key)) {
           nextKey = key;
         } else if (replay.properties.has(key)) {
-          // Newly supplied aliases override captured accessors; existing aliases keep their original order.
+          // New or changed aliases override captured accessors; unchanged aliases keep their original order.
           const before = liveAliases.get(key.toLowerCase()) ?? nextKey;
           const bucket = missing.get(before) ?? [];
           bucket.push([key, undefined]);
@@ -430,7 +453,9 @@ function* iterateHeaders(
       }
       for (const retained of missing.get(undefined)?.reverse() ?? []) ordered.push(retained);
       entries = ordered;
-      replay.propertyOrder = entries.map((entry) => entry[0] as string);
+      replay.propertyOrder = new Map(
+        entries.map(([key]) => [key as string, propertyDescriptors.get(key as string)]),
+      );
       iter = entries;
     } else {
       iter = Object.entries(headers);
@@ -688,7 +713,7 @@ const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
         ),
       }
     : {}),
-  ...(replay.propertyOrder ? { propertyOrder: [...replay.propertyOrder] } : {}),
+  ...(replay.propertyOrder ? { propertyOrder: new Map(replay.propertyOrder) } : {}),
   ...(replay.arraySlots ? { arraySlots: new Map(replay.arraySlots) } : {}),
   ...(replay.rows
     ? {
