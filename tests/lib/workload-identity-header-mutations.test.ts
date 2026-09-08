@@ -435,7 +435,11 @@ describe('Workload credential ownership after native header mutations', () => {
           Object.setPrototypeOf(headers, prototype);
           expect(Object.getOwnPropertyDescriptor(headers, 'set')).toBeUndefined();
           headers.set('X-Custom', 'preserved');
-          Object[hardening](headers);
+          if (hardening === 'seal') {
+            Object.seal(headers);
+          } else {
+            Object.freeze(headers);
+          }
           expect(Object.getOwnPropertyDescriptor(headers, 'set')).toBeUndefined();
         }
       }

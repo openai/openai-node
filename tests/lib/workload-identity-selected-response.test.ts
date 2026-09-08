@@ -355,6 +355,51 @@ test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
   },
 );
 
+test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
+  'does not wait for an unread attributed %s clone branch before a status retry',
+  async (hook) => {
+    let source: Response | undefined;
+    class CloneClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        if (hook !== 'fetchWithTimeout') {
+          return response;
+        }
+        source ??= response;
+        return this.cloneResponse(response);
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const response = await super.fetchWithAuth(...args);
+        if (hook !== 'fetchWithAuth') {
+          return response;
+        }
+        source ??= response;
+        return this.cloneResponse(response);
+      }
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      calls += 1;
+      return calls === 1
+        ? Response.json({ error: 'synthetic server failure' }, { status: 500 })
+        : Response.json({ ok: true });
+    });
+    const client = new CloneClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await expect(client.post('/synthetic', { body: { synthetic: true } })).resolves.toEqual({ ok: true });
+    await source?.body?.cancel();
+    expect(calls).toBe(2);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test('does not replay when mixed delegated credentials return the same response object', async () => {
   const shared = new Response(null, { status: 401 });
   const sdkGate = deferred();

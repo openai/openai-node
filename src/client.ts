@@ -1797,7 +1797,8 @@ export class OpenAI {
         if (x509Authentication) {
           void Shims.CancelReadableStream(response.body).catch(() => undefined);
         } else {
-          await Shims.CancelReadableStream(response.body);
+          // Transport hooks may retain the other branch of an attributed response clone.
+          void Shims.CancelReadableStream(response.body).catch(() => undefined);
         }
         loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
         loggerFor(this).debug(
