@@ -3,34 +3,46 @@ import { getHeadersIterator, hasNativeHeadersBrand } from '../platform-headers';
 
 type HeaderInput = NonNullable<RequestInit['headers']>;
 
-const hasIteratorDescriptor = (source: HeaderInput): boolean => {
+const getIteratorDescriptor = (source: HeaderInput): PropertyDescriptor | undefined => {
   const seen = new Set<object>();
   for (let current: object | null = source; current; current = Object.getPrototypeOf(current)) {
     if (seen.has(current)) {
-      return false;
+      return undefined;
     }
     seen.add(current);
-    if (Object.getOwnPropertyDescriptor(current, Symbol.iterator)) {
-      return true;
+    const descriptor = Object.getOwnPropertyDescriptor(current, Symbol.iterator);
+    if (descriptor) {
+      return descriptor;
     }
   }
-  return false;
+  return undefined;
 };
 
-const defineRecordHeader = (
-  record: Record<PropertyKey, unknown>,
-  source: HeaderInput,
-  key: string,
-  markAdvanced: () => void,
-) =>
-  Object.defineProperty(record, key, {
-    configurable: true,
-    enumerable: true,
-    get() {
-      markAdvanced();
-      return Reflect.get(source, key, source);
+const materializeRecord = (source: HeaderInput): Headers | undefined => {
+  let shapeObserved = false;
+  const observed = new Proxy(source, {
+    ownKeys(target) {
+      const keys = Reflect.ownKeys(target);
+      shapeObserved = true;
+      return keys;
+    },
+    getOwnPropertyDescriptor(target, key) {
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+    get(target, key) {
+      return Reflect.get(target, key, target);
     },
   });
+  try {
+    return new Headers(observed);
+  } catch (error) {
+    if (shapeObserved) {
+      throw error;
+    }
+    // A record whose shape cannot be inspected may require its configured transport to unwrap it.
+    return undefined;
+  }
+};
 
 /**
  * Materializes headers for workload-credential attribution without forwarding an input whose
@@ -39,20 +51,19 @@ const defineRecordHeader = (
 export const materializeWorkloadHeaders = (source: HeaderInput): Headers | undefined => {
   let advanced = false;
   try {
-    if (!hasIteratorDescriptor(source)) {
-      try {
-        return new Headers(source);
-      } catch (error) {
-        try {
-          Reflect.ownKeys(source);
-        } catch {
-          // A persistently opaque record may require its configured transport to unwrap it.
-          return undefined;
-        }
-        // Validation or a field read failed after the record shape became observable.
-        advanced = true;
-        throw error;
-      }
+    const descriptor = getIteratorDescriptor(source);
+    if (
+      !descriptor ||
+      ('value' in descriptor && (descriptor.value === undefined || descriptor.value === null))
+    ) {
+      advanced = true;
+      return materializeRecord(source);
+    }
+    if (!('value' in descriptor)) {
+      // Let the platform select an accessor-backed protocol exactly once. If it fails, the
+      // accessor may already have advanced state, so the input cannot safely reach transport.
+      advanced = true;
+      return new Headers(source);
     }
     const iterator = Reflect.get(source, Symbol.iterator) as unknown;
     const branded = hasNativeHeadersBrand(source);
@@ -85,30 +96,9 @@ export const materializeWorkloadHeaders = (source: HeaderInput): Headers | undef
       // Native-protocol membranes may need their configured transport to unwrap the receiver.
       input = source;
     } else {
-      // Preserve the single selected protocol while record conversion observes every original
-      // string key, including non-enumerable fields, with the original getter receiver.
-      const record = Object.create(null) as Record<PropertyKey, unknown>;
-      if (iterator !== undefined && iterator !== null) {
-        Object.defineProperty(record, Symbol.iterator, { value: iterator });
-        advanced = true;
-      }
-      const markAdvanced = () => {
-        advanced = true;
-      };
-      for (const key of Reflect.ownKeys(source)) {
-        if (key === Symbol.iterator) {
-          continue;
-        }
-        if (typeof key !== 'string') {
-          advanced = true;
-          throw new TypeError('Header record keys must be strings');
-        }
-        if (!Object.getOwnPropertyDescriptor(source, key)) {
-          continue;
-        }
-        defineRecordHeader(record, source, key, markAdvanced);
-      }
-      input = record as HeaderInput;
+      // Match the platform's invalid-iterator diagnostic without retrying the selected protocol.
+      advanced = true;
+      input = source;
     }
     return new Headers(input);
   } catch (error) {

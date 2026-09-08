@@ -923,7 +923,11 @@ test.each(['record', 'array'] as const)('selects a stateful $source header proto
       const headers: Record<string | symbol, unknown> | unknown[][] =
         source === 'record' ? { 'X-Trace': 'record' } : [['X-Trace', 'array']];
       const native = Reflect.get(headers, Symbol.iterator) as unknown;
-      Object.defineProperty(headers, Symbol.iterator, {
+      const protocolOwner = source === 'record' ? Object.create(Object.getPrototypeOf(headers)) : headers;
+      if (source === 'record') {
+        Object.setPrototypeOf(headers, protocolOwner);
+      }
+      Object.defineProperty(protocolOwner, Symbol.iterator, {
         configurable: true,
         get() {
           reads += 1;
@@ -983,7 +987,7 @@ test.each(['hidden proxy', 'phantom proxy', 'symbol'] as const)(
     let expected: [string, string][] | undefined;
     let nativeError = false;
     try {
-      expected = [...new Headers(makeSource())];
+      expected = [...new Headers(makeSource() as NonNullable<RequestInit['headers']>)];
     } catch {
       nativeError = true;
     }
