@@ -140,34 +140,35 @@ export const getStructuralHeaderValue = (
       if (input === undefined) return { value: undefined };
       return undefined;
     };
-    const hasNativeIterator = (input: readonly unknown[]): boolean => {
+    const getArrayIteratorDescriptor = (input: readonly unknown[]): PropertyDescriptor | undefined => {
       try {
-        let descriptor: PropertyDescriptor | undefined;
         const seen = new Set<object>();
         for (let source: object | null = input; source; source = Object.getPrototypeOf(source)) {
-          if (seen.has(source)) return false;
+          if (seen.has(source)) return undefined;
           seen.add(source);
-          descriptor = Object.getOwnPropertyDescriptor(source, Symbol.iterator);
-          if (descriptor) break;
+          const descriptor = Object.getOwnPropertyDescriptor(source, Symbol.iterator);
+          if (descriptor) return descriptor;
         }
-        return !!descriptor && 'value' in descriptor && descriptor.value === getArrayIterator(input);
+        return undefined;
       } catch {
-        return false;
+        return undefined;
       }
     };
+    const hasNativeIterator = (input: readonly unknown[], descriptor: PropertyDescriptor): boolean =>
+      'value' in descriptor && descriptor.value === getArrayIterator(input);
     if (Array.isArray(headers)) {
-      if (!hasNativeIterator(headers)) return undefined;
+      const outerIterator = getArrayIteratorDescriptor(headers);
+      if (!outerIterator) return undefined;
+      descriptorEvidence.push(['outer:iterator', outerIterator]);
+      if (!hasNativeIterator(headers, outerIterator)) {
+        return { value: null, valueKnown: false, descriptorEvidence };
+      }
       const length = Object.getOwnPropertyDescriptor(headers, 'length')?.value;
       if (typeof length !== 'number') return undefined;
       for (let index = 0; index < length; index += 1) {
         try {
           const rowDescriptor = Object.getOwnPropertyDescriptor(headers, String(index));
-          if (
-            !rowDescriptor ||
-            !('value' in rowDescriptor) ||
-            !Array.isArray(rowDescriptor.value) ||
-            !hasNativeIterator(rowDescriptor.value)
-          ) {
+          if (!rowDescriptor || !('value' in rowDescriptor) || !Array.isArray(rowDescriptor.value)) {
             unknown = true;
             continue;
           }
@@ -179,6 +180,16 @@ export const getStructuralHeaderValue = (
           }
           if (nameDescriptor.value.toLowerCase() !== requested) continue;
           descriptorEvidence.push([`row:${index}`, rowDescriptor], [`name:${index}`, nameDescriptor]);
+          const rowIterator = getArrayIteratorDescriptor(rowDescriptor.value);
+          if (!rowIterator) {
+            unknown = true;
+            continue;
+          }
+          descriptorEvidence.push([`row-iterator:${index}`, rowIterator]);
+          if (!hasNativeIterator(rowDescriptor.value, rowIterator)) {
+            unknown = true;
+            continue;
+          }
           if (!valueDescriptor || !('value' in valueDescriptor)) {
             if (valueDescriptor) descriptorEvidence.push([`value:${index}`, valueDescriptor]);
             unknown = true;
