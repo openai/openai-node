@@ -114,7 +114,19 @@ export const getStructuralHeaderValue = (
   | undefined => {
   if (!headers) return { value: null };
   try {
-    if (brand_privateNullableHeaders in headers || (!Array.isArray(headers) && Symbol.iterator in headers)) {
+    if (brand_privateNullableHeaders in headers) {
+      return undefined;
+    }
+    if (!Array.isArray(headers) && Symbol.iterator in headers) {
+      const seen = new Set<object>();
+      for (let source: object | null = headers; source; source = Object.getPrototypeOf(source)) {
+        if (seen.has(source)) return undefined;
+        seen.add(source);
+        const descriptor = Object.getOwnPropertyDescriptor(source, Symbol.iterator);
+        if (descriptor) {
+          return { value: null, valueKnown: false, descriptorEvidence: [['iterator', descriptor]] };
+        }
+      }
       return undefined;
     }
     const requested = requestedName.toLowerCase();
@@ -166,10 +178,13 @@ export const getStructuralHeaderValue = (
             continue;
           }
           if (nameDescriptor.value.toLowerCase() !== requested) continue;
+          descriptorEvidence.push([`row:${index}`, rowDescriptor], [`name:${index}`, nameDescriptor]);
           if (!valueDescriptor || !('value' in valueDescriptor)) {
+            if (valueDescriptor) descriptorEvidence.push([`value:${index}`, valueDescriptor]);
             unknown = true;
             continue;
           }
+          descriptorEvidence.push([`value:${index}`, valueDescriptor]);
           const input = copyInput(valueDescriptor.value);
           if (!input) {
             unknown = true;
@@ -206,13 +221,13 @@ export const getStructuralHeaderValue = (
       }
     }
     if (unknown && entries.length === 0) {
-      return !Array.isArray(headers) && descriptorEvidence.length > 0
+      return descriptorEvidence.length > 0
         ? { value: null, valueKnown: false, descriptorEvidence }
         : undefined;
     }
     const value = new Headers(entries as unknown as [string, string][]).get(requestedName);
     if (Array.isArray(headers)) {
-      return { value };
+      return { value, descriptorEvidence };
     }
     // Node's native Headers includes non-enumerable keys from plain records but ignores those same
     // keys through a transparent Proxy. Standard reflection cannot identify that distinction, so

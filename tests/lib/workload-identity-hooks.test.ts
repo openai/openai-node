@@ -561,6 +561,81 @@ describe('Workload identity request and dispatch hooks', () => {
     },
   );
 
+  test.each(['tuple data to accessor', 'tuple accessor to data', 'iterator replacement'] as const)(
+    'recognizes %s during final dispatch',
+    async (shape) => {
+      let source: object | undefined;
+      let ownedAuthorization: string | undefined;
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture prepares structural headers.
+        protected override async prepareRequest(init: RequestInit) {
+          ownedAuthorization = new Headers(init.headers).get('Authorization') ?? undefined;
+          if (!ownedAuthorization) {
+            throw new Error('Expected prepared workload Authorization');
+          }
+          if (shape === 'iterator replacement') {
+            source = {
+              *[Symbol.iterator]() {
+                yield ['Authorization', ownedAuthorization] as const;
+              },
+            };
+          } else {
+            const row: unknown[] = ['Authorization', ownedAuthorization];
+            if (shape === 'tuple accessor to data') {
+              Object.defineProperty(row, '1', {
+                enumerable: true,
+                configurable: true,
+                get: () => ownedAuthorization,
+              });
+            }
+            source = [row];
+          }
+          init.headers = source as Headers;
+        }
+        override fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+          if (!source || !ownedAuthorization) {
+            throw new Error('Expected structural headers before dispatch');
+          }
+          const normalized = ownedAuthorization.replace(/^Bearer /u, 'bEaReR ');
+          if (shape === 'iterator replacement') {
+            Object.defineProperty(source, Symbol.iterator, {
+              configurable: true,
+              value: function* value() {
+                yield ['Authorization', normalized] as const;
+              },
+            });
+          } else {
+            const [row] = source as unknown[][];
+            if (!row) {
+              throw new Error('Expected Authorization tuple');
+            }
+            Object.defineProperty(row, '1', {
+              enumerable: true,
+              configurable: true,
+              ...(shape === 'tuple data to accessor'
+                ? { get: () => normalized }
+                : { value: normalized, writable: true }),
+            });
+          }
+          return super.fetchWithTimeout(...args);
+        }
+      }
+      let sends = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        sends += 1;
+        return sends === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await client.models.list();
+
+      expect(sends).toBe(2);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
+
   test.each([false, true])('preserves native Request headers (throwing tag getter: %s)', async (throwTag) => {
     class HookClient extends OpenAI {
       override async fetchWithTimeout(
