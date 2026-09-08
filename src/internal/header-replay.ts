@@ -711,6 +711,7 @@ const finishReplay = (
   replay?: HeaderReplayState,
 ) => {
   protocol.finish();
+  replay?.nestedIterations.retain(protocol.kind === 'record' ? replay.propertyOrder : undefined);
   if (replay && (protocol.kind !== 'iterable' || !protocol.refreshable || !Array.isArray(headers))) {
     delete replay.arrayPositions;
   }
@@ -810,6 +811,7 @@ const copyHeaderValues = <T extends { values?: HeaderValuesSnapshot }>(snapshot:
 const copyHeaderReplay = (replay: HeaderReplayState): HeaderReplayState => ({
   ...replay,
   protocol: replay.protocol.fork(),
+  nestedIterations: replay.nestedIterations.fork(),
   ...(replay.properties
     ? {
         properties: new Map(
@@ -882,7 +884,12 @@ export class HeaderReplay {
   /** Starts another attempt with this layer's history and its prior canonical snapshot. */
   next(snapshot?: NullableHeaders): HeaderReplay {
     const next = new HeaderReplay();
-    next.state = { ...this.state, protocol: this.state.protocol.fork(), refreshable: true };
+    next.state = {
+      ...this.state,
+      protocol: this.state.protocol.fork(),
+      nestedIterations: this.state.nestedIterations.fork(),
+      refreshable: true,
+    };
     delete next.state.unverifiedHeaders;
     delete next.state.snapshot;
     if (snapshot) {

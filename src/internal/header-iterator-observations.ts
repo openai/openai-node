@@ -1,14 +1,19 @@
 import { sameHeaderProperty } from './header-descriptor-evidence';
 
-interface IteratorObservation<T> {
+interface IteratorProperty {
   source: object;
   descriptor: PropertyDescriptor;
+  identity: object;
+}
+
+interface IteratorObservation<T> extends IteratorProperty {
   entry: T | undefined;
 }
 
 /** Shares completed record cursor reads between related header layers and retries. */
 export class HeaderIteratorObservations<T> {
-  private readonly observations = new WeakMap<object, Map<string, IteratorObservation<T>>>();
+  private observations = new WeakMap<object, Map<string, IteratorObservation<T>>>();
+  private properties = new Map<string, IteratorProperty>();
 
   /** Selects a prior read without reviving a property whose layer observed removal or replacement. */
   capture(
@@ -27,14 +32,24 @@ export class HeaderIteratorObservations<T> {
       refreshable: boolean;
     },
   ) {
-    if (refreshable || !source || !descriptor) {
+    if (!source || !descriptor) {
+      this.properties.delete(name);
       return;
     }
+    const previous = history?.get(name)?.value === undefined ? undefined : this.properties.get(name);
+    const property =
+      previous &&
+      previous.source === source &&
+      sameHeaderProperty(descriptor, previous.descriptor) &&
+      descriptor.enumerable === previous.descriptor.enumerable
+        ? previous
+        : { source, descriptor, identity: {} };
+    this.properties.set(name, property);
     const observed = this.observations.get(iteration)?.get(name);
     const reused = !!(
-      history?.get(name)?.value !== undefined &&
+      !refreshable &&
       observed &&
-      observed.source === source &&
+      observed.identity === property.identity &&
       sameHeaderProperty(descriptor, observed.descriptor) &&
       descriptor.enumerable === observed.descriptor.enumerable
     );
@@ -47,13 +62,35 @@ export class HeaderIteratorObservations<T> {
           return;
         }
         const { descriptor: completedDescriptor, entry } = completed;
+        const completedProperty = { ...property, descriptor: completedDescriptor };
+        this.properties.set(name, completedProperty);
+        if (refreshable) {
+          return;
+        }
         const entries = this.observations.get(iteration) ?? new Map<string, IteratorObservation<T>>();
         // A layer that observed removal must not replace a sibling's completed observation with an empty read.
         if (!entries.has(name)) {
-          entries.set(name, { source, descriptor: completedDescriptor, entry });
+          entries.set(name, { ...completedProperty, entry });
           this.observations.set(iteration, entries);
         }
       },
     };
+  }
+
+  /** Releases property ownership that is absent from the completed layer. */
+  retain(history: ReadonlyMap<string, unknown> | undefined): void {
+    for (const name of this.properties.keys()) {
+      if (!history?.has(name)) {
+        this.properties.delete(name);
+      }
+    }
+  }
+
+  /** Shares completed values while keeping each layer's property ownership independent. */
+  fork(): HeaderIteratorObservations<T> {
+    const fork = new HeaderIteratorObservations<T>();
+    fork.observations = this.observations;
+    fork.properties = new Map(this.properties);
+    return fork;
   }
 }

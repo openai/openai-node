@@ -378,6 +378,88 @@ test('discards a nested cursor observation after its property disappears', async
   expect(sent).toEqual(['first', null, null]);
 });
 
+test.each(['data', 'accessor'] as const)(
+  'discards a nested cursor observation after a nonempty %s replacement',
+  async (kind) => {
+    const first = ['first'];
+    const second = ['second'];
+    for (const values of [first, second]) {
+      const cursor = values[Symbol.iterator]();
+      Object.defineProperty(values, Symbol.iterator, { value: () => cursor });
+    }
+    const headers: Record<string, string[]> = {};
+    const original = { configurable: true, enumerable: true, writable: true, value: first };
+    Object.defineProperty(headers, 'X-Probe', original);
+    const read = vi.fn(() => second);
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('X-Probe'));
+      if (sent.length === 1) {
+        if (kind === 'data') {
+          headers['X-Probe'] = second;
+        } else {
+          Object.defineProperty(headers, 'X-Probe', { configurable: true, enumerable: true, get: read });
+        }
+      } else if (sent.length === 2) {
+        Object.defineProperty(headers, 'X-Probe', original);
+      }
+      return Response.json(
+        { ok: true },
+        { status: sent.length < 4 ? 500 : 200, headers: { 'retry-after-ms': '0' } },
+      );
+    });
+    const client = new OpenAI({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 3 });
+
+    await expect(client.post('/synthetic', { headers, body: { input: 'synthetic' } })).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(sent).toEqual(['first', 'second', null, null]);
+    expect(read).toHaveBeenCalledTimes(kind === 'accessor' ? 1 : 0);
+  },
+);
+
+test('preserves a sibling layer while another observes a temporary nested replacement', async () => {
+  const first = ['first'];
+  const second = ['second'];
+  for (const values of [first, second]) {
+    const cursor = values[Symbol.iterator]();
+    Object.defineProperty(values, Symbol.iterator, { value: () => cursor });
+  }
+  const headers: Record<string, string[]> = {};
+  const original = { configurable: true, enumerable: true, writable: true, value: first };
+  Object.defineProperty(headers, 'X-Probe', original);
+  const read = vi.fn(() => {
+    // Default headers observe the replacement; request headers still own the original observation.
+    Object.defineProperty(headers, 'X-Probe', original);
+    return second;
+  });
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('X-Probe'));
+    if (sent.length === 1) {
+      Object.defineProperty(headers, 'X-Probe', { configurable: true, enumerable: true, get: read });
+    }
+    return Response.json(
+      { ok: true },
+      { status: sent.length === 1 ? 500 : 200, headers: { 'retry-after-ms': '0' } },
+    );
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    defaultHeaders: headers,
+    fetch: transport.fetch,
+    maxRetries: 1,
+  });
+
+  await expect(client.post('/synthetic', { headers, body: { input: 'synthetic' } })).resolves.toEqual({
+    ok: true,
+  });
+
+  expect(sent).toEqual(['first', 'first']);
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
 test('discards a nested cursor observation after its property visibility is restored', async () => {
   const values = ['first'];
   const headers: Record<string, string[]> = { 'X-Custom': values };
