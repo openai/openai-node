@@ -296,7 +296,7 @@ type PreparedAPIKey = {
   explicitCapture: boolean;
 };
 
-type APIKeyPreparationAttempt = { prepared?: PreparedAPIKey };
+type APIKeyPreparationAttempt = { kind: 'request' | 'build'; prepared?: PreparedAPIKey | undefined };
 type APIKeyBuildContext = {
   owner: OpenAI;
   prepared: PreparedAPIKey | undefined;
@@ -961,9 +961,15 @@ export class OpenAI {
 
   private currentAPIKeyPreparationAttempt(
     options: FinalRequestOptions,
+    kind?: APIKeyPreparationAttempt['kind'],
   ): APIKeyPreparationAttempt | undefined {
     const attempts = this.#apiKeyPreparationAttempts.get(options);
-    return attempts?.[attempts.length - 1];
+    if (!attempts) return undefined;
+    for (let index = attempts.length - 1; index >= 0; index--) {
+      const attempt = attempts[index];
+      if (attempt && (!kind || attempt.kind === kind)) return attempt;
+    }
+    return undefined;
   }
 
   private removeAPIKeyPreparationAttempt(
@@ -1355,7 +1361,7 @@ export class OpenAI {
 
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
-    const preparationAttempt: APIKeyPreparationAttempt = {};
+    const preparationAttempt: APIKeyPreparationAttempt = { kind: 'request' };
     this.addAPIKeyPreparationAttempt(options, preparationAttempt);
     let preparation: Promise<void>;
     try {
@@ -2045,18 +2051,16 @@ export class OpenAI {
     const timeout = x509Headers ? x509Timeout : options.timeout;
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
-      const currentAttempt = this.currentAPIKeyPreparationAttempt(options);
-      const temporaryAttempt =
-        preparedAPIKey && currentAttempt?.prepared !== preparedAPIKey
-          ? { prepared: preparedAPIKey }
-          : currentAttempt === undefined
-            ? {}
-            : undefined;
-      if (temporaryAttempt) this.addAPIKeyPreparationAttempt(options, temporaryAttempt);
+      // A build may inherit request preparation, but never another build's cached credential.
+      const buildAttempt: APIKeyPreparationAttempt = {
+        kind: 'build',
+        prepared: preparedAPIKey ?? this.currentAPIKeyPreparationAttempt(options, 'request')?.prepared,
+      };
+      this.addAPIKeyPreparationAttempt(options, buildAttempt);
       try {
         authenticationHeaders = await this.authHeaders(options, options.__security ?? { bearerAuth: true });
       } finally {
-        if (temporaryAttempt) this.removeAPIKeyPreparationAttempt(options, temporaryAttempt);
+        this.removeAPIKeyPreparationAttempt(options, buildAttempt);
       }
     }
     const headers = buildHeaders([

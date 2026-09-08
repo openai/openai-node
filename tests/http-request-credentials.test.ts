@@ -238,6 +238,123 @@ test('preserves the credential failure when upload cleanup throws during a direc
   expect(release).toHaveBeenCalledTimes(1);
 });
 
+test.each(clients)(
+  '%s gives overlapping direct builds separate credentials with shared options',
+  async (kind) => {
+    let signalEntered!: () => void;
+    let signalRelease!: () => void;
+    // oxlint-disable promise/avoid-new -- Pause the first build after it has obtained authentication headers.
+    const entered = new Promise<void>((resolve) => {
+      signalEntered = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      signalRelease = resolve;
+    });
+    // oxlint-enable promise/avoid-new
+    const seenOptions: FinalRequestOptions[] = [];
+    async function afterAuthentication(options: FinalRequestOptions) {
+      seenOptions.push(options);
+      if (seenOptions.length === 1) {
+        signalEntered();
+        await release;
+      }
+    }
+    class PausedOpenAI extends OpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        const headers = await super.authHeaders(options, options.__security);
+        await afterAuthentication(options);
+        return headers;
+      }
+    }
+    class PausedAzure extends AzureOpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        const headers = await super.authHeaders(options, options.__security);
+        await afterAuthentication(options);
+        return headers;
+      }
+    }
+    class PausedBedrock extends BedrockOpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        const headers = await super.authHeaders(options, options.__security);
+        await afterAuthentication(options);
+        return headers;
+      }
+    }
+    const provider = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce('synthetic-first')
+      .mockResolvedValueOnce('synthetic-second');
+    const fetch = mockFetch();
+    const clientOptions = { baseURL: 'https://credentials.example/v1', fetch };
+    let client: OpenAI;
+    if (kind === 'Azure') {
+      client = new PausedAzure({
+        ...clientOptions,
+        azureADTokenProvider: provider,
+        apiVersion: '2024-10-01-preview',
+      });
+    } else if (kind === 'Bedrock' || kind === 'Bedrock admin') {
+      client = new PausedBedrock({ ...clientOptions, bedrockTokenProvider: provider });
+    } else {
+      client = new PausedOpenAI({ ...clientOptions, apiKey: provider, adminAPIKey: null });
+    }
+    const options: FinalRequestOptions = { method: 'get', path: '/items', __security: securityFor(kind) };
+
+    const first = client.buildRequest(options);
+    await entered;
+    try {
+      const second = await client.buildRequest(options);
+      await fetch(second.url, second.req);
+    } finally {
+      signalRelease();
+    }
+    const built = await first;
+    await fetch(built.url, built.req);
+
+    expect(seenOptions).toHaveLength(2);
+    expect(seenOptions[0]).toBe(options);
+    expect(seenOptions[1]).toBe(options);
+    expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+      'Bearer synthetic-second',
+      'Bearer synthetic-first',
+    ]);
+    expect(provider).toHaveBeenCalledTimes(2);
+
+    provider.mockResolvedValueOnce('synthetic-third');
+    const subsequent = await client.buildRequest(options);
+    expect(subsequent.req.headers.get('authorization')).toBe('Bearer synthetic-third');
+    expect(provider).toHaveBeenCalledTimes(3);
+    expect(seenOptions[2]).toBe(options);
+  },
+);
+
+test('retires direct-build credentials when authHeaders rejects after delegation', async () => {
+  class RejectedHeaders extends OpenAI {
+    calls = 0;
+
+    protected override async authHeaders(options: FinalRequestOptions) {
+      const headers = await super.authHeaders(options);
+      this.calls += 1;
+      if (this.calls === 1) {
+        throw new Error('synthetic post-authentication failure');
+      }
+      return headers;
+    }
+  }
+  const provider = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-failed-build')
+    .mockResolvedValueOnce('synthetic-subsequent-build');
+  const client = new RejectedHeaders({ apiKey: provider, fetch: mockFetch() });
+  const options: FinalRequestOptions = { method: 'get', path: '/items' };
+
+  await expect(client.buildRequest(options)).rejects.toThrow('synthetic post-authentication failure');
+  const { req } = await client.buildRequest(options);
+
+  expect(req.headers.get('authorization')).toBe('Bearer synthetic-subsequent-build');
+  expect(provider).toHaveBeenCalledTimes(2);
+});
+
 test('preserves one-argument delegating hooks and resolves credentials through options preparation', async () => {
   const events: string[] = [];
   class HookedOpenAI extends OpenAI {
