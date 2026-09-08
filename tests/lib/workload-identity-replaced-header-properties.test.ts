@@ -218,6 +218,7 @@ test('preserves descriptor and Get ordering with the original proxy receiver', (
     'get:Authorization',
     'descriptor:X-After',
     'get:X-After',
+    'descriptor:Authorization',
   ]);
   events.length = 0;
   Object.defineProperty(target, 'Authorization', { value: null });

@@ -2335,6 +2335,17 @@ export class OpenAI {
       suppliedHeaders ? undefined : (x509Headers?.requestHeaders ?? options.headers),
     ]);
 
+    if (
+      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
+      security.bearerAuth &&
+      !headers.values.has('Authorization') &&
+      !headers.nulls.has('authorization') &&
+      !this.#workloadTokenProvenance.scopeFor(options, credentialContext)?.authenticationRevoked()
+    ) {
+      // Legacy hooks may omit authentication. Preserve explicit removals before planning dispatch fallback.
+      headers.values.set('Authorization', `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`);
+    }
+
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
       this.validateHeaders(headers, security);
     }

@@ -74,6 +74,7 @@ const getArrayIterator = <T>(headers: readonly T[]) => {
 
 interface HeaderPropertySnapshot {
   descriptor: PropertyDescriptor;
+  omittedDuringRead?: boolean;
   capture?: () => void;
   entry?: readonly [string, string | readonly string[] | null];
 }
@@ -317,10 +318,12 @@ function* iterateHeaders(
       for (const key of [...(replay.propertyOrder ?? [])].reverse()) {
         if (present.has(key)) {
           nextKey = key;
-        } else if (replay.properties.has(key)) {
+        } else if (replay.properties.get(key)?.omittedDuringRead) {
           const bucket = missing.get(nextKey) ?? [];
           bucket.push([key, undefined]);
           missing.set(nextKey, bucket);
+        } else {
+          replay.properties.delete(key);
         }
       }
       const ordered: HeaderEntry[] = [];
@@ -455,6 +458,12 @@ function* iterateHeaders(
       if (!rowReplay?.refreshable) {
         property.capture?.();
         delete property.capture;
+        try {
+          property.omittedDuringRead = !Object.getOwnPropertyDescriptor(headers, name)?.enumerable;
+        } catch {
+          // Preserve the successful read when a membrane prevents distinguishing self-removal.
+          property.omittedDuringRead = true;
+        }
         replay.properties!.set(name, property);
       }
       delete replay.property;

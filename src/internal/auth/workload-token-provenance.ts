@@ -194,6 +194,7 @@ interface TokenScope {
   select: (credential: HeaderCredential) => void;
   credential: (authorization: string) => HeaderCredential | undefined;
   revoke: () => void;
+  authenticationRevoked: () => boolean;
   matches: (authorization: string) => boolean;
   dispose: () => void;
 }
@@ -447,6 +448,7 @@ export class WorkloadTokenProvenance {
       });
     };
     let disposed = false;
+    let authenticationRevoked = false;
     const scope: TokenScope = {
       context,
       resultOwner: {},
@@ -497,10 +499,13 @@ export class WorkloadTokenProvenance {
         return credential?.revoked ? undefined : credential;
       },
       revoke: () => {
+        authenticationRevoked = true;
         for (const credential of tokens.values()) {
           credential.revoked = true;
         }
       },
+      authenticationRevoked: () =>
+        authenticationRevoked || [...tokens.values()].some((credential) => credential.revoked),
       matches: (authorization) => scope.credential(authorization) !== undefined,
       dispose: () => {
         if (disposed) {
