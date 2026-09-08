@@ -197,6 +197,149 @@ describe('AssistantStream run-step dispatch ordering', () => {
     },
   );
 
+  test.each([
+    ['get', false],
+    ['ownKeys', false],
+    ['get', true],
+    ['ownKeys', true],
+  ] as const)(
+    'observes a projection %s trap replacement without listeners (contains id: %s)',
+    async (trap, addIdentity) => {
+      const step = runStep('step_original');
+      const { delta: originalDelta } = toolCallDelta(step.id).data;
+      const data = { id: step.id, delta: originalDelta };
+      const replacement = {
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+        },
+      };
+      const readID = vi.fn(() => '_alias');
+      if (addIdentity) {
+        Object.defineProperty(replacement, 'id', { enumerable: true, get: readID });
+      }
+      const replaceDelta = vi.fn(() => {
+        data.delta = replacement;
+      });
+      data.delta = new Proxy(originalDelta, {
+        get(target, key, receiver) {
+          if (trap === 'get' && key === 'step_details') {
+            replaceDelta();
+          }
+          return Reflect.get(target, key, receiver);
+        },
+        ownKeys(target) {
+          if (trap === 'ownKeys') {
+            replaceDelta();
+          }
+          return Reflect.ownKeys(target);
+        },
+      });
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(replaceDelta).toHaveBeenCalled();
+      expect(readID).not.toHaveBeenCalled();
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      const [emittedDelta, snapshot] = stepDelta.mock.calls[0] ?? [];
+      if (addIdentity) {
+        expect(Object.is(emittedDelta, replacement)).toBe(false);
+        expect(emittedDelta).not.toHaveProperty('id');
+      } else {
+        expect(emittedDelta).toBe(replacement);
+      }
+      expect(snapshot.id).toBe(step.id);
+      expect(snapshot.step_details.tool_calls[0].function.arguments).toBe('{"to":"trusted"} updated');
+    },
+  );
+
+  test.each(['value', 'setter'] as const)(
+    'bounds prototype metadata inspection while preserving a deep inherited delta %s',
+    async (kind) => {
+      const step = runStep('step_original');
+      let currentDelta = toolCallDelta(step.id).data.delta;
+      const lookups: { hops: number }[] = [];
+      let currentLookup: { hops: number } | undefined;
+      const data = new Proxy(
+        { id: step.id },
+        {
+          getPrototypeOf(target) {
+            currentLookup = { hops: 0 };
+            lookups.push(currentLookup);
+            return Reflect.getPrototypeOf(target);
+          },
+        },
+      );
+      const readDelta = vi.fn(function readDeepDelta(this: typeof data) {
+        expect(this).toBe(data);
+        return currentDelta;
+      });
+      const writeDelta = vi.fn(function writeDeepDelta(this: typeof data, value: typeof currentDelta) {
+        expect(this).toBe(data);
+        currentDelta = value;
+      });
+      const owner = Object.defineProperty({}, 'delta', {
+        configurable: true,
+        ...(kind === 'value' ? { value: currentDelta } : { get: readDelta, set: writeDelta }),
+      });
+      let prototype: object = owner;
+      const prototypeHandler = {
+        getPrototypeOf(target: object) {
+          if (currentLookup) {
+            currentLookup.hops += 1;
+          }
+          return Reflect.getPrototypeOf(target);
+        },
+      };
+      for (let depth = 0; depth < 100; depth += 1) {
+        const node = Object.setPrototypeOf({}, prototype);
+        prototype = new Proxy(node, prototypeHandler);
+      }
+      Object.setPrototypeOf(data, prototype);
+      const replacement = {
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+        },
+      };
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          if (kind === 'value') {
+            Object.defineProperty(owner, 'delta', { value: replacement });
+          } else {
+            expect(Reflect.set(data, 'delta', replacement)).toBe(true);
+          }
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(lookups.length).toBeGreaterThan(0);
+      for (const { hops } of lookups) {
+        expect(hops).toBeLessThanOrEqual(32);
+      }
+      expect(writeDelta).toHaveBeenCalledTimes(kind === 'setter' ? 1 : 0);
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).toBe(replacement);
+      expect(step.id).toBe('step_original');
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} replacement');
+    },
+  );
+
   describe.each([
     ['SSE', publicAssistantStream],
     ['serialized stream', assistantStream],

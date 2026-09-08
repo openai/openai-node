@@ -99,8 +99,11 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
-function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: PropertyDescriptor | undefined) {
-  if (left === undefined || right === undefined) {
+function samePropertyDescriptor(
+  left: PropertyDescriptor | null | undefined,
+  right: PropertyDescriptor | null | undefined,
+) {
+  if (!left || !right) {
     return left === right;
   }
   if (left.configurable !== right.configurable || left.enumerable !== right.enumerable) {
@@ -117,18 +120,21 @@ interface RunStepDeltaState {
   getRunStepDelta?: (afterCallbacks?: boolean) => RunStepDelta | undefined;
 }
 
-function getInheritedDeltaDescriptor(data: object): PropertyDescriptor | undefined {
-  const visited = new Set<object>([data]);
-  let prototype = Object.getPrototypeOf(data);
-  while (prototype && !visited.has(prototype)) {
+function getInheritedDeltaDescriptor(data: object): PropertyDescriptor | null | undefined {
+  let prototype = data;
+  // Bound cache metadata inspection. A null result falls back to ordinary property reads
+  // after callbacks, so deeper prototype chains remain supported without an unbounded walk.
+  for (let depth = 0; depth < 32; depth += 1) {
+    prototype = Object.getPrototypeOf(prototype);
+    if (prototype === null) {
+      return undefined;
+    }
     const descriptor = Object.getOwnPropertyDescriptor(prototype, 'delta');
     if (descriptor) {
       return descriptor;
     }
-    visited.add(prototype);
-    prototype = Object.getPrototypeOf(prototype);
   }
-  return undefined;
+  return null;
 }
 
 function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
@@ -195,27 +201,29 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     initializeRunStepDelta = () => {
       // Validate the captured envelope before reading delta content, then reject root identity fields
       // before raw dispatch. Project content privately for accumulation after raw listeners run.
-      const deltaDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
-      let observedInheritedDescriptor = deltaDescriptor
+      const delta = Reflect.get(exposedData, 'delta', exposedData) as RunStepDelta;
+      // A getter may replace its own descriptor while returning the captured value. Record
+      // its post-read state, then detect subsequent replacements from validation or projection.
+      let observedDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
+      let observedInheritedDescriptor = observedDescriptor
         ? undefined
         : getInheritedDeltaDescriptor(exposedData);
-      const delta = Reflect.get(exposedData, 'delta', exposedData) as RunStepDelta;
       if (delta && (hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id'))) {
         throw new OpenAIError('Run-step deltas must not contain an id field');
       }
       capturedData.delta = delta;
-      let observedDescriptor = deltaDescriptor;
       let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = (afterCallbacks = false) => {
-        if (!afterCallbacks) {
-          return observedDelta;
-        }
         const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
         const currentInheritedDescriptor = currentDescriptor
           ? undefined
           : getInheritedDeltaDescriptor(exposedData);
-        // A setter can change the backing value without replacing the property descriptor.
-        const refreshAccessor = (currentDescriptor ?? currentInheritedDescriptor)?.set !== undefined;
+        // Callbacks can change an accessor's backing value. If descriptor inspection was
+        // bounded, use the ordinary lookup to observe changes beyond the inspected chain.
+        const refreshAccessor =
+          afterCallbacks &&
+          (currentInheritedDescriptor === null ||
+            (currentDescriptor ?? currentInheritedDescriptor)?.set !== undefined);
         if (
           !refreshAccessor &&
           samePropertyDescriptor(currentDescriptor, observedDescriptor) &&
@@ -223,17 +231,21 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         ) {
           return observedDelta;
         }
-        observedDescriptor = currentDescriptor;
-        observedInheritedDescriptor = currentInheritedDescriptor;
         observedDelta = (
           currentDescriptor && 'value' in currentDescriptor
             ? currentDescriptor.value
             : Reflect.get(exposedData, 'delta', exposedData)
         ) as RunStepDelta;
+        observedDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
+        observedInheritedDescriptor = observedDescriptor
+          ? undefined
+          : getInheritedDeltaDescriptor(exposedData);
         return observedDelta;
       };
       const refreshRunStepDelta = (afterListeners = false) => {
-        const currentDelta = readCurrentDelta(afterListeners);
+        // Without raw listeners, accumulate the captured value even if its validation
+        // changed the public delta. Projection side effects affect the later callback.
+        const currentDelta = afterListeners ? readCurrentDelta(true) : observedDelta;
         if (!currentDelta || (typeof currentDelta !== 'object' && typeof currentDelta !== 'function')) {
           capturedData.delta = currentDelta;
           return;
@@ -258,7 +270,8 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           });
         }
         capturedData.delta = accumulationDelta as RunStepDelta;
-        // Getters can replace the public delta, while accumulation keeps the content just projected.
+        // Property reads and enumeration can run Proxy traps even for data descriptors.
+        // Recheck replacements while accumulation keeps the content just projected.
         readCurrentDelta(getterRan);
       };
       return { getRunStepDelta: readCurrentDelta, refreshRunStepDelta };
