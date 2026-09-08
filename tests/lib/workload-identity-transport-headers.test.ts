@@ -51,14 +51,17 @@ test('preserves a private-field accessor receiver while normalizing headers', as
     }
   }
   const transport = createWorkloadIdentityTransport(async (url, init) => {
-    const request = new Request(String(url), init);
-    expect(request.method).toBe('PUT');
-    expect(await request.json()).toEqual({ value: 1 });
     if (!init) {
       throw new Error('Expected request init');
     }
     init.method = 'PUT';
+    init.cache = 'no-store';
+    Object.freeze(init);
     expect(init.method).toBe('PUT');
+    const request = new Request(String(url), init);
+    expect(request.method).toBe('PUT');
+    expect(request.cache).toBe('no-store');
+    expect(await request.json()).toEqual({ value: 1 });
     return Response.json({ ok: true });
   });
   const client = new HookClient({
@@ -161,6 +164,69 @@ test.each(['add', 'delete'] as const)(
     expect(transport.exchanges).toBe(1);
   },
 );
+
+describe.each(['own accessor', 'data control'] as const)('%s request state', (shape) => {
+  test.each(['assignment', 'definition', 'deletion', 'prototype replacement'] as const)(
+    'keeps cache consistent with method after %s through normalized headers',
+    async (mutation) => {
+      class HookClient extends OpenAI {
+        protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+          const [request] = args;
+          request.headers = lazyHeaders(request);
+          request.method = 'GET';
+          request.cache = 'default';
+          if (shape !== 'data control') {
+            const descriptor = {
+              configurable: true,
+              enumerable: true,
+              get(this: RequestInit) {
+                return this.method === 'GET' ? 'default' : 'no-store';
+              },
+            };
+            Object.defineProperty(request, 'cache', descriptor);
+          }
+          return super.prepareRequest(...args);
+        }
+
+        protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+          const [, init] = args;
+          if (mutation === 'assignment') {
+            init.method = 'PUT';
+          } else if (mutation === 'definition') {
+            Object.defineProperty(init, 'method', { value: 'PUT' });
+          } else {
+            delete init.method;
+            if (mutation === 'prototype replacement') {
+              Object.setPrototypeOf(init, { method: 'PUT' });
+            }
+          }
+          if (shape === 'data control') {
+            init.cache = 'no-store';
+          }
+          Object.freeze(init);
+          return super.fetchWithAuth(...args);
+        }
+      }
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        expect(init?.cache).toBe('no-store');
+        const request = new Request(String(url), init);
+        expect(request.method).toBe(mutation === 'deletion' ? 'GET' : 'PUT');
+        expect(request.cache).toBe('no-store');
+        return Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list();
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
 
 test.each(['inherited method', 'non-enumerable method', 'one-read headers'] as const)(
   'preserves %s while normalizing a frozen prepared request',

@@ -129,6 +129,101 @@ test.each(['record values', 'tuple row'] as const)('refreshes ordinary mutable n
   expect(sent?.get('X-Custom')).toBe('after');
 });
 
+describe.each(['request', 'default'] as const)('%s nested value slots', (layer) => {
+  test.each([null, 'Bearer independent'] as const)(
+    'refreshes a data slot to %j beside a captured accessor during acquisition',
+    async (authorization) => {
+      const read = vi.fn<() => undefined>();
+      const values: (string | null | undefined)[] = [undefined, undefined];
+      Object.defineProperty(values, 0, { get: read });
+      const headers = { Authorization: values };
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        values[1] = authorization;
+        return 'subject-token';
+      };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await expect(
+        client.get('https://independent.example.test/synthetic', layer === 'request' ? { headers } : {}),
+      ).rejects.toMatchObject({ status: 401 });
+
+      expect(sent).toEqual([authorization]);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
+
+test('retains nested accessor values independently for properties sharing a value array', async () => {
+  const read = vi.fn(() => (read.mock.calls.length === 1 ? 'A' : 'B'));
+  const values = ['', 'before'];
+  Object.defineProperty(values, 0, { get: read });
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    values[1] = 'after';
+    return 'subject-token';
+  };
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    const sent = new Headers(init?.headers);
+    expect(sent.get('X-First')).toBe('A, after');
+    expect(sent.get('X-Second')).toBe('B, after');
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    workloadIdentity: identity,
+    fetch: transport.fetch,
+  });
+
+  await client.models.list({ headers: { 'X-First': values, 'X-Second': values } });
+
+  expect(read).toHaveBeenCalledTimes(2);
+});
+
+test('refreshes nested slot replacements independently for aliased default and request layers', async () => {
+  const original = vi.fn<() => undefined>();
+  const replacement = vi.fn(() => (replacement.mock.calls.length === 1 ? undefined : null));
+  const values: (string | null | undefined)[] = [undefined];
+  Object.defineProperty(values, 0, { configurable: true, get: original });
+  const headers = { Authorization: values };
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    Object.defineProperty(values, 0, { get: replacement });
+    return 'subject-token';
+  };
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('Authorization'));
+    return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    workloadIdentity: identity,
+    defaultHeaders: headers,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list({ headers })).rejects.toMatchObject({ status: 401 });
+
+  expect(sent).toEqual([null]);
+  expect(original).toHaveBeenCalledTimes(1);
+  expect(replacement).toHaveBeenCalledTimes(2);
+  expect(transport.exchanges).toBe(1);
+});
+
 class OneShotHeaders extends Array<[string, string | null]> {
   #iterator: ReturnType<[string, string | null][]['values']> | undefined;
 
