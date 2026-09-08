@@ -717,7 +717,7 @@ const retainedRowEntries = (row: RowRead) => {
   }
   const nameState = nextDescriptorState(
     retainedNameDescriptorState(row),
-    nameDescriptor,
+    nameDescriptorState?.descriptor,
     !!nameDescriptorState,
     getHeaderRowDescriptorState(row.row, '0'),
   );
@@ -871,7 +871,7 @@ const rememberRow = (
     const rows = replay.rows.get(row.row) ?? new Map<number, HeaderRowSnapshot>();
     const nameState = nextDescriptorState(
       retainedNameDescriptorState(row),
-      row.nameDescriptor,
+      row.nameDescriptorState?.descriptor,
       !!row.nameDescriptorState,
       getHeaderRowDescriptorState(row.row, '0'),
     );

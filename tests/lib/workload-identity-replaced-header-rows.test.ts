@@ -398,6 +398,37 @@ test('invalidates a recovered scalar value getter after confirmed external delet
   expect(reads).toBe(1);
 });
 
+test('retains a self-deleting name when repeated post-read descriptor probes fail', () => {
+  let reads = 0;
+  let probesAfterRead = 0;
+  const target = ['X-Custom', 'preserved'];
+  Object.defineProperty(target, 0, {
+    configurable: true,
+    get() {
+      reads += 1;
+      Reflect.deleteProperty(target, 0);
+      return 'X-Custom';
+    },
+  });
+  Object.defineProperty(target, 1, { get: () => 'preserved' });
+  const row = new Proxy(target, {
+    getOwnPropertyDescriptor(object, key) {
+      if (key === '0' && reads > 0) {
+        probesAfterRead += 1;
+        if (probesAfterRead === 1 || probesAfterRead === 3) {
+          throw new Error('post-read descriptor unavailable');
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(object, key);
+    },
+  });
+  const snapshot = snapshotHeaders([row]);
+
+  expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+  expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+  expect(reads).toBe(1);
+});
+
 test('does not freeze consumed columns because of an unused accessor', () => {
   const unused = vi.fn(() => 'unused');
   const row = ['Authorization', 'Bearer original'];
