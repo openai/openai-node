@@ -54,18 +54,25 @@ describeBash('fast-format file lists', () => {
     withFormatFixture((root) => fastFormat(root, list));
   });
 
-  test.each(['selected.ts', 'with spaces.ts', "with'quote.ts", 'with"quote.ts', '-leading-dash.ts'])(
-    'formats the exact listed path %s',
-    (filename) => {
-      withFormatFixture((root) => {
-        writeFileSync(path.join(root, filename), source);
+  test.each([
+    'selected.ts',
+    'with spaces.ts',
+    'with\ttab.ts',
+    "with'quote.ts",
+    'with"quote.ts',
+    '-leading-dash.ts',
+    '[u]nrelated.ts',
+    '*.ts',
+    '{unrelated,other}.ts',
+  ])('formats the exact listed path %s', (filename) => {
+    withFormatFixture((root) => {
+      writeFileSync(path.join(root, filename), source);
 
-        fastFormat(root, `${filename}\n`);
+      fastFormat(root, `${filename}\n`);
 
-        expect(readFileSync(path.join(root, filename), 'utf-8')).toBe(formattedSource);
-      });
-    },
-  );
+      expect(readFileSync(path.join(root, filename), 'utf-8')).toBe(formattedSource);
+    });
+  });
 
   test('ignores blank lines and accepts CRLF and a final path without a newline', () => {
     withFormatFixture((root) => {
@@ -94,7 +101,20 @@ describeBash('fast-format file lists', () => {
     });
   });
 
-  test('does not format unrelated files when listed paths no longer exist', () => {
-    withFormatFixture((root) => fastFormat(root, 'deleted.ts\n'));
+  test.each(['deleted.ts', '[u]nrelated.ts', '*.ts', '{unrelated,other}.ts'])(
+    'does not format unrelated files when listed path %s no longer exists',
+    (filename) => {
+      withFormatFixture((root) => fastFormat(root, filename));
+    },
+  );
+
+  test('formats existing files alongside missing literal paths', () => {
+    withFormatFixture((root) => {
+      writeFileSync(path.join(root, 'selected.ts'), source);
+
+      fastFormat(root, '[u]nrelated.ts\nselected.ts\n{unrelated,other}.ts\n*.ts');
+
+      expect(readFileSync(path.join(root, 'selected.ts'), 'utf-8')).toBe(formattedSource);
+    });
   });
 });

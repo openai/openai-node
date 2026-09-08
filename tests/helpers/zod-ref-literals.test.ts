@@ -18,6 +18,44 @@ function schemaProperties(schema: unknown): Record<string, JSONSchemaRecord> {
 describe.each([
   { version: 'v3', z: zv3 },
   { version: 'v4', z: zv4 as unknown as typeof zv3 },
+  { version: 'v4 Mini', z: zv4Mini as unknown as typeof zv3 },
+])('Zod $version definition names', ({ z }) => {
+  it('keeps raw, pointer-escaped, and percent-escaped definition names distinct on the wire', () => {
+    const Slash = z.object({ slash: z.string() });
+    const Tilde = z.object({ tilde: z.number() });
+    const Percent = z.object({ percent: z.boolean() });
+    const definitions = Object.freeze({
+      'a/b': Slash,
+      'a~1b': Tilde,
+      'a%2Fb': Percent,
+    });
+    const format = zodResponseFormat(
+      z.object({ slash: Slash, tilde: Tilde, percent: Percent }),
+      'escaped_definitions',
+      { schemaDefinitions: definitions },
+    );
+    // oxlint-disable-next-line unicorn/prefer-structured-clone -- Check the JSON wire representation.
+    const wireSchema = JSON.parse(JSON.stringify(format.json_schema.schema)) as {
+      properties: Record<string, { $ref: string }>;
+      definitions: Record<string, JSONSchemaRecord>;
+    };
+
+    expect(wireSchema.properties).toEqual({
+      slash: { $ref: '#/definitions/a~1b' },
+      tilde: { $ref: '#/definitions/a~01b' },
+      percent: { $ref: '#/definitions/a%252Fb' },
+    });
+    expect(schemaProperties(wireSchema.definitions['a/b'])).toEqual({ slash: { type: 'string' } });
+    expect(schemaProperties(wireSchema.definitions['a~1b'])).toEqual({ tilde: { type: 'number' } });
+    expect(schemaProperties(wireSchema.definitions['a%2Fb'])).toEqual({ percent: { type: 'boolean' } });
+    expect(definitions['a/b']).toBe(Slash);
+    expect(definitions['a~1b']).toBe(Tilde);
+  });
+});
+
+describe.each([
+  { version: 'v3', z: zv3 },
+  { version: 'v4', z: zv4 as unknown as typeof zv3 },
 ])('Zod $version schema reference literals', ({ version, z }) => {
   const referenceLiteral = () => z.object({ $ref: z.string() });
   const nestedReferenceLiteral = () => z.object({ $ref: z.string(), nested: referenceLiteral() });
@@ -198,17 +236,18 @@ describe('Zod v4 schema reference literals', () => {
 
 it('preserves Zod v4 Mini literal defaults while escaping real definition references', () => {
   const Account = zv4Mini.object({ id: zv4Mini.string() });
-  const literal = { $ref: '#/definitions/account/admin', tag: 'KEEP' };
+  const definitionName = 'account/admin~team%2Fowner #';
+  const literal = { $ref: `#/definitions/${definitionName}`, tag: 'KEEP' };
   const Root = zv4Mini.object({
     account: Account,
     payload: zv4Mini._default(zv4Mini.any(), literal),
   });
 
   const { schema } = zodResponseFormat(Root, 'account_response', {
-    schemaDefinitions: { 'account/admin': Account },
+    schemaDefinitions: { [definitionName]: Account },
   }).json_schema;
   const properties = schemaProperties(schema);
 
-  expect(properties['account']?.['$ref']).toBe('#/definitions/account~1admin');
+  expect(properties['account']?.['$ref']).toBe('#/definitions/account~1admin~0team%252Fowner%20%23');
   expect(properties['payload']?.['default']).toEqual(literal);
 });

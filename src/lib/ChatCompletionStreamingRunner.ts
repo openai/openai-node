@@ -96,6 +96,7 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
               throw new OpenAIError('cannot serialize a tool message before receiving any chunks');
             }
             push(makeChatCompletionReadableStreamMessageChunk(lastChunk, message, toolCallIds));
+            toolCallIds = undefined;
           }
         };
         this.on('chunk', onChunk);

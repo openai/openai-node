@@ -849,11 +849,25 @@ export class OpenAI {
     return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
-  async _callApiKey(): Promise<boolean> {
-    if (this._provider) return false;
+  /**
+   * Resolves a function-based API key and retains the resolved value on this client.
+   * Returns whether a provider was invoked. Internal callers can capture this
+   * invocation's key before another request updates the shared `apiKey` property.
+   * Overrides should forward `capture` or invoke it with their own resolved key
+   * to preserve connection-local credentials in concurrent Realtime factories.
+   * @internal
+   */
+  async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
+    if (this._provider) {
+      capture?.(this.apiKey);
+      return false;
+    }
 
     const apiKey = this._options.apiKey;
-    if (typeof apiKey !== 'function') return false;
+    if (typeof apiKey !== 'function') {
+      capture?.(this.apiKey);
+      return false;
+    }
 
     let token: unknown;
     try {
@@ -873,6 +887,7 @@ export class OpenAI {
       );
     }
     this.apiKey = token;
+    capture?.(this.apiKey);
     return true;
   }
 
