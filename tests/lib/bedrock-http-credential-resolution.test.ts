@@ -203,6 +203,59 @@ test('validates the exact direct-build URL without resolving query values again'
   expect(provider).toHaveBeenCalledTimes(1);
 });
 
+test('dispatches the constructed Bedrock URL without rebuilding it during preparation', async () => {
+  class StatefulRouting extends BedrockOpenAI {
+    urlBuilds = 0;
+
+    override buildURL(
+      path: string,
+      query: Record<string, unknown> | null | undefined,
+      defaultBaseURL?: string,
+    ) {
+      this.urlBuilds += 1;
+      if (this.urlBuilds > 2) {
+        throw new Error('The URL has already been constructed.');
+      }
+      const url = new URL(super.buildURL(path, query, defaultBaseURL));
+      url.searchParams.set('route', String(this.urlBuilds));
+      return url.toString();
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-request');
+  const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+  const client = new StatefulRouting({ baseURL, bedrockTokenProvider: provider, fetch });
+
+  await expect(
+    client.get('/items', { query: { cursor: 'synthetic' }, fetchOptions: { redirect: 'follow' } }),
+  ).resolves.toEqual({ ok: true });
+
+  expect(client.urlBuilds).toBe(2);
+  expect(provider).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch.mock.calls[0]?.[0]).toBe(`${baseURL}/items?cursor=synthetic&route=2`);
+  expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('manual');
+  expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+    'Bearer synthetic-request',
+  );
+});
+
+test('validates a replaced final Bedrock URL before normal request dispatch', async () => {
+  class ReplacedBuildResult extends BedrockOpenAI {
+    override async buildRequest(options: Parameters<BedrockOpenAI['buildRequest']>[0]) {
+      const built = await super.buildRequest(options);
+      return { ...built, url: 'https://other.example/openai/v1/items' };
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-request');
+  const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+  const client = new ReplacedBuildResult({ baseURL, bedrockTokenProvider: provider, fetch });
+
+  await expect(client.get('/items')).rejects.toThrow('origin');
+
+  expect(provider).toHaveBeenCalledTimes(1);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 test.each(['default', 'client', 'request', 'both'] as const)(
   'uses manual redirects for a direct Bedrock build with %s fetch options',
   async (configuration) => {

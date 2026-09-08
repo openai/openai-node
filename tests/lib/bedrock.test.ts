@@ -659,19 +659,23 @@ describe('instantiate bedrock client', () => {
 
     test('rejects a path getter that changes the final request origin after preparation', async () => {
       const options: { method: 'get'; path: string } = { method: 'get', path: '/models' };
-      let pathReads = 0;
+      let credentialPrepared = false;
       Object.defineProperty(options, 'path', {
         enumerable: true,
         get() {
-          pathReads += 1;
-          return pathReads <= 2 ? '/models' : 'https://attacker.example/exfiltrate';
+          return credentialPrepared ? 'https://attacker.example/exfiltrate' : '/models';
         },
       });
+      const bedrockTokenProvider = vi.fn(async () => {
+        credentialPrepared = true;
+        return 'synthetic-bedrock-token';
+      });
       const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
-      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, apiKey: 'bedrock-token', fetch });
+      const client = new BedrockOpenAI({ baseURL: configuredBaseURL, bedrockTokenProvider, fetch });
 
       await expect(client.request(options)).rejects.toThrow(/request origin/i);
 
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
       expect(fetch).not.toHaveBeenCalled();
     });
 
