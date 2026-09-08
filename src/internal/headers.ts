@@ -182,17 +182,16 @@ export const getStructuralHeaderValue = (
           const nameDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '0');
           const valueDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '1');
           if (nameDescriptor) descriptorEvidence.push([`name:${index}`, nameDescriptor]);
+          if (valueDescriptor) descriptorEvidence.push([`value:${index}`, valueDescriptor]);
           if (!nameDescriptor || !('value' in nameDescriptor) || typeof nameDescriptor.value !== 'string') {
             unknown = true;
             continue;
           }
           if (nameDescriptor.value.toLowerCase() !== requested) continue;
           if (!valueDescriptor || !('value' in valueDescriptor)) {
-            if (valueDescriptor) descriptorEvidence.push([`value:${index}`, valueDescriptor]);
             unknown = true;
             continue;
           }
-          descriptorEvidence.push([`value:${index}`, valueDescriptor]);
           const input = copyInput(valueDescriptor.value);
           if (!input) {
             unknown = true;
