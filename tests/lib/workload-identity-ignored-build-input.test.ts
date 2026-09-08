@@ -1,7 +1,95 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise ownership and retry selection. */
 import OpenAI from 'openai';
 import type { HeadersInit } from 'openai/internal/builtin-types';
+import { buildHeaders } from 'openai/internal/headers';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
+
+test.each(
+  (['request', 'default'] as const).flatMap((layer) =>
+    (['empty hole', 'inherited accessor', 'inherited data', 'virtual proxy slot'] as const).map((kind) => ({
+      layer,
+      kind,
+    })),
+  ),
+)('rejects an unowned $layer sparse slot before retry: $kind', async ({ layer, kind }) => {
+  let values = ['a'];
+  values.length = 3;
+  values[2] = 'b';
+  let reads = 0;
+  if (kind === 'virtual proxy slot') {
+    values = new Proxy(values, {
+      get(target, key, receiver) {
+        if (key === '1') {
+          reads += 1;
+          return `virtual-${reads}`;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+  } else if (kind !== 'empty hole') {
+    const prototype = Object.create(Array.prototype);
+    Object.defineProperty(prototype, '1', {
+      configurable: true,
+      ...(kind === 'inherited accessor'
+        ? {
+            get() {
+              reads += 1;
+              return 'inherited';
+            },
+          }
+        : { value: 'inherited' }),
+    });
+    Object.setPrototypeOf(values, prototype);
+  }
+  let builds = 0;
+  class HookClient extends OpenAI {
+    override buildRequest(options: Parameters<OpenAI['buildRequest']>[0]) {
+      builds += 1;
+      const headers = buildHeaders([
+        { Authorization: 'Bearer independent' },
+        this._options.defaultHeaders,
+        options.headers,
+      ]).values;
+      return Promise.resolve({
+        req: { method: 'GET', headers },
+        url: this.buildURL(options.path, {}),
+        timeout: this.timeout,
+      });
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((url, init) => {
+    const request = new Request(url, init as globalThis.RequestInit);
+    expect(request.headers.get('Authorization')).toBe('Bearer independent');
+    sent.push(request.headers.get('X-Values'));
+    return sent.length === 1
+      ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+      : Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 1,
+    ...(layer === 'default' ? { defaultHeaders: { 'X-Values': values } } : {}),
+  });
+
+  const request = client.models.list(layer === 'request' ? { headers: { 'X-Values': values } } : {});
+  await expect(request).rejects.toThrow('forward credentialContext');
+
+  let expected = 'a, inherited, b';
+  if (kind === 'empty hole') {
+    expected = 'a, b';
+  }
+  if (kind === 'virtual proxy slot') {
+    expected = 'a, virtual-1, b';
+  }
+  expect(sent).toEqual([expected]);
+  expect(builds).toBe(1);
+  expect(reads).toBe(kind === 'inherited accessor' || kind === 'virtual proxy slot' ? 1 : 0);
+  expect(transport.exchanges).toBe(0);
+});
 
 test.each([200, 401, 500])('accepts an independent build membrane with status %s', async (status) => {
   let reads = 0;

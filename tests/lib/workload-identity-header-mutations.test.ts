@@ -19,78 +19,85 @@ describe('Workload credential ownership after native header mutations', () => {
         [false, true].map((copy) => ({ hook, mutation, copy })),
       ),
     ),
-  )('does not refresh an independent overwrite: %j', async ({ hook, mutation, copy }) => {
-    const mutate = (headers: Headers) => {
-      const authorization = headers.get('Authorization');
-      expect(authorization).not.toBeNull();
-      if (mutation === 'delete-append') {
-        headers.delete('aUtHoRiZaTiOn');
-        headers.append('AUTHORIZATION', authorization ?? '');
-      } else {
-        const name =
-          mutation === 'coerced-name'
-            ? ({ toString: () => 'aUtHoRiZaTiOn' } as unknown as string)
-            : 'aUtHoRiZaTiOn';
-        headers.set(name, mutation === 'different' ? 'Bearer independent' : (authorization ?? ''));
-      }
-      return copy ? new Headers(headers) : headers;
-    };
-    class HookClient extends OpenAI {
-      // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
-      protected override async prepareRequest(request: RequestInit) {
-        if (hook === 'prepareRequest') {
-          request.headers = mutate(request.headers as Headers);
+  )(
+    'distinguishes observable overwrites from same-byte native mutations: %j',
+    async ({ hook, mutation, copy }) => {
+      const mutate = (headers: Headers) => {
+        const authorization = headers.get('Authorization');
+        expect(authorization).not.toBeNull();
+        if (mutation === 'delete-append') {
+          headers.delete('aUtHoRiZaTiOn');
+          headers.append('AUTHORIZATION', authorization ?? '');
+        } else {
+          const name =
+            mutation === 'coerced-name'
+              ? ({ toString: () => 'aUtHoRiZaTiOn' } as unknown as string)
+              : 'aUtHoRiZaTiOn';
+          headers.set(name, mutation === 'different' ? 'Bearer independent' : (authorization ?? ''));
+        }
+        return copy ? new Headers(headers) : headers;
+      };
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+        protected override async prepareRequest(request: RequestInit) {
+          if (hook === 'prepareRequest') {
+            request.headers = mutate(request.headers as Headers);
+          }
+        }
+
+        protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+          const headers = await super.authHeaders(...args);
+          if (hook !== 'authHeaders' || !headers) {
+            return headers;
+          }
+          const values = mutate(headers.values);
+          return copy ? buildHeaders([values]) : headers;
+        }
+
+        override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+          const result = await super.buildRequest(...args);
+          if (hook === 'buildRequest') {
+            result.req.headers = mutate(result.req.headers);
+          }
+          return result;
+        }
+
+        override async fetchWithTimeout(
+          url: RequestInfo,
+          init: RequestInit | undefined,
+          timeout: number,
+          controller: AbortController,
+          context?: object,
+        ) {
+          if (hook === 'fetchWithTimeout' && init) {
+            init.headers = mutate(init.headers as Headers);
+          }
+          return super.fetchWithTimeout(url, init, timeout, controller, context);
         }
       }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
 
-      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
-        const headers = await super.authHeaders(...args);
-        if (hook !== 'authHeaders' || !headers) {
-          return headers;
-        }
-        const values = mutate(headers.values);
-        return copy ? buildHeaders([values]) : headers;
-      }
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
-        const result = await super.buildRequest(...args);
-        if (hook === 'buildRequest') {
-          result.req.headers = mutate(result.req.headers);
-        }
-        return result;
-      }
-
-      override async fetchWithTimeout(
-        url: RequestInfo,
-        init: RequestInit | undefined,
-        timeout: number,
-        controller: AbortController,
-        context?: object,
-      ) {
-        if (hook === 'fetchWithTimeout' && init) {
-          init.headers = mutate(init.headers as Headers);
-        }
-        return super.fetchWithTimeout(url, init, timeout, controller, context);
-      }
-    }
-    const sent: (string | null)[] = [];
-    const transport = createWorkloadIdentityTransport((_url, init) => {
-      sent.push(new Headers(init?.headers).get('Authorization'));
-      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
-    });
-    const client = new HookClient({
-      ...createTestClientOptions(),
-      apiKey: null,
-      adminAPIKey: null,
-      fetch: transport.fetch,
-      maxRetries: 0,
-    });
-
-    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-
-    expect(sent).toEqual([mutation === 'different' ? 'Bearer independent' : 'Bearer access-token-1']);
-    expect(transport.exchanges).toBe(1);
-  });
+      expect(sent).toEqual(
+        mutation === 'different'
+          ? ['Bearer independent']
+          : ['Bearer access-token-1', 'Bearer access-token-2'],
+      );
+      expect(transport.exchanges).toBe(mutation === 'different' ? 1 : 2);
+    },
+  );
 
   test.each([
     'untouched',
@@ -186,10 +193,15 @@ describe('Workload credential ownership after native header mutations', () => {
       maxRetries: 0,
     });
 
-    await client.models.list();
-
-    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-    expect(transport.exchanges).toBe(2);
+    if (operation === 'mutator-getter') {
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(sent).toEqual(['Bearer access-token-1']);
+      expect(transport.exchanges).toBe(1);
+    } else {
+      await client.models.list();
+      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+    }
   });
 
   test('does not revoke a simultaneous attempt using the same cached token', async () => {
@@ -227,8 +239,8 @@ describe('Workload credential ownership after native header mutations', () => {
       client.models.list({ headers: { 'X-Synthetic-Request': 'sdk' } }),
     ]);
 
-    expect(results.map((result) => result.status)).toEqual(['rejected', 'fulfilled']);
-    expect(sent.get('independent')).toEqual(['Bearer access-token-1']);
+    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled']);
+    expect(sent.get('independent')).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
     expect(sent.get('sdk')).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
     expect(transport.exchanges).toBe(2);
   });
@@ -301,7 +313,7 @@ describe('Workload credential ownership after native header mutations', () => {
       // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
       protected override async prepareRequest(request: RequestInit) {
         const headers = request.headers as Headers;
-        headers.set('Authorization', headers.get('Authorization') ?? '');
+        headers.set('Authorization', 'Bearer independent');
       }
     }
     let requests = 0;
@@ -321,7 +333,7 @@ describe('Workload credential ownership after native header mutations', () => {
     expect(transport.exchanges).toBe(1);
   });
 
-  test('retains a fresh SDK issuance after an earlier same-byte capability was revoked', async () => {
+  test('retains a fresh SDK issuance after an earlier same-byte capability was mutated', async () => {
     class HookClient extends OpenAI {
       protected override async bearerAuth(...args: Parameters<OpenAI['bearerAuth']>) {
         const previous = await super.bearerAuth(...args);
@@ -351,7 +363,7 @@ describe('Workload credential ownership after native header mutations', () => {
   });
 
   test.each(['inherited', 'getter', 'nonconfigurable', 'membrane'] as const)(
-    'preserves an unobservable %s mutator without enabling refresh',
+    'preserves an unobservable %s mutator without replacing native methods',
     async (kind) => {
       class HookClient extends OpenAI {
         protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
@@ -399,6 +411,53 @@ describe('Workload credential ownership after native header mutations', () => {
         maxRetries: 0,
       });
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(requests).toBe(kind === 'nonconfigurable' ? 2 : 1);
+      expect(transport.exchanges).toBe(kind === 'nonconfigurable' ? 2 : 1);
+    },
+  );
+
+  test.each(['seal', 'freeze'] as const)(
+    'keeps a hook-installed prototype mutator visible through Object.%s',
+    async (hardening) => {
+      let overrideCalls = 0;
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK instance hook.
+        protected override async prepareRequest(request: RequestInit) {
+          const headers = request.headers as Headers;
+          const prototype = Object.create(Object.getPrototypeOf(headers));
+          Object.defineProperty(prototype, 'set', {
+            configurable: true,
+            value(this: Headers, name: string, value: string) {
+              overrideCalls += 1;
+              return Headers.prototype.set.call(this, name, value);
+            },
+          });
+          Object.setPrototypeOf(headers, prototype);
+          expect(Object.getOwnPropertyDescriptor(headers, 'set')).toBeUndefined();
+          headers.set('X-Custom', 'preserved');
+          if (hardening === 'seal') {
+            Object.seal(headers);
+          } else {
+            Object.freeze(headers);
+          }
+          expect(Object.getOwnPropertyDescriptor(headers, 'set')).toBeUndefined();
+        }
+      }
+      let requests = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        requests += 1;
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(overrideCalls).toBe(1);
       expect(requests).toBe(1);
       expect(transport.exchanges).toBe(1);
     },
@@ -439,7 +498,7 @@ describe('Workload credential ownership after native header mutations', () => {
         }
         if (overwrite) {
           const headers = request.headers as Headers;
-          headers.set('Authorization', headers.get('Authorization') ?? '');
+          headers.set('Authorization', 'Bearer independent');
           request.headers = new HeadersConstructor(headers) as unknown as Headers;
         }
         return super.fetchWithTimeout(...args);

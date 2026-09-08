@@ -83,7 +83,7 @@ describe.each(['sdk', 'independent'] as const)('cloning the selected %s response
         const chosen = selected === 'sdk' ? sdk : independent;
         const discarded = selected === 'sdk' ? independent : sdk;
         await discarded.body?.cancel();
-        const clone = chosen.clone();
+        const clone = this.cloneResponse(chosen);
         trackedResponses.push(chosen, clone);
         await chosen.text();
         return clone;
@@ -143,12 +143,12 @@ test.each(['fetchWithAuth', 'fetchWithTimeout'] as const)(
     class CloneClient extends OpenAI {
       override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
         const response = await super.fetchWithTimeout(...args);
-        return hook === 'fetchWithTimeout' ? response.clone() : response;
+        return hook === 'fetchWithTimeout' ? this.cloneResponse(response) : response;
       }
 
       protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
         const response = await super.fetchWithAuth(...args);
-        return hook === 'fetchWithAuth' ? response.clone() : response;
+        return hook === 'fetchWithAuth' ? this.cloneResponse(response) : response;
       }
     }
     const transport = createWorkloadIdentityTransport(() => original);
@@ -233,7 +233,7 @@ test('shares clone tracking safely across concurrent requests returning one Resp
       if (index === 2) {
         await releaseSecond.promise;
       }
-      const clone = response.clone();
+      const clone = this.cloneResponse(response);
       clones.push(clone);
       if (index === 1) {
         firstCloned.resolve();
@@ -254,7 +254,7 @@ test('shares clone tracking safely across concurrent requests returning one Resp
 
   await firstCloned.promise;
   await first;
-  expect(Reflect.getOwnPropertyDescriptor(shared, 'clone')).toBeDefined();
+  expect(Reflect.getOwnPropertyDescriptor(shared, 'clone')).toBeUndefined();
   releaseSecond.resolve();
   await second;
 
@@ -273,7 +273,7 @@ test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
         if (hook !== 'fetchWithTimeout') {
           return response;
         }
-        const clone = response.clone();
+        const clone = this.cloneResponse(response);
         await response.text();
         return clone;
       }
@@ -283,7 +283,7 @@ test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
         if (hook !== 'fetchWithAuth') {
           return response;
         }
-        const clone = response.clone();
+        const clone = this.cloneResponse(response);
         await response.text();
         return clone;
       }
@@ -307,6 +307,96 @@ test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
 
     expect(calls).toBe(2);
     expect(transport.exchanges).toBe(2);
+  },
+);
+
+test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
+  'does not wait for the unread source branch of an attributed %s clone',
+  async (hook) => {
+    let source: Response | undefined;
+    class CloneClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        if (hook !== 'fetchWithTimeout') {
+          return response;
+        }
+        source ??= response;
+        return this.cloneResponse(response);
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const response = await super.fetchWithAuth(...args);
+        if (hook !== 'fetchWithAuth') {
+          return response;
+        }
+        source ??= response;
+        return this.cloneResponse(response);
+      }
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      calls += 1;
+      return calls === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ ok: true });
+    });
+    const client = new CloneClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.post('/synthetic', { body: { synthetic: true } })).resolves.toEqual({ ok: true });
+    await source?.body?.cancel();
+    expect(calls).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  },
+);
+
+test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
+  'does not wait for an unread attributed %s clone branch before a status retry',
+  async (hook) => {
+    let source: Response | undefined;
+    class CloneClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        if (hook !== 'fetchWithTimeout') {
+          return response;
+        }
+        source ??= response;
+        return this.cloneResponse(response);
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const response = await super.fetchWithAuth(...args);
+        if (hook !== 'fetchWithAuth') {
+          return response;
+        }
+        source ??= response;
+        return this.cloneResponse(response);
+      }
+    }
+    let calls = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      calls += 1;
+      return calls === 1
+        ? Response.json({ error: 'synthetic server failure' }, { status: 500 })
+        : Response.json({ ok: true });
+    });
+    const client = new CloneClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await expect(client.post('/synthetic', { body: { synthetic: true } })).resolves.toEqual({ ok: true });
+    await source?.body?.cancel();
+    expect(calls).toBe(2);
+    expect(transport.exchanges).toBe(1);
   },
 );
 

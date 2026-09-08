@@ -68,13 +68,80 @@ test.each([1, 2])('bounds clone lookup across a %i-node response prototype cycle
   await expect(new OpenAI(clientOptions(transport.fetch)).get('/synthetic')).rejects.toThrow(
     'Response prototype circuit breaker',
   );
-  expect(maximumCloneLookups).toBe(cycleSize);
+  expect(maximumCloneLookups).toBe(0);
   expect(Object.getOwnPropertyDescriptor(response, 'clone')).toBeUndefined();
   expect({ sends, exchanges: transport.exchanges }).toEqual({ sends: 1, exchanges: 1 });
 });
 
+test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
+  'keeps the response clone descriptor unchanged through a delegating %s hook',
+  async (hook) => {
+    let descriptor: PropertyDescriptor | undefined;
+    let cloneMatchesPrototype = false;
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        if (hook === 'fetchWithTimeout') {
+          descriptor = Object.getOwnPropertyDescriptor(response, 'clone');
+          cloneMatchesPrototype = response.clone === Response.prototype.clone;
+          Object.freeze(response);
+        }
+        return response;
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const response = await super.fetchWithAuth(...args);
+        if (hook === 'fetchWithAuth') {
+          descriptor = Object.getOwnPropertyDescriptor(response, 'clone');
+          cloneMatchesPrototype = response.clone === Response.prototype.clone;
+          Object.freeze(response);
+        }
+        return response;
+      }
+    }
+    const response = new Response(null);
+    const transport = createWorkloadIdentityTransport(() => response);
+
+    await new HookClient(clientOptions(transport.fetch)).get('/synthetic').asResponse();
+
+    expect(descriptor).toBeUndefined();
+    expect(cloneMatchesPrototype).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(response, 'clone')).toBeUndefined();
+  },
+);
+
+test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
+  'treats a native clone returned by a %s hook as caller-owned',
+  async (hook) => {
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        return hook === 'fetchWithTimeout' ? response.clone() : response;
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const response = await super.fetchWithAuth(...args);
+        return hook === 'fetchWithAuth' ? response.clone() : response;
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      return sends === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ ok: true });
+    });
+
+    await expect(new HookClient(clientOptions(transport.fetch)).get('/synthetic')).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect({ sends, exchanges: transport.exchanges }).toEqual({ sends: 1, exchanges: 1 });
+  },
+);
+
 test.each([false, true])(
-  'retires a response clone tracker after its accessor %s its descriptor',
+  'uses an explicit clone accessor after its setter replaces the descriptor: %s',
   async (replaceDescriptor) => {
     const cached = new Response(null, { status: 401 });
     let method = nativeClone;
@@ -107,7 +174,7 @@ test.each([false, true])(
           new AbortController(),
           context,
         );
-        return response.clone().clone();
+        return this.cloneResponse(this.cloneResponse(response));
       }
     }
     const transport = createWorkloadIdentityTransport((_url, init) =>
@@ -128,7 +195,7 @@ test('retains source response ownership after cloning tees its body', async () =
   class HookClient extends OpenAI {
     override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
       const response = await super.fetchWithTimeout(...args);
-      await response.clone().text();
+      await this.cloneResponse(response).text();
       return new Response(response.body, response);
     }
   }
@@ -160,7 +227,7 @@ test.each(['source', 'copy'] as const)(
           new AbortController(),
           context,
         );
-        const copy = workload.clone();
+        const copy = this.cloneResponse(workload);
         await (branch === 'source' ? copy : workload).text();
         const selected = branch === 'source' ? workload : copy;
         return new Response(selected.body, selected);
@@ -226,45 +293,41 @@ test.each([false, true])(
   },
 );
 
-test.each([false, true])(
-  'attributes a clone returned by a bound accessor when detached: %s',
-  async (detached) => {
-    class HookClient extends OpenAI {
-      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
-        const [url, init, timeout, , context] = args;
-        const response = await super.fetchWithTimeout(...args);
-        await super.fetchWithTimeout(
-          url,
-          { ...init, headers: { Authorization: 'Bearer independent' } },
-          timeout,
-          new AbortController(),
-          context,
-        );
-        const { clone } = response;
-        return detached ? clone() : response.clone();
-      }
+test('attributes an explicit clone returned by a bound accessor', async () => {
+  class HookClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      const [url, init, timeout, , context] = args;
+      const response = await super.fetchWithTimeout(...args);
+      await super.fetchWithTimeout(
+        url,
+        { ...init, headers: { Authorization: 'Bearer independent' } },
+        timeout,
+        new AbortController(),
+        context,
+      );
+      return this.cloneResponse(response);
     }
-    const transport = createWorkloadIdentityTransport((_url, init) => {
-      const response = new Response(null, {
-        status: new Headers(init?.headers).get('Authorization') === 'Bearer access-token-1' ? 401 : 200,
-      });
-      Object.defineProperty(response, 'clone', {
-        configurable: true,
-        get(this: Response) {
-          return Response.prototype.clone.bind(this);
-        },
-      });
-      return response;
+  }
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    const response = new Response(null, {
+      status: new Headers(init?.headers).get('Authorization') === 'Bearer access-token-1' ? 401 : 200,
     });
+    Object.defineProperty(response, 'clone', {
+      configurable: true,
+      get(this: Response) {
+        return Response.prototype.clone.bind(this);
+      },
+    });
+    return response;
+  });
 
-    await expect(
-      new HookClient(clientOptions(transport.fetch)).get('/synthetic').asResponse(),
-    ).resolves.toMatchObject({
-      status: 200,
-    });
-    expect(transport.exchanges).toBe(2);
-  },
-);
+  await expect(
+    new HookClient(clientOptions(transport.fetch)).get('/synthetic').asResponse(),
+  ).resolves.toMatchObject({
+    status: 200,
+  });
+  expect(transport.exchanges).toBe(2);
+});
 
 test.each(
   (['own', 'inherited'] as const).flatMap((placement) =>

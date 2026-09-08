@@ -49,15 +49,15 @@ test.each(['success', 'refresh', 'independent-replacement'] as const)(
     });
 
     const request = client.models.list({ headers: { Authorization: 'Bearer workload-identity-auth' } });
-    await (mode === 'independent-replacement'
-      ? expect(request).rejects.toMatchObject({ status: 401 })
-      : request);
-    expect(sent).toEqual(
-      mode === 'refresh'
-        ? ['Bearer access-token-1', 'Bearer access-token-1', 'Bearer access-token-2', 'Bearer access-token-2']
-        : ['Bearer access-token-1', 'Bearer access-token-1'],
-    );
-    expect(transport.exchanges).toBe(mode === 'refresh' ? 2 : 1);
+    await request;
+    let expected = ['Bearer access-token-1', 'Bearer access-token-1'];
+    if (mode === 'refresh') {
+      expected = [...expected, 'Bearer access-token-2', 'Bearer access-token-2'];
+    } else if (mode === 'independent-replacement') {
+      expected = [...expected, 'Bearer access-token-2', 'Bearer access-token-1'];
+    }
+    expect(sent).toEqual(expected);
+    expect(transport.exchanges).toBe(mode === 'success' ? 1 : 2);
   },
 );
 

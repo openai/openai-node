@@ -70,7 +70,9 @@ describe.each(['native', 'foreign'] as const)('%s prepared headers', (realm) => 
       if (frozen) {
         for (const [index, request] of client.prepared.entries()) {
           expect(Object.isFrozen(request)).toBe(true);
-          expect(new Headers(request.headers).get('Authorization')).toBe(`Bearer access-token-${index + 1}`);
+          expect(new Headers(request.headers).get('Authorization')).toBe(
+            realm === 'foreign' ? 'Bearer workload-identity-auth' : `Bearer access-token-${index + 1}`,
+          );
         }
       }
     },

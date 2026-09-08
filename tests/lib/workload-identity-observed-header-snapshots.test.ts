@@ -142,7 +142,7 @@ test.each(['getter', 'iterator'] as const)(
 test.each([
   { kind: 'direct native copy', independent: false },
   { kind: 'getter native copy', independent: false },
-  { kind: 'observed equal-byte write then getter copy', independent: true },
+  { kind: 'observed equal-byte write then getter copy', independent: false },
   { kind: 'observed independent layer then getter copy', independent: true },
 ] as const)('$kind keeps its established refresh ownership', async ({ kind, independent }) => {
   let sends = 0;

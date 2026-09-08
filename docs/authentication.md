@@ -254,6 +254,12 @@ For subject-token workload identity, a transport hook that dispatches without de
 `fetchWithTimeout` owns its authentication retries. The SDK records token usage immediately before
 calling the configured `fetch`; it cannot verify which credential an independent transport sent.
 When a hook makes several delegated sends, authentication retry follows the response the hook returns.
+Native `response.clone()` calls made inside a transport hook are caller-owned and do not carry automatic
+workload-token retry attribution. A subclass can use the protected `this.cloneResponse(response)` helper
+when it intentionally returns a clone of a delegated response and wants to preserve that attribution.
+The SDK does not replace native `Response` or `Headers` methods. An exact same-byte mutation of a native
+`Headers` object is therefore treated as unchanged; return an independent header record or `buildHeaders`
+result when the same bytes must carry independent credential ownership.
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
 
@@ -282,25 +288,23 @@ class WrappedClient extends OpenAI {
 `bearerAuth` receives the context as its second argument. `buildRequest` overrides can forward the
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
-An in-place Authorization overwrite has the same effect; subsequent header copies do not restore
-SDK ownership.
+An in-place native Authorization overwrite is observable when it changes the emitted bytes or the
+header object's effective mutator shape. An exact same-byte native mutation is treated as unchanged,
+and subsequent native copies retain SDK ownership.
 
-Successful `set`, `append`, and `delete` calls on an SDK-owned native `Headers` revoke that header layer's
-refresh ownership when they target Authorization, even if the resulting bytes are unchanged. An
-independent header layer observed between SDK hook calls also remains independent after a later copy.
-Parsed copies have independent mutation state; changing an unused copy does not invalidate the selected request.
-Reconstructed headers whose mutators cannot be observed retain their normal operations, but do not
-enable automatic authentication refresh. Calling native prototype methods directly, or creating and
-overwriting a native copy entirely inside a hook before delegating, bypasses this observation. Express
-independent credentials as a record or tuple layer through `buildHeaders` and return that layer to the
-SDK before further copying it.
+The SDK does not wrap native `Headers` mutators. Custom, accessor-backed, or uninspectable mutators retain
+their normal operations but do not enable automatic authentication refresh. An independent header layer
+observed between SDK hook calls remains independent after a later copy. Parsed copies have independent
+provenance; changing an unused copy does not invalidate the selected request. To give equal Authorization
+bytes independent ownership, express them as a record or tuple layer through `buildHeaders` and return
+that layer to the SDK before further copying it.
 
 Return the SDK-produced authentication result, retain its marked header values, or rebuild it with
 `buildHeaders([result, additionalHeaders])` to preserve ownership. Immediate delegation can also copy
 both the result container and its values with native `Headers`. This compatibility behavior treats an
 unmarked copy matching the last credential selected by that request's authentication hook as forwarding
 that credential; it cannot distinguish an independent equal-byte native copy. Explicit independent
-layers and observed Authorization overwrites still prevent workload-token refresh.
+layers and observed Authorization value changes still prevent workload-token refresh.
 If a hook awaits before delegating with copied options and returns unmarked copied values, forward the
 opaque context to retain the original authentication scope. Without that context, the request keeps its
 original `401` without a workload-token refresh.

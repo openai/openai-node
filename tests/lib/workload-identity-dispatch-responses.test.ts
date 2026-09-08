@@ -142,10 +142,7 @@ test.each(
           await ignored.body?.cancel();
         }
         if (copy === 'clone') {
-          const cloned = response.clone();
-          // Both tee branches must close before the SDK can await cancellation of a rejected response.
-          void response.body?.cancel();
-          return cloned;
+          return this.cloneResponse(response);
         }
         return new Response(response.body, { status: response.status, headers: response.headers });
       }
@@ -198,7 +195,7 @@ test.each([false, true])(
           releases[releases.length - 1]?.();
           await independent;
         }
-        const clone = selected.clone();
+        const clone = this.cloneResponse(selected);
         void selected.body?.cancel();
         return clone;
       }

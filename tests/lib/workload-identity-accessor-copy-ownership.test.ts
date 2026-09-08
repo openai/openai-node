@@ -124,8 +124,8 @@ describe('prepared native header copies', () => {
         maxRetries: 0,
       });
       await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-      expect(sends).toBe(2);
-      expect(transport.exchanges).toBe(1);
+      expect(sends).toBe(4);
+      expect(transport.exchanges).toBe(2);
     },
   );
 });
