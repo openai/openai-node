@@ -453,6 +453,7 @@ export const getRequestHeaders = (request: unknown): Headers | undefined => {
     if (typeof Request !== 'undefined' && request instanceof Request) {
       return Object.getOwnPropertyDescriptor(Request.prototype, 'headers')?.get?.call(request);
     }
+    let getter: PropertyDescriptor['get'];
     const seen = new Set<object>();
     for (
       let prototype = Object.getPrototypeOf(request);
@@ -468,9 +469,11 @@ export const getRequestHeaders = (request: unknown): Headers | undefined => {
         Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
         Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Request'
       ) {
-        return Object.getOwnPropertyDescriptor(prototype, 'headers')?.get?.call(request);
+        // A subclass can repeat the platform's name and tag. Select the defining getter before reading.
+        getter = Object.getOwnPropertyDescriptor(prototype, 'headers')?.get ?? getter;
       }
     }
+    return getter?.call(request);
   } catch {
     // A Request-shaped proxy can pass instanceof without satisfying the platform's internal brand.
   }

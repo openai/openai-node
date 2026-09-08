@@ -71,6 +71,11 @@ interface HeaderPropertySnapshot {
   values?: HeaderValuesSnapshot;
 }
 
+interface HeaderRecordSnapshot {
+  descriptor: PropertyDescriptor | undefined;
+  value?: HeaderPropertySnapshot['entry'];
+}
+
 interface HeaderSlotSnapshot<T = unknown> {
   descriptor: PropertyDescriptor | undefined;
   input: T;
@@ -133,7 +138,8 @@ interface HeaderReplayState {
   snapshot?: NullableHeaders;
   record?: boolean;
   properties?: Map<string, HeaderPropertySnapshot>;
-  propertyOrder?: Map<string, PropertyDescriptor | undefined>;
+  propertyOrder?: Map<string, HeaderRecordSnapshot>;
+  changedAliases?: Map<string, string>;
   rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, HeaderSlotSnapshot<HeaderEntry>>;
 }
@@ -404,6 +410,14 @@ function* reversed<T>(values: readonly T[]): Generator<T> {
   }
 }
 
+const changedRecordAlias = (
+  name: string,
+  descriptor: PropertyDescriptor | undefined,
+  replay: HeaderReplayState,
+) =>
+  !sameHeaderProperty(descriptor, replay.propertyOrder?.get(name)?.descriptor) ||
+  replay.changedAliases?.get(name.toLowerCase()) === name;
+
 const orderRecordEntries = (
   entries: HeaderEntry[],
   replay: HeaderReplayState,
@@ -413,7 +427,7 @@ const orderRecordEntries = (
   const liveAliases = new Map<string, string>();
   for (const [key] of entries) {
     const name = key as string;
-    if (sameHeaderProperty(descriptors.get(name), replay.propertyOrder?.get(name))) {
+    if (!changedRecordAlias(name, descriptors.get(name), replay)) {
       continue;
     }
     if (!liveAliases.has(name.toLowerCase())) {
@@ -444,7 +458,13 @@ const orderRecordEntries = (
   for (const retained of reversed(missing.get(undefined) ?? [])) {
     ordered.push(retained);
   }
-  replay.propertyOrder = new Map(ordered.map(([key]) => [key as string, descriptors.get(key as string)]));
+  replay.propertyOrder = new Map(
+    ordered.map(([key]) => [
+      key as string,
+      { descriptor: descriptors.get(key as string), value: replay.propertyOrder?.get(key as string)?.value },
+    ]),
+  );
+  replay.changedAliases = new Map();
   return ordered;
 };
 
@@ -643,13 +663,8 @@ const rememberProperty = (
   headers: HeaderSource,
   name: string,
   property: HeaderPropertySnapshot,
-  emitted: boolean,
-  callbacks: HeaderReplayCallbacks,
   replay: HeaderReplayState,
 ) => {
-  if (emitted) {
-    property.entry = callbacks.capture(name);
-  }
   try {
     const current = Object.getOwnPropertyDescriptor(headers, name);
     if (current && sameHeaderProperty(current, property.descriptor)) {
@@ -661,6 +676,69 @@ const rememberProperty = (
   }
   replay.properties ??= new Map();
   replay.properties.set(name, property);
+};
+
+const sameRecordValue = (
+  current: NonNullable<HeaderPropertySnapshot['entry']>[1],
+  previous: NonNullable<HeaderPropertySnapshot['entry']>[1],
+) => {
+  if (isReadonlyArray(current) && isReadonlyArray(previous)) {
+    return current.length === previous.length && current.every((value, index) => value === previous[index]);
+  }
+  return current === previous;
+};
+
+const rememberRecordValue = (name: string, property: HeaderPropertySnapshot, replay: HeaderReplayState) => {
+  const prior = replay.propertyOrder?.get(name);
+  const current = property.entry;
+  if (!prior || !current) {
+    return;
+  }
+  // Compare canonical values after their normal read; array identity alone misses in-place replacements.
+  // Null-only removals retain their existing ordering; replacement values can supersede cached accessors.
+  if (prior.value && current[1] !== null && !sameRecordValue(current[1], prior.value[1])) {
+    replay.changedAliases ??= new Map();
+    const lowerName = name.toLowerCase();
+    if (!replay.changedAliases.has(lowerName)) {
+      replay.changedAliases.set(lowerName, name);
+    }
+  }
+  replay.propertyOrder?.set(name, { ...prior, value: current });
+};
+
+const supersededRecordProperty = (
+  name: string,
+  descriptor: PropertyDescriptor | undefined,
+  property: HeaderPropertySnapshot | undefined,
+  replay?: HeaderReplayState,
+) => !descriptor && property && replay?.changedAliases?.has(name.toLowerCase());
+
+const rememberParsedRow = (
+  row: RowRead,
+  headers: HeaderSource,
+  property: HeaderPropertySnapshot | undefined,
+  snapshot: HeaderValuesSnapshot | undefined,
+  refresh: { refreshable: boolean } | undefined,
+  emitted: boolean,
+  callbacks: HeaderReplayCallbacks,
+  replay?: HeaderReplayState,
+) => {
+  if (snapshot?.slots.size && refresh) {
+    refresh.refreshable = false;
+  }
+  rememberRow(row, refresh, snapshot, replay);
+  if (!property || !replay) {
+    return;
+  }
+  if (emitted && (snapshot || !refresh?.refreshable)) {
+    property.entry = callbacks.capture(row.name);
+    if (snapshot) {
+      rememberRecordValue(row.name, property, replay);
+    }
+  }
+  if (!refresh?.refreshable) {
+    rememberProperty(headers, row.name, property, replay);
+  }
 };
 
 function* replayRow(
@@ -678,6 +756,10 @@ function* replayRow(
     return;
   }
   const retainedProperty = clear ? replay?.properties?.get(row.name) : undefined;
+  // Nested replacements become observable after ordering, before a later missing accessor is replayed.
+  if (supersededRecordProperty(row.name, descriptor, retainedProperty, replay)) {
+    return;
+  }
   if (retainedProperty && !retainedProperty.values) {
     yield* retainedPropertyEntries(row.name, retainedProperty);
     return;
@@ -698,13 +780,7 @@ function* replayRow(
     ? iterateHeaderValues(row.name, snapshot, callbacks.normalize)
     : { [Symbol.iterator]: () => Reflect.apply(iterator, values, []) };
   const didClear = yield* captureRowValues(row, iteration, refresh, clear, native, callbacks, replay);
-  if (snapshot?.slots.size && refresh) {
-    refresh.refreshable = false;
-  }
-  rememberRow(row, refresh, snapshot, replay);
-  if (property && replay && !refresh?.refreshable) {
-    rememberProperty(headers, row.name, property, didClear, callbacks, replay);
-  }
+  rememberParsedRow(row, headers, property, snapshot, refresh, didClear, callbacks, replay);
 }
 
 const pruneRows = (occurrences: Map<HeaderEntry, number>, replay?: HeaderReplayState) => {
@@ -778,6 +854,7 @@ const copyHeaderReplay = (replay: HeaderReplayState): HeaderReplayState => ({
       }
     : {}),
   ...(replay.propertyOrder ? { propertyOrder: new Map(replay.propertyOrder) } : {}),
+  ...(replay.changedAliases ? { changedAliases: new Map(replay.changedAliases) } : {}),
   ...(replay.arraySlots ? { arraySlots: new Map(replay.arraySlots) } : {}),
   ...(replay.rows
     ? {

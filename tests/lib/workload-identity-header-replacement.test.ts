@@ -46,6 +46,85 @@ test.each(['before', 'after'] as const)(
 );
 
 describe.each(['request', 'default'] as const)('replaced %s Authorization accessor', (layer) => {
+  describe.each(['data', 'mixed'] as const)('%s nested alias', (kind) => {
+    test.each([
+      ['replacement', 401],
+      ['replacement', 500],
+      ['empty', 401],
+      ['unchanged', 401],
+      ['equivalent', 401],
+      ['removal', 401],
+    ] as const)(
+      'preserves the observed alias after %s during token acquisition and %i',
+      async (change, status) => {
+        const values: (string | null | undefined)[] = ['Bearer initial'];
+        const readValue = vi.fn(() => {
+          if (readValue.mock.calls.length > 1) {
+            throw new Error('Nested accessor was read twice');
+          }
+        });
+        if (kind === 'mixed') {
+          values.unshift(undefined);
+          Object.defineProperty(values, 0, { get: readValue });
+        }
+        const headers: Record<string, string | (string | null | undefined)[]> = { authorization: values };
+        const read = vi.fn(() => {
+          delete headers['Authorization'];
+          return 'Bearer workload-identity-auth';
+        });
+        Object.defineProperty(headers, 'Authorization', { enumerable: true, configurable: true, get: read });
+        const identity = createTestWorkloadIdentity();
+        identity.provider.getToken = async () => {
+          const replacement = {
+            replacement: 'Bearer independent',
+            empty: '',
+            unchanged: 'Bearer initial',
+            equivalent: ' Bearer initial ',
+            removal: null,
+          }[change];
+          values[values.length - 1] = replacement;
+          return 'subject-token';
+        };
+        const sent: (string | null)[] = [];
+        const transport = createWorkloadIdentityTransport((url, init) => {
+          const request = new Request(url, init as globalThis.RequestInit);
+          expect(request.method).toBe('POST');
+          sent.push(request.headers.get('Authorization'));
+          return Response.json({ error: 'synthetic retry' }, { status, headers: { 'retry-after-ms': '0' } });
+        });
+        const client = new OpenAI({
+          ...createTestClientOptions(),
+          workloadIdentity: identity,
+          defaultHeaders: layer === 'default' ? headers : undefined,
+          fetch: transport.fetch,
+          maxRetries: status === 500 ? 1 : 0,
+        });
+
+        await expect(
+          client.post('/synthetic', {
+            headers: layer === 'request' ? headers : undefined,
+            body: { input: 'synthetic' },
+          }),
+        ).rejects.toMatchObject({ status });
+
+        const expected = {
+          replacement: ['Bearer independent'],
+          empty: [''],
+          unchanged: ['Bearer access-token-1', 'Bearer access-token-2'],
+          equivalent: ['Bearer access-token-1', 'Bearer access-token-2'],
+          removal: ['Bearer access-token-1', 'Bearer access-token-2'],
+        }[change];
+        if (status === 500) {
+          expected.push('Bearer independent');
+        }
+        expect(sent).toEqual(expected);
+        expect(transport.exchanges).toBe(change === 'replacement' || change === 'empty' ? 1 : 2);
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(readValue).toHaveBeenCalledTimes(kind === 'mixed' ? 1 : 0);
+      },
+    );
+  });
+
   test.each(['Bearer independent', null] as const)(
     'prefers a changed existing alias (%s) over a self-removed accessor',
     async (replacement) => {
