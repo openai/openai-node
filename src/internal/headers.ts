@@ -74,6 +74,7 @@ const getArrayIterator = <T>(headers: readonly T[]) => {
 
 interface HeaderPropertySnapshot {
   descriptor: PropertyDescriptor;
+  capture?: () => void;
   entry?: readonly [string, string | readonly string[] | null];
 }
 
@@ -155,6 +156,31 @@ export const hasNativeHeadersBrand = (headers: object): boolean => {
   } catch {
     return false;
   }
+};
+
+/** Detects native values whose actual serialization is supplied by another realm or a subclass. */
+export const hasCustomNativeHeadersIterator = (headers: object): boolean => {
+  if (!hasNativeHeadersBrand(headers)) {
+    return false;
+  }
+  try {
+    const seen = new Set<object>();
+    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
+      if (seen.has(prototype)) {
+        return false;
+      }
+      seen.add(prototype);
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
+      if (descriptor) {
+        return (
+          typeof descriptor.value === 'function' && descriptor.value !== Headers.prototype[Symbol.iterator]
+        );
+      }
+    }
+  } catch {
+    // Uninspectable membranes cannot opt into provenance recovery.
+  }
+  return false;
 };
 
 /** Checks retryable hook inputs without invoking their iterable protocol or value getters. */
@@ -460,7 +486,11 @@ function* iterateHeaders(
       }
     }
     if (property && replay) {
-      if (!rowReplay?.refreshable) replay.properties!.set(name, property);
+      if (!rowReplay?.refreshable) {
+        property.capture?.();
+        delete property.capture;
+        replay.properties!.set(name, property);
+      }
       delete replay.property;
     }
   }
@@ -518,12 +548,18 @@ const mergeHeaderEntries = (
         nullHeaders.delete(lowerName);
       }
       if (replay?.property) {
-        replay.property.entry = [
-          name,
-          value !== null && lowerName === 'set-cookie'
-            ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
-            : targetHeaders.get(lowerName),
-        ];
+        const property = replay.property;
+        // Capture once after the property finishes, preserving platform normalization without rescanning
+        // an expanding Set-Cookie collection after every append.
+        property.capture ??= () => {
+          const value = targetHeaders.get(lowerName);
+          property.entry = [
+            name,
+            value !== null && lowerName === 'set-cookie'
+              ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
+              : value,
+          ];
+        };
       }
     }
     hasAuthorizationLayer ||= suppliesAuthorization;
