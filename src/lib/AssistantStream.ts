@@ -525,6 +525,13 @@ export class AssistantStream
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
     }
 
+    if (event.event === 'thread.run.step.delta') {
+      const delta = event.data.delta;
+      if (delta && hasOwn(delta, 'id')) {
+        throw new OpenAIError('Run-step deltas must not contain an id field');
+      }
+    }
+
     if (event.event === 'thread.run.step.created') {
       if (this.#activeRunStepID !== undefined) {
         throw new OpenAIError(
@@ -842,10 +849,14 @@ export class AssistantStream
           throw new Error('Received a RunStepDelta before creation of a snapshot');
         }
 
-        const data = event.data;
+        const delta = event.data.delta;
 
-        if (data.delta) {
-          const accumulated = accumulateAssistantStreamDelta(snapshot, data.delta, true) as Runs.RunStep;
+        if (delta) {
+          // Raw-event listeners can replace or modify the delta after initial validation.
+          if (hasOwn(delta, 'id')) {
+            throw new OpenAIError('Run-step deltas must not contain an id field');
+          }
+          const accumulated = accumulateAssistantStreamDelta(snapshot, delta, true) as Runs.RunStep;
           this.#runStepSnapshots[runStepID] = accumulated;
         }
 
