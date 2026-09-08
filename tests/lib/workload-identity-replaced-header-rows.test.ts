@@ -259,6 +259,39 @@ test('refreshes deleted ordinary values beside a retained name getter', () => {
   expect(read).toHaveBeenCalledTimes(1);
 });
 
+test.each(['name', 'value'] as const)(
+  'distinguishes a self-deleting %s getter from a later external deletion',
+  (slot) => {
+    const index = slot === 'name' ? 0 : 1;
+    const expected = slot === 'name' ? 'X-Custom' : 'preserved';
+    const selfDeleting = ['X-Custom', 'preserved'];
+    Object.defineProperty(selfDeleting, index, {
+      configurable: true,
+      get() {
+        Reflect.deleteProperty(selfDeleting, index);
+        return expected;
+      },
+    });
+    const retained = snapshotHeaders([selfDeleting]);
+
+    expect(retained.refresh().values.get('X-Custom')).toBe('preserved');
+
+    const externallyDeleted = ['X-Custom', 'preserved'];
+    Object.defineProperty(externallyDeleted, index, {
+      configurable: true,
+      get: () => expected,
+    });
+    const refreshed = snapshotHeaders([externallyDeleted]);
+    Reflect.deleteProperty(externallyDeleted, index);
+
+    if (slot === 'name') {
+      expect(() => refreshed.refresh()).toThrow('expected header name to be a string');
+    } else {
+      expect(refreshed.refresh().values.has('X-Custom')).toBe(false);
+    }
+  },
+);
+
 test('does not freeze consumed columns because of an unused accessor', () => {
   const unused = vi.fn(() => 'unused');
   const row = ['Authorization', 'Bearer original'];
