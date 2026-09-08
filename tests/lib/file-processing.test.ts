@@ -37,7 +37,7 @@ describe('file processing compatibility', () => {
     'returns an initially %s file even after maxWait has elapsed',
     async (status) => {
       let now = 0;
-      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      vi.spyOn(performance, 'now').mockImplementation(() => now);
       const { client, fetch } = fileClient([status], () => {
         now = 1000;
       });
@@ -79,6 +79,30 @@ describe('file processing compatibility', () => {
   });
 
   test.each([
+    { clockChange: 60_000, elapsed: 50, fails: false },
+    { clockChange: -60_000, elapsed: 150, fails: true },
+  ])(
+    'uses elapsed time when the system clock moves by $clockChange ms',
+    async ({ clockChange, elapsed, fails }) => {
+      let wallTime = 100_000;
+      let monotonicTime = 0;
+      vi.spyOn(Date, 'now').mockImplementation(() => wallTime);
+      vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+      mockedSleep.mockImplementation(async () => {
+        wallTime += clockChange;
+        monotonicTime = elapsed;
+      });
+      const { client, fetch } = fileClient(['uploaded', 'processed']);
+      const promise = client.files.waitForProcessing('file_123', { pollInterval: 50, maxWait: 100 });
+
+      await (fails
+        ? expect(promise).rejects.toBeInstanceOf(APIConnectionTimeoutError)
+        : expect(promise).resolves.toMatchObject({ status: 'processed' }));
+      expect(fetch).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  test.each([
     { maxWait: undefined, elapsed: 1_800_000, fails: false },
     { maxWait: undefined, elapsed: 1_800_001, fails: true },
     { maxWait: 0, elapsed: 0, fails: false },
@@ -87,7 +111,7 @@ describe('file processing compatibility', () => {
     { maxWait: 10, elapsed: 11, fails: true },
   ])('checks maxWait $maxWait after retrieval at $elapsed ms', async ({ maxWait, elapsed, fails }) => {
     let now = 0;
-    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
     mockedSleep.mockImplementation(async () => {
       now = elapsed;
     });
