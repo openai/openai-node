@@ -10,6 +10,7 @@ import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/detect-platform';
 import * as Shims from './internal/shims';
+import { cancelResponseForRetry, recordResponseTee } from './internal/response-retry-cleanup';
 import * as Opts from './internal/request-options';
 import { stringifyQuery } from './internal/utils/query';
 import { VERSION } from './version';
@@ -330,7 +331,6 @@ type WorkloadIdentityDispatch = {
   resolvePlaceholder: boolean;
 };
 const responseCloneRequests = new WeakMap<Response, Set<WorkloadIdentityRequest>>();
-const sharedResponseBodies = new WeakSet<object>();
 const nativeResponseClone = globalThis.Response?.prototype.clone;
 const nativeResponseBodyGetter = globalThis.Response
   ? Object.getOwnPropertyDescriptor(globalThis.Response.prototype, 'body')?.get
@@ -434,8 +434,7 @@ const cloneWorkloadIdentityResponse = (response: Response): Response => {
     const sourceBody = responseBodyIdentity(response);
     const copyBody = responseBodyIdentity(copy);
     if (sourceBody && copyBody) {
-      sharedResponseBodies.add(sourceBody);
-      sharedResponseBodies.add(copyBody);
+      recordResponseTee(body, sourceBody, copyBody);
     }
   }
   for (const request of requests ?? []) {
@@ -447,17 +446,6 @@ const cloneWorkloadIdentityResponse = (response: Response): Response => {
     recordWorkloadIdentityResponse(request, copy, usedWorkloadToken);
   }
   return copy;
-};
-
-const cancelResponseForRetry = async (response: Response): Promise<void> => {
-  const body = response.body;
-  const cancelled = Shims.CancelReadableStream(body);
-  if (body && sharedResponseBodies.has(body)) {
-    // A retained sibling can keep cancellation pending until after the retried request returns.
-    void cancelled.catch(() => undefined);
-  } else {
-    await cancelled;
-  }
 };
 
 const releaseWorkloadIdentityResponseClones = (request: WorkloadIdentityRequest) => {

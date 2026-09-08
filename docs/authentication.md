@@ -242,9 +242,11 @@ workload-token retry attribution. A subclass can use the protected `this.cloneRe
 when it intentionally returns a clone of a delegated response and wants to preserve that attribution.
 For retry cleanup, the helper recognizes shared branches when it directly invokes the global
 `Response.prototype.clone` captured when the SDK loads. Cancellation of bodies without established
-sharing is awaited, and cancellation failures propagate. Hooks using custom, bound, or foreign clone
-implementations must release retained siblings before awaiting the retried request, unless an SDK
-helper already established their shared-body ownership.
+sharing is awaited, and cancellation failures propagate. For known shared branches, cleanup is also
+awaited when every sibling can be verified closed; open, locked, or unverifiable siblings keep cleanup
+detached so a retained branch cannot block a retry. The check does not consume sibling bodies.
+Hooks using custom, bound, or foreign clone implementations must release retained siblings before
+awaiting the retried request, unless an SDK helper already established their shared-body ownership.
 The SDK does not replace native `Response` or `Headers` methods. An exact same-byte mutation of a native
 `Headers` object is therefore treated as unchanged; return an independent header record or `buildHeaders`
 result when the same bytes must carry independent credential ownership.

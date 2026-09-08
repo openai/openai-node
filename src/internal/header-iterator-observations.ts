@@ -64,6 +64,7 @@ export class HeaderIteratorObservations<T> {
       observed.identity === property.identity &&
       sameIteratorProperty(observed, source, descriptor)
     );
+    const selectedProperty = property;
     return {
       reused,
       // An undefined entry can represent a successfully completed, non-emitting cursor.
@@ -73,7 +74,7 @@ export class HeaderIteratorObservations<T> {
           return;
         }
         const { descriptor: completedDescriptor, entry } = completed;
-        const completedProperty = { ...property, descriptor: completedDescriptor };
+        const completedProperty = { ...selectedProperty, descriptor: completedDescriptor };
         this.properties.set(name, completedProperty);
         if (refreshable) {
           return;
