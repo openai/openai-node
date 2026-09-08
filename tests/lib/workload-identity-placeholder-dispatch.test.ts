@@ -1,6 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Independent fixtures exercise separate delegation contracts. */
-import OpenAI from 'openai';
-import { test } from 'vitest';
+import OpenAI, { APIConnectionTimeoutError } from 'openai';
+import { test, vi } from 'vitest';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
 function deferred() {
@@ -11,6 +11,96 @@ function deferred() {
   });
   return { promise, resolve: resolveGate };
 }
+
+test.each(
+  ['native', 'record', 'iterable'].flatMap((kind) =>
+    [false, true].map((slowNetwork) => ({ kind, slowNetwork })),
+  ),
+)(
+  'starts the network timeout after $kind placeholder resolution: slow network=$slowNetwork',
+  async ({ kind, slowNetwork }) => {
+    vi.useFakeTimers();
+    try {
+      const started = deferred();
+      const release = deferred();
+      class DeferredClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- Defer acquisition to the transport placeholder.
+        protected override bearerAuth() {
+          // oxlint-disable-next-line unicorn/no-useless-undefined -- The hook requires Promise<undefined>.
+          return Promise.resolve<undefined>(undefined);
+        }
+
+        protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+          const headers = new Headers(args[1].headers);
+          if (kind === 'record') {
+            args[1].headers = Object.fromEntries(headers);
+          }
+          if (kind === 'iterable') {
+            args[1].headers = headers.entries() as unknown as Headers;
+          }
+          return super.fetchWithAuth(...args);
+        }
+      }
+      const options = createTestClientOptions();
+      options.workloadIdentity.provider.getToken = async () => {
+        started.resolve();
+        await release.promise;
+        return 'subject-token';
+      };
+      const abortedAtDispatch: boolean[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        const signal = init?.signal;
+        abortedAtDispatch.push(signal?.aborted ?? false);
+        if (!signal || signal.aborted) {
+          throw new Error('Synthetic aborted dispatch');
+        }
+        if (!slowNetwork) {
+          return Response.json({ data: [] });
+        }
+        // oxlint-disable-next-line promise/avoid-new -- Model a fetch that waits until its signal aborts.
+        return new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('Synthetic network timeout')), {
+            once: true,
+          });
+        });
+      });
+      const client = new DeferredClient({
+        ...options,
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 0,
+        timeout: 10,
+      });
+      const result = (async () => {
+        try {
+          const page = await client.models.list({
+            headers: { Authorization: 'Bearer workload-identity-auth' },
+          });
+          return page.data;
+        } catch (error) {
+          return error;
+        }
+      })();
+      await started.promise;
+      await vi.advanceTimersByTimeAsync(50);
+      expect(abortedAtDispatch).toEqual([]);
+      release.resolve();
+      await vi.advanceTimersByTimeAsync(11);
+
+      expect(abortedAtDispatch).toEqual([false]);
+      if (slowNetwork) {
+        expect(await result).toBeInstanceOf(APIConnectionTimeoutError);
+      } else {
+        expect(await result).toEqual([]);
+      }
+      expect(transport.exchanges).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
 
 test.each(['success', 'refresh', 'independent-replacement'] as const)(
   'retains workload authorization when a frozen native init is reused: %s',

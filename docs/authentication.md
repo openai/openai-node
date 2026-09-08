@@ -288,16 +288,18 @@ class WrappedClient extends OpenAI {
 `bearerAuth` receives the context as its second argument. `buildRequest` overrides can forward the
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
-An in-place native Authorization overwrite is observable when it changes the emitted bytes or the
-header object's effective mutator shape. An exact same-byte native mutation is treated as unchanged,
-and subsequent native copies retain SDK ownership.
+An in-place native Authorization overwrite is observable when it changes the emitted bytes or the header
+object's effective mutator shape. A changed value or removal revokes that header layer's refresh ownership,
+and subsequent header copies do not restore SDK ownership. An exact same-byte `set`, or a `delete` followed
+by restoring the original value before the next hook boundary, is treated as unchanged; subsequent native
+copies retain their prior SDK ownership.
 
-The SDK does not wrap native `Headers` mutators. Custom, accessor-backed, or uninspectable mutators retain
-their normal operations but do not enable automatic authentication refresh. An independent header layer
-observed between SDK hook calls remains independent after a later copy. Parsed copies have independent
-provenance; changing an unused copy does not invalidate the selected request. To give equal Authorization
-bytes independent ownership, express them as a record or tuple layer through `buildHeaders` and return
-that layer to the SDK before further copying it.
+The SDK checks Authorization at hook boundaries without replacing native `Headers` methods. An independent
+header layer observed between SDK hook calls remains independent after a later copy. Parsed copies have
+independent mutation state; changing an unused copy does not invalidate the selected request. Headers with
+custom, accessor-backed, or otherwise nonstandard mutators retain their normal operations, but do not enable
+automatic authentication refresh. To mark equal-byte credentials as independent, express them as a record
+or tuple layer through `buildHeaders` and return that layer to the SDK before further copying it.
 
 Return the SDK-produced authentication result, retain its marked header values, or rebuild it with
 `buildHeaders([result, additionalHeaders])` to preserve ownership. Immediate delegation can also copy

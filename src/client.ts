@@ -2027,8 +2027,23 @@ export class OpenAI {
       if (!descriptor) omitted.add(key);
       else if (descriptor.enumerable) Reflect.set(options, key, Reflect.get(source, key));
     }
-    const body = hasOwn(options, 'body') || omitted.has('body') ? options.body : init?.body;
-    const headers = hasOwn(options, 'headers') || omitted.has('headers') ? options.headers : init?.headers;
+    // Preserve inherited and non-enumerable transport fields without reviving a field deleted before
+    // its copy turn. Capture self-removing own getters as present even when they return undefined.
+    for (const name of ['body', 'headers'] as const) {
+      if (hasOwn(options, name) || omitted.has(name)) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(source, name);
+      if (descriptor?.enumerable) continue;
+      const value = source[name];
+      if (value !== undefined || descriptor) {
+        Object.defineProperty(options, name, {
+          value,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+    }
+    const { body } = options;
     const selectedHeaderState =
       matchingDispatches.length === 1
         ? WorkloadTokenProvenance.requestHeaderDataState(matchingDispatches[0]!.init)
@@ -2037,7 +2052,7 @@ export class OpenAI {
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
     if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
 
-    const timeout = setTimeout(abort, ms);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
     const isReadableBody =
       ((globalThis as any).ReadableStream && body instanceof (globalThis as any).ReadableStream) ||
@@ -2048,8 +2063,6 @@ export class OpenAI {
       ...(isReadableBody ? { duplex: 'half' } : {}),
       method: 'GET',
       ...options,
-      ...(body === undefined ? undefined : { body }),
-      ...(headers === undefined ? undefined : { headers }),
     };
     if (method) {
       // Custom methods like 'patch' need to be uppercased
@@ -2098,15 +2111,18 @@ export class OpenAI {
           resolvePlaceholder,
         );
       }
+      const { init: dispatchOptions, used } = dispatch;
+      // Credential acquisition has its own lifecycle; this timeout covers the network request.
+      timeout = setTimeout(abort, ms);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       const response = await (this.#x509Fetch ?? this.fetch).call(
         undefined,
         url,
-        WorkloadTokenProvenance.forDispatch(dispatch.init),
+        WorkloadTokenProvenance.forDispatch(dispatchOptions),
       );
       // A response reused by independent dispatches cannot attest to workload ownership.
       if (workloadRequest) {
-        recordWorkloadIdentityResponse(workloadRequest, response, dispatch.used);
+        recordWorkloadIdentityResponse(workloadRequest, response, used);
       }
       return response;
     } catch (err) {
@@ -2638,15 +2654,8 @@ export class OpenAI {
     if (sourceHeaders !== undefined && !(platformHeader && canPreserveHeaderInput(sourceHeaders))) {
       try {
         headers = new Headers(sourceHeaders);
-      } catch (error) {
-        if (
-          !(error instanceof TypeError) ||
-          !(sourceHeaders instanceof Headers) ||
-          hasNativeHeadersBrand(sourceHeaders)
-        ) {
-          throw error;
-        }
-        // A native Headers membrane can require unwrapping by its configured transport.
+      } catch {
+        // Opaque headers can require unwrapping or validation by their configured transport.
         return { init, used: false, unreadable: true };
       }
     }

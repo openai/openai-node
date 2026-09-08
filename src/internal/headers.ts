@@ -175,14 +175,14 @@ export const getStructuralHeaderValue = (
           }
           const rowIterator = getArrayIteratorDescriptor(rowDescriptor.value);
           if (rowIterator) descriptorEvidence.push([`row-iterator:${index}`, rowIterator]);
-          if (!rowIterator || !hasNativeIterator(rowDescriptor.value, rowIterator)) {
-            unknown = true;
-            continue;
-          }
           const nameDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '0');
           const valueDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '1');
           if (nameDescriptor) descriptorEvidence.push([`name:${index}`, nameDescriptor]);
           if (valueDescriptor) descriptorEvidence.push([`value:${index}`, valueDescriptor]);
+          if (!rowIterator || !hasNativeIterator(rowDescriptor.value, rowIterator)) {
+            unknown = true;
+            continue;
+          }
           if (!nameDescriptor || !('value' in nameDescriptor) || typeof nameDescriptor.value !== 'string') {
             unknown = true;
             continue;

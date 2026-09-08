@@ -570,6 +570,7 @@ describe('Workload identity request and dispatch hooks', () => {
     'row getter replacement',
     'name getter replacement',
     'name getter value change',
+    'custom row iterator value change',
   ] as const)('recognizes %s during final dispatch', async (shape) => {
     let source: object | undefined;
     let ownedAuthorization: string | undefined;
@@ -600,6 +601,15 @@ describe('Workload identity request and dispatch hooks', () => {
               enumerable: true,
               configurable: true,
               get: () => 'Authorization',
+            });
+          }
+          if (shape === 'custom row iterator value change') {
+            Object.defineProperty(row, Symbol.iterator, {
+              configurable: true,
+              value: function* value() {
+                yield row[0];
+                yield row[1];
+              },
             });
           }
           if (shape === 'row getter replacement') {
@@ -653,7 +663,7 @@ describe('Workload identity request and dispatch hooks', () => {
                 yield normalized;
               },
             });
-          } else if (shape === 'name getter value change') {
+          } else if (shape === 'name getter value change' || shape === 'custom row iterator value change') {
             row[1] = normalized;
           } else if (shape === 'name getter replacement') {
             Object.defineProperty(row, '0', {

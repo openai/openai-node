@@ -20,7 +20,10 @@ export interface HeaderDescriptorHistory {
 }
 
 /** Reads the defining descriptor without invoking a property getter. */
-export const observeHeaderDescriptor = (source: object, key: string): HeaderDescriptorObservation => {
+export const observeHeaderDescriptor = (
+  source: object,
+  key: string | symbol,
+): HeaderDescriptorObservation => {
   const seen = new Set<object>();
   try {
     for (let object: object | null = source; object; object = Object.getPrototypeOf(object)) {
