@@ -2710,14 +2710,9 @@ export class OpenAI {
       if (platform) {
         if (bearerToken(platform.value) !== bearerToken(authorization)) credential.revoke();
         else credential.adopt(headers as Headers);
-      } else if (canPreserveHeaderInput(headers as HeadersLike)) {
-        if (
-          bearerToken(new Headers(headers as NonNullable<RequestInit['headers']>).get('Authorization')) !==
-          bearerToken(authorization)
-        ) {
-          credential.revoke();
-        }
       } else {
+        // Structural records and arrays may expose ordinary-looking descriptors while still
+        // performing stateful reads. Attribute them from the final dispatch snapshot only.
         this.#pendingWorkloadHeaders.set(credential, headers);
       }
     }

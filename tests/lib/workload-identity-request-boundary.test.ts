@@ -42,6 +42,75 @@ test('keeps a prepared one-shot request identical through delegated transport ho
   expect(reads).toBe(1);
 });
 
+test.each([
+  ['prepareRequest', 'record'],
+  ['prepareRequest', 'array'],
+  ['fetchWithAuth', 'record'],
+  ['fetchWithAuth', 'array'],
+] as const)('reads a one-shot %s %s only at final dispatch', async (hook, shape) => {
+  let reads = 0;
+  const install = (request: RequestInit) => {
+    const entries = Object.fromEntries(new Headers(request.headers));
+    entries['x-review'] = 'constant-marker';
+    request.headers =
+      shape === 'record'
+        ? new Proxy(entries, {
+            get(target, key, receiver) {
+              if (key === 'x-review') {
+                reads += 1;
+                if (reads > 1) {
+                  throw new Error('ordinary header read more than once');
+                }
+              }
+              return Reflect.get(target, key, receiver);
+            },
+          })
+        : Object.entries(entries).map((row) =>
+            row[0] === 'x-review'
+              ? new Proxy(row, {
+                  get(target, key, receiver) {
+                    if (key === '1') {
+                      reads += 1;
+                      if (reads > 1) {
+                        throw new Error('ordinary header read more than once');
+                      }
+                    }
+                    return Reflect.get(target, key, receiver);
+                  },
+                })
+              : row,
+          );
+  };
+  class HookClient extends OpenAI {
+    protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+      await super.prepareRequest(...args);
+      if (hook === 'prepareRequest') {
+        install(args[0]);
+      }
+    }
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      if (hook === 'fetchWithAuth') {
+        install(args[1]);
+      }
+      return super.fetchWithAuth(...args);
+    }
+  }
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    expect(new Headers(init?.headers).get('X-Review')).toBe('constant-marker');
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list();
+
+  expect(reads).toBe(1);
+});
+
 test.each(['accessor', 'data control'] as const)(
   'keeps %s cache consistent with replacement headers',
   async (kind) => {
