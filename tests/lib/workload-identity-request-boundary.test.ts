@@ -210,37 +210,96 @@ test('retains workload ownership for a structurally forwarded credential with HT
   expect(transport.exchanges).toBe(2);
 });
 
-test('retains workload ownership for a non-enumerable Authorization data property', async () => {
-  class HookClient extends OpenAI {
-    protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
-      await super.prepareRequest(...args);
-      const [request] = args;
-      request.headers = Object.create(null, {
-        Authorization: {
-          value: new Headers(request.headers).get('Authorization'),
-        },
-      }) as Headers;
+test.each(['data', 'accessor', 'array'] as const)(
+  'retains workload ownership for a non-enumerable Authorization %s property',
+  async (kind) => {
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        await super.prepareRequest(...args);
+        const [request] = args;
+        const authorization = new Headers(request.headers).get('Authorization');
+        request.headers = Object.create(null, {
+          Authorization:
+            kind === 'accessor'
+              ? { get: () => authorization }
+              : { value: kind === 'array' ? [authorization] : authorization },
+        }) as Headers;
+      }
     }
-  }
-  let sends = 0;
-  const transport = createWorkloadIdentityTransport(() => {
-    sends += 1;
-    return sends === 1
-      ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
-      : Response.json({ data: [] });
-  });
-  const client = new HookClient({
-    ...createTestClientOptions(),
-    apiKey: null,
-    fetch: transport.fetch,
-    maxRetries: 0,
-  });
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      return sends === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
 
-  await client.models.list();
+    await client.models.list();
 
-  expect(sends).toBe(2);
-  expect(transport.exchanges).toBe(2);
-});
+    expect(sends).toBe(2);
+    expect(transport.exchanges).toBe(2);
+  },
+);
+
+test.each(['record', 'array'] as const)(
+  'does not let an unrelated %s accessor hide an independent Authorization',
+  async (shape) => {
+    let authorization = '';
+    let record: Record<string, string> = {};
+    let rows: [string, string][] = [];
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        await super.prepareRequest(...args);
+        const [request] = args;
+        authorization = new Headers(request.headers).get('Authorization') ?? '';
+        record = { Authorization: 'Bearer independent' };
+        Object.defineProperty(record, 'X-Note', {
+          enumerable: true,
+          get: () => 'marker',
+        });
+        const note = ['X-Note', 'unused'] as [string, string];
+        Object.defineProperty(note, '1', { get: () => 'marker' });
+        rows = [['Authorization', 'Bearer independent'], note];
+        request.headers = shape === 'record' ? record : rows;
+      }
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        if (shape === 'record') {
+          record['Authorization'] = authorization;
+        } else {
+          const [row] = rows;
+          if (!row) {
+            throw new Error('Expected an Authorization row');
+          }
+          row[1] = authorization;
+        }
+        return super.fetchWithAuth(...args);
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sends += 1;
+      expect(new Headers(init?.headers).get('X-Note')).toBe('marker');
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(sends).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
 
 test('does not restore workload ownership after removing an independent case alias', async () => {
   let headers: Record<string, string> = {};
@@ -325,9 +384,9 @@ test.each([
 
     await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-    expect(coercions).toBe(1);
-    expect(sends).toBe(1);
-    expect(transport.exchanges).toBe(1);
+    expect(coercions).toBe(2);
+    expect(sends).toBe(2);
+    expect(transport.exchanges).toBe(2);
   },
 );
 

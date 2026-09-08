@@ -2728,11 +2728,9 @@ export class OpenAI {
         // Structural records and arrays may expose ordinary-looking descriptors while still
         // performing stateful reads. Inspect only Authorization data descriptors here, then
         // attribute the complete source from the final dispatch snapshot.
-        if (canPreserveHeaderInput(headers as HeadersLike)) {
-          const observed = getStructuralHeaderValue(headers as HeadersLike, 'Authorization');
-          if (!observed || bearerToken(observed.value) !== bearerToken(authorization)) {
-            credential.revoke();
-          }
+        const observed = getStructuralHeaderValue(headers as HeadersLike, 'Authorization');
+        if (observed && bearerToken(observed.value) !== bearerToken(authorization)) {
+          credential.revoke();
         }
         this.#pendingWorkloadHeaders.set(credential, headers);
       }
