@@ -193,6 +193,20 @@ interface TokenScope {
   dispose: () => void;
 }
 
+interface PendingHeaderObservation {
+  request: object;
+  source?: object;
+  exact: boolean;
+  observed?: string | null;
+}
+
+interface StructuralHeaderMismatch {
+  source: object;
+  value: string | null;
+  restorationDefinitive: boolean;
+  exact: boolean;
+}
+
 /** Owns authentication provenance for individual request attempts without retaining a token cache. */
 export class WorkloadTokenProvenance {
   private readonly parseHeaders: (values: HeadersLike) => NullableHeaders;
@@ -216,11 +230,8 @@ export class WorkloadTokenProvenance {
     this.structuralHeader = structuralHeader;
   }
 
-  private readonly pendingHeaders = new WeakMap<WorkloadCredentialUsage, object>();
-  private readonly structuralMismatches = new WeakMap<
-    WorkloadCredentialUsage,
-    { source: object; value: string | null; restorationDefinitive: boolean; exact: boolean }
-  >();
+  private readonly pendingHeaders = new WeakMap<WorkloadCredentialUsage, PendingHeaderObservation>();
+  private readonly structuralMismatches = new WeakMap<WorkloadCredentialUsage, StructuralHeaderMismatch>();
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
@@ -455,6 +466,53 @@ export class WorkloadTokenProvenance {
     );
   }
 
+  private rememberPendingHeaders(
+    credential: WorkloadCredentialUsage,
+    request: object,
+    exact: boolean,
+    source?: object,
+    observed?: string | null,
+  ): void {
+    const prior = this.pendingHeaders.get(credential);
+    let retainedExact = exact;
+    if (!exact && prior?.request === request && prior.exact) {
+      retainedExact =
+        prior.source === source &&
+        (prior.observed === undefined || observed === undefined || prior.observed === observed);
+    }
+    this.pendingHeaders.set(credential, {
+      request,
+      exact: retainedExact,
+      ...(source ? { source } : undefined),
+      ...(observed === undefined ? undefined : { observed }),
+    });
+  }
+
+  private hasTerminalPreparedMismatch(
+    pending: PendingHeaderObservation | undefined,
+    mismatch: StructuralHeaderMismatch | undefined,
+    headers: object | undefined,
+    authorization: string,
+    dispatch: { authorization: string | null | undefined } | undefined,
+  ): boolean {
+    if (pending?.exact && dispatch && dispatch.authorization !== authorization) {
+      return true;
+    }
+    if (
+      !mismatch ||
+      pending?.source !== headers ||
+      mismatch.source !== headers ||
+      !mismatch.restorationDefinitive
+    ) {
+      return false;
+    }
+    const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
+    return (
+      (current !== undefined && matchesAuthorization(current.value, authorization, mismatch.exact)) ||
+      (mismatch.exact && dispatch !== undefined && dispatch.authorization !== authorization)
+    );
+  }
+
   /** Keeps opaque sources unconsumed through hooks and defers their attribution to dispatch. */
   observeRequest(
     credential: WorkloadCredentialUsage | undefined,
@@ -469,6 +527,7 @@ export class WorkloadTokenProvenance {
     const state = WorkloadTokenProvenance.requestHeaderDataState(request);
     if (!state) {
       // Defer accessor reads without erasing an already observed source's ownership.
+      this.rememberPendingHeaders(credential, request, exactAuthorization);
       return;
     }
     const headers = state.value ?? fallbackHeaders;
@@ -510,7 +569,7 @@ export class WorkloadTokenProvenance {
           // retry ownership for this attempt.
           credential.revoke();
         }
-        this.pendingHeaders.set(credential, headers);
+        this.rememberPendingHeaders(credential, request, exactAuthorization, headers, observed?.value);
       }
     }
   }
@@ -520,7 +579,7 @@ export class WorkloadTokenProvenance {
     credential: WorkloadCredentialUsage | undefined,
     headers: object | undefined,
     authorization: string,
-    dispatchedAuthorization?: string | null,
+    dispatch?: { authorization: string | null | undefined },
   ): boolean {
     if (!credential) {
       return false;
@@ -531,29 +590,22 @@ export class WorkloadTokenProvenance {
     }
     const pending = this.pendingHeaders.get(credential);
     const structuralMismatch = this.structuralMismatches.get(credential);
-    if (
-      pending === headers &&
-      structuralMismatch?.source === headers &&
-      structuralMismatch?.restorationDefinitive
-    ) {
-      const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
-      if (
-        (current && matchesAuthorization(current.value, authorization, structuralMismatch.exact)) ||
-        (structuralMismatch.exact &&
-          dispatchedAuthorization !== undefined &&
-          dispatchedAuthorization !== authorization)
-      ) {
-        // A later materialized copy must not regain ownership after this terminal observation.
-        credential.revoke();
-        return false;
-      }
+    if (this.hasTerminalPreparedMismatch(pending, structuralMismatch, headers, authorization, dispatch)) {
+      // A later materialized copy must not regain ownership after this terminal observation.
+      credential.revoke();
+      return false;
     }
-    if (pending === undefined || pending === headers || marked === true) {
+    if (
+      pending === undefined ||
+      pending.source === undefined ||
+      pending.source === headers ||
+      marked === true
+    ) {
       return true;
     }
     return (
       getVerifiedPlatformHeader(headers, 'Authorization') !== undefined &&
-      this.matchesPreparedData(pending, authorization)
+      this.matchesPreparedData(pending.source, authorization)
     );
   }
 

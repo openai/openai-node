@@ -421,6 +421,55 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(2);
   });
 
+  test.each(['accessor', 'iterable', 'proxy-normalized'] as const)(
+    'retains exact preparation semantics for deferred %s headers',
+    async (shape) => {
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture replaces prepared headers.
+        protected override async prepareRequest(init: RequestInit) {
+          const original = new Headers(init.headers).get('Authorization');
+          if (!original) {
+            throw new Error('Expected prepared workload Authorization');
+          }
+          const authorization = original.replace(/^Bearer /u, 'bEaReR ');
+          if (shape === 'accessor') {
+            init.headers = Object.defineProperty({}, 'Authorization', {
+              enumerable: true,
+              get: () => authorization,
+            });
+          } else if (shape === 'iterable') {
+            init.headers = {
+              *[Symbol.iterator]() {
+                yield ['Authorization', authorization] as const;
+              },
+            } as unknown as Headers;
+          } else {
+            const headers = { Authorization: authorization };
+            init.headers = new Proxy(headers, {
+              getOwnPropertyDescriptor(target, property) {
+                const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
+                return property === 'Authorization' && descriptor && 'value' in descriptor
+                  ? { ...descriptor, value: descriptor.value.replace(/^bEaReR /u, 'Bearer ') }
+                  : descriptor;
+              },
+            });
+          }
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+      expect(sent).toEqual(['bEaReR access-token-1']);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+
   test.each([false, true])('preserves native Request headers (throwing tag getter: %s)', async (throwTag) => {
     class HookClient extends OpenAI {
       override async fetchWithTimeout(

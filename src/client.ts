@@ -2672,7 +2672,7 @@ export class OpenAI {
         request.credential,
         sourceHeaders,
         request.authorization,
-        authorization,
+        { authorization },
       ) &&
       bearerToken(authorization ?? null) === bearerToken(request.authorization);
     if (used && request.credential) {
