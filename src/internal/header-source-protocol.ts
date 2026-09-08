@@ -63,6 +63,7 @@ type SourceProtocolState<T> =
       readonly kind: 'iterable';
       readonly iterator: IteratorFactory<T>;
       readonly iterations: WeakSet<object>;
+      readonly history: HeaderDescriptorHistory;
     };
 
 type SourceProtocolCapture<T> = {
@@ -93,17 +94,18 @@ export class HeaderSourceProtocol<T> {
   /** Selects the current protocol without rereading an unchanged or self-removing iterator accessor. */
   capture(source: object, onIterator?: (native: boolean) => void): SourceProtocolCapture<T> {
     const previous = this.state;
-    const record =
-      this.retain && previous.kind !== 'iterable'
-        ? new HeaderDescriptorRead(
-            observeHeaderDescriptor(source, Symbol.iterator),
-            previous.kind === 'record' ? previous.history : undefined,
-          )
-        : undefined;
+    const read = this.retain
+      ? new HeaderDescriptorRead(
+          observeHeaderDescriptor(source, Symbol.iterator),
+          previous.kind === 'unobserved' ? undefined : previous.history,
+        )
+      : undefined;
     let iterator: IteratorFactory<T> | undefined;
-    if (previous.kind === 'iterable') {
-      ({ iterator } = previous);
-    } else if (!record?.retained && Symbol.iterator in source) {
+    if (read?.retained) {
+      if (previous.kind === 'iterable') {
+        ({ iterator } = previous);
+      }
+    } else if (Symbol.iterator in source) {
       const candidate = Reflect.get(source, Symbol.iterator);
       if (typeof candidate === 'function') {
         iterator = candidate as IteratorFactory<T>;
@@ -127,29 +129,35 @@ export class HeaderSourceProtocol<T> {
         kind: 'record',
         refreshable: true,
         finish: () => {
-          if (record) {
+          if (read) {
             // Getter and coercion side effects belong to this read; later protocol changes do not.
             this.state = {
               kind: 'record',
-              history: record.complete(observeHeaderDescriptor(source, Symbol.iterator)),
+              history: read.complete(observeHeaderDescriptor(source, Symbol.iterator)),
             };
           }
         },
       };
     }
+    const factory = iterator;
     const refreshable =
-      this.retain && (Array.isArray(source) ? iterator === getArrayIterator(source) : native);
+      this.retain && (Array.isArray(source) ? factory === getArrayIterator(source) : native);
     return {
       ...facts,
       kind: 'iterable',
       refreshable,
       iterate: (array) => {
-        const iteration = this.retain && refreshable && array ? array() : iterator.call(source);
-        if (!refreshable) {
+        const iteration = refreshable && array ? array() : factory.call(source);
+        if (!refreshable || !read) {
           return { iteration, reused: false };
         }
         const iterations = previous.kind === 'iterable' ? previous.iterations : new WeakSet<object>();
-        this.state = { kind: 'iterable', iterator, iterations };
+        this.state = {
+          kind: 'iterable',
+          iterator: factory,
+          iterations,
+          history: read.complete(observeHeaderDescriptor(source, Symbol.iterator)),
+        };
         if (iterations.has(iteration)) {
           return { iteration, reused: true };
         }
@@ -157,7 +165,13 @@ export class HeaderSourceProtocol<T> {
         return { iteration, reused: false };
       },
       finish: () => {
-        // Iterable state is committed when its cursor is acquired, before row processing.
+        if (read && this.state.kind === 'iterable') {
+          // Include changes caused by this iteration while retaining prior self-removal evidence.
+          this.state = {
+            ...this.state,
+            history: read.complete(observeHeaderDescriptor(source, Symbol.iterator)),
+          };
+        }
       },
     };
   }

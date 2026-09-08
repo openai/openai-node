@@ -19,6 +19,107 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+describe.each(['request', 'default'] as const)('%s native iterable protocol', (layer) => {
+  test.each(
+    (['inherited', 'getter', 'self-removing getter'] as const).flatMap((initial) =>
+      [null, 'Bearer independent'].map((authorization) => ({ initial, authorization })),
+    ),
+  )('uses a replacement after capturing $initial: $authorization', async ({ initial, authorization }) => {
+    const headers = [['X-Initial', 'array']];
+    const nativeIterator = headers[Symbol.iterator];
+    const readIterator = vi.fn(() => {
+      if (initial === 'self-removing getter') {
+        Reflect.deleteProperty(headers, Symbol.iterator);
+      }
+      return nativeIterator;
+    });
+    if (initial !== 'inherited') {
+      Object.defineProperty(headers, Symbol.iterator, { configurable: true, get: readIterator });
+    }
+    const rows = [
+      ['Authorization', authorization],
+      ['X-Protocol', 'replacement'],
+    ][Symbol.iterator]();
+    const iterate = vi.fn(() => rows);
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      Object.defineProperty(headers, Symbol.iterator, { configurable: true, value: iterate });
+      return 'subject-token';
+    };
+    const sent: Headers[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      sent.push(new Request(url, init as globalThis.RequestInit).headers);
+      return sent.length === 1
+        ? Response.json({}, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      workloadIdentity: identity,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list(layer === 'request' ? { headers } : {});
+
+    expect(sent.map((value) => value.get('Authorization'))).toEqual([authorization, authorization]);
+    expect(sent.map((value) => value.get('X-Protocol'))).toEqual(['replacement', 'replacement']);
+    expect(sent.every((value) => !value.has('X-Initial'))).toBe(true);
+    expect(readIterator).toHaveBeenCalledTimes(initial === 'inherited' ? 0 : 1);
+    expect(iterate).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  });
+
+  test.each(['unchanged', 'self-removing', 'opaque'] as const)(
+    'retains an existing %s iterator accessor through refresh',
+    async (kind) => {
+      let opaque = false;
+      const headers = new Proxy([['X-Initial', 'array']], {
+        getOwnPropertyDescriptor(target, key) {
+          if (opaque && key === Symbol.iterator) {
+            throw new Error('Unavailable iterator descriptor');
+          }
+          return Reflect.getOwnPropertyDescriptor(target, key);
+        },
+      });
+      const nativeIterator = headers[Symbol.iterator];
+      const readIterator = vi.fn(() => {
+        if (kind === 'self-removing') {
+          Reflect.deleteProperty(headers, Symbol.iterator);
+        }
+        return nativeIterator;
+      });
+      Object.defineProperty(headers, Symbol.iterator, { configurable: true, get: readIterator });
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        opaque = kind === 'opaque';
+        return 'subject-token';
+      };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        const request = new Request(url, init as globalThis.RequestInit);
+        expect(request.headers.get('X-Initial')).toBe('array');
+        sent.push(request.headers.get('Authorization'));
+        return sent.length === 1 ? Response.json({}, { status: 401 }) : Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(readIterator).toHaveBeenCalledTimes(1);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
+});
+
 describe.each(['request', 'default'] as const)('%s record iterable protocol', (layer) => {
   test.each(
     (['own addition', 'inherited addition', 'getter replacement'] as const).flatMap((change) =>

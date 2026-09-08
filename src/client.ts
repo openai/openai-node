@@ -2013,7 +2013,7 @@ export class OpenAI {
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
     if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
 
-    const timeout = setTimeout(abort, ms);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
     const isReadableBody =
       ((globalThis as any).ReadableStream && body instanceof (globalThis as any).ReadableStream) ||
@@ -2024,8 +2024,8 @@ export class OpenAI {
       ...(isReadableBody ? { duplex: 'half' } : {}),
       method: 'GET',
       ...options,
-      ...(body === undefined ? undefined : { body }),
-      ...(headers === undefined ? undefined : { headers }),
+      ...(body !== undefined || (init && hasOwn(init, 'body')) ? { body } : undefined),
+      ...(headers !== undefined || (init && hasOwn(init, 'headers')) ? { headers } : undefined),
     };
     if (method) {
       // Custom methods like 'patch' need to be uppercased
@@ -2068,6 +2068,8 @@ export class OpenAI {
         );
       }
       const { init: dispatchOptions, used } = dispatch;
+      // Credential acquisition has its own lifecycle; this timeout covers the network request.
+      timeout = setTimeout(abort, ms);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       const response = await (this.#x509Fetch ?? this.fetch).call(
         undefined,
