@@ -308,11 +308,18 @@ selected independent Authorization value or removal. Stable replacements, includ
 If a hook drops ownership on a later retry, the SDK rejects its returned request before dispatch; any
 standalone credential acquisition performed inside that hook may already have occurred.
 
-When removing a repeated tuple reduces its occurrence count, the SDK re-evaluates that tuple's cached
-accessor values because the remaining occurrence cannot be identified reliably, even if other rows
-are added at the same time.
+When previously observed duplicate positions are displaced or the occurrence count decreases, the SDK
+re-evaluates all of that tuple's cached accessor values. This includes reordering and removal followed
+by reinsertion at an equal count: the SDK cannot identify which duplicate occurrence survived and
+reads the current values again. Unchanged duplicate positions retain their one-shot values, including
+when new occurrences are appended after them.
 Within a native array-valued header, accessor slots are retained individually while ordinary data
 slots continue to refresh, including when a credential provider updates them during acquisition.
+When replaying a header record, current enumerable aliases take precedence over a retained accessor
+that removed itself. Their current order is preserved, including unchanged values and explicit `null`
+removals; the SDK does not infer whether a property was deleted and reinserted between observations.
+An alias that emits no value, such as an empty array, does not override the retained value. Retained
+accessors are not read again.
 If previously available property-descriptor evidence becomes unavailable while replaying an
 `Authorization` source, row, or nested value, the SDK rejects the request before dispatch. Keep that
 evidence available or provide a new header layer; the SDK does not consume a one-shot getter again to

@@ -84,7 +84,7 @@ test.each([
 });
 
 test.each(['before', 'after'] as const)(
-  'keeps a self-removing getter %s an existing alias',
+  'prefers the live alias when a getter %s it removes itself',
   async (order) => {
     const headers: Record<string, string> = {};
     if (order === 'after') {
@@ -107,11 +107,54 @@ test.each(['before', 'after'] as const)(
 
     await expect(client.models.list({ headers })).rejects.toMatchObject({ status: 401 });
 
-    expect(sent).toEqual([order === 'before' ? 'Bearer alias' : 'Bearer getter']);
+    expect(sent).toEqual(['Bearer alias']);
     expect(read).toHaveBeenCalledTimes(1);
     expect(transport.exchanges).toBe(0);
   },
 );
+
+describe.each(['request', 'default', 'shared'] as const)('live %s record alias', (layer) => {
+  test.each(['unchanged', 'reinserted'] as const)(
+    'keeps the %s removal authoritative over a self-removed getter',
+    async (change) => {
+      const headers: Record<string, string | null> = { 'x-custom': null };
+      const read = vi.fn(() => {
+        delete headers['X-Custom'];
+        return 'captured';
+      });
+      Object.defineProperty(headers, 'X-Custom', { configurable: true, enumerable: true, get: read });
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        if (change === 'reinserted') {
+          delete headers['x-custom'];
+          headers['x-custom'] = null;
+        }
+        return 'subject-token';
+      };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('X-Custom'));
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        defaultHeaders: layer === 'request' ? undefined : headers,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await client.post('/synthetic', {
+        headers: layer === 'default' ? undefined : headers,
+        body: { input: 'synthetic' },
+      });
+
+      expect(sent).toEqual([null]);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
 
 describe.each(['request', 'default', 'shared'] as const)('initially non-emitting %s alias', (layer) => {
   describe.each(['empty', 'undefined'] as const)('%s array', (initial) => {
@@ -157,16 +200,21 @@ describe.each(['request', 'default', 'shared'] as const)('initially non-emitting
         }),
       ).rejects.toMatchObject({ status });
 
-      const independent = layer !== 'default' && change === 'replacement';
-      const first = independent ? 'Bearer independent' : 'Bearer access-token-1';
+      // Live aliases take precedence in every layer; an empty array still emits no override.
+      const usesWorkload = change === 'unchanged';
+      const first = {
+        replacement: 'Bearer independent',
+        unchanged: 'Bearer access-token-1',
+        removal: null,
+      }[change];
       const expected = [first];
       if (status === 500) {
         expected.push(first);
-      } else if (!independent) {
+      } else if (usesWorkload) {
         expected.push('Bearer access-token-2');
       }
       expect(sent).toEqual(expected);
-      expect(transport.exchanges).toBe(independent || status === 500 ? 1 : 2);
+      expect(transport.exchanges).toBe(usesWorkload && status === 401 ? 2 : 1);
       expect(read).toHaveBeenCalledTimes(1);
     });
   });
@@ -229,18 +277,18 @@ describe.each(['request', 'default'] as const)('replaced %s nested iterator alia
         }),
       ).rejects.toMatchObject({ status });
 
-      const expected =
-        change === 'replacement'
-          ? ['Bearer independent']
-          : ['Bearer access-token-1', 'Bearer access-token-2'];
+      // Even an unchanged live alias takes precedence after the competing accessor disappears.
+      const expected = [
+        { replacement: 'Bearer independent', unchanged: 'Bearer initial', removal: null }[change],
+      ];
       if (status === 500) {
         expected.push('Bearer independent');
       }
       expect(sent).toEqual(expected);
-      expect(transport.exchanges).toBe(change === 'replacement' ? 1 : 2);
+      expect(transport.exchanges).toBe(1);
       expect(read).toHaveBeenCalledTimes(1);
       expect(readIterator).toHaveBeenCalledTimes(initial === 'inherited' ? 0 : 1);
-      if (change === 'replacement') {
+      if (change !== 'unchanged') {
         expect(iterate).toHaveBeenCalledTimes(1);
       }
     });
@@ -476,18 +524,18 @@ describe.each(['request', 'default'] as const)('replaced %s Authorization access
           }),
         ).rejects.toMatchObject({ status });
 
-        const expected = {
+        const expected: (string | null)[] = {
           replacement: ['Bearer independent'],
           empty: [''],
-          unchanged: ['Bearer access-token-1', 'Bearer access-token-2'],
-          equivalent: ['Bearer access-token-1', 'Bearer access-token-2'],
-          removal: ['Bearer access-token-1', 'Bearer access-token-2'],
+          unchanged: ['Bearer initial'],
+          equivalent: ['Bearer initial'],
+          removal: [null],
         }[change];
         if (status === 500) {
           expected.push('Bearer independent');
         }
         expect(sent).toEqual(expected);
-        expect(transport.exchanges).toBe(change === 'replacement' || change === 'empty' ? 1 : 2);
+        expect(transport.exchanges).toBe(1);
         expect(read).toHaveBeenCalledTimes(1);
         expect(readValue).toHaveBeenCalledTimes(kind === 'mixed' ? 1 : 0);
       },
@@ -620,7 +668,7 @@ describe.each(['request', 'default'] as const)('replaced %s Authorization access
   );
 });
 
-test('retains the last emitted default alias across a non-emitting retry', async () => {
+test('applies each live default alias while a non-emitting retry retains the missing accessor', async () => {
   const values = ['Bearer initial'];
   const headers: Record<string, string | string[]> = { authorization: values };
   const read = vi.fn(() => {
@@ -649,7 +697,7 @@ test('retains the last emitted default alias across a non-emitting retry', async
     client.post('https://independent.example.test/synthetic', { body: { input: 'synthetic' } }),
   ).rejects.toMatchObject({ status: 500 });
 
-  expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-1', 'Bearer independent']);
+  expect(sent).toEqual(['Bearer initial', 'Bearer access-token-1', 'Bearer independent']);
   expect(transport.exchanges).toBe(1);
   expect(read).toHaveBeenCalledTimes(1);
 });
