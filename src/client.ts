@@ -1942,6 +1942,7 @@ export class OpenAI {
         init,
         workloadRequest.authorization,
         getRequestHeaders(url),
+        false,
       );
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
@@ -2671,6 +2672,7 @@ export class OpenAI {
         request.credential,
         sourceHeaders,
         request.authorization,
+        authorization,
       ) &&
       bearerToken(authorization ?? null) === bearerToken(request.authorization);
     if (used && request.credential) {

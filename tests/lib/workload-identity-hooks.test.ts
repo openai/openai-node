@@ -22,6 +22,13 @@ function normalizeBearerScheme(init: RequestInit, headers = new Headers(init.hea
   init.headers = headers;
 }
 
+function normalizeBearerRecord(init: RequestInit) {
+  const authorization = new Headers(init.headers).get('Authorization');
+  init.headers = {
+    Authorization: authorization?.replace(/^Bearer /u, 'bEaReR '),
+  };
+}
+
 describe('Workload identity request and dispatch hooks', () => {
   beforeEach(() => {
     delete process.env['OPENAI_API_KEY'];
@@ -335,6 +342,50 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(authorizations).toEqual(['bearer  access-token-1']);
     expect(transport.exchanges).toBe(1);
   });
+
+  test.each(['prepareRequest', 'fetchWithAuth', 'fetchWithTimeout'] as const)(
+    'applies bearer-scheme normalization semantics to record headers at %s',
+    async (hook) => {
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture overrides an SDK boundary.
+        protected override async prepareRequest(init: RequestInit) {
+          if (hook === 'prepareRequest') {
+            normalizeBearerRecord(init);
+          }
+        }
+        protected override fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+          if (hook === 'fetchWithAuth') {
+            normalizeBearerRecord(args[1]);
+          }
+          return super.fetchWithAuth(...args);
+        }
+        override fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+          if (hook === 'fetchWithTimeout' && args[1]) {
+            normalizeBearerRecord(args[1]);
+          }
+          return super.fetchWithTimeout(...args);
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        return sent.length === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      const request = client.models.list();
+      await (hook === 'prepareRequest' ? expect(request).rejects.toMatchObject({ status: 401 }) : request);
+
+      expect(sent).toEqual(
+        hook === 'prepareRequest'
+          ? ['bEaReR access-token-1']
+          : ['bEaReR access-token-1', 'bEaReR access-token-2'],
+      );
+      expect(transport.exchanges).toBe(hook === 'prepareRequest' ? 1 : 2);
+    },
+  );
 
   test.each([false, true])('preserves native Request headers (throwing tag getter: %s)', async (throwTag) => {
     class HookClient extends OpenAI {

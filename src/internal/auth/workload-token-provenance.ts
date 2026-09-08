@@ -18,6 +18,16 @@ export function bearerToken(authorization: string | null): string | undefined {
   return tokenStart === authorization.length ? undefined : authorization.slice(tokenStart);
 }
 
+const matchesAuthorization = (actual: string | null, expected: string, exact: boolean): boolean =>
+  exact ? actual === expected : bearerToken(actual) === bearerToken(expected);
+
+const hasAuthorizationMismatch = (
+  observed: { value: string | null } | undefined,
+  expected: string,
+  exact: boolean,
+): observed is { value: string | null } =>
+  observed !== undefined && !matchesAuthorization(observed.value, expected, exact);
+
 interface HeaderCredential {
   owner: object;
   token: string;
@@ -436,6 +446,7 @@ export class WorkloadTokenProvenance {
     request: object,
     authorization: string | undefined,
     fallbackHeaders?: object,
+    exactAuthorization = true,
   ): void {
     if (!credential || authorization === undefined) {
       return;
@@ -459,7 +470,7 @@ export class WorkloadTokenProvenance {
     } else if (credential.isCurrent()) {
       const platform = getVerifiedPlatformHeader(headers, 'Authorization');
       if (platform) {
-        if (platform.value === authorization) {
+        if (matchesAuthorization(platform.value, authorization, exactAuthorization)) {
           this.adoptPreparedSource(credential, headers as Headers);
         } else {
           credential.revoke();
@@ -469,7 +480,7 @@ export class WorkloadTokenProvenance {
         // performing stateful reads. Inspect only Authorization data descriptors here, then
         // attribute the complete source from the final dispatch snapshot.
         const observed = this.structuralHeader(headers as HeadersLike, 'Authorization');
-        if (observed && bearerToken(observed.value) !== bearerToken(authorization)) {
+        if (hasAuthorizationMismatch(observed, authorization, exactAuthorization)) {
           // A proxy can report an ordinary data descriptor while producing different bytes when
           // materialized. Keep this mismatch tentative until a later structural observation proves
           // restoration, or the final canonical snapshot confirms the independent value.
@@ -497,6 +508,7 @@ export class WorkloadTokenProvenance {
     credential: WorkloadCredentialUsage | undefined,
     headers: object | undefined,
     authorization: string,
+    dispatchedAuthorization?: string | null,
   ): boolean {
     if (!credential) {
       return false;
@@ -513,7 +525,7 @@ export class WorkloadTokenProvenance {
       structuralMismatch?.restorationDefinitive
     ) {
       const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
-      if (current && bearerToken(current.value) === bearerToken(authorization)) {
+      if (current && (current.value === authorization || current.value === dispatchedAuthorization)) {
         return false;
       }
     }
