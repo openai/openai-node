@@ -123,7 +123,7 @@ interface HeaderReplay {
   properties?: Map<string, HeaderPropertySnapshot>;
   propertyOrder?: string[];
   property?: HeaderPropertySnapshot;
-  rows?: WeakMap<object, Map<number, HeaderRowSnapshot>>;
+  rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, { descriptor: PropertyDescriptor | undefined; row: HeaderEntry }>;
   arrayLength?: { boundary: number; fromDescriptor: boolean };
 }
@@ -326,7 +326,12 @@ function* iterateHeaders(
         if (typeof key !== 'string') continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
         const retained = replay.properties.get(key);
-        if (retained && descriptor && !sameHeaderProperty(descriptor, retained.descriptor)) {
+        if (
+          retained &&
+          descriptor &&
+          (!sameHeaderProperty(descriptor, retained.descriptor) ||
+            descriptor.enumerable !== retained.descriptor.enumerable)
+        ) {
           replay.properties.delete(key);
         }
         if (!descriptor?.enumerable) continue;
@@ -460,7 +465,7 @@ function* iterateHeaders(
     }
     if (capturedRow && replay) {
       if (nameStateful || !rowReplay?.refreshable) {
-        replay.rows ??= new WeakMap();
+        replay.rows ??= new Map();
         const rows = replay.rows.get(row) ?? new Map<number, HeaderRowSnapshot>();
         rows.set(occurrence, {
           name,
@@ -481,7 +486,12 @@ function* iterateHeaders(
         property.capture?.();
         delete property.capture;
         try {
-          property.omittedDuringRead = !Object.getOwnPropertyDescriptor(headers, name)?.enumerable;
+          const current = Object.getOwnPropertyDescriptor(headers, name);
+          property.omittedDuringRead = !current?.enumerable;
+          if (current && sameHeaderProperty(current, property.descriptor)) {
+            // A first read can hide itself; later visibility changes must still invalidate its replay.
+            property.descriptor = { ...property.descriptor, enumerable: current.enumerable === true };
+          }
         } catch {
           // Preserve the successful read when a membrane prevents distinguishing self-removal.
           property.omittedDuringRead = true;
@@ -491,11 +501,12 @@ function* iterateHeaders(
       delete replay.property;
     }
   }
-  for (const [row, occurrences] of rowOccurrences) {
-    const retained = replay?.rows?.get(row);
+  for (const [row, retained] of replay?.rows ?? []) {
+    const occurrences = rowOccurrences.get(row) ?? 0;
     for (const occurrence of retained?.keys() ?? []) {
       if (occurrence >= occurrences) retained?.delete(occurrence);
     }
+    if (retained?.size === 0) replay?.rows?.delete(row);
   }
 }
 
@@ -585,6 +596,9 @@ const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
   ...(replay.properties ? { properties: new Map(replay.properties) } : {}),
   ...(replay.propertyOrder ? { propertyOrder: [...replay.propertyOrder] } : {}),
   ...(replay.arraySlots ? { arraySlots: new Map(replay.arraySlots) } : {}),
+  ...(replay.rows
+    ? { rows: new Map([...replay.rows].map(([row, occurrences]) => [row, new Map(occurrences)])) }
+    : {}),
 });
 
 /** Captures synchronous protected-hook reads without leaving request state ambient across an await. */

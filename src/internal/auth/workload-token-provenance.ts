@@ -192,15 +192,20 @@ interface TokenScope {
   hasConsumedHeaders: (source: object | null | undefined) => boolean;
   record: (token: string) => HeaderCredential;
   select: (credential: HeaderCredential) => void;
-  credential: (authorization: string) => HeaderCredential | undefined;
   revoke: () => void;
   authenticationRevoked: () => boolean;
-  matches: (authorization: string) => boolean;
   dispose: () => void;
 }
 
 /** Owns authentication provenance for individual request attempts without retaining a token cache. */
 export class WorkloadTokenProvenance {
+  private readonly parseHeaders: (values: Headers) => NullableHeaders;
+
+  /** Uses the canonical header parser while keeping its dependency on provenance acyclic. */
+  constructor(parseHeaders: (values: Headers) => NullableHeaders) {
+    this.parseHeaders = parseHeaders;
+  }
+
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
@@ -268,7 +273,7 @@ export class WorkloadTokenProvenance {
     };
   }
 
-  /** Recovers an unmarked rebuilt result only from its own active authentication invocation. */
+  /** Preserves authentication ownership only through marked result or value identities. */
   recover(
     headers: NullableHeaders | undefined,
     options: object,
@@ -280,43 +285,37 @@ export class WorkloadTokenProvenance {
     const { values } = headers;
     const outerCredential = workloadHeaderCredential(headers);
     const valueCredential = workloadHeaderCredential(values);
-    const credential = valueCredential === undefined ? outerCredential : valueCredential;
-    if (credential === null) {
-      this.scopeFor(options, context)?.revoke();
-      return headers;
-    }
-    if (credential !== undefined) {
-      rememberWorkloadHeaderCredential(headers, credential, values);
-      this.scopeFor(options, context)?.select(credential);
-      return headers;
-    }
+    let credential = valueCredential === undefined ? outerCredential : valueCredential;
     const platformHeader = hasNativeHeadersBrand(values)
       ? getPlatformHeader(values, 'authorization')
       : undefined;
-    // Recovery and the final header merge must consume the same serialized values.
-    const recovered = platformHeader === undefined ? { ...headers, values: new Headers(values) } : headers;
-    const authorization =
-      platformHeader === undefined
-        ? (getPlatformHeader(recovered.values, 'authorization')?.value ?? null)
-        : platformHeader.value;
-    const token = bearerToken(authorization);
-    if (
-      token !== undefined &&
-      authorization !== null &&
-      this.scopeFor(options, context)?.matches(authorization)
-    ) {
-      const usage = this.issue(headers, token, this.scopeFor(options, context)?.credential(authorization));
-      if (recovered !== headers) {
-        // Retain mutation eligibility from the original collection before adopting its serialized copy.
-        usage.adopt(recovered.values);
-        rememberWorkloadHeaderCredential(
-          recovered,
-          workloadHeaderCredential(recovered.values) ?? null,
-          recovered.values,
-        );
+    let selected = headers;
+    if (!platformHeader) {
+      // Unknown iterators can be one-shot. The later merge must use the exact values read here.
+      const snapshot = this.parseHeaders(values);
+      selected = {
+        ...headers,
+        values: snapshot.values,
+        nulls: new Set([...headers.nulls, ...snapshot.nulls]),
+      };
+      if (credential !== undefined) {
+        credential = copyWorkloadHeaderCredential(credential);
+        rememberWorkloadHeaderValues(selected.values, credential);
       }
     }
-    return recovered;
+    if (credential === null) {
+      rememberWorkloadHeaderCredential(selected, null, selected.values);
+      this.scopeFor(options, context)?.revoke();
+      return selected;
+    }
+    if (credential !== undefined) {
+      rememberWorkloadHeaderCredential(selected, credential, selected.values);
+      this.scopeFor(options, context)?.select(credential);
+      return selected;
+    }
+    // An unmarked native copy can equally represent an independent credential. Token bytes and
+    // the request context identify an exchange, not ownership of this reconstructed result.
+    return selected;
   }
 
   /** Binds provenance to a completed SDK request result independently of caller options. */
@@ -370,29 +369,22 @@ export class WorkloadTokenProvenance {
     );
   }
 
-  /** Checks result-owned provenance before using explicit-context recovery for rebuilt results. */
-  matchesResult(
-    result: { req: { headers: Headers } },
-    authorization: string,
-    scope: TokenScope | undefined,
-  ): boolean {
-    return this.retainResultCredential(result, authorization, scope).isCurrent();
+  /** Checks provenance retained by the header values or SDK request carrier. */
+  matchesResult(result: { req: { headers: Headers } }, authorization: string): boolean {
+    return this.retainResultCredential(result, authorization).isCurrent();
   }
 
   /** Keeps revocation effective after native copies lose their per-object metadata. */
   retainResultCredential(
     result: { req: { headers: Headers } },
     authorization: string,
-    scope: TokenScope | undefined,
   ): WorkloadCredentialUsage {
     const headerMatch = this.matchesHeaderCredential(result.req.headers, authorization);
     let credential: HeaderCredential | null | undefined;
     if (headerMatch === undefined) {
       const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
       credential =
-        typeof carrier === 'object' && carrier !== null
-          ? this.results.get(carrier)?.credential
-          : scope?.credential(authorization);
+        typeof carrier === 'object' && carrier !== null ? this.results.get(carrier)?.credential : undefined;
     } else {
       credential = headerMatch ? workloadHeaderCredential(result.req.headers) : null;
     }
@@ -422,7 +414,7 @@ export class WorkloadTokenProvenance {
 
   /** Starts an attempt with an opaque context that remains stable across delegating hook copies. */
   begin(options: object, context: object = {}, headers?: WorkloadHeaderSnapshots): TokenScope {
-    const tokens = new Map<string, HeaderCredential>();
+    const credentials = new Set<HeaderCredential>();
     const scopes = this.options.get(options) ?? new Set<TokenScope>();
     const consumedSources = new Set<object>();
     const sourceSubscriptions = new Map<object, () => void>();
@@ -484,35 +476,29 @@ export class WorkloadTokenProvenance {
       record: (token) => {
         const credential = { owner: this, token, revoked: false };
         if (!disposed) {
-          tokens.set(token, credential);
+          credentials.add(credential);
         }
         return credential;
       },
       select: (credential) => {
         if (!disposed && credential.owner === this) {
-          tokens.set(credential.token, credential);
+          credentials.add(credential);
         }
-      },
-      credential: (authorization) => {
-        const token = bearerToken(authorization);
-        const credential = token === undefined ? undefined : tokens.get(token);
-        return credential?.revoked ? undefined : credential;
       },
       revoke: () => {
         authenticationRevoked = true;
-        for (const credential of tokens.values()) {
+        for (const credential of credentials) {
           credential.revoked = true;
         }
       },
       authenticationRevoked: () =>
-        authenticationRevoked || [...tokens.values()].some((credential) => credential.revoked),
-      matches: (authorization) => scope.credential(authorization) !== undefined,
+        authenticationRevoked || [...credentials].some((credential) => credential.revoked),
       dispose: () => {
         if (disposed) {
           return;
         }
         disposed = true;
-        tokens.clear();
+        credentials.clear();
         for (const release of sourceSubscriptions.values()) {
           release();
         }

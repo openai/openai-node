@@ -53,9 +53,9 @@ describe('Canonical workload authentication inputs', () => {
     },
   );
 
-  describe.each(['authHeaders', 'bearerAuth'] as const)('%s recovery', (hook) => {
+  describe.each(['authHeaders', 'bearerAuth'] as const)('%s unmarked native values', (hook) => {
     test.each(['method', 'accessor', 'iterator', 'frozen-iterator'] as const)(
-      'uses native storage without invoking a replaced get %s',
+      'preserves the original 401 without invoking a replaced get %s',
       async (kind) => {
         const read = vi.fn(() => {
           throw new Error('Synthetic overridden get must not run');
@@ -100,13 +100,10 @@ describe('Canonical workload authentication inputs', () => {
           maxRetries: 0,
         });
 
-        await client.models.list();
+        await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-        expect(sent.map((headers) => headers.get('Authorization'))).toEqual([
-          'Bearer access-token-1',
-          'Bearer access-token-2',
-        ]);
-        expect(transport.exchanges).toBe(2);
+        expect(sent.map((headers) => headers.get('Authorization'))).toEqual(['Bearer access-token-1']);
+        expect(transport.exchanges).toBe(1);
         expect(read).not.toHaveBeenCalled();
       },
     );

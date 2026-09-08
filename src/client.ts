@@ -322,7 +322,168 @@ type WorkloadIdentityRequest = {
   authorization: string | undefined;
   credential: WorkloadCredentialUsage | undefined;
   responses: WeakMap<Response, boolean>;
-  allResponsesUsedWorkloadToken: boolean | undefined;
+  responseBodies: WeakMap<object, boolean>;
+  cloneTrackedResponses: Set<Response>;
+  finished: boolean;
+};
+type ResponseCloneTracker = {
+  previous: PropertyDescriptor | undefined;
+  installed: PropertyDescriptor;
+  requests: Set<WorkloadIdentityRequest>;
+};
+const responseCloneTrackers = new WeakMap<Response, ResponseCloneTracker>();
+const nativeResponseBodyGetter = globalThis.Response
+  ? Object.getOwnPropertyDescriptor(globalThis.Response.prototype, 'body')?.get
+  : undefined;
+const responseBodyIdentity = (response: Response): object | undefined => {
+  try {
+    const body = nativeResponseBodyGetter?.call(response);
+    return typeof body === 'object' && body !== null ? body : undefined;
+  } catch {
+    return undefined;
+  }
+};
+const responseUsedWorkloadToken = (request: WorkloadIdentityRequest, response: Response): boolean => {
+  const used = request.responses.get(response);
+  if (used !== undefined) {
+    return used;
+  }
+  const body = responseBodyIdentity(response);
+  return body !== undefined && request.responseBodies.get(body) === true;
+};
+
+const hasInstalledResponseClone = (response: Response, tracker: ResponseCloneTracker): boolean => {
+  const current = Object.getOwnPropertyDescriptor(response, 'clone');
+  return 'value' in tracker.installed
+    ? current?.value === tracker.installed.value
+    : current?.get === tracker.installed.get && current?.set === tracker.installed.set;
+};
+
+const recordWorkloadIdentityResponse = (
+  request: WorkloadIdentityRequest,
+  response: Response,
+  usedWorkloadToken: boolean,
+) => {
+  if (request.finished) return;
+  const prior = request.responses.get(response);
+  const selectedUsage = prior === undefined ? usedWorkloadToken : prior && usedWorkloadToken;
+  request.responses.set(response, selectedUsage);
+  const body = responseBodyIdentity(response);
+  if (body) {
+    request.responseBodies.set(body, selectedUsage && request.responseBodies.get(body) !== false);
+  }
+  let trackedRequests = new Set<WorkloadIdentityRequest>([request]);
+  const existing = responseCloneTrackers.get(response);
+  try {
+    if (existing) {
+      if (hasInstalledResponseClone(response, existing)) {
+        existing.requests.add(request);
+        request.cloneTrackedResponses.add(response);
+        return;
+      }
+      responseCloneTrackers.delete(response);
+      trackedRequests = new Set([...existing.requests, request]);
+    }
+    const previous = Object.getOwnPropertyDescriptor(response, 'clone');
+    let cloneDescriptor = previous;
+    if (!previous) {
+      for (let prototype = Object.getPrototypeOf(response); prototype && !cloneDescriptor;) {
+        cloneDescriptor = Object.getOwnPropertyDescriptor(prototype, 'clone');
+        prototype = Object.getPrototypeOf(prototype);
+      }
+    }
+    if (!cloneDescriptor) return;
+    let tracker!: ResponseCloneTracker;
+    const trackCopy = (source: Response, copy: Response, alternateSource?: Response) => {
+      for (const activeRequest of tracker.requests) {
+        let selectedUsage = activeRequest.responses.get(source);
+        if (alternateSource && alternateSource !== source) {
+          const alternateUsage = activeRequest.responses.get(alternateSource);
+          selectedUsage =
+            selectedUsage === undefined
+              ? alternateUsage
+              : alternateUsage === undefined
+                ? selectedUsage
+                : selectedUsage && alternateUsage;
+        }
+        if (selectedUsage !== undefined) {
+          recordWorkloadIdentityResponse(activeRequest, copy, selectedUsage);
+        }
+      }
+      return copy;
+    };
+    let installed: PropertyDescriptor;
+    if ('value' in cloneDescriptor) {
+      if (typeof cloneDescriptor.value !== 'function') return;
+      const clone = cloneDescriptor.value;
+      installed = {
+        configurable: true,
+        enumerable: !!cloneDescriptor.enumerable,
+        writable: cloneDescriptor.writable ?? true,
+        value: function cloneTrackedResponse(this: Response) {
+          return trackCopy(this, Reflect.apply(clone, this, []) as Response);
+        },
+      };
+    } else {
+      if (!cloneDescriptor.get) return;
+      const getClone = cloneDescriptor.get;
+      const setClone = cloneDescriptor.set;
+      installed = {
+        configurable: true,
+        enumerable: !!cloneDescriptor.enumerable,
+        get: function getTrackedResponseClone(this: Response) {
+          const source = this;
+          const clone = Reflect.apply(getClone, this, []) as unknown;
+          if (typeof clone !== 'function') return clone;
+          return function cloneTrackedResponse(this: Response) {
+            return trackCopy(source, Reflect.apply(clone, this, []) as Response, this);
+          };
+        },
+        ...(setClone
+          ? {
+              set: function setTrackedResponseClone(this: Response, value: unknown) {
+                Reflect.apply(setClone, this, [value]);
+              },
+            }
+          : undefined),
+      };
+    }
+    tracker = {
+      previous,
+      requests: trackedRequests,
+      installed,
+    };
+    Object.defineProperty(response, 'clone', installed);
+    responseCloneTrackers.set(response, tracker);
+    for (const activeRequest of trackedRequests) {
+      activeRequest.cloneTrackedResponses.add(response);
+    }
+  } catch {
+    // Non-extensible, accessor-shadowed, or uninspectable responses retain conservative attribution.
+  }
+};
+
+const releaseWorkloadIdentityResponseClones = (request: WorkloadIdentityRequest) => {
+  for (const response of request.cloneTrackedResponses) {
+    const tracker = responseCloneTrackers.get(response);
+    tracker?.requests.delete(request);
+    if (!tracker || tracker.requests.size !== 0) continue;
+    try {
+      if (responseCloneTrackers.get(response) !== tracker) {
+        continue;
+      }
+      responseCloneTrackers.delete(response);
+      if (!hasInstalledResponseClone(response, tracker)) continue;
+      if (tracker.previous) {
+        Object.defineProperty(response, 'clone', tracker.previous);
+      } else {
+        Reflect.deleteProperty(response, 'clone');
+      }
+    } catch {
+      // A hook may harden a response after dispatch; the private wrapper carries no credential.
+    }
+  }
+  request.cloneTrackedResponses.clear();
 };
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
@@ -524,7 +685,7 @@ export class OpenAI {
   private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
   #workloadIdentityRequests = new WeakMap<object, Set<WorkloadIdentityRequest>>();
-  #workloadTokenProvenance = new WorkloadTokenProvenance();
+  #workloadTokenProvenance = new WorkloadTokenProvenance((values) => buildHeaders([values]));
   #requestCredentialContexts = new RequestCredentialContexts();
 
   /**
@@ -1267,34 +1428,55 @@ export class OpenAI {
     const preparation = captureHeaderReads(() => this.prepareOptions(options, credentialContext));
     await preparation.result;
     const previousBuildInput = workloadHeaders?.customBuildInput;
-    const needsBuildRetryGuard =
+    const usesCustomWorkloadBuildRequest =
+      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
+      this.buildRequest !== OpenAI.prototype.buildRequest;
+    // Read ordinary data properties without invoking a lazy accessor before the custom hook.
+    let buildInputDescriptor: PropertyDescriptor | undefined;
+    if (usesCustomWorkloadBuildRequest) {
+      const seen = new Set<object>();
+      try {
+        for (let source: object | null = options; source && !buildInputDescriptor;) {
+          if (seen.has(source)) break;
+          seen.add(source);
+          buildInputDescriptor = Object.getOwnPropertyDescriptor(source, 'headers');
+          source = Object.getPrototypeOf(source);
+        }
+      } catch {
+        // Uninspectable lazy options are read only after the custom hook runs.
+      }
+    }
+    const hasBuildInputValue = !!buildInputDescriptor && 'value' in buildInputDescriptor;
+    let buildInputHeaders = hasBuildInputValue
+      ? (buildInputDescriptor!.value as HeadersLike)
+      : previousBuildInput?.source;
+    let buildInputDefaults = usesCustomWorkloadBuildRequest
+      ? this._options.defaultHeaders
+      : previousBuildInput?.defaultSource;
+    let needsBuildRetryGuard =
       previousBuildInput &&
-      ((previousBuildInput.source === options.headers &&
+      ((hasBuildInputValue &&
+        previousBuildInput.source === buildInputHeaders &&
         (!previousBuildInput.replayable || !canReplayHeaderInput(previousBuildInput.source))) ||
         (previousBuildInput.defaultSource === this._options.defaultHeaders &&
           (!previousBuildInput.defaultReplayable ||
             !canReplayHeaderInput(previousBuildInput.defaultSource))));
-    if (needsBuildRetryGuard && !previousBuildInput.owned) {
+    if (needsBuildRetryGuard && !previousBuildInput?.owned) {
       throw new Errors.OpenAIError(
         'A custom buildRequest hook must retain original options or forward credentialContext before retrying a one-shot source.',
       );
     }
     if (previousBuildInput) {
       previousBuildInput.preventCredentialUpgrade =
-        !!needsBuildRetryGuard && previousBuildInput.independentAuthorization;
+        (!previousBuildInput.replayable || !previousBuildInput.defaultReplayable || !!needsBuildRetryGuard) &&
+        previousBuildInput.independentAuthorization;
     }
-    const buildInputHeaders = options.headers;
-    const buildInputDefaults = this._options.defaultHeaders;
-    const buildInputReplayable =
-      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
-      this.buildRequest !== OpenAI.prototype.buildRequest
-        ? canReplayHeaderInput(buildInputHeaders)
-        : true;
-    const buildDefaultReplayable =
-      this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
-      this.buildRequest !== OpenAI.prototype.buildRequest
-        ? canReplayHeaderInput(buildInputDefaults)
-        : true;
+    let buildInputReplayable = usesCustomWorkloadBuildRequest
+      ? canReplayHeaderInput(buildInputHeaders)
+      : true;
+    let buildDefaultReplayable = usesCustomWorkloadBuildRequest
+      ? canReplayHeaderInput(buildInputDefaults)
+      : true;
     if (this.buildRequest === OpenAI.prototype.buildRequest && workloadHeaders?.defaultHeaders.initialized) {
       workloadHeaders.defaultHeaders.refresh(this._options.defaultHeaders);
     }
@@ -1334,6 +1516,23 @@ export class OpenAI {
           this.#workloadTokenProvenance.takeHeaders(candidate) ??
           workloadIdentityAuthScope?.headers ??
           workloadHeaders;
+        if (usesCustomWorkloadBuildRequest) {
+          if (!hasBuildInputValue || (!previousBuildInput && buildInputHeaders === undefined)) {
+            buildInputHeaders = workloadHeaders?.requestHeaders.source;
+            buildInputReplayable = canReplayHeaderInput(buildInputHeaders);
+          }
+          if (buildInputDefaults === undefined) {
+            buildInputDefaults = workloadHeaders?.defaultHeaders.source ?? this._options.defaultHeaders;
+            buildDefaultReplayable = canReplayHeaderInput(buildInputDefaults);
+          }
+        }
+        needsBuildRetryGuard ||=
+          !!previousBuildInput &&
+          ((previousBuildInput.source === buildInputHeaders &&
+            (!previousBuildInput.replayable || !canReplayHeaderInput(previousBuildInput.source))) ||
+            (previousBuildInput.defaultSource === buildInputDefaults &&
+              (!previousBuildInput.defaultReplayable ||
+                !canReplayHeaderInput(previousBuildInput.defaultSource))));
         if (
           !workloadHeaders &&
           this._workloadIdentityAuth instanceof WorkloadIdentityAuth &&
@@ -1373,21 +1572,17 @@ export class OpenAI {
           };
         }
         if (workloadIdentityAuthScope && !canPreserveHeaderInput(candidate.req.headers)) {
-          candidate.req.headers = buildHeaders([candidate.req.headers]).values;
+          candidate = {
+            ...candidate,
+            req: { ...candidate.req, headers: buildHeaders([candidate.req.headers]).values },
+          };
         }
         const platformHeader = getPlatformHeader(candidate.req.headers, 'Authorization');
         const authorization =
           platformHeader === undefined ? candidate.req.headers.get('Authorization') : platformHeader.value;
-        if (
-          authorization !== null &&
-          this.#workloadTokenProvenance.matchesResult(candidate, authorization, workloadIdentityAuthScope)
-        ) {
+        if (authorization !== null && this.#workloadTokenProvenance.matchesResult(candidate, authorization)) {
           initialWorkloadAuthorization = authorization;
-          workloadCredential = this.#workloadTokenProvenance.retainResultCredential(
-            candidate,
-            authorization,
-            workloadIdentityAuthScope,
-          );
+          workloadCredential = this.#workloadTokenProvenance.retainResultCredential(candidate, authorization);
         }
       } finally {
         releaseCredentialContext();
@@ -1501,7 +1696,9 @@ export class OpenAI {
       authorization: initialWorkloadAuthorization,
       credential: workloadCredential,
       responses: new WeakMap<Response, boolean>(),
-      allResponsesUsedWorkloadToken: undefined,
+      responseBodies: new WeakMap<object, boolean>(),
+      cloneTrackedResponses: new Set<Response>(),
+      finished: false,
     };
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
@@ -1520,10 +1717,11 @@ export class OpenAI {
           if (requests?.size === 0) this.#workloadIdentityRequests.delete(key);
         }
         workloadRequest.bindings.clear();
+        workloadRequest.finished = true;
+        releaseWorkloadIdentityResponseClones(workloadRequest);
       });
     const usedWorkloadToken =
-      !(response instanceof globalThis.Error) &&
-      (workloadRequest.responses.get(response) ?? workloadRequest.allResponsesUsedWorkloadToken) === true;
+      !(response instanceof globalThis.Error) && responseUsedWorkloadToken(workloadRequest, response);
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1810,13 +2008,13 @@ export class OpenAI {
           : undefined;
       const replayable = platformHeader !== undefined || canPreserveHeaderInput(init.headers);
       const headers = platformHeader ? undefined : new Headers(init.headers);
-      if (headers && !replayable) init.headers = headers;
+      if (headers && !replayable) init = { ...init, headers };
       const authHeader = platformHeader ? platformHeader.value : headers?.get('Authorization');
       if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
         const authenticatedHeaders = headers ?? new Headers(init.headers);
         authenticatedHeaders.set('Authorization', `Bearer ${token}`);
-        init.headers = authenticatedHeaders;
+        init = { ...init, headers: authenticatedHeaders };
         const credential = this.#workloadTokenProvenance.issue({ values: authenticatedHeaders }, token);
         if (workloadRequest) {
           workloadRequest.authorization = `Bearer ${token}`;
@@ -1873,10 +2071,6 @@ export class OpenAI {
       // Only this dispatch owner can attest to the headers passed to the configured fetch.
       // Hooks that send independently own their authentication retries.
       const dispatch = this.#snapshotWorkloadIdentityUsage(workloadRequest, url, fetchOptions);
-      if (workloadRequest && !dispatch.used) {
-        // An in-flight independent send also makes an unmarked response copy ambiguous.
-        workloadRequest.allResponsesUsedWorkloadToken = false;
-      }
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       const response = await (this.#x509Fetch ?? this.fetch).call(
         undefined,
@@ -1885,12 +2079,7 @@ export class OpenAI {
       );
       // A response reused by independent dispatches cannot attest to workload ownership.
       if (workloadRequest) {
-        workloadRequest.responses.set(
-          response,
-          dispatch.used && workloadRequest.responses.get(response) !== false,
-        );
-        // Preserve response copies when every delegated send uses workload authentication.
-        workloadRequest.allResponsesUsedWorkloadToken ??= dispatch.used;
+        recordWorkloadIdentityResponse(workloadRequest, response, dispatch.used);
       }
       return response;
     } catch (err) {

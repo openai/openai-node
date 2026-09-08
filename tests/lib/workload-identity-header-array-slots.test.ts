@@ -7,6 +7,52 @@ import {
   createWorkloadIdentityTransport,
 } from './workload-identity-fixtures';
 
+test.each([false, true])('retains a proxy-observed row until its slot is replaced: %s', async (replace) => {
+  const rows = [['X-Custom', 'target']];
+  let reads = 0;
+  const headers = new Proxy(rows, {
+    get(target, key, receiver) {
+      if (key === '0') {
+        reads += 1;
+        if (reads === 1) {
+          return ['X-Custom', 'observed'];
+        }
+        if (!replace || reads > 2) {
+          throw new Error('Proxy row was read twice');
+        }
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    if (replace) {
+      rows[0] = ['X-Custom', 'replacement'];
+    }
+    return 'subject-token';
+  };
+  let sends = 0;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sends += 1;
+    expect(new Headers(init?.headers).get('X-Custom')).toBe(replace ? 'replacement' : 'observed');
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    workloadIdentity: identity,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list({ headers });
+
+  expect(reads).toBe(replace ? 2 : 1);
+  expect(sends).toBe(1);
+  expect(transport.exchanges).toBe(1);
+});
+
 describe.each(['own', 'inherited'] as const)('%s outer header slot', (location) => {
   describe.each(['request', 'default'] as const)('%s headers', (layer) => {
     test.each(
