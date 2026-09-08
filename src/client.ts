@@ -2620,10 +2620,52 @@ export class OpenAI {
     if (!credential.isCurrent()) return request;
     if (!canPreserveHeaderInput(headers)) {
       headers = new Headers(headers);
-      request = Object.create(Object.getPrototypeOf(request), {
-        ...Object.getOwnPropertyDescriptors(request),
+      const originalRequest = request;
+      const descriptors = Object.getOwnPropertyDescriptors(request) as Record<
+        PropertyKey,
+        PropertyDescriptor
+      >;
+      for (const property of Reflect.ownKeys(descriptors)) {
+        const descriptor = descriptors[property];
+        if (!descriptor || 'value' in descriptor) continue;
+        const { get, set, ...attributes } = descriptor;
+        descriptors[property] = {
+          ...attributes,
+          ...(get ? { get: get.bind(originalRequest) } : undefined),
+          ...(set ? { set: set.bind(originalRequest) } : undefined),
+        };
+      }
+      const normalizedRequest = Object.create(Object.getPrototypeOf(request), {
+        ...descriptors,
         headers: { value: headers, enumerable: true, configurable: true, writable: true },
       }) as T;
+      const inheritedAccessor = (property: PropertyKey): PropertyDescriptor | undefined => {
+        const visited = new Set<object>();
+        let prototype = Object.getPrototypeOf(normalizedRequest);
+        while (prototype && !visited.has(prototype)) {
+          visited.add(prototype);
+          const descriptor = Object.getOwnPropertyDescriptor(prototype, property);
+          if (descriptor) return 'value' in descriptor ? undefined : descriptor;
+          prototype = Object.getPrototypeOf(prototype);
+        }
+        return undefined;
+      };
+      request = new Proxy(normalizedRequest, {
+        get(target, property, receiver) {
+          if (hasOwn(target, property)) return Reflect.get(target, property, receiver);
+          const accessor = inheritedAccessor(property);
+          return accessor?.get ? accessor.get.call(originalRequest) : Reflect.get(target, property, receiver);
+        },
+        set(target, property, value, receiver) {
+          if (hasOwn(target, property)) return Reflect.set(target, property, value, receiver);
+          const accessor = inheritedAccessor(property);
+          if (accessor) {
+            accessor.set?.call(originalRequest, value);
+            return accessor.set !== undefined;
+          }
+          return Reflect.set(target, property, value, receiver);
+        },
+      });
     }
     const native = hasNativeHeadersBrand(headers);
     const platformHeader = native ? getPlatformHeader(headers, 'Authorization') : undefined;
