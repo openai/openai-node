@@ -2015,10 +2015,19 @@ export class OpenAI {
     // Legacy hooks may omit the context; ambiguous concurrent delegations cannot grant authentication.
     const resolvePlaceholder =
       matchingDispatches.length > 0 && matchingDispatches.every((dispatch) => dispatch.resolvePlaceholder);
-    const { signal, method, ...options } = init || {};
-    // Copy enumerable accessors in their original order before reading inherited fields.
-    const body = hasOwn(options, 'body') ? options.body : init?.body;
-    const headers = hasOwn(options, 'headers') ? options.headers : init?.headers;
+    const source = init || {};
+    const { signal, method } = source;
+    const options: RequestInit = Object.create(null);
+    const omitted = new Set<PropertyKey>();
+    // Interleave descriptor checks and reads like object-rest, retaining deletions during the copy.
+    for (const key of Reflect.ownKeys(source)) {
+      if (key === 'signal' || key === 'method') continue;
+      const descriptor = Object.getOwnPropertyDescriptor(source, key);
+      if (!descriptor) omitted.add(key);
+      else if (descriptor.enumerable) Reflect.set(options, key, Reflect.get(source, key));
+    }
+    const body = hasOwn(options, 'body') || omitted.has('body') ? options.body : init?.body;
+    const headers = hasOwn(options, 'headers') || omitted.has('headers') ? options.headers : init?.headers;
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
     if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
