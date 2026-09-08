@@ -2066,7 +2066,9 @@ export class OpenAI {
           source as Headers,
           platform.prototype,
         );
-        if (resolved !== source) init = replaceRequestHeaders(init, resolved);
+        if (resolved !== source && WorkloadTokenProvenance.requestHeaderData(init) === source) {
+          init = replaceRequestHeaders(init, resolved);
+        }
       }
     }
     const fetchWithTimeout = this.#x509Fetch ? OpenAI.prototype.fetchWithTimeout : this.fetchWithTimeout;
@@ -2120,7 +2122,10 @@ export class OpenAI {
     // Legacy hooks may omit the context; ambiguous concurrent delegations cannot grant authentication.
     const resolvePlaceholder =
       matchingDispatches.length > 0 && matchingDispatches.every((dispatch) => dispatch.resolvePlaceholder);
-    const { signal, method, body, headers, ...options } = init || {};
+    const { signal, method, ...options } = init || {};
+    // Copy enumerable accessors in their original order before reading inherited fields.
+    const body = hasOwn(options, 'body') ? options.body : init?.body;
+    const headers = hasOwn(options, 'headers') ? options.headers : init?.headers;
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
     if (signal && !composed) signal.addEventListener('abort', abort, { once: true });

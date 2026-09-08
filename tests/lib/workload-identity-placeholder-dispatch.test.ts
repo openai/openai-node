@@ -306,3 +306,85 @@ test('preserves an independent replacement while placeholder token acquisition i
   expect(sent).toEqual(['Bearer independent']);
   expect(transport.exchanges).toBe(1);
 });
+
+test.each(['independent', 'removed', 'unchanged'] as const)(
+  'keeps the selected header layer after resolving an immutable placeholder: %s',
+  async (replacement) => {
+    const started = deferred();
+    const release = deferred();
+    // This platform-style collection enforces a receiver brand and an immutable mutation guard.
+    const ImmutableHeaders = class Headers {
+      #values: globalThis.Headers;
+      constructor(values: globalThis.Headers) {
+        this.#values = values;
+      }
+      get(name: string) {
+        return this.#values.get(name);
+      }
+      has(name: string) {
+        return this.#values.has(name);
+      }
+      entries() {
+        return this.#values.entries();
+      }
+      // oxlint-disable-next-line class-methods-use-this -- The platform guard rejects every mutation.
+      set() {
+        throw new TypeError('immutable headers');
+      }
+    };
+    Object.defineProperties(ImmutableHeaders.prototype, {
+      [Symbol.toStringTag]: { value: 'Headers' },
+      [Symbol.iterator]: { value: ImmutableHeaders.prototype.entries },
+    });
+    class PendingClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- The fixture defers authentication to the transport hook.
+      protected override bearerAuth() {
+        // oxlint-disable-next-line unicorn/no-useless-undefined -- The hook requires Promise<undefined>, not Promise<void>.
+        return Promise.resolve<undefined>(undefined);
+      }
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const [, init] = args;
+        init.headers = new ImmutableHeaders(new Headers(init.headers)) as unknown as Headers;
+        const response = super.fetchWithAuth(...args);
+        await started.promise;
+        if (replacement === 'independent') {
+          init.headers = new Headers({ Authorization: 'Bearer independent' });
+        } else if (replacement === 'removed') {
+          delete init.headers;
+        }
+        release.resolve();
+        return response;
+      }
+    }
+    const options = createTestClientOptions();
+    options.workloadIdentity.provider.getToken = async () => {
+      started.resolve();
+      await release.promise;
+      return 'subject-token';
+    };
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new PendingClient({
+      ...options,
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+    const request = client.models.list({ headers: { Authorization: 'Bearer workload-identity-auth' } });
+    await (replacement === 'unchanged'
+      ? expect(request).resolves.toMatchObject({ data: [] })
+      : expect(request).rejects.toMatchObject({ status: 401 }));
+    expect(sent).toEqual(
+      replacement === 'unchanged'
+        ? ['Bearer access-token-1', 'Bearer access-token-2']
+        : [replacement === 'removed' ? null : 'Bearer independent'],
+    );
+    expect(transport.exchanges).toBe(replacement === 'unchanged' ? 2 : 1);
+  },
+);
