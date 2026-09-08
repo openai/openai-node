@@ -64,6 +64,206 @@ describe.each(['sdk', 'independent'] as const)('selecting the %s response', (sel
   });
 });
 
+describe.each(['sdk', 'independent'] as const)('cloning the selected %s response', (selected) => {
+  test('retains its credential attribution across mixed delegated dispatches', async () => {
+    const trackedResponses: Response[] = [];
+    class DispatchClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [url, init, timeout, , context] = args;
+        const sdk = await super.fetchWithTimeout(url, init, timeout, new AbortController(), context);
+        const headers = new Headers(init?.headers);
+        headers.set('Authorization', 'Bearer independent');
+        const independent = await super.fetchWithTimeout(
+          url,
+          { ...init, headers },
+          timeout,
+          new AbortController(),
+          context,
+        );
+        const chosen = selected === 'sdk' ? sdk : independent;
+        const discarded = selected === 'sdk' ? independent : sdk;
+        await discarded.body?.cancel();
+        const clone = chosen.clone();
+        trackedResponses.push(chosen, clone);
+        await chosen.text();
+        return clone;
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const authorization = new Headers(init?.headers).get('Authorization');
+      sent.push(authorization);
+      return authorization === 'Bearer access-token-2'
+        ? Response.json({ ok: true })
+        : Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new DispatchClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    const response = client.post('/models', { body: { synthetic: true } });
+    if (selected === 'sdk') {
+      await expect(response).resolves.toEqual({ ok: true });
+      expect(transport.exchanges).toBe(2);
+      expect(sent).toHaveLength(4);
+    } else {
+      await expect(response).rejects.toMatchObject({ status: 401 });
+      expect(transport.exchanges).toBe(1);
+      expect(sent).toHaveLength(2);
+    }
+    expect(trackedResponses).toHaveLength(selected === 'sdk' ? 4 : 2);
+    expect(
+      trackedResponses.every((tracked) => Reflect.getOwnPropertyDescriptor(tracked, 'clone') === undefined),
+    ).toBe(true);
+  });
+});
+
+test.each(['fetchWithAuth', 'fetchWithTimeout'] as const)(
+  'preserves an inherited clone accessor through %s',
+  async (hook) => {
+    let cloneCalls = 0;
+    const original = new Response(null, { status: 200, headers: { 'X-Original': 'yes' } });
+    const prototype = Object.create(Response.prototype);
+    Object.setPrototypeOf(original, prototype);
+    Object.defineProperty(prototype, 'clone', {
+      configurable: true,
+      get() {
+        return function customClone(this: Response) {
+          cloneCalls += 1;
+          const result = Response.prototype.clone.call(this);
+          result.headers.set('X-Custom-Clone', 'yes');
+          return result;
+        };
+      },
+    });
+    class CloneClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        return hook === 'fetchWithTimeout' ? response.clone() : response;
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const response = await super.fetchWithAuth(...args);
+        return hook === 'fetchWithAuth' ? response.clone() : response;
+      }
+    }
+    const transport = createWorkloadIdentityTransport(() => original);
+    const client = new CloneClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    const response = await client.get('/synthetic').asResponse();
+
+    expect(cloneCalls).toBe(1);
+    expect(response.headers.get('X-Custom-Clone')).toBe('yes');
+    expect(Reflect.getOwnPropertyDescriptor(original, 'clone')).toBeUndefined();
+  },
+);
+
+test.each(['fetchWithAuth', 'fetchWithTimeout'] as const)(
+  'does not install clone tracking for a late delegated %s response',
+  async (hook) => {
+    const waiting = deferred();
+    const first = new Response(null, { status: 200 });
+    const late = new Response(null, { status: 200 });
+    let sends = 0;
+    let losing!: Promise<Response>;
+    class HedgedClient extends OpenAI {
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        if (hook !== 'fetchWithAuth') {
+          return super.fetchWithAuth(...args);
+        }
+        const winning = super.fetchWithAuth(...args);
+        losing = super.fetchWithAuth(...args);
+        return winning;
+      }
+
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        if (hook !== 'fetchWithTimeout') {
+          return super.fetchWithTimeout(...args);
+        }
+        const winning = super.fetchWithTimeout(...args);
+        losing = super.fetchWithTimeout(...args);
+        return winning;
+      }
+    }
+    const transport = createWorkloadIdentityTransport(async () => {
+      sends += 1;
+      if (sends === 1) {
+        return first;
+      }
+      await waiting.promise;
+      return late;
+    });
+    const client = new HedgedClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.get('/synthetic').asResponse();
+    expect(Reflect.getOwnPropertyDescriptor(first, 'clone')).toBeUndefined();
+    waiting.resolve();
+    await losing;
+    expect(Reflect.getOwnPropertyDescriptor(late, 'clone')).toBeUndefined();
+  },
+);
+
+test('shares clone tracking safely across concurrent requests returning one Response', async () => {
+  const shared = new Response(null, { status: 200 });
+  const firstCloned = deferred();
+  const releaseSecond = deferred();
+  let entries = 0;
+  const clones: Response[] = [];
+  class SharedResponseClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      entries += 1;
+      const index = entries;
+      const response = await super.fetchWithTimeout(...args);
+      if (index === 2) {
+        await releaseSecond.promise;
+      }
+      const clone = response.clone();
+      clones.push(clone);
+      if (index === 1) {
+        firstCloned.resolve();
+      }
+      return clone;
+    }
+  }
+  const transport = createWorkloadIdentityTransport(() => shared);
+  const client = new SharedResponseClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+  const first = client.get('/first').asResponse();
+  const second = client.get('/second').asResponse();
+
+  await firstCloned.promise;
+  await first;
+  expect(Reflect.getOwnPropertyDescriptor(shared, 'clone')).toBeDefined();
+  releaseSecond.resolve();
+  await second;
+
+  expect(Reflect.getOwnPropertyDescriptor(shared, 'clone')).toBeUndefined();
+  expect(clones.every((response) => Reflect.getOwnPropertyDescriptor(response, 'clone') === undefined)).toBe(
+    true,
+  );
+});
+
 test.each(['fetchWithTimeout', 'fetchWithAuth'] as const)(
   'retains selected workload usage through a delegated %s response clone',
   async (hook) => {
