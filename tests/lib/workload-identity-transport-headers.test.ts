@@ -25,6 +25,8 @@ const nativeProxyReadable = () => {
   }
 };
 
+const emptyIterator = function* emptyIterator() {};
+
 test('preserves a private-field accessor receiver while normalizing headers', async () => {
   class WrappedRequest implements RequestInit {
     #method: string;
@@ -667,40 +669,44 @@ test.each([200, 401].flatMap((status) => [false, true].map((bound) => ({ status,
     });
 
     const result = client.post('/synthetic', { body: { value: 1 } });
-    await (status === 200 || bound || readable
-      ? expect(result).resolves.toEqual({ ok: true })
-      : expect(result).rejects.toMatchObject({ status: 401 }));
+    const unreadable = !bound && !readable;
+    if (unreadable) {
+      await expect(result).rejects.toMatchObject({ cause: expect.any(TypeError) });
+    } else if (status === 200 || bound || readable) {
+      await expect(result).resolves.toEqual({ ok: true });
+    } else {
+      await expect(result).rejects.toMatchObject({ status: 401 });
+    }
     const refreshed = (bound || readable) && status === 401;
-    expect(sent).toEqual(
-      refreshed ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer access-token-1'],
-    );
+    let expected: string[] = ['Bearer access-token-1'];
+    if (unreadable) {
+      expected = [];
+    } else if (refreshed) {
+      expected.push('Bearer access-token-2');
+    }
+    expect(sent).toEqual(expected);
     expect(transport.exchanges).toBe(refreshed ? 2 : 1);
   },
 );
 
 test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
-  'forwards an unreadable foreign Headers membrane to its configured transport',
+  'rejects an unreadable foreign Headers membrane before transport dispatch',
   async () => {
     const { Headers: ForeignHeaders } = await import('undici');
-    let target: InstanceType<typeof ForeignHeaders> | undefined;
-    let supplied: NonNullable<RequestInit['headers']> | undefined;
     class HookClient extends OpenAI {
       override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
         const [, request] = args;
         if (!request) {
           throw new Error('Expected request init');
         }
-        target = new ForeignHeaders([...new Headers(request.headers)]);
-        supplied = new Proxy(target, {}) as unknown as NonNullable<RequestInit['headers']>;
-        request.headers = supplied;
+        const target = new ForeignHeaders([...new Headers(request.headers)]);
+        request.headers = new Proxy(target, {}) as unknown as NonNullable<RequestInit['headers']>;
         return super.fetchWithTimeout(...args);
       }
     }
     let dispatches = 0;
-    const transport = createWorkloadIdentityTransport((_url, init) => {
+    const transport = createWorkloadIdentityTransport(() => {
       dispatches += 1;
-      expect(init?.headers).toBe(supplied);
-      expect(target?.get('Authorization')).toBe('Bearer access-token-1');
       return Response.json({ data: [] });
     });
     const client = new HookClient({
@@ -711,16 +717,16 @@ test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
       maxRetries: 0,
     });
 
-    await client.models.list();
+    await expect(client.models.list()).rejects.toMatchObject({ cause: expect.any(TypeError) });
 
-    expect(dispatches).toBe(1);
+    expect(dispatches).toBe(0);
     expect(transport.exchanges).toBe(1);
   },
 );
 
-test.each([200, 401].flatMap((status) => ['iterator', 'record'].map((kind) => ({ status, kind }))))(
-  'forwards an unreadable $kind wrapper to its configured transport (status: $status)',
-  async ({ status, kind }) => {
+test.each([200, 401])(
+  'forwards an unreadable iterator wrapper to its configured transport (status: %i)',
+  async (status) => {
     const targets = new WeakMap<object, Headers>();
     let supplied: NonNullable<RequestInit['headers']> | undefined;
     class HookClient extends OpenAI {
@@ -730,21 +736,11 @@ test.each([200, 401].flatMap((status) => ['iterator', 'record'].map((kind) => ({
           throw new Error('Expected request init');
         }
         const target = new Headers(request.headers);
-        const wrapper =
-          kind === 'iterator'
-            ? {
-                [Symbol.iterator]() {
-                  throw new TypeError('Synthetic wrapper requires transport unwrapping');
-                },
-              }
-            : new Proxy(
-                {},
-                {
-                  ownKeys() {
-                    throw new Error('Synthetic wrapper requires transport unwrapping');
-                  },
-                },
-              );
+        const wrapper = {
+          [Symbol.iterator]() {
+            throw new TypeError('Synthetic wrapper requires transport unwrapping');
+          },
+        };
         targets.set(wrapper, target);
         supplied = wrapper as NonNullable<RequestInit['headers']>;
         request.headers = supplied;
@@ -779,6 +775,63 @@ test.each([200, 401].flatMap((status) => ['iterator', 'record'].map((kind) => ({
       : expect(result).rejects.toMatchObject({ status: 401 }));
 
     expect(sent).toEqual(['Bearer access-token-1']);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
+test.each(['own keys', 'iterator descriptor', 'prototype'] as const)(
+  'rejects a record wrapper with unreadable $kind before transport dispatch',
+  async (kind) => {
+    const diagnostic = new Error('Synthetic wrapper requires transport unwrapping');
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        if (!args[1]) {
+          throw new Error('Expected request init');
+        }
+        args[1].headers = new Proxy(
+          {},
+          {
+            ...(kind === 'own keys'
+              ? {
+                  ownKeys: () => {
+                    throw diagnostic;
+                  },
+                }
+              : {}),
+            ...(kind === 'iterator descriptor'
+              ? {
+                  getOwnPropertyDescriptor: () => {
+                    throw diagnostic;
+                  },
+                }
+              : {}),
+            ...(kind === 'prototype'
+              ? {
+                  getPrototypeOf: () => {
+                    throw diagnostic;
+                  },
+                }
+              : {}),
+          },
+        );
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    let dispatches = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      dispatches += 1;
+      return Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ cause: diagnostic });
+    expect(dispatches).toBe(0);
     expect(transport.exchanges).toBe(1);
   },
 );
@@ -853,7 +906,7 @@ test('does not dispatch a record whose failed field read makes its shape opaque'
           }
           return Reflect.ownKeys(value);
         },
-      });
+      }) as unknown as NonNullable<RequestInit['headers']>;
       return super.fetchWithTimeout(...args);
     }
   }
@@ -876,7 +929,7 @@ test('does not dispatch a record whose failed field read makes its shape opaque'
 });
 
 test.each(
-  (['iterator', 'custom array', 'native Headers'] as const).flatMap((source) =>
+  (['iterator', 'custom array', 'native Headers', 'Headers proxy'] as const).flatMap((source) =>
     (['before first row', 'after first row'] as const).map((when) => ({ source, when })),
   ),
 )('does not dispatch a one-shot $source that fails $when', async ({ source, when }) => {
@@ -896,7 +949,13 @@ test.each(
       if (source === 'iterator') {
         request.headers = iterate() as unknown as NonNullable<RequestInit['headers']>;
       } else {
-        request.headers = source === 'native Headers' ? new Headers() : [];
+        if (source === 'native Headers') {
+          request.headers = new Headers();
+        } else if (source === 'Headers proxy') {
+          request.headers = new Proxy(new Headers(), {});
+        } else {
+          request.headers = [];
+        }
         Object.defineProperty(request.headers, Symbol.iterator, { value: iterate });
       }
       return super.fetchWithTimeout(...args);
@@ -917,6 +976,43 @@ test.each(
 
   await expect(client.models.list()).rejects.toMatchObject({ cause: diagnostic });
   expect(transportCalls).toBe(0);
+  expect(transport.exchanges).toBe(1);
+});
+
+test('does not dispatch an iterator whose next accessor fails after factory selection', async () => {
+  const diagnostic = new Error('Synthetic next accessor failed');
+  class HookClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      if (!args[1]) {
+        throw new Error('Expected request init');
+      }
+      args[1].headers = {
+        [Symbol.iterator]() {
+          return {
+            get next() {
+              throw diagnostic;
+            },
+          };
+        },
+      } as unknown as NonNullable<RequestInit['headers']>;
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  let dispatches = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    dispatches += 1;
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list()).rejects.toMatchObject({ cause: diagnostic });
+  expect(dispatches).toBe(0);
   expect(transport.exchanges).toBe(1);
 });
 
@@ -1004,7 +1100,7 @@ test.each(['record', 'array'] as const)('selects a stateful $source header proto
   expect(sent).toEqual([source]);
 });
 
-test.each(['hidden record', 'hidden proxy', 'phantom proxy', 'symbol'] as const)(
+test.each(['hidden record', 'hidden proxy', 'phantom proxy', 'stateful proxy', 'symbol'] as const)(
   'preserves native record conversion for a $kind header input',
   async (kind) => {
     const makeSource = () => {
@@ -1018,6 +1114,15 @@ test.each(['hidden record', 'hidden proxy', 'phantom proxy', 'symbol'] as const)
       }
       if (kind === 'hidden record') {
         return record;
+      }
+      if (kind === 'stateful proxy') {
+        let reads = 0;
+        return new Proxy(record, {
+          ownKeys(target) {
+            reads += 1;
+            return reads === 1 ? Reflect.ownKeys(target) : [];
+          },
+        });
       }
       return new Proxy(
         record,
@@ -1064,6 +1169,82 @@ test.each(['hidden record', 'hidden proxy', 'phantom proxy', 'symbol'] as const)
     expect(actual).toEqual(expected);
   },
 );
+
+test.each(
+  [null, undefined].flatMap((selected) =>
+    (['own', 'inherited'] as const).map((location) => ({ selected, location })),
+  ),
+)('preserves a single $location nullish iterator selection ($selected)', async ({ selected, location }) => {
+  const makeSource = () => {
+    const owner = {};
+    Object.defineProperty(owner, Symbol.iterator, { configurable: true, value: emptyIterator });
+    let reads = 0;
+    const protocol = new Proxy(owner, {
+      get(target, key, receiver) {
+        if (key === Symbol.iterator) {
+          reads += 1;
+          return selected;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const record = location === 'own' ? { 'X-Trace': 'marker' } : Object.create(protocol);
+    if (location === 'own') {
+      Object.defineProperty(record, Symbol.iterator, {
+        configurable: true,
+        value: emptyIterator,
+      });
+    } else {
+      record['X-Trace'] = 'marker';
+    }
+    Object.defineProperty(record, 'X-Hidden', { value: 'hidden' });
+    return {
+      headers:
+        location === 'own'
+          ? new Proxy(record, {
+              get(target, key, receiver) {
+                if (key === Symbol.iterator) {
+                  reads += 1;
+                  return selected;
+                }
+                return Reflect.get(target, key, receiver);
+              },
+            })
+          : record,
+      reads: () => reads,
+    };
+  };
+  const native = makeSource();
+  const expected = [...new Headers(native.headers)];
+  const supplied = makeSource();
+  class HookClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      if (!args[1]) {
+        throw new Error('Expected request init');
+      }
+      args[1].headers = supplied.headers;
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  let actual: [string, string][] | undefined;
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    actual = [...new Headers(init?.headers)];
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list();
+
+  expect(native.reads()).toBe(1);
+  expect(supplied.reads()).toBe(1);
+  expect(actual).toEqual(expected);
+});
 
 test('does not inspect or replace headers when workload attribution is unnecessary', async () => {
   let reads = 0;

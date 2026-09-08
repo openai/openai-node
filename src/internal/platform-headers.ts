@@ -8,6 +8,10 @@ const nativeHeadersProtocol = nativeHeadersPrototype
     }
   : undefined;
 
+/** Identifies only the current runtime's captured Headers iterator, not structural lookalikes. */
+export const isNativeHeadersIterator = (iterator: unknown): boolean =>
+  iterator === nativeHeadersProtocol?.iterator;
+
 export const hasNativeHeadersBrand = (headers: object): boolean => {
   if (!nativeHeadersProtocol) {
     return false;
