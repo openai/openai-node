@@ -64,7 +64,7 @@ test.each(['ordinary subclass', 'Headers-shaped subclass', 'custom iterator'] as
 );
 
 test.each(['own', 'inherited'] as const)(
-  'bypasses %s get overrides without recovering unmarked authentication values',
+  'bypasses %s get overrides while refreshing immediate native authentication copies',
   async (kind) => {
     let reads = 0;
     class HookClient extends OpenAI {
@@ -101,16 +101,16 @@ test.each(['own', 'inherited'] as const)(
       fetch: transport.fetch,
     });
 
-    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+    await client.models.list();
 
     expect(reads).toBe(0);
-    expect(sent).toEqual(['Bearer access-token-1']);
-    expect(transport.exchanges).toBe(1);
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
   },
 );
 
 test.each(['instance', 'subclass'] as const)(
-  'does not infer workload ownership from an unmarked native %s forwarding iterator',
+  'refreshes an immediate native %s copy with a forwarding iterator',
   async (kind) => {
     class ForwardingHeaders extends Headers {}
     Object.defineProperty(ForwardingHeaders.prototype, Symbol.iterator, {
@@ -147,10 +147,10 @@ test.each(['instance', 'subclass'] as const)(
       maxRetries: 0,
     });
 
-    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+    await client.models.list();
 
-    expect(calls).toBe(1);
-    expect(transport.exchanges).toBe(1);
+    expect(calls).toBe(2);
+    expect(transport.exchanges).toBe(2);
   },
 );
 
@@ -163,7 +163,7 @@ describe.each(['native', 'transparent iterator', 'one-shot iterator'] as const)(
       [true, false],
       [true, true],
     ] as const)(
-      'retains ownership only for marked values (frozen: %s, marked: %s)',
+      'retains marked values and immediate scoped copies (frozen: %s, marked: %s)',
       async (frozen, marked) => {
         let iterations = 0;
         class HookClient extends OpenAI {
@@ -205,13 +205,10 @@ describe.each(['native', 'transparent iterator', 'one-shot iterator'] as const)(
           fetch: transport.fetch,
         });
 
-        const response = client.models.list();
-        await (marked ? response : expect(response).rejects.toMatchObject({ status: 401 }));
+        await client.models.list();
 
-        expect(sent).toEqual(
-          marked ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer access-token-1'],
-        );
-        expect(transport.exchanges).toBe(marked ? 2 : 1);
+        expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+        expect(transport.exchanges).toBe(2);
         expect(iterations).toBe(kind === 'native' ? 0 : sent.length);
       },
     );
@@ -219,7 +216,7 @@ describe.each(['native', 'transparent iterator', 'one-shot iterator'] as const)(
 );
 
 test.each(['unmarked', 'unmarked equal-byte', 'SDK-owned', 'explicitly independent'] as const)(
-  'keeps a %s custom iterator replacement independent',
+  'preserves the accepted immediate-copy ambiguity for a %s custom iterator replacement',
   async (kind) => {
     let iterations = 0;
     const authorization =
@@ -262,8 +259,9 @@ test.each(['unmarked', 'unmarked equal-byte', 'SDK-owned', 'explicitly independe
 
     await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-    expect(sent).toEqual([authorization]);
-    expect(transport.exchanges).toBe(1);
-    expect(iterations).toBe(1);
+    const attempts = kind === 'unmarked equal-byte' ? 2 : 1;
+    expect(sent).toEqual(Array.from({ length: attempts }, () => authorization));
+    expect(transport.exchanges).toBe(attempts);
+    expect(iterations).toBe(attempts);
   },
 );

@@ -336,9 +336,47 @@ const responseCloneTrackers = new WeakMap<Response, ResponseCloneTracker>();
 const nativeResponseBodyGetter = globalThis.Response
   ? Object.getOwnPropertyDescriptor(globalThis.Response.prototype, 'body')?.get
   : undefined;
+const foreignResponseBodyGetter = (response: Response): ((this: Response) => unknown) | undefined => {
+  let getter: ((this: Response) => unknown) | undefined;
+  const seen = new Set<object>();
+  for (
+    let prototype: object | null = Object.getPrototypeOf(response);
+    prototype;
+    prototype = Object.getPrototypeOf(prototype)
+  ) {
+    if (seen.has(prototype)) {
+      return undefined;
+    }
+    seen.add(prototype);
+    const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    const body = Object.getOwnPropertyDescriptor(prototype, 'body')?.get;
+    if (
+      typeof constructor === 'function' &&
+      Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Response' &&
+      Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype &&
+      Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)?.value === 'Response' &&
+      typeof Object.getOwnPropertyDescriptor(prototype, 'clone')?.value === 'function' &&
+      typeof Object.getOwnPropertyDescriptor(prototype, 'status')?.get === 'function' &&
+      typeof Object.getOwnPropertyDescriptor(prototype, 'headers')?.get === 'function' &&
+      typeof body === 'function'
+    ) {
+      // Continue past subclasses to use the defining platform's getter, never a caller shadow.
+      getter = body;
+    }
+  }
+  return getter;
+};
 const responseBodyIdentity = (response: Response): object | undefined => {
   try {
-    const body = nativeResponseBodyGetter?.call(response);
+    if (nativeResponseBodyGetter) {
+      try {
+        const body = nativeResponseBodyGetter.call(response);
+        return typeof body === 'object' && body !== null ? body : undefined;
+      } catch {
+        // A response from another platform has its own branded body reader.
+      }
+    }
+    const body = foreignResponseBodyGetter(response)?.call(response);
     return typeof body === 'object' && body !== null ? body : undefined;
   } catch {
     return undefined;
@@ -2644,20 +2682,47 @@ export class OpenAI {
     request: T,
     authorization: string | undefined,
   ): T {
-    if (!credential || authorization === undefined || request.headers === undefined) {
+    if (!credential || authorization === undefined) {
       return request;
     }
-    if (this.#workloadTokenProvenance.matchesHeaderCredential(request.headers, authorization) === false) {
+    let headers = request.headers;
+    if (headers === undefined) return request;
+    if (this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false) {
       credential.revoke();
       return request;
     }
     if (!credential.isCurrent()) return request;
-    const platformHeader = hasNativeHeadersBrand(request.headers)
-      ? getPlatformHeader(request.headers, 'Authorization')
+    const platformHeader = hasNativeHeadersBrand(headers)
+      ? getPlatformHeader(headers, 'Authorization')
       : undefined;
-    const materialized = platformHeader ? undefined : materializeHeaderInput(request.headers);
-    const headers = materialized && !materialized.preserve ? materialized.values : request.headers;
-    if (headers !== request.headers) request = { ...request, headers };
+    const materialized = platformHeader ? undefined : materializeHeaderInput(headers);
+    if (materialized && !materialized.preserve) {
+      headers = materialized.values;
+      const originalRequest = request;
+      const normalizedRequest = Object.create(Object.getPrototypeOf(request), {
+        ...Object.getOwnPropertyDescriptors(request),
+        headers: { value: headers, enumerable: true, configurable: true, writable: true },
+      }) as T;
+      request = new Proxy(normalizedRequest, {
+        get(target, property, receiver) {
+          return Reflect.get(target, property, property === 'headers' ? receiver : originalRequest);
+        },
+        set(target, property, value, receiver) {
+          const seen = new Set<object>();
+          let owner: object | null = target;
+          while (owner && !seen.has(owner)) {
+            seen.add(owner);
+            const descriptor = Object.getOwnPropertyDescriptor(owner, property);
+            if (descriptor) {
+              // Accessors retain their original receiver; data mutations belong to the SDK copy.
+              return Reflect.set(target, property, value, 'value' in descriptor ? receiver : originalRequest);
+            }
+            owner = Object.getPrototypeOf(owner);
+          }
+          return owner === null && Reflect.set(target, property, value, receiver);
+        },
+      });
+    }
     const native = hasNativeHeadersBrand(headers);
     const value = platformHeader ? platformHeader.value : (materialized?.values.get('Authorization') ?? null);
     if (

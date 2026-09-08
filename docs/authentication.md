@@ -296,10 +296,14 @@ independent credentials as a record or tuple layer through `buildHeaders` and re
 SDK before further copying it.
 
 Return the SDK-produced authentication result, retain its marked header values, or rebuild it with
-`buildHeaders([result, additionalHeaders])` to preserve ownership. Copying both the result container and
-its values with native `Headers` discards that ownership, even for an immediate delegation. Such a
-result keeps its original `401` without a workload-token refresh. Forwarding the request context
-preserves request ownership but does not restore an unmarked credential's ownership from equal bytes.
+`buildHeaders([result, additionalHeaders])` to preserve ownership. Immediate delegation can also copy
+both the result container and its values with native `Headers`. This compatibility behavior treats an
+unmarked copy matching the last credential selected by that request's authentication hook as forwarding
+that credential; it cannot distinguish an independent equal-byte native copy. Explicit independent
+layers and observed Authorization overwrites still prevent workload-token refresh.
+If a hook awaits before delegating with copied options and returns unmarked copied values, forward the
+opaque context to retain the original authentication scope. Without that context, the request keeps its
+original `401` without a workload-token refresh.
 Rebuilt request results likewise need marked headers or their SDK request carrier to retain credential
 ownership; ordinary request object spread preserves that carrier.
 
@@ -321,6 +325,9 @@ selected independent Authorization value or removal. Stable replacements, includ
 `Headers` copies, can retry without treating an ignored raw input as consumed.
 If a hook drops ownership on a later retry, the SDK rejects its returned request before dispatch; any
 standalone credential acquisition performed inside that hook may already have occurred.
+
+When removing a repeated tuple reduces its occurrence count, the SDK re-evaluates that tuple's cached
+accessor values because the remaining occurrence cannot be identified reliably.
 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace

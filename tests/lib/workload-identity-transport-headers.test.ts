@@ -4,6 +4,306 @@ import { test } from 'vitest';
 import type { RequestInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
+const lazyHeaders = (request: RequestInit): NonNullable<RequestInit['headers']> => {
+  const authorization = new Headers(request.headers).get('Authorization');
+  if (authorization === null) {
+    throw new Error('Expected workload Authorization');
+  }
+  return {
+    get Authorization() {
+      return authorization;
+    },
+  };
+};
+
+test('preserves a private-field accessor receiver while normalizing headers', async () => {
+  class WrappedRequest implements RequestInit {
+    #method: string;
+    headers: NonNullable<RequestInit['headers']>;
+
+    constructor(request: RequestInit) {
+      const { method, ...properties } = request;
+      Object.assign(this, properties);
+      this.#method = method ?? 'GET';
+      this.headers = lazyHeaders(request);
+    }
+
+    get method() {
+      return this.#method;
+    }
+
+    set method(value: string) {
+      this.#method = value;
+    }
+  }
+  class HookClient extends OpenAI {
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      args[1] = new WrappedRequest(args[1]);
+      return super.fetchWithAuth(...args);
+    }
+
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      if (!args[1]) {
+        throw new Error('Expected normalized request');
+      }
+      args[1].method = 'PUT';
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  const transport = createWorkloadIdentityTransport(async (url, init) => {
+    const request = new Request(String(url), init);
+    expect(request.method).toBe('PUT');
+    expect(await request.json()).toEqual({ value: 1 });
+    if (!init) {
+      throw new Error('Expected request init');
+    }
+    init.method = 'PUT';
+    expect(init.method).toBe('PUT');
+    return Response.json({ ok: true });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.post('/synthetic', { body: { value: 1 } })).resolves.toEqual({ ok: true });
+});
+
+test('preserves an own accessor receiver while normalizing prepared headers', async () => {
+  const methods = new WeakMap<object, string>();
+  class HookClient extends OpenAI {
+    protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+      const [request] = args;
+      methods.set(request, request.method ?? 'GET');
+      Object.defineProperty(request, 'method', {
+        enumerable: true,
+        configurable: true,
+        get() {
+          return methods.get(this);
+        },
+        set(value: string) {
+          methods.set(this, value);
+        },
+      });
+      request.headers = lazyHeaders(request);
+      return super.prepareRequest(...args);
+    }
+
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      if (!args[1]) {
+        throw new Error('Expected normalized request');
+      }
+      args[1].method = 'PUT';
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  const transport = createWorkloadIdentityTransport(async (url, init) => {
+    const request = new Request(String(url), init);
+    expect(request.method).toBe('PUT');
+    expect(await request.json()).toEqual({ value: 1 });
+    return Response.json({ ok: true });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.post('/synthetic', { body: { value: 1 } })).resolves.toEqual({ ok: true });
+});
+
+test.each(['add', 'delete'] as const)(
+  'preserves a later data field %s on normalized requests',
+  async (change) => {
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        const [request] = args;
+        request.headers = lazyHeaders(request);
+        if (change === 'delete') {
+          request.cache = 'no-store';
+        }
+        return super.prepareRequest(...args);
+      }
+
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [, request] = args;
+        if (!request) {
+          throw new Error('Expected normalized request');
+        }
+        if (change === 'add') {
+          request.cache = 'no-store';
+        } else {
+          delete request.cache;
+        }
+        expect(request.cache).toBe(change === 'add' ? 'no-store' : undefined);
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(init?.cache).toBe(change === 'add' ? 'no-store' : undefined);
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access-token-1');
+      return Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list();
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
+test.each(['inherited method', 'non-enumerable method', 'one-read headers'] as const)(
+  'preserves %s while normalizing a frozen prepared request',
+  async (kind) => {
+    let reads = 0;
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        const [request] = args;
+        const values = new Headers(request.headers);
+        // The platform accepts iterable header pairs beyond the narrower DOM HeadersInit declaration.
+        const headers = (function* headers() {
+          yield* values;
+        })() as unknown as NonNullable<RequestInit['headers']>;
+        if (kind === 'inherited method') {
+          delete request.method;
+          Object.setPrototypeOf(request, { method: 'POST' });
+          request.headers = headers;
+        } else if (kind === 'non-enumerable method') {
+          Object.defineProperty(request, 'method', { value: 'POST', enumerable: false });
+          request.headers = headers;
+        } else {
+          Object.defineProperty(request, 'headers', {
+            enumerable: true,
+            get() {
+              reads += 1;
+              if (reads > 1) {
+                throw new Error('Prepared header getter was consumed twice');
+              }
+              return headers;
+            },
+          });
+        }
+        Object.freeze(request);
+        return super.prepareRequest(...args);
+      }
+    }
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(init?.method).toBe(kind === 'one-read headers' ? 'GET' : 'POST');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access-token-1');
+      return Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      maxRetries: 0,
+      fetch: transport.fetch,
+    });
+    await client.models.list();
+    expect(transport.exchanges).toBe(1);
+    expect(reads).toBe(kind === 'one-read headers' ? 1 : 0);
+  },
+);
+
+describe.each(['prepareRequest', 'fetchWithAuth'] as const)('%s immutable dispatch input', (hook) => {
+  describe.each(['foreign', 'one-shot'] as const)('%s headers', (kind) => {
+    test
+      .skipIf(kind === 'foreign' && Number(process.versions.node.split('.')[0]) < 24)
+      .each(
+        (['frozen', 'getter-only'] as const).flatMap((shape) =>
+          (['workload', 'independent'] as const).map((credential) => ({ shape, credential })),
+        ),
+      )(
+      'normalizes a $shape request with $credential credentials without mutating it',
+      async ({ shape, credential }) => {
+        const inputs: { request: RequestInit; headers: NonNullable<RequestInit['headers']> }[] = [];
+        let iterations = 0;
+        const prepare = async (request: RequestInit) => {
+          const values = new Headers(request.headers);
+          if (credential === 'independent') {
+            values.set('Authorization', 'Bearer independent');
+          }
+          const foreign = kind === 'foreign' ? await import('undici') : undefined;
+          const headers = foreign
+            ? new foreign.Headers([...values])
+            : (function* headers() {
+                iterations += 1;
+                yield* values;
+              })();
+          const supplied = headers as NonNullable<RequestInit['headers']>;
+          request.headers = supplied;
+          if (shape === 'frozen') {
+            Object.freeze(request);
+          } else {
+            Object.defineProperty(request, 'headers', { get: () => supplied });
+          }
+          inputs.push({ request, headers: supplied });
+        };
+        class HookClient extends OpenAI {
+          protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+            await super.prepareRequest(...args);
+            if (hook === 'prepareRequest') {
+              await prepare(args[0]);
+            }
+          }
+
+          protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+            if (hook === 'fetchWithAuth') {
+              await prepare(args[1]);
+            }
+            return super.fetchWithAuth(...args);
+          }
+        }
+        let sends = 0;
+        const transport = createWorkloadIdentityTransport((_url, init) => {
+          const original = inputs[sends];
+          if (!original) {
+            throw new Error('Expected the prepared request');
+          }
+          expect(original.request.headers).toBe(original.headers);
+          expect(init?.headers).toBeInstanceOf(Headers);
+          expect(init?.headers).not.toBe(original.headers);
+          sends += 1;
+          expect(new Headers(init?.headers).get('Authorization')).toBe(
+            credential === 'workload' ? `Bearer access-token-${sends}` : 'Bearer independent',
+          );
+          return sends === 1
+            ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+            : Response.json({ data: [] });
+        });
+        const client = new HookClient({
+          ...createTestClientOptions(),
+          apiKey: null,
+          adminAPIKey: null,
+          maxRetries: 0,
+          fetch: transport.fetch,
+        });
+        if (credential === 'workload') {
+          await client.models.list();
+          expect(sends).toBe(2);
+        } else {
+          await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+          expect(sends).toBe(1);
+        }
+        expect(transport.exchanges).toBe(sends);
+        if (kind === 'one-shot') {
+          expect(iterations).toBe(sends);
+        }
+      },
+    );
+  });
+});
+
 test('materializes a self-deleting header getter before transport dispatch', async () => {
   let reads = 0;
   class HookClient extends OpenAI {

@@ -229,7 +229,9 @@ export class AzureOpenAI extends OpenAI {
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
-      return buildHeaders([{ 'api-key': this.apiKey }]);
+      credentialContext = this._requestCredentialContext(opts, credentialContext);
+      const apiKey = credentialContext?.apiKey === undefined ? this.apiKey : credentialContext.apiKey;
+      return buildHeaders([{ 'api-key': apiKey }]);
     }
     return super.authHeaders(opts, security, credentialContext);
   }

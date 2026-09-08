@@ -660,3 +660,68 @@ test('preserves static-key changes in forwarding preparation hooks and final req
 
   expect(tokens(sent)).toEqual(['Bearer synthetic-request-hook']);
 });
+
+describe('Azure static-key preparation hooks', () => {
+  test.each(['forwarded', 'legacy-auth', 'legacy-preparation', 'unset', 'null'] as const)(
+    'preserves the %s credential context for concurrent public requests',
+    async (mode) => {
+      class PreparationClient extends AzureOpenAI {
+        protected override async prepareOptions(
+          options: FinalRequestOptions,
+          context?: RequestCredentialContext,
+        ): Promise<void> {
+          await super.prepareOptions(options, mode === 'legacy-preparation' ? undefined : context);
+          this.apiKey = 'synthetic-shared-replacement';
+          if (mode !== 'legacy-preparation' && mode !== 'unset') {
+            if (!context) {
+              throw new Error('Expected a request credential context');
+            }
+            context.apiKey = mode === 'null' ? null : `synthetic-attempt-${options.path}`;
+          }
+          await Promise.resolve();
+        }
+
+        protected override async authHeaders(
+          options: FinalRequestOptions,
+          security?: Security,
+          context?: RequestCredentialContext,
+        ): Promise<NullableHeaders | undefined> {
+          return super.authHeaders(options, security, mode === 'legacy-auth' ? undefined : context);
+        }
+      }
+      const { fetch, sent } = recordRequests();
+      const client = new PreparationClient({
+        apiKey: 'synthetic-static-key',
+        baseURL: 'https://synthetic.example/v1',
+        apiVersion: '2024-10-01-preview',
+        fetch,
+      });
+
+      await Promise.all(
+        ['first', 'second'].map((id) =>
+          client.models.retrieve(id, { headers: { 'x-synthetic-request': id } }),
+        ),
+      );
+
+      const expected = (id: string) => {
+        if (mode === 'null') {
+          return null;
+        }
+        if (mode === 'legacy-preparation' || mode === 'unset') {
+          return 'synthetic-shared-replacement';
+        }
+        return `synthetic-attempt-/models/${id}`;
+      };
+      expect(
+        Object.fromEntries(
+          sent.map((headers) => [headers.get('x-synthetic-request'), headers.get('api-key')]),
+        ),
+      ).toEqual({
+        first: expected('first'),
+        second: expected('second'),
+      });
+      expect(tokens(sent)).toEqual([null, null]);
+      expect(client.apiKey).toBe('synthetic-shared-replacement');
+    },
+  );
+});
