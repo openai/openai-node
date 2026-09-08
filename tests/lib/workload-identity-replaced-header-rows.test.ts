@@ -328,6 +328,8 @@ test.each(['name', 'value'] as const)(
 
 test('retains a replacement name getter after an initially unavailable descriptor probe', () => {
   let nameReads = 0;
+  let replacementReads = 0;
+  let failReplacementPostRead = false;
   const firstName = vi.fn(() => {
     nameReads += 1;
     return 'X-Original';
@@ -341,28 +343,33 @@ test('retains a replacement name getter after an initially unavailable descripto
       if (key === '0' && nameReads === 0) {
         throw new Error('initial name descriptor unavailable');
       }
+      if (key === '0' && failReplacementPostRead && replacementReads === 1) {
+        throw new Error('replacement post-read descriptor unavailable');
+      }
       return Reflect.getOwnPropertyDescriptor(object, key);
     },
   });
   const snapshot = snapshotHeaders([row]);
   const replacementName = vi.fn(() => {
-    if (replacementName.mock.calls.length > 1) {
-      throw new Error('replacement name getter was reread');
-    }
+    replacementReads += 1;
     return 'X-Replacement';
   });
   Object.defineProperty(target, 0, { configurable: true, get: replacementName });
+  failReplacementPostRead = true;
 
   expect(snapshot.refresh().values.get('X-Replacement')).toBe('preserved');
-  expect(snapshot.refresh().values.get('X-Replacement')).toBe('preserved');
-  expect(firstName).toHaveBeenCalledTimes(1);
+  failReplacementPostRead = false;
+  Object.defineProperty(target, 0, { configurable: true, get: firstName });
+  expect(snapshot.refresh().values.get('X-Original')).toBe('preserved');
+  expect(snapshot.refresh().values.get('X-Original')).toBe('preserved');
+  expect(firstName).toHaveBeenCalledTimes(2);
   expect(replacementName).toHaveBeenCalledTimes(1);
   expect(value).toHaveBeenCalledTimes(1);
 });
 
 test('invalidates a recovered scalar value getter after confirmed external deletion', () => {
   let reads = 0;
-  let failedPostRead = false;
+  let descriptorProbes = 0;
   const target = ['X-Custom', 'preserved'];
   Object.defineProperty(target, 1, {
     configurable: true,
@@ -373,9 +380,11 @@ test('invalidates a recovered scalar value getter after confirmed external delet
   });
   const row = new Proxy(target, {
     getOwnPropertyDescriptor(object, key) {
-      if (key === '1' && reads === 1 && !failedPostRead) {
-        failedPostRead = true;
-        throw new Error('initial post-read descriptor unavailable');
+      if (key === '1') {
+        descriptorProbes += 1;
+        if (descriptorProbes === 2 || descriptorProbes === 4) {
+          throw new Error('post-read descriptor unavailable');
+        }
       }
       return Reflect.getOwnPropertyDescriptor(object, key);
     },

@@ -652,7 +652,8 @@ const nextDescriptorState = (
   known: boolean,
   afterRead: { descriptor: PropertyDescriptor | undefined } | undefined,
 ): RetainedDescriptorState => {
-  const retainedAfterRead = retained?.afterRead ?? afterRead;
+  const retainedAfterRead =
+    retained?.afterRead ?? afterRead ?? (retained && known ? { descriptor } : undefined);
   return {
     descriptor: retained ? retained.descriptor : descriptor,
     known: retained ? retained.known : known,
@@ -703,8 +704,13 @@ const retainedRowEntries = (row: RowRead) => {
     !!valueDescriptorState,
     getHeaderRowDescriptorState(row.row, '1'),
   );
+  const {
+    nameAfterRead: _nameAfterRead,
+    valueAfterRead: _valueAfterRead,
+    ...retainedWithoutEvidence
+  } = retained;
   row.retainedRows?.set(row.occurrence, {
-    ...retained,
+    ...retainedWithoutEvidence,
     name,
     nameDescriptor: nameState.descriptor,
     nameDescriptorKnown: nameState.known,
