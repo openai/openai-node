@@ -18,7 +18,7 @@ jobs:
   lint:
     timeout-minutes: 10
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -48,7 +48,7 @@ jobs:
   build:
     timeout-minutes: 5
     name: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -88,7 +88,7 @@ jobs:
 
   node_matrix:
     name: Read Node.js test matrix
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -113,8 +113,8 @@ jobs:
   test:
     name: test (${{ matrix.node-version }})
     needs: node_matrix
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     continue-on-error: ${{ matrix.experimental }}
     permissions:
@@ -207,7 +207,7 @@ jobs:
     name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
     if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
     needs: [test, benchmarks, ecosystem_tests]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     permissions: {}
     steps:
       - name: Tests (all)
@@ -232,7 +232,7 @@ jobs:
   benchmarks:
     timeout-minutes: 20
     name: performance benchmarks
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -267,7 +267,7 @@ jobs:
   examples:
     timeout-minutes: 30
     name: examples
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: >-
       ${{
         github.repository == 'openai/openai-node' &&
@@ -321,7 +321,7 @@ jobs:
 
   ecosystem_tests:
     name: ecosystem tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read
