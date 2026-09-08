@@ -260,6 +260,60 @@ describe('AssistantStream run-step dispatch ordering', () => {
     },
   );
 
+  test.each(['event', 'toolCallCreated', 'toolCallDelta'] as const)(
+    'observes an inherited getter owner swapped by %s',
+    async (listener) => {
+      const step = runStep('step_original');
+      const { delta: originalDelta } = toolCallDelta(step.id).data;
+      const replacement = {
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+        },
+      };
+      const data = { id: step.id };
+      const originalOwner = {};
+      const replacementOwner = {};
+      const ownerDeltas = new WeakMap([
+        [originalOwner, originalDelta],
+        [replacementOwner, replacement],
+      ]);
+      const readDelta = vi.fn(function readOwnedDelta(this: typeof data) {
+        expect(this).toBe(data);
+        return ownerDeltas.get(Object.getPrototypeOf(this));
+      });
+      const descriptor = { configurable: true, enumerable: true, get: readDelta };
+      Object.defineProperty(originalOwner, 'delta', descriptor);
+      Object.defineProperty(replacementOwner, 'delta', descriptor);
+      Object.setPrototypeOf(data, originalOwner);
+      const primingDeltas = listener === 'toolCallDelta' ? [toolCallDelta(step.id)] : [];
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        ...primingDeltas,
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      runner.on(listener, () => {
+        if (runner.currentEvent()?.data === data) {
+          Object.setPrototypeOf(data, replacementOwner);
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(stepDelta).toHaveBeenCalledTimes(primingDeltas.length + 1);
+      const [emittedDelta, snapshot] = stepDelta.mock.calls[primingDeltas.length] ?? [];
+      expect(emittedDelta).toBe(replacement);
+      expect(readDelta).toHaveBeenCalledTimes(2);
+      expect(snapshot).toBe(step);
+      expect(snapshot.step_details.tool_calls[0].function.arguments).toBe(
+        `{"to":"trusted"}${listener === 'event' ? ' replacement' : ' updated'.repeat(primingDeltas.length + 1)}`,
+      );
+    },
+  );
+
   test.each(['value', 'setter'] as const)(
     'bounds prototype metadata inspection while preserving a deep inherited delta %s',
     async (kind) => {

@@ -99,10 +99,7 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
-function samePropertyDescriptor(
-  left: PropertyDescriptor | null | undefined,
-  right: PropertyDescriptor | null | undefined,
-) {
+function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: PropertyDescriptor | undefined) {
   if (!left || !right) {
     return left === right;
   }
@@ -120,9 +117,14 @@ interface RunStepDeltaState {
   getRunStepDelta?: (afterCallbacks?: boolean) => RunStepDelta | undefined;
 }
 
-function getInheritedDeltaDescriptor(data: object): PropertyDescriptor | null | undefined {
+interface InheritedDeltaProperty {
+  owner: object | null;
+  descriptor?: PropertyDescriptor;
+}
+
+function getInheritedDeltaProperty(data: object): InheritedDeltaProperty | undefined {
   let prototype = data;
-  // Bound cache metadata inspection. A null result falls back to ordinary property reads
+  // Bound cache metadata inspection. A null owner falls back to ordinary property reads
   // after callbacks, so deeper prototype chains remain supported without an unbounded walk.
   for (let depth = 0; depth < 32; depth += 1) {
     prototype = Object.getPrototypeOf(prototype);
@@ -131,10 +133,10 @@ function getInheritedDeltaDescriptor(data: object): PropertyDescriptor | null | 
     }
     const descriptor = Object.getOwnPropertyDescriptor(prototype, 'delta');
     if (descriptor) {
-      return descriptor;
+      return { owner: prototype, descriptor };
     }
   }
-  return null;
+  return { owner: null };
 }
 
 function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
@@ -205,9 +207,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       // A getter may replace its own descriptor while returning the captured value. Record
       // its post-read state, then detect subsequent replacements from validation or projection.
       let observedDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
-      let observedInheritedDescriptor = observedDescriptor
-        ? undefined
-        : getInheritedDeltaDescriptor(exposedData);
+      let observedInheritedProperty = observedDescriptor ? undefined : getInheritedDeltaProperty(exposedData);
       if (delta && (hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id'))) {
         throw new OpenAIError('Run-step deltas must not contain an id field');
       }
@@ -215,19 +215,20 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = (afterCallbacks = false) => {
         const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
-        const currentInheritedDescriptor = currentDescriptor
+        const currentInheritedProperty = currentDescriptor
           ? undefined
-          : getInheritedDeltaDescriptor(exposedData);
+          : getInheritedDeltaProperty(exposedData);
         // Callbacks can change an accessor's backing value. If descriptor inspection was
         // bounded, use the ordinary lookup to observe changes beyond the inspected chain.
         const refreshAccessor =
           afterCallbacks &&
-          (currentInheritedDescriptor === null ||
-            (currentDescriptor ?? currentInheritedDescriptor)?.set !== undefined);
+          (currentInheritedProperty?.owner === null ||
+            (currentDescriptor ?? currentInheritedProperty?.descriptor)?.set !== undefined);
         if (
           !refreshAccessor &&
           samePropertyDescriptor(currentDescriptor, observedDescriptor) &&
-          samePropertyDescriptor(currentInheritedDescriptor, observedInheritedDescriptor)
+          currentInheritedProperty?.owner === observedInheritedProperty?.owner &&
+          samePropertyDescriptor(currentInheritedProperty?.descriptor, observedInheritedProperty?.descriptor)
         ) {
           return observedDelta;
         }
@@ -237,9 +238,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
             : Reflect.get(exposedData, 'delta', exposedData)
         ) as RunStepDelta;
         observedDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
-        observedInheritedDescriptor = observedDescriptor
-          ? undefined
-          : getInheritedDeltaDescriptor(exposedData);
+        observedInheritedProperty = observedDescriptor ? undefined : getInheritedDeltaProperty(exposedData);
         return observedDelta;
       };
       const refreshRunStepDelta = (afterListeners = false) => {
