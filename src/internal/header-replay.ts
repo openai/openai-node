@@ -694,15 +694,7 @@ function* renameEntries(
 }
 
 const retainedRowEntries = (row: RowRead) => {
-  const {
-    retained,
-    valueDescriptor,
-    valueDescriptorState,
-    name,
-    nameDescriptor,
-    nameDescriptorState,
-    nameStateful,
-  } = row;
+  const { retained, valueDescriptor, valueDescriptorState, name, nameDescriptorState, nameStateful } = row;
   if (
     !retained?.valueStateful ||
     retained.values ||
