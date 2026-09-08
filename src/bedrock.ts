@@ -228,8 +228,14 @@ export class BedrockOpenAI extends OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const url = super.buildURL(path, query, defaultBaseURL);
-    assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, url);
+    this.validateRequestURL(url);
     return url;
+  }
+
+  /** Validates the final URL returned by request construction, including subclass overrides. */
+  protected override validateRequestURL(url: string): void {
+    super.validateRequestURL(url);
+    assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, url);
   }
 
   protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {

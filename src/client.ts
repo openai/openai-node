@@ -747,6 +747,9 @@ export class OpenAI {
     return this._options.defaultQuery;
   }
 
+  /** Validates the final routed URL before constructing a body or authentication headers. */
+  protected validateRequestURL(url: string): void {}
+
   protected validateHeaders(
     { values, nulls }: NullableHeaders,
     schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
@@ -1811,6 +1814,7 @@ export class OpenAI {
     const { method, path, query, defaultBaseURL } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
+    this.validateRequestURL(url);
     x509Authentication?.snapshotAPIURL(url);
     const explicitTimeout = 'timeout' in options;
     if (explicitTimeout) validatePositiveInteger('timeout', options.timeout);

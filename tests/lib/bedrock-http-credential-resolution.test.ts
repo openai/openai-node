@@ -1,3 +1,4 @@
+/* oxlint-disable eslint/max-classes-per-file -- Separate subclass fixtures cover credential fallback and final URL validation. */
 import { vi } from 'vitest';
 
 import { BedrockOpenAI } from 'openai';
@@ -33,6 +34,29 @@ test.each(schemes)('treats a null Bedrock _callApiKey result as final with %j', 
   expect(client.resolutions).toBe(1);
 });
 
+test('validates a replaced buildURL result before direct-build body or credential effects', async () => {
+  class ReplacedURL extends BedrockOpenAI {
+    override buildURL(
+      path: string,
+      query: Record<string, unknown> | null | undefined,
+      defaultBaseURL?: string,
+    ) {
+      super.buildURL(path, query, defaultBaseURL);
+      return 'https://other.example/openai/v1/items';
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-direct');
+  const serializeBody = vi.fn(() => ({ synthetic: true }));
+  const client = new ReplacedURL({ baseURL, bedrockTokenProvider: provider });
+
+  await expect(
+    client.buildRequest({ method: 'post', path: '/items', body: { toJSON: serializeBody } }),
+  ).rejects.toThrow('origin');
+
+  expect(provider).not.toHaveBeenCalled();
+  expect(serializeBody).not.toHaveBeenCalled();
+});
+
 test('validates the constructed URL before resolving credentials in a direct Bedrock build', async () => {
   const provider = vi.fn(async () => 'synthetic-direct');
   const client = new BedrockOpenAI({ baseURL, bedrockTokenProvider: provider });
@@ -64,7 +88,7 @@ test('validates the exact direct-build URL without resolving query values again'
     defaultBaseURL: 'https://default.example/v1',
   });
 
-  expect(guard).toHaveBeenCalledTimes(1);
+  expect(guard).toHaveBeenCalledTimes(2);
   expect(guard).toHaveBeenCalledWith(baseURL, url);
   expect(new URL(url).origin).toBe(new URL(baseURL).origin);
   expect(new URL(url).searchParams.get('cursor')).toBe('synthetic cursor');
