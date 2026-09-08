@@ -967,7 +967,7 @@ export class AssistantStream
         validateRunStepAliases();
         if (toolCalls && accumulatedRunStep.step_details.type === 'tool_calls') {
           for (const toolCall of toolCalls) {
-            const toolCallIndex = toolCall.index;
+            let toolCallIndex = toolCall.index;
             validateRunStepAliases();
             if (toolCallIndex === this.#currentToolCallIndex) {
               const currentDetails = accumulatedRunStep.step_details;
@@ -982,8 +982,11 @@ export class AssistantStream
               toolListenersRan =
                 emitRunStep('toolCallDelta', [toolCall, accumulatedToolCall]) || toolListenersRan;
             } else {
-              if (this.#currentToolCall) {
-                toolListenersRan = emitRunStep('toolCallDone', [this.#currentToolCall]) || toolListenersRan;
+              if (this.#currentToolCall && emitRunStep('toolCallDone', [this.#currentToolCall])) {
+                toolListenersRan = true;
+                // A done listener can redirect the next tool call through the current event.
+                toolCallIndex = toolCall.index;
+                validateRunStepAliases();
               }
 
               this.#currentToolCallIndex = toolCallIndex;

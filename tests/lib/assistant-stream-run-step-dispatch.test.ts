@@ -701,6 +701,93 @@ describe('AssistantStream run-step dispatch ordering', () => {
     ['SSE', publicAssistantStream],
     ['serialized stream', assistantStream],
   ] as const)('%s listener replacements', (_transport, createStream) => {
+    test.each([false, true])(
+      'uses toolCallDone index updates for later callbacks (mutate: %s)',
+      async (mutateIndex) => {
+        const step = runStep('step_original', 'call_first', 'first');
+        step.step_details.tool_calls.push({
+          index: 1,
+          id: 'call_second',
+          type: 'function',
+          function: { name: 'second', arguments: 'second' },
+        });
+        const selectedIndex = mutateIndex ? 0 : 1;
+        const deltaAt = (index: number, args: string) => ({
+          event: 'thread.run.step.delta',
+          data: {
+            id: step.id,
+            delta: {
+              step_details: {
+                type: 'tool_calls',
+                tool_calls: [{ index, type: 'function', function: { arguments: args } }],
+              },
+            },
+          },
+        });
+        const runner = createStream([
+          { event: 'thread.run.step.created', data: step },
+          toolCallDelta(step.id),
+          deltaAt(1, ' switch'),
+          deltaAt(selectedIndex, ' follow'),
+          completedRun(),
+        ]);
+        const lifecycle: [string, string][] = [];
+        const createdTools: unknown[] = [];
+        const deltaTools: unknown[] = [];
+        const accumulatedArgs: string[][] = [];
+        let selectedSnapshot: unknown;
+        runner.on('toolCallDone', (tool) => {
+          lifecycle.push(['done', tool.id]);
+          const event = runner.currentEvent();
+          if (mutateIndex && event?.event === 'thread.run.step.delta') {
+            const details = event.data.delta.step_details;
+            if (details?.type === 'tool_calls' && details.tool_calls?.[0]) {
+              details.tool_calls[0].index = selectedIndex;
+            }
+          }
+          const snapshot = runner.currentRunStepSnapshot();
+          if (snapshot?.step_details.type === 'tool_calls') {
+            selectedSnapshot = snapshot.step_details.tool_calls[selectedIndex];
+          }
+        });
+        runner.on('toolCallCreated', (tool) => {
+          lifecycle.push(['created', tool.id]);
+          createdTools.push(tool);
+        });
+        runner.on('toolCallDelta', (_delta, tool) => {
+          lifecycle.push(['delta', tool.id]);
+          deltaTools.push(tool);
+        });
+        runner.on('runStepDelta', (_delta, snapshot) => {
+          if (snapshot.step_details.type === 'tool_calls') {
+            accumulatedArgs.push(
+              snapshot.step_details.tool_calls.map((tool) =>
+                tool.type === 'function' ? tool.function.arguments : '',
+              ),
+            );
+          }
+        });
+
+        await runner.done();
+
+        expect(createdTools[1]).toBe(selectedSnapshot);
+        expect(deltaTools).toEqual([selectedSnapshot]);
+        const selectedID = mutateIndex ? 'call_first' : 'call_second';
+        expect(lifecycle).toEqual([
+          ['created', 'call_first'],
+          ['done', 'call_first'],
+          ['created', selectedID],
+          ['delta', selectedID],
+          ['done', selectedID],
+        ]);
+        expect(accumulatedArgs).toEqual([
+          ['first updated', 'second'],
+          ['first updated', 'second switch'],
+          mutateIndex ? ['first updated follow', 'second switch'] : ['first updated', 'second switch follow'],
+        ]);
+      },
+    );
+
     test.each([null, undefined, 0, false, 'initial'])(
       'uses a valid delta supplied by a raw listener after initial %j',
       async (initialDelta) => {
