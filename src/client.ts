@@ -297,8 +297,8 @@ export interface ClientOptions {
    *
    * - Accepts either a static string or an async function that resolves to a string.
    * - Defaults to process.env['OPENAI_API_KEY'].
-   * - When a function is provided, it is invoked before each request so you can rotate
-   *   or refresh credentials at runtime.
+   * - When a function is provided, it is invoked while building authentication headers
+   *   for each request attempt, including retries, so you can rotate credentials.
    * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
    * - If the function throws, the error is wrapped in an OpenAIError with the original
    *   error available as `cause`.
@@ -813,10 +813,11 @@ export class OpenAI {
           : await authentication.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
-    if (this.apiKey == null) {
+    const apiKey = await this.resolveAPIKey();
+    if (apiKey == null) {
       return undefined;
     }
-    return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+    return buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
   }
 
   protected async adminAPIKeyAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
@@ -858,17 +859,34 @@ export class OpenAI {
    * @internal
    */
   async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
-    if (this._provider) {
-      capture?.(this.apiKey);
-      return false;
-    }
-
     const apiKey = this._options.apiKey;
-    if (typeof apiKey !== 'function') {
+    if (this._provider || typeof apiKey !== 'function') {
       capture?.(this.apiKey);
       return false;
     }
 
+    this.apiKey = await this.resolveAPIKeyProvider(apiKey);
+    capture?.(this.apiKey);
+    return true;
+  }
+
+  /**
+   * Resolves the credential for the current authentication header construction.
+   * Overrides return their credential directly; callers use the returned value,
+   * since another request can update the shared `apiKey` property after an await.
+   */
+  protected async resolveAPIKey(): Promise<string | null> {
+    const apiKey = this._options.apiKey;
+    if (this._provider || typeof apiKey !== 'function') {
+      return this.apiKey;
+    }
+
+    this.apiKey = await this.resolveAPIKeyProvider(apiKey);
+    // Preserve provider-specific getters before yielding the captured credential.
+    return this.apiKey;
+  }
+
+  private async resolveAPIKeyProvider(apiKey: ApiKeySetter): Promise<string> {
     let token: unknown;
     try {
       token = await apiKey();
@@ -886,9 +904,7 @@ export class OpenAI {
         `Expected 'apiKey' function argument to return a string but it returned ${token}`,
       );
     }
-    this.apiKey = token;
-    capture?.(this.apiKey);
-    return true;
+    return token;
   }
 
   buildURL(
@@ -916,15 +932,9 @@ export class OpenAI {
 
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
+   * Function credentials are resolved later, when authentication headers are built.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    if (this._provider) return;
-
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.bearerAuth) {
-      await this._callApiKey();
-    }
-  }
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.

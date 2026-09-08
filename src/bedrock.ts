@@ -225,20 +225,20 @@ export class BedrockOpenAI extends OpenAI {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
 
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.adminAPIKeyAuth && !security.bearerAuth) {
-      await this._callApiKey();
-    }
-
     await super.prepareOptions(options);
-    assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
   }
 
   protected override async prepareRequest(
     request: RequestInit,
     context: { url: string; options: FinalRequestOptions },
   ): Promise<void> {
-    assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, context.url);
+    const configuredBaseURL = this._options.baseURL ?? this.baseURL;
+    // Credentials now resolve during header construction, after prepareOptions.
+    assertBedrockRequestOrigin(
+      configuredBaseURL,
+      this.buildURL(context.options.path, null, context.options.defaultBaseURL),
+    );
+    assertBedrockRequestOrigin(configuredBaseURL, context.url);
     await super.prepareRequest(request, context);
     request.redirect = 'manual';
   }
@@ -248,7 +248,7 @@ export class BedrockOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    const credential = this.apiKey;
+    const credential = security.bearerAuth || security.adminAPIKeyAuth ? await this.resolveAPIKey() : null;
     if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
       assertValidBedrockBearerCredential(credential);
       try {

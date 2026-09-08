@@ -44,6 +44,26 @@ const client = new OpenAI({
 This also works with an OAuth bearer-token provider for a compatible endpoint;
 see the [Azure v1 example](azure.md#v1-api).
 
+For HTTP requests, the SDK resolves the credential while constructing authentication
+headers and uses that invocation's result directly. Each retry resolves a fresh
+credential. `client.apiKey` still exposes the most recently resolved value, but it
+is shared across requests and must not be used to select a concurrent request's
+credential. Static credentials continue to use the current `client.apiKey` value.
+
+#### Subclass authentication hooks
+
+Function credentials are resolved after `prepareOptions` and request URL/body
+construction. Calling `buildRequest` directly also resolves a function credential.
+Default and request headers retain their existing precedence over SDK authentication.
+
+Subclasses that previously customized HTTP credentials through `_callApiKey` or
+assigned `this.apiKey` after `super.prepareOptions()` should override
+`resolveAPIKey()` and return the credential instead. Overrides of `authHeaders`
+or `bearerAuth` can continue to return custom authentication headers. Delegating
+hooks keep their existing arguments; no request context needs to be forwarded.
+`_callApiKey` remains available with its existing boolean return and capture callback
+for Realtime and direct callers, but ordinary HTTP authentication no longer calls it.
+
 ### Environment and client configuration
 
 The client reads these optional environment variables when their corresponding
