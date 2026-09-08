@@ -12,7 +12,7 @@ import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import type { FinalRequestOptions, RequestOptions } from './internal/request-options';
-import { prepareAPIKey } from './internal/request-options';
+import { prepareAPIKey, resolvedAPIKey } from './internal/request-options';
 import { readEnv } from './internal/utils';
 import { addOutputText } from './lib/ResponsesParser';
 import type { ResponseStreamParams } from './lib/responses/ResponseStream';
@@ -276,7 +276,7 @@ export class BedrockOpenAI extends OpenAI {
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     const credential =
-      security.bearerAuth || security.adminAPIKeyAuth ? await this.resolvedAPIKey(opts) : null;
+      security.bearerAuth || security.adminAPIKeyAuth ? await this[resolvedAPIKey](opts) : null;
     if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
       assertValidBedrockBearerCredential(credential);
       try {

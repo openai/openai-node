@@ -845,7 +845,7 @@ export class OpenAI {
           : await authentication.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
-    const apiKey = await this.resolvedAPIKey(opts);
+    const apiKey = await this[Opts.resolvedAPIKey](opts);
     if (apiKey == null) {
       return undefined;
     }
@@ -1006,7 +1006,7 @@ export class OpenAI {
     }
   }
 
-  protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
+  protected async [Opts.resolvedAPIKey](options: FinalRequestOptions): Promise<string | null> {
     const attempt = this.currentAPIKeyPreparationAttempt(options);
     const prepared = attempt?.prepared;
     if (prepared) {
