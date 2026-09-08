@@ -2370,7 +2370,7 @@ export class OpenAI {
     const requestHeaderSnapshot =
       this._workloadIdentityAuth && !x509Authentication
         ? (this.#workloadTokenProvenance.scopeFor(inputOptions, credentialContext)?.headers?.requestHeaders ??
-          snapshotHeaders(options.headers))
+          snapshotHeaders(options.headers, 'request'))
         : undefined;
     if (requestHeaderSnapshot && (requestHeaderSnapshot.initialized || 'body' in options)) {
       options.headers =
@@ -2472,7 +2472,7 @@ export class OpenAI {
       let defaultLayer = this.#workloadTokenProvenance.scopeFor(options, credentialContext)?.headers
         ?.defaultHeaders;
       const bodyLayer = snapshotHeaders(bodyHeaders);
-      const requestLayer = requestHeaderSnapshot ?? snapshotHeaders(options.headers);
+      const requestLayer = requestHeaderSnapshot ?? snapshotHeaders(options.headers, 'request');
       let initialized = false;
       refreshSuppliedHeaders = (afterAuthentication = false) => {
         const existingDefaultLayer = defaultLayer;

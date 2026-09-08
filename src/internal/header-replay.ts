@@ -13,6 +13,8 @@ export type HeaderSource =
 
 /** Canonical normalization and merged-value access, supplied by headers.ts for one parse. */
 export interface HeaderReplayCallbacks {
+  /** The owning layer controls whether a newly emitted request alias supersedes a retained accessor. */
+  layer?: 'request' | 'default' | undefined;
   /** Normalizes one stateful value once before retaining it. */
   normalize: (name: string, value: string) => string;
   /** Reads a completed record property's normalized result before the next alias is merged. */
@@ -73,7 +75,8 @@ interface HeaderPropertySnapshot {
 
 interface HeaderRecordSnapshot {
   descriptor: PropertyDescriptor | undefined;
-  value?: HeaderPropertySnapshot['entry'];
+  // Null records a completed array that emitted nothing; undefined means it was not observed.
+  value?: HeaderPropertySnapshot['entry'] | null;
 }
 
 interface HeaderSlotSnapshot<T = unknown> {
@@ -688,15 +691,29 @@ const sameRecordValue = (
   return current === previous;
 };
 
-const rememberRecordValue = (name: string, property: HeaderPropertySnapshot, replay: HeaderReplayState) => {
+const rememberRecordValue = (
+  name: string,
+  current: HeaderRecordSnapshot['value'],
+  replay: HeaderReplayState,
+  layer: HeaderReplayCallbacks['layer'],
+) => {
   const prior = replay.propertyOrder?.get(name);
-  const current = property.entry;
-  if (!prior || !current) {
+  if (!prior || current === undefined) {
+    return;
+  }
+  // Other layers compare replacements with their last emitted value, even after an empty iteration.
+  if (layer !== 'request' && current === null && prior.value !== undefined) {
     return;
   }
   // Compare canonical values after their normal read; array identity alone misses in-place replacements.
   // Null-only removals retain their existing ordering; replacement values can supersede cached accessors.
-  if (prior.value && current[1] !== null && !sameRecordValue(current[1], prior.value[1])) {
+  // Newly emitted request aliases override retained accessors; defaults preserve no-emission precedence.
+  if (
+    prior.value !== undefined &&
+    current !== null &&
+    current[1] !== null &&
+    (prior.value === null ? layer === 'request' : !sameRecordValue(current[1], prior.value[1]))
+  ) {
     replay.changedAliases ??= new Map();
     const lowerName = name.toLowerCase();
     if (!replay.changedAliases.has(lowerName)) {
@@ -732,9 +749,9 @@ const rememberParsedRow = (
   }
   if (emitted && (snapshot || !refresh?.refreshable)) {
     property.entry = callbacks.capture(row.name);
-    if (snapshot) {
-      rememberRecordValue(row.name, property, replay);
-    }
+  }
+  if (snapshot) {
+    rememberRecordValue(row.name, emitted ? property.entry : null, replay, callbacks.layer);
   }
   if (!refresh?.refreshable) {
     rememberProperty(headers, row.name, property, replay);

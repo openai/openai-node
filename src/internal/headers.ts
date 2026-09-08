@@ -103,6 +103,7 @@ function* iterateHeaders(
   replay?: HeaderReplay,
   provenance?: { unknown: boolean; values?: Headers },
   capture: HeaderReplayCallbacks['capture'] = (name) => [name, null],
+  layer?: HeaderReplayCallbacks['layer'],
 ): IterableIterator<readonly [string, string | null]> {
   if (!headers) return;
 
@@ -118,6 +119,7 @@ function* iterateHeaders(
   }
 
   const callbacks: HeaderReplayCallbacks = {
+    layer,
     normalize: (name, value) => new Headers([[name, value]]).get(name)!,
     capture,
     previous: (snapshot) => iterateHeaders(snapshot, undefined, provenance),
@@ -137,25 +139,32 @@ const mergeHeaderEntries = (
     source: HeadersLike;
     provenance: { unknown: boolean; values?: Headers };
     replay?: HeaderReplay;
+    layer?: HeaderReplayCallbacks['layer'];
   }[],
 ): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
   let credential: ReturnType<typeof workloadHeaderCredential>;
   let hasAuthorizationLayer = false;
-  for (const { source, provenance, replay } of newHeaders) {
+  for (const { source, provenance, replay, layer } of newHeaders) {
     const seenHeaders = new Set<string>();
     let suppliesAuthorization = false;
-    const entries = iterateHeaders(source, replay, provenance, (name) => {
-      const lowerName = name.toLowerCase();
-      const value = targetHeaders.get(lowerName);
-      return [
-        name,
-        value !== null && lowerName === 'set-cookie'
-          ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
-          : value,
-      ];
-    });
+    const entries = iterateHeaders(
+      source,
+      replay,
+      provenance,
+      (name) => {
+        const lowerName = name.toLowerCase();
+        const value = targetHeaders.get(lowerName);
+        return [
+          name,
+          value !== null && lowerName === 'set-cookie'
+            ? [...targetHeaders.entries()].filter(([key]) => key === lowerName).map(([, entry]) => entry)
+            : value,
+        ];
+      },
+      layer,
+    );
     for (const [name, value] of entries) {
       if (!httpTokenHeaderName.test(name)) {
         throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
@@ -273,7 +282,7 @@ export interface HeaderSnapshot {
   readonly initialized: boolean;
   refresh: (...sources: [] | [HeadersLike]) => NullableHeaders;
   seed: (source: HeadersLike, snapshot: NullableHeaders | undefined) => void;
-  fork: () => HeaderSnapshot;
+  fork: (layer?: HeaderReplayCallbacks['layer']) => HeaderSnapshot;
 }
 
 const createHeaderSnapshot = (
@@ -284,9 +293,11 @@ const createHeaderSnapshot = (
     deferred?: boolean;
     replay?: HeaderReplay;
     materialization?: { source: HeadersLike; snapshot?: NullableHeaders };
+    layer?: HeaderReplayCallbacks['layer'];
   },
 ): HeaderSnapshot => {
   let source = initialSource;
+  const layer = initial?.layer;
   // Forks share only their first materialization; source replacement and replay state stay layer-local.
   const materialization = initial?.materialization ?? { source: initialSource };
   const captured = initial?.snapshot ? capturedHeaderReplays.get(initial.snapshot) : undefined;
@@ -312,7 +323,7 @@ const createHeaderSnapshot = (
     inheritMaterialization();
     if (snapshot) return snapshot;
     const provenance = { unknown: false };
-    snapshot = mergeHeaderEntries([{ source, provenance, replay }]);
+    snapshot = mergeHeaderEntries([{ source, provenance, replay, layer }]);
     capturedHeaderReplays.set(snapshot, { source, replay: replay.fork() });
     rememberMaterialization();
     return snapshot;
@@ -347,6 +358,7 @@ const createHeaderSnapshot = (
             source: currentSource,
             provenance: nextProvenance,
             replay: nextReplay,
+            layer,
           },
         ]);
         if (
@@ -376,19 +388,22 @@ const createHeaderSnapshot = (
         rememberMaterialization();
       }
     },
-    fork: () =>
+    fork: (forkLayer = layer) =>
       createHeaderSnapshot(source, {
         ...(snapshot ? { snapshot } : {}),
         deferred: !snapshot,
         replay: replay.fork(),
         materialization,
+        layer: forkLayer,
       }),
   };
 };
 
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
-export const snapshotHeaders = (initialSource: HeadersLike): HeaderSnapshot =>
-  createHeaderSnapshot(initialSource);
+export const snapshotHeaders = (
+  initialSource: HeadersLike,
+  layer?: HeaderReplayCallbacks['layer'],
+): HeaderSnapshot => createHeaderSnapshot(initialSource, { layer });
 
 /** Parsed header layers shared by preparation and automatic retries. */
 export interface WorkloadHeaderSnapshots {
@@ -423,6 +438,7 @@ export function createWorkloadHeaderSnapshots(
     typeof source === 'object' && source !== null ? captured?.get(source) : undefined;
   const capturedDefault = capturedSnapshot(defaults);
   const defaultHeaders = createHeaderSnapshot(defaults, {
+    layer: 'default',
     ...(capturedDefault ? { snapshot: capturedDefault } : {}),
     refreshable: false,
     deferred: deferDefault && !capturedDefault,
@@ -432,8 +448,9 @@ export function createWorkloadHeaderSnapshots(
     defaultHeaders,
     requestHeaders:
       request === defaults
-        ? defaultHeaders.fork()
+        ? defaultHeaders.fork('request')
         : createHeaderSnapshot(request, {
+            layer: 'request',
             ...(capturedRequest ? { snapshot: capturedRequest } : {}),
             refreshable: false,
             deferred: deferRequest && !capturedRequest,

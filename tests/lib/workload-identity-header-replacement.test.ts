@@ -45,6 +45,65 @@ test.each(['before', 'after'] as const)(
   },
 );
 
+describe.each(['request', 'default', 'shared'] as const)('initially non-emitting %s alias', (layer) => {
+  describe.each(['empty', 'undefined'] as const)('%s array', (initial) => {
+    test.each([
+      ['replacement', 401],
+      ['replacement', 500],
+      ['unchanged', 401],
+      ['removal', 401],
+    ] as const)('observes %s during token acquisition and %i', async (change, status) => {
+      const values: (string | null | undefined)[] = initial === 'empty' ? [] : [undefined];
+      const headers: Record<string, string | (string | null | undefined)[]> = { authorization: values };
+      const read = vi.fn(() => {
+        delete headers['Authorization'];
+        return 'Bearer workload-identity-auth';
+      });
+      Object.defineProperty(headers, 'Authorization', { enumerable: true, configurable: true, get: read });
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        if (change !== 'unchanged') {
+          values[0] = change === 'replacement' ? 'Bearer independent' : null;
+        }
+        return 'subject-token';
+      };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        const request = new Request(url, init as globalThis.RequestInit);
+        expect(request.method).toBe('POST');
+        sent.push(request.headers.get('Authorization'));
+        return Response.json({ error: 'synthetic retry' }, { status, headers: { 'retry-after-ms': '0' } });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        defaultHeaders: layer === 'request' ? undefined : headers,
+        fetch: transport.fetch,
+        maxRetries: status === 500 ? 1 : 0,
+      });
+
+      await expect(
+        client.post('https://independent.example.test/synthetic', {
+          headers: layer === 'default' ? undefined : headers,
+          body: { input: 'synthetic' },
+        }),
+      ).rejects.toMatchObject({ status });
+
+      const independent = layer !== 'default' && change === 'replacement';
+      const first = independent ? 'Bearer independent' : 'Bearer access-token-1';
+      const expected = [first];
+      if (status === 500) {
+        expected.push(first);
+      } else if (!independent) {
+        expected.push('Bearer access-token-2');
+      }
+      expect(sent).toEqual(expected);
+      expect(transport.exchanges).toBe(independent || status === 500 ? 1 : 2);
+      expect(read).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
 describe.each(['request', 'default'] as const)('replaced %s Authorization accessor', (layer) => {
   describe.each(['data', 'mixed'] as const)('%s nested alias', (kind) => {
     test.each([
@@ -249,4 +308,38 @@ describe.each(['request', 'default'] as const)('replaced %s Authorization access
       expect(read).toHaveBeenCalledTimes(1);
     },
   );
+});
+
+test('retains the last emitted default alias across a non-emitting retry', async () => {
+  const values = ['Bearer initial'];
+  const headers: Record<string, string | string[]> = { authorization: values };
+  const read = vi.fn(() => {
+    delete headers['Authorization'];
+    return 'Bearer workload-identity-auth';
+  });
+  Object.defineProperty(headers, 'Authorization', { enumerable: true, configurable: true, get: read });
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((url, init) => {
+    sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+    if (sent.length === 1) {
+      values.length = 0;
+    } else if (sent.length === 2) {
+      values.push('Bearer independent');
+    }
+    return Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    defaultHeaders: headers,
+    fetch: transport.fetch,
+    maxRetries: 2,
+  });
+
+  await expect(
+    client.post('https://independent.example.test/synthetic', { body: { input: 'synthetic' } }),
+  ).rejects.toMatchObject({ status: 500 });
+
+  expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-1', 'Bearer independent']);
+  expect(transport.exchanges).toBe(1);
+  expect(read).toHaveBeenCalledTimes(1);
 });
