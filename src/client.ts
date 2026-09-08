@@ -322,8 +322,7 @@ type WorkloadIdentityRequest = {
   authorization: string | undefined;
   credential: WorkloadCredentialUsage | undefined;
   responses: WeakMap<Response, boolean>;
-  dispatches: number;
-  singleDispatchUsed: boolean;
+  allResponsesUsedWorkloadToken: boolean | undefined;
 };
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
@@ -1502,8 +1501,7 @@ export class OpenAI {
       authorization: initialWorkloadAuthorization,
       credential: workloadCredential,
       responses: new WeakMap<Response, boolean>(),
-      dispatches: 0,
-      singleDispatchUsed: false,
+      allResponsesUsedWorkloadToken: undefined,
     };
     if (this._workloadIdentityAuth && !x509Authentication) {
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
@@ -1525,8 +1523,7 @@ export class OpenAI {
       });
     const usedWorkloadToken =
       !(response instanceof globalThis.Error) &&
-      (workloadRequest.responses.get(response) ??
-        (workloadRequest.dispatches === 1 && workloadRequest.singleDispatchUsed));
+      (workloadRequest.responses.get(response) ?? workloadRequest.allResponsesUsedWorkloadToken) === true;
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -1876,7 +1873,10 @@ export class OpenAI {
       // Only this dispatch owner can attest to the headers passed to the configured fetch.
       // Hooks that send independently own their authentication retries.
       const dispatch = this.#snapshotWorkloadIdentityUsage(workloadRequest, url, fetchOptions);
-      if (workloadRequest) workloadRequest.dispatches += 1;
+      if (workloadRequest && !dispatch.used) {
+        // An in-flight independent send also makes an unmarked response copy ambiguous.
+        workloadRequest.allResponsesUsedWorkloadToken = false;
+      }
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       const response = await (this.#x509Fetch ?? this.fetch).call(
         undefined,
@@ -1889,8 +1889,8 @@ export class OpenAI {
           response,
           dispatch.used && workloadRequest.responses.get(response) !== false,
         );
-        // Response copies retain the existing contract only when one dispatch can own them.
-        if (workloadRequest.dispatches === 1) workloadRequest.singleDispatchUsed = dispatch.used;
+        // Preserve response copies when every delegated send uses workload authentication.
+        workloadRequest.allResponsesUsedWorkloadToken ??= dispatch.used;
       }
       return response;
     } catch (err) {

@@ -131,43 +131,108 @@ test.each(
   (['clone', 'reconstruct'] as const).flatMap((copy) =>
     [false, true].map((multiple) => ({ copy, multiple })),
   ),
-)('preserves response-copy refresh only for a single dispatch: %j', async ({ copy, multiple }) => {
-  class HookClient extends OpenAI {
-    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
-      const response = await super.fetchWithTimeout(...args);
-      if (multiple) {
-        const ignored = await super.fetchWithTimeout(...args);
-        await ignored.body?.cancel();
+)(
+  'preserves response-copy refresh when every dispatch uses workload authentication: %j',
+  async ({ copy, multiple }) => {
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const response = await super.fetchWithTimeout(...args);
+        if (multiple) {
+          const ignored = await super.fetchWithTimeout(...args);
+          await ignored.body?.cancel();
+        }
+        if (copy === 'clone') {
+          const cloned = response.clone();
+          // Both tee branches must close before the SDK can await cancellation of a rejected response.
+          void response.body?.cancel();
+          return cloned;
+        }
+        return new Response(response.body, { status: response.status, headers: response.headers });
       }
-      if (copy === 'clone') {
-        const cloned = response.clone();
-        // Both tee branches must close before the SDK can await cancellation of a rejected response.
-        void response.body?.cancel();
-        return cloned;
-      }
-      return new Response(response.body, { status: response.status, headers: response.headers });
     }
-  }
-  const sent: (string | null)[] = [];
-  const transport = createWorkloadIdentityTransport((_url, init) => {
-    const authorization = new Headers(init?.headers).get('Authorization');
-    sent.push(authorization);
-    return authorization === 'Bearer access-token-2'
-      ? Response.json({ data: [] })
-      : Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
-  });
-  const client = new HookClient({
-    ...createTestClientOptions(),
-    apiKey: null,
-    adminAPIKey: null,
-    maxRetries: 0,
-    fetch: transport.fetch,
-  });
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const authorization = new Headers(init?.headers).get('Authorization');
+      sent.push(authorization);
+      return authorization === 'Bearer access-token-2'
+        ? Response.json({ data: [] })
+        : Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      maxRetries: 0,
+      fetch: transport.fetch,
+    });
 
-  await (multiple
-    ? expect(client.models.list()).rejects.toMatchObject({ status: 401 })
-    : client.models.list());
+    await client.models.list();
 
-  expect(sent).toEqual(['Bearer access-token-1', `Bearer access-token-${multiple ? 1 : 2}`]);
-  expect(transport.exchanges).toBe(multiple ? 1 : 2);
-});
+    expect(sent).toEqual(
+      multiple
+        ? ['Bearer access-token-1', 'Bearer access-token-1', 'Bearer access-token-2', 'Bearer access-token-2']
+        : ['Bearer access-token-1', 'Bearer access-token-2'],
+    );
+    expect(transport.exchanges).toBe(2);
+  },
+);
+
+test.each([false, true])(
+  'does not refresh a copied response after mixed sends (independent pending: %s)',
+  async (pending) => {
+    const discarded: Promise<Response>[] = [];
+    const releases: (() => void)[] = [];
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const selected = await super.fetchWithTimeout(...args);
+        const independent = super.fetchWithTimeout(
+          args[0],
+          { ...args[1], headers: { Authorization: 'Bearer independent' } },
+          args[2],
+          new AbortController(),
+          args[4],
+        );
+        discarded.push(independent);
+        if (!pending) {
+          // oxlint-disable-next-line unicorn/prefer-at -- Tests use the SDK's ES2020 TypeScript library.
+          releases[releases.length - 1]?.();
+          await independent;
+        }
+        const clone = selected.clone();
+        void selected.body?.cancel();
+        return clone;
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sends += 1;
+      const response = Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      if (new Headers(init?.headers).get('Authorization') === 'Bearer independent') {
+        // oxlint-disable-next-line promise/avoid-new -- The fixture keeps an independent dispatch pending through response selection.
+        return new Promise<Response>((resolve) => {
+          releases.push(() => resolve(response));
+        });
+      }
+      return response;
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      maxRetries: 0,
+      fetch: transport.fetch,
+    });
+
+    try {
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(sends).toBe(2);
+      expect(transport.exchanges).toBe(1);
+    } finally {
+      for (const release of releases) {
+        release();
+      }
+      const responses = await Promise.all(discarded);
+      await Promise.all(responses.map((response) => response.body?.cancel()));
+    }
+  },
+);

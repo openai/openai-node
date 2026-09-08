@@ -296,7 +296,7 @@ export class WorkloadTokenProvenance {
     const recovered = platformHeader === undefined ? { ...headers, values: new Headers(values) } : headers;
     const authorization =
       platformHeader === undefined
-        ? Headers.prototype.get.call(recovered.values, 'authorization')
+        ? (getPlatformHeader(recovered.values, 'authorization')?.value ?? null)
         : platformHeader.value;
     const token = bearerToken(authorization);
     if (
