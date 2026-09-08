@@ -959,7 +959,8 @@ export class OpenAI {
   private currentAPIKeyPreparationAttempt(
     options: FinalRequestOptions,
   ): APIKeyPreparationAttempt | undefined {
-    return this.#apiKeyPreparationAttempts.get(options)?.at(-1);
+    const attempts = this.#apiKeyPreparationAttempts.get(options);
+    return attempts?.[attempts.length - 1];
   }
 
   private removeAPIKeyPreparationAttempt(
