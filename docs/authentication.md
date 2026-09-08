@@ -320,11 +320,17 @@ arrays, and data records retain live refresh behavior.
 When attributing a workload credential at dispatch, the SDK preserves local native `Headers`,
 plain-record, and ordinary tuple-array identity. Other iterable implementations, including foreign
 `Headers` collections, are materialized once and that same snapshot is passed to the transport.
+Protected request and transport hooks keep the original request object and its header source until
+the final dispatch snapshot. Accessors therefore observe the same request fields that later hooks
+update. If a hook replaces an opaque, unconsumed source with unmarked copied headers, equal token
+bytes alone cannot restore its refresh ownership; retain SDK-marked values when forwarding ownership.
 Structural constructor/tag descriptors cannot establish that a custom `get()` method agrees with its
 iterator. Foreign collection identity and custom properties are therefore not retained on this path;
 header values and workload refresh remain supported. Headers from a foreign `Request` are also
 materialized into the dispatch snapshot while the `Request` object retains its identity.
 Native `Request` delegation is unchanged.
+Resolving the legacy workload placeholder in native `Headers` updates that collection in place,
+including when its outer request is frozen. A later delegated send can reuse the resolved headers.
 
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Ordinary object
 spread retains the SDK request carrier, including when a legacy wrapper also replaces the controller.

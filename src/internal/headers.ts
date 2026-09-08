@@ -1,5 +1,5 @@
 import { isReadonlyArray } from './utils/values';
-import { getHeadersIterator, getPlatformHeader } from './platform-headers';
+import { getHeadersIterator, getPlatformHeader, getVerifiedPlatformHeader } from './platform-headers';
 export { getPlatformHeader } from './platform-headers';
 import {
   copyWorkloadHeaderCredential,
@@ -141,15 +141,18 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
     // Removing an occurrence invalidates its ordinal. Inspect ordinary slots without rereading row getters.
     for (let index = 0; duplicates.size && index < length; index += 1) {
       const descriptor = getHeaderRowDescriptor(headers, String(index));
-      if (!descriptor || !('value' in descriptor) || replay.arraySlots?.has(index)) {
-        duplicates.clear();
+      const retained = replay.arraySlots?.get(index);
+      const observed = retained && (!descriptor || sameHeaderProperty(descriptor, retained.descriptor));
+      if (!observed && (!descriptor || !('value' in descriptor))) {
+        for (const row of duplicates.keys()) replay.rows!.delete(row);
         break;
       }
-      const count = duplicates.get(descriptor.value);
-      if (count !== undefined) duplicates.set(descriptor.value, count + 1);
+      const row = observed ? retained.row : descriptor!.value;
+      const count = duplicates.get(row);
+      if (count !== undefined) duplicates.set(row, count + 1);
     }
     for (const [row, count] of duplicates) {
-      if (count < replay.rows!.get(row)!.size) replay.rows!.delete(row);
+      if (count < (replay.rows!.get(row)?.size ?? 0)) replay.rows!.delete(row);
     }
   }
   let index = 0;
@@ -233,7 +236,7 @@ export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<obje
           if (!Object.getOwnPropertyDescriptor(headers, String(index))) return false;
         }
       } else {
-        return hasNativeHeadersBrand(headers) && descriptor.value === Headers.prototype[Symbol.iterator];
+        return getVerifiedPlatformHeader(headers, 'authorization') !== undefined;
       }
     }
     return Object.entries(Object.getOwnPropertyDescriptors(headers)).every(([key, property]) => {

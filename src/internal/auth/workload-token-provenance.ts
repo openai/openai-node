@@ -1,4 +1,4 @@
-import { getPlatformHeader } from '../platform-headers';
+import { getPlatformHeader, getVerifiedPlatformHeader } from '../platform-headers';
 import type { NullableHeaders, WorkloadHeaderSnapshots } from '../headers';
 
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
@@ -55,7 +55,7 @@ const mutateHeaders = (headers: Headers, mutation: (...args: string[]) => void, 
   }
 };
 
-const observeHeaderMutations = (headers: Headers, credential: HeaderCredential): void => {
+const observeHeaderMutations = (headers: object, credential: HeaderCredential): void => {
   if (observedHeaderMutations.has(headers)) {
     return;
   }
@@ -162,7 +162,7 @@ export function rememberWorkloadHeaderCredential(
 }
 
 /** Native header values additionally own observable Authorization mutations. */
-export function rememberWorkloadHeaderValues(headers: Headers, credential: HeaderCredential | null): void {
+export function rememberWorkloadHeaderValues(headers: object, credential: HeaderCredential | null): void {
   headerCredentials.set(headers, credential);
   if (credential) {
     observeHeaderMutations(headers, credential);
@@ -232,6 +232,28 @@ export class WorkloadTokenProvenance {
   static forDispatch<T extends object>(request: T): T {
     Reflect.deleteProperty(request, requestCredentialCarrier);
     return request;
+  }
+
+  /** Observes data-valued request headers without invoking caller-owned accessors. */
+  static requestHeaderData(request: object): object | undefined {
+    try {
+      const seen = new Set<object>();
+      for (let source: object | null = request; source; source = Object.getPrototypeOf(source)) {
+        if (seen.has(source)) {
+          break;
+        }
+        seen.add(source);
+        const descriptor = Object.getOwnPropertyDescriptor(source, 'headers');
+        if (!descriptor) {
+          continue;
+        }
+        const value: unknown = 'value' in descriptor ? descriptor.value : undefined;
+        return typeof value === 'object' && value !== null ? value : undefined;
+      }
+    } catch {
+      // Opaque request representations retain their normal reads at dispatch.
+    }
+    return undefined;
   }
 
   /** Reads only this client's opaque SDK request carrier, without evaluating caller accessors. */
@@ -366,45 +388,40 @@ export class WorkloadTokenProvenance {
     );
   }
 
-  /** Checks provenance retained by the header values or SDK request carrier. */
-  matchesResult(result: { req: { headers: Headers } }, authorization: string): boolean {
-    return this.retainResultCredential(result, authorization).isCurrent();
-  }
-
-  /** Keeps revocation effective after native copies lose their per-object metadata. */
-  retainResultCredential(
-    result: { req: { headers: Headers } },
-    authorization: string,
-  ): WorkloadCredentialUsage {
-    const headerMatch = this.matchesHeaderCredential(result.req.headers, authorization);
-    let credential: HeaderCredential | null | undefined;
-    if (headerMatch === undefined) {
-      const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
-      credential =
-        typeof carrier === 'object' && carrier !== null ? this.results.get(carrier)?.credential : undefined;
-    } else {
-      credential = headerMatch ? workloadHeaderCredential(result.req.headers) : null;
+  /** Retains ownership without consuming hook-visible header getters or opaque iterables. */
+  retainRequestCredential(
+    request: object,
+  ): { authorization: string; credential: WorkloadCredentialUsage } | undefined {
+    const headers = WorkloadTokenProvenance.requestHeaderData(request);
+    const headerCredential = headers && workloadHeaderCredential(headers);
+    const carrier = this.requestCarrier(request);
+    const selected =
+      headerCredential === undefined ? carrier && this.results.get(carrier)?.credential : headerCredential;
+    if (!selected || selected.revoked || selected.owner !== this) {
+      return undefined;
     }
-    if (credential && headerMatch === undefined) {
-      rememberWorkloadHeaderValues(result.req.headers, credential);
+    let credential = selected;
+    const platformHeader = getVerifiedPlatformHeader(headers, 'Authorization');
+    if (platformHeader && bearerToken(platformHeader.value) !== credential.token) {
+      return undefined;
+    }
+    if (platformHeader && headerCredential === undefined && headers) {
+      rememberWorkloadHeaderValues(headers, credential);
+    }
+    if (credential.revoked) {
+      return undefined;
     }
     return {
-      isCurrent: () =>
-        credential !== undefined &&
-        credential !== null &&
-        !credential.revoked &&
-        credential.owner === this &&
-        bearerToken(authorization) === credential.token,
-      revoke: () => {
-        if (credential) {
+      authorization: `Bearer ${credential.token}`,
+      credential: {
+        isCurrent: () => !credential.revoked,
+        revoke: () => {
           credential.revoked = true;
-        }
-      },
-      adopt: (headers) => {
-        if (credential) {
+        },
+        adopt: (values) => {
           credential = { ...credential };
-          rememberWorkloadHeaderValues(headers, credential);
-        }
+          rememberWorkloadHeaderValues(values, credential);
+        },
       },
     };
   }

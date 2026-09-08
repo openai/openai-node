@@ -94,6 +94,55 @@ test('refreshes aliased row accessor replacements independently for each header 
   expect(transport.exchanges).toBe(1);
 });
 
+test.each([false, true])(
+  'refreshes duplicate rows beside opaque slots when replaced: %j',
+  async (replace) => {
+    const read = vi.fn(() => {
+      if (!replace && read.mock.calls.length > 2) {
+        throw new Error('An unchanged occurrence was reread');
+      }
+      return read.mock.calls.length === 1 ? 'A' : 'B';
+    });
+    const row = ['X-Custom', ''];
+    Object.defineProperty(row, 1, { get: read });
+    const headers = [row, row];
+    const readSlot = vi.fn(() => {
+      if (readSlot.mock.calls.length > 1) {
+        throw new Error('The opaque row slot was reread');
+      }
+      return row;
+    });
+    Object.defineProperty(headers, 1, { get: readSlot });
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('X-Custom'));
+      if (sent.length === 1) {
+        if (replace) {
+          headers[0] = ['X-Replacement', 'new'];
+        }
+        return Response.json(
+          { error: 'synthetic retry' },
+          { status: 500, headers: { 'retry-after-ms': '0' } },
+        );
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list({ headers });
+
+    expect(sent).toEqual(['A, B', replace ? 'B' : 'A, B']);
+    expect(read).toHaveBeenCalledTimes(replace ? 3 : 2);
+    expect(readSlot).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 describe.each(['name', 'value'] as const)('retained row %s getter', (field) => {
   describe.each(['request', 'default'] as const)('%s headers', (layer) => {
     test.each([null, 'Bearer independent'] as const)(

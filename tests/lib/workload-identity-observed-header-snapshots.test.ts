@@ -46,12 +46,7 @@ test.each(['record', 'array', 'structural'] as const)(
         if (!request) {
           throw new Error('Expected a request');
         }
-        if (kind === 'structural') {
-          expect(request.headers).not.toBe(supplied);
-          expect(request.headers).toBeInstanceOf(Headers);
-        } else {
-          expect(request.headers).toBe(supplied);
-        }
+        expect(request.headers).toBe(supplied);
         const headers = new Headers(request.headers);
         headers.set('Authorization', originalAuthorization);
         request.headers = headers;
