@@ -269,18 +269,17 @@ class WrappedClient extends OpenAI {
 `bearerAuth` receives the context as its second argument. `buildRequest` overrides can forward the
 complete second argument, including `credentialContext`, when rebuilding SDK results. An independent
 Authorization layer replaces the SDK credential's provenance even when the string values are equal.
-An in-place Authorization overwrite has the same effect; subsequent header copies do not restore
+An observable in-place Authorization change has the same effect; subsequent header copies do not restore
 SDK ownership.
 
-Successful `set`, `append`, and `delete` calls on an SDK-owned native `Headers` revoke that header layer's
-refresh ownership when they target Authorization, even if the resulting bytes are unchanged. An
-independent header layer observed between SDK hook calls also remains independent after a later copy.
+The SDK checks Authorization at hook boundaries without replacing native `Headers` methods. A changed
+value or removal revokes that header layer's refresh ownership. A same-byte `set`, or a `delete` followed
+by restoring the original value before the next check, is treated as unchanged. An independent header
+layer observed between SDK hook calls remains independent after a later copy.
 Parsed copies have independent mutation state; changing an unused copy does not invalidate the selected request.
-Reconstructed headers whose mutators cannot be observed retain their normal operations, but do not
-enable automatic authentication refresh. Calling native prototype methods directly, or creating and
-overwriting a native copy entirely inside a hook before delegating, bypasses this observation. Express
-independent credentials as a record or tuple layer through `buildHeaders` and return that layer to the
-SDK before further copying it.
+Headers with nonstandard mutators retain their normal operations, but do not enable automatic
+authentication refresh. To mark equal-byte credentials as independent, express them as a record or tuple
+layer through `buildHeaders` and return that layer to the SDK before further copying it.
 
 Return the SDK-produced authentication result, retain its marked header values, or rebuild it with
 `buildHeaders([result, additionalHeaders])` to preserve ownership. Immediate delegation can also copy
