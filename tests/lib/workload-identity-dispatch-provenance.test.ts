@@ -5,6 +5,102 @@ import { buildHeaders } from 'openai/internal/headers';
 import { test, vi } from 'vitest';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
+test.each([
+  ['workload', 'independent'],
+  ['independent', 'workload'],
+  ['workload', 'placeholder'],
+  ['independent', 'placeholder'],
+  ['placeholder', 'independent'],
+  ['placeholder', 'workload'],
+  ['placeholder', 'missing'],
+] as const)(
+  'uses the dispatched snapshot when a branded reader reports %s and emits %s',
+  async (reported, emitted) => {
+    let reads = 0;
+    let iterations = 0;
+    const StructuralHeaders = class Headers {
+      #reported: string;
+      #emitted: string | null;
+
+      constructor(readerValue: string, iteratorValue: string | null) {
+        this.#reported = readerValue;
+        this.#emitted = iteratorValue;
+      }
+
+      has(name: string) {
+        return this.#reported !== '' && name.toLowerCase() === 'authorization';
+      }
+
+      get(name: string) {
+        reads += 1;
+        return name.toLowerCase() === 'authorization' ? this.#reported : null;
+      }
+
+      *entries() {
+        iterations += 1;
+        if (this.#emitted !== null) {
+          yield ['Authorization', this.#emitted];
+        }
+      }
+    };
+    Object.defineProperties(StructuralHeaders.prototype, {
+      [Symbol.toStringTag]: { value: 'Headers' },
+      [Symbol.iterator]: { value: StructuralHeaders.prototype.entries },
+    });
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [, request] = args;
+        if (!request) {
+          throw new Error('Expected request init');
+        }
+        const authorization = new Headers(request.headers).get('Authorization');
+        if (authorization === null) {
+          throw new Error('Expected workload authorization');
+        }
+        const values = {
+          workload: authorization,
+          independent: 'Bearer independent',
+          placeholder: 'Bearer workload-identity-auth',
+          missing: null,
+        };
+        request.headers = new StructuralHeaders(values[reported], values[emitted]) as unknown as Headers;
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(init?.headers).toBeInstanceOf(Headers);
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ ok: true });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      maxRetries: 0,
+      fetch: transport.fetch,
+    });
+
+    const request = client.post('/synthetic', { body: { value: 1 } });
+    const outcome = await request.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    const retry = emitted === 'workload' || emitted === 'placeholder';
+    expect(sent).toEqual(
+      retry
+        ? ['Bearer access-token-1', 'Bearer access-token-2']
+        : [emitted === 'missing' ? null : 'Bearer independent'],
+    );
+    expect(transport.exchanges).toBe(retry ? 2 : 1);
+    expect(iterations).toBe(sent.length);
+    expect(reads).toBeGreaterThan(0);
+    expect(outcome).toMatchObject(retry ? { value: { ok: true } } : { error: { status: 401 } });
+  },
+);
+
 test.each(['Bearer independent', null] as const)(
   'classifies structural Headers from dispatched entries rather than get(): %j',
   async (authorization) => {

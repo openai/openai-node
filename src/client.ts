@@ -2660,11 +2660,8 @@ export class OpenAI {
         return { init, used: false, unreadable: true };
       }
     }
-    if (
-      resolvePlaceholder &&
-      (platformHeader ? platformHeader.value : headers?.get('Authorization')) ===
-        `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`
-    ) {
+    const authorization = headers ? headers.get('Authorization') : platformHeader?.value;
+    if (resolvePlaceholder && authorization === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
       const resolved = headers ?? (sourceHeaders as Headers);
       return {
         init: headers ? { ...init, headers } : init,
@@ -2685,8 +2682,7 @@ export class OpenAI {
       (request.credential?.isCurrent() ?? false) &&
       marked !== false &&
       (!pending || pending === sourceHeaders || marked === true) &&
-      bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
-        bearerToken(request.authorization);
+      bearerToken(authorization ?? null) === bearerToken(request.authorization);
     if (
       used &&
       headers &&
