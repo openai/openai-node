@@ -137,7 +137,7 @@ export const getStructuralHeaderValue = (
       for (const key of Reflect.ownKeys(headers)) {
         if (typeof key !== 'string' || key.toLowerCase() !== requested) continue;
         const descriptor = Object.getOwnPropertyDescriptor(headers, key);
-        if (!descriptor?.enumerable || !('value' in descriptor)) return undefined;
+        if (!descriptor || !('value' in descriptor)) return undefined;
         const input = copyInput(descriptor.value);
         if (!input) return undefined;
         entries.push([key, input.value]);

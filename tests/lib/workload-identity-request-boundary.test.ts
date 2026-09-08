@@ -210,6 +210,38 @@ test('retains workload ownership for a structurally forwarded credential with HT
   expect(transport.exchanges).toBe(2);
 });
 
+test('retains workload ownership for a non-enumerable Authorization data property', async () => {
+  class HookClient extends OpenAI {
+    protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+      await super.prepareRequest(...args);
+      const [request] = args;
+      request.headers = Object.create(null, {
+        Authorization: {
+          value: new Headers(request.headers).get('Authorization'),
+        },
+      }) as Headers;
+    }
+  }
+  let sends = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    sends += 1;
+    return sends === 1
+      ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+      : Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list();
+
+  expect(sends).toBe(2);
+  expect(transport.exchanges).toBe(2);
+});
+
 test('does not restore workload ownership after removing an independent case alias', async () => {
   let headers: Record<string, string> = {};
   class HookClient extends OpenAI {
