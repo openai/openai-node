@@ -80,10 +80,7 @@ interface HeaderPropertySnapshot {
 interface HeaderValuesSnapshot {
   source: readonly HeaderValue[];
   iterator: () => Iterator<HeaderValue>;
-  slots: Map<
-    number,
-    { descriptor: PropertyDescriptor | undefined; omittedDuringRead: boolean; value: HeaderValue }
-  >;
+  slots: Map<number, { descriptor: PropertyDescriptor | undefined; value: HeaderValue }>;
 }
 
 interface HeaderRowSnapshot {
@@ -186,10 +183,7 @@ function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Gen
   for (; index < Math.min(Math.floor(source.length), Number.MAX_SAFE_INTEGER); index += 1) {
     const descriptor = getHeaderRowDescriptor(source, String(index));
     const retained = slots.get(index);
-    if (
-      retained &&
-      ((!descriptor && retained.omittedDuringRead) || sameHeaderProperty(descriptor, retained.descriptor))
-    ) {
+    if (retained && sameHeaderProperty(descriptor, retained.descriptor)) {
       yield retained.value;
       continue;
     }
@@ -202,7 +196,6 @@ function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Gen
       const currentDescriptor = getHeaderRowDescriptor(source, String(index));
       slots.set(index, {
         descriptor: currentDescriptor,
-        omittedDuringRead: currentDescriptor === undefined,
         value: normalized,
       });
     }
@@ -391,17 +384,23 @@ function* iterateHeaders(
       // A getter may remove itself during its first read. Retain its position before surviving aliases.
       let nextKey: string | undefined;
       const present = new Set(entries.map((entry) => entry[0]));
-      const presentNames = new Set(entries.map((entry) => (entry[0] as string).toLowerCase()));
+      const previousKeys = new Set(replay.propertyOrder);
+      const liveAliases = new Map<string, string>();
+      for (const [key] of entries) {
+        const name = key as string;
+        if (previousKeys.has(name)) continue;
+        if (!liveAliases.has(name.toLowerCase())) liveAliases.set(name.toLowerCase(), name);
+      }
       const missing = new Map<string | undefined, HeaderEntry[]>();
-      const suppressed = new Set<string>();
       for (const key of [...(replay.propertyOrder ?? [])].reverse()) {
         if (present.has(key)) {
           nextKey = key;
         } else if (replay.properties.has(key)) {
-          const bucket = missing.get(nextKey) ?? [];
+          // Newly supplied aliases override captured accessors; existing aliases keep their original order.
+          const before = liveAliases.get(key.toLowerCase()) ?? nextKey;
+          const bucket = missing.get(before) ?? [];
           bucket.push([key, undefined]);
-          missing.set(nextKey, bucket);
-          if (presentNames.has(key.toLowerCase())) suppressed.add(key);
+          missing.set(before, bucket);
         }
       }
       const ordered: HeaderEntry[] = [];
@@ -411,7 +410,7 @@ function* iterateHeaders(
       }
       for (const retained of missing.get(undefined)?.reverse() ?? []) ordered.push(retained);
       replay.propertyOrder = ordered.map((entry) => entry[0] as string);
-      iter = ordered.filter((entry) => !suppressed.has(entry[0] as string));
+      iter = ordered;
     } else {
       iter = Object.entries(headers);
     }
