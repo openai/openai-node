@@ -297,8 +297,8 @@ export interface ClientOptions {
    *
    * - Accepts either a static string or an async function that resolves to a string.
    * - Defaults to process.env['OPENAI_API_KEY'].
-   * - When a function is provided, it is invoked while building authentication headers
-   *   for each request attempt, including retries, so you can rotate credentials.
+   * - When a function is provided, it is invoked for each request attempt, including
+   *   retries, so you can rotate or refresh credentials at runtime.
    * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
    * - If the function throws, the error is wrapped in an OpenAIError with the original
    *   error available as `cause`.
@@ -480,10 +480,19 @@ export class OpenAI {
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
-  #apiKeyResolution = 0;
+  // Replaced on each provider resolution to distinguish it from later hook mutations.
+  #apiKeyResolution: { apiKey: string | null } | undefined;
+  // Retained through preparation hooks and retired before dispatch, including failures.
   #preparedAPIKeys = new WeakMap<
     FinalRequestOptions,
-    { apiKey: string | null; resolution: number; tracksClientValue: boolean }
+    {
+      activeBuilds: number;
+      credential?: {
+        apiKey: string | null;
+        resolution: { apiKey: string | null } | undefined;
+        tracksClientValue: boolean;
+      };
+    }
   >();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
@@ -870,34 +879,55 @@ export class OpenAI {
       return false;
     }
 
-    this.apiKey = await this.resolveAPIKeyProvider(apiKey);
-    this.#apiKeyResolution += 1;
-    capture?.(this.apiKey);
+    const resolved = await this.resolveAPIKeyProvider(apiKey);
+    this.apiKey = resolved;
+    const resolution = (this.#apiKeyResolution = { apiKey: resolved });
+    if (capture) {
+      const currentAPIKey = this.apiKey;
+      resolution.apiKey = currentAPIKey;
+      capture(currentAPIKey);
+    }
     return true;
   }
 
+  /** Captures a credential while preserving the existing preparation hook lifecycle. */
   protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
+    const preparation = this.#preparedAPIKeys.get(options);
     let captured = false;
     await this._callApiKey((apiKey) => {
       captured = true;
-      this.#preparedAPIKeys.set(options, {
-        apiKey,
-        resolution: this.#apiKeyResolution,
-        tracksClientValue: apiKey === this.apiKey,
-      });
+      if (preparation) {
+        preparation.credential = {
+          apiKey,
+          resolution: this.#apiKeyResolution,
+          tracksClientValue: apiKey === this.apiKey,
+        };
+      }
     });
-    if (!captured) {
-      this.#preparedAPIKeys.set(options, {
+    if (!captured && preparation) {
+      preparation.credential = {
         apiKey: this.apiKey,
         resolution: this.#apiKeyResolution,
         tracksClientValue: true,
-      });
+      };
     }
   }
 
+  /** Reads the prepared credential, or resolves it when a request is built directly. */
   protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
-    const prepared = this.#preparedAPIKeys.get(options);
-    if (prepared) return prepared.apiKey;
+    const preparation = this.#preparedAPIKeys.get(options);
+    if (preparation) {
+      const prepared = preparation.credential;
+      const currentAPIKey = this.apiKey;
+      // Preserve hook mutations while keeping concurrent provider results isolated.
+      // A nondelegating preparation hook owns its credential choice too.
+      return !prepared ||
+        (prepared.tracksClientValue &&
+          (prepared.resolution === this.#apiKeyResolution ||
+            currentAPIKey !== this.#apiKeyResolution?.apiKey))
+        ? currentAPIKey
+        : prepared.apiKey;
+    }
 
     let resolved = this.apiKey;
     let captured = false;
@@ -1211,15 +1241,17 @@ export class OpenAI {
 
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
-    await this.prepareOptions(options);
-    const preparedAPIKey = this.#preparedAPIKeys.get(options);
-    if (
-      preparedAPIKey?.tracksClientValue &&
-      preparedAPIKey.resolution === this.#apiKeyResolution &&
-      preparedAPIKey.apiKey !== this.apiKey
-    ) {
-      // Preserve subclasses that assign `this.apiKey` after `super.prepareOptions()`.
-      this.#preparedAPIKeys.set(options, { ...preparedAPIKey, apiKey: this.apiKey });
+    const preparation = this.#preparedAPIKeys.get(options) ?? { activeBuilds: 0 };
+    preparation.activeBuilds += 1;
+    this.#preparedAPIKeys.set(options, preparation);
+    const finishPreparation = () => {
+      if (--preparation.activeBuilds === 0) this.#preparedAPIKeys.delete(options);
+    };
+    try {
+      await this.prepareOptions(options);
+    } catch (error) {
+      finishPreparation();
+      throw error;
     }
 
     x509Authentication?.beginRequestPlanning();
@@ -1264,6 +1296,7 @@ export class OpenAI {
         this.validateHeaders(buildHeaders([supplied, built.req.headers]), security);
       }
     } catch (error) {
+      finishPreparation();
       x509Authentication?.retireRequestBody();
       if (
         x509Authentication &&
@@ -1280,6 +1313,7 @@ export class OpenAI {
       }
       throw error;
     }
+    if (x509Authentication) finishPreparation();
     const { req, url } = built;
     const timeout = x509Authentication
       ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
@@ -1288,8 +1322,12 @@ export class OpenAI {
     let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
     if (!x509Authentication) {
-      await this.prepareRequest(req, { url, options });
-      await this._provider?.prepareRequest?.(req, { url, options });
+      try {
+        await this.prepareRequest(req, { url, options });
+        await this._provider?.prepareRequest?.(req, { url, options });
+      } finally {
+        finishPreparation();
+      }
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {

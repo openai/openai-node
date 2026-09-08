@@ -318,6 +318,32 @@ test('supports _callApiKey overrides returning concurrent credentials without mu
   expect(client.apiKey).toBe('synthetic-configured');
 });
 
+test('preserves transformed provider credentials across concurrent requests', async () => {
+  const provider = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-first')
+    .mockResolvedValueOnce('synthetic-second');
+  const fetch = mockFetch();
+  const client = new OpenAI({ apiKey: provider, fetch });
+  let currentAPIKey: string | null = null;
+  Object.defineProperty(client, 'apiKey', {
+    get() {
+      return currentAPIKey === null ? null : `transformed-${currentAPIKey}`;
+    },
+    set(value: string | null) {
+      currentAPIKey = value;
+    },
+  });
+
+  await Promise.all([client.get('/first'), client.get('/second')]);
+
+  expect(provider).toHaveBeenCalledTimes(2);
+  expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+    'Bearer transformed-synthetic-first',
+    'Bearer transformed-synthetic-second',
+  ]);
+});
+
 test('preserves apiKey assignments after delegated prepareOptions', async () => {
   class PreparedCredentials extends OpenAI {
     protected override async prepareOptions(options: FinalRequestOptions) {
@@ -331,6 +357,167 @@ test('preserves apiKey assignments after delegated prepareOptions', async () => 
   await client.get('/items');
 
   expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-prepared-/items');
+});
+
+test('preserves credentials supplied by prepareOptions without delegation', async () => {
+  class PreparedCredentials extends OpenAI {
+    protected override async prepareOptions() {
+      this.apiKey = 'synthetic-prepared';
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const fetch = mockFetch();
+  const client = new PreparedCredentials({ apiKey: provider, fetch });
+
+  await client.get('/items');
+
+  expect(provider).not.toHaveBeenCalled();
+  expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-prepared');
+});
+
+test('preserves a preparation hook key after another request resolves its credential', async () => {
+  class PreparedCredentials extends OpenAI {
+    protected override async prepareOptions(options: FinalRequestOptions) {
+      await super.prepareOptions(options);
+      if (options.path === '/outer') {
+        await this.get('/inner');
+        this.apiKey = 'synthetic-prepared';
+      }
+    }
+  }
+  const provider = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-outer')
+    .mockResolvedValueOnce('synthetic-inner');
+  const fetch = mockFetch();
+  const client = new PreparedCredentials({ apiKey: provider, fetch });
+
+  await client.get('/outer');
+
+  expect(provider).toHaveBeenCalledTimes(2);
+  expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+    'Bearer synthetic-inner',
+    'Bearer synthetic-prepared',
+  ]);
+});
+
+test.each(['static', 'function'] as const)(
+  'preserves %s key updates in authentication hooks',
+  async (kind) => {
+    class HeaderCredentials extends OpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        this.apiKey = 'synthetic-header-hook';
+        return super.authHeaders(options);
+      }
+    }
+    const fetch = mockFetch();
+    const client = new HeaderCredentials({
+      apiKey: kind === 'static' ? 'synthetic-initial' : async () => 'synthetic-provider',
+      fetch,
+    });
+
+    await client.get('/items');
+
+    expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-header-hook');
+  },
+);
+
+test.each(['success', 'preparation failure', 'build failure', 'request hook failure'] as const)(
+  'retires prepared credentials after %s',
+  async (outcome) => {
+    class PreparedCredentials extends OpenAI {
+      protected override async prepareOptions(options: FinalRequestOptions) {
+        await super.prepareOptions(options);
+        if (outcome === 'preparation failure') {
+          throw new Error('synthetic preparation failure');
+        }
+      }
+
+      protected override async prepareRequest(
+        request: RequestInit,
+        context: { url: string; options: FinalRequestOptions },
+      ) {
+        await super.prepareRequest(request, context);
+        if (outcome === 'request hook failure') {
+          throw new Error('synthetic request hook failure');
+        }
+      }
+    }
+    let resolutions = 0;
+    const provider = vi.fn(async () => {
+      resolutions += 1;
+      return `synthetic-${resolutions}`;
+    });
+    const client = new PreparedCredentials({ apiKey: provider, fetch: mockFetch() });
+    const options: FinalRequestOptions = {
+      method: 'post',
+      path: '/items',
+      body: {
+        toJSON() {
+          if (outcome === 'build failure') {
+            throw new Error('synthetic build failure');
+          }
+          return { synthetic: true };
+        },
+      },
+    };
+
+    await (outcome === 'success'
+      ? client.request(options)
+      : expect(client.request(options)).rejects.toThrow(`synthetic ${outcome}`));
+    delete options.body;
+    const { req } = await client.buildRequest(options);
+
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(req.headers.get('authorization')).toBe('Bearer synthetic-2');
+  },
+);
+
+test('preserves authentication delegated from prepareRequest without resolving twice', async () => {
+  class PreparedRequest extends OpenAI {
+    protected override async prepareRequest(
+      request: RequestInit,
+      context: { url: string; options: FinalRequestOptions },
+    ) {
+      const authentication = await this.authHeaders(context.options);
+      if (authentication) {
+        request.headers = authentication.values;
+      }
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const fetch = mockFetch();
+  const client = new PreparedRequest({ apiKey: provider, fetch });
+
+  await client.get('/items');
+
+  expect(provider).toHaveBeenCalledTimes(1);
+  expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-provider');
+});
+
+test('keeps preparation alive while a nested request builds with the same options', async () => {
+  class NestedRequest extends OpenAI {
+    builds = 0;
+
+    override async buildRequest(options: FinalRequestOptions) {
+      this.builds += 1;
+      if (this.builds === 1) {
+        await this.request(options);
+      }
+      return super.buildRequest(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const fetch = mockFetch();
+  const client = new NestedRequest({ apiKey: provider, fetch });
+  const options: FinalRequestOptions = { method: 'get', path: '/items' };
+
+  await client.request(options);
+
+  expect(provider).toHaveBeenCalledTimes(2);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await client.buildRequest(options);
+  expect(provider).toHaveBeenCalledTimes(3);
 });
 
 test('does not resolve the OpenAI callback for admin-only requests', async () => {
