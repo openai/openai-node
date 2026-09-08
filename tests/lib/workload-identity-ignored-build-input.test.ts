@@ -3,6 +3,63 @@ import OpenAI from 'openai';
 import type { HeadersInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
+test.each([200, 401, 500])('accepts an independent build membrane with status %s', async (status) => {
+  let reads = 0;
+  let preparations = 0;
+  const headers = {
+    get [Symbol.iterator]() {
+      reads += 1;
+      throw new Error('An ignored header source was read');
+    },
+  } as unknown as Headers;
+  class HookClient extends OpenAI {
+    override buildRequest() {
+      const req = new Proxy(
+        { method: 'GET', headers: new Headers({ Authorization: 'Bearer independent' }) },
+        {
+          getOwnPropertyDescriptor(target, key) {
+            if (typeof key === 'symbol' && !Reflect.has(target, key)) {
+              throw new Error('Unknown private descriptor');
+            }
+            return Reflect.getOwnPropertyDescriptor(target, key);
+          },
+        },
+      );
+      return Promise.resolve({ req, url: this.buildURL('/models', {}), timeout: this.timeout });
+    }
+
+    // oxlint-disable-next-line class-methods-use-this -- The hook records the public preparation boundary.
+    protected override async prepareRequest() {
+      preparations += 1;
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('Authorization'));
+    return Response.json({ data: [] }, { status, headers: { 'retry-after-ms': '0' } });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 1,
+  });
+
+  const request = client.models.list({ headers });
+  if (status === 500) {
+    await expect(request).rejects.toThrow('forward credentialContext');
+  } else if (status === 401) {
+    await expect(request).rejects.toMatchObject({ status: 401 });
+  } else {
+    await request;
+  }
+  expect(sent).toEqual(['Bearer independent']);
+  expect(preparations).toBe(1);
+  expect(reads).toBe(0);
+  expect(transport.exchanges).toBe(0);
+});
+
 describe.each(['context', 'original', 'discarded'] as const)('%s request ownership', (ownership) => {
   test.each([
     { authorization: undefined, status: 401 },

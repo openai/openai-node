@@ -2651,7 +2651,10 @@ export class OpenAI {
     const sourceHeaders = init.headers ?? getRequestHeaders(url);
     const platformHeader = getVerifiedPlatformHeader(sourceHeaders, 'Authorization');
     const preserveHeaders = sourceHeaders === undefined || canPreserveHeaderInput(sourceHeaders);
-    const headers = platformHeader && preserveHeaders ? undefined : new Headers(sourceHeaders);
+    const headers =
+      sourceHeaders === undefined || (platformHeader && preserveHeaders)
+        ? undefined
+        : new Headers(sourceHeaders);
     if (
       resolvePlaceholder &&
       (platformHeader ? platformHeader.value : headers?.get('Authorization')) ===
@@ -2688,7 +2691,7 @@ export class OpenAI {
       this.#pendingWorkloadHeaders.delete(request.credential);
       request.credential.adopt(headers);
     }
-    return { init: preserveHeaders ? init : ({ ...init, headers } as T), used };
+    return { init: headers ? { ...init, headers } : init, used };
   }
 
   #observeWorkloadHeaderReplacement<T extends RequestInit>(

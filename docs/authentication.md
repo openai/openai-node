@@ -317,9 +317,10 @@ replace the header layer, or use an explicit record with `Authorization: null`; 
 cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
 arrays, and data records retain live refresh behavior.
 
-When attributing a workload credential at dispatch, the SDK preserves local native `Headers`,
-plain-record, and ordinary tuple-array identity. Other iterable implementations, including foreign
-`Headers` collections, are materialized once and that same snapshot is passed to the transport.
+When attributing a workload credential at dispatch, the SDK preserves local native `Headers` identity.
+Records, tuple arrays, and other iterable implementations, including foreign `Headers` collections,
+are materialized once and that same snapshot is passed to the transport. Data descriptors cannot prove
+that a record or array is free of stateful proxy reads.
 Protected request and transport hooks keep the original request object and its header source until
 the final dispatch snapshot. Accessors therefore observe the same request fields that later hooks
 update. If a hook replaces an opaque, unconsumed source with unmarked copied headers, equal token

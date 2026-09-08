@@ -325,6 +325,64 @@ test('invokes a callable nested iterator without reading its call property', () 
   expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
 });
 
+describe.each(['request', 'default'] as const)('%s duplicate nested values', (layer) => {
+  describe.each(['data', 'coercion'] as const)('%s values', (kind) => {
+    test.each(['shift', 'replace', 'unrelated', 'none'] as const)(
+      'preserves occurrence identity after %s',
+      async (change) => {
+        const serialize = vi.fn(() => {
+          if ((change === 'unrelated' || change === 'none') && serialize.mock.calls.length > 2) {
+            throw new Error('An unchanged object occurrence was serialized again');
+          }
+          return serialize.mock.calls.length === 1 ? 'A' : 'B';
+        });
+        const value = { toString: serialize };
+        const values: (string | typeof value)[] = kind === 'data' ? ['A', 'B'] : [value, value];
+        if (change === 'unrelated') {
+          values.push('tail');
+        }
+        const headers = { 'X-Custom': values } as unknown as HeadersLike;
+        const sent: (string | null)[] = [];
+        const transport = createWorkloadIdentityTransport((_url, init) => {
+          sent.push(new Headers(init?.headers).get('X-Custom'));
+          if (sent.length === 1) {
+            if (change === 'shift' || change === 'replace') {
+              values.shift();
+            }
+            if (change === 'replace') {
+              values.push('tail');
+            }
+            if (change === 'unrelated') {
+              values.pop();
+            }
+            return Response.json(
+              { error: 'synthetic retry' },
+              { status: 500, headers: { 'retry-after-ms': '0' } },
+            );
+          }
+          return Response.json({ data: [] });
+        });
+        const client = new OpenAI({
+          ...createTestClientOptions(),
+          apiKey: null,
+          adminAPIKey: null,
+          ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+          fetch: transport.fetch,
+          maxRetries: 1,
+        });
+
+        await client.models.list(layer === 'request' ? { headers } : {});
+
+        const retry = { shift: 'B', replace: 'B, tail', unrelated: 'A, B', none: 'A, B' }[change];
+        expect(sent).toEqual([change === 'unrelated' ? 'A, B, tail' : 'A, B', retry]);
+        const serializations = change === 'shift' || change === 'replace' ? 3 : 2;
+        expect(serialize).toHaveBeenCalledTimes(kind === 'data' ? 0 : serializations);
+        expect(transport.exchanges).toBe(1);
+      },
+    );
+  });
+});
+
 test('rejects a non-callable nested iterator even when it has a call method', () => {
   const values = ['preserved'];
   const call = vi.fn(() => ['unexpected'][Symbol.iterator]());
