@@ -92,6 +92,60 @@ describe('OpenAI with Workload Identity', () => {
     expect(apiRequestHeaders!.get('Authorization')).toBe('Bearer exchanged-access-token');
   });
 
+  test.each([
+    ['default null', { Authorization: null }, undefined, null],
+    ['default empty', { Authorization: '' }, undefined, ''],
+    ['request null', undefined, { Authorization: null }, null],
+    ['request empty', undefined, { Authorization: '' }, ''],
+    ['request null over default', { Authorization: 'Bearer default' }, { aUtHoRiZaTiOn: null }, null],
+    ['request empty over default', { Authorization: 'Bearer default' }, { authorization: '' }, ''],
+    ['default replacement', { Authorization: 'Bearer replacement' }, undefined, 'Bearer replacement'],
+    [
+      'request replacement',
+      { Authorization: null },
+      { Authorization: 'Bearer replacement' },
+      'Bearer replacement',
+    ],
+    ['default undefined', { Authorization: undefined }, undefined, 'Bearer exchanged-access-token'],
+    [
+      'request undefined',
+      { Authorization: 'Bearer default' },
+      { Authorization: undefined },
+      'Bearer default',
+    ],
+    ['native empty', undefined, new Headers({ Authorization: '' }), ''],
+    [
+      'workload placeholder',
+      undefined,
+      { Authorization: 'Bearer workload-identity-auth' },
+      'Bearer exchanged-access-token',
+    ],
+  ] as const)('preserves merged Authorization: %s', async (_name, defaultHeaders, headers, expected) => {
+    const authorizations: (string | null)[] = [];
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.toString() === 'https://auth.openai.com/oauth/token') {
+        return Response.json({
+          access_token: 'exchanged-access-token',
+          issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        });
+      }
+      if (url.toString() === 'https://api.openai.com/v1/models') {
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ data: [] });
+      }
+      throw new Error('Unexpected request');
+    }) as typeof fetch;
+
+    const client = new OpenAI({ ...createTestClientOptions(), defaultHeaders });
+    await client.get('/models', { headers });
+    // Repeat with the credential cache populated by the first request.
+    await client.get('/models', { headers });
+
+    expect(authorizations).toEqual([expected, expected]);
+  });
+
   test('does not satisfy admin-only auth with workload identity', async () => {
     global.fetch = vi.fn(async () => new Response('Unexpected request', { status: 500 })) as typeof fetch;
 
