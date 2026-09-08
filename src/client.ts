@@ -2621,49 +2621,76 @@ export class OpenAI {
     if (!canPreserveHeaderInput(headers)) {
       headers = new Headers(headers);
       const originalRequest = request;
-      const descriptors = Object.getOwnPropertyDescriptors(request) as Record<
-        PropertyKey,
-        PropertyDescriptor
-      >;
-      for (const property of Reflect.ownKeys(descriptors)) {
-        const descriptor = descriptors[property];
-        if (!descriptor || 'value' in descriptor) continue;
-        const { get, set, ...attributes } = descriptor;
-        descriptors[property] = {
-          ...attributes,
-          ...(get ? { get: get.bind(originalRequest) } : undefined),
-          ...(set ? { set: set.bind(originalRequest) } : undefined),
-        };
-      }
       const normalizedRequest = Object.create(Object.getPrototypeOf(request), {
-        ...descriptors,
+        ...Object.getOwnPropertyDescriptors(request),
         headers: { value: headers, enumerable: true, configurable: true, writable: true },
       }) as T;
-      const inheritedAccessor = (property: PropertyKey): PropertyDescriptor | undefined => {
-        const visited = new Set<object>();
-        let prototype = Object.getPrototypeOf(normalizedRequest);
-        while (prototype && !visited.has(prototype)) {
-          visited.add(prototype);
-          const descriptor = Object.getOwnPropertyDescriptor(prototype, property);
-          if (descriptor) return 'value' in descriptor ? undefined : descriptor;
-          prototype = Object.getPrototypeOf(prototype);
+      // Only headers have separate state. Other properties and their accessor receivers
+      // belong to the original request, including mutations made by later hooks.
+      const sync = (property: PropertyKey) => {
+        if (property === 'headers') return;
+        const descriptor = Reflect.getOwnPropertyDescriptor(originalRequest, property);
+        if (descriptor) Reflect.defineProperty(normalizedRequest, property, descriptor);
+        else Reflect.deleteProperty(normalizedRequest, property);
+      };
+      const syncKeys = () => {
+        Reflect.setPrototypeOf(normalizedRequest, Reflect.getPrototypeOf(originalRequest));
+        for (const property of new Set([
+          ...Reflect.ownKeys(originalRequest),
+          ...Reflect.ownKeys(normalizedRequest),
+        ])) {
+          sync(property);
         }
-        return undefined;
       };
       request = new Proxy(normalizedRequest, {
-        get(target, property, receiver) {
-          if (hasOwn(target, property)) return Reflect.get(target, property, receiver);
-          const accessor = inheritedAccessor(property);
-          return accessor?.get ? accessor.get.call(originalRequest) : Reflect.get(target, property, receiver);
+        get(target, property) {
+          sync(property);
+          return Reflect.get(property === 'headers' ? target : originalRequest, property);
         },
-        set(target, property, value, receiver) {
-          if (hasOwn(target, property)) return Reflect.set(target, property, value, receiver);
-          const accessor = inheritedAccessor(property);
-          if (accessor) {
-            accessor.set?.call(originalRequest, value);
-            return accessor.set !== undefined;
-          }
-          return Reflect.set(target, property, value, receiver);
+        set(target, property, value) {
+          const changed = Reflect.set(property === 'headers' ? target : originalRequest, property, value);
+          sync(property);
+          return changed;
+        },
+        defineProperty(target, property, descriptor) {
+          const changed = Reflect.defineProperty(
+            property === 'headers' ? target : originalRequest,
+            property,
+            descriptor,
+          );
+          sync(property);
+          return changed;
+        },
+        deleteProperty(target, property) {
+          const changed = Reflect.deleteProperty(property === 'headers' ? target : originalRequest, property);
+          sync(property);
+          return changed;
+        },
+        has(target, property) {
+          return Reflect.has(property === 'headers' ? target : originalRequest, property);
+        },
+        getOwnPropertyDescriptor(target, property) {
+          sync(property);
+          return Reflect.getOwnPropertyDescriptor(target, property);
+        },
+        ownKeys(target) {
+          syncKeys();
+          return Reflect.ownKeys(target);
+        },
+        getPrototypeOf(target) {
+          const prototype = Reflect.getPrototypeOf(originalRequest);
+          Reflect.setPrototypeOf(target, prototype);
+          return prototype;
+        },
+        setPrototypeOf(target, prototype) {
+          return (
+            Reflect.setPrototypeOf(originalRequest, prototype) && Reflect.setPrototypeOf(target, prototype)
+          );
+        },
+        preventExtensions(target) {
+          if (!Reflect.preventExtensions(originalRequest)) return false;
+          syncKeys();
+          return Reflect.preventExtensions(target);
         },
       });
     }
