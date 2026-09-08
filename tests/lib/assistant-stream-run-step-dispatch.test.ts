@@ -314,6 +314,63 @@ describe('AssistantStream run-step dispatch ordering', () => {
     },
   );
 
+  test('uses a snapshot tool replacement made by toolCallDone before toolCallCreated', async () => {
+    const step = runStep('step_original');
+    const replacement = {
+      id: 'call_replacement',
+      index: 1,
+      type: 'function' as const,
+      function: { name: 'replacement', arguments: '' },
+    };
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      toolCallDelta(step.id),
+      {
+        event: 'thread.run.step.delta',
+        data: {
+          id: step.id,
+          delta: {
+            step_details: {
+              type: 'tool_calls',
+              tool_calls: [
+                {
+                  id: 'call_second',
+                  index: 1,
+                  type: 'function',
+                  function: { name: 'second', arguments: '' },
+                },
+              ],
+            },
+          },
+        },
+      },
+      completedRun(),
+    ]);
+    let snapshot: ReturnType<typeof runStep> | undefined;
+    runner.on('runStepCreated', (value) => {
+      snapshot = value as unknown as ReturnType<typeof runStep>;
+    });
+    runner.on('toolCallDone', () => {
+      if (!snapshot) {
+        throw new Error('Expected a retained run-step snapshot');
+      }
+      const [first] = snapshot.step_details.tool_calls;
+      if (!first) {
+        throw new Error('Expected the retained run-step snapshot to contain a tool call');
+      }
+      snapshot.step_details = {
+        type: 'tool_calls',
+        tool_calls: [first, replacement],
+      };
+    });
+    const created = vi.fn();
+    runner.on('toolCallCreated', created);
+
+    await runner.done();
+
+    expect(created).toHaveBeenLastCalledWith(replacement);
+  });
+
   test.each(['value', 'setter'] as const)(
     'bounds prototype metadata inspection while preserving a deep inherited delta %s',
     async (kind) => {
@@ -391,6 +448,43 @@ describe('AssistantStream run-step dispatch ordering', () => {
       expect(stepDelta.mock.calls[0]?.[0]).toBe(replacement);
       expect(step.id).toBe('step_original');
       expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} replacement');
+    },
+  );
+
+  test.each([false, true] as const)(
+    'captures a depth-33 inherited getter once during projection (content getter: %s)',
+    async (contentGetter) => {
+      const step = runStep('step_active');
+      const original = toolCallDelta(step.id).data.delta;
+      const replacement = {
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, function: { arguments: ' second-read' } }],
+        },
+      };
+      if (contentGetter) {
+        const details = original.step_details;
+        Object.defineProperty(original, 'step_details', { enumerable: true, get: () => details });
+      }
+      const read = vi.fn().mockReturnValueOnce(original).mockReturnValue(replacement);
+      let prototype = Object.defineProperty({}, 'delta', { configurable: true, get: read });
+      for (let depth = 1; depth < 33; depth += 1) {
+        prototype = Object.create(prototype);
+      }
+      const data = Object.assign(Object.create(prototype), { id: step.id });
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const emitted = vi.fn();
+      runner.on('runStepDelta', emitted);
+
+      await runner.done();
+
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(emitted.mock.calls[0]?.[0]).toBe(original);
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
     },
   );
 

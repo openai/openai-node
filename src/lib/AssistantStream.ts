@@ -213,7 +213,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       }
       capturedData.delta = delta;
       let observedDelta: RunStepDelta | undefined = delta;
-      const readCurrentDelta = (afterCallbacks = false) => {
+      const readCurrentDelta = (afterCallbacks = false, refreshUnknownAccessor = afterCallbacks) => {
         const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
         const currentInheritedProperty = currentDescriptor
           ? undefined
@@ -222,8 +222,9 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         // bounded, use the ordinary lookup to observe changes beyond the inspected chain.
         const refreshAccessor =
           afterCallbacks &&
-          (currentInheritedProperty?.owner === null ||
-            (currentDescriptor ?? currentInheritedProperty?.descriptor)?.set !== undefined);
+          (currentInheritedProperty?.owner === null
+            ? refreshUnknownAccessor
+            : (currentDescriptor ?? currentInheritedProperty?.descriptor)?.set !== undefined);
         if (
           !refreshAccessor &&
           samePropertyDescriptor(currentDescriptor, observedDescriptor) &&
@@ -271,7 +272,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         capturedData.delta = accumulationDelta as RunStepDelta;
         // Property reads and enumeration can run Proxy traps even for data descriptors.
         // Recheck replacements while accumulation keeps the content just projected.
-        readCurrentDelta(getterRan);
+        readCurrentDelta(getterRan, false);
       };
       return { getRunStepDelta: readCurrentDelta, refreshRunStepDelta };
     };
@@ -626,7 +627,7 @@ export class AssistantStream
             this.#reserveRunStepAlias(activeRunStep, runStepID);
           }
         }
-        this.#handleRunStep(stableEvent, runStepID, getRunStepDelta);
+        this.#handleRunStep(stableEvent, runStepID, getRunStepDelta, runStepData);
         if (runStepData !== undefined) {
           this.#reserveRunStepAlias(runStepData, runStepID);
         }
@@ -915,46 +916,78 @@ export class AssistantStream
     event: RunStepStreamEvent,
     runStepID: string,
     getRunStepDelta: RunStepDeltaState['getRunStepDelta'],
+    exposedRunStepData?: RunStepStreamEvent['data'],
   ) {
     const accumulatedRunStep = this.#accumulateRunStep(event, runStepID);
     this.#currentRunStepSnapshot = accumulatedRunStep;
+    const validateRunStepAliases = () => {
+      if (exposedRunStepData) {
+        this.#reserveRunStepAlias(exposedRunStepData, runStepID);
+      }
+      this.#reserveRunStepAlias(accumulatedRunStep, runStepID);
+    };
 
     switch (event.event) {
       case 'thread.run.step.created': {
         this.#currentToolCallIndex = undefined;
         this.#currentToolCall = undefined;
-        this.#emitExposed('runStepCreated', event.data);
+        this.#emitExposedAfterValidation(validateRunStepAliases, 'runStepCreated', event.data);
         break;
       }
       case 'thread.run.step.delta': {
         let toolListenersRan = false;
         // Tool callbacks use ordinary property lookup; accumulation only uses enumerable own fields.
         const delta = getRunStepDelta?.() ?? event.data.delta;
-        if (
-          delta.step_details &&
-          delta.step_details.type === 'tool_calls' &&
-          delta.step_details.tool_calls &&
-          accumulatedRunStep.step_details.type === 'tool_calls'
-        ) {
-          for (const toolCall of delta.step_details.tool_calls) {
-            if (toolCall.index === this.#currentToolCallIndex) {
+        const details = delta.step_details;
+        const toolCalls = details?.type === 'tool_calls' ? details.tool_calls : undefined;
+        validateRunStepAliases();
+        if (toolCalls && accumulatedRunStep.step_details.type === 'tool_calls') {
+          for (const toolCall of toolCalls) {
+            const toolCallIndex = toolCall.index;
+            validateRunStepAliases();
+            if (toolCallIndex === this.#currentToolCallIndex) {
+              const currentDetails = accumulatedRunStep.step_details;
+              const accumulatedToolCall =
+                currentDetails.type === 'tool_calls'
+                  ? (currentDetails.tool_calls[toolCallIndex] as ToolCall)
+                  : undefined;
+              validateRunStepAliases();
+              if (!accumulatedToolCall) {
+                continue;
+              }
               toolListenersRan =
-                this.#emitExposed(
+                this.#emitExposedAfterValidation(
+                  validateRunStepAliases,
                   'toolCallDelta',
                   toolCall,
-                  accumulatedRunStep.step_details.tool_calls[toolCall.index] as ToolCall,
+                  accumulatedToolCall,
                 ) || toolListenersRan;
+              validateRunStepAliases();
             } else {
               if (this.#currentToolCall) {
+                validateRunStepAliases();
                 toolListenersRan =
-                  this.#emitExposed('toolCallDone', this.#currentToolCall) || toolListenersRan;
+                  this.#emitExposedAfterValidation(
+                    validateRunStepAliases,
+                    'toolCallDone',
+                    this.#currentToolCall,
+                  ) || toolListenersRan;
+                validateRunStepAliases();
               }
 
-              this.#currentToolCallIndex = toolCall.index;
-              this.#currentToolCall = accumulatedRunStep.step_details.tool_calls[toolCall.index];
+              this.#currentToolCallIndex = toolCallIndex;
+              const currentDetails = accumulatedRunStep.step_details;
+              this.#currentToolCall =
+                currentDetails.type === 'tool_calls' ? currentDetails.tool_calls[toolCallIndex] : undefined;
               if (this.#currentToolCall) {
+                validateRunStepAliases();
                 toolListenersRan =
-                  this.#emitExposed('toolCallCreated', this.#currentToolCall) || toolListenersRan;
+                  this.#emitExposedAfterValidation(
+                    validateRunStepAliases,
+                    'toolCallCreated',
+                    this.#currentToolCall,
+                  ) || toolListenersRan;
+                validateRunStepAliases();
               }
             }
           }
@@ -962,9 +995,12 @@ export class AssistantStream
 
         // Select listener replacements after tool callbacks without changing the accumulated snapshot.
         const exposedDelta = getRunStepDelta?.(toolListenersRan);
-        this.#emitExposed(
+        const callbackDelta = exposedDelta && !hasOwn(exposedDelta, 'id') ? exposedDelta : event.data.delta;
+        validateRunStepAliases();
+        this.#emitExposedAfterValidation(
+          validateRunStepAliases,
           'runStepDelta',
-          exposedDelta && !hasOwn(exposedDelta, 'id') ? exposedDelta : event.data.delta,
+          callbackDelta,
           accumulatedRunStep,
         );
         break;
@@ -977,9 +1013,18 @@ export class AssistantStream
         this.#activeRunStepID = undefined;
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
-          this.#emitExposed('toolCallDone', this.#currentToolCall as ToolCall);
+          this.#emitExposedAfterValidation(
+            validateRunStepAliases,
+            'toolCallDone',
+            this.#currentToolCall as ToolCall,
+          );
         }
-        this.#emitExposed('runStepDone', event.data, accumulatedRunStep);
+        this.#emitExposedAfterValidation(
+          validateRunStepAliases,
+          'runStepDone',
+          event.data,
+          accumulatedRunStep,
+        );
         this.#currentToolCallIndex = undefined;
         this.#currentToolCall = undefined;
         break;
@@ -1000,6 +1045,22 @@ export class AssistantStream
         markAssistantStreamValueExternallyMutable(value);
       }
     }
+    this._emit(event, ...args);
+    return hasListeners;
+  }
+
+  #emitExposedAfterValidation<Event extends keyof AssistantStreamEvents>(
+    validate: () => void,
+    event: Event,
+    ...args: EventParameters<AssistantStreamEvents, Event>
+  ): boolean {
+    const hasListeners = this._hasListeners(event);
+    if (hasListeners) {
+      for (const value of args) {
+        markAssistantStreamValueExternallyMutable(value);
+      }
+    }
+    validate();
     this._emit(event, ...args);
     return hasListeners;
   }
