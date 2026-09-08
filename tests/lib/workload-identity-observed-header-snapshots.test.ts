@@ -12,9 +12,13 @@ const copyRequestHeadersGetter = (request: RequestInit, original: Headers) => {
   });
 };
 
-test.each(['record', 'array', 'structural'] as const)(
-  'retains an observed independent %s credential through later restoration of SDK bytes',
-  async (kind) => {
+test.each(
+  (['record', 'array', 'structural'] as const).flatMap((kind) =>
+    ['data', 'getter'].map((replacement) => ({ kind, replacement })),
+  ),
+)(
+  'retains an observed independent $kind credential through a $replacement restoration of SDK bytes',
+  async ({ kind, replacement }) => {
     let reads = 0;
     let getCalls = 0;
     const StructuralHeaders = class Headers {
@@ -58,7 +62,11 @@ test.each(['record', 'array', 'structural'] as const)(
         expect(request.headers).toBe(supplied);
         const headers = new Headers(request.headers);
         headers.set('Authorization', originalAuthorization);
-        request.headers = headers;
+        if (replacement === 'getter') {
+          copyRequestHeadersGetter(request, headers);
+        } else {
+          request.headers = headers;
+        }
         return super.fetchWithTimeout(...args);
       }
     }
@@ -133,7 +141,7 @@ test.each(['getter', 'iterator'] as const)(
 );
 test.each([
   { kind: 'direct native copy', independent: false },
-  { kind: 'getter native copy', independent: true },
+  { kind: 'getter native copy', independent: false },
   { kind: 'observed equal-byte write then getter copy', independent: true },
   { kind: 'observed independent layer then getter copy', independent: true },
 ] as const)('$kind keeps its established refresh ownership', async ({ kind, independent }) => {

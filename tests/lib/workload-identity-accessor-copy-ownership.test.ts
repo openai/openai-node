@@ -5,15 +5,24 @@ import { createTestClientOptions, createWorkloadIdentityTransport } from './work
 describe('prepared native header copies', () => {
   test.each([
     'unmarked accessor copy',
+    'precreated accessor copy',
     'self-replacing accessor copy',
     'marked accessor',
     'native data copy',
   ] as const)('preserves the credential ownership of a %s', async (kind) => {
+    let prepared: object | undefined;
+    const reads: { count: number }[] = [];
+    let current = { count: 0 };
     class HookClient extends OpenAI {
       protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
         await super.prepareRequest(...args);
         const [request] = args;
         const original = request.headers;
+        const copy = new Headers(original);
+        prepared = request;
+        const attempt = { count: 0 };
+        current = attempt;
+        reads.push(attempt);
         Object.defineProperty(
           request,
           'headers',
@@ -21,7 +30,13 @@ describe('prepared native header copies', () => {
             ? { value: new Headers(original), configurable: true, enumerable: true, writable: true }
             : {
                 get() {
-                  const headers = kind === 'marked accessor' ? original : new Headers(original);
+                  attempt.count += 1;
+                  let headers = original;
+                  if (kind === 'precreated accessor copy') {
+                    headers = copy;
+                  } else if (kind !== 'marked accessor') {
+                    headers = new Headers(original);
+                  }
                   if (kind === 'self-replacing accessor copy') {
                     Object.defineProperty(request, 'headers', { value: headers });
                   }
@@ -31,6 +46,18 @@ describe('prepared native header copies', () => {
                 enumerable: true,
               },
         );
+      }
+
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        expect(args[1]).toBe(prepared);
+        expect(current.count).toBe(0);
+        return super.fetchWithAuth(...args);
+      }
+
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        expect(args[1]).toBe(prepared);
+        expect(current.count).toBe(0);
+        return super.fetchWithTimeout(...args);
       }
     }
     const sent: (string | null)[] = [];
@@ -47,17 +74,60 @@ describe('prepared native header copies', () => {
       fetch: transport.fetch,
       maxRetries: 0,
     });
-    const result = client.models.list();
-    if (kind === 'unmarked accessor copy' || kind === 'self-replacing accessor copy') {
-      await expect(result).rejects.toMatchObject({ status: 401 });
-      expect(sent).toEqual(['Bearer access-token-1']);
-      expect(transport.exchanges).toBe(1);
-    } else {
-      await result;
-      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-      expect(transport.exchanges).toBe(2);
-    }
+    await client.models.list();
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
+    expect(reads.map((attempt) => attempt.count)).toEqual(kind === 'native data copy' ? [0, 0] : [1, 1]);
   });
+
+  test.each(['data', 'getter'] as const)(
+    'observes an Authorization write to a dispatched %s copy',
+    async (kind) => {
+      let supplied: Headers | undefined;
+      class HookClient extends OpenAI {
+        protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+          await super.prepareRequest(...args);
+          const [request] = args;
+          const copy = new Headers(request.headers);
+          supplied = copy;
+          Object.defineProperty(request, 'headers', {
+            ...(kind === 'data' ? { value: copy } : { get: () => copy }),
+            configurable: true,
+            enumerable: true,
+          });
+        }
+
+        protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+          const response = await super.fetchWithAuth(...args);
+          await response.body?.cancel();
+          const authorization = supplied?.get('Authorization');
+          if (!supplied || !authorization) {
+            throw new Error('Expected the dispatched credential');
+          }
+          supplied.set('Authorization', authorization);
+          const [url, init, timeout, controller, , context] = args;
+          return super.fetchWithTimeout(url, init, timeout, controller, context);
+        }
+      }
+      let sends = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        sends += 1;
+        return sends % 2 === 1
+          ? Response.json({ data: [] })
+          : Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+      await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+      expect(sends).toBe(2);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
 });
 
 test('preserves a marked request whose membrane defers header descriptor inspection', async () => {

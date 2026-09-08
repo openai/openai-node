@@ -18,6 +18,61 @@ function replacementClone(this: Response) {
   return Response.prototype.clone.call(this);
 }
 
+test.each([1, 2])('bounds clone lookup across a %i-node response prototype cycle', async (cycleSize) => {
+  let prototypeVisits = 0;
+  let cloneLookups = 0;
+  let maximumCloneLookups = 0;
+  const prototypes: object[] = Array.from(
+    { length: cycleSize },
+    (_, index) =>
+      new Proxy(
+        {},
+        {
+          getOwnPropertyDescriptor(target, property) {
+            if (property === 'clone') {
+              cloneLookups += 1;
+              maximumCloneLookups = Math.max(maximumCloneLookups, cloneLookups);
+            }
+            return Reflect.getOwnPropertyDescriptor(target, property);
+          },
+          getPrototypeOf() {
+            // Bound the fixture even before the fix; native brand probes may also reject the cycle.
+            prototypeVisits += 1;
+            if (prototypeVisits > 8) {
+              throw new Error('Response prototype circuit breaker');
+            }
+            return prototypes[(index + 1) % cycleSize] ?? null;
+          },
+        },
+      ),
+  );
+  const backing = Response.json({ ok: true });
+  const response = new Proxy(backing, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+    getPrototypeOf() {
+      prototypeVisits = 0;
+      cloneLookups = 0;
+      return prototypes[0] ?? null;
+    },
+  });
+  let sends = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    sends += 1;
+    return response;
+  });
+
+  // A permanent cycle also fails the existing error-instance check after bookkeeping.
+  await expect(new OpenAI(clientOptions(transport.fetch)).get('/synthetic')).rejects.toThrow(
+    'Response prototype circuit breaker',
+  );
+  expect(maximumCloneLookups).toBe(cycleSize);
+  expect(Object.getOwnPropertyDescriptor(response, 'clone')).toBeUndefined();
+  expect({ sends, exchanges: transport.exchanges }).toEqual({ sends: 1, exchanges: 1 });
+});
+
 test.each([false, true])(
   'retires a response clone tracker after its accessor %s its descriptor',
   async (replaceDescriptor) => {

@@ -46,6 +46,48 @@ test.each(['before', 'after'] as const)(
 );
 
 describe.each(['request', 'default'] as const)('replaced %s Authorization accessor', (layer) => {
+  test.each(['Bearer independent', null] as const)(
+    'prefers a changed existing alias (%s) over a self-removed accessor',
+    async (replacement) => {
+      const headers: Record<string, string | null> = { authorization: 'Bearer original' };
+      const read = vi.fn(() => {
+        delete headers['Authorization'];
+        return 'Bearer workload-identity-auth';
+      });
+      Object.defineProperty(headers, 'Authorization', { enumerable: true, configurable: true, get: read });
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        headers['authorization'] = replacement;
+        return 'subject-token';
+      };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        const request = new Request(url, init as globalThis.RequestInit);
+        expect(request.method).toBe('POST');
+        sent.push(request.headers.get('Authorization'));
+        return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        defaultHeaders: layer === 'default' ? headers : undefined,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      await expect(
+        client.post('https://independent.example.test/synthetic', {
+          headers: layer === 'request' ? headers : undefined,
+          body: { input: 'synthetic' },
+        }),
+      ).rejects.toMatchObject({ status: 401 });
+
+      expect(sent).toEqual([replacement]);
+      expect(transport.exchanges).toBe(1);
+      expect(read).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test.each([
     ['authorization', 'Bearer independent'],
     ['authorization', null],

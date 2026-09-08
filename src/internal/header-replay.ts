@@ -160,7 +160,7 @@ const getHeaderRowDescriptor = (row: object, key: string): PropertyDescriptor | 
 interface RecordReplay {
   kind: 'record';
   properties: Map<string, HeaderPropertySnapshot>;
-  propertyOrder: string[];
+  propertyOrder: Map<string, PropertyDescriptor | undefined>;
   property?: HeaderPropertySnapshot;
 }
 
@@ -485,24 +485,30 @@ export const canPreserveHeaderInput = (headers: HeadersLike): boolean => {
   }
 };
 
-const restoreCapturedRecordEntries = (record: RecordReplay, entries: HeaderEntry[]): HeaderEntry[] => {
+const restoreCapturedRecordEntries = (
+  record: RecordReplay,
+  entries: HeaderEntry[],
+  propertyDescriptors: Map<string, PropertyDescriptor>,
+): HeaderEntry[] => {
   // A getter may remove itself during its first read. Retain its position before surviving aliases.
   let nextKey: string | null = null;
   const present = new Set(entries.map((entry) => entry[0]));
-  const previousKeys = new Set(record.propertyOrder);
   const liveAliases = new Map<string, string>();
   for (const [key] of entries) {
     const name = key as string;
-    if (!previousKeys.has(name) && !liveAliases.has(name.toLowerCase())) {
+    if (
+      !sameHeaderProperty(propertyDescriptors.get(name), record.propertyOrder.get(name)) &&
+      !liveAliases.has(name.toLowerCase())
+    ) {
       liveAliases.set(name.toLowerCase(), name);
     }
   }
   const missing = new Map<string | null, HeaderEntry[]>();
-  for (const key of reversed(record.propertyOrder)) {
+  for (const key of reversed([...record.propertyOrder.keys()])) {
     if (present.has(key)) {
       nextKey = key;
     } else if (retainsSlot(record.properties.get(key)?.slot)) {
-      // Newly supplied aliases override captured accessors; existing aliases keep their original order.
+      // New or changed aliases override captured accessors; unchanged aliases keep their original order.
       const before = liveAliases.get(key.toLowerCase()) ?? nextKey;
       const bucket = missing.get(before) ?? [];
       bucket.push([key, undefined]);
@@ -521,7 +527,9 @@ const restoreCapturedRecordEntries = (record: RecordReplay, entries: HeaderEntry
   for (const retained of reversed(missing.get(null))) {
     ordered.push(retained);
   }
-  record.propertyOrder = ordered.map((entry) => entry[0] as string);
+  record.propertyOrder = new Map(
+    ordered.map(([key]) => [key as string, propertyDescriptors.get(key as string)]),
+  );
   return ordered;
 };
 
@@ -552,7 +560,7 @@ const observeHeaderRecord = (
     propertyDescriptors.set(key, descriptor);
     entries.push([key, record.properties.has(key) ? undefined : Reflect.get(headers, key)]);
   }
-  return restoreCapturedRecordEntries(record, entries);
+  return restoreCapturedRecordEntries(record, entries, propertyDescriptors);
 };
 
 type OccurrenceSource =
@@ -831,7 +839,7 @@ export function* iterateHeaders(
   } else {
     shouldClear = true;
     if (replay) {
-      record ??= { kind: 'record', properties: new Map(), propertyOrder: [] };
+      record ??= { kind: 'record', properties: new Map(), propertyOrder: new Map() };
       replay.state = record;
       iter = observeHeaderRecord(headers, record, propertyDescriptors);
     } else {
@@ -887,7 +895,7 @@ export const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => {
           { ...copyHeaderValues(value), slot: { ...value.slot } },
         ]),
       ),
-      propertyOrder: [...state.propertyOrder],
+      propertyOrder: new Map(state.propertyOrder),
     };
   } else {
     copy.state = {

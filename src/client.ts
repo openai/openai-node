@@ -439,7 +439,10 @@ const recordWorkloadIdentityResponse = (
     const previous = Object.getOwnPropertyDescriptor(response, 'clone');
     let cloneDescriptor = previous;
     if (!previous) {
+      const seen = new Set<object>();
       for (let prototype = Object.getPrototypeOf(response); prototype && !cloneDescriptor;) {
+        if (seen.has(prototype)) return;
+        seen.add(prototype);
         cloneDescriptor = Object.getOwnPropertyDescriptor(prototype, 'clone');
         prototype = Object.getPrototypeOf(prototype);
       }
@@ -2757,8 +2760,11 @@ export class OpenAI {
       ) &&
       bearerToken(platformHeader ? platformHeader.value : (headers?.get('Authorization') ?? null)) ===
         bearerToken(request.authorization);
-    if (used && headers && request.credential) {
-      this.#workloadTokenProvenance.adoptPreparedSource(request.credential, headers);
+    if (used && request.credential) {
+      this.#workloadTokenProvenance.adoptPreparedSource(
+        request.credential,
+        headers ?? (sourceHeaders as Headers),
+      );
     }
     return { init: dispatchInit, used };
   }

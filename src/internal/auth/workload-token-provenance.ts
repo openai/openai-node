@@ -217,7 +217,7 @@ export class WorkloadTokenProvenance {
     this.canPreserveHeaders = canPreserveHeaders;
   }
 
-  private readonly pendingHeaders = new WeakMap<WorkloadCredentialUsage, object | null>();
+  private readonly pendingHeaders = new WeakMap<WorkloadCredentialUsage, object>();
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
@@ -436,8 +436,7 @@ export class WorkloadTokenProvenance {
     }
     const headers = WorkloadTokenProvenance.requestHeaderData(request);
     if (!headers) {
-      // An accessor has no observed source yet; unmarked native copies cannot attest ownership.
-      this.pendingHeaders.set(credential, null);
+      // Defer accessor reads without erasing an already observed source's ownership.
       return;
     }
     if (!this.matchesPreparedSource(credential, headers, authorization)) {
@@ -472,9 +471,6 @@ export class WorkloadTokenProvenance {
     const pending = this.pendingHeaders.get(credential);
     if (pending === undefined || pending === headers || marked === true) {
       return true;
-    }
-    if (pending === null) {
-      return !headers || !hasNativeHeadersBrand(headers);
     }
     return (
       getVerifiedPlatformHeader(headers, 'Authorization') !== undefined &&
