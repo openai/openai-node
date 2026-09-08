@@ -100,9 +100,47 @@ test.each([false, true])('honors disabled bearer auth with a legacy timeout wrap
   expect(transport.exchanges).toBe(0);
 });
 
-test.each([false, true])(
-  'keeps concurrent bearer schemes separate with a legacy wrapper: %s',
-  async (legacy) => {
+test.each(['record', 'iterable'] as const)(
+  'resolves an opaque placeholder when a legacy wrapper replaces both dispatch identities: %s',
+  async (kind) => {
+    class ReplacingClient extends OpenAI {
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const headers = new Headers(args[1].headers);
+        args[1].headers =
+          kind === 'record' ? Object.fromEntries(headers) : (headers.entries() as unknown as Headers);
+        return super.fetchWithAuth(...args);
+      }
+
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [url, init, timeout] = args;
+        return super.fetchWithTimeout(url, { ...init }, timeout, new AbortController());
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return Response.json({ data: [] });
+    });
+    const client = new ReplacingClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list({ headers: { Authorization: 'Bearer workload-identity-auth' } });
+
+    expect(sent).toEqual(['Bearer access-token-1']);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
+test.each(
+  [false, true].flatMap((legacy) => [false, true].map((sharedController) => ({ legacy, sharedController }))),
+)(
+  'keeps concurrent bearer schemes separate with a legacy wrapper: $legacy, shared controller: $sharedController',
+  async ({ legacy, sharedController }) => {
     const enabledSent = deferred();
     class ConcurrentClient extends OpenAI {
       // oxlint-disable-next-line class-methods-use-this -- The fixture defers authentication to the transport hook.
@@ -112,7 +150,7 @@ test.each([false, true])(
       }
 
       protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
-        const [url, init, timeout, , schemes, context] = args;
+        const [url, init, timeout, controller, schemes, context] = args;
         const calls = [false, true].map((bearerAuth) => {
           const headers = new Headers(init.headers);
           headers.set('X-Bearer-Enabled', String(bearerAuth));
@@ -120,7 +158,7 @@ test.each([false, true])(
             url,
             { ...init, headers },
             timeout,
-            new AbortController(),
+            sharedController ? controller : new AbortController(),
             { ...schemes, bearerAuth },
             context,
           );
@@ -172,6 +210,40 @@ test.each([false, true])(
     expect(transport.exchanges).toBe(1);
   },
 );
+
+test('logs effective headers when dispatching a native Request', async () => {
+  class RequestClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      const [url, init, timeout, controller, context] = args;
+      return super.fetchWithTimeout(new Request(String(url), init), undefined, timeout, controller, context);
+    }
+  }
+  const records: unknown[] = [];
+  const logger = {
+    debug(...args: unknown[]) {
+      records.push(args);
+    },
+    info() {},
+    warn() {},
+    error() {},
+  };
+  const transport = createWorkloadIdentityTransport((url, init) => {
+    expect(new Request(url as Request, init).headers.get('X-Debug-Marker')).toBe('present');
+    return Response.json({ data: [] });
+  });
+  const client = new RequestClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    fetch: transport.fetch,
+    logger,
+    logLevel: 'debug',
+    maxRetries: 0,
+  });
+
+  await client.models.list({ headers: { 'X-Debug-Marker': 'present' } });
+
+  expect(JSON.stringify(records)).toContain('x-debug-marker');
+});
 
 test('preserves an independent replacement while placeholder token acquisition is pending', async () => {
   const started = deferred();

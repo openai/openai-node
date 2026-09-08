@@ -2085,9 +2085,17 @@ export class OpenAI {
     const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
     const dispatches = [...(workloadRequest?.dispatches ?? [])];
     const exactDispatch = dispatches.find((dispatch) => dispatch.context === credentialContext);
+    const initDispatches = dispatches.filter((dispatch) => dispatch.init === init);
+    const controllerDispatches = dispatches.filter((dispatch) => dispatch.controller === controller);
     const matchingDispatches = exactDispatch
       ? [exactDispatch]
-      : dispatches.filter((dispatch) => dispatch.init === init || dispatch.controller === controller);
+      : initDispatches.length > 0
+        ? initDispatches
+        : controllerDispatches.length > 0
+          ? controllerDispatches
+          : dispatches.length === 1
+            ? dispatches
+            : [];
     // Legacy hooks may omit the context; ambiguous concurrent delegations cannot grant authentication.
     const resolvePlaceholder =
       matchingDispatches.length > 0 && matchingDispatches.every((dispatch) => dispatch.resolvePlaceholder);
@@ -2141,7 +2149,7 @@ export class OpenAI {
       if (workloadRequest) {
         loggerFor(this).debug(
           'workload request dispatch headers',
-          formatRequestDetails({ headers: new Headers(dispatch.init.headers) }),
+          formatRequestDetails({ headers: new Headers(dispatch.init.headers ?? getRequestHeaders(url)) }),
         );
         dispatch = this.#snapshotWorkloadIdentityUsage(
           workloadRequest,
