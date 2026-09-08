@@ -321,6 +321,7 @@ test.each(['name', 'value'] as const)(
     const snapshot = snapshotHeaders([row]);
 
     expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+    expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
     expect(reads).toBe(1);
   },
 );
