@@ -136,6 +136,68 @@ test.each(['record', 'iterable'] as const)(
   },
 );
 
+test('preserves a copied transport header layer while resolving an opaque placeholder', async () => {
+  const ImmutableHeaders = class Headers {
+    #values: globalThis.Headers;
+    constructor(values: globalThis.Headers) {
+      this.#values = values;
+    }
+    get(name: string) {
+      return this.#values.get(name);
+    }
+    has(name: string) {
+      return this.#values.has(name);
+    }
+    entries() {
+      return this.#values.entries();
+    }
+    // oxlint-disable-next-line class-methods-use-this -- The platform guard rejects every mutation.
+    set() {
+      throw new TypeError('immutable headers');
+    }
+  };
+  Object.defineProperties(ImmutableHeaders.prototype, {
+    [Symbol.toStringTag]: { value: 'Headers' },
+    [Symbol.iterator]: { value: ImmutableHeaders.prototype.entries },
+  });
+  class CopyingClient extends OpenAI {
+    // oxlint-disable-next-line class-methods-use-this -- The fixture defers authentication to dispatch.
+    protected override bearerAuth() {
+      // oxlint-disable-next-line unicorn/no-useless-undefined -- The hook requires Promise<undefined>.
+      return Promise.resolve<undefined>(undefined);
+    }
+    protected override fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      args[1].headers = new ImmutableHeaders(new Headers(args[1].headers)) as unknown as Headers;
+      return super.fetchWithAuth(...args);
+    }
+    override fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      const [url, init, timeout, controller, context] = args;
+      const headers = new Headers(init?.headers);
+      headers.set('X-Transport-Copy', 'retained');
+      return super.fetchWithTimeout(url, { ...init, headers }, timeout, controller, context);
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    const headers = new Headers(init?.headers);
+    expect(headers.get('X-Transport-Copy')).toBe('retained');
+    sent.push(headers.get('Authorization'));
+    return Response.json({ data: [] });
+  });
+  const client = new CopyingClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list({ headers: { Authorization: 'Bearer workload-identity-auth' } });
+
+  expect(sent).toEqual(['Bearer access-token-1']);
+  expect(transport.exchanges).toBe(1);
+});
+
 test.each(
   [false, true].flatMap((legacy) => [false, true].map((sharedController) => ({ legacy, sharedController }))),
 )(

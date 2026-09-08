@@ -2028,6 +2028,10 @@ export class OpenAI {
     }
     const body = hasOwn(options, 'body') || omitted.has('body') ? options.body : init?.body;
     const headers = hasOwn(options, 'headers') || omitted.has('headers') ? options.headers : init?.headers;
+    const selectedHeaderState =
+      matchingDispatches.length === 1
+        ? WorkloadTokenProvenance.requestHeaderDataState(matchingDispatches[0]!.init)
+        : undefined;
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
     if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
@@ -2067,15 +2071,17 @@ export class OpenAI {
           dispatch.placeholder.headers,
           dispatch.placeholder.prototype,
         );
-        const selectedHeaderState =
+        const currentSelectedHeaderState =
           matchingDispatches.length === 1
             ? WorkloadTokenProvenance.requestHeaderDataState(matchingDispatches[0]!.init)
             : undefined;
         // A hook can replace the selected layer while an immutable or foreign placeholder resolves.
         // Preserve that later choice instead of installing the resolved copy over it.
         const selectedHeaders =
-          selectedHeaderState && selectedHeaderState.value !== headers
-            ? (selectedHeaderState.value as RequestInit['headers'])
+          selectedHeaderState &&
+          currentSelectedHeaderState &&
+          currentSelectedHeaderState.value !== selectedHeaderState.value
+            ? (currentSelectedHeaderState.value as RequestInit['headers'])
             : resolved;
         dispatch.init = replaceRequestHeaders(dispatch.init, selectedHeaders);
       }
