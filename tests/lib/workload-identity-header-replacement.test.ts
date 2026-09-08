@@ -347,6 +347,59 @@ test.each(
   },
 );
 
+test.each(['data', 'accessor'] as const)(
+  'retains a shared nested %s replacement after only the default layer changes',
+  async (kind) => {
+    const first = ['first'];
+    const replacement = ['replacement'];
+    for (const values of [first, replacement]) {
+      const cursor = values[Symbol.iterator]();
+      Object.defineProperty(values, Symbol.iterator, { value: () => cursor });
+    }
+    const headers: Record<string, string[]> = { 'X-Probe': first };
+    const read = vi.fn(() => replacement);
+    const sent: (string | null)[] = [];
+    class HookClient extends OpenAI {
+      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+        const result = await super.authHeaders(...args);
+        if (sent.length === 2) {
+          this._options.defaultHeaders = { 'X-Default': 'changed' };
+        }
+        return result;
+      }
+    }
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      const dispatched = new Headers(init?.headers);
+      sent.push(dispatched.get('X-Probe'));
+      expect(dispatched.get('X-Default')).toBe(sent.length === 3 ? 'changed' : null);
+      if (sent.length === 1) {
+        if (kind === 'data') {
+          headers['X-Probe'] = replacement;
+        } else {
+          Object.defineProperty(headers, 'X-Probe', { configurable: true, enumerable: true, get: read });
+        }
+      }
+      return Response.json(
+        { ok: true },
+        { status: sent.length < 3 ? 500 : 200, headers: { 'retry-after-ms': '0' } },
+      );
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      defaultHeaders: headers,
+      fetch: transport.fetch,
+      maxRetries: 2,
+    });
+
+    await expect(client.post('/synthetic', { headers, body: { input: 'synthetic' } })).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(sent).toEqual(['first', 'replacement', 'replacement']);
+    expect(read).toHaveBeenCalledTimes(kind === 'accessor' ? 2 : 0);
+  },
+);
+
 test('discards a nested cursor observation after its property disappears', async () => {
   const values = ['first'];
   const cursor = values[Symbol.iterator]();

@@ -10,6 +10,7 @@ import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/detect-platform';
 import * as Shims from './internal/shims';
+import { cancelResponseForRetry, recordResponseTee } from './internal/response-retry-cleanup';
 import * as Opts from './internal/request-options';
 import { replaceRequestHeaders } from './internal/request-view';
 import { stringifyQuery } from './internal/utils/query';
@@ -337,7 +338,7 @@ type WorkloadIdentityDispatch = {
   resolvePlaceholder: boolean;
 };
 const responseCloneRequests = new WeakMap<Response, Set<WorkloadIdentityRequest>>();
-const sharedResponseBodies = new WeakSet<object>();
+const nativeResponseClone = globalThis.Response?.prototype.clone;
 const responseUsedWorkloadToken = (request: WorkloadIdentityRequest, response: Response): boolean => {
   const used = request.responses.get(response);
   if (used !== undefined) {
@@ -384,13 +385,15 @@ const cloneWorkloadIdentityResponse = (response: Response): Response => {
       }
     }
   }
-  const copy = response.clone();
-  const sourceBody = responseBodyIdentity(response);
-  const copyBody = responseBodyIdentity(copy);
-  if (body && sourceBody && copyBody && sourceBody !== body && copyBody !== sourceBody && copyBody !== body) {
-    // The helper observed a tee. Either branch may be retained after request tracking is released.
-    sharedResponseBodies.add(sourceBody);
-    sharedResponseBodies.add(copyBody);
+  const clone = response.clone;
+  const copy = Reflect.apply(clone, response, []);
+  if (clone === nativeResponseClone) {
+    // This invocation created both branches. A custom clone may return an unrelated stream.
+    const sourceBody = responseBodyIdentity(response);
+    const copyBody = responseBodyIdentity(copy);
+    if (sourceBody && copyBody) {
+      recordResponseTee(body, sourceBody, copyBody);
+    }
   }
   for (const request of requests ?? []) {
     const selectedUsage = request.responses.get(response);
@@ -401,17 +404,6 @@ const cloneWorkloadIdentityResponse = (response: Response): Response => {
     recordWorkloadIdentityResponse(request, copy, usedWorkloadToken);
   }
   return copy;
-};
-
-const cancelResponseForRetry = async (response: Response): Promise<void> => {
-  const body = response.body;
-  const cancelled = Shims.CancelReadableStream(body);
-  if (body && sharedResponseBodies.has(body)) {
-    // A retained sibling can keep cancellation pending until after the retried request returns.
-    void cancelled.catch(() => undefined);
-  } else {
-    await cancelled;
-  }
 };
 
 const releaseWorkloadIdentityResponseClones = (request: WorkloadIdentityRequest) => {
@@ -1933,6 +1925,9 @@ export class OpenAI {
   /**
    * Clones a delegated response while preserving its workload-credential retry attribution.
    * Native `response.clone()` remains caller-owned and is not instrumented by the SDK.
+   * Only direct calls to the captured global platform clone establish shared-body retry cleanup.
+   * Custom or foreign clones must release retained siblings unless an SDK helper already
+   * established their shared-body ownership.
    */
   protected cloneResponse(response: Response): Response {
     return cloneWorkloadIdentityResponse(response);
