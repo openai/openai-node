@@ -532,27 +532,19 @@ describe.each([
       "additionalProperties": false,
       "properties": {
         "description": {
-          "anyOf": [
-            {
-              "type": "string",
-            },
-            {
-              "type": "null",
-            },
-          ],
           "description": "Open text for any other relevant information about what the contact does.",
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "name": {
           "type": "string",
         },
         "phone_number": {
-          "anyOf": [
-            {
-              "type": "string",
-            },
-            {
-              "type": "null",
-            },
+          "type": [
+            "string",
+            "null",
           ],
         },
         "roles": {
@@ -589,13 +581,9 @@ describe.each([
           "type": "string",
         },
         "phone_number": {
-          "anyOf": [
-            {
-              "type": "string",
-            },
-            {
-              "type": "null",
-            },
+          "type": [
+            "string",
+            "null",
           ],
         },
       },

@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import type {
@@ -8,13 +10,43 @@ import type {
   ResponsesClientEvent,
   ResponsesServerEvent,
 } from 'openai/resources/responses/responses';
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { WebSocketServer } from 'ws';
 
 interface Reply {
   events: ResponsesServerEvent[];
   close?: 'clean' | 'abrupt';
 }
+
+const uncaughtErrorMarker = 'SYNTHETIC_UNCAUGHT_WEBSOCKET_ERROR';
+const observeUncaught = `process.on('uncaughtExceptionMonitor', () => {
+  process.stderr.write(${JSON.stringify(`${uncaughtErrorMarker}\n`)});
+});`;
+const apiErrors: { name: string; event: ResponsesServerEvent }[] = [
+  {
+    name: 'nested',
+    event: {
+      type: 'error',
+      error: {
+        code: 'invalid_request',
+        message: 'Synthetic API failure',
+        param: null,
+        type: 'invalid_request_error',
+      },
+      status: 400,
+    },
+  },
+  {
+    name: 'flat',
+    event: {
+      type: 'error',
+      code: 'invalid_request',
+      message: 'Synthetic API failure',
+      param: null,
+      sequence_number: 1,
+    },
+  },
+];
 
 const textEvent: ResponsesServerEvent = {
   type: 'response.output_text.delta',
@@ -51,15 +83,31 @@ function completed(responseID: string, output: Response['output'] = []): Respons
   };
 }
 
-async function runExample(reply: (request: ResponsesClientEvent, index: number) => Reply) {
-  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+async function runExample(
+  reply: (request: ResponsesClientEvent, index: number) => Reply,
+  {
+    rejectUpgrade = false,
+    initialError,
+  }: { rejectUpgrade?: boolean; initialError?: ResponsesServerEvent } = {},
+) {
+  const server = new WebSocketServer({
+    host: '127.0.0.1',
+    port: 0,
+    verifyClient: () => !rejectUpgrade,
+  });
   await once(server, 'listening');
   const address = server.address();
   if (!address || typeof address === 'string') {
     throw new Error('Expected a local TCP address');
   }
   const requests: ResponsesClientEvent[] = [];
-  server.on('connection', (socket) => {
+  server.on('headers', (_headers, request) => {
+    if (initialError) {
+      // Deliver the HTTP upgrade and first error frame in the same transport write.
+      request.socket.cork();
+    }
+  });
+  server.on('connection', (socket, upgradeRequest) => {
     socket.on('message', (data) => {
       const request = JSON.parse(data.toString()) as ResponsesClientEvent;
       requests.push(request);
@@ -73,12 +121,22 @@ async function runExample(reply: (request: ResponsesClientEvent, index: number) 
         socket.terminate();
       }
     });
+    if (initialError) {
+      socket.send(JSON.stringify(initialError));
+      upgradeRequest.socket.uncork();
+    }
   });
 
   const root = process.cwd();
+  const fixture = mkdtempSync(path.join(tmpdir(), 'openai-websocket-example-'));
+  const observerPath = path.join(fixture, 'observe-uncaught.cjs');
+  writeFileSync(observerPath, observeUncaught);
   const child = spawn(
     process.execPath,
     [
+      // Observe crashes without handling them or changing Node's default failure behavior.
+      '--require',
+      observerPath,
       path.join(root, 'node_modules/ts-node/dist/bin.js'),
       '--swc',
       '-r',
@@ -111,6 +169,8 @@ async function runExample(reply: (request: ResponsesClientEvent, index: number) 
     expect(signal).toBeNull();
     expect(stdout + stderr).not.toContain('synthetic-example-key');
     expect(stdout + stderr).not.toContain('SYNTHETIC_PRIVATE_CLOSE_REASON');
+    expect(stderr).not.toContain(uncaughtErrorMarker);
+    expect(stderr).not.toContain('To resolve these unhandled rejection errors');
     return { exitCode, stdout, stderr, requests };
   } finally {
     child.kill();
@@ -120,6 +180,7 @@ async function runExample(reply: (request: ResponsesClientEvent, index: number) 
     const closed = once(server, 'close');
     server.close();
     await closed;
+    rmSync(fixture, { recursive: true, force: true });
   }
 }
 
@@ -173,25 +234,37 @@ test('completes all turns and closes normally without reporting an unfinished re
   ]);
 });
 
-test('preserves an API failure when the server closes immediately afterward', async () => {
-  const result = await runExample(() => ({
-    events: [
-      {
-        type: 'error',
-        error: {
-          code: 'invalid_request',
-          message: 'Synthetic API failure',
-          param: null,
-          type: 'invalid_request_error',
-        },
-        status: 400,
-      },
-    ],
-    close: 'clean',
-  }));
+describe.each(apiErrors)('$name API errors', ({ event }) => {
+  test.each([false, true])('handles the failure once when followed by a close: %s', async (close) => {
+    const result = await runExample(() => ({
+      events: [event],
+      ...(close ? { close: 'clean' as const } : {}),
+    }));
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('Synthetic API failure');
+    expect(result.stderr).not.toContain('WebSocket closed before the response completed.');
+    expect(result.requests).toHaveLength(1);
+    expect(result.stdout).not.toContain('Assistant:');
+    expect(result.stdout).not.toContain('=== Turn 2 ===');
+  });
+
+  test('handles a failure delivered with the opening handshake', async () => {
+    const result = await runExample(() => ({ events: [] }), { initialError: event });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('Synthetic API failure');
+    expect(result.requests.length).toBeLessThanOrEqual(1);
+    expect(result.stdout).not.toContain('Assistant:');
+    expect(result.stdout).not.toContain('=== Turn 2 ===');
+  });
+});
+
+test('handles an opening handshake rejection without an unhandled SDK error', async () => {
+  const result = await runExample(() => ({ events: [] }), { rejectUpgrade: true });
 
   expect(result.exitCode).toBe(1);
-  expect(result.stderr).toContain('Synthetic API failure');
-  expect(result.stderr).not.toContain('WebSocket closed before the response completed.');
-  expect(result.requests).toHaveLength(1);
+  expect(result.stderr).toContain('Unexpected server response: 401');
+  expect(result.requests).toHaveLength(0);
+  expect(result.stdout).not.toContain('Assistant:');
 });
