@@ -2,9 +2,11 @@
 import OpenAI from 'openai';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
-function* forwardNativeHeadersIterator(this: Headers) {
-  yield* Headers.prototype.entries.call(this);
-}
+const forwardNativeHeadersIterator: Headers[typeof Symbol.iterator] = function forwardNativeHeadersIterator(
+  this: Headers,
+) {
+  return Headers.prototype.entries.call(this);
+};
 
 test.each(['ordinary subclass', 'Headers-shaped subclass', 'custom iterator'] as const)(
   'reads the serialized credential from a native %s',
@@ -109,11 +111,10 @@ test.each(['own', 'inherited'] as const)(
 test.each(['instance', 'subclass'] as const)(
   'recovers workload provenance from a native %s forwarding iterator',
   async (kind) => {
-    class ForwardingHeaders extends Headers {
-      override *[Symbol.iterator]() {
-        yield* Headers.prototype.entries.call(this);
-      }
-    }
+    class ForwardingHeaders extends Headers {}
+    Object.defineProperty(ForwardingHeaders.prototype, Symbol.iterator, {
+      value: forwardNativeHeadersIterator,
+    });
     class HookClient extends OpenAI {
       protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
         const result = await super.authHeaders(...args);
