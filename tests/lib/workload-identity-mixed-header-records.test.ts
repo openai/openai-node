@@ -177,9 +177,13 @@ test('retains an empty accessor snapshot while refreshing other keys', () => {
   expect(read).toHaveBeenCalledTimes(1);
 });
 
-test.each(['request', 'default'] as const)(
-  'uses a data property replacing a self-deleting %s Authorization accessor',
-  async (layer) => {
+test.each(
+  (['request', 'default'] as const).flatMap((layer) =>
+    (['same spelling', 'case-insensitive alias'] as const).map((spelling) => ({ layer, spelling })),
+  ),
+)(
+  'uses a data property replacing a self-deleting $layer Authorization accessor: $spelling',
+  async ({ layer, spelling }) => {
     const headers: Record<string, string | undefined> = {};
     const read = vi.fn(() => {
       delete headers['Authorization'];
@@ -187,7 +191,7 @@ test.each(['request', 'default'] as const)(
     Object.defineProperty(headers, 'Authorization', { configurable: true, enumerable: true, get: read });
     const identity = createTestWorkloadIdentity();
     identity.provider.getToken = async () => {
-      headers['Authorization'] = 'Bearer independent';
+      headers[spelling === 'same spelling' ? 'Authorization' : 'authorization'] = 'Bearer independent';
       return 'subject-token';
     };
     const sent: (string | null)[] = [];

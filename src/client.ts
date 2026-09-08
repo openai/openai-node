@@ -262,6 +262,7 @@ import {
   createWorkloadHeaderSnapshots,
   canReplayHeaderInput,
   canPreserveHeaderInput,
+  getStructuralHeaderValue,
   hasNativeHeadersBrand,
   type WorkloadHeaderSnapshots,
 } from './internal/headers';
@@ -1684,9 +1685,19 @@ export class OpenAI {
 
     if (!x509Authentication) {
       await this.prepareRequest(req, { url, options });
-      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(
+        workloadCredential,
+        req,
+        initialWorkloadAuthorization,
+        getRequestHeaders(url),
+      );
       await this._provider?.prepareRequest?.(req, { url, options });
-      req = this.#observeWorkloadHeaderReplacement(workloadCredential, req, initialWorkloadAuthorization);
+      req = this.#observeWorkloadHeaderReplacement(
+        workloadCredential,
+        req,
+        initialWorkloadAuthorization,
+        getRequestHeaders(url),
+      );
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -2038,6 +2049,7 @@ export class OpenAI {
         workloadRequest.credential,
         init,
         workloadRequest.authorization,
+        getRequestHeaders(url),
       );
       this.#bindWorkloadIdentityRequest(controller, workloadRequest);
       this.#bindWorkloadIdentityRequest(init, workloadRequest);
@@ -2086,9 +2098,17 @@ export class OpenAI {
     const workloadRequest = this.#workloadIdentityRequest(controller, init, credentialContext);
     const dispatches = [...(workloadRequest?.dispatches ?? [])];
     const exactDispatch = dispatches.find((dispatch) => dispatch.context === credentialContext);
+    const initDispatches = dispatches.filter((dispatch) => dispatch.init === init);
+    const controllerDispatches = dispatches.filter((dispatch) => dispatch.controller === controller);
     const matchingDispatches = exactDispatch
       ? [exactDispatch]
-      : dispatches.filter((dispatch) => dispatch.init === init || dispatch.controller === controller);
+      : initDispatches.length > 0
+        ? initDispatches
+        : controllerDispatches.length > 0
+          ? controllerDispatches
+          : dispatches.length === 1
+            ? dispatches
+            : [];
     // Legacy hooks may omit the context; ambiguous concurrent delegations cannot grant authentication.
     const resolvePlaceholder =
       matchingDispatches.length > 0 && matchingDispatches.every((dispatch) => dispatch.resolvePlaceholder);
@@ -2142,7 +2162,7 @@ export class OpenAI {
       if (workloadRequest && !dispatch.unreadable) {
         loggerFor(this).debug(
           'workload request dispatch headers',
-          formatRequestDetails({ headers: new Headers(dispatch.init.headers) }),
+          formatRequestDetails({ headers: new Headers(dispatch.init.headers ?? getRequestHeaders(url)) }),
         );
         dispatch = this.#snapshotWorkloadIdentityUsage(
           workloadRequest,
@@ -2699,9 +2719,16 @@ export class OpenAI {
     credential: WorkloadCredentialUsage | undefined,
     request: T,
     authorization: string | undefined,
+    fallbackHeaders?: object,
   ): T {
     if (!credential || authorization === undefined) return request;
-    const headers = WorkloadTokenProvenance.requestHeaderData(request);
+    const headerState = WorkloadTokenProvenance.requestHeaderDataState(request);
+    if (!headerState) return request;
+    const headers = headerState.value ?? fallbackHeaders;
+    if (!headers) {
+      credential.revoke();
+      return request;
+    }
     const marked = this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization);
     const pending = this.#pendingWorkloadHeaders.get(credential);
     if (marked === false || (pending && pending !== headers && marked !== true)) {
@@ -2711,14 +2738,14 @@ export class OpenAI {
       if (platform) {
         if (bearerToken(platform.value) !== bearerToken(authorization)) credential.revoke();
         else credential.adopt(headers as Headers);
-      } else if (canPreserveHeaderInput(headers as HeadersLike)) {
-        if (
-          bearerToken(new Headers(headers as NonNullable<RequestInit['headers']>).get('Authorization')) !==
-          bearerToken(authorization)
-        ) {
+      } else {
+        // Structural records and arrays may expose ordinary-looking descriptors while still
+        // performing stateful reads. Inspect only Authorization data descriptors here, then
+        // attribute the complete source from the final dispatch snapshot.
+        const observed = getStructuralHeaderValue(headers as HeadersLike, 'Authorization');
+        if (observed && bearerToken(observed.value) !== bearerToken(authorization)) {
           credential.revoke();
         }
-      } else {
         this.#pendingWorkloadHeaders.set(credential, headers);
       }
     }

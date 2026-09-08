@@ -15,6 +15,74 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllEnvs());
 
+test.each([
+  'record getter',
+  'proxy record getter',
+  'tuple getter',
+  'tuple array getter',
+  'nested getter',
+  'data control',
+  'self-delete control',
+] as const)('does not replay an externally deleted %s after a retryable response', async (kind) => {
+  const read = vi.fn(() => 'before');
+  const record: Record<string, string | readonly string[]> = {};
+  const row = ['X-Custom', 'before'];
+  const values = ['before'];
+  let headers: Record<string, string | readonly string[]> | string[][];
+  if (kind === 'tuple getter' || kind === 'tuple array getter') {
+    Object.defineProperty(row, '1', {
+      configurable: true,
+      get: () => (kind === 'tuple array getter' ? [read()] : read()),
+    });
+    headers = [row];
+  } else if (kind === 'nested getter') {
+    Object.defineProperty(values, '0', { configurable: true, get: read });
+    record['X-Custom'] = values;
+    headers = record;
+  } else if (kind === 'data control') {
+    record['X-Custom'] = 'before';
+    headers = record;
+  } else {
+    Object.defineProperty(record, 'X-Custom', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        const value = read();
+        if (kind === 'self-delete control') {
+          delete record['X-Custom'];
+        }
+        return value;
+      },
+    });
+    headers = kind === 'proxy record getter' ? new Proxy(record, { ownKeys: () => ['X-Custom'] }) : record;
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('X-Custom'));
+    if (sent.length === 1) {
+      if (kind === 'tuple getter' || kind === 'tuple array getter') {
+        delete row[1];
+      } else if (kind !== 'self-delete control') {
+        delete record['X-Custom'];
+      }
+      return Response.json({ error: 'synthetic retry' }, { status: 500 });
+    }
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 1,
+  });
+
+  await client.models.list({ headers });
+
+  expect(sent).toEqual(['before', kind === 'self-delete control' ? 'before' : null]);
+  expect(read).toHaveBeenCalledTimes(kind === 'data control' ? 0 : 1);
+});
+
 test.each(['before', 'after'] as const)(
   'keeps a self-removing getter %s an existing alias',
   async (order) => {
@@ -342,4 +410,52 @@ test('retains the last emitted default alias across a non-emitting retry', async
   expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-1', 'Bearer independent']);
   expect(transport.exchanges).toBe(1);
   expect(read).toHaveBeenCalledTimes(1);
+});
+
+describe.each(['request', 'default'] as const)('%s header alias ordering', (layer) => {
+  test.each([
+    ['Authorization', null],
+    ['Authorization', 'Bearer existing-live'],
+    ['X-Probe', null],
+    ['X-Probe', 'existing-live'],
+  ] as const)(
+    'restores the surviving %s alias %j after removing a temporary alias',
+    async (name, existing) => {
+      const headers: Record<string, string | null> = {};
+      const read = vi.fn(() => {
+        Reflect.deleteProperty(headers, name);
+        return 'captured-stale';
+      });
+      Object.defineProperty(headers, name, { configurable: true, enumerable: true, get: read });
+      const liveAlias = name.toLowerCase();
+      const temporaryAlias = name.toUpperCase();
+      headers[liveAlias] = existing;
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get(name));
+        if (sent.length < 3) {
+          if (sent.length === 1) {
+            headers[temporaryAlias] = 'temporary-live';
+          } else {
+            Reflect.deleteProperty(headers, temporaryAlias);
+          }
+          return Response.json({}, { status: 500, headers: { 'retry-after-ms': '1' } });
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 2,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual([existing, 'temporary-live', existing]);
+      expect(read).toHaveBeenCalledTimes(1);
+    },
+  );
 });
