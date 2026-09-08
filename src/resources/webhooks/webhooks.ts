@@ -466,8 +466,8 @@ export namespace LiveCallIncomingWebhookEvent {
    */
   export interface Data {
     /**
-     * The Transceiver `rtc_...` ID of the pending SIP session. The same value appears
-     * as `call_id` in `realtime.call.incoming`.
+     * The `live_...` ID of the pending SIP session. Forward this value unchanged when
+     * accepting or rejecting the call through the Live API.
      */
     session_id: string;
 
@@ -533,8 +533,10 @@ export namespace RealtimeCallIncomingWebhookEvent {
    */
   export interface Data {
     /**
-     * The Transceiver `rtc_...` ID of the pending SIP session. The same value appears
-     * as `session_id` in `live.call.incoming`.
+     * The Transceiver `rtc_...` ID of the pending SIP session. The paired
+     * `live.call.incoming` event derives its `session_id` by replacing the `rtc_`
+     * prefix with `live_`. Use the ID returned by the event with the corresponding
+     * Realtime or Live API.
      */
     call_id: string;
 
