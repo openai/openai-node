@@ -113,7 +113,7 @@ function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: Pro
 }
 
 function hasRunStepDeltaID(delta: RunStepDelta): boolean {
-  // Use the same descriptor inspection at capture and callback selection without reading an ID accessor.
+  // Inspect identity at capture and dispatch without reading an ID accessor.
   return hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id');
 }
 
@@ -940,9 +940,13 @@ export class AssistantStream
     };
     const emitRunStep = <Event extends keyof AssistantStreamEvents>(
       eventName: Event,
-      ...args: EventParameters<AssistantStreamEvents, Event>
+      args: EventParameters<AssistantStreamEvents, Event>,
+      validateDelta?: () => void,
     ): boolean => {
-      const hasListeners = this.#emitExposed(eventName, args, validateRunStepAliases);
+      const hasListeners = this.#emitExposed(eventName, args, () => {
+        validateDelta?.();
+        validateRunStepAliases();
+      });
       validateRunStepAliases();
       return hasListeners;
     };
@@ -951,7 +955,7 @@ export class AssistantStream
       case 'thread.run.step.created': {
         this.#currentToolCallIndex = undefined;
         this.#currentToolCall = undefined;
-        emitRunStep('runStepCreated', event.data);
+        emitRunStep('runStepCreated', [event.data]);
         break;
       }
       case 'thread.run.step.delta': {
@@ -976,10 +980,10 @@ export class AssistantStream
                 continue;
               }
               toolListenersRan =
-                emitRunStep('toolCallDelta', toolCall, accumulatedToolCall) || toolListenersRan;
+                emitRunStep('toolCallDelta', [toolCall, accumulatedToolCall]) || toolListenersRan;
             } else {
               if (this.#currentToolCall) {
-                toolListenersRan = emitRunStep('toolCallDone', this.#currentToolCall) || toolListenersRan;
+                toolListenersRan = emitRunStep('toolCallDone', [this.#currentToolCall]) || toolListenersRan;
               }
 
               this.#currentToolCallIndex = toolCallIndex;
@@ -988,7 +992,8 @@ export class AssistantStream
                 currentDetails.type === 'tool_calls' ? currentDetails.tool_calls[toolCallIndex] : undefined;
               validateRunStepAliases();
               if (this.#currentToolCall) {
-                toolListenersRan = emitRunStep('toolCallCreated', this.#currentToolCall) || toolListenersRan;
+                toolListenersRan =
+                  emitRunStep('toolCallCreated', [this.#currentToolCall]) || toolListenersRan;
               }
             }
           }
@@ -999,7 +1004,12 @@ export class AssistantStream
         const callbackDelta =
           exposedDelta && !hasRunStepDeltaID(exposedDelta) ? exposedDelta : event.data.delta;
         validateRunStepAliases();
-        emitRunStep('runStepDelta', callbackDelta, accumulatedRunStep);
+        emitRunStep('runStepDelta', [callbackDelta, accumulatedRunStep], () => {
+          // Marking callback arguments can execute user code; validate the exact value afterward.
+          if (callbackDelta && hasRunStepDeltaID(callbackDelta)) {
+            throw new OpenAIError('Run-step deltas must not contain an id field');
+          }
+        });
         break;
       }
       case 'thread.run.step.completed':
@@ -1010,9 +1020,9 @@ export class AssistantStream
         this.#activeRunStepID = undefined;
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
-          emitRunStep('toolCallDone', this.#currentToolCall as ToolCall);
+          emitRunStep('toolCallDone', [this.#currentToolCall as ToolCall]);
         }
-        emitRunStep('runStepDone', event.data, accumulatedRunStep);
+        emitRunStep('runStepDone', [event.data, accumulatedRunStep]);
         this.#currentToolCallIndex = undefined;
         this.#currentToolCall = undefined;
         break;
