@@ -215,8 +215,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           ? undefined
           : getInheritedDeltaDescriptor(exposedData);
         // A setter can change the backing value without replacing the property descriptor.
-        const refreshAccessor =
-          afterListeners && (currentDescriptor ?? currentInheritedDescriptor)?.set !== undefined;
+        const refreshAccessor = (currentDescriptor ?? currentInheritedDescriptor)?.set !== undefined;
         if (
           !refreshAccessor &&
           samePropertyDescriptor(currentDescriptor, observedDescriptor) &&
