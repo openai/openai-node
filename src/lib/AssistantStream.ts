@@ -186,28 +186,16 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     runStepDeltaData = exposedData;
     // Capture the envelope identity before a user-defined delta getter can mutate it.
     const idDescriptor = Object.getOwnPropertyDescriptor(stableData, 'id');
-    const deltaDescriptor = Object.getOwnPropertyDescriptor(stableData, 'delta');
-    // Capture the envelope without invoking an accessor-backed delta, even on frozen data.
-    const capturedDescriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(stableData);
-    if (idDescriptor) {
-      capturedDescriptors['id'] = idDescriptor;
-    } else {
-      delete capturedDescriptors['id'];
-    }
-    capturedDescriptors['delta'] = {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value: undefined,
-    };
-    const capturedData = Object.create(
-      Object.getPrototypeOf(stableData),
-      capturedDescriptors,
-    ) as AssistantStreamEvent['data'] & { delta: unknown };
+    // The private envelope needs only identity and delta; keep all other fields on the raw event.
+    const capturedData = Object.create(null, {
+      ...(idDescriptor ? { id: idDescriptor } : {}),
+      delta: { configurable: true, enumerable: true, writable: true, value: undefined },
+    }) as AssistantStreamEvent['data'] & { delta: unknown };
     stableData = capturedData;
     initializeRunStepDelta = () => {
       // Validate the captured envelope before reading delta content, then reject root identity fields
       // before raw dispatch. Project content privately for accumulation after raw listeners run.
+      const deltaDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
       let observedInheritedDescriptor = deltaDescriptor
         ? undefined
         : getInheritedDeltaDescriptor(exposedData);
@@ -216,9 +204,6 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         throw new OpenAIError('Run-step deltas must not contain an id field');
       }
       capturedData.delta = delta;
-      if (!delta || (typeof delta !== 'object' && typeof delta !== 'function')) {
-        return {};
-      }
       let observedDescriptor = deltaDescriptor;
       let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = (afterListeners = false) => {
@@ -574,7 +559,6 @@ export class AssistantStream
     if (runStepID !== undefined && runStepData !== undefined) {
       this.#reserveRunStepAlias(runStepData, runStepID);
     }
-    refreshRunStepDelta?.(rawEventListenersRan);
     if (runStepID === undefined && this.#activeRunStepID !== undefined && this.#currentRunStepSnapshot) {
       this.#reserveRunStepAlias(this.#currentRunStepSnapshot, this.#activeRunStepID);
     }
@@ -613,6 +597,7 @@ export class AssistantStream
         if (activeRunStep) {
           this.#reserveRunStepAlias(activeRunStep, runStepID);
         }
+        refreshRunStepDelta?.(rawEventListenersRan);
         this.#handleRunStep(stableEvent, runStepID, getRunStepDelta);
         if (runStepData !== undefined) {
           this.#reserveRunStepAlias(runStepData, runStepID);
