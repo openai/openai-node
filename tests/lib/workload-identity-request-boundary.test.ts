@@ -247,6 +247,58 @@ test('does not restore workload ownership after removing an independent case ali
   expect(transport.exchanges).toBe(1);
 });
 
+test.each([
+  ['record', 'direct'],
+  ['record', 'nested'],
+  ['array', 'direct'],
+  ['array', 'nested'],
+] as const)(
+  'defers a %s Authorization array with %s custom coercion until dispatch',
+  async (shape, nesting) => {
+    let coercions = 0;
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        await super.prepareRequest(...args);
+        const [request] = args;
+        const authorization = new Headers(request.headers).get('Authorization');
+        if (!authorization) {
+          throw new Error('Expected workload Authorization');
+        }
+        const coercible = ['unused'];
+        Object.defineProperty(coercible, 'toString', {
+          configurable: true,
+          get() {
+            coercions += 1;
+            return () => authorization;
+          },
+        });
+        const value = nesting === 'direct' ? coercible : [coercible];
+        request.headers = (shape === 'record'
+          ? { Authorization: value }
+          : [['Authorization', value]]) as unknown as NonNullable<RequestInit['headers']>;
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sends += 1;
+      expect(new Headers(init?.headers).get('Authorization')).toMatch(/^Bearer access-token-/u);
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(coercions).toBe(1);
+    expect(sends).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test.each(['accessor', 'data control'] as const)(
   'keeps %s cache consistent with replacement headers',
   async (kind) => {

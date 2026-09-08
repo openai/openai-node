@@ -303,21 +303,9 @@ export const getStructuralHeaderValue = (
       return undefined;
     }
     const requested = requestedName.toLowerCase();
-    const entries: [string, HeaderValue | HeaderValue[]][] = [];
-    const copyInput = (
-      input: HeaderValue | readonly HeaderValue[],
-    ): { value: HeaderValue | HeaderValue[] } | undefined => {
-      if (!isReadonlyArray(input)) return { value: input };
-      const length = Object.getOwnPropertyDescriptor(input, 'length')?.value;
-      if (typeof length !== 'number') return undefined;
-      const values: HeaderValue[] = [];
-      for (let index = 0; index < length; index += 1) {
-        const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
-        if (!descriptor || !('value' in descriptor)) return undefined;
-        values.push(descriptor.value);
-      }
-      return { value: values };
-    };
+    const entries: [string, HeaderValue][] = [];
+    const copyInput = (input: unknown): { value: HeaderValue } | undefined =>
+      input === null || input === undefined || typeof input === 'string' ? { value: input } : undefined;
     if (Array.isArray(headers)) {
       const length = Object.getOwnPropertyDescriptor(headers, 'length')?.value;
       if (typeof length !== 'number') return undefined;
