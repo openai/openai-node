@@ -4,9 +4,11 @@ import type { RequestInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
 describe('normalized request ownership', () => {
-  test.each(['accessor', 'data control'] as const)(
+  test.each(['accessor', 'configurable headers', 'data control'] as const)(
     'keeps %s state aligned with replaced headers',
     async (shape) => {
+      let prepared: RequestInit | undefined;
+      let dispatched: RequestInit | undefined;
       class HookClient extends OpenAI {
         protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
           await super.prepareRequest(...args);
@@ -21,18 +23,22 @@ describe('normalized request ownership', () => {
             },
             'X-Cache': 'default',
           };
+          if (shape === 'configurable headers') {
+            Object.defineProperty(request, 'headers', { writable: false, configurable: true });
+          }
+          prepared = request;
           Object.defineProperty(
             request,
             'cache',
-            shape === 'accessor'
-              ? {
+            shape === 'data control'
+              ? { value: 'default', writable: true, configurable: true, enumerable: true }
+              : {
                   configurable: true,
                   enumerable: true,
                   get(this: RequestInit) {
                     return new Headers(this.headers).get('X-Cache');
                   },
-                }
-              : { value: 'default', writable: true, configurable: true, enumerable: true },
+                },
           );
         }
         override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
@@ -40,8 +46,14 @@ describe('normalized request ownership', () => {
           if (!request) {
             throw new Error('Expected normalized request');
           }
-          request.headers = new Headers(request.headers);
-          request.headers.set('X-Cache', 'no-store');
+          const headers = new Headers(request.headers);
+          headers.set('X-Cache', 'no-store');
+          if (shape === 'configurable headers') {
+            Object.defineProperty(request, 'headers', { value: headers });
+          } else {
+            request.headers = headers;
+          }
+          dispatched = request;
           if (shape === 'data control') {
             request.cache = 'no-store';
           }
@@ -59,6 +71,7 @@ describe('normalized request ownership', () => {
         fetch: transport.fetch,
         maxRetries: 0,
       }).models.list();
+      expect(dispatched).toBe(prepared);
     },
   );
 

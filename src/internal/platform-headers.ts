@@ -66,10 +66,10 @@ export const getHeadersIterator = (headers: object) => getHeadersProtocol(header
 /** Identifies mutation descriptors without calling a credential reader. */
 export const getHeadersPrototype = (headers: object) => getHeadersProtocol(headers)?.prototype;
 
-/** Reads platform collections without consuming the iterable later handed to custom fetch. */
-export const getPlatformHeader = (
+const readPlatformHeader = (
   headers: object | null | undefined,
   name: string,
+  verify: boolean,
 ): { value: string | null; prototype: object } | undefined => {
   try {
     if (!headers) {
@@ -93,6 +93,22 @@ export const getPlatformHeader = (
       if (prototype !== platform.prototype) {
         continue;
       }
+      if (verify && prototype !== nativeHeadersPrototype) {
+        const has = Object.getOwnPropertyDescriptor(prototype, 'has')?.value;
+        if (typeof has !== 'function') {
+          return undefined;
+        }
+        // A foreign platform reader must reject unbranded receivers. Merely matching the
+        // Headers-shaped iterable protocol does not prove that its source can be replayed.
+        try {
+          Reflect.apply(has, {}, [name]);
+          return undefined;
+        } catch {
+          if (typeof Reflect.apply(has, headers, [name]) !== 'boolean') {
+            return undefined;
+          }
+        }
+      }
       const getter =
         prototype === nativeHeadersPrototype
           ? nativeHeadersGet
@@ -106,3 +122,11 @@ export const getPlatformHeader = (
     return undefined;
   }
 };
+
+/** Reads platform collections without consuming the iterable later handed to custom fetch. */
+export const getPlatformHeader = (headers: object | null | undefined, name: string) =>
+  readPlatformHeader(headers, name, false);
+
+/** Reads recognized native collections after validating their defining realm's receiver brand. */
+export const getVerifiedPlatformHeader = (headers: object | null | undefined, name: string) =>
+  readPlatformHeader(headers, name, true);

@@ -1,7 +1,16 @@
 /* oxlint-disable max-classes-per-file -- The structural collection and client are independent fixtures. */
 import OpenAI from 'openai';
 import type { RequestInit } from 'openai/internal/builtin-types';
+import { buildHeaders } from 'openai/internal/headers';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
+
+const copyRequestHeadersGetter = (request: RequestInit, original: Headers) => {
+  Object.defineProperty(request, 'headers', {
+    configurable: true,
+    enumerable: true,
+    get: () => new Headers(original),
+  });
+};
 
 test.each(['record', 'array', 'structural'] as const)(
   'retains an observed independent %s credential through later restoration of SDK bytes',
@@ -46,12 +55,7 @@ test.each(['record', 'array', 'structural'] as const)(
         if (!request) {
           throw new Error('Expected a request');
         }
-        if (kind === 'structural') {
-          expect(request.headers).not.toBe(supplied);
-          expect(request.headers).toBeInstanceOf(Headers);
-        } else {
-          expect(request.headers).toBe(supplied);
-        }
+        expect(request.headers).toBe(supplied);
         const headers = new Headers(request.headers);
         headers.set('Authorization', originalAuthorization);
         request.headers = headers;
@@ -127,3 +131,56 @@ test.each(['getter', 'iterator'] as const)(
     expect(transport.exchanges).toBe(2);
   },
 );
+test.each([
+  { kind: 'direct native copy', independent: false },
+  { kind: 'getter native copy', independent: true },
+  { kind: 'observed equal-byte write then getter copy', independent: true },
+  { kind: 'observed independent layer then getter copy', independent: true },
+] as const)('$kind keeps its established refresh ownership', async ({ kind, independent }) => {
+  let sends = 0;
+  class HookClient extends OpenAI {
+    // oxlint-disable-next-line class-methods-use-this -- The fixture overrides an SDK instance hook.
+    protected override async prepareRequest(request: RequestInit) {
+      const original = request.headers as Headers;
+      const authorization = original.get('Authorization');
+      if (authorization === null) {
+        throw new Error('Expected the SDK workload credential');
+      }
+      if (kind === 'direct native copy') {
+        request.headers = new Headers(original);
+      } else if (kind === 'observed independent layer then getter copy') {
+        request.headers = buildHeaders([{ Authorization: authorization }]).values;
+      } else {
+        if (kind === 'observed equal-byte write then getter copy') {
+          original.set('Authorization', authorization);
+        }
+        copyRequestHeadersGetter(request, original);
+      }
+    }
+
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      if (kind === 'observed independent layer then getter copy') {
+        copyRequestHeadersGetter(args[1], args[1].headers as Headers);
+      }
+      return super.fetchWithAuth(...args);
+    }
+  }
+  const transport = createWorkloadIdentityTransport(() => {
+    sends += 1;
+    return sends === 1
+      ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+      : Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+  await (independent
+    ? expect(client.models.list()).rejects.toMatchObject({ status: 401 })
+    : expect(client.models.list()).resolves.toMatchObject({ data: [] }));
+  expect(sends).toBe(independent ? 1 : 2);
+  expect(transport.exchanges).toBe(independent ? 1 : 2);
+});

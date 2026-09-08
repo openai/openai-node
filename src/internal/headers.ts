@@ -1,5 +1,3 @@
-import type { HeadersInit } from './builtin-types';
-import { hasNativeHeadersBrand } from './platform-headers';
 export { getPlatformHeader, hasNativeHeadersBrand } from './platform-headers';
 import {
   copyWorkloadHeaderCredential,
@@ -12,7 +10,6 @@ import {
 
 import {
   brand_privateNullableHeaders,
-  canPreserveHeaderInput,
   copyHeaderReplay,
   iterateHeaders,
   HeaderReplay,
@@ -322,34 +319,6 @@ const createHeaderSnapshot = (
 /** A first parse shared by body encoding and authentication, with safe refresh after async hooks. */
 export const snapshotHeaders = (initialSource: HeadersLike): HeaderSnapshot =>
   createHeaderSnapshot(initialSource);
-
-/** Observes native transport serialization before deciding whether its source can be reused. */
-export const materializeHeaderInput = (
-  source: HeadersInit | undefined,
-): { values: Headers; preserve: boolean } => {
-  let preserve = canPreserveHeaderInput(source);
-  const descriptors = new Map<PropertyKey, PropertyDescriptor | undefined>();
-  // Preservation already classified the iterable protocol; do not repeat a caller-controlled has probe.
-  const observed =
-    source && preserve && !Array.isArray(source) && !hasNativeHeadersBrand(source)
-      ? new Proxy(source, {
-          getOwnPropertyDescriptor(target, key) {
-            const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
-            descriptors.set(key, descriptor);
-            return descriptor;
-          },
-          get(target, key) {
-            const value = Reflect.get(target, key, target);
-            if (typeof key === 'string') {
-              const descriptor = descriptors.get(key);
-              if (!descriptor || !('value' in descriptor) || descriptor.value !== value) preserve = false;
-            }
-            return value;
-          },
-        })
-      : source;
-  return { values: new Headers(observed), preserve };
-};
 
 /** Parsed header layers shared by preparation and automatic retries. */
 export interface WorkloadHeaderSnapshots {

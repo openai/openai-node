@@ -205,6 +205,72 @@ test('retains a self-deleting slot getter until a data property replaces it', ()
   expect(read).toHaveBeenCalledTimes(1);
 });
 
+describe.each(['request', 'default'] as const)('%s outer slot deletion', (layer) => {
+  test.each(['data', 'accessor', 'self read', 'self serialization'] as const)(
+    'preserves canonical retry behavior after deleting a %s slot',
+    async (kind) => {
+      const row = ['Authorization', 'Bearer independent'];
+      const headers = [row];
+      const read = vi.fn(() => {
+        if (read.mock.calls.length > 1) {
+          throw new Error('An outer accessor was reread');
+        }
+        if (kind === 'self read') {
+          delete headers[0];
+        }
+        return row;
+      });
+      if (kind !== 'data') {
+        Object.defineProperty(headers, 0, { configurable: true, get: read });
+      }
+      if (kind === 'self serialization') {
+        Object.defineProperty(row, 1, {
+          get() {
+            delete headers[0];
+            return 'Bearer independent';
+          },
+        });
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        if (sent.length === 1) {
+          if (kind === 'data' || kind === 'accessor') {
+            delete headers[0];
+          }
+          return Response.json(
+            { error: 'synthetic retry' },
+            { status: 500, headers: { 'retry-after-ms': '0' } },
+          );
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 1,
+      });
+
+      const request = client.models.list(layer === 'request' ? { headers } : {});
+      if (kind === 'data') {
+        await expect(request).rejects.toThrow(TypeError);
+        expect(sent).toEqual(['Bearer independent']);
+      } else {
+        await request;
+        expect(sent).toEqual([
+          'Bearer independent',
+          kind === 'accessor' ? 'Bearer access-token-1' : 'Bearer independent',
+        ]);
+      }
+      expect(read).toHaveBeenCalledTimes(kind === 'data' ? 0 : 1);
+      expect(transport.exchanges).toBe(kind === 'accessor' ? 1 : 0);
+    },
+  );
+});
+
 test('does not throw when outer slot descriptors are hidden by a proxy', () => {
   const headers = new Proxy([['X-Custom', 'preserved']], {
     getOwnPropertyDescriptor(target, key) {

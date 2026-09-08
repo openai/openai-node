@@ -348,15 +348,25 @@ Tuple-array refresh reads the array's data length when it matched the first trav
 ordinary growth and truncation without repeating a custom length getter. Otherwise it retains the
 first traversal's row boundary; replace the header source to select a different boundary.
 
-When attributing a workload credential at dispatch, the SDK preserves local native `Headers`,
-plain-record, and ordinary tuple-array identity. Other iterable implementations, including foreign
-`Headers` collections, are materialized once and that same snapshot is passed to the transport.
+When attributing a workload credential at dispatch, the SDK preserves local native `Headers` identity.
+Records, tuple arrays, and other iterable implementations, including foreign `Headers` collections,
+are materialized once and that same snapshot is passed to the transport. Data descriptors cannot prove
+that a record or array is free of stateful proxy reads.
+Protected request and transport hooks keep the original request object and its header source until
+the final dispatch snapshot. Accessors therefore observe the same request fields that later hooks
+update. If a hook replaces an opaque, unconsumed source with unmarked copied headers, equal token
+bytes alone cannot restore its refresh ownership; retain SDK-marked values when forwarding ownership.
+A request `headers` getter returning an unmarked local native copy does not retain refresh ownership;
+return the original SDK-marked values to preserve it. An observed independent layer or Authorization
+overwrite still disables refresh.
 Structural constructor/tag descriptors cannot establish that a custom `get()` method agrees with its
 iterator. Foreign collection identity and custom properties are therefore not retained on this path.
 Header values remain supported, as does workload refresh when SDK credential ownership is retained.
 Headers from a foreign `Request` are also materialized into the dispatch snapshot while the `Request`
 object retains its identity.
 Native `Request` delegation is unchanged.
+Resolving the legacy workload placeholder in native `Headers` updates that collection in place,
+including when its outer request is frozen. A later delegated send can reuse the resolved headers.
 
 `fetchWithAuth` and `fetchWithTimeout` also accept the context as their final argument. Ordinary object
 spread retains the SDK request carrier, including when a legacy wrapper also replaces the controller.

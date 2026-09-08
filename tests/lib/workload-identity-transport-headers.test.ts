@@ -410,7 +410,7 @@ test('materializes a self-deleting header getter before transport dispatch', asy
 describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identity', (hook) => {
   describe.each(['record', 'array', 'native', 'foreign'] as const)('%s', (kind) => {
     test.skipIf(kind === 'foreign' && Number(process.versions.node.split('.')[0]) < 24)(
-      'preserves supported copies and materializes unverified transport collections',
+      'preserves native identity and dispatches snapshots of other inputs through workload refresh',
       async () => {
         const supplied: NonNullable<RequestInit['headers']>[] = [];
         const retainHeaders = async (request: RequestInit) => {
@@ -447,19 +447,24 @@ describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identi
             if (hook === 'fetchWithTimeout' && args[1]) {
               await retainHeaders(args[1]);
             }
+            // oxlint-disable-next-line unicorn/prefer-at -- Keep indexed access compatible with the repository's ES2020 type library.
+            expect(args[1]?.headers).toBe(supplied[supplied.length - 1]);
+            expect(Object.getOwnPropertyDescriptor(args[1]?.headers, 'transportMetadata')?.value).toBe(
+              'synthetic-extension',
+            );
             return super.fetchWithTimeout(...args);
           }
         }
         const sent: (string | null)[] = [];
         const transport = createWorkloadIdentityTransport((_url, init) => {
-          if (kind === 'foreign') {
-            expect(init?.headers).not.toBe(supplied[sent.length]);
-            expect(init?.headers).toBeInstanceOf(Headers);
-          } else {
+          if (kind === 'native') {
             expect(init?.headers).toBe(supplied[sent.length]);
             expect(Object.getOwnPropertyDescriptor(init?.headers, 'transportMetadata')?.value).toBe(
               'synthetic-extension',
             );
+          } else {
+            expect(init?.headers).not.toBe(supplied[sent.length]);
+            expect(init?.headers).toBeInstanceOf(Headers);
           }
           sent.push(new Headers(init?.headers).get('Authorization'));
           return sent.length === 1
@@ -482,6 +487,68 @@ describe.each(['prepareRequest', 'fetchWithTimeout'] as const)('%s header identi
     );
   });
 });
+
+test.each(['workload', 'independent'] as const)(
+  'dispatches the inspected %s credential from a changing record proxy',
+  async (first) => {
+    const reads: number[] = [];
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [, request] = args;
+        if (!request) {
+          throw new Error('Expected request init');
+        }
+        const authorization = new Headers(request.headers).get('Authorization');
+        if (authorization === null) {
+          throw new Error('Expected workload Authorization');
+        }
+        const attempt = reads.length;
+        let count = 0;
+        reads.push(0);
+        request.headers = new Proxy(
+          { Authorization: authorization },
+          {
+            get(target, key, receiver) {
+              if (key === 'Authorization') {
+                count += 1;
+                reads[attempt] = count;
+                const workload = count % 2 === 1 ? first === 'workload' : first !== 'workload';
+                return workload ? authorization : 'Bearer independent';
+              }
+              return Reflect.get(target, key, receiver);
+            },
+          },
+        );
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+        : Response.json({ ok: true });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    const result = client.post('/synthetic', { body: { value: 1 } });
+    await (first === 'workload'
+      ? expect(result).resolves.toEqual({ ok: true })
+      : expect(result).rejects.toMatchObject({ status: 401 }));
+
+    expect(sent).toEqual(
+      first === 'workload' ? ['Bearer access-token-1', 'Bearer access-token-2'] : ['Bearer independent'],
+    );
+    expect(reads).toEqual(first === 'workload' ? [1, 1] : [1]);
+    expect(transport.exchanges).toBe(first === 'workload' ? 2 : 1);
+  },
+);
 
 test.each(['iterator', 'getter'] as const)(
   'materializes a stateful %s exactly once before fetch',

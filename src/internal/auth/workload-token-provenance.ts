@@ -1,4 +1,9 @@
-import { getHeadersPrototype, getPlatformHeader, hasNativeHeadersBrand } from '../platform-headers';
+import {
+  getHeadersPrototype,
+  getPlatformHeader,
+  getVerifiedPlatformHeader,
+  hasNativeHeadersBrand,
+} from '../platform-headers';
 import type { HeadersLike, NullableHeaders, WorkloadHeaderSnapshots } from '../headers';
 
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
@@ -68,7 +73,7 @@ const mutateHeaders = (headers: Headers, mutation: (...args: string[]) => void, 
   }
 };
 
-const observeHeaderMutations = (headers: Headers, credential: HeaderCredential): void => {
+const observeHeaderMutations = (headers: object, credential: HeaderCredential): void => {
   if (observedHeaderMutations.has(headers)) {
     return;
   }
@@ -175,7 +180,7 @@ export function rememberWorkloadHeaderCredential(
 }
 
 /** Native header values additionally own observable Authorization mutations. */
-export function rememberWorkloadHeaderValues(headers: Headers, credential: HeaderCredential | null): void {
+export function rememberWorkloadHeaderValues(headers: object, credential: HeaderCredential | null): void {
   headerCredentials.set(headers, credential);
   if (credential) {
     observeHeaderMutations(headers, credential);
@@ -200,13 +205,19 @@ interface TokenScope {
 
 /** Owns authentication provenance for individual request attempts without retaining a token cache. */
 export class WorkloadTokenProvenance {
-  private readonly parseHeaders: (values: Headers) => NullableHeaders;
+  private readonly parseHeaders: (values: HeadersLike) => NullableHeaders;
+  private readonly canPreserveHeaders: (values: HeadersLike) => boolean;
 
   /** Uses the canonical header parser while keeping its dependency on provenance acyclic. */
-  constructor(parseHeaders: (values: Headers) => NullableHeaders) {
+  constructor(
+    parseHeaders: (values: HeadersLike) => NullableHeaders,
+    canPreserveHeaders: (values: HeadersLike) => boolean,
+  ) {
     this.parseHeaders = parseHeaders;
+    this.canPreserveHeaders = canPreserveHeaders;
   }
 
+  private readonly pendingHeaders = new WeakMap<WorkloadCredentialUsage, object | null>();
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
@@ -251,10 +262,39 @@ export class WorkloadTokenProvenance {
     return request;
   }
 
+  /** Observes data-valued request headers without invoking caller-owned accessors. */
+  static requestHeaderData(request: object): object | undefined {
+    try {
+      const seen = new Set<object>();
+      for (let source: object | null = request; source; source = Object.getPrototypeOf(source)) {
+        if (seen.has(source)) {
+          break;
+        }
+        seen.add(source);
+        const descriptor = Object.getOwnPropertyDescriptor(source, 'headers');
+        if (!descriptor) {
+          continue;
+        }
+        const value: unknown = 'value' in descriptor ? descriptor.value : undefined;
+        return typeof value === 'object' && value !== null ? value : undefined;
+      }
+    } catch {
+      // Opaque request representations retain their normal reads at dispatch.
+    }
+    return undefined;
+  }
+
   /** Reads only this client's opaque SDK request carrier, without evaluating caller accessors. */
   requestCarrier(request: object): object | undefined {
-    const carrier = Object.getOwnPropertyDescriptor(request, requestCredentialCarrier)?.value;
-    return typeof carrier === 'object' && carrier !== null && this.results.has(carrier) ? carrier : undefined;
+    try {
+      const carrier = Object.getOwnPropertyDescriptor(request, requestCredentialCarrier)?.value;
+      return typeof carrier === 'object' && carrier !== null && this.results.has(carrier)
+        ? carrier
+        : undefined;
+    } catch {
+      // A caller membrane may expose public request fields without exposing private SDK metadata.
+      return undefined;
+    }
   }
 
   /** Marks the concrete authentication result issued by this client. */
@@ -361,8 +401,8 @@ export class WorkloadTokenProvenance {
 
   /** Transfers snapshots to retry bookkeeping without retaining them on a held request result. */
   takeHeaders(result: { req: object }): WorkloadHeaderSnapshots | undefined {
-    const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
-    if (typeof carrier !== 'object' || carrier === null) {
+    const carrier = this.requestCarrier(result.req);
+    if (carrier === undefined) {
       return undefined;
     }
     const state = this.results.get(carrier);
@@ -385,45 +425,140 @@ export class WorkloadTokenProvenance {
     );
   }
 
-  /** Checks provenance retained by the header values or SDK request carrier. */
-  matchesResult(result: { req: { headers: Headers } }, authorization: string): boolean {
-    return this.retainResultCredential(result, authorization).isCurrent();
+  /** Keeps opaque sources unconsumed through hooks and defers their attribution to dispatch. */
+  observeRequest(
+    credential: WorkloadCredentialUsage | undefined,
+    request: object,
+    authorization: string | undefined,
+  ): void {
+    if (!credential || authorization === undefined) {
+      return;
+    }
+    const headers = WorkloadTokenProvenance.requestHeaderData(request);
+    if (!headers) {
+      // An accessor has no observed source yet; unmarked native copies cannot attest ownership.
+      this.pendingHeaders.set(credential, null);
+      return;
+    }
+    if (!this.matchesPreparedSource(credential, headers, authorization)) {
+      credential.revoke();
+    } else if (credential.isCurrent()) {
+      const platform = getVerifiedPlatformHeader(headers, 'Authorization');
+      if (platform) {
+        if (bearerToken(platform.value) === bearerToken(authorization)) {
+          this.adoptPreparedSource(credential, headers as Headers);
+        } else {
+          credential.revoke();
+        }
+      } else {
+        this.pendingHeaders.set(credential, headers);
+      }
+    }
   }
 
-  /** Keeps revocation effective after native copies lose their per-object metadata. */
-  retainResultCredential(
-    result: { req: { headers: Headers } },
+  /** Copies of ordinary data inputs remain compatible; opaque copies require an owned capability. */
+  matchesPreparedSource(
+    credential: WorkloadCredentialUsage | undefined,
+    headers: object | undefined,
     authorization: string,
-  ): WorkloadCredentialUsage {
-    const headerMatch = this.matchesHeaderCredential(result.req.headers, authorization);
-    let credential: HeaderCredential | null | undefined;
-    if (headerMatch === undefined) {
-      const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
-      credential =
-        typeof carrier === 'object' && carrier !== null ? this.results.get(carrier)?.credential : undefined;
-    } else {
-      credential = headerMatch ? workloadHeaderCredential(result.req.headers) : null;
+  ): boolean {
+    if (!credential) {
+      return false;
     }
-    if (credential && headerMatch === undefined) {
-      rememberWorkloadHeaderValues(result.req.headers, credential);
+    const marked = this.matchesHeaderCredential(headers, authorization);
+    if (marked === false) {
+      return false;
+    }
+    const pending = this.pendingHeaders.get(credential);
+    if (pending === undefined || pending === headers || marked === true) {
+      return true;
+    }
+    if (pending === null) {
+      return !headers || !hasNativeHeadersBrand(headers);
+    }
+    return (
+      getVerifiedPlatformHeader(headers, 'Authorization') !== undefined &&
+      this.matchesPreparedData(pending, authorization)
+    );
+  }
+
+  private matchesPreparedData(source: object, authorization: string): boolean {
+    if (!this.canPreserveHeaders(source as HeadersLike)) {
+      return false;
+    }
+    try {
+      const copies = new WeakMap<object, object>();
+      const copyData = (value: object): object => {
+        const previous = copies.get(value);
+        if (previous) {
+          return previous;
+        }
+        const copy: object = Array.isArray(value) ? [] : Object.create(null);
+        copies.set(value, copy);
+        const descriptors = Object.getOwnPropertyDescriptors(value);
+        for (const key of Reflect.ownKeys(descriptors)) {
+          const descriptor: PropertyDescriptor = Reflect.get(descriptors, key);
+          if (!('value' in descriptor) || typeof descriptor.value === 'function') {
+            throw new TypeError('A prepared data copy cannot contain executable properties');
+          }
+          if (Array.isArray(descriptor.value)) {
+            descriptor.value = copyData(descriptor.value);
+          } else if (descriptor.value !== null && typeof descriptor.value === 'object') {
+            throw new TypeError('A prepared data copy cannot contain opaque objects');
+          }
+        }
+        return Object.defineProperties(copy, descriptors);
+      };
+      // Parse only captured data descriptors; caller getters and iterators remain hook-owned.
+      return (
+        bearerToken(this.parseHeaders(copyData(source) as HeadersLike).values.get('Authorization')) ===
+        bearerToken(authorization)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /** A concrete dispatch snapshot replaces its pending source for this attempt only. */
+  adoptPreparedSource(credential: WorkloadCredentialUsage, headers: Headers): void {
+    this.pendingHeaders.delete(credential);
+    credential.adopt(headers);
+  }
+
+  /** Retains ownership without consuming hook-visible header getters or opaque iterables. */
+  retainRequestCredential(
+    request: object,
+  ): { authorization: string; credential: WorkloadCredentialUsage } | undefined {
+    const headers = WorkloadTokenProvenance.requestHeaderData(request);
+    const headerCredential = headers && workloadHeaderCredential(headers);
+    const carrier = this.requestCarrier(request);
+    const selected =
+      headerCredential === undefined ? carrier && this.results.get(carrier)?.credential : headerCredential;
+    if (!selected || selected.revoked || selected.owner !== this) {
+      return undefined;
+    }
+    let credential = selected;
+    const platformHeader = getVerifiedPlatformHeader(headers, 'Authorization');
+    if (platformHeader && bearerToken(platformHeader.value) !== credential.token) {
+      return undefined;
+    }
+    if (platformHeader && headerCredential === undefined && headers) {
+      rememberWorkloadHeaderValues(headers, credential);
+    }
+    if (credential.revoked) {
+      return undefined;
     }
     return {
-      isCurrent: () =>
-        credential !== undefined &&
-        credential !== null &&
-        !credential.revoked &&
-        credential.owner === this &&
-        bearerToken(authorization) === credential.token,
-      revoke: () => {
-        if (credential) {
+      authorization: `Bearer ${credential.token}`,
+      credential: {
+        isCurrent: () => !credential.revoked,
+        revoke: () => {
           credential.revoked = true;
-        }
-      },
-      adopt: (headers) => {
-        if (credential) {
+        },
+        adopt: (values) => {
           credential = { ...credential };
-          rememberWorkloadHeaderValues(headers, credential);
-        }
+          rememberWorkloadHeaderValues(values, credential);
+        },
       },
     };
   }

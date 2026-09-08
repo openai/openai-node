@@ -3,7 +3,7 @@ import type { RequestInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
 test.each(['throw', 'change'] as const)(
-  'uses one iterable membership observation when a repeated probe would %s',
+  'uses native serialization when a repeated iterable membership probe would %s',
   async (behavior) => {
     const probes: number[] = [];
     const supplied: NonNullable<RequestInit['headers']>[] = [];
@@ -35,7 +35,8 @@ test.each(['throw', 'change'] as const)(
     }
     const sent: (string | null)[] = [];
     const transport = createWorkloadIdentityTransport((_url, init) => {
-      expect(init?.headers).toBe(supplied[sent.length]);
+      expect(init?.headers).toBeInstanceOf(Headers);
+      expect(init?.headers).not.toBe(supplied[sent.length]);
       const headers = new Headers(init?.headers);
       sent.push(headers.get('Authorization'));
       expect(headers.get('X-Custom')).toBe('synthetic-preserved');
@@ -54,7 +55,7 @@ test.each(['throw', 'change'] as const)(
     await client.models.list({ headers: { 'X-Custom': 'synthetic-preserved' } });
 
     expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
-    expect(probes).toEqual([1, 1]);
+    expect(probes).toEqual([0, 0]);
     expect(transport.exchanges).toBe(2);
   },
 );

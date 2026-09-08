@@ -157,7 +157,8 @@ test('preserves native authorization aliases without refreshing their combined c
   }
   const sent: (string | null)[] = [];
   const transport = createWorkloadIdentityTransport((_url, init) => {
-    expect(init?.headers).toBe(supplied[sent.length]);
+    expect(init?.headers).toBeInstanceOf(Headers);
+    expect(init?.headers).not.toBe(supplied[sent.length]);
     sent.push(new Headers(init?.headers).get('Authorization'));
     return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
   });
