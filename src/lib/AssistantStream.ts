@@ -221,7 +221,11 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         }
         const accumulationDelta: Record<PropertyKey, unknown> = {};
         for (const key of Reflect.ownKeys(currentDelta)) {
-          if (key === 'id' || !Object.getOwnPropertyDescriptor(currentDelta, key)?.enumerable) {
+          if (
+            typeof key === 'symbol' ||
+            key === 'id' ||
+            !Object.getOwnPropertyDescriptor(currentDelta, key)?.enumerable
+          ) {
             continue;
           }
           // Read accessors on their original receiver, without ever evaluating an excluded identity field.

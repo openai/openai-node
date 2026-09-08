@@ -9,6 +9,33 @@ import {
 } from './assistant-stream-test-utils';
 
 describe('AssistantStream run-step deltas', () => {
+  test('ignores symbol metadata on callable deltas during accumulation', async () => {
+    const step = runStep('step_original');
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      toolCallDelta(step.id),
+      completedRun(),
+    ]);
+    const read = vi.fn(() => {
+      throw new Error('unexpected metadata read');
+    });
+    const stepDelta = vi.fn();
+    runner.on('event', (event) => {
+      if (event.event === 'thread.run.step.delta') {
+        const callable = Object.assign(() => 'synthetic callable', event.data.delta);
+        Object.defineProperty(callable, Symbol('metadata'), { enumerable: true, get: read });
+        event.data.delta = callable;
+      }
+    });
+    runner.on('runStepDelta', stepDelta);
+
+    await runner.done();
+
+    expect(read).not.toHaveBeenCalled();
+    expect(typeof stepDelta.mock.calls[0]?.[0]).toBe('function');
+    expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+  });
+
   describe.each([
     ['SSE', publicAssistantStream],
     ['serialized stream', assistantStream],
