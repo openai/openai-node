@@ -219,7 +219,7 @@ export class WorkloadTokenProvenance {
   private readonly pendingHeaders = new WeakMap<WorkloadCredentialUsage, object>();
   private readonly structuralMismatches = new WeakMap<
     WorkloadCredentialUsage,
-    { source: object; value: string | null; restorationDefinitive: boolean }
+    { source: object; value: string | null; restorationDefinitive: boolean; exact: boolean }
   >();
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
@@ -440,6 +440,21 @@ export class WorkloadTokenProvenance {
     );
   }
 
+  private isStructuralRestoration(
+    exactAuthorization: boolean,
+    credential: WorkloadCredentialUsage,
+    headers: object,
+    observed: { value: string | null } | undefined,
+  ): boolean {
+    const mismatch = this.structuralMismatches.get(credential);
+    return (
+      exactAuthorization &&
+      observed !== undefined &&
+      mismatch?.source === headers &&
+      mismatch.restorationDefinitive
+    );
+  }
+
   /** Keeps opaque sources unconsumed through hooks and defers their attribution to dispatch. */
   observeRequest(
     credential: WorkloadCredentialUsage | undefined,
@@ -488,12 +503,9 @@ export class WorkloadTokenProvenance {
             source: headers,
             value: observed.value,
             restorationDefinitive: observed.restorationDefinitive !== false,
+            exact: exactAuthorization,
           });
-        } else if (
-          observed &&
-          this.structuralMismatches.get(credential)?.source === headers &&
-          this.structuralMismatches.get(credential)?.restorationDefinitive
-        ) {
+        } else if (this.isStructuralRestoration(exactAuthorization, credential, headers, observed)) {
           // Returning to the workload bytes after a definite structural mismatch must not restore
           // retry ownership for this attempt.
           credential.revoke();
@@ -525,7 +537,14 @@ export class WorkloadTokenProvenance {
       structuralMismatch?.restorationDefinitive
     ) {
       const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
-      if (current && (current.value === authorization || current.value === dispatchedAuthorization)) {
+      if (
+        (current && current.value === authorization) ||
+        (structuralMismatch.exact &&
+          dispatchedAuthorization !== undefined &&
+          dispatchedAuthorization !== authorization)
+      ) {
+        // A later materialized copy must not regain ownership after this terminal observation.
+        credential.revoke();
         return false;
       }
     }

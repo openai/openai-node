@@ -387,6 +387,40 @@ describe('Workload identity request and dispatch hooks', () => {
     },
   );
 
+  test('defers a proxy descriptor normalization until its canonical getter is dispatched', async () => {
+    class HookClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture installs a proxy at preparation.
+      protected override async prepareRequest(init: RequestInit) {
+        const authorization = new Headers(init.headers).get('Authorization');
+        const headers = { Authorization: authorization };
+        init.headers = new Proxy(headers, {
+          getOwnPropertyDescriptor(target, property) {
+            const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
+            return property === 'Authorization' && descriptor && 'value' in descriptor
+              ? {
+                  ...descriptor,
+                  value: `${descriptor.value}`.replace(/^Bearer /u, 'bEaReR '),
+                }
+              : descriptor;
+          },
+        });
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      return sent.length === 1
+        ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+        : Response.json({ data: [] });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await client.models.list();
+
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+    expect(transport.exchanges).toBe(2);
+  });
+
   test.each([false, true])('preserves native Request headers (throwing tag getter: %s)', async (throwTag) => {
     class HookClient extends OpenAI {
       override async fetchWithTimeout(
