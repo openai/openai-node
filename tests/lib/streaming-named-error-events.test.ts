@@ -327,3 +327,59 @@ describe('named SSE provider errors', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 });
+
+describe.each([
+  { name: 'unnamed wrapped', event: undefined, wrapped: true },
+  { name: 'named wrapped', event: 'error', wrapped: true },
+  { name: 'named flat', event: 'error', wrapped: false },
+])('$name API errors resembling transport cancellation', ({ event, wrapped }) => {
+  const payload = { ...providerError, message: 'Provider failure: FetchRequestCanceledException' };
+
+  test.each(['exported stream', 'public request', 'chat helper'] as const)(
+    'preserves the provider error through %s',
+    async (surface) => {
+      const response = responseForWire(record(event, wrapped ? { error: payload } : payload));
+      let failure: unknown;
+      if (surface === 'chat helper') {
+        const client = new OpenAI({
+          apiKey: 'sk-synthetic-stream-error',
+          maxRetries: 0,
+          fetch: async () => response,
+        });
+        failure = await client.chat.completions
+          .stream({ model: 'gpt-synthetic', messages: [] })
+          .finalChatCompletion()
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+      } else {
+        const stream =
+          surface === 'exported stream'
+            ? Stream.fromSSEResponse(response, new AbortController())
+            : await publicStream(publicSurfaces[0], response);
+        failure = await rejection(stream);
+      }
+
+      expect(failure).toBeInstanceOf(APIError);
+      expect(failure).toMatchObject({ ...payload, error: payload, requestID });
+    },
+  );
+});
+
+test.each([
+  { name: 'AbortError', failure: new DOMException('Synthetic transport cancellation', 'AbortError') },
+  { name: 'Expo', failure: new Error('expo.modules.fetch.FetchRequestCanceledException') },
+])('preserves transport cancellation handling for $name', async ({ failure }) => {
+  const response = new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.error(failure);
+      },
+    }),
+    { headers: { 'content-type': 'text/event-stream' } },
+  );
+  const stream = Stream.fromSSEResponse(response, new AbortController());
+
+  expect(await collect(stream)).toEqual([]);
+});
