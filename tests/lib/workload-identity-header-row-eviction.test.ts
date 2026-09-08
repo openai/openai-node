@@ -8,6 +8,51 @@ const accessorRow = (read: () => string) => {
   return row;
 };
 
+test.each(['shift and append', 'move unrelated row', 'unchanged'] as const)(
+  'rechecks duplicate tuple positions before retry: %s',
+  async (change) => {
+    let reads = 0;
+    const row = accessorRow(() => {
+      reads += 1;
+      if (change === 'unchanged' && reads > 2) {
+        throw new Error('Unchanged tuple occurrences must not be reread');
+      }
+      return String.fromCodePoint(64 + reads);
+    });
+    const other = ['X-Other', 'stable'];
+    const headers = [row, row, other];
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('X-Custom'));
+      if (sent.length === 1) {
+        if (change === 'shift and append') {
+          headers.shift();
+          headers.push(row);
+        } else if (change === 'move unrelated row') {
+          headers.splice(0, headers.length, row, other, row);
+        }
+        return Response.json(
+          { error: 'synthetic retry' },
+          { status: 500, headers: { 'retry-after-ms': '0' } },
+        );
+      }
+      return Response.json({ ok: true });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      maxRetries: 1,
+      fetch: transport.fetch,
+    });
+
+    await client.post('/synthetic', { headers, body: { input: 'synthetic' } });
+
+    expect(sent).toEqual(['A, B', change === 'unchanged' ? 'A, B' : 'C, D']);
+    expect(reads).toBe(change === 'unchanged' ? 2 : 4);
+  },
+);
+
 test('rereads an accessor-backed tuple after every occurrence was removed', () => {
   let reads = 0;
   const row = accessorRow(() => String((reads += 1)));
@@ -49,7 +94,22 @@ test('evicts all duplicate tuple occurrences before reinsertion and reordering',
   headers.splice(0, 1, row, row, other);
   expect(snapshot.refresh().values.get('X-Custom')).toBe('3, 4');
   headers.reverse();
-  expect(snapshot.refresh().values.get('X-Custom')).toBe('3, 4');
+  expect(snapshot.refresh().values.get('X-Custom')).toBe('5, 6');
+});
+
+test('keeps forked duplicate positions independent after movement', () => {
+  let reads = 0;
+  const row = accessorRow(() => String((reads += 1)));
+  const other = ['X-Other', 'stable'];
+  const headers = [row, row, other];
+  const first = snapshotHeaders(headers);
+  const second = first.fork();
+
+  headers.splice(0, headers.length, row, other, row);
+  expect(first.refresh().values.get('X-Custom')).toBe('3, 4');
+  headers.splice(0, headers.length, row, row, other);
+  expect(second.refresh().values.get('X-Custom')).toBe('1, 2');
+  expect(first.refresh().values.get('X-Custom')).toBe('5, 6');
 });
 
 test('uses a reinserted accessor-backed tuple current value on retry', async () => {

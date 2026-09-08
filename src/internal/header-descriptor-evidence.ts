@@ -86,6 +86,15 @@ export class HeaderDescriptorRead {
     return this.history !== undefined;
   }
 
+  /** Whether replay would reuse a value after previously available descriptor evidence disappeared. */
+  get verificationLost(): boolean {
+    return (
+      this.observation.state === 'unknown' &&
+      this.history !== undefined &&
+      (this.history.before.state !== 'unknown' || this.history.after.state !== 'unknown')
+    );
+  }
+
   /** Whether a fresh read needs capture instead of ordinary live data-slot iteration. */
   needsCapture(input: unknown, after: HeaderDescriptorObservation, force = false): boolean {
     const { descriptor } = this.observation;

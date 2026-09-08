@@ -62,6 +62,7 @@ type SourceProtocolCapture<T> = {
   readonly native: boolean;
   readonly refreshable: boolean;
   readonly unverifiedHeaders: boolean;
+  readonly verificationLost: boolean;
   /** Commits descriptor evidence only after all canonical rows have completed successfully. */
   finish: () => void;
 } & (
@@ -114,6 +115,7 @@ export class HeaderSourceProtocol<T> {
     const facts = {
       native,
       unverifiedHeaders: this.retain && native && !hasNativeHeadersBrand(source),
+      verificationLost: read?.verificationLost === true,
     };
     if (typeof iterator !== 'function') {
       return {

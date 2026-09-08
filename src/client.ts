@@ -337,6 +337,7 @@ type WorkloadIdentityDispatch = {
   resolvePlaceholder: boolean;
 };
 const responseCloneRequests = new WeakMap<Response, Set<WorkloadIdentityRequest>>();
+const sharedResponseBodies = new WeakSet<object>();
 const responseUsedWorkloadToken = (request: WorkloadIdentityRequest, response: Response): boolean => {
   const used = request.responses.get(response);
   if (used !== undefined) {
@@ -374,20 +375,24 @@ const recordWorkloadIdentityResponse = (
 
 const cloneWorkloadIdentityResponse = (response: Response): Response => {
   const requests = responseCloneRequests.get(response);
-  if (!requests?.size) {
-    return response.clone();
-  }
   const conflicts = new Set<WorkloadIdentityRequest>();
   const body = responseBodyIdentity(response);
   if (body) {
-    for (const request of requests) {
+    for (const request of requests ?? []) {
       if (request.responseBodies.get(body) === false) {
         conflicts.add(request);
       }
     }
   }
   const copy = response.clone();
-  for (const request of requests) {
+  const sourceBody = responseBodyIdentity(response);
+  const copyBody = responseBodyIdentity(copy);
+  if (body && sourceBody && copyBody && sourceBody !== body && copyBody !== sourceBody && copyBody !== body) {
+    // The helper observed a tee. Either branch may be retained after request tracking is released.
+    sharedResponseBodies.add(sourceBody);
+    sharedResponseBodies.add(copyBody);
+  }
+  for (const request of requests ?? []) {
     const selectedUsage = request.responses.get(response);
     if (selectedUsage === undefined) continue;
     const usedWorkloadToken = selectedUsage && !conflicts.has(request);
@@ -396,6 +401,17 @@ const cloneWorkloadIdentityResponse = (response: Response): Response => {
     recordWorkloadIdentityResponse(request, copy, usedWorkloadToken);
   }
   return copy;
+};
+
+const cancelResponseForRetry = async (response: Response): Promise<void> => {
+  const body = response.body;
+  const cancelled = Shims.CancelReadableStream(body);
+  if (body && sharedResponseBodies.has(body)) {
+    // A retained sibling can keep cancellation pending until after the retried request returns.
+    void cancelled.catch(() => undefined);
+  } else {
+    await cancelled;
+  }
 };
 
 const releaseWorkloadIdentityResponseClones = (request: WorkloadIdentityRequest) => {
@@ -1766,9 +1782,7 @@ export class OpenAI {
         if (x509Authentication) {
           void Shims.CancelReadableStream(response.body).catch(() => undefined);
         } else {
-          // A selected clone can share its stream with a source retained by a transport hook.
-          // Cancelling that tee branch may wait for the retained branch, so retry must not await it.
-          void Shims.CancelReadableStream(response.body).catch(() => undefined);
+          await cancelResponseForRetry(response);
           this._workloadIdentityAuth?.invalidateToken();
         }
 
@@ -1798,8 +1812,7 @@ export class OpenAI {
         if (x509Authentication) {
           void Shims.CancelReadableStream(response.body).catch(() => undefined);
         } else {
-          // Transport hooks may retain the other branch of an attributed response clone.
-          void Shims.CancelReadableStream(response.body).catch(() => undefined);
+          await cancelResponseForRetry(response);
         }
         loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
         loggerFor(this).debug(
@@ -2112,7 +2125,8 @@ export class OpenAI {
           resolvePlaceholder,
         );
       }
-      const { init: dispatchOptions, used } = dispatch;
+      const { init: dispatchOptions, used, fallbackHeaders } = dispatch;
+      const dispatchedAuthorization = workloadRequest?.authorization;
       // Credential acquisition has its own lifecycle; this timeout covers the network request.
       timeout = setTimeout(abort, ms);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
@@ -2123,7 +2137,14 @@ export class OpenAI {
       );
       // A response reused by independent dispatches cannot attest to workload ownership.
       if (workloadRequest) {
-        recordWorkloadIdentityResponse(workloadRequest, response, used);
+        // A configured transport can overwrite the supplied headers before its actual send.
+        // Keep this check passive and tied to the credential selected by this dispatch.
+        recordWorkloadIdentityResponse(
+          workloadRequest,
+          response,
+          used &&
+            this.#workloadDispatchStillCurrent(dispatchOptions, dispatchedAuthorization, fallbackHeaders),
+        );
       }
       return response;
     } catch (err) {
@@ -2643,11 +2664,13 @@ export class OpenAI {
   ): {
     init: T;
     used: boolean;
+    fallbackHeaders?: object | undefined;
     unreadable?: boolean;
     placeholder?: { headers: Headers; prototype: object };
   } {
     if (!request) return { init, used: false };
-    const sourceHeaders = init.headers ?? getRequestHeaders(url);
+    const requestedHeaders = init.headers;
+    const sourceHeaders = requestedHeaders ?? getRequestHeaders(url);
     const platformHeader = getVerifiedPlatformHeader(sourceHeaders, 'Authorization');
     let headers: Headers | undefined;
     // Preserve #2696's short-circuit: opaque iterable probes are only safe after a verified
@@ -2690,7 +2713,31 @@ export class OpenAI {
         headers ?? (sourceHeaders as Headers),
       );
     }
-    return { init: dispatchInit, used };
+    return {
+      init: dispatchInit,
+      used,
+      fallbackHeaders: requestedHeaders == null ? sourceHeaders : undefined,
+    };
+  }
+
+  #workloadDispatchStillCurrent(
+    init: RequestInit,
+    authorization: string | undefined,
+    fallbackHeaders: object | undefined,
+  ): boolean {
+    if (authorization === undefined) return false;
+    const state = WorkloadTokenProvenance.requestHeaderDataState(init);
+    if (!state) return false;
+    const headers = state.value ?? fallbackHeaders;
+    if (!headers) return false;
+    const observed = getVerifiedPlatformHeader(headers, 'Authorization');
+    return (
+      observed !== undefined &&
+      this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization, {
+        revokeChangedMutators: false,
+      }) !== false &&
+      bearerToken(observed.value) === bearerToken(authorization)
+    );
   }
 
   private _makeAbort(controller: AbortController) {

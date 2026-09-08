@@ -60,6 +60,10 @@ interface HeaderCredential {
   revoked: boolean;
 }
 
+interface HeaderCredentialReadOptions {
+  revokeChangedMutators?: boolean;
+}
+
 export interface WorkloadCredentialUsage {
   isCurrent: () => boolean;
   revoke: () => void;
@@ -156,7 +160,10 @@ const validateIssuedCredential = (
 };
 
 /** Reads the credential capability attached to an SDK-produced header layer. */
-export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
+export function workloadHeaderCredential(
+  headers: object,
+  options?: HeaderCredentialReadOptions,
+): HeaderCredential | null | undefined {
   const source = headerValueSources.get(headers);
   let credential = headerCredentials.get(headers);
   let values = headers;
@@ -177,7 +184,10 @@ export function workloadHeaderCredential(headers: object): HeaderCredential | nu
     }
   }
   if (credential && nativeHeaderValues.has(values) && !hasUnmodifiedHeaderMutators(values)) {
-    credential.revoked = true;
+    if (options?.revokeChangedMutators !== false) {
+      credential.revoked = true;
+    }
+    return null;
   }
   return credential?.revoked ? null : credential;
 }
@@ -465,8 +475,12 @@ export class WorkloadTokenProvenance {
   }
 
   /** An explicitly replaced header capability is authoritative, including at dispatch. */
-  matchesHeaderCredential(headers: object | undefined, authorization: string): boolean | undefined {
-    const credential = headers && workloadHeaderCredential(headers);
+  matchesHeaderCredential(
+    headers: object | undefined,
+    authorization: string,
+    options?: HeaderCredentialReadOptions,
+  ): boolean | undefined {
+    const credential = headers && workloadHeaderCredential(headers, options);
     if (credential === undefined) {
       return undefined;
     }

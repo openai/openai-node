@@ -1,6 +1,8 @@
 import { isReadonlyArray } from './utils/values';
 import { getArrayIterator, HeaderSourceProtocol } from './header-source-protocol';
 import { HeaderIteratorObservations } from './header-iterator-observations';
+import { invalidateHeaderSlots, recordHeaderPosition } from './header-array-occurrences';
+import type { HeaderSlotSnapshot } from './header-array-occurrences';
 import type { NullableHeaders } from './headers';
 import {
   HeaderDescriptorRead,
@@ -15,6 +17,13 @@ export { getArrayIterator, hasNativeHeadersBrand } from './header-source-protoco
 /** Values accepted by the canonical header parser, including explicit removal. */
 export type HeaderValue = string | undefined | null;
 type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
+
+const assertAuthorizationEvidence = (name: string, verificationLost: boolean) => {
+  if (verificationLost && name.toLowerCase() === 'authorization') {
+    throw new TypeError('Cannot replay Authorization after header descriptor evidence is lost');
+  }
+};
+
 /** Raw header sources whose occurrence history can be retained across attempts. */
 export type HeaderSource =
   | Headers
@@ -49,11 +58,6 @@ interface HeaderRecordSnapshot {
   value?: HeaderPropertySnapshot['entry'] | null;
 }
 
-interface HeaderSlotSnapshot<T = unknown> {
-  history: HeaderDescriptorHistory;
-  input: T;
-}
-
 interface ArrayTraversal {
   length?: { boundary: number; fromDescriptor: boolean };
 }
@@ -86,95 +90,8 @@ interface HeaderReplayState extends ArrayTraversal {
   rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, HeaderSlotSnapshot<HeaderEntry>>;
   removedArraySlots?: Set<number>;
+  arrayPositions?: ReadonlyMap<HeaderEntry, ReadonlySet<number>>;
 }
-
-type HeaderOccurrenceCounts<T> = Map<T, { previous: number; current: number }>;
-
-const duplicateHeaderOccurrences = <T>(previous: ReadonlyMap<T, number>): HeaderOccurrenceCounts<T> =>
-  new Map(
-    [...previous]
-      .filter(([, count]) => count > 1)
-      .map(([input, count]) => [input, { previous: count, current: 0 }]),
-  );
-
-const countHeaderOccurrences = <T>(
-  headers: readonly T[],
-  length: number,
-  slots: ReadonlyMap<number, HeaderSlotSnapshot<T>> | undefined,
-  duplicates: HeaderOccurrenceCounts<T>,
-  accessors: HeaderOccurrenceCounts<() => unknown>,
-): boolean => {
-  let unreadable = false;
-  // Removing a duplicate changes its ordinal. Count captured opaque slots without rereading getters.
-  for (let index = 0; (duplicates.size || accessors.size) && index < length; index += 1) {
-    const descriptorState = observeHeaderDescriptor(headers, String(index));
-    const descriptor = descriptorState?.descriptor;
-    const retained = slots?.get(index);
-    // An unavailable probe is not evidence that a retained accessor occurrence disappeared.
-    // Count its captured identity until a readable descriptor proves removal or replacement.
-    const getter =
-      descriptor?.get ??
-      (descriptorState.state === 'unknown' ? retained?.history.before.descriptor?.get : undefined);
-    const accessorCount = getter && accessors.get(getter);
-    if (accessorCount) {
-      accessorCount.current += 1;
-    }
-    let input: T;
-    if (retained && new HeaderDescriptorRead(descriptorState, retained.history).retained) {
-      ({ input } = retained);
-    } else if (descriptor && 'value' in descriptor) {
-      input = descriptor.value;
-    } else {
-      unreadable = true;
-      continue;
-    }
-    const count = duplicates.get(input);
-    if (count) {
-      count.current += 1;
-    }
-  }
-  return unreadable;
-};
-
-const invalidateHeaderSlots = <T>(
-  headers: readonly T[],
-  traversal: ArrayTraversal,
-  previous: ReadonlyMap<T, number>,
-  slots: Map<number, HeaderSlotSnapshot<T>> | undefined,
-): Set<T> => {
-  // An opaque observed boundary cannot prove which duplicate occurrences are present now.
-  if (traversal.length?.fromDescriptor === false) {
-    return new Set();
-  }
-  const duplicates = duplicateHeaderOccurrences(previous);
-  const length = observeHeaderDescriptor(headers, 'length').descriptor?.value;
-  if (typeof length !== 'number') {
-    return new Set();
-  }
-  const previousAccessors = new Map<() => unknown, number>();
-  for (const { history } of slots?.values() ?? []) {
-    const { descriptor } = history.before;
-    if (descriptor?.get) {
-      previousAccessors.set(descriptor.get, (previousAccessors.get(descriptor.get) ?? 0) + 1);
-    }
-  }
-  const accessors = duplicateHeaderOccurrences(previousAccessors);
-  const unreadable = countHeaderOccurrences(headers, length, slots, duplicates, accessors);
-  const invalidated = new Set(
-    [...duplicates]
-      .filter(([, count]) => unreadable || count.current < count.previous)
-      .map(([input]) => input),
-  );
-  for (const [index, slot] of slots ?? []) {
-    const getter = slot.history.before.descriptor?.get;
-    const count = getter && accessors.get(getter);
-    if (count && count.current < count.previous) {
-      slots?.delete(index);
-      invalidated.add(slot.input);
-    }
-  }
-  return invalidated;
-};
 
 // Preserve first-traversal live reads; later visits use verified descriptors or the observed boundary.
 function* iterateArrayIndices(source: readonly unknown[], traversal: ArrayTraversal): Generator<number> {
@@ -212,11 +129,17 @@ function* iterateArrayIndices(source: readonly unknown[], traversal: ArrayTraver
 function* iterateHeaderArray(
   headers: readonly HeaderEntry[],
   replay: HeaderReplayState,
+  observeVerification: (lost: boolean) => void,
 ): Generator<HeaderEntry> {
   const counts = new Map([...(replay.rows ?? [])].map(([row, occurrences]) => [row, occurrences.size]));
-  for (const row of invalidateHeaderSlots(headers, replay, counts, replay.arraySlots)) {
+  const invalidated =
+    replay.length?.fromDescriptor === false
+      ? new Set<HeaderEntry>()
+      : invalidateHeaderSlots(headers, counts, replay.arraySlots, replay.arrayPositions);
+  for (const row of invalidated) {
     replay.rows?.delete(row);
   }
+  const positions = new Map<HeaderEntry, Set<number>>();
   let boundary = 0;
   // Match native array iteration's live length on first use, while preserving an opaque observed
   // boundary across retries without invoking a proxy length trap again.
@@ -226,6 +149,7 @@ function* iterateHeaderArray(
     const removed = replay.removedArraySlots?.has(index) === true;
     const retained = replay.arraySlots?.get(index);
     const read = new HeaderDescriptorRead(descriptorState, retained?.history);
+    observeVerification(read.verificationLost);
     const observed = retained && read.retained;
     const row: HeaderEntry = observed ? retained.input : Reflect.get(headers, String(index));
     if (row === undefined) {
@@ -244,6 +168,7 @@ function* iterateHeaderArray(
     }
     replay.removedArraySlots?.delete(index);
     yield row;
+    recordHeaderPosition(positions, row, index);
     const afterRead = observeHeaderDescriptor(headers, String(index));
     if (observed) {
       replay.arraySlots?.set(index, { ...retained, history: read.complete(afterRead) });
@@ -267,6 +192,8 @@ function* iterateHeaderArray(
       replay.removedArraySlots?.delete(slot);
     }
   }
+  // Publish only complete traversals; forks share this immutable observation until their next read.
+  replay.arrayPositions = new Map([...positions].filter(([row]) => replay.rows?.has(row)));
 }
 
 function* iterateHeaderValues(
@@ -276,12 +203,17 @@ function* iterateHeaderValues(
 ): Generator<HeaderValue> {
   const { source, slots } = snapshot;
   const counts = new Map<unknown, number>();
-  for (const { input } of slots.values()) {
+  const positions = new Map<unknown, Set<number>>();
+  for (const [index, { input }] of slots) {
     if (input !== null && (typeof input === 'object' || typeof input === 'function')) {
       counts.set(input, (counts.get(input) ?? 0) + 1);
+      recordHeaderPosition(positions, input, index);
     }
   }
-  const invalidated = invalidateHeaderSlots(source, snapshot, counts, slots);
+  const invalidated =
+    snapshot.length?.fromDescriptor === false
+      ? new Set<unknown>()
+      : invalidateHeaderSlots(source, counts, slots, positions);
   for (const [index, slot] of slots) {
     if (invalidated.has(slot.input)) {
       slots.delete(index);
@@ -293,6 +225,7 @@ function* iterateHeaderValues(
     const descriptorState = observeHeaderDescriptor(source, String(index));
     const retained = slots.get(index);
     const read = new HeaderDescriptorRead(descriptorState, retained?.history);
+    assertAuthorizationEvidence(name, read.verificationLost);
     if (retained && read.retained) {
       yield retained.value;
       const afterRead = observeHeaderDescriptor(source, String(index));
@@ -394,14 +327,6 @@ function* reversed<T>(values: readonly T[]): Generator<T> {
   }
 }
 
-const changedRecordAlias = (
-  name: string,
-  descriptor: PropertyDescriptor | undefined,
-  replay: HeaderReplayState,
-) =>
-  !sameHeaderProperty(descriptor, replay.propertyOrder?.get(name)?.descriptor) ||
-  replay.changedAliases?.get(name.toLowerCase()) === name;
-
 const earlierEntry = (
   retainedPosition: string | undefined,
   liveAlias: string | undefined,
@@ -434,7 +359,7 @@ const retainMissingRecordEntry = (
     replay.properties?.delete(key);
     return;
   }
-  // New or changed aliases override captured accessors; unchanged aliases keep their order.
+  // Current aliases override missing captured accessors without changing the live keys' order.
   const liveAlias = liveAliases.get(key.toLowerCase());
   const before = earlierEntry(nextKey, liveAlias, positions);
   const bucket = missing.get(before) ?? [];
@@ -452,9 +377,6 @@ const orderRecordEntries = (
   const liveAliases = new Map<string, string>();
   for (const [key] of entries) {
     const name = key as string;
-    if (!changedRecordAlias(name, descriptors.get(name), replay)) {
-      continue;
-    }
     if (!liveAliases.has(name.toLowerCase())) {
       liveAliases.set(name.toLowerCase(), name);
     }
@@ -624,6 +546,7 @@ const readHeaderValues = (
       ? (retained ?? { source: values, protocol: new HeaderSourceProtocol<HeaderValue>(), slots: new Map() })
       : undefined;
   const protocol = (nested?.protocol ?? new HeaderSourceProtocol<HeaderValue>(false)).capture(values);
+  assertAuthorizationEvidence(row.name, protocol.verificationLost);
   if (protocol.kind !== 'iterable') {
     throw new TypeError('Header value arrays must be iterable');
   }
@@ -867,7 +790,16 @@ function* replayRow(
   observation?.complete(property);
 }
 
-const pruneRows = (occurrences: Map<HeaderEntry, number>, replay?: HeaderReplayState) => {
+const finishReplay = (
+  headers: HeaderSource,
+  protocol: ReturnType<HeaderSourceProtocol<HeaderEntry>['capture']>,
+  occurrences: Map<HeaderEntry, number>,
+  replay?: HeaderReplayState,
+) => {
+  protocol.finish();
+  if (replay && (protocol.kind !== 'iterable' || !protocol.refreshable || !Array.isArray(headers))) {
+    delete replay.arrayPositions;
+  }
   for (const [row, retained] of replay?.rows ?? []) {
     const count = occurrences.get(row) ?? 0;
     for (const occurrence of retained.keys()) {
@@ -895,18 +827,27 @@ function* replayHeaderEntries(
     replay.unverifiedHeaders = protocol.unverifiedHeaders;
   }
   const clear = protocol.kind === 'record';
+  let slotVerificationLost = false;
   const descriptors = new Map<string, PropertyDescriptor>();
   const presentProperties = new Set<string>();
   let entries: Iterable<HeaderEntry>;
   if (protocol.kind === 'iterable') {
     const { iteration, reused } = protocol.iterate(
-      replay && Array.isArray(headers) ? () => iterateHeaderArray(headers, replay) : undefined,
+      replay && Array.isArray(headers)
+        ? () =>
+            iterateHeaderArray(headers, replay, (lost) => {
+              slotVerificationLost = lost;
+            })
+        : undefined,
     );
     if (reused) {
       if (replay) {
         replay.refreshable = false;
       }
-      yield* callbacks.previous(replay?.snapshot);
+      for (const entry of callbacks.previous(replay?.snapshot)) {
+        assertAuthorizationEvidence(entry[0], protocol.verificationLost);
+        yield entry;
+      }
       return;
     }
     entries = { [Symbol.iterator]: () => iteration };
@@ -927,10 +868,16 @@ function* replayHeaderEntries(
       occurrences.set(row, occurrence + 1);
     }
     const read = readRow(row, occurrence, clear, replay);
+    assertAuthorizationEvidence(
+      read.name,
+      protocol.verificationLost ||
+        slotVerificationLost ||
+        read.nameRead.verificationLost ||
+        read.valueRead.verificationLost,
+    );
     yield* replayRow(read, headers, descriptors.get(read.name), clear, protocol.native, callbacks, replay);
   }
-  protocol.finish();
-  pruneRows(occurrences, replay);
+  finishReplay(headers, protocol, occurrences, replay);
 }
 
 const copyHeaderValues = <T extends { values?: HeaderValuesSnapshot }>(snapshot: T): T => ({
