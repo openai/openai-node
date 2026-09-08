@@ -678,6 +678,46 @@ test.each([200, 401].flatMap((status) => [false, true].map((bound) => ({ status,
   },
 );
 
+test.skipIf(Number(process.versions.node.split('.')[0]) < 24)(
+  'forwards an unreadable foreign Headers membrane to its configured transport',
+  async () => {
+    const { Headers: ForeignHeaders } = await import('undici');
+    let target: InstanceType<typeof ForeignHeaders> | undefined;
+    let supplied: NonNullable<RequestInit['headers']> | undefined;
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        const [, request] = args;
+        if (!request) {
+          throw new Error('Expected request init');
+        }
+        target = new ForeignHeaders([...new Headers(request.headers)]);
+        supplied = new Proxy(target, {}) as unknown as NonNullable<RequestInit['headers']>;
+        request.headers = supplied;
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    let dispatches = 0;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      dispatches += 1;
+      expect(init?.headers).toBe(supplied);
+      expect(target?.get('Authorization')).toBe('Bearer access-token-1');
+      return Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await client.models.list();
+
+    expect(dispatches).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test.each([200, 401].flatMap((status) => ['iterator', 'record'].map((kind) => ({ status, kind }))))(
   'forwards an unreadable $kind wrapper to its configured transport (status: $status)',
   async ({ status, kind }) => {
@@ -786,9 +826,192 @@ test.each(['native iterator', 'record', 'array'] as const)(
     await expect(client.models.list()).rejects.toMatchObject({
       cause: kind === 'native iterator' ? diagnostic : expect.any(TypeError),
     });
-    expect(transportCalls).toBe(1);
+    expect(transportCalls).toBe(kind === 'native iterator' ? 1 : 0);
     expect(sends).toHaveLength(0);
     expect(transport.exchanges).toBe(1);
+  },
+);
+
+test.each(
+  (['iterator', 'custom array', 'native Headers'] as const).flatMap((source) =>
+    (['before first row', 'after first row'] as const).map((when) => ({ source, when })),
+  ),
+)('does not dispatch a one-shot $source that fails $when', async ({ source, when }) => {
+  const diagnostic = new Error('Synthetic header iteration failed');
+  class HookClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      const [, request] = args;
+      if (!request) {
+        throw new Error('Expected request init');
+      }
+      const iterate = function* iterate() {
+        if (when === 'after first row') {
+          yield ['X-Trace', 'synthetic'];
+        }
+        throw diagnostic;
+      };
+      if (source === 'iterator') {
+        request.headers = iterate() as unknown as NonNullable<RequestInit['headers']>;
+      } else {
+        request.headers = source === 'native Headers' ? new Headers() : [];
+        Object.defineProperty(request.headers, Symbol.iterator, { value: iterate });
+      }
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  let transportCalls = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    transportCalls += 1;
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list()).rejects.toMatchObject({ cause: diagnostic });
+  expect(transportCalls).toBe(0);
+  expect(transport.exchanges).toBe(1);
+});
+
+test('does not dispatch a native array after consuming a failed one-shot row', async () => {
+  const diagnostic = new Error('Synthetic row iteration failed');
+  class HookClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      const [, request] = args;
+      if (!request) {
+        throw new Error('Expected request init');
+      }
+      request.headers = [
+        (function* row() {
+          yield 'X-Trace';
+          throw diagnostic;
+        })(),
+      ] as unknown as NonNullable<RequestInit['headers']>;
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  let dispatches = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    dispatches += 1;
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list()).rejects.toMatchObject({ cause: diagnostic });
+  expect(dispatches).toBe(0);
+  expect(transport.exchanges).toBe(1);
+});
+
+test.each(['record', 'array'] as const)('selects a stateful $source header protocol once', async (source) => {
+  let reads = 0;
+  class HookClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      const [, request] = args;
+      if (!request) {
+        throw new Error('Expected request init');
+      }
+      const headers: Record<string | symbol, unknown> | unknown[][] =
+        source === 'record' ? { 'X-Trace': 'record' } : [['X-Trace', 'array']];
+      const native = Reflect.get(headers, Symbol.iterator) as unknown;
+      Object.defineProperty(headers, Symbol.iterator, {
+        configurable: true,
+        get() {
+          reads += 1;
+          return reads === 1
+            ? native
+            : function* changed() {
+                yield ['X-Trace', `second-${source}`];
+              };
+        },
+      });
+      request.headers = headers as NonNullable<RequestInit['headers']>;
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('X-Trace'));
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await client.models.list();
+
+  expect(reads).toBe(1);
+  expect(sent).toEqual([source]);
+});
+
+test.each(['hidden proxy', 'phantom proxy', 'symbol'] as const)(
+  'preserves native record conversion for a $kind header input',
+  async (kind) => {
+    const makeSource = () => {
+      const record: Record<PropertyKey, unknown> = { 'X-Trace': 'marker' };
+      if (kind === 'symbol') {
+        record[Symbol('synthetic')] = 'value';
+        return record;
+      }
+      if (kind === 'hidden proxy') {
+        Object.defineProperty(record, 'X-Hidden', { value: 'hidden' });
+      }
+      return new Proxy(
+        record,
+        kind === 'phantom proxy'
+          ? {
+              ownKeys(target) {
+                return [...Reflect.ownKeys(target), 'X-Phantom'];
+              },
+            }
+          : {},
+      );
+    };
+    let expected: [string, string][] | undefined;
+    let nativeError = false;
+    try {
+      expected = [...new Headers(makeSource())];
+    } catch {
+      nativeError = true;
+    }
+    class HookClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        if (!args[1]) {
+          throw new Error('Expected request init');
+        }
+        args[1].headers = makeSource() as NonNullable<RequestInit['headers']>;
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    let actual: [string, string][] | undefined;
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      actual = [...new Headers(init?.headers)];
+      return Response.json({ data: [] });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    const result = client.models.list();
+    await (nativeError ? expect(result).rejects.toThrow() : expect(result).resolves.toBeDefined());
+    expect(actual).toEqual(expected);
   },
 );
 

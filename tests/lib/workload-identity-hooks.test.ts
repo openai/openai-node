@@ -24,8 +24,11 @@ function normalizeBearerScheme(init: RequestInit, headers = new Headers(init.hea
 
 function normalizeBearerRecord(init: RequestInit) {
   const authorization = new Headers(init.headers).get('Authorization');
+  if (authorization === null) {
+    throw new Error('Expected workload Authorization');
+  }
   init.headers = {
-    Authorization: authorization?.replace(/^Bearer /u, 'bEaReR '),
+    Authorization: authorization.replace(/^Bearer /u, 'bEaReR '),
   };
 }
 
@@ -392,6 +395,9 @@ describe('Workload identity request and dispatch hooks', () => {
       // oxlint-disable-next-line class-methods-use-this -- This fixture installs a proxy at preparation.
       protected override async prepareRequest(init: RequestInit) {
         const authorization = new Headers(init.headers).get('Authorization');
+        if (authorization === null) {
+          throw new Error('Expected workload Authorization');
+        }
         const headers = { Authorization: authorization };
         init.headers = new Proxy(headers, {
           getOwnPropertyDescriptor(target, property) {

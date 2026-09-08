@@ -281,6 +281,7 @@ import {
   type WorkloadCredentialUsage,
 } from './internal/auth/workload-token-provenance';
 import { responseBodyIdentity } from './internal/auth/workload-response-body';
+import { materializeWorkloadHeaders } from './internal/auth/workload-header-input';
 import {
   type LogLevel,
   type Logger,
@@ -2652,10 +2653,9 @@ export class OpenAI {
     // Preserve #2696's short-circuit: opaque iterable probes are only safe after a verified
     // platform Authorization reader proves that dispatch can keep the original source.
     if (sourceHeaders !== undefined && !(platformHeader && canPreserveHeaderInput(sourceHeaders))) {
-      try {
-        headers = new Headers(sourceHeaders);
-      } catch {
-        // Opaque headers can require unwrapping or validation by their configured transport.
+      headers = materializeWorkloadHeaders(sourceHeaders);
+      if (!headers) {
+        // Opaque, unconsumed headers can require unwrapping or validation by their configured transport.
         return { init, used: false, unreadable: true };
       }
     }
