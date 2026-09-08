@@ -126,15 +126,19 @@ function getInheritedDeltaProperty(data: object): InheritedDeltaProperty | undef
   let prototype = data;
   // Bound cache metadata inspection. A null owner falls back to ordinary property reads
   // after callbacks, so deeper prototype chains remain supported without an unbounded walk.
-  for (let depth = 0; depth < 32; depth += 1) {
-    prototype = Object.getPrototypeOf(prototype);
-    if (prototype === null) {
-      return undefined;
+  try {
+    for (let depth = 0; depth < 32; depth += 1) {
+      prototype = Object.getPrototypeOf(prototype);
+      if (prototype === null) {
+        return undefined;
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'delta');
+      if (descriptor) {
+        return { owner: prototype, descriptor };
+      }
     }
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'delta');
-    if (descriptor) {
-      return { owner: prototype, descriptor };
-    }
+  } catch {
+    // Optional metadata may be unavailable even when ordinary property lookup succeeds.
   }
   return { owner: null };
 }
@@ -568,6 +572,10 @@ export class AssistantStream
     const { refreshRunStepDelta, getRunStepDelta } = initializeRunStepDelta?.() ?? {};
     if (runStepID !== undefined && runStepDeltaData !== undefined) {
       this.#reserveRunStepAlias(runStepDeltaData, runStepID);
+      const retainedRunStep = this.#runStepSnapshots[runStepID];
+      if (retainedRunStep) {
+        this.#reserveRunStepAlias(retainedRunStep, runStepID);
+      }
     }
     this.#currentEvent = exposedEvent;
 
