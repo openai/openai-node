@@ -1,5 +1,6 @@
 import { isReadonlyArray } from './utils/values';
 import { getArrayIterator, HeaderSourceProtocol } from './header-source-protocol';
+import { HeaderIteratorObservations } from './header-iterator-observations';
 import type { NullableHeaders } from './headers';
 import {
   HeaderDescriptorRead,
@@ -72,6 +73,7 @@ interface HeaderReplayState {
   refreshable: boolean;
   unverifiedHeaders?: boolean;
   protocol: HeaderSourceProtocol<HeaderEntry>;
+  nestedIterations: HeaderIteratorObservations<HeaderPropertySnapshot['entry']>;
   snapshot?: NullableHeaders;
   properties?: Map<string, HeaderPropertySnapshot>;
   propertyOrder?: Map<string, HeaderRecordSnapshot>;
@@ -489,13 +491,13 @@ const retainedRowEntries = (row: RowRead) => {
 
 function* retainedPropertyEntries(
   name: string,
-  property: HeaderPropertySnapshot,
+  entry: HeaderPropertySnapshot['entry'],
 ): Generator<readonly [string, string | null]> {
-  if (!property.entry) {
+  if (!entry) {
     return;
   }
   yield [name, null];
-  const [, value] = property.entry;
+  const [, value] = entry;
   if (isReadonlyArray(value)) {
     for (const item of value) {
       yield [name, item];
@@ -554,7 +556,7 @@ const readHeaderValues = (
     refresh.refreshable = false;
   }
   // Record the completed array value even when its new protocol becomes snapshot-only.
-  return { protocol, snapshot, observed: !!nested };
+  return { protocol, snapshot, source: nested?.source };
 };
 
 function* captureRowValues(
@@ -711,7 +713,7 @@ const rememberParsedRow = (
   if (emitted && (snapshot || !refresh?.refreshable)) {
     property.entry = callbacks.capture(row.name);
   }
-  if (values.observed) {
+  if (values.source) {
     rememberRecordValue(row.name, emitted ? property.entry : null, replay, callbacks.layer);
   }
   if (!refresh?.refreshable) {
@@ -739,7 +741,7 @@ function* replayRow(
     return;
   }
   if (retainedProperty && !retainedProperty.values) {
-    yield* retainedPropertyEntries(row.name, retainedProperty);
+    yield* retainedPropertyEntries(row.name, retainedProperty.entry);
     return;
   }
   const refresh = rowRefreshState(row, descriptor, clear, replay);
@@ -753,17 +755,32 @@ function* replayRow(
   const { iteration } = protocol.iterate(
     snapshot ? () => iterateHeaderValues(row.name, snapshot, callbacks.normalize) : undefined,
   );
-  const didClear = yield* captureRowValues(
-    row,
-    { [Symbol.iterator]: () => iteration },
-    refresh,
-    clear,
-    native,
-    callbacks,
-    replay,
-  );
+  const observation = replay?.nestedIterations.capture(iteration, {
+    source: values.source,
+    name: row.name,
+    descriptor: property?.descriptor,
+    history: replay.propertyOrder,
+    refreshable: protocol.refreshable,
+  });
+  let didClear: boolean;
+  if (observation?.reused) {
+    // Related layers can receive the same exhausted cursor; reuse its completed canonical value.
+    yield* retainedPropertyEntries(row.name, observation.entry);
+    didClear = observation.entry !== undefined;
+  } else {
+    didClear = yield* captureRowValues(
+      row,
+      { [Symbol.iterator]: () => iteration },
+      refresh,
+      clear,
+      native,
+      callbacks,
+      replay,
+    );
+  }
   protocol.finish();
   rememberParsedRow(row, headers, property, values, refresh, didClear, callbacks, replay);
+  observation?.complete(property);
 }
 
 const pruneRows = (occurrences: Map<HeaderEntry, number>, replay?: HeaderReplayState) => {
@@ -880,7 +897,11 @@ export class HeaderReplay {
 
   /** Creates an empty replay owner; deferred layers may initially prohibit refresh. */
   constructor(refreshable = true) {
-    this.state = { refreshable, protocol: new HeaderSourceProtocol() };
+    this.state = {
+      refreshable,
+      protocol: new HeaderSourceProtocol(),
+      nestedIterations: new HeaderIteratorObservations(),
+    };
   }
 
   /** Whether the observed protocol permits refreshing this layer. */
@@ -925,7 +946,7 @@ export class HeaderReplay {
     return next;
   }
 
-  /** Copies every mutable occurrence cache while retaining consumed-iterator identity. */
+  /** Copies per-layer caches while sharing completed iterator observations. */
   fork(): HeaderReplay {
     const copy = new HeaderReplay();
     copy.state = copyHeaderReplay(this.state);

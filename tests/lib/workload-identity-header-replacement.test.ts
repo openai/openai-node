@@ -247,6 +247,173 @@ describe.each(['request', 'default'] as const)('replaced %s nested iterator alia
   });
 });
 
+test.each(
+  (['shared', 'fresh'] as const).flatMap((kind) => [200, 401, 500].map((status) => ({ kind, status }))),
+)(
+  'preserves a replaced nested $kind cursor across aliased header layers after $status',
+  async ({ kind, status }) => {
+    const values = ['Bearer initial'];
+    const headers: Record<string, string | string[]> = { authorization: values };
+    const read = vi.fn(() => {
+      delete headers['Authorization'];
+      return 'Bearer workload-identity-auth';
+    });
+    Object.defineProperty(headers, 'Authorization', { enumerable: true, configurable: true, get: read });
+    const cursor = ['Bearer independent'][Symbol.iterator]();
+    const iterate = vi.fn(() => (kind === 'shared' ? cursor : ['Bearer independent'][Symbol.iterator]()));
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      Object.defineProperty(values, Symbol.iterator, { configurable: true, value: iterate });
+      return 'subject-token';
+    };
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport(async (url, init) => {
+      const request = new Request(url, init as globalThis.RequestInit);
+      expect(request.method).toBe('POST');
+      expect(await request.json()).toEqual({ input: 'synthetic' });
+      sent.push(request.headers.get('Authorization'));
+      return Response.json(
+        { ok: true },
+        { status: sent.length === 1 ? status : 200, headers: { 'retry-after-ms': '0' } },
+      );
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      workloadIdentity: identity,
+      defaultHeaders: headers,
+      fetch: transport.fetch,
+      maxRetries: status === 500 ? 1 : 0,
+    });
+
+    const request = client.post('/synthetic', { headers, body: { input: 'synthetic' } });
+    await (status === 401
+      ? expect(request).rejects.toMatchObject({ status })
+      : expect(request).resolves.toEqual({ ok: true }));
+
+    expect(sent).toEqual(
+      status === 500 ? ['Bearer independent', 'Bearer independent'] : ['Bearer independent'],
+    );
+    expect(transport.exchanges).toBe(1);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(iterate).toHaveBeenCalled();
+  },
+);
+
+test('discards a nested cursor observation after its property disappears', async () => {
+  const values = ['first'];
+  const cursor = values[Symbol.iterator]();
+  Object.defineProperty(values, Symbol.iterator, { value: () => cursor });
+  const headers: Record<string, string[]> = { 'X-Custom': values };
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('X-Custom'));
+    if (sent.length === 1) {
+      delete headers['X-Custom'];
+    } else if (sent.length === 2) {
+      headers['X-Custom'] = values;
+    }
+    return Response.json(
+      { ok: true },
+      { status: sent.length < 3 ? 500 : 200, headers: { 'retry-after-ms': '0' } },
+    );
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    fetch: transport.fetch,
+    maxRetries: 2,
+  });
+
+  await expect(client.post('/synthetic', { headers, body: { input: 'synthetic' } })).resolves.toEqual({
+    ok: true,
+  });
+
+  expect(sent).toEqual(['first', null, null]);
+});
+
+test('discards a nested cursor observation after its property visibility is restored', async () => {
+  const values = ['first'];
+  const headers: Record<string, string[]> = { 'X-Custom': values };
+  const cursor = (function* valueCursor() {
+    yield 'first';
+    Object.defineProperty(headers, 'X-Custom', { enumerable: false });
+  })();
+  Object.defineProperty(values, Symbol.iterator, { value: () => cursor });
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('X-Custom'));
+    if (sent.length === 1) {
+      Object.defineProperty(headers, 'X-Custom', { enumerable: true });
+    }
+    return Response.json(
+      { ok: true },
+      { status: sent.length === 1 ? 500 : 200, headers: { 'retry-after-ms': '0' } },
+    );
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    fetch: transport.fetch,
+    maxRetries: 1,
+  });
+
+  await expect(client.post('/synthetic', { headers, body: { input: 'synthetic' } })).resolves.toEqual({
+    ok: true,
+  });
+
+  expect(sent).toEqual(['first', null]);
+});
+
+test('isolates a nested cursor observation between requests on one client', async () => {
+  const values = ['Bearer initial'];
+  const headers: Record<string, string | string[]> = { authorization: values };
+  let current = ['Bearer initial'][Symbol.iterator]();
+  const cursor = { next: () => current.next() };
+  const identity = createTestWorkloadIdentity();
+  identity.provider.getToken = async () => {
+    Object.defineProperty(values, Symbol.iterator, { configurable: true, value: () => cursor });
+    return 'subject-token';
+  };
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('Authorization'));
+    return Response.json({ ok: true });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    workloadIdentity: identity,
+    defaultHeaders: headers,
+    maxRetries: 0,
+    fetch: transport.fetch,
+  });
+
+  let now = Date.now();
+  const readNow = vi.spyOn(Date, 'now');
+  try {
+    for (const credential of ['Bearer independent-first', 'Bearer independent-second']) {
+      readNow.mockReturnValue(now);
+      Reflect.deleteProperty(values, Symbol.iterator);
+      current = [credential][Symbol.iterator]();
+      Object.defineProperty(headers, 'Authorization', {
+        enumerable: true,
+        configurable: true,
+        get() {
+          delete headers['Authorization'];
+          return 'Bearer workload-identity-auth';
+        },
+      });
+      // oxlint-disable-next-line no-await-in-loop -- Reuse the same cursor only after the prior request completes.
+      await expect(client.post('/synthetic', { headers, body: { input: 'synthetic' } })).resolves.toEqual({
+        ok: true,
+      });
+      now += 3_600_000;
+    }
+  } finally {
+    readNow.mockRestore();
+  }
+
+  expect(sent).toEqual(['Bearer independent-first', 'Bearer independent-second']);
+  expect(transport.exchanges).toBe(2);
+});
+
 describe.each(['request', 'default'] as const)('replaced %s Authorization accessor', (layer) => {
   describe.each(['data', 'mixed'] as const)('%s nested alias', (kind) => {
     test.each([
