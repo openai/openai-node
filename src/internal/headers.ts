@@ -303,25 +303,20 @@ export const getStructuralHeaderValue = (
       return undefined;
     }
     const requested = requestedName.toLowerCase();
-    let value: string | null = null;
-    const appendScalar = (input: HeaderValue): boolean => {
-      if (input === undefined) return true;
-      if (input === null) {
-        value = null;
-        return true;
-      }
-      value = value === null ? input : `${value}, ${input}`;
-      return true;
-    };
-    const appendInput = (input: HeaderValue | readonly HeaderValue[]): boolean => {
-      if (!isReadonlyArray(input)) return appendScalar(input);
+    const entries: [string, HeaderValue | HeaderValue[]][] = [];
+    const copyInput = (
+      input: HeaderValue | readonly HeaderValue[],
+    ): { value: HeaderValue | HeaderValue[] } | undefined => {
+      if (!isReadonlyArray(input)) return { value: input };
       const length = Object.getOwnPropertyDescriptor(input, 'length')?.value;
-      if (typeof length !== 'number') return false;
+      if (typeof length !== 'number') return undefined;
+      const values: HeaderValue[] = [];
       for (let index = 0; index < length; index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
-        if (!descriptor || !('value' in descriptor) || !appendScalar(descriptor.value)) return false;
+        if (!descriptor || !('value' in descriptor)) return undefined;
+        values.push(descriptor.value);
       }
-      return true;
+      return { value: values };
     };
     if (Array.isArray(headers)) {
       const length = Object.getOwnPropertyDescriptor(headers, 'length')?.value;
@@ -337,20 +332,26 @@ export const getStructuralHeaderValue = (
           return undefined;
         }
         if (nameDescriptor.value.toLowerCase() !== requested) continue;
-        if (!valueDescriptor || !('value' in valueDescriptor) || !appendInput(valueDescriptor.value)) {
+        if (!valueDescriptor || !('value' in valueDescriptor)) {
           return undefined;
         }
+        const input = copyInput(valueDescriptor.value);
+        if (!input) return undefined;
+        entries.push([nameDescriptor.value, input.value]);
       }
-      return { value };
+    } else {
+      for (const key of Reflect.ownKeys(headers)) {
+        if (typeof key !== 'string' || key.toLowerCase() !== requested) continue;
+        const descriptor = Object.getOwnPropertyDescriptor(headers, key);
+        if (!descriptor?.enumerable || !('value' in descriptor)) return undefined;
+        const input = copyInput(descriptor.value);
+        if (!input) return undefined;
+        entries.push([key, input.value]);
+      }
     }
-    for (const key of Reflect.ownKeys(headers)) {
-      if (typeof key !== 'string' || key.toLowerCase() !== requested) continue;
-      const descriptor = Object.getOwnPropertyDescriptor(headers, key);
-      if (!descriptor?.enumerable || !('value' in descriptor)) return undefined;
-      value = null;
-      if (!appendInput(descriptor.value)) return undefined;
-    }
-    return { value };
+    return {
+      value: new Headers(entries as unknown as [string, string][]).get(requestedName),
+    };
   } catch {
     return undefined;
   }
