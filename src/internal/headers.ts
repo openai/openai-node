@@ -74,6 +74,13 @@ interface HeaderPropertySnapshot {
   descriptor: PropertyDescriptor;
   capture?: () => void;
   entry?: readonly [string, string | readonly string[] | null];
+  values?: HeaderValuesSnapshot;
+}
+
+interface HeaderValuesSnapshot {
+  source: readonly HeaderValue[];
+  iterator: () => Iterator<HeaderValue>;
+  slots: Map<number, { descriptor: PropertyDescriptor | undefined; value: HeaderValue }>;
 }
 
 interface HeaderRowSnapshot {
@@ -83,6 +90,7 @@ interface HeaderRowSnapshot {
   valueDescriptor: PropertyDescriptor | undefined;
   valueStateful: boolean;
   entries: readonly (readonly [string, string | null])[];
+  values?: HeaderValuesSnapshot;
 }
 
 const sameHeaderProperty = (
@@ -122,12 +130,11 @@ interface HeaderReplay {
   property?: HeaderPropertySnapshot;
   rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, { descriptor: PropertyDescriptor | undefined; row: HeaderEntry }>;
-  arrayLength?: number;
 }
 
 function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderReplay): Generator<HeaderEntry> {
   const length = getHeaderRowDescriptor(headers, 'length')?.value;
-  if (typeof length === 'number' && replay.arrayLength !== undefined && length < replay.arrayLength) {
+  if (typeof length === 'number') {
     const duplicates = new Map(
       [...(replay.rows ?? [])].filter(([, occurrences]) => occurrences.size > 1).map(([row]) => [row, 0]),
     );
@@ -165,7 +172,31 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
   for (const slot of replay.arraySlots?.keys() ?? []) {
     if (slot >= index) replay.arraySlots?.delete(slot);
   }
-  replay.arrayLength = index;
+}
+
+function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Generator<HeaderValue> {
+  const { source, slots } = snapshot;
+  let index = 0;
+  for (; index < Math.min(Math.floor(source.length), Number.MAX_SAFE_INTEGER); index += 1) {
+    const descriptor = getHeaderRowDescriptor(source, String(index));
+    const retained = slots.get(index);
+    if (retained && (!descriptor || sameHeaderProperty(descriptor, retained.descriptor))) {
+      yield retained.value;
+      continue;
+    }
+    slots.delete(index);
+    const value = source[index];
+    const needsCoercion = value !== null && (typeof value === 'object' || typeof value === 'function');
+    const normalized = needsCoercion ? new Headers([[name, value]]).get(name)! : value;
+    if (!descriptor || !('value' in descriptor) || descriptor.value !== value || needsCoercion) {
+      // A stateful read can replace its own slot. Retain the observed value until a later change.
+      slots.set(index, { descriptor: getHeaderRowDescriptor(source, String(index)), value: normalized });
+    }
+    yield normalized;
+  }
+  for (const slot of slots.keys()) {
+    if (slot >= index) slots.delete(slot);
+  }
 }
 
 export const hasNativeHeadersBrand = (headers: object): boolean => {
@@ -390,6 +421,7 @@ function* iterateHeaders(
     if (
       retainedRow &&
       retainedRow.valueStateful &&
+      !retainedRow.values &&
       (!valueDescriptor || sameHeaderProperty(valueDescriptor, retainedRow.valueDescriptor))
     ) {
       retainedRows?.set(occurrence, {
@@ -403,7 +435,7 @@ function* iterateHeaders(
     }
     const capturedRow: (readonly [string, string | null])[] | undefined = trackRow ? [] : undefined;
     const retained = shouldClear ? replay?.properties?.get(name) : undefined;
-    if (retained) {
+    if (retained && !retained.values) {
       if (retained.entry) {
         yield [name, null];
         const value = retained.entry[1];
@@ -424,11 +456,21 @@ function* iterateHeaders(
     const property: HeaderPropertySnapshot | undefined =
       shouldClear && replay && descriptor ? { descriptor } : undefined;
     if (property && replay) replay.property = property;
-    const headerValue = row[1];
+    const retainedValues =
+      retained?.values ??
+      (retainedRow && (!valueDescriptor || sameHeaderProperty(valueDescriptor, retainedRow.valueDescriptor))
+        ? retainedRow.values
+        : undefined);
+    const headerValue = retainedValues?.source ?? row[1];
     const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
     const statefulValues =
       rowReplay?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
-    const valueIterator = values[Symbol.iterator];
+    const valueIterator = retainedValues?.iterator ?? values[Symbol.iterator];
+    const valueSnapshot =
+      replay && isReadonlyArray(headerValue) && valueIterator === getArrayIterator(values)
+        ? (retainedValues ?? { source: values, iterator: valueIterator, slots: new Map() })
+        : undefined;
+    if (property && valueSnapshot) property.values = valueSnapshot;
     if (
       rowReplay?.refreshable &&
       isReadonlyArray(headerValue) &&
@@ -437,7 +479,10 @@ function* iterateHeaders(
       rowReplay.refreshable = false;
     }
     let didClear = false;
-    for (const value of { [Symbol.iterator]: () => Reflect.apply(valueIterator, values, []) }) {
+    const valueIteration = valueSnapshot
+      ? iterateHeaderValues(name, valueSnapshot)
+      : { [Symbol.iterator]: () => Reflect.apply(valueIterator, values, []) };
+    for (const value of valueIteration) {
       if (rowReplay && value !== null && (typeof value === 'object' || typeof value === 'function')) {
         rowReplay.refreshable = false;
       }
@@ -466,6 +511,7 @@ function* iterateHeaders(
       capturedRow?.push([name, capturedValue]);
       yield [name, capturedValue];
     }
+    if (valueSnapshot?.slots.size && rowReplay) rowReplay.refreshable = false;
     if (capturedRow && replay) {
       if (nameStateful || !rowReplay?.refreshable) {
         replay.rows ??= new Map();
@@ -477,6 +523,7 @@ function* iterateHeaders(
           valueDescriptor,
           valueStateful: !rowReplay?.refreshable,
           entries: capturedRow,
+          ...(valueSnapshot ? { values: valueSnapshot } : {}),
         });
         replay.rows.set(row, rows);
       } else {
@@ -591,13 +638,31 @@ interface HeaderReadContext {
 let headerReadContext: HeaderReadContext | undefined;
 const capturedHeaderReplays = new WeakMap<NullableHeaders, { source: HeadersLike; replay: HeaderReplay }>();
 
+const copyHeaderValues = <T extends { values?: HeaderValuesSnapshot }>(snapshot: T): T => ({
+  ...snapshot,
+  ...(snapshot.values ? { values: { ...snapshot.values, slots: new Map(snapshot.values.slots) } } : {}),
+});
+
 const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => ({
   ...replay,
-  ...(replay.properties ? { properties: new Map(replay.properties) } : {}),
+  ...(replay.properties
+    ? {
+        properties: new Map(
+          [...replay.properties].map(([key, property]) => [key, copyHeaderValues(property)]),
+        ),
+      }
+    : {}),
   ...(replay.propertyOrder ? { propertyOrder: [...replay.propertyOrder] } : {}),
   ...(replay.arraySlots ? { arraySlots: new Map(replay.arraySlots) } : {}),
   ...(replay.rows
-    ? { rows: new Map([...replay.rows].map(([row, occurrences]) => [row, new Map(occurrences)])) }
+    ? {
+        rows: new Map(
+          [...replay.rows].map(([row, occurrences]) => [
+            row,
+            new Map([...occurrences].map(([index, snapshot]) => [index, copyHeaderValues(snapshot)])),
+          ]),
+        ),
+      }
     : {}),
 });
 
@@ -755,7 +820,6 @@ const createHeaderSnapshot = (
                 propertyOrder: replay.propertyOrder,
                 rows: replay.rows,
                 arraySlots: replay.arraySlots,
-                arrayLength: replay.arrayLength,
               }
             : undefined),
         };

@@ -128,6 +128,10 @@ test('preserves nested getter order and receiver when a getter replaces itself',
 
   expect(snapshot.refresh().values.get('X-Custom')).toBe('first, second');
   expect(order).toEqual(['first', 'second']);
+
+  Object.defineProperty(values, '0', { value: 'later' });
+  expect(snapshot.refresh().values.get('X-Custom')).toBe('later, second');
+  expect(order).toEqual(['first', 'second']);
 });
 
 test('reads a tuple header value once and retains accessor-backed rows', () => {

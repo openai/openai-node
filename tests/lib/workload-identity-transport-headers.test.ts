@@ -19,7 +19,7 @@ const lazyHeaders = (request: RequestInit): NonNullable<RequestInit['headers']> 
 test('preserves a private-field accessor receiver while normalizing headers', async () => {
   class WrappedRequest implements RequestInit {
     #method: string;
-    headers: RequestInit['headers'];
+    headers: NonNullable<RequestInit['headers']>;
 
     constructor(request: RequestInit) {
       const { method, ...properties } = request;

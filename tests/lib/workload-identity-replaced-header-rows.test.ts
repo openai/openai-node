@@ -7,7 +7,7 @@ import {
   createWorkloadIdentityTransport,
 } from './workload-identity-fixtures';
 
-test.each(['duplicate', 'unrelated'] as const)(
+test.each(['duplicate', 'replaced duplicate', 'expanded replacement', 'unrelated'] as const)(
   'refreshes tuple occurrences after removing a %s row before a retry',
   async (removed) => {
     const read = vi.fn(() => {
@@ -26,10 +26,16 @@ test.each(['duplicate', 'unrelated'] as const)(
     const transport = createWorkloadIdentityTransport((_url, init) => {
       sent.push(new Headers(init?.headers).get('X-Custom'));
       if (sent.length === 1) {
-        if (removed === 'duplicate') {
-          headers.shift();
-        } else {
+        if (removed === 'unrelated') {
           headers.pop();
+        } else {
+          headers.shift();
+          if (removed !== 'duplicate') {
+            headers.push(['X-Replacement', 'new']);
+          }
+          if (removed === 'expanded replacement') {
+            headers.push(['X-Extra', 'new']);
+          }
         }
         return Response.json(
           { error: 'synthetic retry' },
@@ -48,8 +54,8 @@ test.each(['duplicate', 'unrelated'] as const)(
 
     await client.models.list({ headers });
 
-    expect(sent).toEqual(['A, B', removed === 'duplicate' ? 'B' : 'A, B']);
-    expect(read).toHaveBeenCalledTimes(removed === 'duplicate' ? 3 : 2);
+    expect(sent).toEqual(['A, B', removed === 'unrelated' ? 'A, B' : 'B']);
+    expect(read).toHaveBeenCalledTimes(removed === 'unrelated' ? 2 : 3);
     expect(transport.exchanges).toBe(1);
   },
 );

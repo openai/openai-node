@@ -211,23 +211,25 @@ export class AzureOpenAI extends OpenAI {
     timeout: number,
     controller: AbortController,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    credentialContext?: object,
   ): Promise<Response> {
     if (new Headers(init.headers).has('api-key')) {
       init.redirect = 'manual';
     }
 
-    return super.fetchWithAuth(url, init, timeout, controller, schemes);
+    return super.fetchWithAuth(url, init, timeout, controller, schemes, credentialContext);
   }
 
   protected override async authHeaders(
     opts: FinalRequestOptions,
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    context?: object,
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
       return buildHeaders([{ 'api-key': this.apiKey }]);
     }
-    return super.authHeaders(opts, security);
+    return super.authHeaders(opts, security, context);
   }
 }
 

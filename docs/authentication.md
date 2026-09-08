@@ -302,7 +302,10 @@ If a hook drops ownership on a later retry, the SDK rejects its returned request
 standalone credential acquisition performed inside that hook may already have occurred.
 
 When removing a repeated tuple reduces its occurrence count, the SDK re-evaluates that tuple's cached
-accessor values because the remaining occurrence cannot be identified reliably.
+accessor values because the remaining occurrence cannot be identified reliably, even if other rows
+are added at the same time.
+Within a native array-valued header, accessor slots are retained individually while ordinary data
+slots continue to refresh, including when a credential provider updates them during acquisition.
 
 Hooks that consume one-shot header iterables must keep the parsed headers if later SDK processing
 needs them, for example by assigning the parsed result to `options.headers`. The SDK does not replace
