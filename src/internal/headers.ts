@@ -156,31 +156,6 @@ export const hasNativeHeadersBrand = (headers: object): boolean => {
   }
 };
 
-/** Detects native values whose actual serialization is supplied by another realm or a subclass. */
-export const hasCustomNativeHeadersIterator = (headers: object): boolean => {
-  if (!hasNativeHeadersBrand(headers)) {
-    return false;
-  }
-  try {
-    const seen = new Set<object>();
-    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-      if (seen.has(prototype)) {
-        return false;
-      }
-      seen.add(prototype);
-      const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-      if (descriptor) {
-        return (
-          typeof descriptor.value === 'function' && descriptor.value !== Headers.prototype[Symbol.iterator]
-        );
-      }
-    }
-  } catch {
-    // Uninspectable membranes cannot opt into provenance recovery.
-  }
-  return false;
-};
-
 /** Checks retryable hook inputs without invoking their iterable protocol or value getters. */
 export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<object>()): boolean => {
   if (!headers) return true;

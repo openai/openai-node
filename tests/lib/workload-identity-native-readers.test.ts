@@ -1,5 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Fixtures cover separate protected header-reading boundaries. */
 import OpenAI from 'openai';
+import { buildHeaders } from 'openai/internal/headers';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
 const forwardNativeHeadersIterator: Headers[typeof Symbol.iterator] = function forwardNativeHeadersIterator(
@@ -150,5 +151,105 @@ test.each(['instance', 'subclass'] as const)(
 
     expect(calls).toBe(2);
     expect(transport.exchanges).toBe(2);
+  },
+);
+
+describe.each(['native', 'transparent iterator', 'one-shot iterator'] as const)(
+  'recovering cloned authentication values with a %s',
+  (kind) => {
+    test.each([false, true])('reuses the selected snapshot (frozen result: %s)', async (frozen) => {
+      let iterations = 0;
+      class HookClient extends OpenAI {
+        protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+          const headers = await super.authHeaders(...args);
+          if (!headers) {
+            return headers;
+          }
+          const values = new Headers(headers.values);
+          if (kind !== 'native') {
+            const iterator = Headers.prototype.entries.call(values);
+            Object.defineProperty(values, Symbol.iterator, {
+              value() {
+                iterations += 1;
+                return kind === 'one-shot iterator' ? iterator : Headers.prototype.entries.call(values);
+              },
+            });
+          }
+          Object.defineProperty(values, 'get', {
+            get() {
+              throw new Error('Synthetic diagnostic getter must not run');
+            },
+          });
+          const result = { ...headers, values };
+          return frozen ? Object.freeze(result) : result;
+        }
+      }
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+        return sent.length === 1
+          ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        apiKey: null,
+        maxRetries: 0,
+        fetch: transport.fetch,
+      });
+
+      await client.models.list();
+
+      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
+      expect(iterations).toBe(kind === 'native' ? 0 : 2);
+    });
+  },
+);
+
+test.each(['unmarked', 'SDK-owned', 'explicitly independent'] as const)(
+  'keeps a %s custom iterator replacement independent',
+  async (kind) => {
+    let iterations = 0;
+    const authorization = kind === 'explicitly independent' ? 'Bearer access-token-1' : 'Bearer independent';
+    class HookClient extends OpenAI {
+      protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
+        const headers = await super.authHeaders(...args);
+        if (!headers) {
+          return headers;
+        }
+        let values = new Headers(headers.values);
+        if (kind === 'SDK-owned') {
+          ({ values } = headers);
+        } else if (kind === 'explicitly independent') {
+          ({ values } = buildHeaders([{ Authorization: authorization }]));
+        }
+        const iterator = [['Authorization', authorization]].values();
+        Object.defineProperty(values, Symbol.iterator, {
+          value() {
+            iterations += 1;
+            return iterator;
+          },
+        });
+        return Object.freeze({ ...headers, values });
+      }
+    }
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((url, init) => {
+      sent.push(new Request(url, init as globalThis.RequestInit).headers.get('Authorization'));
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      maxRetries: 0,
+      fetch: transport.fetch,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(sent).toEqual([authorization]);
+    expect(transport.exchanges).toBe(1);
+    expect(iterations).toBe(1);
   },
 );

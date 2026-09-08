@@ -260,7 +260,6 @@ import {
   snapshotHeaders,
   getRequestHeaders,
   getPlatformHeader,
-  hasCustomNativeHeadersIterator,
   hasNativeHeadersBrand,
   createWorkloadHeaderSnapshots,
   canReplayHeaderInput,
@@ -520,7 +519,7 @@ export class OpenAI {
   private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
   #workloadIdentityRequests = new WeakMap<object, Set<WorkloadIdentityRequest>>();
-  #workloadTokenProvenance = new WorkloadTokenProvenance();
+  #workloadTokenProvenance = new WorkloadTokenProvenance((values) => buildHeaders([values]));
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -815,14 +814,13 @@ export class OpenAI {
     ) {
       return await this.adminAPIKeyAuth(opts);
     }
-    const bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, context) : undefined;
-    this.#workloadTokenProvenance.recover(bearerHeaders, opts, context);
+    let bearerHeaders = schemes.bearerAuth ? await this.bearerAuth(opts, context) : undefined;
+    bearerHeaders = this.#workloadTokenProvenance.recover(bearerHeaders, opts, context);
     const headers = buildHeaders([
       bearerHeaders,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
     ]);
-    this.#workloadTokenProvenance.recover(headers, opts, context);
-    return headers;
+    return this.#workloadTokenProvenance.recover(headers, opts, context);
   }
 
   /** Resolves bearer authentication with result-owned workload provenance. */
@@ -2249,12 +2247,11 @@ export class OpenAI {
         suppliedHeaders = refreshSuppliedHeaders();
       }
     }
-    if (authenticationHeaders?.values && hasCustomNativeHeadersIterator(authenticationHeaders.values)) {
-      // Attribute the same one-time canonical serialization that is handed to the request. This
-      // preserves forwarding native iterators without trusting them as intrinsic readers.
-      authenticationHeaders = buildHeaders([authenticationHeaders]);
-    }
-    this.#workloadTokenProvenance.recover(authenticationHeaders, options, credentialContext);
+    authenticationHeaders = this.#workloadTokenProvenance.recover(
+      authenticationHeaders,
+      options,
+      credentialContext,
+    );
     const headers = buildHeaders([
       idempotencyHeaders,
       {

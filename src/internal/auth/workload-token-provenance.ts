@@ -1,5 +1,5 @@
 import { getPlatformHeader } from '../platform-headers';
-import type { WorkloadHeaderSnapshots } from '../headers';
+import type { NullableHeaders, WorkloadHeaderSnapshots } from '../headers';
 
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
 export function bearerToken(authorization: string | null): string | undefined {
@@ -184,6 +184,13 @@ interface TokenScope {
 
 /** Owns authentication provenance for individual request attempts without retaining a token cache. */
 export class WorkloadTokenProvenance {
+  private readonly parseHeaders: (values: Headers) => NullableHeaders;
+
+  /** Uses the canonical header parser while keeping its dependency on provenance acyclic. */
+  constructor(parseHeaders: (values: Headers) => NullableHeaders) {
+    this.parseHeaders = parseHeaders;
+  }
+
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
@@ -252,24 +259,44 @@ export class WorkloadTokenProvenance {
   }
 
   /** Recovers an unmarked rebuilt result only from its own active authentication invocation. */
-  recover(headers: { values: Headers } | undefined, options: object, context: object | undefined): void {
+  recover(
+    headers: NullableHeaders | undefined,
+    options: object,
+    context: object | undefined,
+  ): NullableHeaders | undefined {
     if (!headers) {
-      return;
+      return headers;
     }
     const { values } = headers;
     const outerCredential = workloadHeaderCredential(headers);
     const valueCredential = workloadHeaderCredential(values);
-    const credential = valueCredential === undefined ? outerCredential : valueCredential;
+    let credential = valueCredential === undefined ? outerCredential : valueCredential;
+    const platformHeader = getPlatformHeader(values, 'authorization');
+    let selected = headers;
+    if (!platformHeader) {
+      // Unknown iterators can be one-shot. The later merge must use the exact values read here.
+      const snapshot = this.parseHeaders(values);
+      selected = {
+        ...headers,
+        values: snapshot.values,
+        nulls: new Set([...headers.nulls, ...snapshot.nulls]),
+      };
+      if (credential !== undefined) {
+        credential = copyWorkloadHeaderCredential(credential);
+        rememberWorkloadHeaderValues(selected.values, credential);
+      }
+    }
     if (credential === null) {
+      rememberWorkloadHeaderCredential(selected, null, selected.values);
       this.scopeFor(options, context)?.revoke();
-      return;
+      return selected;
     }
     if (credential !== undefined) {
-      rememberWorkloadHeaderCredential(headers, credential, values);
+      rememberWorkloadHeaderCredential(selected, credential, selected.values);
       this.scopeFor(options, context)?.select(credential);
-      return;
+      return selected;
     }
-    const authorization = getPlatformHeader(values, 'authorization')?.value ?? null;
+    const authorization = platformHeader ? platformHeader.value : selected.values.get('authorization');
     const token = bearerToken(authorization);
     if (
       token !== undefined &&
@@ -277,7 +304,14 @@ export class WorkloadTokenProvenance {
       this.scopeFor(options, context)?.matches(authorization)
     ) {
       this.issue(headers, token, this.scopeFor(options, context)?.credential(authorization));
+      if (selected !== headers) {
+        // Parsing must not remove the source's mutation-observability restriction.
+        const recovered = copyWorkloadHeaderCredential(workloadHeaderCredential(values) ?? null);
+        rememberWorkloadHeaderCredential(selected, recovered, selected.values);
+        rememberWorkloadHeaderValues(selected.values, recovered);
+      }
     }
+    return selected;
   }
 
   /** Binds provenance to a completed SDK request result independently of caller options. */

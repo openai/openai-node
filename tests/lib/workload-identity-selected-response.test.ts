@@ -154,3 +154,59 @@ test('does not replay when mixed delegated credentials return the same response 
   expect(calls).toBe(2);
   expect(transport.exchanges).toBe(1);
 });
+
+const wrapResponse = (response: Response) =>
+  new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+
+describe.each(['sdk', 'independent'] as const)('single %s dispatch', (credential) => {
+  test.each(['original', 'wrapped', 'shadowed body'] as const)('returns a %s response', async (mode) => {
+    class DispatchClient extends OpenAI {
+      override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        if (credential === 'independent' && args[1]) {
+          args[1].headers = { Authorization: 'Bearer independent' };
+        }
+        const response = await super.fetchWithTimeout(...args);
+        Reflect.deleteProperty(response, 'body');
+        return mode === 'original' ? response : wrapResponse(response);
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      const response =
+        sends === 1
+          ? Response.json({ error: 'synthetic unauthorized' }, { status: 401 })
+          : Response.json({ ok: true });
+      if (mode === 'shadowed body') {
+        Object.defineProperty(response, 'body', {
+          configurable: true,
+          get() {
+            throw new Error('Bookkeeping must not invoke a caller-defined body getter');
+          },
+        });
+      }
+      return response;
+    });
+    const client = new DispatchClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+    const response = client.post('/models', { body: { synthetic: true } });
+    if (credential === 'sdk') {
+      await expect(response).resolves.toEqual({ ok: true });
+      expect(sends).toBe(2);
+      expect(transport.exchanges).toBe(2);
+    } else {
+      await expect(response).rejects.toMatchObject({ status: 401 });
+      expect(sends).toBe(1);
+      expect(transport.exchanges).toBe(1);
+    }
+  });
+});
