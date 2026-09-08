@@ -849,7 +849,7 @@ test('does not dispatch a record whose failed field read makes its shape opaque'
       args[1].headers = new Proxy(target, {
         ownKeys(value) {
           if (opaque) {
-            throw new Error('Synthetic unavailable keys');
+            throw diagnostic;
           }
           return Reflect.ownKeys(value);
         },

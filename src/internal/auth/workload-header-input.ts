@@ -18,42 +18,16 @@ const getIteratorDescriptor = (source: HeaderInput): PropertyDescriptor | undefi
   return undefined;
 };
 
-const errorOrigin = (error: unknown): string | undefined =>
-  error instanceof Error && typeof error.stack === 'string'
-    ? error.stack.split('\n', 2)[1]?.trim()
-    : undefined;
-
-const sameOpaqueFailure = (first: unknown, second: unknown) => {
-  if (Object.is(first, second)) {
-    return true;
-  }
-  if (!(first instanceof Error) || !(second instanceof Error)) {
-    return false;
-  }
-  const firstOrigin = errorOrigin(first);
-  return (
-    first.name === second.name &&
-    first.message === second.message &&
-    firstOrigin !== undefined &&
-    firstOrigin === errorOrigin(second)
-  );
-};
-
 const materializeRecord = (source: HeaderInput): Headers | undefined => {
   try {
-    return new Headers(source);
-  } catch (error) {
-    try {
-      Reflect.ownKeys(source);
-    } catch (shapeError) {
-      if (sameOpaqueFailure(error, shapeError)) {
-        // A record whose shape cannot be inspected may require its configured transport to unwrap it.
-        return undefined;
-      }
-    }
-    // Validation or a field read failed after the record shape became observable.
-    throw error;
+    // Establish opacity before platform conversion can consume a field. The platform performs its
+    // own authoritative traversal so ordinary and Proxy record semantics remain unchanged.
+    Reflect.ownKeys(source);
+  } catch {
+    // A record whose shape cannot be inspected may require its configured transport to unwrap it.
+    return undefined;
   }
+  return new Headers(source);
 };
 
 /**
