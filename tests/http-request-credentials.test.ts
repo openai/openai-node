@@ -1,7 +1,7 @@
 /* oxlint-disable eslint/max-classes-per-file -- Separate subclass fixtures cover delegation and custom credential resolution. */
 import { vi } from 'vitest';
 
-import OpenAI, { AzureOpenAI, BedrockOpenAI } from 'openai';
+import OpenAI, { AzureOpenAI, BedrockOpenAI, OpenAIError } from 'openai';
 import type { ClientOptions } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import type { FinalRequestOptions } from 'openai/internal/request-options';
@@ -180,6 +180,62 @@ describe.each(clients)('%s HTTP credentials', (kind) => {
     await expect(client.get('/items', { __security: securityFor(kind) })).rejects.toThrow(message);
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  test.each(['empty', 'rejected'] as const)(
+    'releases an upload iterator after a %s credential without waiting for cleanup',
+    async (failure) => {
+      const provider = vi.fn(async () => {
+        if (failure === 'rejected') {
+          throw new Error('synthetic provider failure');
+        }
+        return '';
+      });
+      // oxlint-disable-next-line promise/avoid-new -- Pending iterator cleanup must not delay the authentication failure.
+      const release = vi.fn(() => new Promise<IteratorResult<Uint8Array>>(() => {}));
+      const body = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () => ({ done: false, value: new Uint8Array([1]) }),
+            return: release,
+          };
+        },
+      };
+      const fetch = mockFetch();
+      const client = clientFor(kind, provider, { fetch });
+
+      await expect(client.post('/items', { body, __security: securityFor(kind) })).rejects.toThrow(
+        failure === 'rejected'
+          ? "Failed to get token from 'apiKey' function"
+          : "Expected 'apiKey' function argument to return a string",
+      );
+
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(provider).toHaveBeenCalledTimes(1);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+});
+
+test('preserves the credential failure when upload cleanup throws during a direct build', async () => {
+  const failure = new OpenAIError('synthetic provider failure');
+  const release = vi.fn(() => {
+    throw new Error('synthetic cleanup failure');
+  });
+  const body = {
+    [Symbol.iterator]() {
+      return this;
+    },
+    next: () => ({ done: false, value: new Uint8Array([1]) }),
+    return: release,
+  };
+  const client = new OpenAI({
+    apiKey: async () => {
+      throw failure;
+    },
+  });
+
+  await expect(client.buildRequest({ method: 'post', path: '/items', body })).rejects.toBe(failure);
+  expect(release).toHaveBeenCalledTimes(1);
 });
 
 test('preserves one-argument delegating hooks and resolves credentials after options and body preparation', async () => {

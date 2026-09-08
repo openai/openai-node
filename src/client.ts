@@ -1770,6 +1770,12 @@ export class OpenAI {
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
       x509Tenant,
+    }).catch((error) => {
+      if (isStreamingBody && body !== options.body && !x509Authentication) {
+        // Retire the SDK-created adapter without delaying or masking the header error.
+        void Shims.CancelReadableStream(body).catch(() => undefined);
+      }
+      throw error;
     });
 
     const req: FinalizedRequestInit = {

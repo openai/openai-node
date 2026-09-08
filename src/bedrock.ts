@@ -221,6 +221,17 @@ export class BedrockOpenAI extends OpenAI {
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
   }
 
+  /** Builds and validates the request URL before preparing its body or resolving credentials. */
+  override buildURL(
+    path: string,
+    query: Record<string, unknown> | null | undefined,
+    defaultBaseURL?: string | undefined,
+  ): string {
+    const url = super.buildURL(path, query, defaultBaseURL);
+    assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, url);
+    return url;
+  }
+
   protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
@@ -262,7 +273,7 @@ export class BedrockOpenAI extends OpenAI {
       }
     }
 
-    return super.authHeaders(opts, security);
+    return undefined;
   }
 
   /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */

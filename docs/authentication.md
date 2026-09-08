@@ -56,13 +56,46 @@ Function credentials are resolved after `prepareOptions` and request URL/body
 construction. Calling `buildRequest` directly also resolves a function credential.
 Default and request headers retain their existing precedence over SDK authentication.
 
-Subclasses that previously customized HTTP credentials through `_callApiKey` or
+For bearer-token authentication, subclasses that customized HTTP credentials through `_callApiKey` or
 assigned `this.apiKey` after `super.prepareOptions()` should override
 `resolveAPIKey()` and return the credential instead. Overrides of `authHeaders`
 or `bearerAuth` can continue to return custom authentication headers. Delegating
 hooks keep their existing arguments; no request context needs to be forwarded.
 `_callApiKey` remains available with its existing boolean return and capture callback
 for Realtime and direct callers, but ordinary HTTP authentication no longer calls it.
+
+`AzureOpenAI` uses `resolveAPIKey()` for `azureADTokenProvider`, but a static
+`apiKey` uses Azure's `api-key` header without calling `resolveAPIKey()` or
+`bearerAuth()`. For an Azure subclass that refreshes API keys, override
+`authHeaders()` instead. Delegate to Azure first to preserve security-scheme
+selection, then replace its `api-key` value:
+
+```ts
+import { AzureOpenAI } from 'openai';
+
+class RotatingAzureOpenAI extends AzureOpenAI {
+  protected override async authHeaders(
+    options: Parameters<AzureOpenAI['buildRequest']>[0],
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ) {
+    const headers = await super.authHeaders(options, schemes);
+    if (headers?.values.has('api-key')) {
+      const apiKey = process.env['AZURE_OPENAI_API_KEY'];
+      if (!apiKey) {
+        throw new Error('Missing AZURE_OPENAI_API_KEY');
+      }
+      headers.values.set('api-key', apiKey);
+    }
+    return headers;
+  }
+}
+
+const client = new RotatingAzureOpenAI(); // Configure Azure environment variables as usual.
+```
+
+This example reads the current API key during header construction and leaves
+`client.apiKey` unchanged. Default and request headers still take precedence.
+See the [Azure guide](azure.md) for endpoint and API-version configuration.
 
 ### Environment and client configuration
 
