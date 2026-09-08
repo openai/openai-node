@@ -250,8 +250,8 @@ describe('Workload identity authentication hook provenance', () => {
   );
 
   test.each([false, true])(
-    'recovers only the last same-byte issuance when its native copy is returned (revoked: %s)',
-    async (revokeSelected) => {
+    'recovers the last same-byte issuance when its native copy is returned (mutated: %s)',
+    async (mutateSelected) => {
       class HookClient extends OpenAI {
         protected override async bearerAuth(...args: Parameters<OpenAI['bearerAuth']>) {
           const previous = await super.bearerAuth(...args);
@@ -260,7 +260,7 @@ describe('Workload identity authentication hook provenance', () => {
             throw new Error('Expected both synthetic SDK issuances');
           }
           expect(previous.values.get('Authorization')).toBe(selected.values.get('Authorization'));
-          const overwritten = revokeSelected ? selected : previous;
+          const overwritten = mutateSelected ? selected : previous;
           overwritten.values.set('Authorization', overwritten.values.get('Authorization') ?? '');
           return { ...selected, values: new Headers(selected.values) };
         }
@@ -278,11 +278,9 @@ describe('Workload identity authentication hook provenance', () => {
         maxRetries: 0,
       });
       const result = client.models.list();
-      await (revokeSelected ? expect(result).rejects.toMatchObject({ status: 401 }) : result);
-      expect(sent).toEqual(
-        revokeSelected ? ['Bearer access-token-1'] : ['Bearer access-token-1', 'Bearer access-token-2'],
-      );
-      expect(transport.exchanges).toBe(revokeSelected ? 1 : 2);
+      await result;
+      expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-2']);
+      expect(transport.exchanges).toBe(2);
     },
   );
 

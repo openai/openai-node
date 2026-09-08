@@ -6,14 +6,27 @@ import { createTestClientOptions, createWorkloadIdentityTransport } from './work
 
 test.each(
   (['request', 'default'] as const).flatMap((layer) =>
-    (['empty hole', 'inherited accessor', 'inherited data'] as const).map((kind) => ({ layer, kind })),
+    (['empty hole', 'inherited accessor', 'inherited data', 'virtual proxy slot'] as const).map((kind) => ({
+      layer,
+      kind,
+    })),
   ),
-)('retries a nondelegating build only for replayable $layer nested slots: $kind', async ({ layer, kind }) => {
-  const values = ['a'];
+)('rejects an unowned $layer sparse slot before retry: $kind', async ({ layer, kind }) => {
+  let values = ['a'];
   values.length = 3;
   values[2] = 'b';
   let reads = 0;
-  if (kind !== 'empty hole') {
+  if (kind === 'virtual proxy slot') {
+    values = new Proxy(values, {
+      get(target, key, receiver) {
+        if (key === '1') {
+          reads += 1;
+          return `virtual-${reads}`;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+  } else if (kind !== 'empty hole') {
     const prototype = Object.create(Array.prototype);
     Object.defineProperty(prototype, '1', {
       configurable: true,
@@ -63,11 +76,18 @@ test.each(
   });
 
   const request = client.models.list(layer === 'request' ? { headers: { 'X-Values': values } } : {});
-  await (kind === 'empty hole' ? request : expect(request).rejects.toThrow('forward credentialContext'));
+  await expect(request).rejects.toThrow('forward credentialContext');
 
-  expect(sent).toEqual(kind === 'empty hole' ? ['a, b', 'a, b'] : ['a, inherited, b']);
-  expect(builds).toBe(kind === 'empty hole' ? 2 : 1);
-  expect(reads).toBe(kind === 'inherited accessor' ? 1 : 0);
+  let expected = 'a, inherited, b';
+  if (kind === 'empty hole') {
+    expected = 'a, b';
+  }
+  if (kind === 'virtual proxy slot') {
+    expected = 'a, virtual-1, b';
+  }
+  expect(sent).toEqual([expected]);
+  expect(builds).toBe(1);
+  expect(reads).toBe(kind === 'inherited accessor' || kind === 'virtual proxy slot' ? 1 : 0);
   expect(transport.exchanges).toBe(0);
 });
 

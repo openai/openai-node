@@ -1,5 +1,4 @@
 import { getPlatformHeader, getVerifiedPlatformHeader } from './platform-headers';
-import { observeHeaderDescriptor } from './header-descriptor-evidence';
 import {
   HeaderReplay,
   iterateHeaderEntries,
@@ -65,12 +64,9 @@ export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<obje
           return false;
         const length = Object.getOwnPropertyDescriptor(headers, 'length')?.value;
         for (let index = 0; index < length; index += 1) {
-          const key = String(index);
-          if (!Object.getOwnPropertyDescriptor(headers, key)) {
-            // Native iteration yields undefined for a hole only when no inherited slot supplies a value.
-            const prototype = Object.getPrototypeOf(headers);
-            if (prototype && observeHeaderDescriptor(prototype, key).state !== 'absent') return false;
-          }
+          // A missing own descriptor cannot distinguish an ordinary hole from a Proxy-supplied value.
+          // Without a consumed snapshot, retrying it would read caller state a second time.
+          if (!Object.getOwnPropertyDescriptor(headers, String(index))) return false;
         }
       } else {
         return getVerifiedPlatformHeader(headers, 'authorization') !== undefined;

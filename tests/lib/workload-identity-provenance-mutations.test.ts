@@ -4,7 +4,7 @@ import { buildHeaders } from 'openai/internal/headers';
 import { inspect } from 'node:util';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
-test('keeps a resolved legacy placeholder independent after mutation and cloning', async () => {
+test('treats a same-byte resolved legacy placeholder mutation as unchanged after cloning', async () => {
   class HookClient extends OpenAI {
     // oxlint-disable-next-line class-methods-use-this -- This fixture delegates legacy credential resolution to transport.
     protected override async authHeaders() {
@@ -33,8 +33,8 @@ test('keeps a resolved legacy placeholder independent after mutation and cloning
   });
 
   await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-  expect(sends).toBe(1);
-  expect(transport.exchanges).toBe(1);
+  expect(sends).toBe(2);
+  expect(transport.exchanges).toBe(2);
 });
 
 describe.each(['in place', 'replacement'] as const)('%s independent credentials', (replacement) => {
@@ -69,8 +69,12 @@ describe.each(['in place', 'replacement'] as const)('%s independent credentials'
     });
 
     await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-    expect(sent).toEqual(['Bearer access-token-1']);
-    expect(transport.exchanges).toBe(1);
+    expect(sent).toEqual(
+      replacement === 'in place'
+        ? ['Bearer access-token-1', 'Bearer access-token-1']
+        : ['Bearer access-token-1'],
+    );
+    expect(transport.exchanges).toBe(replacement === 'in place' ? 2 : 1);
   });
 });
 
@@ -112,7 +116,7 @@ test.each(['own', 'inherited'] as const)('bypasses %s get overrides on built Hea
 });
 
 test.each(['authHeaders', 'bearerAuth'] as const)(
-  'keeps an equal-byte %s overwrite independent when returning its original layer',
+  'treats an equal-byte %s overwrite as unchanged when returning its original layer',
   async (hook) => {
     class HookClient extends OpenAI {
       protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
@@ -144,8 +148,8 @@ test.each(['authHeaders', 'bearerAuth'] as const)(
     });
 
     await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
-    expect(sent).toEqual(['Bearer access-token-1']);
-    expect(transport.exchanges).toBe(1);
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-1']);
+    expect(transport.exchanges).toBe(2);
   },
 );
 
@@ -178,7 +182,7 @@ test('does not invalidate an unchanged credential when an unused parsed copy is 
 });
 
 test.each(['authHeaders', 'bearerAuth'] as const)(
-  'does not restore %s ownership by cloning after an equal-byte overwrite',
+  'retains %s ownership through cloning after an equal-byte overwrite',
   async (hook) => {
     class HookClient extends OpenAI {
       protected override async authHeaders(...args: Parameters<OpenAI['authHeaders']>) {
@@ -213,8 +217,8 @@ test.each(['authHeaders', 'bearerAuth'] as const)(
 
     await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
 
-    expect(sent).toEqual(['Bearer access-token-1']);
-    expect(transport.exchanges).toBe(1);
+    expect(sent).toEqual(['Bearer access-token-1', 'Bearer access-token-1']);
+    expect(transport.exchanges).toBe(2);
   },
 );
 

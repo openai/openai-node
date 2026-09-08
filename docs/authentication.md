@@ -235,6 +235,12 @@ For subject-token workload identity, a transport hook that dispatches without de
 `fetchWithTimeout` owns its authentication retries. The SDK records token usage immediately before
 calling the configured `fetch`; it cannot verify which credential an independent transport sent.
 When a hook makes several delegated sends, authentication retry follows the response the hook returns.
+Native `response.clone()` calls made inside a transport hook are caller-owned and do not carry automatic
+workload-token retry attribution. A subclass can use the protected `this.cloneResponse(response)` helper
+when it intentionally returns a clone of a delegated response and wants to preserve that attribution.
+The SDK does not replace native `Response` or `Headers` methods. An exact same-byte mutation of a native
+`Headers` object is therefore treated as unchanged; return an independent header record or `buildHeaders`
+result when the same bytes must carry independent credential ownership.
 Requests with streamed upload bodies cannot be replayed; see the
 [upload retry guidance](uploads.md#streaming-and-retries).
 

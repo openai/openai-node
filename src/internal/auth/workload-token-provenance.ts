@@ -27,38 +27,11 @@ export interface WorkloadCredentialUsage {
 
 const headerCredentials = new WeakMap<object, HeaderCredential | null>();
 const headerValueSources = new WeakMap<object, Headers>();
-const observedHeaderMutations = new WeakSet<object>();
+const nativeHeaderValues = new WeakSet<object>();
 const requestCredentialCarrier = Symbol('workload.requestCredentialCarrier');
 
-const mutateHeaders = (headers: Headers, mutation: (...args: string[]) => void, args: unknown[]): void => {
-  let name: string | undefined;
-  if (args.length > 0) {
-    const [input] = args;
-    if (typeof input === 'string') {
-      name = input;
-    } else {
-      // Let the platform retain receiver validation, coercion order, and ByteString validation.
-      args[0] = {
-        [Symbol.toPrimitive]() {
-          name = `${input}`;
-          return name;
-        },
-      };
-    }
-  }
-  Reflect.apply(mutation, headers, args);
-  if (name?.toLowerCase() === 'authorization') {
-    const credential = headerCredentials.get(headers);
-    if (credential) {
-      credential.revoked = true;
-    }
-  }
-};
-
-const observeHeaderMutations = (headers: object, credential: HeaderCredential): void => {
-  if (observedHeaderMutations.has(headers)) {
-    return;
-  }
+/** Validates ownership without shadowing caller-visible platform methods. */
+const hasUnmodifiedHeaderMutators = (headers: object): boolean => {
   let platform: object | undefined;
   try {
     Headers.prototype.has.call(headers, 'authorization');
@@ -67,16 +40,14 @@ const observeHeaderMutations = (headers: object, credential: HeaderCredential): 
     try {
       platform = getPlatformHeader(headers, 'authorization')?.prototype;
     } catch {
-      credential.revoked = true;
+      return false;
     }
   }
   if (!platform) {
-    credential.revoked = true;
-    return;
+    return false;
   }
   try {
     const names = ['set', 'append', 'delete'] as const;
-    const mutations = new Map<string, (...args: string[]) => void>();
     for (const name of names) {
       let descriptor: PropertyDescriptor | undefined;
       const seen = new Set<object>();
@@ -92,35 +63,12 @@ const observeHeaderMutations = (headers: object, credential: HeaderCredential): 
       }
       const native = Object.getOwnPropertyDescriptor(platform, name)?.value;
       if (!descriptor || descriptor.value !== native || typeof native !== 'function') {
-        credential.revoked = true;
-        return;
+        return false;
       }
-      mutations.set(name, native);
     }
-    if (
-      !Object.isExtensible(headers) ||
-      names.some((name) => Object.getOwnPropertyDescriptor(headers, name)?.configurable === false)
-    ) {
-      credential.revoked = true;
-      return;
-    }
-    for (const [name, mutation] of mutations) {
-      const observedMutation = function observedMutation(this: Headers, ...args: string[]) {
-        mutateHeaders(this, mutation, args);
-      };
-      Object.defineProperties(observedMutation, {
-        name: { value: name },
-        length: { value: name === 'delete' ? 1 : 2 },
-      });
-      Object.defineProperty(headers, name, {
-        configurable: true,
-        writable: true,
-        value: observedMutation,
-      });
-    }
-    observedHeaderMutations.add(headers);
+    return true;
   } catch {
-    credential.revoked = true;
+    return false;
   }
 };
 
@@ -128,20 +76,25 @@ const observeHeaderMutations = (headers: object, credential: HeaderCredential): 
 export function workloadHeaderCredential(headers: object): HeaderCredential | null | undefined {
   const source = headerValueSources.get(headers);
   let credential = headerCredentials.get(headers);
+  let values = headers;
   if (source) {
-    let values: unknown;
+    let selectedValues: unknown;
     try {
-      values = Object.getOwnPropertyDescriptor(headers, 'values')?.value;
+      selectedValues = Object.getOwnPropertyDescriptor(headers, 'values')?.value;
     } catch {
       return undefined;
     }
-    if (typeof values !== 'object' || values === null) {
+    if (typeof selectedValues !== 'object' || selectedValues === null) {
       return undefined;
     }
-    const selected = headerCredentials.get(values);
-    if (selected !== undefined || values !== source) {
+    values = selectedValues;
+    const selected = headerCredentials.get(selectedValues);
+    if (selected !== undefined || selectedValues !== source) {
       credential = selected;
     }
+  }
+  if (credential && nativeHeaderValues.has(values) && !hasUnmodifiedHeaderMutators(values)) {
+    credential.revoked = true;
   }
   return credential?.revoked ? null : credential;
 }
@@ -161,12 +114,10 @@ export function rememberWorkloadHeaderCredential(
   headerValueSources.set(headers, values);
 }
 
-/** Native header values additionally own observable Authorization mutations. */
+/** Marks native header values for passive shape validation when ownership is consulted. */
 export function rememberWorkloadHeaderValues(headers: object, credential: HeaderCredential | null): void {
   headerCredentials.set(headers, credential);
-  if (credential) {
-    observeHeaderMutations(headers, credential);
-  }
+  nativeHeaderValues.add(headers);
 }
 
 interface TokenScope {

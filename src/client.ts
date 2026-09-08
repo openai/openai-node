@@ -329,12 +329,7 @@ type WorkloadIdentityDispatch = {
   controller: AbortController;
   resolvePlaceholder: boolean;
 };
-type ResponseCloneTracker = {
-  previous: PropertyDescriptor | undefined;
-  installed: PropertyDescriptor;
-  requests: Set<WorkloadIdentityRequest>;
-};
-const responseCloneTrackers = new WeakMap<Response, ResponseCloneTracker>();
+const responseCloneRequests = new WeakMap<Response, Set<WorkloadIdentityRequest>>();
 const nativeResponseBodyGetter = globalThis.Response
   ? Object.getOwnPropertyDescriptor(globalThis.Response.prototype, 'body')?.get
   : undefined;
@@ -403,13 +398,6 @@ const recordWorkloadIdentityResponseBody = (
   }
 };
 
-const hasInstalledResponseClone = (response: Response, tracker: ResponseCloneTracker): boolean => {
-  const current = Object.getOwnPropertyDescriptor(response, 'clone');
-  return 'value' in tracker.installed
-    ? current?.value === tracker.installed.value
-    : current?.get === tracker.installed.get && current?.set === tracker.installed.set;
-};
-
 const recordWorkloadIdentityResponse = (
   request: WorkloadIdentityRequest,
   response: Response,
@@ -420,151 +408,44 @@ const recordWorkloadIdentityResponse = (
   const selectedUsage = prior === undefined ? usedWorkloadToken : prior && usedWorkloadToken;
   request.responses.set(response, selectedUsage);
   recordWorkloadIdentityResponseBody(request, response, selectedUsage);
-  let trackedRequests = new Set<WorkloadIdentityRequest>([request]);
-  const existing = responseCloneTrackers.get(response);
-  try {
-    if (existing) {
-      if (hasInstalledResponseClone(response, existing)) {
-        existing.requests.add(request);
-        request.cloneTrackedResponses.add(response);
-        return;
-      }
-      responseCloneTrackers.delete(response);
-      trackedRequests = new Set([...existing.requests, request]);
-    }
-    const previous = Object.getOwnPropertyDescriptor(response, 'clone');
-    let cloneDescriptor = previous;
-    if (!previous) {
-      for (let prototype = Object.getPrototypeOf(response); prototype && !cloneDescriptor;) {
-        cloneDescriptor = Object.getOwnPropertyDescriptor(prototype, 'clone');
-        prototype = Object.getPrototypeOf(prototype);
-      }
-    }
-    if (!cloneDescriptor) return;
-    let tracker!: ResponseCloneTracker;
-    const captureBodyConflicts = (...sources: (Response | undefined)[]) => {
-      const conflicts = new Set<WorkloadIdentityRequest>();
-      for (const activeRequest of tracker.requests) {
-        for (const source of sources) {
-          const body = source && responseBodyIdentity(source);
-          if (body && activeRequest.responseBodies.get(body) === false) {
-            conflicts.add(activeRequest);
-          }
-        }
-      }
-      return conflicts;
-    };
-    const trackCopy = (
-      source: Response,
-      copy: Response,
-      alternateSource?: Response,
-      bodyConflicts = new Set<WorkloadIdentityRequest>(),
-    ) => {
-      for (const activeRequest of tracker.requests) {
-        let selectedUsage = activeRequest.responses.get(source);
-        if (selectedUsage !== undefined) {
-          // Native clone tees and replaces the source body stream before returning its copy.
-          recordWorkloadIdentityResponseBody(
-            activeRequest,
-            source,
-            selectedUsage && !bodyConflicts.has(activeRequest),
-          );
-        }
-        if (alternateSource && alternateSource !== source) {
-          const alternateUsage = activeRequest.responses.get(alternateSource);
-          if (alternateUsage !== undefined) {
-            recordWorkloadIdentityResponseBody(
-              activeRequest,
-              alternateSource,
-              alternateUsage && !bodyConflicts.has(activeRequest),
-            );
-          }
-          selectedUsage =
-            selectedUsage === undefined && alternateUsage === undefined
-              ? undefined
-              : selectedUsage === true && alternateUsage === true;
-        }
-        if (selectedUsage !== undefined) {
-          recordWorkloadIdentityResponse(
-            activeRequest,
-            copy,
-            selectedUsage && !bodyConflicts.has(activeRequest),
-          );
-        }
-      }
-      return copy;
-    };
-    let installed: PropertyDescriptor;
-    if ('value' in cloneDescriptor) {
-      if (typeof cloneDescriptor.value !== 'function') return;
-      const clone = cloneDescriptor.value;
-      installed = {
-        configurable: true,
-        enumerable: !!cloneDescriptor.enumerable,
-        writable: cloneDescriptor.writable ?? true,
-        value: function cloneTrackedResponse(this: Response) {
-          const bodyConflicts = captureBodyConflicts(this);
-          return trackCopy(this, Reflect.apply(clone, this, []) as Response, undefined, bodyConflicts);
-        },
-      };
-    } else {
-      if (!cloneDescriptor.get) return;
-      const getClone = cloneDescriptor.get;
-      const setClone = cloneDescriptor.set;
-      installed = {
-        configurable: true,
-        enumerable: !!cloneDescriptor.enumerable,
-        get: function getTrackedResponseClone(this: Response) {
-          const source = this;
-          const clone = Reflect.apply(getClone, this, []) as unknown;
-          if (typeof clone !== 'function') return clone;
-          return function cloneTrackedResponse(this: Response) {
-            const bodyConflicts = captureBodyConflicts(source, this);
-            return trackCopy(source, Reflect.apply(clone, this, []) as Response, this, bodyConflicts);
-          };
-        },
-        ...(setClone
-          ? {
-              set: function setTrackedResponseClone(this: Response, value: unknown) {
-                Reflect.apply(setClone, this, [value]);
-              },
-            }
-          : undefined),
-      };
-    }
-    tracker = {
-      previous,
-      requests: trackedRequests,
-      installed,
-    };
-    Object.defineProperty(response, 'clone', installed);
-    responseCloneTrackers.set(response, tracker);
-    for (const activeRequest of trackedRequests) {
-      activeRequest.cloneTrackedResponses.add(response);
-    }
-  } catch {
-    // Non-extensible, accessor-shadowed, or uninspectable responses retain conservative attribution.
+  const requests = responseCloneRequests.get(response) ?? new Set<WorkloadIdentityRequest>();
+  requests.add(request);
+  responseCloneRequests.set(response, requests);
+  request.cloneTrackedResponses.add(response);
+};
+
+const cloneWorkloadIdentityResponse = (response: Response): Response => {
+  const requests = responseCloneRequests.get(response);
+  if (!requests?.size) {
+    return response.clone();
   }
+  const conflicts = new Set<WorkloadIdentityRequest>();
+  const body = responseBodyIdentity(response);
+  if (body) {
+    for (const request of requests) {
+      if (request.responseBodies.get(body) === false) {
+        conflicts.add(request);
+      }
+    }
+  }
+  const copy = response.clone();
+  for (const request of requests) {
+    const selectedUsage = request.responses.get(response);
+    if (selectedUsage === undefined) continue;
+    const usedWorkloadToken = selectedUsage && !conflicts.has(request);
+    // Native clone tees and replaces the source body stream before returning its copy.
+    recordWorkloadIdentityResponseBody(request, response, usedWorkloadToken);
+    recordWorkloadIdentityResponse(request, copy, usedWorkloadToken);
+  }
+  return copy;
 };
 
 const releaseWorkloadIdentityResponseClones = (request: WorkloadIdentityRequest) => {
   for (const response of request.cloneTrackedResponses) {
-    const tracker = responseCloneTrackers.get(response);
-    tracker?.requests.delete(request);
-    if (!tracker || tracker.requests.size !== 0) continue;
-    try {
-      if (responseCloneTrackers.get(response) !== tracker) {
-        continue;
-      }
-      responseCloneTrackers.delete(response);
-      if (!hasInstalledResponseClone(response, tracker)) continue;
-      if (tracker.previous) {
-        Object.defineProperty(response, 'clone', tracker.previous);
-      } else {
-        Reflect.deleteProperty(response, 'clone');
-      }
-    } catch {
-      // A hook may harden a response after dispatch; the private wrapper carries no credential.
+    const requests = responseCloneRequests.get(response);
+    requests?.delete(request);
+    if (requests?.size === 0) {
+      responseCloneRequests.delete(response);
     }
   }
   request.cloneTrackedResponses.clear();
@@ -1884,7 +1765,9 @@ export class OpenAI {
         if (x509Authentication) {
           void Shims.CancelReadableStream(response.body).catch(() => undefined);
         } else {
-          await Shims.CancelReadableStream(response.body);
+          // A selected clone can share its stream with a source retained by a transport hook.
+          // Cancelling that tee branch may wait for the retained branch, so retry must not await it.
+          void Shims.CancelReadableStream(response.body).catch(() => undefined);
           this._workloadIdentityAuth?.invalidateToken();
         }
 
@@ -2030,6 +1913,14 @@ export class OpenAI {
     page.withResponse = guarded.withResponse.bind(guarded);
     page._thenUnwrap = guarded._thenUnwrap.bind(guarded);
     return page;
+  }
+
+  /**
+   * Clones a delegated response while preserving its workload-credential retry attribution.
+   * Native `response.clone()` remains caller-owned and is not instrumented by the SDK.
+   */
+  protected cloneResponse(response: Response): Response {
+    return cloneWorkloadIdentityResponse(response);
   }
 
   protected async fetchWithAuth(
