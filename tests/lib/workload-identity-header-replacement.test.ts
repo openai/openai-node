@@ -129,3 +129,51 @@ describe.each(['request', 'default'] as const)('replaced %s Authorization access
     },
   );
 });
+
+describe.each(['request', 'default'] as const)('%s header alias ordering', (layer) => {
+  test.each([
+    ['Authorization', null],
+    ['Authorization', 'Bearer existing-live'],
+    ['X-Probe', null],
+    ['X-Probe', 'existing-live'],
+  ] as const)(
+    'restores the surviving %s alias %j after removing a temporary alias',
+    async (name, existing) => {
+      const headers: Record<string, string | null> = {};
+      const read = vi.fn(() => {
+        Reflect.deleteProperty(headers, name);
+        return 'captured-stale';
+      });
+      Object.defineProperty(headers, name, { configurable: true, enumerable: true, get: read });
+      const liveAlias = name.toLowerCase();
+      const temporaryAlias = name.toUpperCase();
+      headers[liveAlias] = existing;
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get(name));
+        if (sent.length < 3) {
+          if (sent.length === 1) {
+            headers[temporaryAlias] = 'temporary-live';
+          } else {
+            Reflect.deleteProperty(headers, temporaryAlias);
+          }
+          return Response.json({}, { status: 500, headers: { 'retry-after-ms': '1' } });
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 2,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual([existing, 'temporary-live', existing]);
+      expect(read).toHaveBeenCalledTimes(1);
+    },
+  );
+});

@@ -392,12 +392,22 @@ function* iterateHeaders(
         if (!liveAliases.has(name.toLowerCase())) liveAliases.set(name.toLowerCase(), name);
       }
       const missing = new Map<string | undefined, HeaderEntry[]>();
+      const positions = new Map(entries.map(([key], index) => [key, index]));
       for (const key of [...(replay.propertyOrder ?? [])].reverse()) {
         if (present.has(key)) {
           nextKey = key;
         } else if (replay.properties.has(key)) {
           // Newly supplied aliases override captured accessors; existing aliases keep their original order.
-          const before = liveAliases.get(key.toLowerCase()) ?? nextKey;
+          const liveAlias = liveAliases.get(key.toLowerCase());
+          const nextPosition = nextKey === undefined ? undefined : positions.get(nextKey);
+          const liveAliasPosition = liveAlias === undefined ? undefined : positions.get(liveAlias);
+          const before =
+            liveAlias === undefined ||
+            (nextPosition !== undefined &&
+              liveAliasPosition !== undefined &&
+              nextPosition <= liveAliasPosition)
+              ? nextKey
+              : liveAlias;
           const bucket = missing.get(before) ?? [];
           bucket.push([key, undefined]);
           missing.set(before, bucket);
