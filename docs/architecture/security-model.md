@@ -122,6 +122,27 @@ trusted repository/application code; when untrusted runtime, API, network,
 webhook, stream, or model data reaches a sensitive sink; or when PR code or an
 artifact crosses into protected CI, release, or publication credentials.
 
+### CI runner configuration
+
+`SDK_GHA_RUNNER` is trusted repository-administrator configuration, not an
+input controlled by a pull-request author. When set, it must select ephemeral
+GitHub-hosted capacity with a fresh VM for each job. Persistent self-hosted
+runners are not a supported configuration for this override. A shared hosted
+runner pool does not imply that jobs share a persistent machine; see
+[GitHub's runner isolation documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#choosing-github-hosted-runners).
+
+The workflow does not enforce the fleet's lifecycle. Isolation and runner-group
+access remain infrastructure assumptions that must be verified when changing
+the configured runner. Private-network access is a separate boundary and is
+not made safe solely by using ephemeral VMs. Evidence that lower-trust actors
+can alter runner configuration, reach protected resources, or persist across
+jobs remains reportable; administrator control of this variable is not a
+blanket exclusion for CI findings.
+
+The secret-bearing `examples` job explicitly uses `ubuntu-latest`, independent
+of the override. Its existing main-only trigger, protected environment, and
+read-only token permissions remain in place (`.github/workflows/ci.yml`).
+
 ### Important boundaries and assumptions
 
 - **Native audio bytes and microphone capture to subprocesses:** the public

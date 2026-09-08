@@ -10,6 +10,9 @@ trust boundaries, attacker capabilities, security objectives, exclusions,
 reportability, and severity. This policy adds no separate trust-boundary rules,
 exclusions, or severity guidance.
 
+For CI runner trust and isolation assumptions, see
+[CI runner configuration](../docs/architecture/security-model.md#ci-runner-configuration).
+
 ## Reporting a vulnerability
 
 Please report potential security vulnerabilities through OpenAI's
