@@ -53,6 +53,39 @@ test.each([false, true])('retains a proxy-observed row until its slot is replace
   expect(transport.exchanges).toBe(1);
 });
 
+test.each(['request', 'default'] as const)(
+  'drops an accessor-backed nested %s value deleted between retry attempts',
+  async (layer) => {
+    const values: (string | undefined)[] = [];
+    const read = vi.fn(() => 'Bearer independent');
+    Object.defineProperty(values, 0, { configurable: true, get: read });
+    const headers = { Authorization: values };
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      if (sent.length === 1) {
+        delete values[0];
+        return Response.json({ error: 'synthetic retry' }, { status: 500 });
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list(layer === 'request' ? { headers } : {});
+
+    expect(sent).toEqual(['Bearer independent', 'Bearer access-token-1']);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 describe.each(['own', 'inherited'] as const)('%s outer header slot', (location) => {
   describe.each(['request', 'default'] as const)('%s headers', (layer) => {
     test.each(
