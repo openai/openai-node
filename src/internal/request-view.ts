@@ -5,11 +5,11 @@ export function replaceRequestHeaders<T extends RequestInit>(request: T, headers
   const headerDescriptor = Object.getOwnPropertyDescriptor(request, 'headers');
   if (headerDescriptor && 'value' in headerDescriptor && headerDescriptor.writable) {
     try {
-      if (Reflect.defineProperty(request, 'headers', { value: headers })) {
+      if (Reflect.defineProperty(request, 'headers', { value: headers }) && request.headers === headers) {
         return request;
       }
     } catch {
-      // Proxy hooks can decline an otherwise writable property update.
+      // Proxy hooks can decline a property update or prevent verification of the installed value.
     }
   }
   const originalRequest = request;
