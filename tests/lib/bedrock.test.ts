@@ -657,7 +657,7 @@ describe('instantiate bedrock client', () => {
       expect(fetch).not.toHaveBeenCalled();
     });
 
-    test('rejects a path getter that changes the final request origin after preparation', async () => {
+    test('dispatches the captured safe URL without rereading a stateful path getter', async () => {
       const options: { method: 'get'; path: string } = { method: 'get', path: '/models' };
       let pathReads = 0;
       Object.defineProperty(options, 'path', {
@@ -670,9 +670,11 @@ describe('instantiate bedrock client', () => {
       const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
       const client = new BedrockOpenAI({ baseURL: configuredBaseURL, apiKey: 'bedrock-token', fetch });
 
-      await expect(client.request(options)).rejects.toThrow(/request origin/i);
+      await client.request(options);
 
-      expect(fetch).not.toHaveBeenCalled();
+      expect(pathReads).toBe(3);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(String(fetch.mock.calls[0]![0])).toBe('https://bedrock.example.com/openai/v1/models');
     });
 
     test('rejects a request path mutated in a later token-provider microtask', async () => {

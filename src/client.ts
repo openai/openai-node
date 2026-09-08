@@ -296,7 +296,10 @@ type PreparedAPIKey = {
   explicitCapture: boolean;
 };
 
-type APIKeyPreparationAttempt = { kind: 'request' | 'build'; prepared?: PreparedAPIKey | undefined };
+type APIKeyPreparationAttempt = {
+  kind: 'request' | 'build';
+  prepared?: PreparedAPIKey | undefined;
+};
 type APIKeyBuildContext = {
   owner: OpenAI;
   prepared: PreparedAPIKey | undefined;
@@ -950,6 +953,16 @@ export class OpenAI {
     ].every((hook) => this.#safeCredentialHooks.has(hook));
   }
 
+  private hasCustomAuthenticationDelegationHooks(schemes: {
+    bearerAuth?: boolean;
+    adminAPIKeyAuth?: boolean;
+  }): boolean {
+    return (
+      !this.#safeCredentialHooks.has(this.authHeaders) ||
+      (!!schemes.bearerAuth && !this.#safeCredentialHooks.has(this.bearerAuth))
+    );
+  }
+
   private addAPIKeyPreparationAttempt(options: FinalRequestOptions, attempt: APIKeyPreparationAttempt): void {
     const attempts = this.#apiKeyPreparationAttempts.get(options);
     if (attempts) {
@@ -1013,7 +1026,8 @@ export class OpenAI {
   }
 
   protected async [Opts.resolvedAPIKey](options: FinalRequestOptions): Promise<string | null> {
-    const attempt = this.currentAPIKeyPreparationAttempt(options);
+    const attempt =
+      this.currentAPIKeyPreparationAttempt(options, 'build') ?? this.currentAPIKeyPreparationAttempt(options);
     const prepared = attempt?.prepared;
     if (prepared) {
       if (prepared.explicitCapture) return prepared.apiKey;
@@ -2051,6 +2065,15 @@ export class OpenAI {
     const timeout = x509Headers ? x509Timeout : options.timeout;
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
+      const security = options.__security ?? { bearerAuth: true };
+      if (
+        this.hasCustomAuthenticationDelegationHooks(security) &&
+        this.#apiKeyPreparationAttempts.get(options)?.some((attempt) => attempt.kind === 'build')
+      ) {
+        throw new Errors.OpenAIError(
+          'Cannot safely resolve credentials for overlapping requests that share the same options object while an authentication hook is pending. Pass a distinct options object to each request.',
+        );
+      }
       // A build may inherit request preparation, but never another build's cached credential.
       const buildAttempt: APIKeyPreparationAttempt = {
         kind: 'build',
@@ -2058,7 +2081,7 @@ export class OpenAI {
       };
       this.addAPIKeyPreparationAttempt(options, buildAttempt);
       try {
-        authenticationHeaders = await this.authHeaders(options, options.__security ?? { bearerAuth: true });
+        authenticationHeaders = await this.authHeaders(options, security);
       } finally {
         this.removeAPIKeyPreparationAttempt(options, buildAttempt);
       }

@@ -69,6 +69,11 @@ it retain their shared-property behavior. Custom hooks that write `this.apiKey`
 remain responsible for coordinating concurrent writes. Prepared credentials are
 discarded when request construction finishes or fails.
 
+When concurrent requests use custom `authHeaders` or `bearerAuth` hooks, pass a
+distinct request-options object to each invocation. If two such hooks overlap on
+the same options object before authentication finishes, the SDK rejects the later
+request rather than risk associating one request's credential with the other.
+
 `AzureOpenAI` uses the inherited function-credential lifecycle for
 `azureADTokenProvider`, but a static `apiKey` uses Azure's `api-key` header. For
 an Azure subclass that refreshes API keys, override

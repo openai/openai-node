@@ -266,10 +266,6 @@ export class BedrockOpenAI extends OpenAI {
     context: { url: string; options: FinalRequestOptions },
   ): Promise<void> {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
-    assertBedrockRequestOrigin(
-      configuredBaseURL,
-      this.buildURL(context.options.path, null, context.options.defaultBaseURL),
-    );
     assertBedrockRequestOrigin(configuredBaseURL, context.url);
     await super.prepareRequest(request, context);
     request.redirect = 'manual';

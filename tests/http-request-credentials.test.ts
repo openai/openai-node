@@ -239,7 +239,7 @@ test('preserves the credential failure when upload cleanup throws during a direc
 });
 
 test.each(clients)(
-  '%s gives overlapping direct builds separate credentials with shared options',
+  '%s rejects overlapping direct builds with shared options and a pending authentication hook',
   async (kind) => {
     let signalEntered!: () => void;
     let signalRelease!: () => void;
@@ -280,10 +280,7 @@ test.each(clients)(
         return headers;
       }
     }
-    const provider = vi
-      .fn<() => Promise<string>>()
-      .mockResolvedValueOnce('synthetic-first')
-      .mockResolvedValueOnce('synthetic-second');
+    const provider = vi.fn<() => Promise<string>>().mockResolvedValueOnce('synthetic-first');
     const fetch = mockFetch();
     const clientOptions = { baseURL: 'https://credentials.example/v1', fetch };
     let client: OpenAI;
@@ -303,28 +300,27 @@ test.each(clients)(
     const first = client.buildRequest(options);
     await entered;
     try {
-      const second = await client.buildRequest(options);
-      await fetch(second.url, second.req);
+      await expect(client.buildRequest(options)).rejects.toThrow(
+        'overlapping requests that share the same options object',
+      );
     } finally {
       signalRelease();
     }
     const built = await first;
     await fetch(built.url, built.req);
 
-    expect(seenOptions).toHaveLength(2);
+    expect(seenOptions).toHaveLength(1);
     expect(seenOptions[0]).toBe(options);
-    expect(seenOptions[1]).toBe(options);
     expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
-      'Bearer synthetic-second',
       'Bearer synthetic-first',
     ]);
-    expect(provider).toHaveBeenCalledTimes(2);
+    expect(provider).toHaveBeenCalledTimes(1);
 
-    provider.mockResolvedValueOnce('synthetic-third');
+    provider.mockResolvedValueOnce('synthetic-second');
     const subsequent = await client.buildRequest(options);
-    expect(subsequent.req.headers.get('authorization')).toBe('Bearer synthetic-third');
-    expect(provider).toHaveBeenCalledTimes(3);
-    expect(seenOptions[2]).toBe(options);
+    expect(subsequent.req.headers.get('authorization')).toBe('Bearer synthetic-second');
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(seenOptions[1]).toBe(options);
   },
 );
 
@@ -634,7 +630,7 @@ test('preserves post-prepare static keys through transparent _callApiKey overrid
   expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-selected-by-prepare');
 });
 
-test('keeps prepared credentials through overlapping async hooks sharing options', async () => {
+test('rejects ambiguous shared-options authentication before sending another request credential', async () => {
   let signalEntered!: () => void;
   let signalRelease!: () => void;
   // oxlint-disable promise/avoid-new -- These gates enforce the shared-options overlap.
@@ -667,15 +663,191 @@ test('keeps prepared credentials through overlapping async hooks sharing options
 
   const first = client.request(options);
   await entered;
-  await client.request(options);
+  await expect(client.request(options)).rejects.toThrow(
+    'overlapping requests that share the same options object',
+  );
   signalRelease();
   await first;
 
   expect(provider).toHaveBeenCalledTimes(2);
   expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
-    'Bearer synthetic-second',
     'Bearer synthetic-first',
   ]);
+});
+
+test('keeps repeated authentication delegation bound after rejecting shared-options overlap', async () => {
+  let releaseFirst!: () => void;
+  let signalFirstEntered!: () => void;
+  // oxlint-disable promise/avoid-new -- This gate overlaps another request between delegations.
+  const firstEntered = new Promise<void>((resolve) => {
+    signalFirstEntered = resolve;
+  });
+  const firstRelease = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  // oxlint-enable promise/avoid-new
+  class RepeatedHeaders extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      await super.authHeaders(options);
+      signalFirstEntered();
+      await firstRelease;
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-first')
+    .mockResolvedValueOnce('synthetic-second');
+  const fetch = mockFetch();
+  const client = new RepeatedHeaders({ apiKey: provider, fetch });
+  const options: FinalRequestOptions = { method: 'get', path: '/items' };
+
+  const first = client.request(options);
+  await firstEntered;
+  await expect(client.request(options)).rejects.toThrow(
+    'overlapping requests that share the same options object',
+  );
+  releaseFirst();
+  await first;
+
+  expect(provider).toHaveBeenCalledTimes(2);
+  expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+    'Bearer synthetic-first',
+  ]);
+});
+
+test('keeps an active build credential while a shared-options request pauses after preparation', async () => {
+  let releaseFirst!: () => void;
+  let releaseSecond!: () => void;
+  let finishFirst!: () => void;
+  let signalFirstEntered!: () => void;
+  let signalFirstDelegated!: () => void;
+  let signalSecondPrepared!: () => void;
+  // oxlint-disable promise/avoid-new -- These gates enforce the preparation/build overlap.
+  const firstEntered = new Promise<void>((resolve) => {
+    signalFirstEntered = resolve;
+  });
+  const firstRelease = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const firstDelegated = new Promise<void>((resolve) => {
+    signalFirstDelegated = resolve;
+  });
+  const firstFinish = new Promise<void>((resolve) => {
+    finishFirst = resolve;
+  });
+  const secondPrepared = new Promise<void>((resolve) => {
+    signalSecondPrepared = resolve;
+  });
+  const secondRelease = new Promise<void>((resolve) => {
+    releaseSecond = resolve;
+  });
+  // oxlint-enable promise/avoid-new
+  class PausedPreparation extends OpenAI {
+    preparations = 0;
+    authentications = 0;
+
+    protected override async prepareOptions(options: FinalRequestOptions) {
+      this.preparations += 1;
+      await super.prepareOptions(options);
+      if (this.preparations === 2) {
+        signalSecondPrepared();
+        await secondRelease;
+      }
+    }
+
+    protected override async authHeaders(options: FinalRequestOptions) {
+      this.authentications += 1;
+      if (this.authentications === 1) {
+        signalFirstEntered();
+        await firstRelease;
+        const headers = await super.authHeaders(options);
+        signalFirstDelegated();
+        await firstFinish;
+        return headers;
+      }
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-first')
+    .mockResolvedValueOnce('synthetic-second');
+  const fetch = mockFetch();
+  const client = new PausedPreparation({ apiKey: provider, fetch, maxRetries: 0 });
+  const options: FinalRequestOptions = { method: 'get', path: '/items' };
+
+  const first = client.request(options);
+  await firstEntered;
+  const second = client.request(options);
+  await secondPrepared;
+  releaseFirst();
+  await firstDelegated;
+  releaseSecond();
+  await expect(second).rejects.toThrow('overlapping requests that share the same options object');
+  finishFirst();
+  await first;
+
+  expect(provider).toHaveBeenCalledTimes(2);
+  expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+    'Bearer synthetic-first',
+  ]);
+});
+
+test.each([{}, { adminAPIKeyAuth: true }])(
+  'allows shared-options direct builds when a custom bearer hook is unused by security %o',
+  async (security) => {
+    let bearerCalls = 0;
+    class UnusedBearerHook extends OpenAI {
+      protected override async bearerAuth(options: FinalRequestOptions) {
+        bearerCalls += 1;
+        return super.bearerAuth(options);
+      }
+    }
+    const client = new UnusedBearerHook({ apiKey: 'synthetic-api', adminAPIKey: 'synthetic-admin' });
+    const options: FinalRequestOptions = {
+      method: 'get',
+      path: '/items',
+      __security: security,
+      headers: { authorization: security.adminAPIKeyAuth ? undefined : null },
+    };
+
+    const [first, second] = await Promise.all([client.buildRequest(options), client.buildRequest(options)]);
+
+    expect(first.req.headers.get('authorization')).toBe(
+      security.adminAPIKeyAuth ? 'Bearer synthetic-admin' : null,
+    );
+    expect(second.req.headers.get('authorization')).toBe(
+      security.adminAPIKeyAuth ? 'Bearer synthetic-admin' : null,
+    );
+    expect(bearerCalls).toBe(0);
+  },
+);
+
+test('Bedrock request preparation does not rebuild a stateful URL', async () => {
+  class StatefulBedrock extends BedrockOpenAI {
+    buildURLCalls = 0;
+
+    override buildURL(
+      path: string,
+      query: Record<string, unknown> | null | undefined,
+      defaultBaseURL?: string | undefined,
+    ): string {
+      this.buildURLCalls += 1;
+      if (this.buildURLCalls > 2) {
+        throw new Error('synthetic exhausted route');
+      }
+      return super.buildURL(path, query, defaultBaseURL);
+    }
+  }
+  const client = new StatefulBedrock({
+    baseURL: 'https://credentials.example/v1',
+    bedrockTokenProvider: async () => 'synthetic-provider',
+    fetch: mockFetch(),
+  });
+
+  await expect(client.get('/items')).resolves.toEqual({ ok: true });
+  expect(client.buildURLCalls).toBe(2);
 });
 
 test('preserves apiKey assignments after delegated prepareOptions', async () => {
