@@ -263,6 +263,7 @@ import {
   canReplayHeaderInput,
   canPreserveHeaderInput,
   getStructuralHeaderValue,
+  hasNativeHeadersBrand,
   type WorkloadHeaderSnapshots,
 } from './internal/headers';
 import { getVerifiedPlatformHeader } from './internal/platform-headers';
@@ -2147,7 +2148,7 @@ export class OpenAI {
           resolvePlaceholder,
         );
       }
-      if (workloadRequest) {
+      if (workloadRequest && !dispatch.unreadable) {
         loggerFor(this).debug(
           'workload request dispatch headers',
           formatRequestDetails({ headers: new Headers(dispatch.init.headers ?? getRequestHeaders(url)) }),
@@ -2647,15 +2648,27 @@ export class OpenAI {
     url: RequestInfo,
     init: T,
     resolvePlaceholder: boolean,
-  ): { init: T; used: boolean; placeholder?: { headers: Headers; prototype: object } } {
+  ): { init: T; used: boolean; unreadable?: boolean; placeholder?: { headers: Headers; prototype: object } } {
     if (!request) return { init, used: false };
     const sourceHeaders = init.headers ?? getRequestHeaders(url);
     const platformHeader = getVerifiedPlatformHeader(sourceHeaders, 'Authorization');
     const preserveHeaders = sourceHeaders === undefined || canPreserveHeaderInput(sourceHeaders);
-    const headers =
-      sourceHeaders === undefined || (platformHeader && preserveHeaders)
-        ? undefined
-        : new Headers(sourceHeaders);
+    let headers: Headers | undefined;
+    if (sourceHeaders !== undefined && !(platformHeader && preserveHeaders)) {
+      try {
+        headers = new Headers(sourceHeaders);
+      } catch (error) {
+        if (
+          !(error instanceof TypeError) ||
+          !(sourceHeaders instanceof Headers) ||
+          hasNativeHeadersBrand(sourceHeaders)
+        ) {
+          throw error;
+        }
+        // A native Headers membrane can require unwrapping by its configured transport.
+        return { init, used: false, unreadable: true };
+      }
+    }
     if (
       resolvePlaceholder &&
       (platformHeader ? platformHeader.value : headers?.get('Authorization')) ===

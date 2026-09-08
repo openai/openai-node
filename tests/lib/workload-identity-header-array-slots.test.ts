@@ -223,6 +223,62 @@ test('keeps a cached slot row live without rereading its getter after descriptor
   expect(snapshot.replayable).toBe(false);
 });
 
+describe.each(['request', 'default'] as const)('%s shared outer accessor', (layer) => {
+  test.each(['truncate', 'replace', 'unrelated', 'unchanged'] as const)(
+    'tracks getter occurrences after %s',
+    async (change) => {
+      const read = vi.fn(() => {
+        if ((change === 'unchanged' || change === 'unrelated') && read.mock.calls.length > 2) {
+          throw new Error('An unchanged accessor occurrence was read twice');
+        }
+        return ['X-Custom', read.mock.calls.length === 1 ? 'A' : 'B'];
+      });
+      const descriptor = { configurable: true, get: read };
+      const headers: string[][] = [];
+      Object.defineProperty(headers, 0, descriptor);
+      Object.defineProperty(headers, 1, descriptor);
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('X-Custom'));
+        if (sent.length === 1) {
+          if (change === 'truncate' || change === 'replace') {
+            Object.defineProperty(headers, 0, descriptor);
+            headers.length = 1;
+            if (change === 'replace') {
+              headers.push(['X-Custom', 'tail']);
+            }
+          }
+          if (change === 'unrelated') {
+            Object.defineProperty(headers, 2, { get: () => ['X-Other', 'tail'] });
+          }
+          return Response.json(
+            { error: 'synthetic retry' },
+            { status: 500, headers: { 'retry-after-ms': '0' } },
+          );
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 1,
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual([
+        'A, B',
+        { truncate: 'B', replace: 'B, tail', unrelated: 'A, B', unchanged: 'A, B' }[change],
+      ]);
+      expect(read).toHaveBeenCalledTimes(change === 'truncate' || change === 'replace' ? 3 : 2);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
+
 test('retains a self-deleting slot getter until a data property replaces it', () => {
   const headers = [['X-Custom', 'initial']];
   const read = vi.fn(() => {
