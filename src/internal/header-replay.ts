@@ -1,39 +1,32 @@
 import { isReadonlyArray } from './utils/values';
-import {
-  getHeadersIterator,
-  getPlatformHeader,
-  getVerifiedPlatformHeader,
-  hasNativeHeadersBrand,
-} from './platform-headers';
+import { getHeadersIterator, hasNativeHeadersBrand } from './platform-headers';
+import type { NullableHeaders } from './headers';
 
-type HeaderValue = string | undefined | null;
+/** Values accepted by the canonical header parser, including explicit removal. */
+export type HeaderValue = string | undefined | null;
 type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
-export type HeadersLike =
+/** Raw header sources whose occurrence history can be retained across attempts. */
+export type HeaderSource =
   | Headers
   | readonly HeaderValue[][]
-  | Record<string, HeaderValue | readonly HeaderValue[]>
-  | undefined
-  | null
-  | NullableHeaders;
+  | Record<string, HeaderValue | readonly HeaderValue[]>;
 
-// Preserve the canonical module's tree-shaking annotation.
-// oxlint-disable-next-line eslint/no-inline-comments
-export const brand_privateNullableHeaders = /* @__PURE__ */ Symbol('brand.privateNullableHeaders');
-
-/**
- * Users can pass explicit nulls to unset default headers. When we parse them
- * into a standard headers type we need to preserve that information.
- */
-export interface NullableHeaders {
-  /** Brand check, prevent users from creating a NullableHeaders. */
-  [brand_privateNullableHeaders]: true;
-  /** Parsed headers. */
-  values: Headers;
-  /** Set of lowercase header names explicitly set to null. */
-  nulls: Set<string>;
+/** Canonical normalization and merged-value access, supplied by headers.ts for one parse. */
+export interface HeaderReplayCallbacks {
+  /** The owning layer controls whether a newly emitted request alias supersedes a retained accessor. */
+  layer?: 'request' | 'default' | undefined;
+  /** Normalizes one stateful value once before retaining it. */
+  normalize: (name: string, value: string) => string;
+  /** Reads a completed record property's normalized result before the next alias is merged. */
+  capture: (name: string) => readonly [string, string | readonly string[] | null];
+  /** Reuses the prior canonical snapshot when a source returns an already-consumed iterator. */
+  previous: (snapshot: NullableHeaders | undefined) => Iterable<readonly [string, string | null]>;
+  /** Reports whether the iterable protocol is a platform Headers implementation. */
+  onIterator?: (native: boolean) => void;
 }
 
-const getArrayIterator = <T>(headers: readonly T[]) => {
+/** Reads the defining array iterator without evaluating intervening accessors. */
+export const getArrayIterator = <T>(headers: readonly T[]) => {
   try {
     let platformIterator: (() => Iterator<T>) | undefined;
     let prototype: object | null = headers;
@@ -68,16 +61,31 @@ const getArrayIterator = <T>(headers: readonly T[]) => {
     }
     return platformIterator;
   } catch {
-    // Uninspectable protocols remain opaque.
-    // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit fallback satisfies noImplicitReturns.
-    return undefined;
+    // An opaque prototype chain does not identify a native array iterator.
   }
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit undefined satisfies noImplicitReturns for a fallible probe.
+  return undefined;
 };
 
 interface HeaderPropertySnapshot {
-  slot: HeaderSlot<readonly [string, string | readonly string[] | null] | undefined>;
-  capture?: () => void;
+  descriptor: PropertyDescriptor;
+  entry?: readonly [string, string | readonly string[] | null];
   values?: HeaderValuesSnapshot;
+  afterRead?: { descriptor: PropertyDescriptor | undefined };
+  valueStateful?: boolean;
+}
+
+interface HeaderRecordSnapshot {
+  descriptor: PropertyDescriptor | undefined;
+  // Null records a completed array that emitted nothing; undefined means it was not observed.
+  value?: HeaderPropertySnapshot['entry'] | null;
+}
+
+interface HeaderSlotSnapshot<T = unknown> {
+  descriptor: PropertyDescriptor | undefined;
+  descriptorKnown: boolean;
+  afterRead?: { descriptor: PropertyDescriptor | undefined };
+  input: T;
 }
 
 interface ArrayTraversal {
@@ -87,21 +95,21 @@ interface ArrayTraversal {
 interface HeaderValuesSnapshot extends ArrayTraversal {
   source: readonly HeaderValue[];
   iterator: () => Iterator<HeaderValue>;
-  slots: Map<number, CapturedSlot<HeaderValue> & { input: HeaderValue }>;
+  slots: Map<number, HeaderSlotSnapshot & { value: HeaderValue }>;
 }
 
 interface HeaderRowSnapshot {
-  name: HeaderSlot<string>;
-  value: HeaderSlot<readonly (readonly [string, string | null])[]>;
+  name: string;
+  nameDescriptor: PropertyDescriptor | undefined;
+  nameDescriptorKnown: boolean;
+  nameAfterRead?: { descriptor: PropertyDescriptor | undefined };
+  nameStateful: boolean;
+  valueDescriptor: PropertyDescriptor | undefined;
+  valueDescriptorKnown: boolean;
+  valueAfterRead?: { descriptor: PropertyDescriptor | undefined };
+  valueStateful: boolean;
+  entries: readonly (readonly [string, string | null])[];
   values?: HeaderValuesSnapshot;
-}
-
-type HeaderSlot<T> = { kind: 'live'; descriptor: PropertyDescriptor | undefined; value: T } | CapturedSlot<T>;
-interface CapturedSlot<T> {
-  kind: 'captured';
-  descriptor: PropertyDescriptor | undefined;
-  omittedDuringRead: boolean;
-  value: T;
 }
 
 const sameHeaderProperty = (
@@ -117,27 +125,48 @@ const sameHeaderProperty = (
   return !('value' in previous) && current.get === previous.get;
 };
 
-const reversed = <T>(values: readonly T[] = []): T[] =>
-  // ES2021 declaration compatibility: the copied array is private to this traversal.
-  // oxlint-disable-next-line unicorn/no-array-reverse
-  [...values].reverse();
+const retainsHeaderProperty = (
+  current: { descriptor: PropertyDescriptor | undefined } | undefined,
+  initialKnown: boolean,
+  initial: PropertyDescriptor | undefined,
+  afterRead: { descriptor: PropertyDescriptor | undefined } | undefined,
+) => {
+  if (!current) {
+    return true;
+  }
+  if (!current.descriptor) {
+    return !afterRead || afterRead.descriptor === undefined;
+  }
+  if (initialKnown && sameHeaderProperty(current.descriptor, initial)) {
+    return true;
+  }
+  return !!afterRead?.descriptor && sameHeaderProperty(current.descriptor, afterRead.descriptor);
+};
 
-const matchesSlot = <T>(slot: HeaderSlot<T> | undefined, descriptor: PropertyDescriptor | undefined) =>
-  slot !== undefined &&
-  (descriptor
-    ? sameHeaderProperty(descriptor, slot.descriptor)
-    : slot.kind === 'captured' && slot.omittedDuringRead);
+const retainsHeaderSlot = <T>(
+  current: { descriptor: PropertyDescriptor | undefined } | undefined,
+  retained: HeaderSlotSnapshot<T> | undefined,
+): retained is HeaderSlotSnapshot<T> =>
+  !!retained &&
+  retainsHeaderProperty(current, retained.descriptorKnown, retained.descriptor, retained.afterRead);
 
-const retainsSlot = <T>(slot: HeaderSlot<T> | undefined, descriptor?: PropertyDescriptor) =>
-  slot?.kind === 'captured' && matchesSlot(slot, descriptor);
-
-const captureSlot = <T>(
-  value: T,
+const headerSlotChanged = <T>(
   descriptor: PropertyDescriptor | undefined,
-  omittedDuringRead = !descriptor,
-): CapturedSlot<T> => ({ kind: 'captured', value, descriptor, omittedDuringRead });
+  input: T,
+  afterRead: { descriptor: PropertyDescriptor | undefined } | undefined,
+  force: boolean,
+) =>
+  force ||
+  !descriptor ||
+  !('value' in descriptor) ||
+  descriptor.value !== input ||
+  !afterRead ||
+  !sameHeaderProperty(afterRead.descriptor, descriptor);
 
-const getHeaderRowDescriptor = (row: object, key: string): PropertyDescriptor | undefined => {
+const getHeaderRowDescriptorState = (
+  row: object,
+  key: string,
+): { descriptor: PropertyDescriptor | undefined } | undefined => {
   const seen = new Set<object>();
   try {
     for (let object: object | null = row; object; object = Object.getPrototypeOf(object)) {
@@ -147,116 +176,130 @@ const getHeaderRowDescriptor = (row: object, key: string): PropertyDescriptor | 
       seen.add(object);
       const descriptor = Object.getOwnPropertyDescriptor(object, key);
       if (descriptor) {
-        return descriptor;
+        return { descriptor };
       }
     }
+    return { descriptor: undefined };
   } catch {
     // Preserve the first actual read when a proxy cannot expose its descriptor.
   }
-  // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit fallback satisfies noImplicitReturns.
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit undefined satisfies noImplicitReturns for a fallible probe.
   return undefined;
 };
 
-interface RecordReplay {
-  kind: 'record';
-  properties: Map<string, HeaderPropertySnapshot>;
-  propertyOrder: Map<string, PropertyDescriptor | undefined>;
-  property?: HeaderPropertySnapshot;
-}
+const getHeaderRowDescriptor = (row: object, key: string): PropertyDescriptor | undefined =>
+  getHeaderRowDescriptorState(row, key)?.descriptor;
 
-interface TupleReplay {
-  iterator: () => Iterator<HeaderEntry>;
-  iterations: WeakSet<object>;
-  rows: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
-}
-interface RemovedSlot {
-  kind: 'removed';
-}
-
-interface ArrayReplay extends TupleReplay, ArrayTraversal {
-  kind: 'array';
-  slots: Map<number, CapturedSlot<HeaderEntry> | RemovedSlot>;
-}
-interface IteratorReplay extends TupleReplay {
-  kind: 'iterator';
-  unverifiedHeaders: boolean;
-}
-type IterableReplay = ArrayReplay | IteratorReplay;
-
-/** One layer owns its source classification and occurrence captures across refreshes. */
-export class HeaderReplay {
-  state: { kind: 'pending' } | RecordReplay | IterableReplay = { kind: 'pending' };
-  snapshot: NullableHeaders | undefined;
+interface HeaderReplayState extends ArrayTraversal {
   refreshable: boolean;
-  constructor(refreshable = true) {
-    this.refreshable = refreshable;
-  }
-
-  get property() {
-    return this.state.kind === 'record' ? this.state.property : undefined;
-  }
-
-  get unverifiedHeaders() {
-    return this.state.kind === 'iterator' && this.state.unverifiedHeaders;
-  }
-
-  get replayable() {
-    const { state } = this;
-    return (
-      this.refreshable &&
-      (state.kind === 'pending' ||
-        (state.kind === 'record'
-          ? [...state.properties.values()].every((property) => property.slot.kind === 'live')
-          : [...state.rows.values()].every((rows) =>
-              [...rows.values()].every((row) => row.name.kind === 'live' && row.value.kind === 'live'),
-            ) &&
-            (state.kind === 'iterator'
-              ? !state.unverifiedHeaders
-              : state.length?.fromDescriptor !== false && !state.slots.size)))
-    );
-  }
-
-  next(snapshot: NullableHeaders | undefined): HeaderReplay {
-    const next = new HeaderReplay();
-    next.state = this.state;
-    next.snapshot = snapshot;
-    return next;
-  }
+  unverifiedHeaders?: boolean;
+  iterator?: () => Iterator<HeaderEntry>;
+  iterations?: WeakSet<object>;
+  snapshot?: NullableHeaders;
+  record?: boolean;
+  properties?: Map<string, HeaderPropertySnapshot>;
+  propertyOrder?: Map<string, HeaderRecordSnapshot>;
+  changedAliases?: Map<string, string>;
+  rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
+  arraySlots?: Map<number, HeaderSlotSnapshot<HeaderEntry>>;
+  removedArraySlots?: Set<number>;
 }
 
-const invalidatedHeaderInputs = <T, S extends CapturedSlot<unknown>>(
-  headers: readonly unknown[],
+type HeaderOccurrenceCounts<T> = Map<T, { previous: number; current: number }>;
+
+const duplicateHeaderOccurrences = <T>(previous: ReadonlyMap<T, number>): HeaderOccurrenceCounts<T> =>
+  new Map(
+    [...previous]
+      .filter(([, count]) => count > 1)
+      .map(([input, count]) => [input, { previous: count, current: 0 }]),
+  );
+
+const countHeaderOccurrences = <T>(
+  headers: readonly T[],
+  length: number,
+  slots: ReadonlyMap<number, HeaderSlotSnapshot<T>> | undefined,
+  duplicates: HeaderOccurrenceCounts<T>,
+  accessors: HeaderOccurrenceCounts<() => unknown>,
+): boolean => {
+  let unreadable = false;
+  // Removing a duplicate changes its ordinal. Count captured opaque slots without rereading getters.
+  for (let index = 0; (duplicates.size || accessors.size) && index < length; index += 1) {
+    const descriptorState = getHeaderRowDescriptorState(headers, String(index));
+    const descriptor = descriptorState?.descriptor;
+    const retained = slots?.get(index);
+    // An unavailable probe is not evidence that a retained accessor occurrence disappeared.
+    // Count its captured identity until a readable descriptor proves removal or replacement.
+    const getter = descriptor?.get ?? (descriptorState ? undefined : retained?.descriptor?.get);
+    const accessorCount = getter && accessors.get(getter);
+    if (accessorCount) {
+      accessorCount.current += 1;
+    }
+    let input: T;
+    if (retainsHeaderSlot(descriptorState, retained)) {
+      ({ input } = retained);
+    } else if (descriptor && 'value' in descriptor) {
+      input = descriptor.value;
+    } else {
+      unreadable = true;
+      continue;
+    }
+    const count = duplicates.get(input);
+    if (count) {
+      count.current += 1;
+    }
+  }
+  return unreadable;
+};
+
+const invalidateHeaderSlots = <T>(
+  headers: readonly T[],
   traversal: ArrayTraversal,
   previous: ReadonlyMap<T, number>,
-  slots: ReadonlyMap<number, S | RemovedSlot>,
-  input: (slot: S) => T,
+  slots: Map<number, HeaderSlotSnapshot<T>> | undefined,
 ): Set<T> => {
-  const duplicates = new Map([...previous].filter(([, count]) => count > 1).map(([value]) => [value, 0]));
-  if (!duplicates.size || !traversal.length?.fromDescriptor) {
+  // An opaque observed boundary cannot prove which duplicate occurrences are present now.
+  if (traversal.length?.fromDescriptor === false) {
     return new Set();
   }
+  const duplicates = duplicateHeaderOccurrences(previous);
   const length = getHeaderRowDescriptor(headers, 'length')?.value;
   if (typeof length !== 'number') {
     return new Set();
   }
-  // Removing an occurrence changes its ordinal. Reuse observed opaque slots instead of invoking getters.
-  for (let index = 0; index < length; index += 1) {
-    const descriptor = getHeaderRowDescriptor(headers, String(index));
-    const slot = slots.get(index);
-    const retained = slot?.kind === 'captured' ? slot : undefined;
-    const observed = retained && retainsSlot(retained, descriptor);
-    if (!observed && (!descriptor || !('value' in descriptor))) {
-      return new Set(duplicates.keys());
-    }
-    const value = observed ? input(retained) : descriptor?.value;
-    const count = duplicates.get(value);
-    if (count !== undefined) {
-      duplicates.set(value, count + 1);
+  const previousAccessors = new Map<() => unknown, number>();
+  for (const { descriptor } of slots?.values() ?? []) {
+    if (descriptor?.get) {
+      previousAccessors.set(descriptor.get, (previousAccessors.get(descriptor.get) ?? 0) + 1);
     }
   }
-  return new Set(
-    [...duplicates].filter(([value, count]) => count < (previous.get(value) ?? 0)).map(([value]) => value),
+  const accessors = duplicateHeaderOccurrences(previousAccessors);
+  const unreadable = countHeaderOccurrences(headers, length, slots, duplicates, accessors);
+  const invalidated = new Set(
+    [...duplicates]
+      .filter(([, count]) => unreadable || count.current < count.previous)
+      .map(([input]) => input),
   );
+  for (const [index, slot] of slots ?? []) {
+    const getter = slot.descriptor?.get;
+    const count = getter && accessors.get(getter);
+    if (count && count.current < count.previous) {
+      slots?.delete(index);
+      invalidated.add(slot.input);
+    }
+  }
+  return invalidated;
+};
+
+const recoverHeaderSlotEvidence = <T extends HeaderSlotSnapshot>(
+  retained: T,
+  descriptorState: { descriptor: PropertyDescriptor | undefined } | undefined,
+  afterRead: { descriptor: PropertyDescriptor | undefined } | undefined,
+): T => {
+  if (retained.afterRead) {
+    return retained;
+  }
+  const recovered = afterRead ?? descriptorState;
+  return recovered ? ({ ...retained, afterRead: recovered } as T) : retained;
 };
 
 // Preserve first-traversal live reads; later visits use verified descriptors or the observed boundary.
@@ -290,94 +333,126 @@ function* iterateArrayIndices(source: readonly unknown[], traversal: ArrayTraver
   traversal.length = { boundary: index, fromDescriptor };
 }
 
-// Read/yield sequencing is observable: capture self-removal only after the consumer serializes the slot.
+// Descriptor evidence, tombstones, and duplicate invalidation share one observable traversal.
 // oxlint-disable-next-line eslint/complexity
-function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: ArrayReplay): Generator<HeaderEntry> {
-  const counts = new Map([...replay.rows].map(([row, occurrences]) => [row, occurrences.size]));
-  for (const row of invalidatedHeaderInputs(headers, replay, counts, replay.slots, (slot) => slot.value)) {
-    replay.rows.delete(row);
+function* iterateHeaderArray(
+  headers: readonly HeaderEntry[],
+  replay: HeaderReplayState,
+): Generator<HeaderEntry> {
+  const counts = new Map([...(replay.rows ?? [])].map(([row, occurrences]) => [row, occurrences.size]));
+  for (const row of invalidateHeaderSlots(headers, replay, counts, replay.arraySlots)) {
+    replay.rows?.delete(row);
   }
+  let boundary = 0;
+  // Match native array iteration's live length on first use, while preserving an opaque observed
+  // boundary across retries without invoking a proxy length trap again.
   for (const index of iterateArrayIndices(headers, replay)) {
-    const descriptor = getHeaderRowDescriptor(headers, String(index));
-    const previous = replay.slots.get(index);
-    const retained = previous?.kind === 'captured' ? previous : undefined;
-    if (retained && retainsSlot(retained, descriptor)) {
-      yield retained.value;
-      continue;
-    }
-    replay.slots?.delete(index);
-    const row = headers[index];
+    boundary = index + 1;
+    const descriptorState = getHeaderRowDescriptorState(headers, String(index));
+    const descriptor = descriptorState?.descriptor;
+    const removed = replay.removedArraySlots?.has(index) === true;
+    const retained = replay.arraySlots?.get(index);
+    const observed = retainsHeaderSlot(descriptorState, retained);
+    const row: HeaderEntry = observed ? retained.input : Reflect.get(headers, String(index));
     if (row === undefined) {
-      if (previous && !descriptor) {
-        replay.slots.set(index, { kind: 'removed' });
+      if (removed || (retained && descriptorState && descriptor === undefined)) {
+        // A captured slot deleted between attempts is an intentional tombstone. Read first so a
+        // proxy that still produces a replacement row remains authoritative despite no descriptor.
+        replay.arraySlots?.delete(index);
+        if (retained) {
+          replay.rows?.delete(retained.input);
+        }
+        replay.removedArraySlots ??= new Set();
+        replay.removedArraySlots.add(index);
         continue;
       }
       throw new TypeError('expected header row to be present');
     }
-    if (!descriptor || !('value' in descriptor) || row !== descriptor.value) {
-      const slot = captureSlot(row, descriptor);
-      replay.slots.set(index, slot);
-      yield row;
-      // Reading or serializing the row may remove its own slot. Only that missing slot stays retained.
-      slot.omittedDuringRead = !getHeaderRowDescriptor(headers, String(index));
+    replay.removedArraySlots?.delete(index);
+    yield row;
+    const afterRead = getHeaderRowDescriptorState(headers, String(index));
+    if (observed) {
+      replay.arraySlots?.set(index, recoverHeaderSlotEvidence(retained, descriptorState, afterRead));
+    } else if (headerSlotChanged(descriptor, row, afterRead, false)) {
+      replay.arraySlots ??= new Map();
+      replay.arraySlots.set(index, {
+        descriptor,
+        descriptorKnown: !!descriptorState,
+        ...(afterRead ? { afterRead } : {}),
+        input: row,
+      });
     } else {
-      yield row;
+      replay.arraySlots?.delete(index);
     }
   }
-  for (const slot of replay.slots?.keys() ?? []) {
-    if (slot >= (replay.length?.boundary ?? 0)) {
-      replay.slots?.delete(slot);
+  for (const slot of replay.arraySlots?.keys() ?? []) {
+    if (slot >= boundary) {
+      replay.arraySlots?.delete(slot);
+    }
+  }
+  for (const slot of replay.removedArraySlots?.keys() ?? []) {
+    if (slot >= boundary) {
+      replay.removedArraySlots?.delete(slot);
     }
   }
 }
 
-const invalidateHeaderValues = (snapshot: HeaderValuesSnapshot) => {
+function* iterateHeaderValues(
+  name: string,
+  snapshot: HeaderValuesSnapshot,
+  normalize: HeaderReplayCallbacks['normalize'],
+): Generator<HeaderValue> {
   const { source, slots } = snapshot;
-  const counts = new Map<HeaderValue, number>();
+  const counts = new Map<unknown, number>();
   for (const { input } of slots.values()) {
     if (input !== null && (typeof input === 'object' || typeof input === 'function')) {
       counts.set(input, (counts.get(input) ?? 0) + 1);
     }
   }
-  const invalidated = invalidatedHeaderInputs(source, snapshot, counts, slots, (slot) => slot.input);
+  const invalidated = invalidateHeaderSlots(source, snapshot, counts, slots);
   for (const [index, slot] of slots) {
     if (invalidated.has(slot.input)) {
       slots.delete(index);
     }
   }
-};
-
-function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Generator<HeaderValue> {
-  const { source, slots } = snapshot;
-  invalidateHeaderValues(snapshot);
+  let boundary = 0;
   for (const index of iterateArrayIndices(source, snapshot)) {
-    const descriptor = getHeaderRowDescriptor(source, String(index));
+    boundary = index + 1;
+    const descriptorState = getHeaderRowDescriptorState(source, String(index));
+    const descriptor = descriptorState?.descriptor;
     const retained = slots.get(index);
-    if (retained && retainsSlot(retained, descriptor)) {
+    if (retainsHeaderSlot(descriptorState, retained)) {
       yield retained.value;
+      const afterRead = getHeaderRowDescriptorState(source, String(index));
+      slots.set(index, recoverHeaderSlotEvidence(retained, descriptorState, afterRead));
       continue;
     }
     slots.delete(index);
     const value = source[index];
     const needsCoercion = value !== null && (typeof value === 'object' || typeof value === 'function');
-    const normalized = needsCoercion ? new Headers([[name, value]]).get(name) : value;
-    if (!descriptor || !('value' in descriptor) || descriptor.value !== value || needsCoercion) {
+    const normalized = needsCoercion ? normalize(name, value) : value;
+    const afterRead = getHeaderRowDescriptorState(source, String(index));
+    if (headerSlotChanged(descriptor, value, afterRead, needsCoercion)) {
       // A stateful read can replace its own slot. Retain the observed value until a later change.
       slots.set(index, {
-        ...captureSlot(normalized, getHeaderRowDescriptor(source, String(index))),
+        descriptor,
+        descriptorKnown: !!descriptorState,
+        ...(afterRead ? { afterRead } : {}),
         input: value,
+        value: normalized,
       });
     }
     yield normalized;
   }
   for (const slot of slots.keys()) {
-    if (slot >= (snapshot.length?.boundary ?? 0)) {
+    if (slot >= boundary) {
       slots.delete(slot);
     }
   }
 }
 
-const hasStatefulArrayProperties = (
+/** Detects stateful array slots without consuming their values. */
+export const hasStatefulArrayProperties = (
   array: readonly unknown[],
   iterator?: () => Iterator<unknown>,
 ): boolean => {
@@ -408,471 +483,694 @@ const hasStatefulArrayProperties = (
   return false;
 };
 
-/** Checks retryable hook inputs without invoking their iterable protocol or value getters. */
-export const canReplayHeaderInput = (headers: HeadersLike, inputs = new Set<object>()): boolean => {
-  if (!headers) {
-    return true;
+const captureHeaderProtocol = (
+  headers: HeaderSource,
+  callbacks: HeaderReplayCallbacks,
+  replay?: HeaderReplayState,
+) => {
+  // Snapshot the iterable protocol without rereading a caller-controlled getter.
+  const hasIterator = !replay?.record && (replay?.iterator !== undefined || Symbol.iterator in headers);
+  const iterator: (() => Iterator<HeaderEntry>) | undefined =
+    replay?.iterator ?? (hasIterator ? Reflect.get(headers, Symbol.iterator) : undefined);
+  const nativeIterator =
+    (replay || callbacks.onIterator) && typeof iterator === 'function' && !Array.isArray(headers)
+      ? getHeadersIterator(headers)
+      : undefined;
+  const native = typeof iterator === 'function' && iterator === nativeIterator;
+  callbacks.onIterator?.(native);
+  if (replay) {
+    replay.unverifiedHeaders = native && !hasNativeHeadersBrand(headers);
+    // Custom iterators may be one-shot whether inherited or owned.
+    replay.refreshable =
+      !hasIterator ||
+      (typeof iterator === 'function' &&
+        (Array.isArray(headers) ? iterator === getArrayIterator(headers) : native));
   }
-  if (inputs.has(headers)) {
-    return false;
-  }
-  inputs.add(headers);
-  try {
-    if (brand_privateNullableHeaders in headers) {
-      return true;
-    }
-    let descriptor: PropertyDescriptor | undefined;
-    const seen = new Set<object>();
-    for (let prototype: object | null = headers; prototype; prototype = Object.getPrototypeOf(prototype)) {
-      if (seen.has(prototype)) {
-        return false;
-      }
-      seen.add(prototype);
-      descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.iterator);
-      if (descriptor) {
-        break;
-      }
-    }
-    if (descriptor) {
-      if (typeof descriptor.value !== 'function') {
-        return false;
-      }
-      if (Array.isArray(headers)) {
-        if (descriptor.value !== getArrayIterator(headers) || hasStatefulArrayProperties(headers)) {
-          return false;
-        }
-        const length = Object.getOwnPropertyDescriptor(headers, 'length')?.value;
-        for (let index = 0; index < length; index += 1) {
-          if (!Object.getOwnPropertyDescriptor(headers, String(index))) {
-            return false;
-          }
-        }
-      } else {
-        return getVerifiedPlatformHeader(headers, 'authorization') !== undefined;
-      }
-    }
-    return Object.entries(Object.getOwnPropertyDescriptors(headers)).every(([key, property]) => {
-      if (Array.isArray(headers) ? !/^(?:0|[1-9]\d*)$/u.test(key) : !property.enumerable) {
-        return true;
-      }
-      if (!('value' in property)) {
-        return false;
-      }
-      return Array.isArray(property.value)
-        ? canReplayHeaderInput(property.value, inputs)
-        : property.value === null ||
-            (typeof property.value !== 'object' && typeof property.value !== 'function');
-    });
-  } catch {
-    return false;
-  } finally {
-    inputs.delete(headers);
-  }
+  return { iterator, native };
 };
 
-/** Unknown iterable implementations must dispatch the same snapshot used for credential attribution. */
-export const canPreserveHeaderInput = (headers: HeadersLike): boolean => {
-  if (!headers) {
-    return true;
-  }
-  try {
-    if (!Array.isArray(headers) && Symbol.iterator in headers) {
-      return hasNativeHeadersBrand(headers) && getPlatformHeader(headers, 'Authorization') !== undefined;
-    }
-    return canReplayHeaderInput(headers);
-  } catch {
-    return false;
-  }
-};
-
-const restoreCapturedRecordEntries = (
-  record: RecordReplay,
-  entries: HeaderEntry[],
-  propertyDescriptors: Map<string, PropertyDescriptor>,
+const captureRecordEntries = (
+  headers: HeaderSource,
+  replay: HeaderReplayState,
+  descriptors: Map<string, PropertyDescriptor>,
+  present: Set<string>,
 ): HeaderEntry[] => {
-  // A getter may remove itself during its first read. Retain its position before surviving aliases.
-  let nextKey: string | null = null;
-  const present = new Set(entries.map((entry) => entry[0]));
-  const liveAliases = new Map<string, string>();
-  for (const [key] of entries) {
-    const name = key as string;
-    if (
-      !sameHeaderProperty(propertyDescriptors.get(name), record.propertyOrder.get(name)) &&
-      !liveAliases.has(name.toLowerCase())
-    ) {
-      liveAliases.set(name.toLowerCase(), name);
-    }
-  }
-  const missing = new Map<string | null, HeaderEntry[]>();
-  for (const key of reversed([...record.propertyOrder.keys()])) {
-    if (present.has(key)) {
-      nextKey = key;
-    } else if (retainsSlot(record.properties.get(key)?.slot)) {
-      // New or changed aliases override captured accessors; unchanged aliases keep their original order.
-      const before = liveAliases.get(key.toLowerCase()) ?? nextKey;
-      const bucket = missing.get(before) ?? [];
-      bucket.push([key, undefined]);
-      missing.set(before, bucket);
-    } else {
-      record.properties.delete(key);
-    }
-  }
-  const ordered: HeaderEntry[] = [];
-  for (const entry of entries) {
-    for (const retained of reversed(missing.get(entry[0] as string))) {
-      ordered.push(retained);
-    }
-    ordered.push(entry);
-  }
-  for (const retained of reversed(missing.get(null))) {
-    ordered.push(retained);
-  }
-  record.propertyOrder = new Map(
-    ordered.map(([key]) => [key as string, propertyDescriptors.get(key as string)]),
-  );
-  return ordered;
-};
-
-const observeHeaderRecord = (
-  headers: object,
-  record: RecordReplay,
-  propertyDescriptors: Map<string, PropertyDescriptor>,
-): HeaderEntry[] => {
-  // Match Object.entries' eager descriptor/get order while recognizing one-shot accessors.
+  replay.record = true;
+  replay.properties ??= new Map();
   const entries: HeaderEntry[] = [];
+  // Records read getters eagerly, matching Object.entries before any row is validated.
   for (const key of Reflect.ownKeys(headers)) {
     if (typeof key !== 'string') {
       continue;
     }
     const descriptor = Object.getOwnPropertyDescriptor(headers, key);
-    const retained = record.properties.get(key);
+    if (descriptor) {
+      present.add(key);
+    }
+    const retained = replay.properties.get(key);
     if (
       retained &&
       descriptor &&
-      (!matchesSlot(retained.slot, descriptor) ||
-        descriptor.enumerable !== retained.slot.descriptor?.enumerable)
+      (!sameHeaderProperty(descriptor, retained.descriptor) ||
+        descriptor.enumerable !== retained.descriptor.enumerable)
     ) {
-      record.properties.delete(key);
+      replay.properties.delete(key);
     }
     if (!descriptor?.enumerable) {
       continue;
     }
-    propertyDescriptors.set(key, descriptor);
-    entries.push([key, record.properties.has(key) ? undefined : Reflect.get(headers, key)]);
+    descriptors.set(key, descriptor);
+    entries.push([key, replay.properties.has(key) ? undefined : Reflect.get(headers, key)]);
   }
-  return restoreCapturedRecordEntries(record, entries, propertyDescriptors);
+  return entries;
 };
 
-type OccurrenceSource =
-  | {
-      kind: 'record';
-      source: object;
-      record: RecordReplay | undefined;
-      descriptors: Map<string, PropertyDescriptor>;
-    }
-  | { kind: 'tuple'; iterable: IterableReplay | undefined; native: boolean };
+function* reversed<T>(values: readonly T[]): Generator<T> {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    yield Reflect.get(values, index);
+  }
+}
 
-// Read/yield sequencing is observable: capture self-removal only after the consumer serializes the slot.
-// oxlint-disable-next-line eslint/complexity
-function* iterateHeaderOccurrence(
-  row: HeaderEntry,
-  occurrence: number,
-  source: OccurrenceSource,
-  replay: HeaderReplay | undefined,
-): IterableIterator<readonly [string, string | null]> {
-  const shouldClear = source.kind === 'record';
-  const record = source.kind === 'record' ? source.record : undefined;
-  const iterable = source.kind === 'tuple' ? source.iterable : undefined;
-  // Replacing one tuple column must not reread an unchanged getter in the other.
-  const retainedRows = shouldClear ? undefined : iterable?.rows?.get(row);
-  const retainedRow = retainedRows?.get(occurrence);
-  const trackRow = !shouldClear && (retainedRow || replay?.refreshable);
-  const nameDescriptor = trackRow ? getHeaderRowDescriptor(row, '0') : undefined;
-  const retainName = retainedRow && retainsSlot(retainedRow.name, nameDescriptor);
-  const name = retainName ? retainedRow.name.value : row[0];
+const changedRecordAlias = (
+  name: string,
+  descriptor: PropertyDescriptor | undefined,
+  replay: HeaderReplayState,
+) =>
+  !sameHeaderProperty(descriptor, replay.propertyOrder?.get(name)?.descriptor) ||
+  replay.changedAliases?.get(name.toLowerCase()) === name;
+
+const earlierEntry = (
+  retainedPosition: string | undefined,
+  liveAlias: string | undefined,
+  positions: ReadonlyMap<HeaderValue | readonly HeaderValue[], number>,
+): string | undefined => {
+  if (liveAlias === undefined) {
+    return retainedPosition;
+  }
+  if (retainedPosition === undefined) {
+    return liveAlias;
+  }
+  const retainedIndex = positions.get(retainedPosition);
+  const aliasIndex = positions.get(liveAlias);
+  return retainedIndex !== undefined && aliasIndex !== undefined && retainedIndex <= aliasIndex
+    ? retainedPosition
+    : liveAlias;
+};
+
+const retainMissingRecordEntry = (
+  key: string,
+  nextKey: string | undefined,
+  replay: HeaderReplayState,
+  presentProperties: ReadonlySet<string>,
+  liveAliases: ReadonlyMap<string, string>,
+  positions: ReadonlyMap<HeaderValue | readonly HeaderValue[], number>,
+  missing: Map<string | undefined, HeaderEntry[]>,
+) => {
+  const property = replay.properties?.get(key);
+  if (!presentProperties.has(key) && property?.afterRead?.descriptor) {
+    replay.properties?.delete(key);
+    return;
+  }
+  // New or changed aliases override captured accessors; unchanged aliases keep their order.
+  const liveAlias = liveAliases.get(key.toLowerCase());
+  const before = earlierEntry(nextKey, liveAlias, positions);
+  const bucket = missing.get(before) ?? [];
+  bucket.push([key, undefined]);
+  missing.set(before, bucket);
+};
+
+const orderRecordEntries = (
+  entries: HeaderEntry[],
+  replay: HeaderReplayState,
+  descriptors: Map<string, PropertyDescriptor>,
+  presentProperties: ReadonlySet<string>,
+): HeaderEntry[] => {
+  const present = new Set(entries.map(([key]) => key));
+  const liveAliases = new Map<string, string>();
+  for (const [key] of entries) {
+    const name = key as string;
+    if (!changedRecordAlias(name, descriptors.get(name), replay)) {
+      continue;
+    }
+    if (!liveAliases.has(name.toLowerCase())) {
+      liveAliases.set(name.toLowerCase(), name);
+    }
+  }
+  const missing = new Map<string | undefined, HeaderEntry[]>();
+  const positions = new Map(entries.map(([key], index) => [key, index]));
+  let nextKey: string | undefined;
+  for (const key of reversed([...(replay.propertyOrder?.keys() ?? [])])) {
+    if (present.has(key)) {
+      nextKey = key;
+    } else if (replay.properties?.has(key)) {
+      retainMissingRecordEntry(key, nextKey, replay, presentProperties, liveAliases, positions, missing);
+    }
+  }
+  const ordered: HeaderEntry[] = [];
+  for (const entry of entries) {
+    for (const retained of reversed(missing.get(entry[0] as string) ?? [])) {
+      ordered.push(retained);
+    }
+    ordered.push(entry);
+  }
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Undefined identifies retained entries appended after all live keys.
+  for (const retained of reversed(missing.get(undefined) ?? [])) {
+    ordered.push(retained);
+  }
+  replay.propertyOrder = new Map(
+    ordered.map(([key]) => [
+      key as string,
+      { descriptor: descriptors.get(key as string), value: replay.propertyOrder?.get(key as string)?.value },
+    ]),
+  );
+  replay.changedAliases = new Map();
+  return ordered;
+};
+
+const readRowName = (row: HeaderEntry, retained: HeaderRowSnapshot | undefined, track: boolean) => {
+  const descriptorState = track ? getHeaderRowDescriptorState(row, '0') : undefined;
+  const descriptor = descriptorState?.descriptor;
+  const retain =
+    retained?.nameStateful &&
+    retainsHeaderProperty(
+      descriptorState,
+      retained.nameDescriptorKnown,
+      retained.nameDescriptor,
+      retained.nameAfterRead,
+    );
+  const name = retain ? retained.name : row[0];
   if (typeof name !== 'string') {
     throw new TypeError('expected header name to be a string');
   }
-  const nameStateful = retainName || !nameDescriptor || !('value' in nameDescriptor);
-  let capturedName: HeaderSlot<string> = { kind: 'live', descriptor: nameDescriptor, value: name };
-  if (retainName) {
-    capturedName = { ...retainedRow.name };
-  } else if (nameStateful && trackRow) {
-    capturedName = captureSlot(name, nameDescriptor);
+  return {
+    name,
+    nameRetained: !!retain,
+    nameDescriptor: retain ? retained.nameDescriptor : descriptor,
+    nameDescriptorState: descriptorState,
+    nameStateful: !!retain || !descriptor || !('value' in descriptor),
+  };
+};
+
+const readRow = (row: HeaderEntry, occurrence: number, clear: boolean, replay?: HeaderReplayState) => {
+  const retainedRows = clear ? undefined : replay?.rows?.get(row);
+  const retained = retainedRows?.get(occurrence);
+  const track = !clear && !!(retained || replay?.refreshable);
+  const name = readRowName(row, retained, track);
+  const valueDescriptorState = track ? getHeaderRowDescriptorState(row, '1') : undefined;
+  return {
+    row,
+    occurrence,
+    retainedRows,
+    retained,
+    track,
+    ...name,
+    valueDescriptor: valueDescriptorState?.descriptor,
+    valueDescriptorState,
+    captured: track ? ([] as (readonly [string, string | null])[]) : undefined,
+  };
+};
+type RowRead = ReturnType<typeof readRow>;
+
+interface RetainedDescriptorState {
+  descriptor: PropertyDescriptor | undefined;
+  known: boolean;
+  afterRead?: { descriptor: PropertyDescriptor | undefined };
+}
+
+const retainedNameDescriptorState = (row: RowRead): RetainedDescriptorState | undefined => {
+  if (!row.nameRetained || !row.retained) {
+    return undefined;
   }
-  const valueDescriptor = trackRow ? getHeaderRowDescriptor(row, '1') : undefined;
-  if (retainedRow && !retainedRow.values && retainsSlot(retainedRow.value, valueDescriptor)) {
-    if (capturedName.kind === 'captured') {
-      capturedName.omittedDuringRead = !getHeaderRowDescriptor(row, '0');
-    }
-    retainedRows?.set(occurrence, { ...retainedRow, name: capturedName });
-    for (const [, value] of retainedRow.value.value) {
-      yield [name, value];
-    }
+  return {
+    descriptor: row.retained.nameDescriptor,
+    known: row.retained.nameDescriptorKnown,
+    ...(row.retained.nameAfterRead ? { afterRead: row.retained.nameAfterRead } : {}),
+  };
+};
+
+const retainedValueDescriptorState = (row: RowRead): RetainedDescriptorState | undefined => {
+  if (
+    !row.retained ||
+    !retainsHeaderProperty(
+      row.valueDescriptorState,
+      row.retained.valueDescriptorKnown,
+      row.retained.valueDescriptor,
+      row.retained.valueAfterRead,
+    )
+  ) {
+    return undefined;
+  }
+  return {
+    descriptor: row.retained.valueDescriptor,
+    known: row.retained.valueDescriptorKnown,
+    ...(row.retained.valueAfterRead ? { afterRead: row.retained.valueAfterRead } : {}),
+  };
+};
+
+const nextDescriptorState = (
+  retained: RetainedDescriptorState | undefined,
+  descriptor: PropertyDescriptor | undefined,
+  known: boolean,
+  afterRead: { descriptor: PropertyDescriptor | undefined } | undefined,
+): RetainedDescriptorState => {
+  const retainedAfterRead =
+    retained?.afterRead ?? afterRead ?? (retained && known ? { descriptor } : undefined);
+  return {
+    descriptor: retained ? retained.descriptor : descriptor,
+    known: retained ? retained.known : known,
+    ...(retainedAfterRead ? { afterRead: retainedAfterRead } : {}),
+  };
+};
+
+function* renameEntries(
+  name: string,
+  entries: HeaderRowSnapshot['entries'],
+): Generator<readonly [string, string | null]> {
+  for (const [, value] of entries) {
+    yield [name, value];
+  }
+}
+
+const retainedRowEntries = (row: RowRead) => {
+  const { retained, valueDescriptor, valueDescriptorState, name, nameDescriptorState, nameStateful } = row;
+  if (
+    !retained?.valueStateful ||
+    retained.values ||
+    !retainsHeaderProperty(
+      valueDescriptorState,
+      retained.valueDescriptorKnown,
+      retained.valueDescriptor,
+      retained.valueAfterRead,
+    )
+  ) {
     return;
   }
-  const capturedRow: (readonly [string, string | null])[] | undefined = trackRow ? [] : undefined;
-  const retained = shouldClear ? record?.properties?.get(name) : undefined;
-  if (retained && !retained.values) {
-    if (retained.slot.value) {
-      yield [name, null];
-      const [, value] = retained.slot.value;
-      if (isReadonlyArray(value)) {
-        for (const item of value) {
-          yield [name, item];
-        }
-      } else if (value !== null) {
-        yield [name, value];
-      }
-    }
+  const nameState = nextDescriptorState(
+    retainedNameDescriptorState(row),
+    nameDescriptorState?.descriptor,
+    !!nameDescriptorState,
+    getHeaderRowDescriptorState(row.row, '0'),
+  );
+  const valueState = nextDescriptorState(
+    retainedValueDescriptorState(row),
+    valueDescriptor,
+    !!valueDescriptorState,
+    getHeaderRowDescriptorState(row.row, '1'),
+  );
+  const {
+    nameAfterRead: _nameAfterRead,
+    valueAfterRead: _valueAfterRead,
+    ...retainedWithoutEvidence
+  } = retained;
+  row.retainedRows?.set(row.occurrence, {
+    ...retainedWithoutEvidence,
+    name,
+    nameDescriptor: nameState.descriptor,
+    nameDescriptorKnown: nameState.known,
+    ...(nameState.afterRead ? { nameAfterRead: nameState.afterRead } : {}),
+    nameStateful,
+    valueDescriptor: valueState.descriptor,
+    valueDescriptorKnown: valueState.known,
+    ...(valueState.afterRead ? { valueAfterRead: valueState.afterRead } : {}),
+  });
+  return renameEntries(name, retained.entries);
+};
+
+function* retainedPropertyEntries(
+  name: string,
+  property: HeaderPropertySnapshot,
+): Generator<readonly [string, string | null]> {
+  if (!property.entry) {
     return;
   }
-  const descriptor = source.kind === 'record' ? source.descriptors.get(name) : undefined;
-  let rowReplay: { refreshable: boolean } | undefined = replay;
-  if (trackRow) {
-    rowReplay = { refreshable: !!valueDescriptor && 'value' in valueDescriptor };
-  } else if (shouldClear && replay) {
-    rowReplay = { refreshable: !descriptor || 'value' in descriptor };
+  yield [name, null];
+  const [, value] = property.entry;
+  if (isReadonlyArray(value)) {
+    for (const item of value) {
+      yield [name, item];
+    }
+  } else if (value !== null) {
+    yield [name, value];
   }
-  const property: HeaderPropertySnapshot | undefined =
-    shouldClear && replay && descriptor ? { slot: captureSlot(undefined, descriptor) } : undefined;
-  if (property && record) {
-    record.property = property;
+}
+
+const rowRefreshState = (
+  row: RowRead,
+  descriptor: PropertyDescriptor | undefined,
+  clear: boolean,
+  replay?: HeaderReplayState,
+) => {
+  if (row.track) {
+    return { refreshable: !!row.valueDescriptor && 'value' in row.valueDescriptor };
   }
-  const retainedValues =
-    retained?.values ??
-    (retainedRow && matchesSlot(retainedRow.value, valueDescriptor) ? retainedRow.values : undefined);
-  const headerValue = retainedValues?.source ?? row[1];
-  if (shouldClear && rowReplay && descriptor && 'value' in descriptor && headerValue !== descriptor.value) {
-    // A proxy's ordinary data descriptor cannot authorize rereading a different observed value.
-    rowReplay.refreshable = false;
+  if (clear && replay) {
+    return { refreshable: !descriptor || 'value' in descriptor };
   }
-  const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
-  const statefulValues =
-    rowReplay?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
-  const liveValues = retained?.slot.kind === 'live' || retainedRow?.value.kind === 'live';
-  const valueIterator = (liveValues ? undefined : retainedValues?.iterator) ?? values[Symbol.iterator];
-  const valueSnapshot: HeaderValuesSnapshot | undefined =
-    replay && isReadonlyArray(headerValue) && valueIterator === getArrayIterator(values)
-      ? (retainedValues ?? { source: values, iterator: valueIterator, slots: new Map() })
-      : undefined;
-  if (property && valueSnapshot) {
-    property.values = valueSnapshot;
+  return replay;
+};
+
+const retainedRowValues = (row: RowRead, property: HeaderPropertySnapshot | undefined) => {
+  if (property?.values) {
+    return property.values;
   }
   if (
-    rowReplay?.refreshable &&
-    isReadonlyArray(headerValue) &&
-    (statefulValues || hasStatefulArrayProperties(values, valueIterator))
+    row.retained &&
+    retainsHeaderProperty(
+      row.valueDescriptorState,
+      row.retained.valueDescriptorKnown,
+      row.retained.valueDescriptor,
+      row.retained.valueAfterRead,
+    )
   ) {
-    rowReplay.refreshable = false;
+    return row.retained.values;
   }
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicit undefined satisfies noImplicitReturns when no value was retained.
+  return undefined;
+};
+
+// Protocol classification must stay adjacent to the single observable nested-value read.
+// oxlint-disable-next-line eslint/complexity
+const readHeaderValues = (
+  row: RowRead,
+  retained: HeaderValuesSnapshot | undefined,
+  refresh: { refreshable: boolean } | undefined,
+  descriptor: PropertyDescriptor | undefined,
+  property: HeaderPropertySnapshot | undefined,
+  liveValues: boolean,
+  replay?: HeaderReplayState,
+) => {
+  const headerValue = retained?.source ?? row.row[1];
+  if (property && refresh && descriptor && 'value' in descriptor && headerValue !== descriptor.value) {
+    // A proxy's ordinary data descriptor cannot authorize rereading a different observed value.
+    refresh.refreshable = false;
+  }
+  const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
+  const stateful = refresh?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
+  const iterator = (liveValues ? undefined : retained?.iterator) ?? values[Symbol.iterator];
+  const snapshot =
+    replay && isReadonlyArray(headerValue) && iterator === getArrayIterator(values)
+      ? (retained ?? { source: values, iterator, slots: new Map() })
+      : undefined;
+  if (
+    refresh?.refreshable &&
+    isReadonlyArray(headerValue) &&
+    (stateful || hasStatefulArrayProperties(values, iterator))
+  ) {
+    refresh.refreshable = false;
+  }
+  return { values, iterator, snapshot };
+};
+
+function* captureRowValues(
+  row: RowRead,
+  valueIteration: Iterable<HeaderValue>,
+  refresh: { refreshable: boolean } | undefined,
+  clear: boolean,
+  native: boolean,
+  callbacks: HeaderReplayCallbacks,
+  replay?: HeaderReplayState,
+): Generator<readonly [string, string | null], boolean> {
   let didClear = false;
-  const valueIteration = valueSnapshot
-    ? iterateHeaderValues(name, valueSnapshot)
-    : { [Symbol.iterator]: () => Reflect.apply(valueIterator, values, []) };
+  const { name, captured } = row;
   for (const value of valueIteration) {
-    if (rowReplay && value !== null && (typeof value === 'object' || typeof value === 'function')) {
-      rowReplay.refreshable = false;
+    if (refresh && value !== null && (typeof value === 'object' || typeof value === 'function')) {
+      refresh.refreshable = false;
     }
-    if (replay && source.kind === 'tuple' && source.native && typeof value !== 'string') {
-      // Platform Headers only yields strings; a nullable source is a custom one-shot candidate.
+    // Platform Headers only yields strings; nullable values identify a one-shot custom source.
+    if (replay && native && typeof value !== 'string') {
       replay.refreshable = false;
     }
     if (value === undefined) {
       continue;
     }
-
-    // Objects keys always overwrite older headers, they never append.
-    // Yield a null to clear the header before adding the new values.
-    if (shouldClear && !didClear) {
+    if (clear && !didClear) {
       didClear = true;
-      capturedRow?.push([name, null]);
+      captured?.push([name, null]);
       yield [name, null];
     }
     const capturedValue =
-      capturedRow && !rowReplay?.refreshable && value !== null
-        ? new Headers([[name, value]]).get(name)
-        : value;
-    capturedRow?.push([name, capturedValue]);
+      captured && !refresh?.refreshable && value !== null ? callbacks.normalize(name, value) : value;
+    captured?.push([name, capturedValue]);
     yield [name, capturedValue];
   }
-  if (capturedName.kind === 'captured') {
-    capturedName.omittedDuringRead = !getHeaderRowDescriptor(row, '0');
-  }
-  if (rowReplay && (valueSnapshot?.slots.size || valueSnapshot?.length?.fromDescriptor === false)) {
-    rowReplay.refreshable = false;
-  }
-  if (capturedRow && iterable) {
-    if (nameStateful || !rowReplay?.refreshable || valueSnapshot) {
-      const rows = iterable.rows.get(row) ?? new Map<number, HeaderRowSnapshot>();
-      rows.set(occurrence, {
-        name: capturedName,
-        value: rowReplay?.refreshable
-          ? { kind: 'live', descriptor: valueDescriptor, value: capturedRow }
-          : captureSlot(capturedRow, valueDescriptor, !getHeaderRowDescriptor(row, '1')),
-        ...(valueSnapshot ? { values: valueSnapshot } : {}),
-      });
-      iterable.rows.set(row, rows);
-    } else {
-      retainedRows?.delete(occurrence);
-      if (retainedRows?.size === 0) {
-        iterable.rows?.delete(row);
-      }
-    }
-  }
-  if (property && record) {
-    if (valueSnapshot || !rowReplay?.refreshable) {
-      property.capture?.();
-      delete property.capture;
-      if (rowReplay?.refreshable) {
-        property.slot = { kind: 'live', descriptor: property.slot.descriptor, value: property.slot.value };
-      } else {
-        try {
-          const current = Object.getOwnPropertyDescriptor(
-            source.kind === 'record' ? source.source : row,
-            name,
-          );
-          property.slot = captureSlot(property.slot.value, property.slot.descriptor, !current?.enumerable);
-          if (current && sameHeaderProperty(current, property.slot.descriptor)) {
-            // A first read can hide itself; later visibility changes must still invalidate its replay.
-            property.slot.descriptor = {
-              ...property.slot.descriptor,
-              enumerable: current.enumerable === true,
-            };
-          }
-        } catch {
-          // Preserve the successful read when a membrane prevents distinguishing self-removal.
-          property.slot = captureSlot(property.slot.value, property.slot.descriptor, true);
-        }
-      }
-      record.properties.set(name, property);
-    }
-    delete record.property;
-  }
+  return didClear;
 }
 
-// Source classification and iterator reuse must finish before the first observable row read.
-// oxlint-disable-next-line eslint/complexity
-export function* iterateHeaders(
-  headers: HeadersLike,
-  replay?: HeaderReplay,
-  provenance?: { unknown: boolean; values?: Headers },
-): IterableIterator<readonly [string, string | null]> {
-  if (!headers) {
+const rememberRow = (
+  row: RowRead,
+  refresh: { refreshable: boolean } | undefined,
+  values: HeaderValuesSnapshot | undefined,
+  replay?: HeaderReplayState,
+) => {
+  if (!row.captured || !replay) {
     return;
   }
+  if (row.nameStateful || !refresh?.refreshable || values) {
+    replay.rows ??= new Map();
+    const rows = replay.rows.get(row.row) ?? new Map<number, HeaderRowSnapshot>();
+    const nameState = nextDescriptorState(
+      retainedNameDescriptorState(row),
+      row.nameDescriptorState?.descriptor,
+      !!row.nameDescriptorState,
+      getHeaderRowDescriptorState(row.row, '0'),
+    );
+    const valueState = nextDescriptorState(
+      retainedValueDescriptorState(row),
+      row.valueDescriptor,
+      !!row.valueDescriptorState,
+      getHeaderRowDescriptorState(row.row, '1'),
+    );
+    rows.set(row.occurrence, {
+      name: row.name,
+      nameDescriptor: nameState.descriptor,
+      nameDescriptorKnown: nameState.known,
+      ...(nameState.afterRead ? { nameAfterRead: nameState.afterRead } : {}),
+      nameStateful: row.nameStateful,
+      valueDescriptor: valueState.descriptor,
+      valueDescriptorKnown: valueState.known,
+      ...(valueState.afterRead ? { valueAfterRead: valueState.afterRead } : {}),
+      valueStateful: !refresh?.refreshable,
+      entries: row.captured,
+      ...(values ? { values } : {}),
+    });
+    replay.rows.set(row.row, rows);
+  } else {
+    row.retainedRows?.delete(row.occurrence);
+    if (row.retainedRows?.size === 0) {
+      replay.rows?.delete(row.row);
+    }
+  }
+};
 
-  if (brand_privateNullableHeaders in headers) {
-    if (provenance) {
-      provenance.unknown = true;
+const rememberProperty = (
+  headers: HeaderSource,
+  name: string,
+  property: HeaderPropertySnapshot,
+  replay: HeaderReplayState,
+) => {
+  try {
+    const current = Object.getOwnPropertyDescriptor(headers, name);
+    property.afterRead = { descriptor: current };
+    if (current && sameHeaderProperty(current, property.descriptor)) {
+      // A first read can hide itself; later visibility changes must invalidate its replay.
+      property.descriptor = { ...property.descriptor, enumerable: current.enumerable === true };
     }
-    const { values, nulls } = headers;
-    if (provenance) {
-      provenance.values = values;
-    }
-    yield* values.entries();
-    for (const name of nulls) {
-      yield [name, null];
-    }
+  } catch {
+    // A proxy may stop exposing descriptors after its first value was consumed.
+  }
+  replay.properties ??= new Map();
+  replay.properties.set(name, property);
+};
+
+const sameRecordValue = (
+  current: NonNullable<HeaderPropertySnapshot['entry']>[1],
+  previous: NonNullable<HeaderPropertySnapshot['entry']>[1],
+) => {
+  if (isReadonlyArray(current) && isReadonlyArray(previous)) {
+    return current.length === previous.length && current.every((value, index) => value === previous[index]);
+  }
+  return current === previous;
+};
+
+const rememberRecordValue = (
+  name: string,
+  current: HeaderRecordSnapshot['value'],
+  replay: HeaderReplayState,
+  layer: HeaderReplayCallbacks['layer'],
+) => {
+  const prior = replay.propertyOrder?.get(name);
+  if (!prior || current === undefined) {
     return;
   }
+  // Other layers compare replacements with their last emitted value, even after an empty iteration.
+  if (layer !== 'request' && current === null && prior.value !== undefined) {
+    return;
+  }
+  // Compare canonical values after their normal read; array identity alone misses in-place replacements.
+  // Null-only removals retain their existing ordering; replacement values can supersede cached accessors.
+  // Newly emitted request aliases override retained accessors; defaults preserve no-emission precedence.
+  if (
+    prior.value !== undefined &&
+    current !== null &&
+    current[1] !== null &&
+    (prior.value === null ? layer === 'request' : !sameRecordValue(current[1], prior.value[1]))
+  ) {
+    replay.changedAliases ??= new Map();
+    const lowerName = name.toLowerCase();
+    if (!replay.changedAliases.has(lowerName)) {
+      replay.changedAliases.set(lowerName, name);
+    }
+  }
+  replay.propertyOrder?.set(name, { ...prior, value: current });
+};
 
-  let shouldClear = false;
-  let iter: Iterable<HeaderEntry>;
-  const propertyDescriptors = new Map<string, PropertyDescriptor>();
-  let record = replay?.state.kind === 'record' ? replay.state : undefined;
-  let iterable =
-    replay?.state.kind === 'array' || replay?.state.kind === 'iterator' ? replay.state : undefined;
-  // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
-  const hasIterator = !record && (iterable !== undefined || Symbol.iterator in headers);
-  const iterator: (() => Iterator<HeaderEntry>) | undefined =
-    iterable?.iterator ?? (hasIterator ? Reflect.get(headers, Symbol.iterator) : undefined);
-  const nativeHeadersIterator =
-    (replay || provenance) && typeof iterator === 'function' && !Array.isArray(headers)
-      ? getHeadersIterator(headers)
-      : undefined;
-  if (provenance) {
-    provenance.unknown = typeof iterator === 'function' && iterator === nativeHeadersIterator;
+const supersededRecordProperty = (
+  name: string,
+  descriptor: PropertyDescriptor | undefined,
+  property: HeaderPropertySnapshot | undefined,
+  replay?: HeaderReplayState,
+) => !descriptor && property && replay?.changedAliases?.has(name.toLowerCase());
+
+const rememberParsedRow = (
+  row: RowRead,
+  headers: HeaderSource,
+  property: HeaderPropertySnapshot | undefined,
+  snapshot: HeaderValuesSnapshot | undefined,
+  refresh: { refreshable: boolean } | undefined,
+  emitted: boolean,
+  callbacks: HeaderReplayCallbacks,
+  replay?: HeaderReplayState,
+) => {
+  if ((snapshot?.slots.size || snapshot?.length?.fromDescriptor === false) && refresh) {
+    refresh.refreshable = false;
   }
-  if (replay) {
-    // Custom iterators may be one-shot whether inherited or owned. Platform Headers
-    // are reusable across realms, where instanceof cannot identify them.
-    replay.refreshable =
-      !hasIterator ||
-      (typeof iterator === 'function' &&
-        ((Array.isArray(headers) && iterator === getArrayIterator(headers)) ||
-          (!Array.isArray(headers) && iterator === nativeHeadersIterator)));
+  rememberRow(row, refresh, snapshot, replay);
+  if (!property || !replay) {
+    return;
   }
-  if (typeof iterator === 'function') {
-    if (replay) {
-      iterable ??= Array.isArray(headers)
-        ? { kind: 'array', iterator, iterations: new WeakSet(), rows: new Map(), slots: new Map() }
-        : {
-            kind: 'iterator',
-            iterator,
-            iterations: new WeakSet(),
-            rows: new Map(),
-            unverifiedHeaders: false,
-          };
-      if (iterable.kind === 'iterator') {
-        iterable.unverifiedHeaders =
-          nativeHeadersIterator !== undefined &&
-          iterator === nativeHeadersIterator &&
-          !hasNativeHeadersBrand(headers);
+  property.valueStateful = !refresh?.refreshable;
+  if (emitted && (snapshot || !refresh?.refreshable)) {
+    property.entry = callbacks.capture(row.name);
+  }
+  if (snapshot) {
+    rememberRecordValue(row.name, emitted ? property.entry : null, replay, callbacks.layer);
+  }
+  if (snapshot || !refresh?.refreshable) {
+    rememberProperty(headers, row.name, property, replay);
+  }
+};
+
+function* replayRow(
+  row: RowRead,
+  headers: HeaderSource,
+  descriptor: PropertyDescriptor | undefined,
+  clear: boolean,
+  native: boolean,
+  callbacks: HeaderReplayCallbacks,
+  replay?: HeaderReplayState,
+): Generator<readonly [string, string | null]> {
+  const retainedEntries = retainedRowEntries(row);
+  if (retainedEntries) {
+    yield* retainedEntries;
+    return;
+  }
+  const retainedProperty = clear ? replay?.properties?.get(row.name) : undefined;
+  // Nested replacements become observable after ordering, before a later missing accessor is replayed.
+  if (supersededRecordProperty(row.name, descriptor, retainedProperty, replay)) {
+    return;
+  }
+  if (retainedProperty && !retainedProperty.values) {
+    yield* retainedPropertyEntries(row.name, retainedProperty);
+    return;
+  }
+  const refresh = rowRefreshState(row, descriptor, clear, replay);
+  const property: HeaderPropertySnapshot | undefined =
+    clear && replay && descriptor ? { descriptor } : undefined;
+  let liveValues = true;
+  if (retainedProperty) {
+    liveValues = !retainedProperty.valueStateful;
+  } else if (row.retained) {
+    liveValues = !row.retained.valueStateful;
+  }
+  const { values, iterator, snapshot } = readHeaderValues(
+    row,
+    retainedRowValues(row, retainedProperty),
+    refresh,
+    descriptor,
+    property,
+    liveValues,
+    replay,
+  );
+  if (property && snapshot) {
+    property.values = snapshot;
+  }
+  const iteration = snapshot
+    ? iterateHeaderValues(row.name, snapshot, callbacks.normalize)
+    : { [Symbol.iterator]: () => Reflect.apply(iterator, values, []) };
+  const didClear = yield* captureRowValues(row, iteration, refresh, clear, native, callbacks, replay);
+  rememberParsedRow(row, headers, property, snapshot, refresh, didClear, callbacks, replay);
+}
+
+const pruneRows = (occurrences: Map<HeaderEntry, number>, replay?: HeaderReplayState) => {
+  for (const [row, retained] of replay?.rows ?? []) {
+    const count = occurrences.get(row) ?? 0;
+    for (const occurrence of retained.keys()) {
+      if (occurrence >= count) {
+        retained.delete(occurrence);
       }
-      replay.state = iterable;
     }
+    if (retained.size === 0) {
+      replay?.rows?.delete(row);
+    }
+  }
+};
+
+function* replayHeaderEntries(
+  headers: HeaderSource,
+  callbacks: HeaderReplayCallbacks,
+  replay?: HeaderReplayState,
+): IterableIterator<readonly [string, string | null]> {
+  const { iterator, native } = captureHeaderProtocol(headers, callbacks, replay);
+  const clear = typeof iterator !== 'function';
+  const descriptors = new Map<string, PropertyDescriptor>();
+  const presentProperties = new Set<string>();
+  let entries: Iterable<HeaderEntry>;
+  if (typeof iterator === 'function') {
     const iteration =
-      replay?.refreshable && iterable?.kind === 'array' && Array.isArray(headers)
-        ? iterateHeaderArray(headers, iterable)
+      replay?.refreshable && Array.isArray(headers)
+        ? iterateHeaderArray(headers, replay)
         : iterator.call(headers);
-    if (replay?.refreshable && iterable) {
-      if (iterable.iterations.has(iteration)) {
-        // Headers-shaped custom sources can return a consumed iterator despite matching descriptors.
+    if (replay?.refreshable) {
+      replay.iterator = iterator;
+      replay.iterations ??= new WeakSet<object>();
+      if (replay.iterations.has(iteration)) {
         replay.refreshable = false;
-        yield* iterateHeaders(replay.snapshot, undefined, provenance);
+        yield* callbacks.previous(replay.snapshot);
         return;
       }
-      iterable.iterations.add(iteration);
+      replay.iterations.add(iteration);
     }
-    iter = { [Symbol.iterator]: () => iteration };
+    entries = { [Symbol.iterator]: () => iteration };
+  } else if (replay) {
+    entries = orderRecordEntries(
+      captureRecordEntries(headers, replay, descriptors, presentProperties),
+      replay,
+      descriptors,
+      presentProperties,
+    );
   } else {
-    shouldClear = true;
-    if (replay) {
-      record ??= { kind: 'record', properties: new Map(), propertyOrder: new Map() };
-      replay.state = record;
-      iter = observeHeaderRecord(headers, record, propertyDescriptors);
-    } else {
-      iter = Object.entries(headers);
-    }
+    entries = Object.entries(headers);
   }
-  const occurrenceSource: OccurrenceSource = shouldClear
-    ? { kind: 'record', source: headers, record, descriptors: propertyDescriptors }
-    : {
-        kind: 'tuple',
-        iterable,
-        native: nativeHeadersIterator !== undefined && iterator === nativeHeadersIterator,
-      };
-  // Reusing a tuple at another position still owns a separate initial accessor read.
-  const rowOccurrences = new Map<HeaderEntry, number>();
-  for (const row of iter) {
-    const occurrence = rowOccurrences.get(row) ?? 0;
-    if (!shouldClear && replay) {
-      rowOccurrences.set(row, occurrence + 1);
+  const occurrences = new Map<HeaderEntry, number>();
+  for (const row of entries) {
+    const occurrence = occurrences.get(row) ?? 0;
+    if (!clear && replay) {
+      occurrences.set(row, occurrence + 1);
     }
-    yield* iterateHeaderOccurrence(row, occurrence, occurrenceSource, replay);
+    const read = readRow(row, occurrence, clear, replay);
+    yield* replayRow(read, headers, descriptors.get(read.name), clear, native, callbacks, replay);
   }
-  for (const [row, retained] of iterable?.rows ?? []) {
-    const occurrences = rowOccurrences.get(row) ?? 0;
-    for (const occurrence of retained?.keys() ?? []) {
-      if (occurrence >= occurrences) {
-        retained?.delete(occurrence);
-      }
-    }
-    if (retained?.size === 0) {
-      iterable?.rows?.delete(row);
-    }
-  }
+  pruneRows(occurrences, replay);
 }
 
 const copyHeaderValues = <T extends { values?: HeaderValuesSnapshot }>(snapshot: T): T => ({
@@ -880,34 +1178,103 @@ const copyHeaderValues = <T extends { values?: HeaderValuesSnapshot }>(snapshot:
   ...(snapshot.values ? { values: { ...snapshot.values, slots: new Map(snapshot.values.slots) } } : {}),
 });
 
-export const copyHeaderReplay = (replay: HeaderReplay): HeaderReplay => {
-  const copy = new HeaderReplay(replay.refreshable);
-  copy.snapshot = replay.snapshot;
-  const { state } = replay;
-  if (state.kind === 'pending') {
-    copy.state = state;
-  } else if (state.kind === 'record') {
-    copy.state = {
-      ...state,
-      properties: new Map(
-        [...state.properties].map(([key, value]) => [
-          key,
-          { ...copyHeaderValues(value), slot: { ...value.slot } },
-        ]),
-      ),
-      propertyOrder: new Map(state.propertyOrder),
-    };
-  } else {
-    copy.state = {
-      ...state,
-      ...(state.kind === 'array' ? { slots: new Map(state.slots) } : {}),
-      rows: new Map(
-        [...state.rows].map(([row, occurrences]) => [
-          row,
-          new Map([...occurrences].map(([index, snapshot]) => [index, copyHeaderValues(snapshot)])),
-        ]),
-      ),
-    };
+const copyHeaderReplay = (replay: HeaderReplayState): HeaderReplayState => ({
+  ...replay,
+  ...(replay.properties
+    ? {
+        properties: new Map(
+          [...replay.properties].map(([key, property]) => [key, copyHeaderValues(property)]),
+        ),
+      }
+    : {}),
+  ...(replay.propertyOrder ? { propertyOrder: new Map(replay.propertyOrder) } : {}),
+  ...(replay.changedAliases ? { changedAliases: new Map(replay.changedAliases) } : {}),
+  ...(replay.arraySlots ? { arraySlots: new Map(replay.arraySlots) } : {}),
+  ...(replay.removedArraySlots ? { removedArraySlots: new Set(replay.removedArraySlots) } : {}),
+  ...(replay.rows
+    ? {
+        rows: new Map(
+          [...replay.rows].map(([row, occurrences]) => [
+            row,
+            new Map([...occurrences].map(([index, snapshot]) => [index, copyHeaderValues(snapshot)])),
+          ]),
+        ),
+      }
+    : {}),
+});
+
+const hasOnlyLiveHeaderValues = (values: HeaderValuesSnapshot | undefined) =>
+  !values || (!values.slots.size && values.length?.fromDescriptor !== false);
+
+/** Reads ordinary inputs without retaining state for another attempt. */
+export const iterateHeaderEntries = (headers: HeaderSource, callbacks: HeaderReplayCallbacks) =>
+  replayHeaderEntries(headers, callbacks);
+
+/** Owns occurrence capture, invalidation, pruning and copying for one header layer. */
+export class HeaderReplay {
+  private state: HeaderReplayState;
+
+  /** Creates an empty replay owner; deferred layers may initially prohibit refresh. */
+  constructor(refreshable = true) {
+    this.state = { refreshable };
   }
-  return copy;
-};
+
+  /** Whether the observed protocol permits refreshing this layer. */
+  get refreshable(): boolean {
+    return this.state.refreshable;
+  }
+
+  /** Whether a Headers-shaped protocol could not be verified by its native implementation. */
+  get unverifiedHeaders(): boolean {
+    return this.state.unverifiedHeaders === true;
+  }
+
+  /** Whether a retry can read the source again without retained one-shot state. */
+  get replayable(): boolean {
+    const { state } = this;
+    const propertiesLive = [...(state.properties?.values() ?? [])].every(
+      (property) => !property.valueStateful && hasOnlyLiveHeaderValues(property.values),
+    );
+    const rowsLive = [...(state.rows?.values() ?? [])].every((rows) =>
+      [...rows.values()].every(
+        (row) => !row.nameStateful && !row.valueStateful && hasOnlyLiveHeaderValues(row.values),
+      ),
+    );
+    return (
+      state.refreshable &&
+      !state.unverifiedHeaders &&
+      propertiesLive &&
+      rowsLive &&
+      state.length?.fromDescriptor !== false &&
+      !state.arraySlots?.size &&
+      !state.removedArraySlots?.size
+    );
+  }
+
+  /** Refreshes all occurrence caches together and yields entries to canonical header merging. */
+  entries(
+    headers: HeaderSource,
+    callbacks: HeaderReplayCallbacks,
+  ): IterableIterator<readonly [string, string | null]> {
+    return replayHeaderEntries(headers, callbacks, this.state);
+  }
+
+  /** Starts another attempt with this layer's history and its prior canonical snapshot. */
+  next(snapshot?: NullableHeaders): HeaderReplay {
+    const next = new HeaderReplay();
+    next.state = { ...this.state, refreshable: true };
+    delete next.state.unverifiedHeaders;
+    delete next.state.snapshot;
+    if (snapshot) {
+      next.state.snapshot = snapshot;
+    }
+    return next;
+  }
+
+  /** Copies every mutable occurrence cache while retaining consumed-iterator identity. */
+  fork(): HeaderReplay {
+    const copy = new HeaderReplay();
+    copy.state = copyHeaderReplay(this.state);
+    return copy;
+  }
+}

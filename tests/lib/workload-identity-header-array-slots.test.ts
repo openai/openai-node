@@ -53,6 +53,205 @@ test.each([false, true])('retains a proxy-observed row until its slot is replace
   expect(transport.exchanges).toBe(1);
 });
 
+test.each(
+  (['outer', 'nested'] as const).flatMap((location) =>
+    (['retry', 'post-read'] as const).map((failure) => ({ failure, location })),
+  ),
+)('retains a $location slot getter across a $failure descriptor failure', async ({ failure, location }) => {
+  let reads = 0;
+  let blockDescriptors = false;
+  let failedPostRead = false;
+  const target = location === 'outer' ? [['X-Note', 'before']] : ['before'];
+  const [input] = target;
+  Object.defineProperty(target, 0, {
+    configurable: true,
+    get() {
+      reads += 1;
+      if (reads > 1) {
+        throw new Error('slot getter read twice');
+      }
+      return input;
+    },
+  });
+  const exposed = new Proxy(target, {
+    getOwnPropertyDescriptor(object, key) {
+      if (key === '0') {
+        if (failure === 'retry' && blockDescriptors) {
+          throw new Error('retry descriptor unavailable');
+        }
+        if (failure === 'post-read' && reads === 1 && !failedPostRead) {
+          failedPostRead = true;
+          throw new Error('post-read descriptor unavailable');
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(object, key);
+    },
+  });
+  const headers = location === 'outer' ? exposed : { 'X-Note': exposed };
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('X-Note'));
+    blockDescriptors = true;
+    return sent.length < 3
+      ? Response.json({ error: 'synthetic retry' }, { status: 500 })
+      : Response.json({ data: [] });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 2,
+  });
+
+  await client.models.list({ headers: headers as never });
+
+  expect(sent).toEqual(['before', 'before', 'before']);
+  expect(reads).toBe(1);
+});
+
+test.each(['outer', 'nested'] as const)(
+  'does not evict duplicate %s getter snapshots when one descriptor probe is unavailable',
+  async (location) => {
+    let reads = 0;
+    let blockFirstDescriptor = false;
+    const target: unknown[] = [];
+    const read = vi.fn(() => {
+      reads += 1;
+      if (reads > 2) {
+        throw new Error('duplicate getter was reread');
+      }
+      return location === 'outer'
+        ? ['X-Note', reads === 1 ? 'A' : 'B']
+        : { toString: () => (reads === 1 ? 'A' : 'B') };
+    });
+    const descriptor = { configurable: true, get: read };
+    Object.defineProperty(target, 0, descriptor);
+    Object.defineProperty(target, 1, descriptor);
+    const exposed = new Proxy(target, {
+      getOwnPropertyDescriptor(object, key) {
+        if (blockFirstDescriptor && key === '0') {
+          throw new Error('descriptor unavailable');
+        }
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+    });
+    const headers = location === 'outer' ? exposed : { 'X-Note': exposed };
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('X-Note'));
+      blockFirstDescriptor = true;
+      return sent.length === 1
+        ? Response.json({ error: 'synthetic retry' }, { status: 500, headers: { 'retry-after-ms': '0' } })
+        : Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list({ headers: headers as never });
+
+    expect(sent).toEqual(['A, B', 'A, B']);
+    expect(read).toHaveBeenCalledTimes(2);
+  },
+);
+
+test.each(['outer', 'nested'] as const)(
+  'invalidates a recovered %s slot after confirmed external deletion',
+  (location) => {
+    let reads = 0;
+    let failedPostRead = false;
+    const target =
+      location === 'outer' ? ([['X-Note', 'preserved']] as unknown[]) : (['preserved'] as unknown[]);
+    const [input] = target;
+    Object.defineProperty(target, 0, {
+      configurable: true,
+      get() {
+        reads += 1;
+        return input;
+      },
+    });
+    const exposed = new Proxy(target, {
+      getOwnPropertyDescriptor(object, key) {
+        if (key === '0' && reads === 1 && !failedPostRead) {
+          failedPostRead = true;
+          throw new Error('initial post-read descriptor unavailable');
+        }
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+    });
+    const snapshot = snapshotHeaders((location === 'outer' ? exposed : { 'X-Note': exposed }) as never);
+
+    expect(snapshot.refresh().values.get('X-Note')).toBe('preserved');
+    Reflect.deleteProperty(target, 0);
+
+    expect(snapshot.refresh().values.has('X-Note')).toBe(false);
+    expect(reads).toBe(1);
+  },
+);
+
+test('observes a proxy row that reappears after an outer-slot tombstone', () => {
+  const target = [['X-Note', 'initial']] as unknown[];
+  const [initial] = target;
+  const state: { replacement?: unknown } = {};
+  const read = vi.fn(() => initial);
+  Object.defineProperty(target, 0, { configurable: true, get: read });
+  const headers = new Proxy(target, {
+    get(array, key, receiver) {
+      if (key === '0' && state.replacement) {
+        return state.replacement;
+      }
+      return Reflect.get(array, key, receiver);
+    },
+  });
+  const snapshot = snapshotHeaders(headers as never);
+
+  expect(snapshot.refresh().values.get('X-Note')).toBe('initial');
+  Reflect.deleteProperty(target, 0);
+  expect(snapshot.refresh().values.has('X-Note')).toBe(false);
+  expect(snapshot.refresh().values.has('X-Note')).toBe(false);
+  state.replacement = ['X-Note', 'replacement'];
+  expect(snapshot.refresh().values.get('X-Note')).toBe('replacement');
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+test.each(['request', 'default'] as const)(
+  'drops an accessor-backed nested %s value deleted between retry attempts',
+  async (layer) => {
+    const values: (string | undefined)[] = [];
+    const read = vi.fn(() => 'Bearer independent');
+    Object.defineProperty(values, 0, { configurable: true, get: read });
+    const headers = { Authorization: values };
+    const sent: (string | null)[] = [];
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'));
+      if (sent.length === 1) {
+        delete values[0];
+        return Response.json({ error: 'synthetic retry' }, { status: 500 });
+      }
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+      maxRetries: 1,
+    });
+
+    await client.models.list(layer === 'request' ? { headers } : {});
+
+    expect(sent).toEqual(['Bearer independent', 'Bearer access-token-1']);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 describe.each(['own', 'inherited'] as const)('%s outer header slot', (location) => {
   describe.each(['request', 'default'] as const)('%s headers', (layer) => {
     test.each(
@@ -188,6 +387,62 @@ test('keeps a cached slot row live without rereading its getter after descriptor
   expect(snapshot.refresh().values.get('X-Custom')).toBe('updated');
   expect(read).toHaveBeenCalledTimes(1);
   expect(snapshot.replayable).toBe(false);
+});
+
+describe.each(['request', 'default'] as const)('%s shared outer accessor', (layer) => {
+  test.each(['truncate', 'replace', 'unrelated', 'unchanged'] as const)(
+    'tracks getter occurrences after %s',
+    async (change) => {
+      const read = vi.fn(() => {
+        if ((change === 'unchanged' || change === 'unrelated') && read.mock.calls.length > 2) {
+          throw new Error('An unchanged accessor occurrence was read twice');
+        }
+        return ['X-Custom', read.mock.calls.length === 1 ? 'A' : 'B'];
+      });
+      const descriptor = { configurable: true, get: read };
+      const headers: string[][] = [];
+      Object.defineProperty(headers, 0, descriptor);
+      Object.defineProperty(headers, 1, descriptor);
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('X-Custom'));
+        if (sent.length === 1) {
+          if (change === 'truncate' || change === 'replace') {
+            Object.defineProperty(headers, 0, descriptor);
+            headers.length = 1;
+            if (change === 'replace') {
+              headers.push(['X-Custom', 'tail']);
+            }
+          }
+          if (change === 'unrelated') {
+            Object.defineProperty(headers, 2, { get: () => ['X-Other', 'tail'] });
+          }
+          return Response.json(
+            { error: 'synthetic retry' },
+            { status: 500, headers: { 'retry-after-ms': '0' } },
+          );
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+        maxRetries: 1,
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual([
+        'A, B',
+        { truncate: 'B', replace: 'B, tail', unrelated: 'A, B', unchanged: 'A, B' }[change],
+      ]);
+      expect(read).toHaveBeenCalledTimes(change === 'truncate' || change === 'replace' ? 3 : 2);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
 });
 
 test('retains a self-deleting slot getter until a data property replaces it', () => {

@@ -259,6 +259,176 @@ test('refreshes deleted ordinary values beside a retained name getter', () => {
   expect(read).toHaveBeenCalledTimes(1);
 });
 
+test.each(['name', 'value'] as const)(
+  'distinguishes a self-deleting %s getter from a later external deletion',
+  (slot) => {
+    const index = slot === 'name' ? 0 : 1;
+    const expected = slot === 'name' ? 'X-Custom' : 'preserved';
+    const selfDeleting = ['X-Custom', 'preserved'];
+    Object.defineProperty(selfDeleting, index, {
+      configurable: true,
+      get() {
+        Reflect.deleteProperty(selfDeleting, index);
+        return expected;
+      },
+    });
+    const retained = snapshotHeaders([selfDeleting]);
+
+    expect(retained.refresh().values.get('X-Custom')).toBe('preserved');
+
+    const externallyDeleted = ['X-Custom', 'preserved'];
+    Object.defineProperty(externallyDeleted, index, {
+      configurable: true,
+      get: () => expected,
+    });
+    const refreshed = snapshotHeaders([externallyDeleted]);
+    Reflect.deleteProperty(externallyDeleted, index);
+
+    if (slot === 'name') {
+      expect(() => refreshed.refresh()).toThrow('expected header name to be a string');
+    } else {
+      expect(refreshed.refresh().values.has('X-Custom')).toBe(false);
+    }
+  },
+);
+
+test.each(['name', 'value'] as const)(
+  'retains a self-hiding %s getter whose descriptor becomes readable after its first access',
+  (slot) => {
+    const index = slot === 'name' ? 0 : 1;
+    const expected = slot === 'name' ? 'X-Custom' : 'preserved';
+    let reads = 0;
+    const target = ['X-Custom', 'preserved'];
+    Object.defineProperty(target, index, {
+      configurable: true,
+      get() {
+        reads += 1;
+        Object.defineProperty(target, index, { enumerable: false });
+        if (reads > 1) {
+          throw new Error('getter read twice');
+        }
+        return expected;
+      },
+    });
+    const row = new Proxy(target, {
+      getOwnPropertyDescriptor(object, key) {
+        if (key === String(index) && reads === 0) {
+          throw new Error('initial descriptor unavailable');
+        }
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+    });
+    const snapshot = snapshotHeaders([row]);
+
+    expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+    expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+    expect(reads).toBe(1);
+  },
+);
+
+test('retains a replacement name getter after an initially unavailable descriptor probe', () => {
+  let nameReads = 0;
+  let replacementReads = 0;
+  let failReplacementPostRead = false;
+  const firstName = vi.fn(() => {
+    nameReads += 1;
+    return 'X-Original';
+  });
+  const value = vi.fn(() => 'preserved');
+  const target = ['X-Original', 'preserved'];
+  Object.defineProperty(target, 0, { configurable: true, get: firstName });
+  Object.defineProperty(target, 1, { configurable: true, get: value });
+  const row = new Proxy(target, {
+    getOwnPropertyDescriptor(object, key) {
+      if (key === '0' && nameReads === 0) {
+        throw new Error('initial name descriptor unavailable');
+      }
+      if (key === '0' && failReplacementPostRead && replacementReads === 1) {
+        throw new Error('replacement post-read descriptor unavailable');
+      }
+      return Reflect.getOwnPropertyDescriptor(object, key);
+    },
+  });
+  const snapshot = snapshotHeaders([row]);
+  const replacementName = vi.fn(() => {
+    replacementReads += 1;
+    return 'X-Replacement';
+  });
+  Object.defineProperty(target, 0, { configurable: true, get: replacementName });
+  failReplacementPostRead = true;
+
+  expect(snapshot.refresh().values.get('X-Replacement')).toBe('preserved');
+  failReplacementPostRead = false;
+  Object.defineProperty(target, 0, { configurable: true, get: firstName });
+  expect(snapshot.refresh().values.get('X-Original')).toBe('preserved');
+  expect(snapshot.refresh().values.get('X-Original')).toBe('preserved');
+  expect(firstName).toHaveBeenCalledTimes(2);
+  expect(replacementName).toHaveBeenCalledTimes(1);
+  expect(value).toHaveBeenCalledTimes(1);
+});
+
+test('invalidates a recovered scalar value getter after confirmed external deletion', () => {
+  let reads = 0;
+  let descriptorProbes = 0;
+  const target = ['X-Custom', 'preserved'];
+  Object.defineProperty(target, 1, {
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'preserved';
+    },
+  });
+  const row = new Proxy(target, {
+    getOwnPropertyDescriptor(object, key) {
+      if (key === '1') {
+        descriptorProbes += 1;
+        if (descriptorProbes === 2 || descriptorProbes === 4) {
+          throw new Error('post-read descriptor unavailable');
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(object, key);
+    },
+  });
+  const snapshot = snapshotHeaders([row]);
+
+  expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+  Reflect.deleteProperty(target, 1);
+
+  expect(snapshot.refresh().values.has('X-Custom')).toBe(false);
+  expect(reads).toBe(1);
+});
+
+test('retains a self-deleting name when repeated post-read descriptor probes fail', () => {
+  let reads = 0;
+  let probesAfterRead = 0;
+  const target = ['X-Custom', 'preserved'];
+  Object.defineProperty(target, 0, {
+    configurable: true,
+    get() {
+      reads += 1;
+      Reflect.deleteProperty(target, 0);
+      return 'X-Custom';
+    },
+  });
+  Object.defineProperty(target, 1, { get: () => 'preserved' });
+  const row = new Proxy(target, {
+    getOwnPropertyDescriptor(object, key) {
+      if (key === '0' && reads > 0) {
+        probesAfterRead += 1;
+        if (probesAfterRead === 1 || probesAfterRead === 3) {
+          throw new Error('post-read descriptor unavailable');
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(object, key);
+    },
+  });
+  const snapshot = snapshotHeaders([row]);
+
+  expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+  expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+  expect(reads).toBe(1);
+});
+
 test('does not freeze consumed columns because of an unused accessor', () => {
   const unused = vi.fn(() => 'unused');
   const row = ['Authorization', 'Bearer original'];

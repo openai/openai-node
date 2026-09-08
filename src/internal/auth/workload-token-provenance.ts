@@ -207,17 +207,30 @@ interface TokenScope {
 export class WorkloadTokenProvenance {
   private readonly parseHeaders: (values: HeadersLike) => NullableHeaders;
   private readonly canPreserveHeaders: (values: HeadersLike) => boolean;
+  private readonly structuralHeader: (
+    values: HeadersLike,
+    name: string,
+  ) => { value: string | null; restorationDefinitive?: boolean } | undefined;
 
   /** Uses the canonical header parser while keeping its dependency on provenance acyclic. */
   constructor(
     parseHeaders: (values: HeadersLike) => NullableHeaders,
     canPreserveHeaders: (values: HeadersLike) => boolean,
+    structuralHeader: (
+      values: HeadersLike,
+      name: string,
+    ) => { value: string | null; restorationDefinitive?: boolean } | undefined,
   ) {
     this.parseHeaders = parseHeaders;
     this.canPreserveHeaders = canPreserveHeaders;
+    this.structuralHeader = structuralHeader;
   }
 
   private readonly pendingHeaders = new WeakMap<WorkloadCredentialUsage, object>();
+  private readonly structuralMismatches = new WeakMap<
+    WorkloadCredentialUsage,
+    { source: object; value: string | null; restorationDefinitive: boolean }
+  >();
   private readonly contexts = new WeakMap<object, TokenScope>();
   private readonly options = new WeakMap<object, Set<TokenScope>>();
   private readonly consumedHeaders = new WeakMap<object, Set<TokenScope>>();
@@ -264,6 +277,11 @@ export class WorkloadTokenProvenance {
 
   /** Observes data-valued request headers without invoking caller-owned accessors. */
   static requestHeaderData(request: object): object | undefined {
+    return WorkloadTokenProvenance.requestHeaderDataState(request)?.value;
+  }
+
+  /** Distinguishes a definite missing header input from an unreadable accessor. */
+  static requestHeaderDataState(request: object): { value: object | undefined } | undefined {
     try {
       const seen = new Set<object>();
       for (let source: object | null = request; source; source = Object.getPrototypeOf(source)) {
@@ -275,9 +293,13 @@ export class WorkloadTokenProvenance {
         if (!descriptor) {
           continue;
         }
-        const value: unknown = 'value' in descriptor ? descriptor.value : undefined;
-        return typeof value === 'object' && value !== null ? value : undefined;
+        if (!('value' in descriptor)) {
+          return undefined;
+        }
+        const value: unknown = descriptor.value;
+        return { value: typeof value === 'object' && value !== null ? value : undefined };
       }
+      return { value: undefined };
     } catch {
       // Opaque request representations retain their normal reads at dispatch.
     }
@@ -430,14 +452,24 @@ export class WorkloadTokenProvenance {
     credential: WorkloadCredentialUsage | undefined,
     request: object,
     authorization: string | undefined,
+    fallbackHeaders?: object,
   ): void {
     if (!credential || authorization === undefined) {
       return;
     }
-    const headers = WorkloadTokenProvenance.requestHeaderData(request);
-    if (!headers) {
+    const state = WorkloadTokenProvenance.requestHeaderDataState(request);
+    if (!state) {
       // Defer accessor reads without erasing an already observed source's ownership.
       return;
+    }
+    const headers = state.value ?? fallbackHeaders;
+    if (!headers) {
+      credential.revoke();
+      return;
+    }
+    const priorStructuralMismatch = this.structuralMismatches.get(credential);
+    if (priorStructuralMismatch?.restorationDefinitive && priorStructuralMismatch.source !== headers) {
+      credential.revoke();
     }
     if (!this.matchesPreparedSource(credential, headers, authorization)) {
       credential.revoke();
@@ -450,6 +482,28 @@ export class WorkloadTokenProvenance {
           credential.revoke();
         }
       } else {
+        // Structural records and arrays may expose ordinary-looking descriptors while still
+        // performing stateful reads. Inspect only Authorization data descriptors here, then
+        // attribute the complete source from the final dispatch snapshot.
+        const observed = this.structuralHeader(headers as HeadersLike, 'Authorization');
+        if (observed && bearerToken(observed.value) !== bearerToken(authorization)) {
+          // A proxy can report an ordinary data descriptor while producing different bytes when
+          // materialized. Keep this mismatch tentative until a later structural observation proves
+          // restoration, or the final canonical snapshot confirms the independent value.
+          this.structuralMismatches.set(credential, {
+            source: headers,
+            value: observed.value,
+            restorationDefinitive: observed.restorationDefinitive !== false,
+          });
+        } else if (
+          observed &&
+          this.structuralMismatches.get(credential)?.source === headers &&
+          this.structuralMismatches.get(credential)?.restorationDefinitive
+        ) {
+          // Returning to the workload bytes after a definite structural mismatch must not restore
+          // retry ownership for this attempt.
+          credential.revoke();
+        }
         this.pendingHeaders.set(credential, headers);
       }
     }
@@ -469,6 +523,17 @@ export class WorkloadTokenProvenance {
       return false;
     }
     const pending = this.pendingHeaders.get(credential);
+    const structuralMismatch = this.structuralMismatches.get(credential);
+    if (
+      pending === headers &&
+      structuralMismatch?.source === headers &&
+      structuralMismatch?.restorationDefinitive
+    ) {
+      const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
+      if (current && bearerToken(current.value) === bearerToken(authorization)) {
+        return false;
+      }
+    }
     if (pending === undefined || pending === headers || marked === true) {
       return true;
     }
@@ -518,6 +583,7 @@ export class WorkloadTokenProvenance {
   /** A concrete dispatch snapshot replaces its pending source for this attempt only. */
   adoptPreparedSource(credential: WorkloadCredentialUsage, headers: Headers): void {
     this.pendingHeaders.delete(credential);
+    this.structuralMismatches.delete(credential);
     credential.adopt(headers);
   }
 
