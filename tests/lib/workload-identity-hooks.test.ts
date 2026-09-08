@@ -567,6 +567,8 @@ describe('Workload identity request and dispatch hooks', () => {
     'iterator replacement',
     'outer iterator replacement',
     'row iterator replacement',
+    'row getter replacement',
+    'name getter replacement',
   ] as const)('recognizes %s during final dispatch', async (shape) => {
     let source: object | undefined;
     let ownedAuthorization: string | undefined;
@@ -592,7 +594,23 @@ describe('Workload identity request and dispatch hooks', () => {
               get: () => ownedAuthorization,
             });
           }
-          source = [row];
+          if (shape === 'name getter replacement') {
+            Object.defineProperty(row, '0', {
+              enumerable: true,
+              configurable: true,
+              get: () => 'Authorization',
+            });
+          }
+          if (shape === 'row getter replacement') {
+            source = [];
+            Object.defineProperty(source, '0', {
+              enumerable: true,
+              configurable: true,
+              get: () => row,
+            });
+          } else {
+            source = [row];
+          }
         }
         init.headers = source as Headers;
       }
@@ -607,6 +625,12 @@ describe('Workload identity request and dispatch hooks', () => {
             value: function* value() {
               yield ['Authorization', normalized] as const;
             },
+          });
+        } else if (shape === 'row getter replacement') {
+          Object.defineProperty(source, '0', {
+            enumerable: true,
+            configurable: true,
+            get: () => ['Authorization', normalized],
           });
         } else {
           const [row] = source as unknown[][];
@@ -628,6 +652,13 @@ describe('Workload identity request and dispatch hooks', () => {
                 yield normalized;
               },
             });
+          } else if (shape === 'name getter replacement') {
+            Object.defineProperty(row, '0', {
+              enumerable: true,
+              configurable: true,
+              get: () => 'Authorization',
+            });
+            row[1] = normalized;
           } else {
             Object.defineProperty(row, '1', {
               enumerable: true,
