@@ -260,6 +260,172 @@ describe('AssistantStream run-step dispatch ordering', () => {
     },
   );
 
+  test.each([
+    ['envelope prototype', 'none'],
+    ['envelope prototype', 'event'],
+    ['inherited prototype', 'none'],
+    ['inherited prototype', 'toolCallCreated'],
+    ['inherited descriptor', 'none'],
+    ['inherited descriptor', 'toolCallDelta'],
+  ] as const)('tolerates unavailable %s metadata with %s replacement', async (kind, listener) => {
+    const step = runStep('step_original');
+    let currentDelta = toolCallDelta(step.id).data.delta;
+    const originalDelta = currentDelta;
+    const replacement = {
+      step_details: {
+        type: 'tool_calls',
+        tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+      },
+    };
+    const inspect = vi.fn(() => {
+      throw new Error('Optional metadata is unavailable');
+    });
+    const target = { id: step.id };
+    const data = kind === 'envelope prototype' ? new Proxy(target, { getPrototypeOf: inspect }) : target;
+    const readDelta = vi.fn(function readCurrentDelta(this: typeof data) {
+      expect(this).toBe(data);
+      return currentDelta;
+    });
+    const writeDelta = vi.fn(function writeCurrentDelta(this: typeof data, value: typeof currentDelta) {
+      expect(this).toBe(data);
+      currentDelta = value;
+    });
+    const owner = Object.defineProperty({}, 'delta', { get: readDelta, set: writeDelta });
+    const intermediate = new Proxy(Object.setPrototypeOf({}, owner), {
+      getPrototypeOf(object) {
+        return kind === 'inherited prototype' ? inspect() : Reflect.getPrototypeOf(object);
+      },
+      getOwnPropertyDescriptor(object, key) {
+        return kind === 'inherited descriptor' && key === 'delta'
+          ? inspect()
+          : Reflect.getOwnPropertyDescriptor(object, key);
+      },
+    });
+    Object.setPrototypeOf(target, kind === 'envelope prototype' ? owner : intermediate);
+    const primingDeltas = listener === 'toolCallDelta' ? [toolCallDelta(step.id)] : [];
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      ...primingDeltas,
+      { event: 'thread.run.step.delta', data },
+      completedRun(),
+    ]);
+    const stepDelta = vi.fn();
+    if (listener !== 'none') {
+      runner.on(listener, () => {
+        if (runner.currentEvent()?.data === data) {
+          expect(Reflect.set(data, 'delta', replacement)).toBe(true);
+        }
+      });
+    }
+    runner.on('runStepDelta', stepDelta);
+
+    await runner.done();
+
+    expect(inspect).toHaveBeenCalled();
+    expect(writeDelta).toHaveBeenCalledTimes(listener === 'none' ? 0 : 1);
+    expect(readDelta).toHaveBeenCalledTimes(listener === 'none' ? 1 : 2);
+    expect(stepDelta).toHaveBeenCalledTimes(primingDeltas.length + 1);
+    const [emittedDelta, snapshot] = stepDelta.mock.calls[primingDeltas.length] ?? [];
+    expect(emittedDelta).toBe(listener === 'none' ? originalDelta : replacement);
+    expect(snapshot).toBe(step);
+    expect(snapshot.step_details.tool_calls[0].function.arguments).toBe(
+      `{"to":"trusted"}${listener === 'event' ? ' replacement' : ' updated'.repeat(primingDeltas.length + 1)}`,
+    );
+  });
+
+  test.each(['initial', 'event'] as const)(
+    'propagates a required delta read failure during %s access despite unavailable metadata',
+    async (phase) => {
+      const step = runStep('step_original');
+      const { delta } = toolCallDelta(step.id).data;
+      let failRead = phase === 'initial';
+      const data = new Proxy(
+        { id: step.id },
+        {
+          get(target, key, receiver) {
+            if (key === 'delta') {
+              if (failRead) {
+                throw new Error('Required delta read failed');
+              }
+              return delta;
+            }
+            return Reflect.get(target, key, receiver);
+          },
+          getPrototypeOf() {
+            throw new Error('Optional metadata is unavailable');
+          },
+        },
+      );
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const rawDelta = vi.fn();
+      const stepDelta = vi.fn();
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          rawDelta();
+          failRead = true;
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await expect(runner.done()).rejects.toThrow('Required delta read failed');
+
+      expect(rawDelta).toHaveBeenCalledTimes(phase === 'initial' ? 0 : 1);
+      expect(stepDelta).not.toHaveBeenCalled();
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"}');
+    },
+  );
+
+  test.each(['invalid', 'safe alias'] as const)(
+    'validates a snapshot %s from initial delta enumeration before raw dispatch',
+    async (mutation) => {
+      const step = runStep('step_original');
+      const { delta: originalDelta } = toolCallDelta(step.id).data;
+      const enumerate = vi.fn(() => {
+        step.id = mutation === 'invalid' ? '' : 'step_safe_alias';
+      });
+      const delta = new Proxy(originalDelta, {
+        ownKeys(target) {
+          enumerate();
+          return Reflect.ownKeys(target);
+        },
+      });
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data: { id: step.id, delta } },
+        completedRun(),
+      ]);
+      const rawDelta = vi.fn();
+      const toolCreated = vi.fn();
+      const stepDelta = vi.fn();
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          rawDelta();
+        }
+      });
+      runner.on('toolCallCreated', toolCreated);
+      runner.on('runStepDelta', stepDelta);
+
+      if (mutation === 'invalid') {
+        await expect(runner.done()).rejects.toThrow(/invalid run-step ID/u);
+        expect(rawDelta).not.toHaveBeenCalled();
+        expect(toolCreated).not.toHaveBeenCalled();
+        expect(stepDelta).not.toHaveBeenCalled();
+        expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"}');
+      } else {
+        await runner.done();
+        expect(rawDelta).toHaveBeenCalledTimes(1);
+        expect(toolCreated).toHaveBeenCalledTimes(1);
+        expect(stepDelta.mock.calls[0]?.[0]).toBe(delta);
+        expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+      }
+      expect(enumerate).toHaveBeenCalled();
+    },
+  );
+
   test.each(['event', 'toolCallCreated', 'toolCallDelta'] as const)(
     'observes an inherited getter owner swapped by %s',
     async (listener) => {
