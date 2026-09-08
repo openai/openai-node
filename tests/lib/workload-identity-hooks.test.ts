@@ -470,6 +470,75 @@ describe('Workload identity request and dispatch hooks', () => {
     },
   );
 
+  test('retains deferred preparation semantics through a copied dispatch request', async () => {
+    class HookClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture installs a deferred header value.
+      protected override async prepareRequest(init: RequestInit) {
+        const authorization = new Headers(init.headers).get('Authorization');
+        init.headers = Object.defineProperty({}, 'Authorization', {
+          enumerable: true,
+          get: () => authorization?.replace(/^Bearer /u, 'bEaReR '),
+        });
+      }
+      protected override fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        const [url, init, timeout, controller, schemes, context] = args;
+        return super.fetchWithAuth(url, { ...init }, timeout, controller, schemes, context);
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
+    });
+    const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(sends).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  });
+
+  test.each(['in place', 'native copy'] as const)(
+    'recognizes %s dispatch normalization after canonical record preparation',
+    async (shape) => {
+      class HookClient extends OpenAI {
+        // oxlint-disable-next-line class-methods-use-this -- This fixture prepares a canonical record.
+        protected override async prepareRequest(init: RequestInit) {
+          init.headers = Object.fromEntries(new Headers(init.headers));
+        }
+        override fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+          const [, init] = args;
+          if (init) {
+            const authorization = new Headers(init.headers).get('Authorization');
+            if (!authorization) {
+              throw new Error('Expected canonical record Authorization');
+            }
+            const normalized = authorization.replace(/^Bearer /u, 'bEaReR ');
+            if (shape === 'native copy') {
+              init.headers = new Headers({ Authorization: normalized });
+            } else {
+              (init.headers as Record<string, string>)['authorization'] = normalized;
+            }
+          }
+          return super.fetchWithTimeout(...args);
+        }
+      }
+      let sends = 0;
+      const transport = createWorkloadIdentityTransport(() => {
+        sends += 1;
+        return sends === 1
+          ? Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
+          : Response.json({ data: [] });
+      });
+      const client = new HookClient({ ...createTestClientOptions(), fetch: transport.fetch, maxRetries: 0 });
+
+      await client.models.list();
+
+      expect(sends).toBe(2);
+      expect(transport.exchanges).toBe(2);
+    },
+  );
+
   test.each([false, true])('preserves native Request headers (throwing tag getter: %s)', async (throwTag) => {
     class HookClient extends OpenAI {
       override async fetchWithTimeout(

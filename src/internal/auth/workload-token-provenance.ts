@@ -475,10 +475,11 @@ export class WorkloadTokenProvenance {
   ): void {
     const prior = this.pendingHeaders.get(credential);
     let retainedExact = exact;
-    if (!exact && prior?.request === request && prior.exact) {
+    if (!exact && prior?.exact) {
       retainedExact =
-        prior.source === source &&
-        (prior.observed === undefined || observed === undefined || prior.observed === observed);
+        prior.source === undefined ||
+        (prior.source === source &&
+          (prior.observed === undefined || observed === undefined || prior.observed === observed));
     }
     this.pendingHeaders.set(credential, {
       request,
@@ -495,7 +496,8 @@ export class WorkloadTokenProvenance {
     authorization: string,
     dispatch: { authorization: string | null | undefined } | undefined,
   ): boolean {
-    if (pending?.exact && dispatch && dispatch.authorization !== authorization) {
+    const pendingExact = this.pendingUsesExactComparison(pending, headers);
+    if (pendingExact && dispatch && dispatch.authorization !== authorization) {
       return true;
     }
     if (
@@ -511,6 +513,23 @@ export class WorkloadTokenProvenance {
       (current !== undefined && matchesAuthorization(current.value, authorization, mismatch.exact)) ||
       (mismatch.exact && dispatch !== undefined && dispatch.authorization !== authorization)
     );
+  }
+
+  private pendingUsesExactComparison(
+    pending: PendingHeaderObservation | undefined,
+    headers: object | undefined,
+  ): boolean {
+    if (!pending?.exact || pending.source === undefined) {
+      return pending?.exact === true;
+    }
+    if (pending.source !== headers) {
+      return false;
+    }
+    if (pending.observed === undefined) {
+      return true;
+    }
+    const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
+    return current === undefined || current.value === pending.observed;
   }
 
   /** Keeps opaque sources unconsumed through hooks and defers their attribution to dispatch. */
