@@ -112,6 +112,11 @@ function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: Pro
   return !('value' in right) && left.get === right.get && left.set === right.set;
 }
 
+function hasRunStepDeltaID(delta: RunStepDelta): boolean {
+  // Use the same descriptor inspection at capture and callback selection without reading an ID accessor.
+  return hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id');
+}
+
 interface RunStepDeltaState {
   refreshRunStepDelta?: (afterListeners?: boolean) => void;
   getRunStepDelta?: (afterCallbacks?: boolean) => RunStepDelta | undefined;
@@ -212,7 +217,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       // its post-read state, then detect subsequent replacements from validation or projection.
       let observedDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
       let observedInheritedProperty = observedDescriptor ? undefined : getInheritedDeltaProperty(exposedData);
-      if (delta && (hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id'))) {
+      if (delta && hasRunStepDeltaID(delta)) {
         throw new OpenAIError('Run-step deltas must not contain an id field');
       }
       capturedData.delta = delta;
@@ -827,7 +832,7 @@ export class AssistantStream
     for (const content of newContent) {
       const snapshotContent = accumulatedMessage.content[content.index];
       if (snapshotContent?.type === 'text') {
-        this.#emitExposed('textCreated', snapshotContent.text);
+        this.#emitExposed('textCreated', [snapshotContent.text]);
       }
     }
 
@@ -835,7 +840,7 @@ export class AssistantStream
       case 'thread.message.created': {
         this.#currentContentIndex = undefined;
         this.#currentContent = undefined;
-        this.#emitExposed('messageCreated', event.data);
+        this.#emitExposed('messageCreated', [event.data]);
         break;
       }
 
@@ -844,7 +849,7 @@ export class AssistantStream
       }
 
       case 'thread.message.delta': {
-        this.#emitExposed('messageDelta', event.data.delta, accumulatedMessage);
+        this.#emitExposed('messageDelta', [event.data.delta, accumulatedMessage]);
 
         if (event.data.delta.content) {
           for (const content of event.data.delta.content) {
@@ -853,7 +858,7 @@ export class AssistantStream
               const textDelta = content.text;
               const snapshot = accumulatedMessage.content[content.index];
               if (snapshot && snapshot.type === 'text') {
-                this.#emitExposed('textDelta', textDelta, snapshot.text);
+                this.#emitExposed('textDelta', [textDelta, snapshot.text]);
               } else {
                 throw new Error('The snapshot associated with this text delta is not text or missing');
               }
@@ -864,15 +869,14 @@ export class AssistantStream
               if (this.#currentContent) {
                 switch (this.#currentContent.type) {
                   case 'text': {
-                    this.#emitExposed('textDone', this.#currentContent.text, this.#messageSnapshot);
+                    this.#emitExposed('textDone', [this.#currentContent.text, this.#messageSnapshot]);
                     break;
                   }
                   case 'image_file': {
-                    this.#emitExposed(
-                      'imageFileDone',
+                    this.#emitExposed('imageFileDone', [
                       this.#currentContent.image_file,
                       this.#messageSnapshot,
-                    );
+                    ]);
                     break;
                   }
                 }
@@ -896,11 +900,11 @@ export class AssistantStream
           if (currentContent) {
             switch (currentContent.type) {
               case 'image_file': {
-                this.#emitExposed('imageFileDone', currentContent.image_file, this.#messageSnapshot);
+                this.#emitExposed('imageFileDone', [currentContent.image_file, this.#messageSnapshot]);
                 break;
               }
               case 'text': {
-                this.#emitExposed('textDone', currentContent.text, this.#messageSnapshot);
+                this.#emitExposed('textDone', [currentContent.text, this.#messageSnapshot]);
                 break;
               }
             }
@@ -908,7 +912,7 @@ export class AssistantStream
         }
 
         if (this.#messageSnapshot) {
-          this.#emitExposed('messageDone', event.data);
+          this.#emitExposed('messageDone', [event.data]);
         }
 
         this.#currentContentIndex = undefined;
@@ -934,12 +938,20 @@ export class AssistantStream
       }
       this.#reserveRunStepAlias(accumulatedRunStep, runStepID);
     };
+    const emitRunStep = <Event extends keyof AssistantStreamEvents>(
+      eventName: Event,
+      ...args: EventParameters<AssistantStreamEvents, Event>
+    ): boolean => {
+      const hasListeners = this.#emitExposed(eventName, args, validateRunStepAliases);
+      validateRunStepAliases();
+      return hasListeners;
+    };
 
     switch (event.event) {
       case 'thread.run.step.created': {
         this.#currentToolCallIndex = undefined;
         this.#currentToolCall = undefined;
-        this.#emitExposedAfterValidation(validateRunStepAliases, 'runStepCreated', event.data);
+        emitRunStep('runStepCreated', event.data);
         break;
       }
       case 'thread.run.step.delta': {
@@ -964,38 +976,19 @@ export class AssistantStream
                 continue;
               }
               toolListenersRan =
-                this.#emitExposedAfterValidation(
-                  validateRunStepAliases,
-                  'toolCallDelta',
-                  toolCall,
-                  accumulatedToolCall,
-                ) || toolListenersRan;
-              validateRunStepAliases();
+                emitRunStep('toolCallDelta', toolCall, accumulatedToolCall) || toolListenersRan;
             } else {
               if (this.#currentToolCall) {
-                validateRunStepAliases();
-                toolListenersRan =
-                  this.#emitExposedAfterValidation(
-                    validateRunStepAliases,
-                    'toolCallDone',
-                    this.#currentToolCall,
-                  ) || toolListenersRan;
-                validateRunStepAliases();
+                toolListenersRan = emitRunStep('toolCallDone', this.#currentToolCall) || toolListenersRan;
               }
 
               this.#currentToolCallIndex = toolCallIndex;
               const currentDetails = accumulatedRunStep.step_details;
               this.#currentToolCall =
                 currentDetails.type === 'tool_calls' ? currentDetails.tool_calls[toolCallIndex] : undefined;
+              validateRunStepAliases();
               if (this.#currentToolCall) {
-                validateRunStepAliases();
-                toolListenersRan =
-                  this.#emitExposedAfterValidation(
-                    validateRunStepAliases,
-                    'toolCallCreated',
-                    this.#currentToolCall,
-                  ) || toolListenersRan;
-                validateRunStepAliases();
+                toolListenersRan = emitRunStep('toolCallCreated', this.#currentToolCall) || toolListenersRan;
               }
             }
           }
@@ -1003,14 +996,10 @@ export class AssistantStream
 
         // Select listener replacements after tool callbacks without changing the accumulated snapshot.
         const exposedDelta = getRunStepDelta?.(toolListenersRan);
-        const callbackDelta = exposedDelta && !hasOwn(exposedDelta, 'id') ? exposedDelta : event.data.delta;
+        const callbackDelta =
+          exposedDelta && !hasRunStepDeltaID(exposedDelta) ? exposedDelta : event.data.delta;
         validateRunStepAliases();
-        this.#emitExposedAfterValidation(
-          validateRunStepAliases,
-          'runStepDelta',
-          callbackDelta,
-          accumulatedRunStep,
-        );
+        emitRunStep('runStepDelta', callbackDelta, accumulatedRunStep);
         break;
       }
       case 'thread.run.step.completed':
@@ -1021,18 +1010,9 @@ export class AssistantStream
         this.#activeRunStepID = undefined;
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
-          this.#emitExposedAfterValidation(
-            validateRunStepAliases,
-            'toolCallDone',
-            this.#currentToolCall as ToolCall,
-          );
+          emitRunStep('toolCallDone', this.#currentToolCall as ToolCall);
         }
-        this.#emitExposedAfterValidation(
-          validateRunStepAliases,
-          'runStepDone',
-          event.data,
-          accumulatedRunStep,
-        );
+        emitRunStep('runStepDone', event.data, accumulatedRunStep);
         this.#currentToolCallIndex = undefined;
         this.#currentToolCall = undefined;
         break;
@@ -1045,7 +1025,8 @@ export class AssistantStream
 
   #emitExposed<Event extends keyof AssistantStreamEvents>(
     event: Event,
-    ...args: EventParameters<AssistantStreamEvents, Event>
+    args: EventParameters<AssistantStreamEvents, Event>,
+    beforeDispatch?: () => void,
   ): boolean {
     const hasListeners = this._hasListeners(event);
     if (hasListeners) {
@@ -1053,28 +1034,13 @@ export class AssistantStream
         markAssistantStreamValueExternallyMutable(value);
       }
     }
-    this._emit(event, ...args);
-    return hasListeners;
-  }
-
-  #emitExposedAfterValidation<Event extends keyof AssistantStreamEvents>(
-    validate: () => void,
-    event: Event,
-    ...args: EventParameters<AssistantStreamEvents, Event>
-  ): boolean {
-    const hasListeners = this._hasListeners(event);
-    if (hasListeners) {
-      for (const value of args) {
-        markAssistantStreamValueExternallyMutable(value);
-      }
-    }
-    validate();
+    beforeDispatch?.();
     this._emit(event, ...args);
     return hasListeners;
   }
 
   #handleEvent(this: AssistantStream, event: AssistantStreamEvent) {
-    return this.#emitExposed('event', event);
+    return this.#emitExposed('event', [event]);
   }
 
   #accumulateRunStep(event: RunStepStreamEvent, runStepID: string): Runs.RunStep {
@@ -1224,7 +1190,7 @@ export class AssistantStream
       case 'thread.run.incomplete': {
         this.#finalRun = event.data;
         if (this.#currentToolCall) {
-          this.#emitExposed('toolCallDone', this.#currentToolCall);
+          this.#emitExposed('toolCallDone', [this.#currentToolCall]);
         }
         this.#currentToolCallIndex = undefined;
         this.#currentToolCall = undefined;
@@ -1237,7 +1203,7 @@ export class AssistantStream
   }
 
   protected _addRun(run: Run): Run {
-    this.#emitExposed('run', run);
+    this.#emitExposed('run', [run]);
     return run;
   }
 
