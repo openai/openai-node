@@ -759,6 +759,68 @@ describe('AssistantStream run-step deltas', () => {
     },
   );
 
+  test.each([
+    ['value', 'event'],
+    ['value', 'toolCallCreated'],
+    ['value', 'toolCallDelta'],
+    ['getter', 'event'],
+    ['getter', 'toolCallCreated'],
+    ['getter', 'toolCallDelta'],
+  ] as const)('observes an inherited delta %s replaced by %s', async (kind, listener) => {
+    const step = runStep('step_original');
+    const { delta: originalDelta } = toolCallDelta(step.id).data;
+    const data = { id: step.id };
+    const replacement = {
+      step_details: {
+        type: 'tool_calls',
+        tool_calls: [{ index: 0, function: { arguments: ' replacement' } }],
+      },
+    };
+    const readOriginal = vi.fn(function readOriginalDelta(this: typeof data) {
+      expect(this).toBe(data);
+      return originalDelta;
+    });
+    const readReplacement = vi.fn(function readReplacementDelta(this: typeof data) {
+      expect(this).toBe(data);
+      return replacement;
+    });
+    const prototype = Object.defineProperty({}, 'delta', {
+      configurable: true,
+      ...(kind === 'value' ? { value: originalDelta } : { get: readOriginal }),
+    });
+    Object.setPrototypeOf(data, prototype);
+    const primingDeltas = listener === 'toolCallDelta' ? [toolCallDelta(step.id)] : [];
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      ...primingDeltas,
+      { event: 'thread.run.step.delta', data },
+      completedRun(),
+    ]);
+    const stepDelta = vi.fn();
+    runner.on(listener, () => {
+      if (runner.currentEvent()?.event === 'thread.run.step.delta') {
+        Object.defineProperty(
+          prototype,
+          'delta',
+          kind === 'value' ? { value: replacement } : { get: readReplacement },
+        );
+      }
+    });
+    runner.on('runStepDelta', stepDelta);
+
+    await runner.done();
+
+    expect(stepDelta).toHaveBeenCalledTimes(primingDeltas.length + 1);
+    const [emittedDelta, snapshot] = stepDelta.mock.calls[primingDeltas.length] ?? [];
+    expect(emittedDelta).toBe(replacement);
+    expect(readOriginal).toHaveBeenCalledTimes(kind === 'getter' ? 1 : 0);
+    expect(readReplacement).toHaveBeenCalledTimes(kind === 'getter' ? 1 : 0);
+    expect(snapshot.id).toBe(step.id);
+    expect(snapshot.step_details.tool_calls[0].function.arguments).toBe(
+      `{"to":"trusted"}${listener === 'event' ? ' replacement' : ' updated'.repeat(primingDeltas.length + 1)}`,
+    );
+  });
+
   test('uses a raw listener value replacement of a configurable delta getter', async () => {
     const step = runStep('step_original');
     const { delta } = toolCallDelta(step.id).data;

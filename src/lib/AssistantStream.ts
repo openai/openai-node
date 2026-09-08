@@ -208,6 +208,9 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     initializeRunStepDelta = () => {
       // Validate the captured envelope before reading delta content, then reject root identity fields
       // before raw dispatch. Project content privately for accumulation after raw listeners run.
+      let observedInheritedDescriptor = deltaDescriptor
+        ? undefined
+        : getInheritedDeltaDescriptor(exposedData);
       const delta = Reflect.get(exposedData, 'delta', exposedData) as RunStepDelta;
       if (delta && (hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id'))) {
         throw new OpenAIError('Run-step deltas must not contain an id field');
@@ -220,14 +223,21 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = (afterListeners = false) => {
         const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
+        const currentInheritedDescriptor = currentDescriptor
+          ? undefined
+          : getInheritedDeltaDescriptor(exposedData);
         // A setter can change the backing value without replacing the property descriptor.
         const refreshAccessor =
-          afterListeners &&
-          (currentDescriptor ?? getInheritedDeltaDescriptor(exposedData))?.set !== undefined;
-        if (!refreshAccessor && samePropertyDescriptor(currentDescriptor, observedDescriptor)) {
+          afterListeners && (currentDescriptor ?? currentInheritedDescriptor)?.set !== undefined;
+        if (
+          !refreshAccessor &&
+          samePropertyDescriptor(currentDescriptor, observedDescriptor) &&
+          samePropertyDescriptor(currentInheritedDescriptor, observedInheritedDescriptor)
+        ) {
           return observedDelta;
         }
         observedDescriptor = currentDescriptor;
+        observedInheritedDescriptor = currentInheritedDescriptor;
         observedDelta = (
           currentDescriptor && 'value' in currentDescriptor
             ? currentDescriptor.value
