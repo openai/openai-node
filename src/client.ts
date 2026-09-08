@@ -2008,7 +2008,24 @@ export class OpenAI {
     // Legacy hooks may omit the context; ambiguous concurrent delegations cannot grant authentication.
     const resolvePlaceholder =
       matchingDispatches.length > 0 && matchingDispatches.every((dispatch) => dispatch.resolvePlaceholder);
-    const { signal, method, body, headers, ...options } = init || {};
+    const { signal, method, ...options } = init || {};
+    // Rest spread captures an enumerable field's presence with its value, including self-removing getters.
+    // Preserve the existing support for inherited and non-enumerable request body/header fields as well.
+    for (const name of ['body', 'headers'] as const) {
+      if (!init || hasOwn(options, name)) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(init, name);
+      if (descriptor?.enumerable) continue;
+      const value = init[name];
+      if (value !== undefined || descriptor) {
+        Object.defineProperty(options, name, {
+          value,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+    }
+    const { body } = options;
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
     if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
@@ -2024,8 +2041,6 @@ export class OpenAI {
       ...(isReadableBody ? { duplex: 'half' } : {}),
       method: 'GET',
       ...options,
-      ...(body !== undefined || (init && hasOwn(init, 'body')) ? { body } : undefined),
-      ...(headers !== undefined || (init && hasOwn(init, 'headers')) ? { headers } : undefined),
     };
     if (method) {
       // Custom methods like 'patch' need to be uppercased

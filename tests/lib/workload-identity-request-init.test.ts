@@ -4,14 +4,32 @@ import { createTestClientOptions, createWorkloadIdentityTransport } from './work
 
 test.each(
   [false, true].flatMap((workload) =>
-    ['build', 'timeout'].flatMap((hook) => [false, true].map((present) => ({ workload, hook, present }))),
+    ['build', 'timeout'].flatMap((hook) =>
+      (hook === 'timeout' ? ['absent', 'data', 'self-removing accessor'] : ['absent', 'data']).map(
+        (kind) => ({ workload, hook, kind }),
+      ),
+    ),
   ),
 )(
-  'preserves request field presence from $hook: workload=$workload, present=$present',
-  async ({ workload, hook, present }) => {
+  'preserves $kind request field presence from $hook: workload=$workload',
+  async ({ workload, hook, kind }) => {
+    const present = kind !== 'absent';
+    const reads: string[] = [];
     function replaceFields(init: object) {
       for (const name of ['body', 'headers']) {
-        if (present) {
+        if (kind === 'self-removing accessor') {
+          Object.defineProperty(init, name, {
+            configurable: true,
+            enumerable: true,
+            get(this: object) {
+              expect(this).toBe(init);
+              reads.push(name);
+              Reflect.deleteProperty(this, name);
+              // oxlint-disable-next-line unicorn/no-useless-undefined -- Explicitly suppress the transport default.
+              return undefined;
+            },
+          });
+        } else if (present) {
           Reflect.set(init, name, undefined);
         } else {
           Reflect.deleteProperty(init, name);
@@ -58,5 +76,8 @@ test.each(
 
     await expect(client.post('/synthetic', { body: { original: true } })).resolves.toEqual({ ok: true });
     expect(sends).toBe(1);
+    for (const name of ['body', 'headers']) {
+      expect(reads.filter((value) => value === name)).toHaveLength(kind === 'self-removing accessor' ? 1 : 0);
+    }
   },
 );
