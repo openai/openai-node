@@ -372,6 +372,25 @@ test('treats transformed base callbacks as request-local credential captures', a
   ]);
 });
 
+test('preserves post-prepare static keys through transparent _callApiKey overrides', async () => {
+  class PreparedCredentials extends OpenAI {
+    override async _callApiKey(capture?: (apiKey: string | null) => void) {
+      return super._callApiKey((apiKey) => capture?.(apiKey));
+    }
+
+    protected override async prepareOptions(options: FinalRequestOptions) {
+      await super.prepareOptions(options);
+      this.apiKey = 'synthetic-selected-by-prepare';
+    }
+  }
+  const fetch = mockFetch();
+  const client = new PreparedCredentials({ apiKey: 'synthetic-static', fetch });
+
+  await client.get('/items');
+
+  expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-selected-by-prepare');
+});
+
 test('keeps prepared credentials through overlapping async hooks sharing options', async () => {
   let signalEntered!: () => void;
   let signalRelease!: () => void;

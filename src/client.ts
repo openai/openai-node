@@ -500,7 +500,7 @@ export class OpenAI {
     }
   >();
   #lastProviderAPIKey: string | null | undefined;
-  #baseAPIKeyCapture: ((apiKey: string | null) => void) | undefined;
+  #baseAPIKeyCapture: { apiKey: string | null } | undefined;
   #apiKeyPreparationAttempts = new WeakMap<FinalRequestOptions, APIKeyPreparationAttempt[]>();
   #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
   #safeCredentialHooks = new Set<Function>([
@@ -914,7 +914,7 @@ export class OpenAI {
   ): void {
     if (!capture) return;
     const previousCapture = this.#baseAPIKeyCapture;
-    this.#baseAPIKeyCapture = capture;
+    this.#baseAPIKeyCapture = { apiKey };
     try {
       capture(apiKey);
     } finally {
@@ -984,7 +984,7 @@ export class OpenAI {
     let captured = false;
     const captureAPIKey = (apiKey: string | null) => {
       captured = true;
-      const capturedByBase = this.#baseAPIKeyCapture !== undefined && apiKey === this.#lastProviderAPIKey;
+      const capturedByBase = this.#baseAPIKeyCapture?.apiKey === apiKey;
       remember({
         apiKey,
         tracksClientValue: apiKey === this.apiKey,
