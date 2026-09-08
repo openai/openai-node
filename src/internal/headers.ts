@@ -125,12 +125,33 @@ interface HeaderReplay {
   property?: HeaderPropertySnapshot;
   rows?: WeakMap<object, Map<number, HeaderRowSnapshot>>;
   arraySlots?: Map<number, { descriptor: PropertyDescriptor | undefined; row: HeaderEntry }>;
+  arrayLength?: { boundary: number; fromDescriptor: boolean };
 }
 
 function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderReplay): Generator<HeaderEntry> {
+  const previousLength = replay.arrayLength;
+  let fromDescriptor = previousLength?.fromDescriptor ?? true;
   let index = 0;
-  // Match native array iteration's live length, with each row validated before reading the next slot.
-  for (; index < Math.min(Math.floor(headers.length), Number.MAX_SAFE_INTEGER); index += 1) {
+  // The first traversal keeps native live-length reads. Replay uses the data descriptor when those
+  // reads matched it; otherwise it retains the visited rows without invoking a length trap again.
+  for (; ; index += 1) {
+    let length: number;
+    let lengthDescriptor: PropertyDescriptor | undefined;
+    if (previousLength) {
+      lengthDescriptor = fromDescriptor ? getHeaderRowDescriptor(headers, 'length') : undefined;
+      length =
+        lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : previousLength.boundary;
+    } else {
+      length = headers.length;
+      lengthDescriptor = getHeaderRowDescriptor(headers, 'length');
+    }
+    fromDescriptor =
+      fromDescriptor &&
+      typeof length === 'number' &&
+      !!lengthDescriptor &&
+      'value' in lengthDescriptor &&
+      lengthDescriptor.value === length;
+    if (!(index < Math.min(Math.floor(length), Number.MAX_SAFE_INTEGER))) break;
     const descriptor = getHeaderRowDescriptor(headers, String(index));
     const retained = replay.arraySlots?.get(index);
     if (retained && (!descriptor || sameHeaderProperty(descriptor, retained.descriptor))) {
@@ -145,6 +166,7 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
     }
     yield row;
   }
+  replay.arrayLength = { boundary: index, fromDescriptor };
   for (const slot of replay.arraySlots?.keys() ?? []) {
     if (slot >= index) replay.arraySlots?.delete(slot);
   }
@@ -650,6 +672,7 @@ function* observeHeaderConsumption(
       replay.unverifiedHeaders ||
       replay.properties?.size ||
       replay.rows ||
+      replay.arrayLength?.fromDescriptor === false ||
       replay.arraySlots?.size
     ) {
       (onConsume ?? notifyWorkloadHeaderConsumption)(source);
@@ -732,6 +755,7 @@ const createHeaderSnapshot = (
         !replay.unverifiedHeaders &&
         !replay.properties?.size &&
         !replay.rows &&
+        replay.arrayLength?.fromDescriptor !== false &&
         !replay.arraySlots?.size
       );
     },
@@ -753,6 +777,7 @@ const createHeaderSnapshot = (
                 propertyOrder: replay.propertyOrder,
                 rows: replay.rows,
                 arraySlots: replay.arraySlots,
+                arrayLength: replay.arrayLength,
               }
             : undefined),
         };

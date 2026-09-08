@@ -331,6 +331,9 @@ while applying every newly observed value. To intentionally delete headers in su
 replace the header layer, or use an explicit record with `Authorization: null`; missing rows alone
 cannot establish that removal. Foreign additions and value updates still refresh. Native `Headers`,
 arrays, and data records retain live refresh behavior.
+Tuple-array refresh reads the array's data length when it matched the first traversal, preserving
+ordinary growth and truncation without repeating a custom length getter. Otherwise it retains the
+first traversal's row boundary; replace the header source to select a different boundary.
 
 When attributing a workload credential at dispatch, the SDK preserves local native `Headers`,
 plain-record, and ordinary tuple-array identity. Other iterable implementations, including foreign
