@@ -1,6 +1,8 @@
 # Runs the repository's normal lint, build, test, benchmark, example, and ecosystem checks.
 # These checks catch generated-code, packaging, runtime, and integration
 # regressions; policy-document alignment lives in node-version-policy.yml.
+# SDK_GHA_RUNNER is trusted configuration for ephemeral GitHub-hosted capacity.
+# See docs/architecture/security-model.md#ci-runner-configuration.
 name: CI
 on:
   push:
@@ -267,7 +269,8 @@ jobs:
   examples:
     timeout-minutes: 30
     name: examples
-    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
+    # Keep live credentials independent of the configurable CI runner pool.
+    runs-on: ubuntu-latest
     if: >-
       ${{
         github.repository == 'openai/openai-node' &&
