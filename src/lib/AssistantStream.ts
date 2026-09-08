@@ -222,6 +222,9 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       let observedDescriptor = deltaDescriptor;
       let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = (afterListeners = false) => {
+        if (!afterListeners) {
+          return observedDelta;
+        }
         const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
         const currentInheritedDescriptor = currentDescriptor
           ? undefined

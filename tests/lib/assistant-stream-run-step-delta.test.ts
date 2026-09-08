@@ -533,6 +533,34 @@ describe('AssistantStream run-step deltas', () => {
     expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} first');
   });
 
+  test('keeps a self-replacing inherited delta getter stable without preceding listeners', async () => {
+    const step = runStep('step_original');
+    const first = toolCallDelta(step.id).data.delta;
+    const second = toolCallDelta(step.id).data.delta;
+    const readSecond = vi.fn(() => second);
+    const prototype = {};
+    const readFirst = vi.fn(() => {
+      Object.defineProperty(prototype, 'delta', { configurable: true, get: readSecond });
+      return first;
+    });
+    Object.defineProperty(prototype, 'delta', { configurable: true, get: readFirst });
+    const data = Object.assign(Object.create(prototype), { id: step.id });
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      { event: 'thread.run.step.delta', data },
+      completedRun(),
+    ]);
+    const stepDelta = vi.fn();
+    runner.on('runStepDelta', stepDelta);
+
+    await runner.done();
+
+    expect(readFirst).toHaveBeenCalledTimes(1);
+    expect(readSecond).not.toHaveBeenCalled();
+    expect(stepDelta.mock.calls[0]?.[0]).toBe(first);
+    expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+  });
+
   test.each([
     { kind: 'foreign', id: 'step_foreign', error: /does not match the active run step/u },
     { kind: 'missing', id: undefined, error: /invalid run-step ID/u },
