@@ -7,7 +7,7 @@ const getIteratorDescriptor = (
   source: HeaderInput,
 ): { descriptor: PropertyDescriptor; owner: object } | undefined => {
   const seen = new Set<object>();
-  for (let current: object | null = source; current; current = Object.getPrototypeOf(current)) {
+  for (let current: object | null = source; current;) {
     if (seen.has(current)) {
       return undefined;
     }
@@ -15,6 +15,12 @@ const getIteratorDescriptor = (
     const descriptor = Object.getOwnPropertyDescriptor(current, Symbol.iterator);
     if (descriptor) {
       return { descriptor, owner: current };
+    }
+    try {
+      current = Object.getPrototypeOf(current);
+    } catch {
+      // A membrane can block inspection while still supporting platform header conversion.
+      return undefined;
     }
   }
   return undefined;

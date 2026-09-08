@@ -779,7 +779,73 @@ test.each([200, 401])(
   },
 );
 
-test.each(['own keys', 'iterator descriptor', 'prototype'] as const)(
+describe.each(['fetchWithTimeout', 'fetchWithAuth'] as const)('%s prototype inspection', (hook) => {
+  test.each([false, true])(
+    'uses platform conversion when inspection fails (invalid value: %s)',
+    async (invalid) => {
+      const diagnostic = new Error('Synthetic header conversion failed');
+      let valueReads = 0;
+      const makeSource = (headers: NonNullable<RequestInit['headers']>) => {
+        const values = Object.fromEntries(new Headers(headers));
+        Object.defineProperty(values, 'X-Trace', {
+          enumerable: true,
+          get() {
+            valueReads += 1;
+            if (invalid) {
+              throw diagnostic;
+            }
+            return 'preserved';
+          },
+        });
+        return new Proxy(values, {
+          getPrototypeOf() {
+            throw new Error('Synthetic membrane blocks prototype inspection');
+          },
+        });
+      };
+      class HookClient extends OpenAI {
+        override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+          if (hook === 'fetchWithTimeout' && args[1]) {
+            args[1].headers = makeSource(args[1].headers ?? {});
+          }
+          return super.fetchWithTimeout(...args);
+        }
+
+        protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+          if (hook === 'fetchWithAuth') {
+            args[1].headers = makeSource(args[1].headers ?? {});
+          }
+          return super.fetchWithAuth(...args);
+        }
+      }
+      let sends = 0;
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sends += 1;
+        const headers = new Headers(init?.headers);
+        expect(headers.get('X-Trace')).toBe('preserved');
+        expect(headers.get('Authorization')).toBe('Bearer access-token-1');
+        return Response.json({ data: [] });
+      });
+      const client = new HookClient({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        fetch: transport.fetch,
+        maxRetries: 0,
+      });
+
+      const result = client.models.list();
+      await (invalid
+        ? expect(result).rejects.toMatchObject({ cause: diagnostic })
+        : expect(result).resolves.toMatchObject({ data: [] }));
+      expect(sends).toBe(invalid ? 0 : 1);
+      expect(valueReads).toBe(1);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
+
+test.each(['own keys', 'iterator descriptor'] as const)(
   'rejects a record wrapper with unreadable $kind before transport dispatch',
   async (kind) => {
     const diagnostic = new Error('Synthetic wrapper requires transport unwrapping');
@@ -801,13 +867,6 @@ test.each(['own keys', 'iterator descriptor', 'prototype'] as const)(
             ...(kind === 'iterator descriptor'
               ? {
                   getOwnPropertyDescriptor: () => {
-                    throw diagnostic;
-                  },
-                }
-              : {}),
-            ...(kind === 'prototype'
-              ? {
-                  getPrototypeOf: () => {
                     throw diagnostic;
                   },
                 }
