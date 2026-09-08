@@ -112,12 +112,16 @@ function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: Pro
   return !('value' in right) && left.get === right.get && left.set === right.set;
 }
 
+interface RunStepDeltaState {
+  refreshRunStepDelta?: () => void;
+  getRunStepDelta?: () => RunStepDelta | undefined;
+}
+
 function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
   event: AssistantStreamEvent;
   exposedEvent: AssistantStreamEvent;
   runStepDeltaData: RunStepStreamEvent['data'] | undefined;
-  refreshRunStepDelta: (() => void) | undefined;
-  getRunStepDelta: (() => RunStepDelta | undefined) | undefined;
+  initializeRunStepDelta: (() => RunStepDeltaState) | undefined;
 } {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
@@ -160,8 +164,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     ? event
     : ({ event: eventType, data: stableData } as AssistantStreamEvent);
   let runStepDeltaData: RunStepStreamEvent['data'] | undefined;
-  let refreshRunStepDelta: (() => void) | undefined;
-  let getRunStepDelta: (() => RunStepDelta | undefined) | undefined;
+  let initializeRunStepDelta: (() => RunStepDeltaState) | undefined;
 
   if (eventType === 'thread.run.step.delta') {
     // Track listener-created envelope aliases on the original data, independently of delta content.
@@ -170,13 +173,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     // Capture the envelope identity before a user-defined delta getter can mutate it.
     const idDescriptor = Object.getOwnPropertyDescriptor(stableData, 'id');
     const deltaDescriptor = Object.getOwnPropertyDescriptor(stableData, 'delta');
-    const delta = Reflect.get(stableData, 'delta', stableData) as RunStepDelta;
-    // Reject even nonenumerable identity fields before reading any delta values.
-    if (delta && (hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id'))) {
-      throw new OpenAIError('Run-step deltas must not contain an id field');
-    }
-    // Capture the envelope without rereading an accessor-backed delta, even on frozen data.
-    // Delta content is projected privately for accumulation after raw listeners run.
+    // Capture the envelope without invoking an accessor-backed delta, even on frozen data.
     const capturedDescriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(stableData);
     if (idDescriptor) {
       capturedDescriptors['id'] = idDescriptor;
@@ -187,14 +184,24 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       configurable: true,
       enumerable: true,
       writable: true,
-      value: delta,
+      value: undefined,
     };
     const capturedData = Object.create(
       Object.getPrototypeOf(stableData),
       capturedDescriptors,
     ) as AssistantStreamEvent['data'] & { delta: unknown };
     stableData = capturedData;
-    if (delta && (typeof delta === 'object' || typeof delta === 'function')) {
+    initializeRunStepDelta = () => {
+      // Validate the captured envelope before reading delta content, then reject root identity fields
+      // before raw dispatch. Project content privately for accumulation after raw listeners run.
+      const delta = Reflect.get(exposedData, 'delta', exposedData) as RunStepDelta;
+      if (delta && (hasOwn(delta, 'id') || hasOwn(Object.getOwnPropertyDescriptors(delta), 'id'))) {
+        throw new OpenAIError('Run-step deltas must not contain an id field');
+      }
+      capturedData.delta = delta;
+      if (!delta || (typeof delta !== 'object' && typeof delta !== 'function')) {
+        return {};
+      }
       let observedDescriptor = deltaDescriptor;
       let observedDelta: RunStepDelta | undefined = delta;
       const readCurrentDelta = () => {
@@ -203,17 +210,14 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
           return observedDelta;
         }
         observedDescriptor = currentDescriptor;
-        if (currentDescriptor && 'value' in currentDescriptor) {
-          observedDelta = currentDescriptor.value as RunStepDelta;
-        } else {
-          observedDelta = currentDescriptor
-            ? (Reflect.get(exposedData, 'delta', exposedData) as RunStepDelta)
-            : undefined;
-        }
+        observedDelta = (
+          currentDescriptor && 'value' in currentDescriptor
+            ? currentDescriptor.value
+            : Reflect.get(exposedData, 'delta', exposedData)
+        ) as RunStepDelta;
         return observedDelta;
       };
-      getRunStepDelta = readCurrentDelta;
-      refreshRunStepDelta = () => {
+      const refreshRunStepDelta = () => {
         const currentDelta = readCurrentDelta();
         if (!currentDelta || (typeof currentDelta !== 'object' && typeof currentDelta !== 'function')) {
           capturedData.delta = currentDelta;
@@ -238,7 +242,8 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         }
         capturedData.delta = accumulationDelta as RunStepDelta;
       };
-    }
+      return { getRunStepDelta: readCurrentDelta, refreshRunStepDelta };
+    };
   }
   const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
 
@@ -246,8 +251,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     event: stableEvent,
     exposedEvent,
     runStepDeltaData,
-    refreshRunStepDelta,
-    getRunStepDelta,
+    initializeRunStepDelta,
   };
 }
 
@@ -499,8 +503,7 @@ export class AssistantStream
       event: stableEvent,
       exposedEvent,
       runStepDeltaData,
-      refreshRunStepDelta,
-      getRunStepDelta,
+      initializeRunStepDelta,
     } = stabilizeAssistantStreamEvent(event);
 
     let messageID: string | undefined;
@@ -530,6 +533,7 @@ export class AssistantStream
       }
     }
 
+    const { refreshRunStepDelta, getRunStepDelta } = initializeRunStepDelta?.() ?? {};
     this.#currentEvent = exposedEvent;
 
     this.#handleEvent(exposedEvent);
@@ -636,10 +640,6 @@ export class AssistantStream
 
     if (typeof runStepID !== 'string' || runStepID.length === 0) {
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
-    }
-
-    if (event.event === 'thread.run.step.delta' && event.data.delta && hasOwn(event.data.delta, 'id')) {
-      throw new OpenAIError('Run-step deltas must not contain an id field');
     }
 
     if (event.event === 'thread.run.step.created') {

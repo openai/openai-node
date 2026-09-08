@@ -498,33 +498,85 @@ describe('AssistantStream run-step deltas', () => {
     },
   );
 
-  test('validates the captured envelope ID before invoking its delta getter', async () => {
+  test.each([
+    { kind: 'foreign', id: 'step_foreign', error: /does not match the active run step/u },
+    { kind: 'missing', id: undefined, error: /invalid run-step ID/u },
+    { kind: 'non-string', id: 123, error: /invalid run-step ID/u },
+    { kind: 'no-active-step', id: 'step_trusted', error: /before creation of a snapshot/u },
+  ])('rejects a $kind envelope before invoking its delta getter', async ({ kind, id, error }) => {
     const step = runStep('step_trusted');
-    const data = Object.defineProperty({ id: 'step_foreign' }, 'delta', {
-      enumerable: true,
-      get() {
-        data.id = step.id;
-        return toolCallDelta(step.id).data.delta;
-      },
+    const data = id === undefined ? {} : { id };
+    const readDelta = vi.fn(() => {
+      throw new Error('Delta getter must not run before envelope validation');
     });
+    Object.defineProperty(data, 'delta', { enumerable: true, get: readDelta });
     const runner = unencodedAssistantStream([
-      { event: 'thread.run.step.created', data: step },
+      ...(kind === 'no-active-step' ? [] : [{ event: 'thread.run.step.created', data: step }]),
       { event: 'thread.run.step.delta', data },
       completedRun(),
     ]);
     const rawEvent = vi.fn();
     const stepDelta = vi.fn();
+    const toolCreated = vi.fn();
     runner.on('event', rawEvent);
     runner.on('runStepDelta', stepDelta);
+    runner.on('toolCallCreated', toolCreated);
 
-    await expect(runner.done()).rejects.toThrow(
-      'Received thread.run.step.delta for run step "step_foreign", which does not match the active run step "step_trusted"',
-    );
+    await expect(runner.done()).rejects.toThrow(error);
 
-    expect(rawEvent).toHaveBeenCalledTimes(1);
+    expect(readDelta).not.toHaveBeenCalled();
+    expect(rawEvent).toHaveBeenCalledTimes(kind === 'no-active-step' ? 0 : 1);
     expect(stepDelta).not.toHaveBeenCalled();
+    expect(toolCreated).not.toHaveBeenCalled();
     expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"}');
   });
+
+  test.each(['value', 'accessor'] as const)(
+    'uses an inherited delta %s after a raw listener deletes the shadowing property',
+    async (kind) => {
+      const step = runStep('step_original');
+      const data = { id: step.id, delta: toolCallDelta(step.id).data.delta };
+      const inheritedDelta = {
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, function: { arguments: ' inherited' } }],
+        },
+      };
+      const readInherited = vi.fn(function readInheritedDelta(this: typeof data) {
+        expect(this).toBe(data);
+        return inheritedDelta;
+      });
+      Object.setPrototypeOf(
+        data,
+        Object.defineProperty(
+          {},
+          'delta',
+          kind === 'value' ? { value: inheritedDelta } : { get: readInherited },
+        ),
+      );
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const stepDelta = vi.fn();
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          expect(Reflect.deleteProperty(event.data, 'delta')).toBe(true);
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(readInherited).toHaveBeenCalledTimes(kind === 'accessor' ? 1 : 0);
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).toBe(inheritedDelta);
+      expect(stepDelta.mock.calls[0]?.[1]).toBe(step);
+      expect(step.id).toBe('step_original');
+      expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} inherited');
+    },
+  );
 
   test('retains a proxy-provided delta until the property is actually replaced', async () => {
     const step = runStep('step_original');
