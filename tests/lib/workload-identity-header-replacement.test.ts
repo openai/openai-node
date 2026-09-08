@@ -15,65 +15,73 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllEnvs());
 
-test.each(['record getter', 'tuple getter', 'nested getter', 'data control', 'self-delete control'] as const)(
-  'does not replay an externally deleted %s after a retryable response',
-  async (kind) => {
-    const read = vi.fn(() => 'before');
-    const record: Record<string, string | readonly string[]> = {};
-    const row = ['X-Custom', 'before'];
-    const values = ['before'];
-    let headers: Record<string, string | readonly string[]> | string[][];
-    if (kind === 'tuple getter') {
-      Object.defineProperty(row, '1', { configurable: true, get: read });
-      headers = [row];
-    } else if (kind === 'nested getter') {
-      Object.defineProperty(values, '0', { configurable: true, get: read });
-      record['X-Custom'] = values;
-      headers = record;
-    } else if (kind === 'data control') {
-      record['X-Custom'] = 'before';
-      headers = record;
-    } else {
-      Object.defineProperty(record, 'X-Custom', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          const value = read();
-          if (kind === 'self-delete control') {
-            delete record['X-Custom'];
-          }
-          return value;
-        },
-      });
-      headers = record;
-    }
-    const sent: (string | null)[] = [];
-    const transport = createWorkloadIdentityTransport((_url, init) => {
-      sent.push(new Headers(init?.headers).get('X-Custom'));
-      if (sent.length === 1) {
-        if (kind === 'tuple getter') {
-          delete row[1];
-        } else if (kind !== 'self-delete control') {
+test.each([
+  'record getter',
+  'proxy record getter',
+  'tuple getter',
+  'tuple array getter',
+  'nested getter',
+  'data control',
+  'self-delete control',
+] as const)('does not replay an externally deleted %s after a retryable response', async (kind) => {
+  const read = vi.fn(() => 'before');
+  const record: Record<string, string | readonly string[]> = {};
+  const row = ['X-Custom', 'before'];
+  const values = ['before'];
+  let headers: Record<string, string | readonly string[]> | string[][];
+  if (kind === 'tuple getter' || kind === 'tuple array getter') {
+    Object.defineProperty(row, '1', {
+      configurable: true,
+      get: () => (kind === 'tuple array getter' ? [read()] : read()),
+    });
+    headers = [row];
+  } else if (kind === 'nested getter') {
+    Object.defineProperty(values, '0', { configurable: true, get: read });
+    record['X-Custom'] = values;
+    headers = record;
+  } else if (kind === 'data control') {
+    record['X-Custom'] = 'before';
+    headers = record;
+  } else {
+    Object.defineProperty(record, 'X-Custom', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        const value = read();
+        if (kind === 'self-delete control') {
           delete record['X-Custom'];
         }
-        return Response.json({ error: 'synthetic retry' }, { status: 500 });
+        return value;
+      },
+    });
+    headers = kind === 'proxy record getter' ? new Proxy(record, { ownKeys: () => ['X-Custom'] }) : record;
+  }
+  const sent: (string | null)[] = [];
+  const transport = createWorkloadIdentityTransport((_url, init) => {
+    sent.push(new Headers(init?.headers).get('X-Custom'));
+    if (sent.length === 1) {
+      if (kind === 'tuple getter' || kind === 'tuple array getter') {
+        delete row[1];
+      } else if (kind !== 'self-delete control') {
+        delete record['X-Custom'];
       }
-      return Response.json({ data: [] });
-    });
-    const client = new OpenAI({
-      ...createTestClientOptions(),
-      apiKey: null,
-      adminAPIKey: null,
-      fetch: transport.fetch,
-      maxRetries: 1,
-    });
+      return Response.json({ error: 'synthetic retry' }, { status: 500 });
+    }
+    return Response.json({ data: [] });
+  });
+  const client = new OpenAI({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 1,
+  });
 
-    await client.models.list({ headers });
+  await client.models.list({ headers });
 
-    expect(sent).toEqual(['before', kind === 'self-delete control' ? 'before' : null]);
-    expect(read).toHaveBeenCalledTimes(kind === 'data control' ? 0 : 1);
-  },
-);
+  expect(sent).toEqual(['before', kind === 'self-delete control' ? 'before' : null]);
+  expect(read).toHaveBeenCalledTimes(kind === 'data control' ? 0 : 1);
+});
 
 test.each(['before', 'after'] as const)(
   'keeps a self-removing getter %s an existing alias',

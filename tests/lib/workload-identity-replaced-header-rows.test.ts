@@ -292,6 +292,39 @@ test.each(['name', 'value'] as const)(
   },
 );
 
+test.each(['name', 'value'] as const)(
+  'retains a self-hiding %s getter whose descriptor becomes readable after its first access',
+  (slot) => {
+    const index = slot === 'name' ? 0 : 1;
+    const expected = slot === 'name' ? 'X-Custom' : 'preserved';
+    let reads = 0;
+    const target = ['X-Custom', 'preserved'];
+    Object.defineProperty(target, index, {
+      configurable: true,
+      get() {
+        reads += 1;
+        Object.defineProperty(target, index, { enumerable: false });
+        if (reads > 1) {
+          throw new Error('getter read twice');
+        }
+        return expected;
+      },
+    });
+    const row = new Proxy(target, {
+      getOwnPropertyDescriptor(object, key) {
+        if (key === String(index) && reads === 0) {
+          throw new Error('initial descriptor unavailable');
+        }
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+    });
+    const snapshot = snapshotHeaders([row]);
+
+    expect(snapshot.refresh().values.get('X-Custom')).toBe('preserved');
+    expect(reads).toBe(1);
+  },
+);
+
 test('does not freeze consumed columns because of an unused accessor', () => {
   const unused = vi.fn(() => 'unused');
   const row = ['Authorization', 'Bearer original'];

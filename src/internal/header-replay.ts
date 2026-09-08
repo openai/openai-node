@@ -86,9 +86,11 @@ interface HeaderValuesSnapshot {
 interface HeaderRowSnapshot {
   name: string;
   nameDescriptor: PropertyDescriptor | undefined;
+  nameDescriptorKnown: boolean;
   nameAfterRead?: { descriptor: PropertyDescriptor | undefined };
   nameStateful: boolean;
   valueDescriptor: PropertyDescriptor | undefined;
+  valueDescriptorKnown: boolean;
   valueAfterRead?: { descriptor: PropertyDescriptor | undefined };
   valueStateful: boolean;
   entries: readonly (readonly [string, string | null])[];
@@ -390,8 +392,10 @@ const captureRecordEntries = (
     if (typeof key !== 'string') {
       continue;
     }
-    present.add(key);
     const descriptor = Object.getOwnPropertyDescriptor(headers, key);
+    if (descriptor) {
+      present.add(key);
+    }
     const retained = replay.properties.get(key);
     if (
       retained &&
@@ -498,15 +502,39 @@ const orderRecordEntries = (
   return ordered;
 };
 
+const retainsRowProperty = (
+  current: { descriptor: PropertyDescriptor | undefined } | undefined,
+  initialKnown: boolean,
+  initial: PropertyDescriptor | undefined,
+  afterRead: { descriptor: PropertyDescriptor | undefined } | undefined,
+) => {
+  if (!current) {
+    return true;
+  }
+  if (!current.descriptor) {
+    return !afterRead || afterRead.descriptor === undefined;
+  }
+  if (initialKnown) {
+    return sameHeaderProperty(current.descriptor, initial);
+  }
+  return (
+    !!afterRead?.descriptor &&
+    !('value' in afterRead.descriptor) &&
+    sameHeaderProperty(current.descriptor, afterRead.descriptor)
+  );
+};
+
 const readRowName = (row: HeaderEntry, retained: HeaderRowSnapshot | undefined, track: boolean) => {
   const descriptorState = track ? getHeaderRowDescriptorState(row, '0') : undefined;
   const descriptor = descriptorState?.descriptor;
   const retain =
     retained?.nameStateful &&
-    (!descriptorState ||
-      (descriptor
-        ? sameHeaderProperty(descriptor, retained.nameDescriptor)
-        : !retained.nameAfterRead || retained.nameAfterRead.descriptor === undefined));
+    retainsRowProperty(
+      descriptorState,
+      retained.nameDescriptorKnown,
+      retained.nameDescriptor,
+      retained.nameAfterRead,
+    );
   const name = retain ? retained.name : row[0];
   if (typeof name !== 'string') {
     throw new TypeError('expected header name to be a string');
@@ -549,14 +577,16 @@ function* renameEntries(
 }
 
 const retainedRowEntries = (row: RowRead) => {
-  const { retained, valueDescriptor, valueDescriptorState, name, nameDescriptor, nameStateful } = row;
+  const { retained, valueDescriptorState, name, nameDescriptor, nameStateful } = row;
   if (
     !retained?.valueStateful ||
     retained.values ||
-    (valueDescriptorState &&
-      (valueDescriptor
-        ? !sameHeaderProperty(valueDescriptor, retained.valueDescriptor)
-        : !!retained.valueAfterRead?.descriptor))
+    !retainsRowProperty(
+      valueDescriptorState,
+      retained.valueDescriptorKnown,
+      retained.valueDescriptor,
+      retained.valueAfterRead,
+    )
   ) {
     return;
   }
@@ -603,7 +633,12 @@ const retainedRowValues = (row: RowRead, property: HeaderPropertySnapshot | unde
   }
   if (
     row.retained &&
-    (!row.valueDescriptor || sameHeaderProperty(row.valueDescriptor, row.retained.valueDescriptor))
+    retainsRowProperty(
+      row.valueDescriptorState,
+      row.retained.valueDescriptorKnown,
+      row.retained.valueDescriptor,
+      row.retained.valueAfterRead,
+    )
   ) {
     return row.retained.values;
   }
@@ -682,14 +717,16 @@ const rememberRow = (
   if (row.nameStateful || !refresh?.refreshable) {
     replay.rows ??= new Map();
     const rows = replay.rows.get(row.row) ?? new Map<number, HeaderRowSnapshot>();
-    const nameAfterRead = row.nameDescriptorState ? getHeaderRowDescriptorState(row.row, '0') : undefined;
-    const valueAfterRead = row.valueDescriptorState ? getHeaderRowDescriptorState(row.row, '1') : undefined;
+    const nameAfterRead = getHeaderRowDescriptorState(row.row, '0');
+    const valueAfterRead = getHeaderRowDescriptorState(row.row, '1');
     rows.set(row.occurrence, {
       name: row.name,
       nameDescriptor: row.nameDescriptor,
+      nameDescriptorKnown: !!row.nameDescriptorState,
       ...(nameAfterRead ? { nameAfterRead } : {}),
       nameStateful: row.nameStateful,
       valueDescriptor: row.valueDescriptor,
+      valueDescriptorKnown: !!row.valueDescriptorState,
       ...(valueAfterRead ? { valueAfterRead } : {}),
       valueStateful: !refresh?.refreshable,
       entries: row.captured,
