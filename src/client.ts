@@ -499,8 +499,9 @@ export class OpenAI {
     }
   >();
   #lastProviderAPIKey: string | null | undefined;
-  #capturingBaseAPIKey = false;
+  #baseAPIKeyCapture: ((apiKey: string | null) => void) | undefined;
   #preparedAPIKeys = new WeakMap<FinalRequestOptions, PreparedAPIKey>();
+  #activeCredentialOptions = new WeakSet<FinalRequestOptions>();
   #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
   #safeCredentialHooks = new Set<Function>([
     OpenAI.prototype._callApiKey,
@@ -906,11 +907,12 @@ export class OpenAI {
     apiKey: string | null,
   ): void {
     if (!capture) return;
-    this.#capturingBaseAPIKey = true;
+    const previousCapture = this.#baseAPIKeyCapture;
+    this.#baseAPIKeyCapture = capture;
     try {
       capture(apiKey);
     } finally {
-      this.#capturingBaseAPIKey = false;
+      this.#baseAPIKeyCapture = previousCapture;
     }
   }
 
@@ -944,16 +946,17 @@ export class OpenAI {
       }
     };
     let captured = false;
-    await this._callApiKey((apiKey) => {
+    const captureAPIKey = (apiKey: string | null) => {
       captured = true;
-      const capturedByBase = this.#capturingBaseAPIKey;
+      const capturedByBase = this.#baseAPIKeyCapture === captureAPIKey;
       remember({
         apiKey,
         tracksClientValue: apiKey === this.apiKey,
         allowClientOverride: this.hasCustomRequestCredentialHooks(),
         explicitCapture: !this.#safeCredentialHooks.has(this._callApiKey) && !capturedByBase,
       });
-    });
+    };
+    await this._callApiKey(captureAPIKey);
     if (!captured) {
       remember({
         apiKey: this.apiKey,
@@ -1293,12 +1296,23 @@ export class OpenAI {
     retriesRemaining: number | null,
     retryOfRequestLogID: string | undefined,
   ): Promise<APIResponseProps> {
-    const options = await optionsInput;
+    const inputOptions = await optionsInput;
+    // A request hook may recursively or concurrently reuse its caller's options.
+    // Give only those overlapping attempts a distinct WeakMap identity while
+    // forwarding all reads and writes to the original object.
+    const options =
+      this.hasCustomCredentialHooks() && this.#activeCredentialOptions.has(inputOptions)
+        ? new Proxy(inputOptions, {
+            get: (target, property) => Reflect.get(target, property, target),
+            set: (target, property, value) => Reflect.set(target, property, value, target),
+          })
+        : inputOptions;
     const maxRetries = options.maxRetries ?? this.maxRetries;
     if (retriesRemaining == null) {
       retriesRemaining = maxRetries;
     }
 
+    this.#activeCredentialOptions.add(options);
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
     const preparationAttempt: APIKeyPreparationAttempt = {};
@@ -1315,6 +1329,7 @@ export class OpenAI {
       await preparation;
     } catch (error) {
       this.#preparedAPIKeys.delete(options);
+      this.#activeCredentialOptions.delete(options);
       throw error;
     }
     let preparedAPIKey = preparationAttempt.prepared ?? this.#preparedAPIKeys.get(options);
@@ -1329,6 +1344,7 @@ export class OpenAI {
       }
     } catch (error) {
       this.#preparedAPIKeys.delete(options);
+      this.#activeCredentialOptions.delete(options);
       throw error;
     }
 
@@ -1384,6 +1400,7 @@ export class OpenAI {
     } catch (error) {
       apiKeyBuildContext.active = false;
       this.#preparedAPIKeys.delete(options);
+      this.#activeCredentialOptions.delete(options);
       x509Authentication?.retireRequestBody();
       if (
         x509Authentication &&
@@ -1400,6 +1417,7 @@ export class OpenAI {
       }
       throw error;
     }
+    this.#activeCredentialOptions.delete(options);
     const { req, url } = built;
     const timeout = x509Authentication
       ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)

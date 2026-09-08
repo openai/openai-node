@@ -322,6 +322,78 @@ test('supports _callApiKey overrides returning concurrent credentials without mu
   expect(client.apiKey).toBe('synthetic-configured');
 });
 
+test('treats transformed base callbacks as request-local credential captures', async () => {
+  class TransformedCredentials extends OpenAI {
+    protected override async prepareOptions(options: FinalRequestOptions) {
+      await super.prepareOptions(options);
+    }
+
+    override async _callApiKey(capture?: (apiKey: string | null) => void) {
+      return super._callApiKey((apiKey) => {
+        this.apiKey = `transformed-${apiKey}`;
+        capture?.(this.apiKey);
+      });
+    }
+  }
+  const provider = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-first')
+    .mockResolvedValueOnce('synthetic-second');
+  const fetch = mockFetch();
+  const client = new TransformedCredentials({ apiKey: provider, fetch });
+
+  await Promise.all([client.get('/first'), client.get('/second')]);
+
+  expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+    'Bearer transformed-synthetic-first',
+    'Bearer transformed-synthetic-second',
+  ]);
+});
+
+test('keeps prepared credentials through overlapping async hooks sharing options', async () => {
+  let signalEntered!: () => void;
+  let signalRelease!: () => void;
+  // oxlint-disable promise/avoid-new -- These gates enforce the shared-options overlap.
+  const entered = new Promise<void>((resolve) => {
+    signalEntered = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    signalRelease = resolve;
+  });
+  // oxlint-enable promise/avoid-new
+  class PausedHeaders extends OpenAI {
+    calls = 0;
+
+    protected override async authHeaders(options: FinalRequestOptions) {
+      this.calls += 1;
+      if (this.calls === 1) {
+        signalEntered();
+        await release;
+      }
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-first')
+    .mockResolvedValueOnce('synthetic-second');
+  const fetch = mockFetch();
+  const client = new PausedHeaders({ apiKey: provider, fetch });
+  const options: FinalRequestOptions = { method: 'get', path: '/items' };
+
+  const first = client.request(options);
+  await entered;
+  await client.request(options);
+  signalRelease();
+  await first;
+
+  expect(provider).toHaveBeenCalledTimes(2);
+  expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+    'Bearer synthetic-second',
+    'Bearer synthetic-first',
+  ]);
+});
+
 test('preserves apiKey assignments after delegated prepareOptions', async () => {
   class PreparedCredentials extends OpenAI {
     protected override async prepareOptions(options: FinalRequestOptions) {
