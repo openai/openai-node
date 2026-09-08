@@ -262,6 +262,13 @@ export function assertBedrockClientRequestOrigin(client: object, requestURL: str
   }
 }
 
+/** Prevents automatic redirects after merging a legacy Bedrock client's fetch options. */
+export function applyBedrockClientRequestRedirect(client: object, request: FinalizedRequestInit): void {
+  if (bedrockClientOrigins.has(client)) {
+    request.redirect = 'manual';
+  }
+}
+
 /** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
 export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): void {
   if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {

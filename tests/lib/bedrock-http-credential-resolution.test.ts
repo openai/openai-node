@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 
 import { BedrockOpenAI } from 'openai';
 import * as bedrockInternal from 'openai/internal/bedrock';
+import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 
 const baseURL = 'https://bedrock.example/openai/v1';
 const schemes = [
@@ -122,3 +123,39 @@ test('validates the exact direct-build URL without resolving query values again'
   expect(req.headers.get('authorization')).toBe('Bearer synthetic-direct');
   expect(provider).toHaveBeenCalledTimes(1);
 });
+
+test.each(['default', 'client', 'request', 'both'] as const)(
+  'uses manual redirects for a direct Bedrock build with %s fetch options',
+  async (configuration) => {
+    const provider = vi.fn(async () => 'synthetic-direct');
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new BedrockOpenAI({
+      baseURL,
+      bedrockTokenProvider: provider,
+      fetch,
+      ...(configuration === 'client' || configuration === 'both'
+        ? { fetchOptions: { redirect: 'follow' as const } }
+        : {}),
+    });
+
+    const { req, url } = await client.buildRequest({
+      method: 'get',
+      path: '/items',
+      ...(configuration === 'request' || configuration === 'both'
+        ? { fetchOptions: { redirect: 'follow' as const } }
+        : {}),
+    });
+
+    expect(req.redirect).toBe('manual');
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+
+    await client.fetchWithTimeout(url, req, 1000, new AbortController());
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('manual');
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+      'Bearer synthetic-direct',
+    );
+  },
+);

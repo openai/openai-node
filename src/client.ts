@@ -251,7 +251,7 @@ import {
   ChatCompletionsPage,
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
-import { assertBedrockClientRequestOrigin } from './internal/bedrock';
+import { applyBedrockClientRequestRedirect, assertBedrockClientRequestOrigin } from './internal/bedrock';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
@@ -508,6 +508,7 @@ export class OpenAI {
     OpenAI.prototype.prepareOptions,
     OpenAI.prototype.authHeaders,
     OpenAI.prototype.bearerAuth,
+    OpenAI.prototype.buildURL,
     OpenAI.prototype.buildRequest,
     OpenAI.prototype.prepareRequest,
   ]);
@@ -932,6 +933,7 @@ export class OpenAI {
       this.prepareOptions,
       this.authHeaders,
       this.bearerAuth,
+      this.buildURL,
       this.buildRequest,
       this.prepareRequest,
     ].every((hook) => this.#safeCredentialHooks.has(hook));
@@ -942,6 +944,7 @@ export class OpenAI {
       this.prepareOptions,
       this.authHeaders,
       this.bearerAuth,
+      this.buildURL,
       this.buildRequest,
       this.prepareRequest,
     ].every((hook) => this.#safeCredentialHooks.has(hook));
@@ -1996,6 +1999,7 @@ export class OpenAI {
       ...(((x509Authentication ? x509ClientFetchOptions : this.fetchOptions) as any) ?? {}),
       ...(((x509Authentication ? x509RequestFetchOptions : options.fetchOptions) as any) ?? {}),
     };
+    applyBedrockClientRequestRedirect(this, req);
 
     return { req, url, timeout: options.timeout };
   }

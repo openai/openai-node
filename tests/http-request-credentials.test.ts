@@ -513,6 +513,30 @@ test.each(['static', 'function'] as const)(
   },
 );
 
+test.each(['static', 'function'] as const)('preserves %s key updates in buildURL overrides', async (kind) => {
+  class RoutingClient extends OpenAI {
+    override buildURL(
+      path: string,
+      query: Record<string, unknown> | null | undefined,
+      defaultBaseURL?: string,
+    ) {
+      this.apiKey = 'synthetic-routing-hook';
+      return super.buildURL(path, query, defaultBaseURL);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const fetch = mockFetch();
+  const client = new RoutingClient({
+    apiKey: kind === 'static' ? 'synthetic-static' : provider,
+    fetch,
+  });
+
+  await client.get('/items');
+
+  expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-routing-hook');
+  expect(provider).toHaveBeenCalledTimes(kind === 'static' ? 0 : 1);
+});
+
 test.each(['success', 'preparation failure', 'build failure', 'request hook failure'] as const)(
   'retires prepared credentials after %s',
   async (outcome) => {

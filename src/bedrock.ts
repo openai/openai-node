@@ -224,6 +224,7 @@ export class BedrockOpenAI extends OpenAI {
     this.bedrockTokenProvider = bedrockTokenProvider;
     this.responses = restoreBedrockStreamOutputText(new API.Responses(this));
     this.markCredentialHooksSafe(
+      BedrockOpenAI.prototype.buildURL,
       BedrockOpenAI.prototype.prepareOptions,
       BedrockOpenAI.prototype.authHeaders,
       BedrockOpenAI.prototype.prepareRequest,
