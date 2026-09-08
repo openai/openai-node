@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
-import type { Response, RequestInit } from 'openai/internal/builtin-types';
+import type { RequestInit } from 'openai/internal/builtin-types';
 
 const originalFetch = global.fetch;
 

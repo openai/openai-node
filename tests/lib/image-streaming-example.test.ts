@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -57,6 +57,99 @@ async function runExample(directory: string, baseURL: string) {
 }
 
 describe('image-streaming executable example', () => {
+  test.each([
+    ['path traversal', 'images/../../victim', false],
+    ['null', null, false],
+    ['numeric string', '0', false],
+    ['fraction', 0.5, false],
+    ['negative', -1, false],
+    ['out of range', 3, false],
+    ['missing', undefined, false],
+    ['boolean', true, false],
+    ['object', {}, false],
+    ['array', [], false],
+    ['first partial', 0, true],
+    ['last partial', 2, true],
+  ] as const)(
+    'validates the partial image index before writing or logging: %s',
+    async (_name, index, valid) => {
+      const directory = await mkdtemp(path.join(tmpdir(), 'openai-image-stream-index-'));
+      const work = path.join(directory, 'work');
+      const victim = path.join(directory, 'victim1.png');
+      const sentinel = Buffer.from('original sentinel');
+      let requestBody = '';
+      const server = createServer((request, response) => {
+        request.setEncoding('utf-8');
+        request.on('data', (chunk: string) => {
+          requestBody += chunk;
+        });
+        request.on('end', () => {
+          response.writeHead(200, { 'content-type': 'text/event-stream', connection: 'close' });
+          response.end(
+            [
+              {
+                type: 'image_generation.partial_image',
+                partial_image_index: index,
+                b64_json: partialImage.toString('base64'),
+              },
+              { type: 'image_generation.completed', b64_json: finalImage.toString('base64') },
+            ]
+              .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+              .join(''),
+          );
+        });
+      });
+
+      try {
+        // The vulnerable filename resolves through this directory to the parent sentinel.
+        await mkdir(path.join(work, 'partial_images'), { recursive: true });
+        await writeFile(victim, sentinel);
+        server.listen(0, '127.0.0.1');
+        await once(server, 'listening');
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          throw new Error('Expected a loopback HTTP address');
+        }
+        const result = await runExample(work, `http://127.0.0.1:${address.port}/v1`);
+
+        expect(result.signal).toBeNull();
+        expect(JSON.parse(requestBody).partial_images).toBe(3);
+        expect(await readFile(victim)).toEqual(sentinel);
+        expect(await readdir(path.join(work, 'partial_images'))).toEqual([]);
+        if (valid && typeof index === 'number') {
+          const filename = `partial_${index + 1}.png`;
+          expect(result.code).toBe(0);
+          expect(result.stderr).toBe('');
+          expect(result.stdout).toContain(`Partial image ${index + 1}/3 received`);
+          expect(await readFile(path.join(work, filename))).toEqual(partialImage);
+          expect(await readFile(path.join(work, 'final_image.png'))).toEqual(finalImage);
+          expect(new Set(await readdir(work))).toEqual(
+            new Set(['final_image.png', filename, 'partial_images']),
+          );
+        } else {
+          expect(result.code).toBe(1);
+          expect(result.stdout).toBe('');
+          expect(result.stderr).toContain('Error generating image: Error: Invalid partial image index.');
+          expect(result.stderr).not.toContain('images/../../victim');
+          expect(result.stderr).not.toContain(partialImage.toString('base64'));
+          expect(result.stderr).not.toContain('synthetic-image-example-key');
+          expect(await readdir(work)).toEqual(['partial_images']);
+        }
+      } finally {
+        try {
+          if (server.listening) {
+            const closed = once(server, 'close');
+            server.close();
+            server.closeAllConnections();
+            await closed;
+          }
+        } finally {
+          await rm(directory, { recursive: true, force: true });
+        }
+      }
+    },
+  );
+
   test.each([
     'HTTP rejection',
     'SSE error',

@@ -248,14 +248,15 @@ const _parseJSON = (jsonString: string, allow: number) => {
       markPartialJSON('Unterminated number literal');
     }
 
+    const number = jsonString.substring(start, index);
     try {
-      return JSON.parse(jsonString.substring(start, index));
+      return JSON.parse(number);
     } catch {
-      if (jsonString.substring(start, index) === '-' && Allow.NUM & allow) {
+      if (number === '-' && Allow.NUM & allow) {
         markPartialJSON("Not sure what '-' is");
       }
       try {
-        return JSON.parse(jsonString.substring(start, jsonString.lastIndexOf('e')));
+        return JSON.parse(number.substring(0, number.lastIndexOf('e')));
       } catch (e) {
         throwMalformedError(String(e));
       }

@@ -19,13 +19,34 @@ const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchan
 // workload-identity path, so short-lived tokens keep a usable cache window.
 const MAX_REFRESH_BUFFER_FRACTION = 0.5;
 
+function calculateExpiresAt(expiresIn: unknown, exchangeStartedAt: number): number {
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+
+  const now = Date.now();
+  const fullLifetimeDeadline = now + expiresIn * 1000;
+  if (!Number.isSafeInteger(fullLifetimeDeadline) || fullLifetimeDeadline <= now) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+  const expiresAt = fullLifetimeDeadline - (performance.now() - exchangeStartedAt);
+  if (expiresAt <= now) {
+    throw new OpenAIError('Workload identity token expired before its exchange completed.');
+  }
+
+  return expiresAt;
+}
+
 function calculateRefreshAt(
   expiresAt: number,
-  now: number,
+  lifetimeSeconds: number,
   refreshBufferSeconds: number | undefined,
 ): number {
   const configuredBufferMs = (refreshBufferSeconds ?? 1200) * 1000;
-  const effectiveBufferMs = Math.min(configuredBufferMs, (expiresAt - now) * MAX_REFRESH_BUFFER_FRACTION);
+  const effectiveBufferMs = Math.min(
+    configuredBufferMs,
+    lifetimeSeconds * 1000 * MAX_REFRESH_BUFFER_FRACTION,
+  );
   return expiresAt - effectiveBufferMs;
 }
 
@@ -217,6 +238,8 @@ export class WorkloadIdentityAuth {
       body['client_id'] = this.config.clientId;
     }
 
+    // Exclude provider acquisition and measure delivery time independently of wall-clock changes.
+    const exchangeStartedAt = performance.now();
     const response = await this.fetch(this.tokenExchangeUrl, {
       method: 'POST',
       headers: {
@@ -261,21 +284,13 @@ export class WorkloadIdentityAuth {
     }
 
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
-    if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
-
-    const now = Date.now();
-    const expiresAt = now + expiresIn * 1000;
-    if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
+    const expiresAt = calculateExpiresAt(expiresIn, exchangeStartedAt);
 
     if (this.tokenGeneration === generation) {
       this.cachedToken = {
         token: accessToken,
         expiresAt,
-        refreshAt: calculateRefreshAt(expiresAt, now, this.config.refreshBufferSeconds),
+        refreshAt: calculateRefreshAt(expiresAt, expiresIn, this.config.refreshBufferSeconds),
       };
     }
 

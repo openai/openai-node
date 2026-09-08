@@ -93,6 +93,11 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
       return factory.createStringLiteral(`${node.text}/index${options.extname}`);
     }
 
+    // Declaration files have no emitted JavaScript counterpart.
+    if (node.text.endsWith('.d.ts') || node.text.endsWith('.d.mts') || node.text.endsWith('.d.cts')) {
+      return node;
+    }
+
     return factory.createStringLiteral(`${base}${options.extname}`);
   }
 

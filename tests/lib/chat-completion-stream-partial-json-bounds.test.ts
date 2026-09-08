@@ -207,6 +207,66 @@ function createStructuredStream(kind: 'content' | 'tool', fragments: Iterable<st
 
 afterEach(() => vi.restoreAllMocks());
 
+it.each(['content', 'tool'] as const)(
+  'keeps numeric recovery work linear for malformed serialized %s',
+  async (kind) => {
+    const content = `[${'[x,'.repeat(100)}"${'x'.repeat(1024 * 1024)}"]`;
+    const chunks = kind === 'content' ? contentFragments([content]) : argumentFragments([content]);
+    const client = createSerializedClient(chunks, vi.fn());
+    const { lastIndexOf } = String.prototype;
+    let searchedCharacters = 0;
+    const search = vi.spyOn(String.prototype, 'lastIndexOf').mockImplementation(function search(
+      this: string,
+      value: string,
+      position?: number,
+    ) {
+      if (value === 'e') {
+        searchedCharacters += this.length;
+      }
+      return lastIndexOf.call(this, value, position);
+    });
+    let failure: unknown;
+
+    try {
+      await client.chat.completions
+        .stream({
+          model: 'gpt-test',
+          messages: [{ role: 'user', content: 'Return structured output' }],
+          ...(kind === 'content' ? { response_format: structuredResponseFormat } : { tools: [strictTool] }),
+        })
+        .finalChatCompletion();
+    } catch (error) {
+      failure = error;
+    } finally {
+      search.mockRestore();
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).toMatchObject({ message: 'Error reading response: invalid structured output JSON.' });
+    expect(searchedCharacters).toBeLessThanOrEqual(content.length);
+  },
+);
+
+it.each(['content', 'tool'] as const)('preserves large valid serialized %s', async (kind) => {
+  const value = { value: 'x'.repeat(1024 * 1024) };
+  const content = JSON.stringify(value);
+  const chunks = kind === 'content' ? contentFragments([content]) : argumentFragments([content]);
+  const client = createSerializedClient(chunks, vi.fn());
+  const completion = await client.chat.completions
+    .stream({
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Return structured output' }],
+      ...(kind === 'content' ? { response_format: structuredResponseFormat } : { tools: [strictTool] }),
+    })
+    .finalChatCompletion();
+
+  expect(completion.choices[0]?.message).toMatchObject(
+    kind === 'content'
+      ? { parsed: value }
+      : { tool_calls: [{ type: 'function', function: { parsed_arguments: value } }] },
+  );
+});
+
 it.each(['strict', 'auto-parseable'] as const)(
   'captures receiver-bound %s argument accessors exactly once before all accounting and events',
   async (kind) => {

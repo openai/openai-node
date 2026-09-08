@@ -1426,6 +1426,25 @@ describe('AssistantStream run-step lifecycle', () => {
 });
 
 describe('AssistantStream factories and async iteration', () => {
+  test.each(['on', 'once'] as const)('preserves callback receivers for %s listeners', async (method) => {
+    const events = [{ event: 'thread.created', data: { id: 'thread_synthetic' } }, completedRun()];
+    const stream = assistantStream(events);
+    const unbound = vi.fn();
+    const bound = vi.fn();
+    const context = { name: 'caller-owned context' };
+
+    stream[method]('event', unbound);
+    stream[method]('event', bound.bind(context));
+    await stream.done();
+
+    const calls = (method === 'once' ? events.slice(0, 1) : events).map((event) => [event]);
+    expect(bound.mock.calls).toEqual(calls);
+    expect(bound.mock.contexts).toEqual(calls.map(() => context));
+    expect(unbound.mock.calls).toEqual(calls);
+    expect(unbound.mock.contexts).toHaveLength(calls.length);
+    expect(unbound.mock.contexts.every((receiver) => receiver === undefined)).toBe(true);
+  });
+
   test('surfaces a server error event from a readable stream as an APIError', async () => {
     const errorBody = {
       message: 'upstream exploded',

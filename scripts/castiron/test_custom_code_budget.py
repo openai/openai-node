@@ -7,9 +7,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock as mock
 from pathlib import Path
 from typing import Any, cast
-from unittest import mock
 
 import custom_code_budget as budget
 import test_custom_code_report as fixtures

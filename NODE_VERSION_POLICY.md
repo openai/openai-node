@@ -60,9 +60,12 @@ type-checked `scripts/check-node-version-policy.ts` fails when those projections
 drift and emits the matrix consumed by CI.
 
 Each month, `.github/workflows/node-version-review.yml` asks Codex to research
-the official Node.js schedule, reconcile the policy artifacts, run repository
-validation, and open or update one draft pull request. Generated changes never
-merge automatically.
+the official Node.js schedule and propose policy edits in a job with read-only
+repository access. Separate jobs verify the same JSON proposal against the
+workflow commit, run repository validation, and open or update one draft pull
+request. Only the publishing job has repository write access; it applies
+verified policy files without installing dependencies or executing proposed
+code. Generated changes never merge automatically.
 
 For upstream dates and lifecycle definitions, see the
 [Node.js release schedule](https://github.com/nodejs/Release/blob/main/schedule.json)

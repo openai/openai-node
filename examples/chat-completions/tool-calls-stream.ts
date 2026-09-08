@@ -147,7 +147,7 @@ async function main() {
     messages.push(message);
 
     // If there are no tool calls, we're done and can exit this loop
-    if (!message.tool_calls) {
+    if (!message.tool_calls?.length) {
       return;
     }
 
