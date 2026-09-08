@@ -262,6 +262,7 @@ import {
   createWorkloadHeaderSnapshots,
   canReplayHeaderInput,
   canPreserveHeaderInput,
+  getStructuralHeaderValue,
   type WorkloadHeaderSnapshots,
 } from './internal/headers';
 import { getVerifiedPlatformHeader } from './internal/platform-headers';
@@ -2712,7 +2713,14 @@ export class OpenAI {
         else credential.adopt(headers as Headers);
       } else {
         // Structural records and arrays may expose ordinary-looking descriptors while still
-        // performing stateful reads. Attribute them from the final dispatch snapshot only.
+        // performing stateful reads. Inspect only Authorization data descriptors here, then
+        // attribute the complete source from the final dispatch snapshot.
+        if (canPreserveHeaderInput(headers as HeadersLike)) {
+          const observed = getStructuralHeaderValue(headers as HeadersLike, 'Authorization');
+          if (!observed || bearerToken(observed.value) !== bearerToken(authorization)) {
+            credential.revoke();
+          }
+        }
         this.#pendingWorkloadHeaders.set(credential, headers);
       }
     }

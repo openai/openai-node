@@ -292,6 +292,70 @@ export const canPreserveHeaderInput = (headers: HeadersLike): boolean => {
   }
 };
 
+/** Reads only data descriptors, so unrelated structural header values remain untouched until dispatch. */
+export const getStructuralHeaderValue = (
+  headers: HeadersLike,
+  requestedName: string,
+): { value: string | null } | undefined => {
+  if (!headers) return { value: null };
+  try {
+    if (brand_privateNullableHeaders in headers || (!Array.isArray(headers) && Symbol.iterator in headers)) {
+      return undefined;
+    }
+    const requested = requestedName.toLowerCase();
+    let value: string | null = null;
+    const appendScalar = (input: HeaderValue): boolean => {
+      if (input === undefined) return true;
+      if (input === null) {
+        value = null;
+        return true;
+      }
+      value = value === null ? input : `${value}, ${input}`;
+      return true;
+    };
+    const appendInput = (input: HeaderValue | readonly HeaderValue[]): boolean => {
+      if (!isReadonlyArray(input)) return appendScalar(input);
+      const length = Object.getOwnPropertyDescriptor(input, 'length')?.value;
+      if (typeof length !== 'number') return false;
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
+        if (!descriptor || !('value' in descriptor) || !appendScalar(descriptor.value)) return false;
+      }
+      return true;
+    };
+    if (Array.isArray(headers)) {
+      const length = Object.getOwnPropertyDescriptor(headers, 'length')?.value;
+      if (typeof length !== 'number') return undefined;
+      for (let index = 0; index < length; index += 1) {
+        const rowDescriptor = Object.getOwnPropertyDescriptor(headers, String(index));
+        if (!rowDescriptor || !('value' in rowDescriptor) || !Array.isArray(rowDescriptor.value)) {
+          return undefined;
+        }
+        const nameDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '0');
+        const valueDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, '1');
+        if (!nameDescriptor || !('value' in nameDescriptor) || typeof nameDescriptor.value !== 'string') {
+          return undefined;
+        }
+        if (nameDescriptor.value.toLowerCase() !== requested) continue;
+        if (!valueDescriptor || !('value' in valueDescriptor) || !appendInput(valueDescriptor.value)) {
+          return undefined;
+        }
+      }
+      return { value };
+    }
+    for (const key of Reflect.ownKeys(headers)) {
+      if (typeof key !== 'string' || key.toLowerCase() !== requested) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(headers, key);
+      if (!descriptor?.enumerable || !('value' in descriptor)) return undefined;
+      value = null;
+      if (!appendInput(descriptor.value)) return undefined;
+    }
+    return { value };
+  } catch {
+    return undefined;
+  }
+};
+
 const hasStatefulArrayProperties = (
   array: readonly unknown[],
   iterator?: () => Iterator<unknown>,

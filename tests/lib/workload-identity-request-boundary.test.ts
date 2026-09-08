@@ -111,6 +111,75 @@ test.each([
   expect(reads).toBe(1);
 });
 
+test.each([
+  ['record', 'independent', 'in place'],
+  ['record', 'independent', 'original'],
+  ['record', 'missing', 'in place'],
+  ['record', 'missing', 'original'],
+  ['array', 'independent', 'in place'],
+  ['array', 'independent', 'original'],
+  ['array', 'missing', 'in place'],
+  ['array', 'missing', 'original'],
+] as const)(
+  'does not restore workload ownership after a %s Authorization starts %s and returns %s',
+  async (shape, initial, restoration) => {
+    let original: Headers | undefined;
+    let ownedAuthorization: string | null = null;
+    let record: Record<string, string> = {};
+    let rows: string[][] = [];
+    class HookClient extends OpenAI {
+      protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+        await super.prepareRequest(...args);
+        const [request] = args;
+        original = request.headers as Headers;
+        ownedAuthorization = original.get('Authorization');
+        record = Object.fromEntries(original);
+        if (initial === 'independent') {
+          record.authorization = 'Bearer independent';
+        } else {
+          Reflect.deleteProperty(record, 'authorization');
+        }
+        rows = Object.entries(record);
+        request.headers = shape === 'record' ? record : rows;
+      }
+      protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        if (!original || !ownedAuthorization) {
+          throw new Error('Expected prepared workload headers');
+        }
+        if (restoration === 'original') {
+          args[1].headers = original;
+        } else if (shape === 'record') {
+          record.authorization = ownedAuthorization;
+        } else {
+          const authorization = rows.find(([name]) => name === 'authorization');
+          if (authorization) {
+            authorization[1] = ownedAuthorization;
+          } else {
+            rows.push(['authorization', ownedAuthorization]);
+          }
+        }
+        return super.fetchWithAuth(...args);
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(sends).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test.each(['accessor', 'data control'] as const)(
   'keeps %s cache consistent with replacement headers',
   async (kind) => {
