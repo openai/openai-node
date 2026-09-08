@@ -645,6 +645,85 @@ describe('AssistantStream run-step deltas', () => {
     },
   );
 
+  test.each([
+    ['own', 'event', false],
+    ['own', 'event', true],
+    ['own', 'toolCallCreated', false],
+    ['own', 'toolCallCreated', true],
+    ['own', 'toolCallDelta', false],
+    ['own', 'toolCallDelta', true],
+    ['inherited', 'event', false],
+    ['inherited', 'toolCallDelta', false],
+  ] as const)(
+    'observes %s delta setters written by %s (contains id: %s)',
+    async (owner, listener, addIdentity) => {
+      const step = runStep('step_original');
+      const { delta: originalDelta } = toolCallDelta(step.id).data;
+      let currentDelta = originalDelta;
+      const data = { id: step.id };
+      const readDelta = vi.fn(function readCurrentDelta(this: typeof data) {
+        expect(this).toBe(data);
+        return currentDelta;
+      });
+      const writeDelta = vi.fn(function writeCurrentDelta(this: typeof data, value: typeof originalDelta) {
+        expect(this).toBe(data);
+        currentDelta = value;
+      });
+      const descriptor = { configurable: true, enumerable: true, get: readDelta, set: writeDelta };
+      if (owner === 'own') {
+        Object.defineProperty(data, 'delta', descriptor);
+      } else {
+        Object.setPrototypeOf(data, Object.defineProperty({}, 'delta', descriptor));
+      }
+      const primingDeltas = listener === 'toolCallDelta' ? [toolCallDelta(step.id)] : [];
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        ...primingDeltas,
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const replacement = {
+        step_details: {
+          type: 'tool_calls' as const,
+          tool_calls: [{ index: 0, type: 'function' as const, function: { arguments: ' replacement' } }],
+        },
+      };
+      const readID = vi.fn(() => '_alias');
+      if (addIdentity) {
+        Object.defineProperty(replacement, 'id', { enumerable: true, get: readID });
+      }
+      const stepDelta = vi.fn();
+      runner.on(listener, () => {
+        const event = runner.currentEvent();
+        if (event?.event === 'thread.run.step.delta') {
+          event.data.delta = replacement;
+        }
+      });
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(writeDelta).toHaveBeenCalledTimes(1);
+      expect(Object.is(currentDelta, replacement)).toBe(true);
+      expect(readID).not.toHaveBeenCalled();
+      expect(stepDelta).toHaveBeenCalledTimes(primingDeltas.length + 1);
+      const [emittedDelta, snapshot] = stepDelta.mock.calls[primingDeltas.length] ?? [];
+      if (addIdentity) {
+        expect(Object.is(emittedDelta, replacement)).toBe(false);
+        expect(emittedDelta).not.toHaveProperty('id');
+        expect(emittedDelta.step_details.tool_calls[0].function.arguments).toBe(
+          listener === 'event' ? ' replacement' : ' updated',
+        );
+      } else {
+        expect(emittedDelta).toBe(replacement);
+      }
+      expect(snapshot.id).toBe(step.id);
+      expect(snapshot.step_details.tool_calls[0].function.arguments).toBe(
+        `{"to":"trusted"}${listener === 'event' ? ' replacement' : ' updated'.repeat(primingDeltas.length + 1)}`,
+      );
+    },
+  );
+
   test('uses a raw listener value replacement of a configurable delta getter', async () => {
     const step = runStep('step_original');
     const { delta } = toolCallDelta(step.id).data;

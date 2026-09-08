@@ -114,7 +114,21 @@ function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: Pro
 
 interface RunStepDeltaState {
   refreshRunStepDelta?: () => void;
-  getRunStepDelta?: () => RunStepDelta | undefined;
+  getRunStepDelta?: (afterListeners?: boolean) => RunStepDelta | undefined;
+}
+
+function getInheritedDeltaDescriptor(data: object): PropertyDescriptor | undefined {
+  const visited = new Set<object>([data]);
+  let prototype = Object.getPrototypeOf(data);
+  while (prototype && !visited.has(prototype)) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'delta');
+    if (descriptor) {
+      return descriptor;
+    }
+    visited.add(prototype);
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return undefined;
 }
 
 function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
@@ -204,9 +218,13 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
       }
       let observedDescriptor = deltaDescriptor;
       let observedDelta: RunStepDelta | undefined = delta;
-      const readCurrentDelta = () => {
+      const readCurrentDelta = (afterListeners = false) => {
         const currentDescriptor = Object.getOwnPropertyDescriptor(exposedData, 'delta');
-        if (samePropertyDescriptor(currentDescriptor, observedDescriptor)) {
+        // A setter can change the backing value without replacing the property descriptor.
+        const refreshAccessor =
+          afterListeners &&
+          (currentDescriptor ?? getInheritedDeltaDescriptor(exposedData))?.set !== undefined;
+        if (!refreshAccessor && samePropertyDescriptor(currentDescriptor, observedDescriptor)) {
           return observedDelta;
         }
         observedDescriptor = currentDescriptor;
@@ -218,7 +236,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         return observedDelta;
       };
       const refreshRunStepDelta = () => {
-        const currentDelta = readCurrentDelta();
+        const currentDelta = readCurrentDelta(true);
         if (!currentDelta || (typeof currentDelta !== 'object' && typeof currentDelta !== 'function')) {
           capturedData.delta = currentDelta;
           return;
@@ -870,7 +888,7 @@ export class AssistantStream
     this: AssistantStream,
     event: RunStepStreamEvent,
     runStepID: string,
-    getRunStepDelta: (() => RunStepDelta | undefined) | undefined,
+    getRunStepDelta: RunStepDeltaState['getRunStepDelta'],
   ) {
     const accumulatedRunStep = this.#accumulateRunStep(event, runStepID);
     this.#currentRunStepSnapshot = accumulatedRunStep;
@@ -913,7 +931,7 @@ export class AssistantStream
         }
 
         // Select listener replacements after tool callbacks without changing the accumulated snapshot.
-        const exposedDelta = getRunStepDelta?.();
+        const exposedDelta = getRunStepDelta?.(true);
         this.#emitExposed(
           'runStepDelta',
           exposedDelta && !hasOwn(exposedDelta, 'id') ? exposedDelta : event.data.delta,
