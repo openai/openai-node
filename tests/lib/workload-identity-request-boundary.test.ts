@@ -252,6 +252,7 @@ test.each([
   ['array', 'value'],
   ['array', 'name'],
   ['array', 'slot'],
+  ['array', 'descriptor'],
 ] as const)(
   'does not let an unrelated %s %s accessor hide an independent Authorization',
   async (shape, accessor) => {
@@ -269,12 +270,23 @@ test.each([
           get: () => 'marker',
         });
         const note = ['X-Note', 'marker'] as [string, string];
-        if (accessor !== 'slot') {
+        if (accessor !== 'slot' && accessor !== 'descriptor') {
           Object.defineProperty(note, accessor === 'name' ? '0' : '1', {
             get: () => (accessor === 'name' ? 'X-Note' : 'marker'),
           });
         }
-        rows = [['Authorization', 'Bearer independent'], note];
+        const exposedNote =
+          accessor === 'descriptor'
+            ? new Proxy(note, {
+                getOwnPropertyDescriptor(target, key) {
+                  if (key === '0') {
+                    throw new Error('unrelated row descriptor unavailable');
+                  }
+                  return Reflect.getOwnPropertyDescriptor(target, key);
+                },
+              })
+            : note;
+        rows = [['Authorization', 'Bearer independent'], exposedNote];
         if (accessor === 'slot') {
           Object.defineProperty(rows, '1', { get: () => note });
         }
@@ -323,16 +335,16 @@ test.each(['outer', 'row'] as const)(
         const authorization = new Headers(request.headers).get('Authorization') ?? '';
         if (location === 'outer') {
           const rows: [string, string][] = [];
-          rows[Symbol.iterator] = function* iterator() {
+          Reflect.set(rows, Symbol.iterator, function* iterator(): Generator<[string, string], undefined> {
             yield ['Authorization', authorization];
-          };
+          });
           request.headers = rows;
         } else {
           const row = ['Authorization', 'Bearer independent'] as [string, string];
-          row[Symbol.iterator] = function* iterator() {
+          Reflect.set(row, Symbol.iterator, function* iterator(): Generator<string, undefined> {
             yield 'Authorization';
             yield authorization;
-          };
+          });
           request.headers = [row];
         }
       }
@@ -370,7 +382,7 @@ test.each(['delete', 'undefined'] as const)(
         if (kind === 'delete') {
           Reflect.deleteProperty(request, 'headers');
         } else {
-          request.headers = undefined;
+          Reflect.set(request, 'headers', undefined);
         }
       }
       protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
@@ -403,8 +415,13 @@ test.each(['delete', 'undefined'] as const)(
 test('retains workload ownership when a native Request supplies the effective fallback headers', async () => {
   class HookClient extends OpenAI {
     protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
-      args[0] = new Request(args[0], { headers: args[1].headers });
-      Reflect.deleteProperty(args[1], 'headers');
+      const [url, init] = args;
+      const { headers } = init;
+      if (!headers) {
+        throw new Error('Expected prepared workload headers');
+      }
+      args[0] = new Request(url, { headers });
+      Reflect.deleteProperty(init, 'headers');
       return super.fetchWithAuth(...args);
     }
   }
