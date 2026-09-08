@@ -4,6 +4,7 @@ import {
   getVerifiedPlatformHeader,
   hasNativeHeadersBrand,
 } from '../platform-headers';
+import { sameHeaderProperty } from '../header-descriptor-evidence';
 import type { HeadersLike, NullableHeaders, WorkloadHeaderSnapshots } from '../headers';
 
 /** Extracts a bearer credential while preserving the token's case-sensitive bytes. */
@@ -22,11 +23,36 @@ const matchesAuthorization = (actual: string | null, expected: string, exact: bo
   exact ? actual === expected : bearerToken(actual) === bearerToken(expected);
 
 const hasAuthorizationMismatch = (
-  observed: { value: string | null } | undefined,
+  observed: StructuralHeaderObservation | undefined,
   expected: string,
   exact: boolean,
 ): observed is { value: string | null } =>
-  observed !== undefined && !matchesAuthorization(observed.value, expected, exact);
+  observed !== undefined &&
+  observed.valueKnown !== false &&
+  !matchesAuthorization(observed.value, expected, exact);
+
+interface StructuralHeaderObservation {
+  value: string | null;
+  valueKnown?: boolean;
+  restorationDefinitive?: boolean;
+  descriptorEvidence?: readonly (readonly [string, PropertyDescriptor])[];
+}
+
+const sameDescriptorEvidence = (
+  current: StructuralHeaderObservation['descriptorEvidence'],
+  previous: StructuralHeaderObservation['descriptorEvidence'],
+): boolean | undefined => {
+  if (!current || !previous) {
+    return undefined;
+  }
+  return (
+    current.length === previous.length &&
+    current.every(
+      ([key, descriptor], index) =>
+        key === previous[index]?.[0] && sameHeaderProperty(descriptor, previous[index]?.[1]),
+    )
+  );
+};
 
 interface HeaderCredential {
   owner: object;
@@ -198,6 +224,7 @@ interface PendingHeaderObservation {
   source?: object;
   exact: boolean;
   observed?: string | null;
+  descriptorEvidence?: StructuralHeaderObservation['descriptorEvidence'];
 }
 
 interface StructuralHeaderMismatch {
@@ -214,16 +241,13 @@ export class WorkloadTokenProvenance {
   private readonly structuralHeader: (
     values: HeadersLike,
     name: string,
-  ) => { value: string | null; restorationDefinitive?: boolean } | undefined;
+  ) => StructuralHeaderObservation | undefined;
 
   /** Uses the canonical header parser while keeping its dependency on provenance acyclic. */
   constructor(
     parseHeaders: (values: HeadersLike) => NullableHeaders,
     canPreserveHeaders: (values: HeadersLike) => boolean,
-    structuralHeader: (
-      values: HeadersLike,
-      name: string,
-    ) => { value: string | null; restorationDefinitive?: boolean } | undefined,
+    structuralHeader: (values: HeadersLike, name: string) => StructuralHeaderObservation | undefined,
   ) {
     this.parseHeaders = parseHeaders;
     this.canPreserveHeaders = canPreserveHeaders;
@@ -455,12 +479,13 @@ export class WorkloadTokenProvenance {
     exactAuthorization: boolean,
     credential: WorkloadCredentialUsage,
     headers: object,
-    observed: { value: string | null } | undefined,
+    observed: StructuralHeaderObservation | undefined,
   ): boolean {
     const mismatch = this.structuralMismatches.get(credential);
     return (
       exactAuthorization &&
       observed !== undefined &&
+      observed.valueKnown !== false &&
       mismatch?.source === headers &&
       mismatch.restorationDefinitive
     );
@@ -472,6 +497,7 @@ export class WorkloadTokenProvenance {
     exact: boolean,
     source?: object,
     observed?: string | null,
+    descriptorEvidence?: StructuralHeaderObservation['descriptorEvidence'],
   ): void {
     const prior = this.pendingHeaders.get(credential);
     let retainedExact = exact;
@@ -479,6 +505,7 @@ export class WorkloadTokenProvenance {
       retainedExact =
         prior.source === undefined ||
         (prior.source === source &&
+          sameDescriptorEvidence(descriptorEvidence, prior.descriptorEvidence) !== false &&
           (prior.observed === undefined || observed === undefined || prior.observed === observed));
     }
     this.pendingHeaders.set(credential, {
@@ -486,6 +513,7 @@ export class WorkloadTokenProvenance {
       exact: retainedExact,
       ...(source ? { source } : undefined),
       ...(observed === undefined ? undefined : { observed }),
+      ...(descriptorEvidence ? { descriptorEvidence } : undefined),
     });
   }
 
@@ -510,7 +538,9 @@ export class WorkloadTokenProvenance {
     }
     const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
     return (
-      (current !== undefined && matchesAuthorization(current.value, authorization, mismatch.exact)) ||
+      (current !== undefined &&
+        current.valueKnown !== false &&
+        matchesAuthorization(current.value, authorization, mismatch.exact)) ||
       (mismatch.exact && dispatch !== undefined && dispatch.authorization !== authorization)
     );
   }
@@ -525,11 +555,16 @@ export class WorkloadTokenProvenance {
     if (pending.source !== headers) {
       return false;
     }
-    if (pending.observed === undefined) {
-      return true;
-    }
     const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
-    return current === undefined || current.value === pending.observed;
+    if (sameDescriptorEvidence(current?.descriptorEvidence, pending.descriptorEvidence) === false) {
+      return false;
+    }
+    return (
+      pending.observed === undefined ||
+      current === undefined ||
+      current.valueKnown === false ||
+      current.value === pending.observed
+    );
   }
 
   /** Keeps opaque sources unconsumed through hooks and defers their attribution to dispatch. */
@@ -588,7 +623,14 @@ export class WorkloadTokenProvenance {
           // retry ownership for this attempt.
           credential.revoke();
         }
-        this.rememberPendingHeaders(credential, request, exactAuthorization, headers, observed?.value);
+        this.rememberPendingHeaders(
+          credential,
+          request,
+          exactAuthorization,
+          headers,
+          observed?.valueKnown === false ? undefined : observed?.value,
+          observed?.descriptorEvidence,
+        );
       }
     }
   }

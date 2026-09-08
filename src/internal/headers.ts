@@ -104,7 +104,14 @@ export const canPreserveHeaderInput = (headers: HeadersLike): boolean => {
 export const getStructuralHeaderValue = (
   headers: HeadersLike,
   requestedName: string,
-): { value: string | null; restorationDefinitive?: boolean } | undefined => {
+):
+  | {
+      value: string | null;
+      valueKnown?: boolean;
+      restorationDefinitive?: boolean;
+      descriptorEvidence?: readonly (readonly [string, PropertyDescriptor])[];
+    }
+  | undefined => {
   if (!headers) return { value: null };
   try {
     if (brand_privateNullableHeaders in headers || (!Array.isArray(headers) && Symbol.iterator in headers)) {
@@ -113,6 +120,7 @@ export const getStructuralHeaderValue = (
     const requested = requestedName.toLowerCase();
     const entries: [string, HeaderValue][] = [];
     const enumerableEntries: [string, HeaderValue][] = [];
+    const descriptorEvidence: [string, PropertyDescriptor][] = [];
     let unknown = false;
     const copyInput = (input: unknown): { value: HeaderValue } | undefined => {
       if (typeof input === 'string') return { value: input };
@@ -178,9 +186,11 @@ export const getStructuralHeaderValue = (
         try {
           const descriptor = Object.getOwnPropertyDescriptor(headers, key);
           if (!descriptor || !('value' in descriptor)) {
+            if (descriptor) descriptorEvidence.push([key, descriptor]);
             unknown = true;
             continue;
           }
+          descriptorEvidence.push([key, descriptor]);
           const input = copyInput(descriptor.value);
           if (!input) {
             unknown = true;
@@ -195,7 +205,11 @@ export const getStructuralHeaderValue = (
         }
       }
     }
-    if (unknown && entries.length === 0) return undefined;
+    if (unknown && entries.length === 0) {
+      return !Array.isArray(headers) && descriptorEvidence.length > 0
+        ? { value: null, valueKnown: false, descriptorEvidence }
+        : undefined;
+    }
     const value = new Headers(entries as unknown as [string, string][]).get(requestedName);
     if (Array.isArray(headers)) {
       return { value };
@@ -207,7 +221,7 @@ export const getStructuralHeaderValue = (
     const enumerableValue = new Headers(enumerableEntries as unknown as [string, string][]).get(
       requestedName,
     );
-    return { value, restorationDefinitive: value === enumerableValue };
+    return { value, restorationDefinitive: value === enumerableValue, descriptorEvidence };
   } catch {
     return undefined;
   }

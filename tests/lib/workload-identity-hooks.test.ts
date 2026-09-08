@@ -498,13 +498,22 @@ describe('Workload identity request and dispatch hooks', () => {
     expect(transport.exchanges).toBe(1);
   });
 
-  test.each(['in place', 'native copy'] as const)(
+  test.each(['in place', 'native copy', 'data to accessor', 'accessor to data'] as const)(
     'recognizes %s dispatch normalization after canonical record preparation',
     async (shape) => {
       class HookClient extends OpenAI {
         // oxlint-disable-next-line class-methods-use-this -- This fixture prepares a canonical record.
         protected override async prepareRequest(init: RequestInit) {
-          init.headers = Object.fromEntries(new Headers(init.headers));
+          const record = Object.fromEntries(new Headers(init.headers));
+          if (shape === 'accessor to data') {
+            const { authorization } = record;
+            Object.defineProperty(record, 'authorization', {
+              enumerable: true,
+              configurable: true,
+              get: () => authorization,
+            });
+          }
+          init.headers = record;
         }
         override fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
           const [, init] = args;
@@ -516,6 +525,19 @@ describe('Workload identity request and dispatch hooks', () => {
             const normalized = authorization.replace(/^Bearer /u, 'bEaReR ');
             if (shape === 'native copy') {
               init.headers = new Headers({ Authorization: normalized });
+            } else if (shape === 'data to accessor') {
+              Object.defineProperty(init.headers, 'authorization', {
+                enumerable: true,
+                configurable: true,
+                get: () => normalized,
+              });
+            } else if (shape === 'accessor to data') {
+              Object.defineProperty(init.headers, 'authorization', {
+                enumerable: true,
+                configurable: true,
+                writable: true,
+                value: normalized,
+              });
             } else {
               (init.headers as Record<string, string>)['authorization'] = normalized;
             }
