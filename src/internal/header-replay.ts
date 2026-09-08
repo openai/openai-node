@@ -70,12 +70,16 @@ const getArrayIterator = <T>(headers: readonly T[]) => {
 };
 
 interface HeaderPropertySnapshot {
-  slot: CapturedSlot<readonly [string, string | readonly string[] | null] | undefined>;
+  slot: HeaderSlot<readonly [string, string | readonly string[] | null] | undefined>;
   capture?: () => void;
   values?: HeaderValuesSnapshot;
 }
 
-interface HeaderValuesSnapshot {
+interface ArrayTraversal {
+  length?: { boundary: number; fromDescriptor: boolean };
+}
+
+interface HeaderValuesSnapshot extends ArrayTraversal {
   source: readonly HeaderValue[];
   iterator: () => Iterator<HeaderValue>;
   slots: Map<number, CapturedSlot<HeaderValue>>;
@@ -87,7 +91,7 @@ interface HeaderRowSnapshot {
   values?: HeaderValuesSnapshot;
 }
 
-type HeaderSlot<T> = { kind: 'live'; value: T } | CapturedSlot<T>;
+type HeaderSlot<T> = { kind: 'live'; descriptor: PropertyDescriptor | undefined; value: T } | CapturedSlot<T>;
 interface CapturedSlot<T> {
   kind: 'captured';
   descriptor: PropertyDescriptor | undefined;
@@ -113,9 +117,14 @@ const reversed = <T>(values: readonly T[] = []): T[] =>
   // oxlint-disable-next-line unicorn/no-array-reverse
   [...values].reverse();
 
-const retainsSlot = <T>(slot: HeaderSlot<T> | undefined, descriptor: PropertyDescriptor | undefined) =>
-  slot?.kind === 'captured' &&
-  (descriptor ? sameHeaderProperty(descriptor, slot.descriptor) : slot.omittedDuringRead);
+const matchesSlot = <T>(slot: HeaderSlot<T> | undefined, descriptor: PropertyDescriptor | undefined) =>
+  slot !== undefined &&
+  (descriptor
+    ? sameHeaderProperty(descriptor, slot.descriptor)
+    : slot.kind === 'captured' && slot.omittedDuringRead);
+
+const retainsSlot = <T>(slot: HeaderSlot<T> | undefined, descriptor?: PropertyDescriptor) =>
+  slot?.kind === 'captured' && matchesSlot(slot, descriptor);
 
 const captureSlot = <T>(
   value: T,
@@ -155,10 +164,9 @@ interface TupleReplay {
   iterations: WeakSet<object>;
   rows: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
 }
-interface ArrayReplay extends TupleReplay {
+interface ArrayReplay extends TupleReplay, ArrayTraversal {
   kind: 'array';
   slots: Map<number, CapturedSlot<HeaderEntry>>;
-  length?: { boundary: number; fromDescriptor: boolean };
 }
 interface IteratorReplay extends TupleReplay {
   kind: 'iterator';
@@ -189,8 +197,10 @@ export class HeaderReplay {
       this.refreshable &&
       (state.kind === 'pending' ||
         (state.kind === 'record'
-          ? state.properties.size === 0
-          : state.rows.size === 0 &&
+          ? [...state.properties.values()].every((property) => property.slot.kind === 'live')
+          : [...state.rows.values()].every((rows) =>
+              [...rows.values()].every((row) => row.name.kind === 'live' && row.value.kind === 'live'),
+            ) &&
             (state.kind === 'iterator'
               ? !state.unverifiedHeaders
               : state.length?.fromDescriptor !== false && !state.slots.size)))
@@ -235,12 +245,10 @@ const invalidateRemovedOccurrences = (headers: readonly HeaderEntry[], replay: A
   }
 };
 
-// Read/yield sequencing is observable: capture self-removal only after the consumer serializes the slot.
-// oxlint-disable-next-line eslint/complexity
-function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: ArrayReplay): Generator<HeaderEntry> {
-  const previousLength = replay.length;
+// Preserve first-traversal live reads; later visits use verified descriptors or the observed boundary.
+function* iterateArrayIndices(source: readonly unknown[], traversal: ArrayTraversal): Generator<number> {
+  const previousLength = traversal.length;
   let fromDescriptor = previousLength?.fromDescriptor ?? true;
-  invalidateRemovedOccurrences(headers, replay);
   let index = 0;
   // The first traversal keeps native live-length reads. Replay uses the data descriptor when those
   // reads matched it; otherwise it retains the visited rows without invoking a length trap again.
@@ -248,12 +256,12 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: ArrayRepla
     let length: number;
     let lengthDescriptor: PropertyDescriptor | undefined;
     if (previousLength) {
-      lengthDescriptor = fromDescriptor ? getHeaderRowDescriptor(headers, 'length') : undefined;
+      lengthDescriptor = fromDescriptor ? getHeaderRowDescriptor(source, 'length') : undefined;
       length =
         lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : previousLength.boundary;
     } else {
-      ({ length } = headers);
-      lengthDescriptor = getHeaderRowDescriptor(headers, 'length');
+      ({ length } = source);
+      lengthDescriptor = getHeaderRowDescriptor(source, 'length');
     }
     fromDescriptor &&=
       typeof length === 'number' &&
@@ -263,6 +271,16 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: ArrayRepla
     if (!(index < Math.min(Math.floor(length), Number.MAX_SAFE_INTEGER))) {
       break;
     }
+    yield index;
+  }
+  traversal.length = { boundary: index, fromDescriptor };
+}
+
+// Read/yield sequencing is observable: capture self-removal only after the consumer serializes the slot.
+// oxlint-disable-next-line eslint/complexity
+function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: ArrayReplay): Generator<HeaderEntry> {
+  invalidateRemovedOccurrences(headers, replay);
+  for (const index of iterateArrayIndices(headers, replay)) {
     const descriptor = getHeaderRowDescriptor(headers, String(index));
     const retained = replay.slots.get(index);
     if (retained && retainsSlot(retained, descriptor)) {
@@ -284,9 +302,8 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: ArrayRepla
       yield row;
     }
   }
-  replay.length = { boundary: index, fromDescriptor };
   for (const slot of replay.slots?.keys() ?? []) {
-    if (slot >= index) {
+    if (slot >= (replay.length?.boundary ?? 0)) {
       replay.slots?.delete(slot);
     }
   }
@@ -294,8 +311,7 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: ArrayRepla
 
 function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Generator<HeaderValue> {
   const { source, slots } = snapshot;
-  let index = 0;
-  for (; index < Math.min(Math.floor(source.length), Number.MAX_SAFE_INTEGER); index += 1) {
+  for (const index of iterateArrayIndices(source, snapshot)) {
     const descriptor = getHeaderRowDescriptor(source, String(index));
     const retained = slots.get(index);
     if (retained && retainsSlot(retained, descriptor)) {
@@ -313,7 +329,7 @@ function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Gen
     yield normalized;
   }
   for (const slot of slots.keys()) {
-    if (slot >= index) {
+    if (slot >= (snapshot.length?.boundary ?? 0)) {
       slots.delete(slot);
     }
   }
@@ -443,7 +459,7 @@ const observeHeaderRecord = (
     if (
       retained &&
       descriptor &&
-      (!retainsSlot(retained.slot, descriptor) ||
+      (!matchesSlot(retained.slot, descriptor) ||
         descriptor.enumerable !== retained.slot.descriptor?.enumerable)
     ) {
       record.properties.delete(key);
@@ -461,7 +477,7 @@ const observeHeaderRecord = (
   for (const key of reversed(record.propertyOrder)) {
     if (present.has(key)) {
       nextKey = key;
-    } else if (record.properties.get(key)?.slot.omittedDuringRead) {
+    } else if (retainsSlot(record.properties.get(key)?.slot)) {
       const bucket = missing.get(nextKey) ?? [];
       bucket.push([key, undefined]);
       missing.set(nextKey, bucket);
@@ -515,7 +531,7 @@ function* iterateHeaderOccurrence(
     throw new TypeError('expected header name to be a string');
   }
   const nameStateful = retainName || !nameDescriptor || !('value' in nameDescriptor);
-  let capturedName: HeaderSlot<string> = { kind: 'live', value: name };
+  let capturedName: HeaderSlot<string> = { kind: 'live', descriptor: nameDescriptor, value: name };
   if (retainName) {
     capturedName = { ...retainedRow.name };
   } else if (nameStateful && trackRow) {
@@ -562,7 +578,7 @@ function* iterateHeaderOccurrence(
   }
   const retainedValues =
     retained?.values ??
-    (retainedRow && retainsSlot(retainedRow.value, valueDescriptor) ? retainedRow.values : undefined);
+    (retainedRow && matchesSlot(retainedRow.value, valueDescriptor) ? retainedRow.values : undefined);
   const headerValue = retainedValues?.source ?? row[1];
   if (shouldClear && rowReplay && descriptor && 'value' in descriptor && headerValue !== descriptor.value) {
     // A proxy's ordinary data descriptor cannot authorize rereading a different observed value.
@@ -571,8 +587,9 @@ function* iterateHeaderOccurrence(
   const values = isReadonlyArray(headerValue) ? headerValue : [headerValue];
   const statefulValues =
     rowReplay?.refreshable && isReadonlyArray(headerValue) && hasStatefulArrayProperties(values);
-  const valueIterator = retainedValues?.iterator ?? values[Symbol.iterator];
-  const valueSnapshot =
+  const liveValues = retained?.slot.kind === 'live' || retainedRow?.value.kind === 'live';
+  const valueIterator = (liveValues ? undefined : retainedValues?.iterator) ?? values[Symbol.iterator];
+  const valueSnapshot: HeaderValuesSnapshot | undefined =
     replay && isReadonlyArray(headerValue) && valueIterator === getArrayIterator(values)
       ? (retainedValues ?? { source: values, iterator: valueIterator, slots: new Map() })
       : undefined;
@@ -619,16 +636,16 @@ function* iterateHeaderOccurrence(
   if (capturedName.kind === 'captured') {
     capturedName.omittedDuringRead = !getHeaderRowDescriptor(row, '0');
   }
-  if (valueSnapshot?.slots.size && rowReplay) {
+  if (rowReplay && (valueSnapshot?.slots.size || valueSnapshot?.length?.fromDescriptor === false)) {
     rowReplay.refreshable = false;
   }
   if (capturedRow && iterable) {
-    if (nameStateful || !rowReplay?.refreshable) {
+    if (nameStateful || !rowReplay?.refreshable || valueSnapshot) {
       const rows = iterable.rows.get(row) ?? new Map<number, HeaderRowSnapshot>();
       rows.set(occurrence, {
         name: capturedName,
         value: rowReplay?.refreshable
-          ? { kind: 'live', value: capturedRow }
+          ? { kind: 'live', descriptor: valueDescriptor, value: capturedRow }
           : captureSlot(capturedRow, valueDescriptor, !getHeaderRowDescriptor(row, '1')),
         ...(valueSnapshot ? { values: valueSnapshot } : {}),
       });
@@ -641,22 +658,29 @@ function* iterateHeaderOccurrence(
     }
   }
   if (property && record) {
-    if (!rowReplay?.refreshable) {
+    if (valueSnapshot || !rowReplay?.refreshable) {
       property.capture?.();
       delete property.capture;
-      try {
-        const current = Object.getOwnPropertyDescriptor(source.kind === 'record' ? source.source : row, name);
-        property.slot.omittedDuringRead = !current?.enumerable;
-        if (current && sameHeaderProperty(current, property.slot.descriptor)) {
-          // A first read can hide itself; later visibility changes must still invalidate its replay.
-          property.slot.descriptor = {
-            ...property.slot.descriptor,
-            enumerable: current.enumerable === true,
-          };
+      if (rowReplay?.refreshable) {
+        property.slot = { kind: 'live', descriptor: property.slot.descriptor, value: property.slot.value };
+      } else {
+        try {
+          const current = Object.getOwnPropertyDescriptor(
+            source.kind === 'record' ? source.source : row,
+            name,
+          );
+          property.slot = captureSlot(property.slot.value, property.slot.descriptor, !current?.enumerable);
+          if (current && sameHeaderProperty(current, property.slot.descriptor)) {
+            // A first read can hide itself; later visibility changes must still invalidate its replay.
+            property.slot.descriptor = {
+              ...property.slot.descriptor,
+              enumerable: current.enumerable === true,
+            };
+          }
+        } catch {
+          // Preserve the successful read when a membrane prevents distinguishing self-removal.
+          property.slot = captureSlot(property.slot.value, property.slot.descriptor, true);
         }
-      } catch {
-        // Preserve the successful read when a membrane prevents distinguishing self-removal.
-        property.slot.omittedDuringRead = true;
       }
       record.properties.set(name, property);
     }

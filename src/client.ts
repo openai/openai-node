@@ -2692,9 +2692,23 @@ export class OpenAI {
     if (!credential || authorization === undefined) {
       return request;
     }
+    let headerDescriptor: PropertyDescriptor | undefined;
+    try {
+      headerDescriptor = Object.getOwnPropertyDescriptor(request, 'headers');
+    } catch {
+      // Opaque request membranes cannot prove that the header property is an accessor.
+    }
     let headers = request.headers;
     if (headers === undefined) return request;
-    if (this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization) === false) {
+    const ownership = this.#workloadTokenProvenance.matchesHeaderCredential(headers, authorization);
+    // Accessors can return a fresh unmarked collection on every read; equal bytes do not attest ownership.
+    if (
+      ownership === false ||
+      (ownership === undefined &&
+        headerDescriptor &&
+        !('value' in headerDescriptor) &&
+        hasNativeHeadersBrand(headers))
+    ) {
       credential.revoke();
       return request;
     }

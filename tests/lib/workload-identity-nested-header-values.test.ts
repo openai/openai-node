@@ -341,3 +341,95 @@ test('leaves tuple descriptor inspection out of ordinary static-credential reque
   await client.models.list({ headers: [row] });
   expect(inspect).not.toHaveBeenCalled();
 });
+
+describe.each(['request', 'default'] as const)('nested %s traversal boundary', (layer) => {
+  test.each([
+    ['shorter', false],
+    ['throws', false],
+    ['shorter', true],
+    ['throws', true],
+  ] as const)(
+    'retains a proxy length that later %s with an observed boundary: %s',
+    async (laterLength, observed) => {
+      let acquired = false;
+      const lengths = vi.fn((target: (string | undefined)[]) => {
+        if (acquired) {
+          if (laterLength === 'throws') {
+            throw new Error('Nested length was read again');
+          }
+          return 0;
+        }
+        return observed ? 1 : target.length;
+      });
+      const values: (string | undefined)[] = ['preserved'];
+      const authorization: (string | undefined)[] = [undefined];
+      if (observed) {
+        values.push('unvisited');
+        authorization.push('unvisited');
+      }
+      const proxy = (target: (string | undefined)[]) =>
+        new Proxy(target, {
+          get(array, key, receiver) {
+            return key === 'length' ? lengths(array) : Reflect.get(array, key, receiver);
+          },
+        });
+      const headers = { 'X-Custom': proxy(values), Authorization: proxy(authorization) };
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        acquired = true;
+        authorization[0] = 'Bearer synthetic-independent';
+        return 'subject-token';
+      };
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        const sent = new Headers(init?.headers);
+        expect(sent.get('X-Custom')).toBe('preserved');
+        expect(sent.get('Authorization')).toBe('Bearer synthetic-independent');
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        maxRetries: 0,
+        workloadIdentity: identity,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+      });
+      await client.models.list(layer === 'request' ? { headers } : {});
+      expect(lengths).toHaveBeenCalledTimes(4);
+      expect(transport.exchanges).toBe(1);
+    },
+  );
+});
+
+test.each(['request', 'default'] as const)(
+  'refreshes an ordinary nested %s iterator replacement',
+  async (layer) => {
+    const values = ['before'];
+    const headers = { 'X-Custom': values };
+    const identity = createTestWorkloadIdentity();
+    identity.provider.getToken = async () => {
+      Object.defineProperty(values, Symbol.iterator, {
+        *value(this: unknown) {
+          expect(this).toBe(values);
+          yield 'after';
+        },
+      });
+      return 'subject-token';
+    };
+    const transport = createWorkloadIdentityTransport((_url, init) => {
+      expect(new Headers(init?.headers).get('X-Custom')).toBe('after');
+      return Response.json({ data: [] });
+    });
+    const client = new OpenAI({
+      ...createTestClientOptions(),
+      apiKey: null,
+      adminAPIKey: null,
+      maxRetries: 0,
+      workloadIdentity: identity,
+      ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+      fetch: transport.fetch,
+    });
+    await client.models.list(layer === 'request' ? { headers } : {});
+  },
+);
