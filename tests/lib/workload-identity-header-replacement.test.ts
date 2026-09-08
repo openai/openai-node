@@ -172,6 +172,81 @@ describe.each(['request', 'default', 'shared'] as const)('initially non-emitting
   });
 });
 
+describe.each(['request', 'default'] as const)('replaced %s nested iterator alias', (layer) => {
+  describe.each(['inherited', 'getter', 'self-removing getter'] as const)('%s native iterator', (initial) => {
+    test.each([
+      ['replacement', 401],
+      ['replacement', 500],
+      ['unchanged', 401],
+      ['removal', 401],
+    ] as const)('preserves %s during acquisition and %i', async (change, status) => {
+      const values: (string | null)[] = ['Bearer initial'];
+      const nativeIterator = values[Symbol.iterator];
+      const readIterator = vi.fn(() => {
+        if (initial === 'self-removing getter') {
+          Reflect.deleteProperty(values, Symbol.iterator);
+        }
+        return nativeIterator;
+      });
+      if (initial !== 'inherited') {
+        Object.defineProperty(values, Symbol.iterator, { configurable: true, get: readIterator });
+      }
+      const headers: Record<string, string | (string | null)[]> = { authorization: values };
+      const read = vi.fn(() => {
+        delete headers['Authorization'];
+        return 'Bearer workload-identity-auth';
+      });
+      Object.defineProperty(headers, 'Authorization', { enumerable: true, configurable: true, get: read });
+      const replacement = change === 'removal' ? null : 'Bearer independent';
+      const cursor = [replacement][Symbol.iterator]();
+      const iterate = vi.fn(() => cursor);
+      const identity = createTestWorkloadIdentity();
+      identity.provider.getToken = async () => {
+        if (change !== 'unchanged') {
+          Object.defineProperty(values, Symbol.iterator, { configurable: true, value: iterate });
+        }
+        return 'subject-token';
+      };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((url, init) => {
+        const request = new Request(url, init as globalThis.RequestInit);
+        expect(request.method).toBe('POST');
+        sent.push(request.headers.get('Authorization'));
+        return Response.json({ error: 'synthetic retry' }, { status, headers: { 'retry-after-ms': '0' } });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        workloadIdentity: identity,
+        defaultHeaders: layer === 'default' ? headers : undefined,
+        fetch: transport.fetch,
+        maxRetries: status === 500 ? 1 : 0,
+      });
+
+      await expect(
+        client.post('/synthetic', {
+          headers: layer === 'request' ? headers : undefined,
+          body: { input: 'synthetic' },
+        }),
+      ).rejects.toMatchObject({ status });
+
+      const expected =
+        change === 'replacement'
+          ? ['Bearer independent']
+          : ['Bearer access-token-1', 'Bearer access-token-2'];
+      if (status === 500) {
+        expected.push('Bearer independent');
+      }
+      expect(sent).toEqual(expected);
+      expect(transport.exchanges).toBe(change === 'replacement' ? 1 : 2);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(readIterator).toHaveBeenCalledTimes(initial === 'inherited' ? 0 : 1);
+      if (change === 'replacement') {
+        expect(iterate).toHaveBeenCalledTimes(1);
+      }
+    });
+  });
+});
+
 describe.each(['request', 'default'] as const)('replaced %s Authorization accessor', (layer) => {
   describe.each(['data', 'mixed'] as const)('%s nested alias', (kind) => {
     test.each([

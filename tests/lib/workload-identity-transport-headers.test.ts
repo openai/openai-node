@@ -832,6 +832,49 @@ test.each(['native iterator', 'record', 'array'] as const)(
   },
 );
 
+test('does not dispatch a record whose failed field read makes its shape opaque', async () => {
+  const diagnostic = new Error('Synthetic header parse failure');
+  class HookClient extends OpenAI {
+    override async fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+      if (!args[1]) {
+        throw new Error('Expected request init');
+      }
+      let opaque = false;
+      const target = {
+        get 'X-Trace'() {
+          opaque = true;
+          throw diagnostic;
+        },
+      };
+      args[1].headers = new Proxy(target, {
+        ownKeys(value) {
+          if (opaque) {
+            throw new Error('Synthetic unavailable keys');
+          }
+          return Reflect.ownKeys(value);
+        },
+      });
+      return super.fetchWithTimeout(...args);
+    }
+  }
+  let dispatches = 0;
+  const transport = createWorkloadIdentityTransport(() => {
+    dispatches += 1;
+    return Response.json({ data: [] });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.models.list()).rejects.toMatchObject({ cause: diagnostic });
+  expect(dispatches).toBe(0);
+  expect(transport.exchanges).toBe(1);
+});
+
 test.each(
   (['iterator', 'custom array', 'native Headers'] as const).flatMap((source) =>
     (['before first row', 'after first row'] as const).map((when) => ({ source, when })),
@@ -961,7 +1004,7 @@ test.each(['record', 'array'] as const)('selects a stateful $source header proto
   expect(sent).toEqual([source]);
 });
 
-test.each(['hidden proxy', 'phantom proxy', 'symbol'] as const)(
+test.each(['hidden record', 'hidden proxy', 'phantom proxy', 'symbol'] as const)(
   'preserves native record conversion for a $kind header input',
   async (kind) => {
     const makeSource = () => {
@@ -970,8 +1013,11 @@ test.each(['hidden proxy', 'phantom proxy', 'symbol'] as const)(
         record[Symbol('synthetic')] = 'value';
         return record;
       }
-      if (kind === 'hidden proxy') {
+      if (kind === 'hidden record' || kind === 'hidden proxy') {
         Object.defineProperty(record, 'X-Hidden', { value: 'hidden' });
+      }
+      if (kind === 'hidden record') {
+        return record;
       }
       return new Proxy(
         record,
