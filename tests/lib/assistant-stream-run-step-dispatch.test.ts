@@ -340,6 +340,49 @@ describe('AssistantStream run-step dispatch ordering', () => {
     },
   );
 
+  test.each([
+    ['envelope', 'invalid'],
+    ['snapshot', 'invalid'],
+    ['envelope', 'safe alias'],
+    ['snapshot', 'safe alias'],
+  ] as const)(
+    'validates a %s mutation (%s) during projection before tool callbacks',
+    async (owner, mutation) => {
+      const step = runStep('step_original');
+      const { step_details: details } = toolCallDelta(step.id).data.delta;
+      const data = { id: step.id, delta: {} };
+      const readDetails = vi.fn(() => {
+        const target = owner === 'envelope' ? data : step;
+        target.id = mutation === 'invalid' ? '' : 'step_safe_alias';
+        return details;
+      });
+      Object.defineProperty(data.delta, 'step_details', { enumerable: true, get: readDetails });
+      const runner = unencodedAssistantStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data },
+        completedRun(),
+      ]);
+      const toolCreated = vi.fn();
+      const stepDelta = vi.fn();
+      runner.on('toolCallCreated', toolCreated);
+      runner.on('runStepDelta', stepDelta);
+
+      if (mutation === 'invalid') {
+        await expect(runner.done()).rejects.toThrow(/invalid run-step ID/u);
+        expect(toolCreated).not.toHaveBeenCalled();
+        expect(stepDelta).not.toHaveBeenCalled();
+        expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"}');
+      } else {
+        await runner.done();
+        expect(toolCreated).toHaveBeenCalledTimes(1);
+        expect(stepDelta).toHaveBeenCalledTimes(1);
+        expect(stepDelta.mock.calls[0]?.[0]).toBe(data.delta);
+        expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} updated');
+      }
+      expect(readDetails).toHaveBeenCalled();
+    },
+  );
+
   describe.each([
     ['SSE', publicAssistantStream],
     ['serialized stream', assistantStream],

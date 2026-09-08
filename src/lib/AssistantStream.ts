@@ -616,7 +616,17 @@ export class AssistantStream
         if (activeRunStep) {
           this.#reserveRunStepAlias(activeRunStep, runStepID);
         }
-        refreshRunStepDelta?.(rawEventListenersRan);
+        if (refreshRunStepDelta) {
+          refreshRunStepDelta(rawEventListenersRan);
+          // Projection may invoke user-defined getters or Proxy traps. Revalidate their
+          // identity mutations before accumulation or any typed callbacks observe them.
+          if (runStepData !== undefined) {
+            this.#reserveRunStepAlias(runStepData, runStepID);
+          }
+          if (activeRunStep) {
+            this.#reserveRunStepAlias(activeRunStep, runStepID);
+          }
+        }
         this.#handleRunStep(stableEvent, runStepID, getRunStepDelta);
         if (runStepData !== undefined) {
           this.#reserveRunStepAlias(runStepData, runStepID);
