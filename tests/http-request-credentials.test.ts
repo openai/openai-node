@@ -182,7 +182,7 @@ describe.each(clients)('%s HTTP credentials', (kind) => {
   });
 
   test.each(['empty', 'rejected'] as const)(
-    'releases an upload iterator after a %s credential without waiting for cleanup',
+    'rejects a %s credential before starting an upload iterator',
     async (failure) => {
       const provider = vi.fn(async () => {
         if (failure === 'rejected') {
@@ -209,7 +209,7 @@ describe.each(clients)('%s HTTP credentials', (kind) => {
           : "Expected 'apiKey' function argument to return a string",
       );
 
-      expect(release).toHaveBeenCalledTimes(1);
+      expect(release).not.toHaveBeenCalled();
       expect(provider).toHaveBeenCalledTimes(1);
       expect(fetch).not.toHaveBeenCalled();
     },
@@ -238,7 +238,7 @@ test('preserves the credential failure when upload cleanup throws during a direc
   expect(release).toHaveBeenCalledTimes(1);
 });
 
-test('preserves one-argument delegating hooks and resolves credentials after options and body preparation', async () => {
+test('preserves one-argument delegating hooks and resolves credentials through options preparation', async () => {
   const events: string[] = [];
   class HookedOpenAI extends OpenAI {
     protected override async prepareOptions(options: FinalRequestOptions) {
@@ -276,7 +276,7 @@ test('preserves one-argument delegating hooks and resolves credentials after opt
     },
   });
 
-  expect(events).toEqual(['prepare', 'prepared', 'build', 'body', 'auth', 'credential']);
+  expect(events).toEqual(['prepare', 'credential', 'prepared', 'build', 'body', 'auth']);
   expect(provider).toHaveBeenCalledTimes(1);
   expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-hook');
   expect(sentHeaders(fetch)[0]?.get('x-prepared')).toBe('yes');
@@ -295,13 +295,14 @@ test('uses a Bedrock callback once when both security schemes are requested', as
   expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-bedrock');
 });
 
-test('supports resolver overrides returning concurrent credentials without mutating apiKey', async () => {
+test('supports _callApiKey overrides returning concurrent credentials without mutating apiKey', async () => {
   class CustomCredentials extends OpenAI {
     resolutions = 0;
 
-    protected override async resolveAPIKey() {
+    override async _callApiKey(capture?: (apiKey: string | null) => void) {
       this.resolutions += 1;
-      return `synthetic-resolved-${this.resolutions}`;
+      capture?.(`synthetic-resolved-${this.resolutions}`);
+      return true;
     }
   }
   const fetch = mockFetch();
@@ -315,6 +316,21 @@ test('supports resolver overrides returning concurrent credentials without mutat
     'Bearer synthetic-resolved-2',
   ]);
   expect(client.apiKey).toBe('synthetic-configured');
+});
+
+test('preserves apiKey assignments after delegated prepareOptions', async () => {
+  class PreparedCredentials extends OpenAI {
+    protected override async prepareOptions(options: FinalRequestOptions) {
+      await super.prepareOptions(options);
+      this.apiKey = `synthetic-prepared-${options.path}`;
+    }
+  }
+  const fetch = mockFetch();
+  const client = new PreparedCredentials({ apiKey: async () => 'synthetic-provider', fetch });
+
+  await client.get('/items');
+
+  expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-prepared-/items');
 });
 
 test('does not resolve the OpenAI callback for admin-only requests', async () => {

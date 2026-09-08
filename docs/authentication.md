@@ -44,29 +44,27 @@ const client = new OpenAI({
 This also works with an OAuth bearer-token provider for a compatible endpoint;
 see the [Azure v1 example](azure.md#v1-api).
 
-For HTTP requests, the SDK resolves the credential while constructing authentication
-headers and uses that invocation's result directly. Each retry resolves a fresh
+For HTTP requests, the SDK keeps each credential resolution associated with its
+request and uses that invocation's result directly. Each retry resolves a fresh
 credential. `client.apiKey` still exposes the most recently resolved value, but it
 is shared across requests and must not be used to select a concurrent request's
 credential. Static credentials continue to use the current `client.apiKey` value.
 
 #### Subclass authentication hooks
 
-Function credentials are resolved after `prepareOptions` and request URL/body
-construction. Calling `buildRequest` directly also resolves a function credential.
+Function credentials continue to resolve through `prepareOptions` and `_callApiKey`.
+Calling `buildRequest` directly also resolves a function credential.
 Default and request headers retain their existing precedence over SDK authentication.
 
-For bearer-token authentication, subclasses that customized HTTP credentials through `_callApiKey` or
-assigned `this.apiKey` after `super.prepareOptions()` should override
-`resolveAPIKey()` and return the credential instead. Overrides of `authHeaders`
-or `bearerAuth` can continue to return custom authentication headers. Delegating
-hooks keep their existing arguments; no request context needs to be forwarded.
-`_callApiKey` remains available with its existing boolean return and capture callback
-for Realtime and direct callers, but ordinary HTTP authentication no longer calls it.
+Existing bearer-token subclasses that customize `_callApiKey`, or assign
+`this.apiKey` after `super.prepareOptions()`, remain supported. Overrides of
+`authHeaders` or `bearerAuth` can continue to return custom authentication headers.
+Delegating hooks keep their existing arguments; no request context needs to be
+forwarded.
 
-`AzureOpenAI` uses `resolveAPIKey()` for `azureADTokenProvider`, but a static
-`apiKey` uses Azure's `api-key` header without calling `resolveAPIKey()` or
-`bearerAuth()`. For an Azure subclass that refreshes API keys, override
+`AzureOpenAI` uses the inherited function-credential lifecycle for
+`azureADTokenProvider`, but a static `apiKey` uses Azure's `api-key` header. For
+an Azure subclass that refreshes API keys, override
 `authHeaders()` instead. Delegate to Azure first to preserve security-scheme
 selection, then replace its `api-key` value:
 

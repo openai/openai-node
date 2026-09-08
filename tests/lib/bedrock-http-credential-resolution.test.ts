@@ -14,13 +14,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test.each(schemes)('treats a null Bedrock resolver result as final with %j', async (__security) => {
+test.each(schemes)('treats a null Bedrock _callApiKey result as final with %j', async (__security) => {
   class MissingCredentials extends BedrockOpenAI {
     resolutions = 0;
 
-    protected override async resolveAPIKey() {
+    override async _callApiKey(capture?: (apiKey: string | null) => void) {
       this.resolutions += 1;
-      return this.resolutions === 1 ? null : 'synthetic';
+      capture?.(this.resolutions === 1 ? null : 'synthetic');
+      return true;
     }
   }
   const client = new MissingCredentials({ baseURL, apiKey: 'synthetic-configured' });

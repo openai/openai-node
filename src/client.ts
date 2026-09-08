@@ -480,6 +480,11 @@ export class OpenAI {
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
+  #apiKeyResolution = 0;
+  #preparedAPIKeys = new WeakMap<
+    FinalRequestOptions,
+    { apiKey: string | null; resolution: number; tracksClientValue: boolean }
+  >();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
@@ -813,7 +818,7 @@ export class OpenAI {
           : await authentication.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
-    const apiKey = await this.resolveAPIKey();
+    const apiKey = await this.resolvedAPIKey(opts);
     if (apiKey == null) {
       return undefined;
     }
@@ -866,24 +871,41 @@ export class OpenAI {
     }
 
     this.apiKey = await this.resolveAPIKeyProvider(apiKey);
+    this.#apiKeyResolution += 1;
     capture?.(this.apiKey);
     return true;
   }
 
-  /**
-   * Resolves the credential for the current authentication header construction.
-   * Overrides return their credential directly; callers use the returned value,
-   * since another request can update the shared `apiKey` property after an await.
-   */
-  protected async resolveAPIKey(): Promise<string | null> {
-    const apiKey = this._options.apiKey;
-    if (this._provider || typeof apiKey !== 'function') {
-      return this.apiKey;
+  protected async prepareAPIKey(options: FinalRequestOptions): Promise<void> {
+    let captured = false;
+    await this._callApiKey((apiKey) => {
+      captured = true;
+      this.#preparedAPIKeys.set(options, {
+        apiKey,
+        resolution: this.#apiKeyResolution,
+        tracksClientValue: apiKey === this.apiKey,
+      });
+    });
+    if (!captured) {
+      this.#preparedAPIKeys.set(options, {
+        apiKey: this.apiKey,
+        resolution: this.#apiKeyResolution,
+        tracksClientValue: true,
+      });
     }
+  }
 
-    this.apiKey = await this.resolveAPIKeyProvider(apiKey);
-    // Preserve provider-specific getters before yielding the captured credential.
-    return this.apiKey;
+  protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
+    const prepared = this.#preparedAPIKeys.get(options);
+    if (prepared) return prepared.apiKey;
+
+    let resolved = this.apiKey;
+    let captured = false;
+    await this._callApiKey((apiKey) => {
+      captured = true;
+      resolved = apiKey;
+    });
+    return captured ? resolved : this.apiKey;
   }
 
   private async resolveAPIKeyProvider(apiKey: ApiKeySetter): Promise<string> {
@@ -932,9 +954,15 @@ export class OpenAI {
 
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
-   * Function credentials are resolved later, when authentication headers are built.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    if (this._provider) return;
+
+    const security = options.__security ?? { bearerAuth: true };
+    if (security.bearerAuth) {
+      await this.prepareAPIKey(options);
+    }
+  }
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
@@ -1184,6 +1212,15 @@ export class OpenAI {
     const x509Authentication = this.#x509Authentication;
     x509Authentication?.beginRequestPreparation();
     await this.prepareOptions(options);
+    const preparedAPIKey = this.#preparedAPIKeys.get(options);
+    if (
+      preparedAPIKey?.tracksClientValue &&
+      preparedAPIKey.resolution === this.#apiKeyResolution &&
+      preparedAPIKey.apiKey !== this.apiKey
+    ) {
+      // Preserve subclasses that assign `this.apiKey` after `super.prepareOptions()`.
+      this.#preparedAPIKeys.set(options, { ...preparedAPIKey, apiKey: this.apiKey });
+    }
 
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };

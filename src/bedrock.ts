@@ -236,6 +236,10 @@ export class BedrockOpenAI extends OpenAI {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
 
+    const security = options.__security ?? { bearerAuth: true };
+    if (security.adminAPIKeyAuth && !security.bearerAuth) {
+      await this.prepareAPIKey(options);
+    }
     await super.prepareOptions(options);
   }
 
@@ -244,7 +248,6 @@ export class BedrockOpenAI extends OpenAI {
     context: { url: string; options: FinalRequestOptions },
   ): Promise<void> {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
-    // Credentials now resolve during header construction, after prepareOptions.
     assertBedrockRequestOrigin(
       configuredBaseURL,
       this.buildURL(context.options.path, null, context.options.defaultBaseURL),
@@ -259,7 +262,8 @@ export class BedrockOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    const credential = security.bearerAuth || security.adminAPIKeyAuth ? await this.resolveAPIKey() : null;
+    const credential =
+      security.bearerAuth || security.adminAPIKeyAuth ? await this.resolvedAPIKey(opts) : null;
     if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
       assertValidBedrockBearerCredential(credential);
       try {
