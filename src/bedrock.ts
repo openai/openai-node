@@ -290,7 +290,7 @@ export class BedrockOpenAI extends OpenAI {
       }
     }
 
-    return undefined;
+    return security.bearerAuth ? await super.authHeaders(opts, security) : undefined;
   }
 
   /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */

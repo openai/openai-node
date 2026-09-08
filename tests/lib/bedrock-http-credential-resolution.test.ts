@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { BedrockOpenAI } from 'openai';
 import * as bedrockInternal from 'openai/internal/bedrock';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import { buildHeaders } from 'openai/internal/headers';
 
 const baseURL = 'https://bedrock.example/openai/v1';
 const schemes = [
@@ -33,6 +34,84 @@ test.each(schemes)('treats a null Bedrock _callApiKey result as final with %j', 
   );
 
   expect(client.resolutions).toBe(1);
+});
+
+test.each([
+  { mode: 'request', delegates: false, __security: { bearerAuth: true } },
+  { mode: 'request', delegates: false, __security: { bearerAuth: true, adminAPIKeyAuth: true } },
+  { mode: 'request', delegates: true, __security: { bearerAuth: true } },
+  { mode: 'request', delegates: true, __security: { bearerAuth: true, adminAPIKeyAuth: true } },
+  { mode: 'direct', delegates: false, __security: { bearerAuth: true } },
+  { mode: 'direct', delegates: false, __security: { bearerAuth: true, adminAPIKeyAuth: true } },
+  { mode: 'direct', delegates: true, __security: { bearerAuth: true } },
+  { mode: 'direct', delegates: true, __security: { bearerAuth: true, adminAPIKeyAuth: true } },
+] as const)(
+  'uses a custom Bedrock bearer fallback after one null resolution: %j',
+  async ({ mode, delegates, __security }) => {
+    class FallbackCredentials extends BedrockOpenAI {
+      resolutions = 0;
+      bearerCalls = 0;
+
+      override async _callApiKey(capture?: (apiKey: string | null) => void) {
+        this.resolutions += 1;
+        this.apiKey = null;
+        capture?.(null);
+        return true;
+      }
+
+      protected override async bearerAuth(options: Parameters<BedrockOpenAI['buildRequest']>[0]) {
+        this.bearerCalls += 1;
+        const inherited = delegates ? await super.bearerAuth(options) : undefined;
+        return inherited ?? buildHeaders([{ Authorization: 'Bearer synthetic-fallback' }]);
+      }
+    }
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new FallbackCredentials({ baseURL, apiKey: 'synthetic-configured', fetch });
+    if (mode === 'direct') {
+      client.apiKey = null;
+    }
+
+    let headers: Headers;
+    if (mode === 'request') {
+      await client.get('/items', { __security });
+      headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+    } else {
+      const { req } = await client.buildRequest({ method: 'get', path: '/items', __security });
+      ({ headers } = req);
+    }
+
+    expect(headers.get('authorization')).toBe('Bearer synthetic-fallback');
+    expect(client.resolutions).toBe(1);
+    expect(client.bearerCalls).toBe(1);
+  },
+);
+
+test('does not use a custom Bedrock bearer fallback for an admin-only request', async () => {
+  class FallbackCredentials extends BedrockOpenAI {
+    resolutions = 0;
+    bearerCalls = 0;
+
+    override async _callApiKey(capture?: (apiKey: string | null) => void) {
+      this.resolutions += 1;
+      this.apiKey = null;
+      capture?.(null);
+      return true;
+    }
+
+    protected override async bearerAuth(options: Parameters<BedrockOpenAI['buildRequest']>[0]) {
+      this.bearerCalls += 1;
+      return super.bearerAuth(options);
+    }
+  }
+  const client = new FallbackCredentials({ baseURL, apiKey: 'synthetic-configured' });
+  client.apiKey = null;
+
+  await expect(
+    client.buildRequest({ method: 'get', path: '/items', __security: { adminAPIKeyAuth: true } }),
+  ).rejects.toThrow('Could not resolve authentication method.');
+
+  expect(client.resolutions).toBe(1);
+  expect(client.bearerCalls).toBe(0);
 });
 
 test('validates a replaced buildURL result before direct-build body or credential effects', async () => {

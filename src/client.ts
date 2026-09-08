@@ -1007,7 +1007,8 @@ export class OpenAI {
   }
 
   protected async resolvedAPIKey(options: FinalRequestOptions): Promise<string | null> {
-    const prepared = this.currentAPIKeyPreparationAttempt(options)?.prepared;
+    const attempt = this.currentAPIKeyPreparationAttempt(options);
+    const prepared = attempt?.prepared;
     if (prepared) {
       if (prepared.explicitCapture) return prepared.apiKey;
       if (
@@ -1031,11 +1032,22 @@ export class OpenAI {
 
     let resolved = this.apiKey;
     let captured = false;
+    let capturedByBase = false;
     await this._callApiKey((apiKey) => {
       captured = true;
       resolved = apiKey;
+      capturedByBase = this.#baseAPIKeyCapture?.apiKey === apiKey;
     });
-    return captured ? resolved : this.apiKey;
+    const apiKey = captured ? resolved : this.apiKey;
+    if (attempt) {
+      attempt.prepared = {
+        apiKey,
+        tracksClientValue: apiKey === this.apiKey,
+        allowClientOverride: this.hasCustomRequestCredentialHooks(),
+        explicitCapture: captured && !this.#safeCredentialHooks.has(this._callApiKey) && !capturedByBase,
+      };
+    }
+    return apiKey;
   }
 
   protected validateOptionsBeforePreparation(options: FinalRequestOptions): void {}
@@ -2037,7 +2049,9 @@ export class OpenAI {
       const temporaryAttempt =
         preparedAPIKey && currentAttempt?.prepared !== preparedAPIKey
           ? { prepared: preparedAPIKey }
-          : undefined;
+          : currentAttempt === undefined
+            ? {}
+            : undefined;
       if (temporaryAttempt) this.addAPIKeyPreparationAttempt(options, temporaryAttempt);
       try {
         authenticationHeaders = await this.authHeaders(options, options.__security ?? { bearerAuth: true });
