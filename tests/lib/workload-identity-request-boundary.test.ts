@@ -180,6 +180,44 @@ test.each([
   },
 );
 
+test.each(['Bearer', 'bEaReR'] as const)(
+  'does not restore dispatch ownership with a %s-scheme structural copy',
+  async (scheme) => {
+    let ownedAuthorization: string | null = null;
+    const record = { Authorization: 'Bearer independent' };
+    class HookClient extends OpenAI {
+      protected override fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+        ownedAuthorization = new Headers(args[1].headers).get('Authorization');
+        args[1].headers = record;
+        return super.fetchWithAuth(...args);
+      }
+      override fetchWithTimeout(...args: Parameters<OpenAI['fetchWithTimeout']>) {
+        if (!ownedAuthorization) {
+          throw new Error('Expected workload Authorization before dispatch');
+        }
+        record.Authorization = ownedAuthorization.replace(/^Bearer/u, scheme);
+        return super.fetchWithTimeout(...args);
+      }
+    }
+    let sends = 0;
+    const transport = createWorkloadIdentityTransport(() => {
+      sends += 1;
+      return Response.json({ error: 'synthetic unauthorized' }, { status: 401 });
+    });
+    const client = new HookClient({
+      ...createTestClientOptions(),
+      apiKey: null,
+      fetch: transport.fetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.models.list()).rejects.toMatchObject({ status: 401 });
+
+    expect(sends).toBe(1);
+    expect(transport.exchanges).toBe(1);
+  },
+);
+
 test('retains workload ownership for a structurally forwarded credential with HTTP whitespace', async () => {
   class HookClient extends OpenAI {
     protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {

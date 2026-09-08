@@ -538,7 +538,7 @@ export class WorkloadTokenProvenance {
     ) {
       const current = this.structuralHeader(headers as HeadersLike, 'Authorization');
       if (
-        (current && current.value === authorization) ||
+        (current && matchesAuthorization(current.value, authorization, structuralMismatch.exact)) ||
         (structuralMismatch.exact &&
           dispatchedAuthorization !== undefined &&
           dispatchedAuthorization !== authorization)
