@@ -498,6 +498,41 @@ describe('AssistantStream run-step deltas', () => {
     },
   );
 
+  test('does not refresh a setter-backed delta when no preceding listener ran', async () => {
+    const step = runStep('step_original');
+    const deltas = [' first', ' second', ' third'].map((argumentsDelta) => ({
+      step_details: {
+        type: 'tool_calls' as const,
+        tool_calls: [{ index: 0, function: { arguments: argumentsDelta } }],
+      },
+    }));
+    let reads = 0;
+    const data = Object.defineProperty({ id: step.id }, 'delta', {
+      enumerable: true,
+      get() {
+        const delta = deltas[reads];
+        reads += 1;
+        return delta;
+      },
+      set(_value) {},
+    });
+    const runner = unencodedAssistantStream([
+      { event: 'thread.run.step.created', data: step },
+      { event: 'thread.run.step.delta', data },
+      completedRun(),
+    ]);
+    const stepDelta = vi.fn();
+    runner.on('runStepDelta', stepDelta);
+
+    await runner.done();
+
+    expect(reads).toBe(1);
+    expect(stepDelta).toHaveBeenCalledTimes(1);
+    expect(stepDelta.mock.calls[0]?.[0]).toBe(deltas[0]);
+    expect(stepDelta.mock.calls[0]?.[1]).toBe(step);
+    expect(step.step_details.tool_calls[0]?.function.arguments).toBe('{"to":"trusted"} first');
+  });
+
   test.each([
     { kind: 'foreign', id: 'step_foreign', error: /does not match the active run step/u },
     { kind: 'missing', id: undefined, error: /invalid run-step ID/u },

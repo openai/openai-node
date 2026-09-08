@@ -113,7 +113,7 @@ function samePropertyDescriptor(left: PropertyDescriptor | undefined, right: Pro
 }
 
 interface RunStepDeltaState {
-  refreshRunStepDelta?: () => void;
+  refreshRunStepDelta?: (afterListeners?: boolean) => void;
   getRunStepDelta?: (afterListeners?: boolean) => RunStepDelta | undefined;
 }
 
@@ -235,8 +235,8 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
         ) as RunStepDelta;
         return observedDelta;
       };
-      const refreshRunStepDelta = () => {
-        const currentDelta = readCurrentDelta(true);
+      const refreshRunStepDelta = (afterListeners = false) => {
+        const currentDelta = readCurrentDelta(afterListeners);
         if (!currentDelta || (typeof currentDelta !== 'object' && typeof currentDelta !== 'function')) {
           capturedData.delta = currentDelta;
           return;
@@ -554,14 +554,14 @@ export class AssistantStream
     const { refreshRunStepDelta, getRunStepDelta } = initializeRunStepDelta?.() ?? {};
     this.#currentEvent = exposedEvent;
 
-    this.#handleEvent(exposedEvent);
+    const rawEventListenersRan = this.#handleEvent(exposedEvent);
     if (messageID !== undefined && messageData !== undefined) {
       this.#reserveMessageAlias(messageData, messageID);
     }
     if (runStepID !== undefined && runStepData !== undefined) {
       this.#reserveRunStepAlias(runStepData, runStepID);
     }
-    refreshRunStepDelta?.();
+    refreshRunStepDelta?.(rawEventListenersRan);
     if (runStepID === undefined && this.#activeRunStepID !== undefined && this.#currentRunStepSnapshot) {
       this.#reserveRunStepAlias(this.#currentRunStepSnapshot, this.#activeRunStepID);
     }
@@ -901,6 +901,7 @@ export class AssistantStream
         break;
       }
       case 'thread.run.step.delta': {
+        let toolListenersRan = false;
         // Tool callbacks use ordinary property lookup; accumulation only uses enumerable own fields.
         const delta = getRunStepDelta?.() ?? event.data.delta;
         if (
@@ -911,27 +912,30 @@ export class AssistantStream
         ) {
           for (const toolCall of delta.step_details.tool_calls) {
             if (toolCall.index === this.#currentToolCallIndex) {
-              this.#emitExposed(
-                'toolCallDelta',
-                toolCall,
-                accumulatedRunStep.step_details.tool_calls[toolCall.index] as ToolCall,
-              );
+              toolListenersRan =
+                this.#emitExposed(
+                  'toolCallDelta',
+                  toolCall,
+                  accumulatedRunStep.step_details.tool_calls[toolCall.index] as ToolCall,
+                ) || toolListenersRan;
             } else {
               if (this.#currentToolCall) {
-                this.#emitExposed('toolCallDone', this.#currentToolCall);
+                toolListenersRan =
+                  this.#emitExposed('toolCallDone', this.#currentToolCall) || toolListenersRan;
               }
 
               this.#currentToolCallIndex = toolCall.index;
               this.#currentToolCall = accumulatedRunStep.step_details.tool_calls[toolCall.index];
               if (this.#currentToolCall) {
-                this.#emitExposed('toolCallCreated', this.#currentToolCall);
+                toolListenersRan =
+                  this.#emitExposed('toolCallCreated', this.#currentToolCall) || toolListenersRan;
               }
             }
           }
         }
 
         // Select listener replacements after tool callbacks without changing the accumulated snapshot.
-        const exposedDelta = getRunStepDelta?.(true);
+        const exposedDelta = getRunStepDelta?.(toolListenersRan);
         this.#emitExposed(
           'runStepDelta',
           exposedDelta && !hasOwn(exposedDelta, 'id') ? exposedDelta : event.data.delta,
@@ -963,17 +967,19 @@ export class AssistantStream
   #emitExposed<Event extends keyof AssistantStreamEvents>(
     event: Event,
     ...args: EventParameters<AssistantStreamEvents, Event>
-  ): void {
-    if (this._hasListeners(event)) {
+  ): boolean {
+    const hasListeners = this._hasListeners(event);
+    if (hasListeners) {
       for (const value of args) {
         markAssistantStreamValueExternallyMutable(value);
       }
     }
     this._emit(event, ...args);
+    return hasListeners;
   }
 
   #handleEvent(this: AssistantStream, event: AssistantStreamEvent) {
-    this.#emitExposed('event', event);
+    return this.#emitExposed('event', event);
   }
 
   #accumulateRunStep(event: RunStepStreamEvent, runStepID: string): Runs.RunStep {
