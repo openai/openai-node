@@ -53,9 +53,9 @@ describe('Canonical workload authentication inputs', () => {
     },
   );
 
-  describe.each(['authHeaders', 'bearerAuth'] as const)('%s unmarked native values', (hook) => {
+  describe.each(['authHeaders', 'bearerAuth'] as const)('%s recovery', (hook) => {
     test.each(['method', 'accessor', 'iterator', 'frozen-iterator'] as const)(
-      'preserves the original 401 without invoking a replaced get %s',
+      'does not recover unmarked native ownership or invoke a replaced get %s',
       async (kind) => {
         const read = vi.fn(() => {
           throw new Error('Synthetic overridden get must not run');

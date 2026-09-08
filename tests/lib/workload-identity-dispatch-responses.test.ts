@@ -178,7 +178,7 @@ test.each(
 );
 
 test.each([false, true])(
-  'refreshes a clone of the selected workload response after mixed sends (independent pending: %s)',
+  'refreshes the selected response clone after mixed sends (independent pending: %s)',
   async (pending) => {
     const discarded: Promise<Response>[] = [];
     const releases: (() => void)[] = [];

@@ -351,6 +351,16 @@ const responseUsedWorkloadToken = (request: WorkloadIdentityRequest, response: R
   const body = responseBodyIdentity(response);
   return body !== undefined && request.responseBodies.get(body) === true;
 };
+const recordWorkloadIdentityResponseBody = (
+  request: WorkloadIdentityRequest,
+  response: Response,
+  usedWorkloadToken: boolean,
+) => {
+  const body = responseBodyIdentity(response);
+  if (body) {
+    request.responseBodies.set(body, usedWorkloadToken && request.responseBodies.get(body) !== false);
+  }
+};
 
 const hasInstalledResponseClone = (response: Response, tracker: ResponseCloneTracker): boolean => {
   const current = Object.getOwnPropertyDescriptor(response, 'clone');
@@ -368,10 +378,7 @@ const recordWorkloadIdentityResponse = (
   const prior = request.responses.get(response);
   const selectedUsage = prior === undefined ? usedWorkloadToken : prior && usedWorkloadToken;
   request.responses.set(response, selectedUsage);
-  const body = responseBodyIdentity(response);
-  if (body) {
-    request.responseBodies.set(body, selectedUsage && request.responseBodies.get(body) !== false);
-  }
+  recordWorkloadIdentityResponseBody(request, response, selectedUsage);
   let trackedRequests = new Set<WorkloadIdentityRequest>([request]);
   const existing = responseCloneTrackers.get(response);
   try {
@@ -394,20 +401,54 @@ const recordWorkloadIdentityResponse = (
     }
     if (!cloneDescriptor) return;
     let tracker!: ResponseCloneTracker;
-    const trackCopy = (source: Response, copy: Response, alternateSource?: Response) => {
+    const captureBodyConflicts = (...sources: (Response | undefined)[]) => {
+      const conflicts = new Set<WorkloadIdentityRequest>();
+      for (const activeRequest of tracker.requests) {
+        for (const source of sources) {
+          const body = source && responseBodyIdentity(source);
+          if (body && activeRequest.responseBodies.get(body) === false) {
+            conflicts.add(activeRequest);
+          }
+        }
+      }
+      return conflicts;
+    };
+    const trackCopy = (
+      source: Response,
+      copy: Response,
+      alternateSource?: Response,
+      bodyConflicts = new Set<WorkloadIdentityRequest>(),
+    ) => {
       for (const activeRequest of tracker.requests) {
         let selectedUsage = activeRequest.responses.get(source);
+        if (selectedUsage !== undefined) {
+          // Native clone tees and replaces the source body stream before returning its copy.
+          recordWorkloadIdentityResponseBody(
+            activeRequest,
+            source,
+            selectedUsage && !bodyConflicts.has(activeRequest),
+          );
+        }
         if (alternateSource && alternateSource !== source) {
           const alternateUsage = activeRequest.responses.get(alternateSource);
+          if (alternateUsage !== undefined) {
+            recordWorkloadIdentityResponseBody(
+              activeRequest,
+              alternateSource,
+              alternateUsage && !bodyConflicts.has(activeRequest),
+            );
+          }
           selectedUsage =
-            selectedUsage === undefined
-              ? alternateUsage
-              : alternateUsage === undefined
-                ? selectedUsage
-                : selectedUsage && alternateUsage;
+            selectedUsage === undefined && alternateUsage === undefined
+              ? undefined
+              : selectedUsage === true && alternateUsage === true;
         }
         if (selectedUsage !== undefined) {
-          recordWorkloadIdentityResponse(activeRequest, copy, selectedUsage);
+          recordWorkloadIdentityResponse(
+            activeRequest,
+            copy,
+            selectedUsage && !bodyConflicts.has(activeRequest),
+          );
         }
       }
       return copy;
@@ -421,7 +462,8 @@ const recordWorkloadIdentityResponse = (
         enumerable: !!cloneDescriptor.enumerable,
         writable: cloneDescriptor.writable ?? true,
         value: function cloneTrackedResponse(this: Response) {
-          return trackCopy(this, Reflect.apply(clone, this, []) as Response);
+          const bodyConflicts = captureBodyConflicts(this);
+          return trackCopy(this, Reflect.apply(clone, this, []) as Response, undefined, bodyConflicts);
         },
       };
     } else {
@@ -436,7 +478,8 @@ const recordWorkloadIdentityResponse = (
           const clone = Reflect.apply(getClone, this, []) as unknown;
           if (typeof clone !== 'function') return clone;
           return function cloneTrackedResponse(this: Response) {
-            return trackCopy(source, Reflect.apply(clone, this, []) as Response, this);
+            const bodyConflicts = captureBodyConflicts(source, this);
+            return trackCopy(source, Reflect.apply(clone, this, []) as Response, this, bodyConflicts);
           };
         },
         ...(setClone
