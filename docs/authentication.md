@@ -324,6 +324,8 @@ Protected request and transport hooks keep the original request object and its h
 the final dispatch snapshot. Accessors therefore observe the same request fields that later hooks
 update. If a hook replaces an opaque, unconsumed source with unmarked copied headers, equal token
 bytes alone cannot restore its refresh ownership; retain SDK-marked values when forwarding ownership.
+A transparent request `headers` getter returning a native copy retains the accepted unmarked-copy
+ambiguity. An observed independent layer or Authorization overwrite still disables refresh.
 Structural constructor/tag descriptors cannot establish that a custom `get()` method agrees with its
 iterator. Foreign collection identity and custom properties are therefore not retained on this path;
 header values and workload refresh remain supported. Headers from a foreign `Request` are also

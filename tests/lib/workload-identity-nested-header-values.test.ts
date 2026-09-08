@@ -257,6 +257,57 @@ test.each([401, 500])('retains nested serialization through an automatic %s retr
   expect(transport.exchanges).toBe(status === 401 ? 2 : 1);
 });
 
+describe.each(['request', 'default'] as const)('%s nested Authorization deletion', (layer) => {
+  test.each(['external', 'self', 'none'] as const)(
+    'refreshes an accessor slot after %s removal',
+    async (removal) => {
+      const values = ['Bearer independent'];
+      const read = vi.fn(() => {
+        if (read.mock.calls.length > 1) {
+          throw new Error('The nested accessor was read again');
+        }
+        if (removal === 'self') {
+          delete values[0];
+        }
+        return 'Bearer independent';
+      });
+      Object.defineProperty(values, '0', { configurable: true, get: read });
+      const headers = { Authorization: values };
+      const sent: (string | null)[] = [];
+      const transport = createWorkloadIdentityTransport((_url, init) => {
+        sent.push(new Headers(init?.headers).get('Authorization'));
+        if (sent.length === 1) {
+          if (removal === 'external') {
+            delete values[0];
+          }
+          return Response.json(
+            { error: 'synthetic retry' },
+            { status: 500, headers: { 'retry-after-ms': '0' } },
+          );
+        }
+        return Response.json({ data: [] });
+      });
+      const client = new OpenAI({
+        ...createTestClientOptions(),
+        apiKey: null,
+        adminAPIKey: null,
+        maxRetries: 1,
+        ...(layer === 'default' ? { defaultHeaders: headers } : {}),
+        fetch: transport.fetch,
+      });
+
+      await client.models.list(layer === 'request' ? { headers } : {});
+
+      expect(sent).toEqual([
+        'Bearer independent',
+        removal === 'external' ? 'Bearer access-token-1' : 'Bearer independent',
+      ]);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(transport.exchanges).toBe(removal === 'external' ? 1 : 0);
+    },
+  );
+});
+
 test('invokes a callable nested iterator without reading its call property', () => {
   const values = ['preserved'];
   const iterator = function* iterator(this: unknown) {
