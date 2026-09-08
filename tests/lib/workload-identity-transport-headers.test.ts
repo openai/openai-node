@@ -4,6 +4,100 @@ import { test } from 'vitest';
 import type { RequestInit } from 'openai/internal/builtin-types';
 import { createTestClientOptions, createWorkloadIdentityTransport } from './workload-identity-fixtures';
 
+const lazyHeaders = (request: RequestInit): NonNullable<RequestInit['headers']> => {
+  const authorization = new Headers(request.headers).get('Authorization');
+  if (authorization === null) {
+    throw new Error('Expected workload Authorization');
+  }
+  return {
+    get Authorization() {
+      return authorization;
+    },
+  };
+};
+
+test('preserves a private-field accessor receiver while normalizing headers', async () => {
+  class WrappedRequest implements RequestInit {
+    #method: string;
+    headers: RequestInit['headers'];
+
+    constructor(request: RequestInit) {
+      const { method, ...properties } = request;
+      Object.assign(this, properties);
+      this.#method = method ?? 'GET';
+      this.headers = lazyHeaders(request);
+    }
+
+    get method() {
+      return this.#method;
+    }
+
+    set method(value: string) {
+      this.#method = value;
+    }
+  }
+  class HookClient extends OpenAI {
+    protected override async fetchWithAuth(...args: Parameters<OpenAI['fetchWithAuth']>) {
+      args[1] = new WrappedRequest(args[1]);
+      return super.fetchWithAuth(...args);
+    }
+  }
+  const transport = createWorkloadIdentityTransport(async (url, init) => {
+    const request = new Request(String(url), init);
+    expect(request.method).toBe('POST');
+    expect(await request.json()).toEqual({ value: 1 });
+    if (!init) {
+      throw new Error('Expected request init');
+    }
+    init.method = 'PUT';
+    expect(init.method).toBe('PUT');
+    return Response.json({ ok: true });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.post('/synthetic', { body: { value: 1 } })).resolves.toEqual({ ok: true });
+});
+
+test('preserves an own accessor receiver while normalizing prepared headers', async () => {
+  const methods = new WeakMap<object, string>();
+  class HookClient extends OpenAI {
+    protected override async prepareRequest(...args: Parameters<OpenAI['prepareRequest']>) {
+      const [request] = args;
+      methods.set(request, request.method ?? 'GET');
+      Object.defineProperty(request, 'method', {
+        enumerable: true,
+        configurable: true,
+        get() {
+          return methods.get(this);
+        },
+      });
+      request.headers = lazyHeaders(request);
+      return super.prepareRequest(...args);
+    }
+  }
+  const transport = createWorkloadIdentityTransport(async (url, init) => {
+    const request = new Request(String(url), init);
+    expect(request.method).toBe('POST');
+    expect(await request.json()).toEqual({ value: 1 });
+    return Response.json({ ok: true });
+  });
+  const client = new HookClient({
+    ...createTestClientOptions(),
+    apiKey: null,
+    adminAPIKey: null,
+    fetch: transport.fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.post('/synthetic', { body: { value: 1 } })).resolves.toEqual({ ok: true });
+});
+
 test.each(['inherited method', 'non-enumerable method', 'one-read headers'] as const)(
   'preserves %s while normalizing a frozen prepared request',
   async (kind) => {

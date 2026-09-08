@@ -2620,10 +2620,23 @@ export class OpenAI {
     if (!credential.isCurrent()) return request;
     if (!canPreserveHeaderInput(headers)) {
       headers = new Headers(headers);
-      request = Object.create(Object.getPrototypeOf(request), {
+      const originalRequest = request;
+      const normalizedRequest = Object.create(Object.getPrototypeOf(request), {
         ...Object.getOwnPropertyDescriptors(request),
         headers: { value: headers, enumerable: true, configurable: true, writable: true },
       }) as T;
+      request = new Proxy(normalizedRequest, {
+        get(target, property, receiver) {
+          return property === 'headers'
+            ? Reflect.get(target, property, receiver)
+            : Reflect.get(originalRequest, property, originalRequest);
+        },
+        set(target, property, value, receiver) {
+          return property === 'headers'
+            ? Reflect.set(target, property, value, receiver)
+            : Reflect.set(originalRequest, property, value, originalRequest);
+        },
+      });
     }
     const native = hasNativeHeadersBrand(headers);
     const platformHeader = native ? getPlatformHeader(headers, 'Authorization') : undefined;
