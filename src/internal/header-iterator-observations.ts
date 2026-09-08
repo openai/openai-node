@@ -4,11 +4,17 @@ interface IteratorProperty {
   source: object;
   descriptor: PropertyDescriptor;
   identity: object;
+  predecessor: object | undefined;
 }
 
 interface IteratorObservation<T> extends IteratorProperty {
   entry: T | undefined;
 }
+
+const sameIteratorProperty = (property: IteratorProperty, source: object, descriptor: PropertyDescriptor) =>
+  property.source === source &&
+  sameHeaderProperty(descriptor, property.descriptor) &&
+  descriptor.enumerable === property.descriptor.enumerable;
 
 /** Shares completed record cursor reads between related header layers and retries. */
 export class HeaderIteratorObservations<T> {
@@ -37,21 +43,26 @@ export class HeaderIteratorObservations<T> {
       return;
     }
     const previous = history?.get(name)?.value === undefined ? undefined : this.properties.get(name);
-    const property =
-      previous &&
-      previous.source === source &&
-      sameHeaderProperty(descriptor, previous.descriptor) &&
-      descriptor.enumerable === previous.descriptor.enumerable
-        ? previous
-        : { source, descriptor, identity: {} };
-    this.properties.set(name, property);
     const observed = this.observations.get(iteration)?.get(name);
+    let property = previous;
+    if (!property || !sameIteratorProperty(property, source, descriptor)) {
+      // Siblings observing the same transition can share its completed value. Restoring an
+      // exhausted older source has a different predecessor and cannot revive its observation.
+      property =
+        !refreshable &&
+        observed &&
+        previous &&
+        observed.predecessor === previous.identity &&
+        sameIteratorProperty(observed, source, descriptor)
+          ? observed
+          : { source, descriptor, identity: {}, predecessor: previous?.identity };
+    }
+    this.properties.set(name, property);
     const reused = !!(
       !refreshable &&
       observed &&
       observed.identity === property.identity &&
-      sameHeaderProperty(descriptor, observed.descriptor) &&
-      descriptor.enumerable === observed.descriptor.enumerable
+      sameIteratorProperty(observed, source, descriptor)
     );
     return {
       reused,

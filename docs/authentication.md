@@ -327,7 +327,8 @@ An alias that emits no value, such as an empty array, does not override the reta
 accessors are not read again.
 Related header layers can share a completed one-shot iterator value while retaining independent
 ownership of it. Observing a property removal or replacement ends that layer's ownership; restoring
-an exhausted source does not revive its old value. Sibling layers that kept the original property can
+an exhausted source does not revive its old value. Sibling layers that observe the same replacement
+retain its completed value independently. Sibling layers that kept the original property can
 still use their completed observation.
 If previously available property-descriptor evidence becomes unavailable while replaying an
 `Authorization` source, row, or nested value, the SDK rejects the request before dispatch. Keep that
