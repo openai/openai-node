@@ -258,8 +258,15 @@ export class WorkloadTokenProvenance {
 
   /** Reads only this client's opaque SDK request carrier, without evaluating caller accessors. */
   requestCarrier(request: object): object | undefined {
-    const carrier = Object.getOwnPropertyDescriptor(request, requestCredentialCarrier)?.value;
-    return typeof carrier === 'object' && carrier !== null && this.results.has(carrier) ? carrier : undefined;
+    try {
+      const carrier = Object.getOwnPropertyDescriptor(request, requestCredentialCarrier)?.value;
+      return typeof carrier === 'object' && carrier !== null && this.results.has(carrier)
+        ? carrier
+        : undefined;
+    } catch {
+      // A caller membrane may expose public request fields without exposing private SDK metadata.
+      return undefined;
+    }
   }
 
   /** Marks the concrete authentication result issued by this client. */
@@ -364,8 +371,8 @@ export class WorkloadTokenProvenance {
 
   /** Transfers snapshots to retry bookkeeping without retaining them on a held request result. */
   takeHeaders(result: { req: object }): WorkloadHeaderSnapshots | undefined {
-    const carrier = Object.getOwnPropertyDescriptor(result.req, requestCredentialCarrier)?.value;
-    if (typeof carrier !== 'object' || carrier === null) {
+    const carrier = this.requestCarrier(result.req);
+    if (carrier === undefined) {
       return undefined;
     }
     const state = this.results.get(carrier);

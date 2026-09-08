@@ -77,10 +77,15 @@ interface HeaderPropertySnapshot {
   values?: HeaderValuesSnapshot;
 }
 
+interface HeaderSlotSnapshot<T = unknown> {
+  descriptor: PropertyDescriptor | undefined;
+  input: T;
+}
+
 interface HeaderValuesSnapshot {
   source: readonly HeaderValue[];
   iterator: () => Iterator<HeaderValue>;
-  slots: Map<number, { descriptor: PropertyDescriptor | undefined; value: HeaderValue }>;
+  slots: Map<number, HeaderSlotSnapshot & { value: HeaderValue }>;
 }
 
 interface HeaderRowSnapshot {
@@ -129,48 +134,56 @@ interface HeaderReplay {
   propertyOrder?: string[];
   property?: HeaderPropertySnapshot;
   rows?: Map<HeaderEntry, Map<number, HeaderRowSnapshot>>;
-  arraySlots?: Map<number, { descriptor: PropertyDescriptor | undefined; row: HeaderEntry }>;
+  arraySlots?: Map<number, HeaderSlotSnapshot<HeaderEntry>>;
 }
 
-function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderReplay): Generator<HeaderEntry> {
+const invalidatedHeaderInputs = <T>(
+  headers: readonly T[],
+  previous: ReadonlyMap<T, number>,
+  slots: ReadonlyMap<number, HeaderSlotSnapshot<T>> | undefined,
+): Set<T> => {
+  const duplicates = new Map([...previous].filter(([, count]) => count > 1).map(([input]) => [input, 0]));
   const length = getHeaderRowDescriptor(headers, 'length')?.value;
-  if (typeof length === 'number') {
-    const duplicates = new Map(
-      [...(replay.rows ?? [])].filter(([, occurrences]) => occurrences.size > 1).map(([row]) => [row, 0]),
-    );
-    // Removing an occurrence invalidates its ordinal. Inspect ordinary slots without rereading row getters.
-    for (let index = 0; duplicates.size && index < length; index += 1) {
-      const descriptor = getHeaderRowDescriptor(headers, String(index));
-      const retained = replay.arraySlots?.get(index);
-      const observed = retained && (!descriptor || sameHeaderProperty(descriptor, retained.descriptor));
-      if (!observed && (!descriptor || !('value' in descriptor))) {
-        for (const row of duplicates.keys()) replay.rows!.delete(row);
-        break;
-      }
-      const row = observed ? retained.row : descriptor!.value;
-      const count = duplicates.get(row);
-      if (count !== undefined) duplicates.set(row, count + 1);
-    }
-    for (const [row, count] of duplicates) {
-      if (count < (replay.rows!.get(row)?.size ?? 0)) replay.rows!.delete(row);
-    }
+  if (typeof length !== 'number') return new Set();
+  // Removing a duplicate changes its ordinal. Count captured opaque slots without rereading getters.
+  for (let index = 0; duplicates.size && index < length; index += 1) {
+    const descriptor = getHeaderRowDescriptor(headers, String(index));
+    const retained = slots?.get(index);
+    const observed = retained && sameHeaderProperty(descriptor, retained.descriptor);
+    if (!observed && (!descriptor || !('value' in descriptor))) return new Set(duplicates.keys());
+    const input = observed ? retained.input : descriptor!.value;
+    const count = duplicates.get(input);
+    if (count !== undefined) duplicates.set(input, count + 1);
   }
+  return new Set(
+    [...duplicates].filter(([input, count]) => count < previous.get(input)!).map(([input]) => input),
+  );
+};
+
+function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderReplay): Generator<HeaderEntry> {
+  const counts = new Map([...(replay.rows ?? [])].map(([row, occurrences]) => [row, occurrences.size]));
+  for (const row of invalidatedHeaderInputs(headers, counts, replay.arraySlots)) replay.rows?.delete(row);
   let index = 0;
   // Match native array iteration's live length, with each row validated before reading the next slot.
   for (; index < Math.min(Math.floor(headers.length), Number.MAX_SAFE_INTEGER); index += 1) {
     const descriptor = getHeaderRowDescriptor(headers, String(index));
     const retained = replay.arraySlots?.get(index);
-    if (retained && (!descriptor || sameHeaderProperty(descriptor, retained.descriptor))) {
-      yield retained.row;
-      continue;
-    }
-    replay.arraySlots?.delete(index);
-    const row = headers[index]!;
-    if (!descriptor || !('value' in descriptor) || descriptor.value !== row) {
-      replay.arraySlots ??= new Map();
-      replay.arraySlots.set(index, { descriptor, row });
-    }
+    const observed = retained && sameHeaderProperty(descriptor, retained.descriptor);
+    const row = observed ? retained.input : headers[index]!;
     yield row;
+    const current = getHeaderRowDescriptor(headers, String(index));
+    if (
+      observed ||
+      !descriptor ||
+      !('value' in descriptor) ||
+      descriptor.value !== row ||
+      !sameHeaderProperty(current, descriptor)
+    ) {
+      replay.arraySlots ??= new Map();
+      replay.arraySlots.set(index, { descriptor: current, input: row });
+    } else {
+      replay.arraySlots?.delete(index);
+    }
   }
   for (const slot of replay.arraySlots?.keys() ?? []) {
     if (slot >= index) replay.arraySlots?.delete(slot);
@@ -179,6 +192,13 @@ function* iterateHeaderArray(headers: readonly HeaderEntry[], replay: HeaderRepl
 
 function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Generator<HeaderValue> {
   const { source, slots } = snapshot;
+  const counts = new Map<unknown, number>();
+  for (const { input } of slots.values()) {
+    if (input !== null && (typeof input === 'object' || typeof input === 'function'))
+      counts.set(input, (counts.get(input) ?? 0) + 1);
+  }
+  const invalidated = invalidatedHeaderInputs(source, counts, slots);
+  for (const [index, slot] of slots) if (invalidated.has(slot.input)) slots.delete(index);
   let index = 0;
   for (; index < Math.min(Math.floor(source.length), Number.MAX_SAFE_INTEGER); index += 1) {
     const descriptor = getHeaderRowDescriptor(source, String(index));
@@ -193,7 +213,11 @@ function* iterateHeaderValues(name: string, snapshot: HeaderValuesSnapshot): Gen
     const normalized = needsCoercion ? new Headers([[name, value]]).get(name)! : value;
     if (!descriptor || !('value' in descriptor) || descriptor.value !== value || needsCoercion) {
       // A stateful read can replace its own slot. Retain the observed value until a later change.
-      slots.set(index, { descriptor: getHeaderRowDescriptor(source, String(index)), value: normalized });
+      slots.set(index, {
+        descriptor: getHeaderRowDescriptor(source, String(index)),
+        input: value,
+        value: normalized,
+      });
     }
     yield normalized;
   }
