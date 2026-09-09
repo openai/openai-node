@@ -389,6 +389,72 @@ test('preserves an inherited credential accessor while observing null writes acr
   expect(client.apiKey).toBeNull();
 });
 
+test('preserves provider writes to an inherited writable credential property', async () => {
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      return super.authHeaders(options);
+    }
+  }
+  Object.defineProperty(Credentials.prototype, 'apiKey', {
+    value: null,
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+  let resolutions = 0;
+  const provider = vi.fn(async () => {
+    resolutions += 1;
+    return `synthetic-${resolutions}`;
+  });
+  const client = new Credentials({ apiKey: provider, adminAPIKey: null });
+  delete (client as { apiKey?: string | null }).apiKey;
+
+  const first = await client.buildRequest({ method: 'get', path: '/items' });
+  expect(first.req.headers.get('authorization')).toBe('Bearer synthetic-1');
+  expect(Object.getOwnPropertyDescriptor(client, 'apiKey')).toEqual({
+    value: 'synthetic-1',
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+  const second = await client.buildRequest({ method: 'get', path: '/items' });
+
+  expect(second.req.headers.get('authorization')).toBe('Bearer synthetic-2');
+  expect(provider).toHaveBeenCalledTimes(2);
+});
+
+test.each(['direct', 'normal'] as const)(
+  'preserves a nonextensible client with an inherited credential accessor during a %s request',
+  async (mode) => {
+    let value: string | null = null;
+    class Credentials extends OpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        this.apiKey = 'synthetic-hook';
+        return super.authHeaders(options);
+      }
+    }
+    Object.defineProperty(Credentials.prototype, 'apiKey', {
+      configurable: true,
+      get: () => value,
+      set: (next: string | null) => {
+        value = next;
+      },
+    });
+    const fetch = mockFetch();
+    const client = new Credentials({ apiKey: async () => 'synthetic-provider', adminAPIKey: null, fetch });
+    Object.preventExtensions(client);
+
+    if (mode === 'direct') {
+      const { req } = await client.buildRequest({ method: 'get', path: '/items' });
+      expect(req.headers.get('authorization')).toBe('Bearer synthetic-hook');
+    } else {
+      await client.get('/items');
+      expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-hook');
+    }
+    expect(Object.hasOwn(client, 'apiKey')).toBe(false);
+  },
+);
+
 test.each(['direct', 'normal'] as const)(
   'preserves credential writes through a proxy receiver during a %s request',
   async (mode) => {
@@ -413,6 +479,134 @@ test.each(['direct', 'normal'] as const)(
     }
   },
 );
+
+test.each(['direct', 'normal'] as const)(
+  'preserves rejection from a credential Proxy receiver during a %s request',
+  async (mode) => {
+    class ProxyCredentials extends OpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        new Proxy(this, { defineProperty: () => false }).apiKey = 'synthetic-denied';
+        return super.authHeaders(options);
+      }
+    }
+    const fetch = mockFetch();
+    const client = new ProxyCredentials({
+      apiKey: async () => 'synthetic-provider',
+      adminAPIKey: null,
+      fetch,
+    });
+    const request =
+      mode === 'direct' ? client.buildRequest({ method: 'get', path: '/items' }) : client.get('/items');
+
+    await expect(request).rejects.toBeInstanceOf(TypeError);
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
+
+test('observes a replacement credential descriptor during an overlapping build', async () => {
+  let entered!: () => void;
+  // oxlint-disable promise/avoid-new -- These gates hold the first descriptor generation open.
+  const ready = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // oxlint-enable promise/avoid-new
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      if (options.path === '/first') {
+        Object.defineProperty(this, 'apiKey', {
+          value: null,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+        entered();
+        await gate;
+      } else {
+        this.apiKey = null;
+      }
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const client = new Credentials({ apiKey: provider, adminAPIKey: null });
+  const first = client.buildRequest({ method: 'get', path: '/first' }).then(
+    () => {},
+    () => {},
+  );
+  await ready;
+
+  try {
+    await expect(client.buildRequest({ method: 'get', path: '/second' })).rejects.toThrow(
+      'Could not resolve authentication method.',
+    );
+  } finally {
+    release();
+    await first;
+  }
+
+  expect(provider).not.toHaveBeenCalled();
+});
+
+test('keeps observing an outer build after a nested provider resolution', async () => {
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      if (options.path === '/outer') {
+        await this.buildRequest({ method: 'get', path: '/inner' });
+        this.apiKey = null;
+      }
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const client = new Credentials({ apiKey: provider, adminAPIKey: null });
+
+  await expect(client.buildRequest({ method: 'get', path: '/outer' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+
+  expect(provider).toHaveBeenCalledTimes(1);
+});
+
+test('keeps observing a direct hook after it resolves a provider credential', async () => {
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      await this._callApiKey();
+      this.apiKey = null;
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const client = new Credentials({ apiKey: provider, adminAPIKey: null });
+
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+
+  expect(provider).toHaveBeenCalledTimes(1);
+});
+
+test('restores credential data-property metadata changed during a build', async () => {
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      Object.defineProperty(this, 'apiKey', { enumerable: false });
+      return super.authHeaders(options);
+    }
+  }
+  const client = new Credentials({ apiKey: async () => 'synthetic-provider', adminAPIKey: null });
+
+  await client.buildRequest({ method: 'get', path: '/items' });
+
+  expect(Object.getOwnPropertyDescriptor(client, 'apiKey')).toMatchObject({
+    value: 'synthetic-provider',
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+});
 
 test('restores the ordinary apiKey data descriptor after observing a direct build', async () => {
   class Credentials extends OpenAI {
@@ -1142,6 +1336,43 @@ describe.each(['request', 'direct build'] as const)('%s post-delegation credenti
     ]);
   });
 });
+
+test.each(['transform', 'clear', 'explicit capture'] as const)(
+  'refreshes direct credentials after a post-delegation %s write',
+  async (behavior) => {
+    class PostDelegationCredentials extends OpenAI {
+      override async _callApiKey(capture?: (apiKey: string | null) => void) {
+        const result = await super._callApiKey(capture);
+        if (behavior === 'explicit capture') {
+          capture?.('synthetic-explicit');
+        }
+        this.apiKey = behavior === 'clear' ? null : 'synthetic-transformed';
+        return result;
+      }
+    }
+    let resolutions = 0;
+    const provider = vi.fn(async () => {
+      resolutions += 1;
+      return `synthetic-${resolutions}`;
+    });
+    const client = new PostDelegationCredentials({ apiKey: provider, adminAPIKey: null });
+    const build = () => client.buildRequest({ method: 'get', path: '/items' });
+
+    if (behavior === 'clear') {
+      await expect(build()).rejects.toThrow('Could not resolve authentication method.');
+      await expect(build()).rejects.toThrow('Could not resolve authentication method.');
+    } else {
+      const first = await build();
+      const second = await build();
+      const expected =
+        behavior === 'explicit capture' ? 'Bearer synthetic-explicit' : 'Bearer synthetic-transformed';
+      expect(first.req.headers.get('authorization')).toBe(expected);
+      expect(second.req.headers.get('authorization')).toBe(expected);
+    }
+
+    expect(provider).toHaveBeenCalledTimes(2);
+  },
+);
 
 test('preserves apiKey assignments after delegated prepareOptions', async () => {
   class PreparedCredentials extends OpenAI {

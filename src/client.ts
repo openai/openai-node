@@ -306,6 +306,10 @@ type APIKeyBuildContext = {
   prepared: PreparedAPIKey | undefined;
   active: boolean;
 };
+type APIKeyWriteObservation = {
+  depth: number;
+  restore: () => boolean;
+};
 type InternalBuildProperties = {
   retryCount?: number;
   [preparedAPIKeyContext]?: APIKeyBuildContext;
@@ -506,9 +510,8 @@ export class OpenAI {
   #lastProviderAPIKey: string | null | undefined;
   #apiKeyWriteVersion = 0;
   #lastProviderAPIKeyWriteVersion = 0;
-  #apiKeyWriteObserver: ((apiKey: string | null) => void) | undefined;
-  #apiKeyWriteObservationDepth = 0;
-  #restoreAPIKeyWriteDescriptor: (() => void) | undefined;
+  #writingProviderAPIKey = false;
+  #apiKeyWriteObservations = new Map<Function, APIKeyWriteObservation>();
   #baseAPIKeyCapture: { apiKey: string | null } | undefined;
   #apiKeyPreparationAttempts = new WeakMap<FinalRequestOptions, APIKeyPreparationAttempt[]>();
   #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
@@ -910,7 +913,12 @@ export class OpenAI {
     }
 
     const resolved = await this.resolveAPIKeyProvider(apiKey);
-    this.apiKey = resolved;
+    this.#writingProviderAPIKey = true;
+    try {
+      this.apiKey = resolved;
+    } finally {
+      this.#writingProviderAPIKey = false;
+    }
     this.#lastProviderAPIKeyWriteVersion = this.#apiKeyWriteVersion;
     if (capture) {
       const currentAPIKey = this.apiKey;
@@ -1014,10 +1022,12 @@ export class OpenAI {
 
   #observeAPIKeyWrites(): (() => void) | undefined {
     if (typeof this._options.apiKey !== 'function' || !this.hasCustomRequestCredentialHooks()) return;
-    if (this.#apiKeyWriteObservationDepth) {
-      if (Object.getOwnPropertyDescriptor(this, 'apiKey')?.set !== this.#apiKeyWriteObserver) return;
-      this.#apiKeyWriteObservationDepth++;
-      return () => this.#releaseAPIKeyWriteObserver();
+    const ownDescriptor = Object.getOwnPropertyDescriptor(this, 'apiKey');
+    const activeObserver = ownDescriptor?.set;
+    const activeObservation = activeObserver ? this.#apiKeyWriteObservations.get(activeObserver) : undefined;
+    if (activeObserver && activeObservation) {
+      activeObservation.depth++;
+      return this.#releaseAPIKeyWriteObserver(activeObserver, activeObservation);
     }
     let owner: object | null = this;
     let descriptor: PropertyDescriptor | undefined;
@@ -1025,19 +1035,18 @@ export class OpenAI {
       descriptor = Object.getOwnPropertyDescriptor(owner, 'apiKey');
       if (!descriptor) owner = Object.getPrototypeOf(owner);
     }
-    if (
-      !descriptor?.configurable ||
-      (this.#apiKeyWriteObserver && descriptor.set === this.#apiKeyWriteObserver)
-    ) {
-      return;
-    }
+    if (!descriptor?.configurable) return;
 
     const client = this;
     const inherited = owner !== this;
+    if (inherited && !Object.isExtensible(this)) return;
     let getter = descriptor.get;
     let setter = descriptor.set;
     let dataValue: { apiKey: string | null } | undefined;
+    let dataWrittenToClient = false;
     let observer: (this: OpenAI, next: string | null) => void;
+    let observedDescriptor: PropertyDescriptor;
+    let observation: APIKeyWriteObservation;
     const targetsClient = (receiver: OpenAI) => {
       if (receiver === client) return true;
       try {
@@ -1051,11 +1060,51 @@ export class OpenAI {
       dataValue = { apiKey: descriptor.value };
       getter = () => dataValue!.apiKey;
       setter = function (this: OpenAI, next: string | null) {
-        if (targetsClient(this)) {
-          dataValue!.apiKey = next;
-        } else if (!Reflect.set(dataValue!, 'apiKey', next, this)) {
+        const observesClient = targetsClient(this);
+        const current = Object.getOwnPropertyDescriptor(client, 'apiKey');
+        if (
+          current &&
+          current.get === observedDescriptor.get &&
+          current.set === observer &&
+          current.configurable
+        ) {
+          if (inherited) {
+            Reflect.deleteProperty(client, 'apiKey');
+          } else {
+            Object.defineProperty(client, 'apiKey', {
+              ...descriptor,
+              value: dataValue!.apiKey,
+              enumerable: current.enumerable ?? false,
+            });
+          }
+          let writeSucceeded = false;
+          try {
+            if (!Reflect.set(client, 'apiKey', next, this)) {
+              throw new TypeError('Cannot assign to read only property apiKey');
+            }
+            writeSucceeded = true;
+          } finally {
+            const after = Object.getOwnPropertyDescriptor(client, 'apiKey');
+            if (after && 'value' in after) dataValue!.apiKey = after.value;
+            if (
+              (!writeSucceeded ||
+                !observesClient ||
+                client.#writingProviderAPIKey ||
+                observation.depth > 1) &&
+              ((!after && inherited && Object.isExtensible(client)) ||
+                (after && 'value' in after && after.configurable && after.writable))
+            ) {
+              observedDescriptor.enumerable = after?.enumerable ?? observedDescriptor.enumerable ?? false;
+              Object.defineProperty(client, 'apiKey', observedDescriptor);
+            }
+          }
+          if (observesClient) dataWrittenToClient = true;
+          return;
+        }
+        if (!Reflect.set(dataValue!, 'apiKey', next, observesClient ? dataValue! : this)) {
           throw new TypeError('Cannot assign to read only property apiKey');
         }
+        if (observesClient) dataWrittenToClient = true;
       };
     }
     if (!setter) return;
@@ -1065,43 +1114,63 @@ export class OpenAI {
       originalSetter.call(this, next);
       if (observesClient) client.#apiKeyWriteVersion++;
     };
-    const observedDescriptor: PropertyDescriptor = {
+    observedDescriptor = {
       ...(getter && { get: getter }),
       set: observer,
       enumerable: descriptor.enumerable ?? false,
       configurable: descriptor.configurable,
     };
     Object.defineProperty(this, 'apiKey', observedDescriptor);
-    this.#apiKeyWriteObserver = observer;
-    this.#apiKeyWriteObservationDepth = 1;
-    this.#restoreAPIKeyWriteDescriptor = () => {
-      const current = Object.getOwnPropertyDescriptor(this, 'apiKey');
-      if (
-        current?.get !== observedDescriptor.get ||
-        current?.set !== observer ||
-        current.enumerable !== observedDescriptor.enumerable ||
-        current.configurable !== observedDescriptor.configurable
-      ) {
-        return;
-      }
-      if (inherited) {
-        Reflect.deleteProperty(this, 'apiKey');
-      } else if (dataValue) {
-        Object.defineProperty(this, 'apiKey', { ...descriptor, value: dataValue.apiKey });
-      } else {
-        Object.defineProperty(this, 'apiKey', descriptor);
-      }
+    observation = {
+      depth: 1,
+      restore: () => {
+        const current = Object.getOwnPropertyDescriptor(this, 'apiKey');
+        if (current?.set !== observer) return true;
+        if (current.get !== observedDescriptor.get || !current.configurable) return false;
+        if (inherited) {
+          if (dataValue && dataWrittenToClient) {
+            Object.defineProperty(this, 'apiKey', {
+              value: dataValue.apiKey,
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
+          } else {
+            Reflect.deleteProperty(this, 'apiKey');
+          }
+        } else if (dataValue) {
+          Object.defineProperty(this, 'apiKey', {
+            ...descriptor,
+            value: dataValue.apiKey,
+            enumerable: current.enumerable ?? false,
+          });
+        } else {
+          Object.defineProperty(this, 'apiKey', {
+            ...descriptor,
+            enumerable: current.enumerable ?? false,
+          });
+        }
+        return true;
+      },
     };
-    return () => this.#releaseAPIKeyWriteObserver();
+    this.#apiKeyWriteObservations.set(observer, observation);
+    return this.#releaseAPIKeyWriteObserver(observer, observation);
   }
 
-  #releaseAPIKeyWriteObserver(): void {
-    if (--this.#apiKeyWriteObservationDepth > 0) return;
-    this.#apiKeyWriteObservationDepth = 0;
-    const restore = this.#restoreAPIKeyWriteDescriptor;
-    this.#restoreAPIKeyWriteDescriptor = undefined;
-    this.#apiKeyWriteObserver = undefined;
-    restore?.();
+  #releaseAPIKeyWriteObserver(observer: Function, observation: APIKeyWriteObservation): () => void {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      if (--observation.depth > 0) return;
+      observation.depth = 0;
+      if (observation.restore()) this.#apiKeyWriteObservations.delete(observer);
+    };
+  }
+
+  #consumeAPIKeyWrite(): void {
+    this.#lastProviderAPIKey = this.apiKey;
+    this.#lastProviderAPIKeyWriteVersion = this.#apiKeyWriteVersion;
   }
 
   protected async [Opts.prepareAPIKey](options: FinalRequestOptions): Promise<void> {
@@ -1123,13 +1192,10 @@ export class OpenAI {
       });
     };
     await this._callApiKey(captureAPIKey);
+    const postDelegationWrite =
+      !this.#safeCredentialHooks.has(this._callApiKey) && this.apiKey !== this.#lastProviderAPIKey;
     const prepared = attempt?.prepared;
-    if (
-      prepared &&
-      !prepared.explicitCapture &&
-      !this.#safeCredentialHooks.has(this._callApiKey) &&
-      this.apiKey !== this.#lastProviderAPIKey
-    ) {
+    if (prepared && !prepared.explicitCapture && postDelegationWrite) {
       prepared.apiKey = this.apiKey;
       prepared.tracksClientValue = true;
     }
@@ -1141,6 +1207,7 @@ export class OpenAI {
         explicitCapture: false,
       });
     }
+    if (postDelegationWrite) this.#consumeAPIKeyWrite();
   }
 
   protected async [Opts.resolvedAPIKey](options: FinalRequestOptions): Promise<string | null> {
@@ -1178,10 +1245,9 @@ export class OpenAI {
       capturedByBase = this.#baseAPIKeyCapture?.apiKey === apiKey;
     });
     const explicitCapture = captured && !this.#safeCredentialHooks.has(this._callApiKey) && !capturedByBase;
-    const postDelegationOverride =
-      !explicitCapture &&
-      !this.#safeCredentialHooks.has(this._callApiKey) &&
-      this.apiKey !== this.#lastProviderAPIKey;
+    const postDelegationWrite =
+      !this.#safeCredentialHooks.has(this._callApiKey) && this.apiKey !== this.#lastProviderAPIKey;
+    const postDelegationOverride = !explicitCapture && postDelegationWrite;
     const apiKey = captured && !postDelegationOverride ? resolved : this.apiKey;
     if (attempt) {
       attempt.prepared = {
@@ -1191,6 +1257,7 @@ export class OpenAI {
         explicitCapture,
       };
     }
+    if (postDelegationWrite) this.#consumeAPIKeyWrite();
     return apiKey;
   }
 
