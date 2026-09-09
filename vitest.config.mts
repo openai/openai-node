@@ -19,6 +19,6 @@ export default defineConfig({
       'tests/live/**',
     ],
     fileParallelism: true,
-    maxWorkers: 4,
+    maxWorkers: process.env['CI'] === 'true' ? 8 : 4,
   },
 });
