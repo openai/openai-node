@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -31,9 +32,8 @@ async function runExample(file: string, baseURL: string) {
       moveCursor: (...args) => readline.moveCursor(process.stdout, ...args),
       clearScreenDown: (...args) => readline.clearScreenDown(process.stdout, ...args),
     });
-    require(${JSON.stringify(path.join(root, 'node_modules/ts-node'))}).register({ swc: true });
     require(${JSON.stringify(path.join(root, 'node_modules/tsconfig-paths/register.js'))});
-    require(${JSON.stringify(path.join(root, 'examples/chat-completions', file))});
+    require(${JSON.stringify(compiledFixture('examples/chat-completions', file))});
   `;
   const child = spawn(process.execPath, ['-e', bootstrap], {
     cwd: root,
@@ -41,9 +41,10 @@ async function runExample(file: string, baseURL: string) {
       OPENAI_API_KEY: 'synthetic-book-lookup-key',
       OPENAI_BASE_URL: baseURL,
       OPENAI_LOG: 'off',
-      TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+      TS_NODE_PROJECT: compiledFixtureConfig(),
       TS_NODE_TRANSPILE_ONLY: 'true',
       DISABLE_V8_COMPILE_CACHE: '1',
+      NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
       NO_PROXY: '127.0.0.1',
       no_proxy: '127.0.0.1',
     },

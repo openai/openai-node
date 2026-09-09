@@ -1,3 +1,4 @@
+import { compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -69,9 +70,10 @@ async function runRecorder(emptyPath: string, scenario: string) {
       env: {
         PATH: emptyPath,
         AUDIO_SCENARIO: scenario,
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         TS_NODE_TRANSPILE_ONLY: 'true',
         DISABLE_V8_COMPILE_CACHE: '1',
+        NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
