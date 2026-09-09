@@ -1,7 +1,9 @@
+/* oxlint-disable eslint/max-classes-per-file -- Separate subclasses exercise active and bypassed bearer hooks. */
 import { vi } from 'vitest';
 import { AzureOpenAI, APIUserAbortError, OpenAIError, toStreamingFile } from 'openai';
 import type { AzureClientOptions } from 'openai';
 import type { RequestInit, RequestInfo, Response as FetchResponse } from 'openai/internal/builtin-types';
+import type { FinalRequestOptions } from 'openai/internal/request-options';
 
 const defaultFetch = fetch;
 
@@ -84,6 +86,80 @@ describe('instantiate azure client', () => {
         { retryCount: 1 },
       );
       expect(req.headers.get('x-stainless-retry-count')).toEqual('1');
+    });
+
+    test.each(['buildRequest', 'request'] as const)(
+      '%s allows shared options when static Azure authentication bypasses bearerAuth',
+      async (operation) => {
+        let bearerCalls = 0;
+        class CustomBearerClient extends AzureOpenAI {
+          protected override async bearerAuth(options: FinalRequestOptions) {
+            bearerCalls++;
+            return super.bearerAuth(options);
+          }
+        }
+        const client = new CustomBearerClient({
+          endpoint: 'https://azure.example.test',
+          apiKey: 'synthetic-azure-key',
+          apiVersion,
+          fetch: async (_url, init) => Response.json({ apiKey: new Headers(init?.headers).get('api-key') }),
+        });
+        const options: FinalRequestOptions = { method: 'get', path: '/models' };
+
+        if (operation === 'buildRequest') {
+          const builds = await Promise.all([client.buildRequest(options), client.buildRequest(options)]);
+          expect(builds.map(({ req }) => req.headers.get('api-key'))).toEqual([
+            'synthetic-azure-key',
+            'synthetic-azure-key',
+          ]);
+        } else {
+          const responses = await Promise.all([client.request(options), client.request(options)]);
+          expect(responses).toEqual([{ apiKey: 'synthetic-azure-key' }, { apiKey: 'synthetic-azure-key' }]);
+        }
+        expect(bearerCalls).toBe(0);
+      },
+    );
+
+    test('rejects shared options while Azure AD authentication is using a custom bearerAuth', async () => {
+      let enter!: () => void;
+      let release!: () => void;
+      // oxlint-disable promise/avoid-new -- Pause the active bearer hook before it delegates.
+      const entered = new Promise<void>((resolve) => (enter = resolve));
+      const paused = new Promise<void>((resolve) => (release = resolve));
+      // oxlint-enable promise/avoid-new
+      let bearerCalls = 0;
+      class PausedBearerClient extends AzureOpenAI {
+        protected override async bearerAuth(options: FinalRequestOptions) {
+          if (++bearerCalls === 1) {
+            enter();
+            await paused;
+          }
+          return super.bearerAuth(options);
+        }
+      }
+      const provider = vi
+        .fn<() => Promise<string>>()
+        .mockResolvedValueOnce('synthetic-first')
+        .mockResolvedValueOnce('synthetic-next');
+      const client = new PausedBearerClient({
+        endpoint: 'https://azure.example.test',
+        azureADTokenProvider: provider,
+        apiVersion,
+      });
+      const options: FinalRequestOptions = { method: 'get', path: '/models' };
+
+      const first = client.buildRequest(options);
+      await entered;
+      await expect(client.buildRequest(options)).rejects.toThrow(
+        'overlapping requests that share the same options object',
+      );
+      release();
+      const initial = await first;
+      const subsequent = await client.buildRequest(options);
+      expect(initial.req.headers.get('authorization')).toBe('Bearer synthetic-first');
+      expect(subsequent.req.headers.get('authorization')).toBe('Bearer synthetic-next');
+      expect(bearerCalls).toBe(2);
+      expect(provider).toHaveBeenCalledTimes(2);
     });
   });
 

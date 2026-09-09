@@ -984,6 +984,78 @@ test('Bedrock request preparation does not rebuild a stateful URL', async () => 
   expect(client.buildURLCalls).toBe(2);
 });
 
+describe.each(['request', 'direct build'] as const)('%s post-delegation credentials', (entrypoint) => {
+  test.each(['transform', 'clear', 'explicit capture'] as const)(
+    'preserves a _callApiKey override that uses %s',
+    async (behavior) => {
+      class PostDelegationCredentials extends OpenAI {
+        override async _callApiKey(capture?: (apiKey: string | null) => void) {
+          const result = await super._callApiKey(capture);
+          if (behavior === 'explicit capture') {
+            capture?.('synthetic-explicit');
+          }
+          this.apiKey = behavior === 'clear' ? null : 'synthetic-transformed';
+          return result;
+        }
+      }
+      const provider = vi.fn(async () => 'synthetic-provider');
+      const fetch = mockFetch();
+      const client = new PostDelegationCredentials({ apiKey: provider, adminAPIKey: null, fetch });
+      const getHeaders = async () => {
+        if (entrypoint === 'request') {
+          await client.get('/items');
+          return sentHeaders(fetch)[0];
+        }
+        const built = await client.buildRequest({ method: 'get', path: '/items' });
+        return built.req.headers;
+      };
+
+      if (behavior === 'clear') {
+        await expect(getHeaders()).rejects.toThrow('Could not resolve authentication method.');
+        expect(fetch).not.toHaveBeenCalled();
+      } else {
+        const headers = await getHeaders();
+        expect(headers?.get('authorization')).toBe(
+          behavior === 'explicit capture' ? 'Bearer synthetic-explicit' : 'Bearer synthetic-transformed',
+        );
+      }
+      expect(provider).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('keeps concurrent credentials through transparent _callApiKey forwarding', async () => {
+    class DelegatingCredentials extends OpenAI {
+      override async _callApiKey(capture?: (apiKey: string | null) => void) {
+        const result = await super._callApiKey(capture);
+        return result;
+      }
+    }
+    const provider = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce('synthetic-first')
+      .mockResolvedValueOnce('synthetic-second');
+    const fetch = mockFetch();
+    const client = new DelegatingCredentials({ apiKey: provider, fetch });
+    let headers: Headers[];
+    if (entrypoint === 'request') {
+      await Promise.all([client.get('/first'), client.get('/second')]);
+      headers = sentHeaders(fetch);
+    } else {
+      const built = await Promise.all([
+        client.buildRequest({ method: 'get', path: '/first' }),
+        client.buildRequest({ method: 'get', path: '/second' }),
+      ]);
+      headers = built.map(({ req }) => req.headers);
+    }
+
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(headers.map((value) => value.get('authorization'))).toEqual([
+      'Bearer synthetic-first',
+      'Bearer synthetic-second',
+    ]);
+  });
+});
+
 test('preserves apiKey assignments after delegated prepareOptions', async () => {
   class PreparedCredentials extends OpenAI {
     protected override async prepareOptions(options: FinalRequestOptions) {
