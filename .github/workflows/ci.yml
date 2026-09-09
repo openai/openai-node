@@ -114,9 +114,6 @@ jobs:
 
   test:
     name: test (${{ matrix.node-version }})
-    # Reuse V8 compilation within this job only; never restore executable caches across runs.
-    env:
-      NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
     needs: node_matrix
     timeout-minutes: 15
     runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
@@ -157,10 +154,15 @@ jobs:
           node scripts/steady/cache.test.cjs
 
       - name: Run tests
+        # Reuse V8 compilation within this job only; never restore it across runs.
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: ./scripts/test
 
       - name: Test packed npm package
         if: matrix.experimental == false
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: |
           ./scripts/build
           node --experimental-strip-types scripts/test-packed-package.ts
