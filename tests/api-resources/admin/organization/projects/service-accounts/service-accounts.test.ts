@@ -25,7 +25,8 @@ describe('resource serviceAccounts', () => {
   test('create: required and optional params', async () => {
     const response = await client.admin.organization.projects.serviceAccounts.create('project_id', {
       name: 'name',
-      create_service_account_only: true,
+      create_service_account_only: false,
+      expires_in_seconds: 1,
     });
   });
 

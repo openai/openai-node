@@ -19,16 +19,16 @@ export class Responses extends APIResource {
 
   /**
    * Creates a model response. Provide
-   * [text](https://platform.openai.com/docs/guides/text) or
-   * [image](https://platform.openai.com/docs/guides/images) inputs to generate
-   * [text](https://platform.openai.com/docs/guides/text) or
-   * [JSON](https://platform.openai.com/docs/guides/structured-outputs) outputs. Have
-   * the model call your own
-   * [custom code](https://platform.openai.com/docs/guides/function-calling) or use
-   * built-in [tools](https://platform.openai.com/docs/guides/tools) like
-   * [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   * [file search](https://platform.openai.com/docs/guides/tools-file-search) to use
-   * your own data as input for the model's response.
+   * [text](https://developers.openai.com/api/docs/guides/text) or
+   * [image](https://developers.openai.com/api/docs/guides/images-vision) inputs to
+   * generate [text](https://developers.openai.com/api/docs/guides/text) or
+   * [JSON](https://developers.openai.com/api/docs/guides/structured-outputs)
+   * outputs. Have the model call your own
+   * [custom code](https://developers.openai.com/api/docs/guides/function-calling) or
+   * use built-in [tools](https://developers.openai.com/api/docs/guides/tools) like
+   * [web search](https://developers.openai.com/api/docs/guides/tools-web-search) or
+   * [file search](https://developers.openai.com/api/docs/guides/tools-file-search)
+   * to use your own data as input for the model's response.
    *
    * @example
    * ```ts
@@ -133,7 +133,7 @@ export class Responses extends APIResource {
   /**
    * Cancels a model response with the given ID. Only responses created with the
    * `background` parameter set to `true` can be cancelled.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    *
    * @example
    * ```ts
@@ -162,9 +162,9 @@ export class Responses extends APIResource {
    * Compact a conversation. Returns a compacted response object.
    *
    * Learn when and how to compact long-running conversations in the
-   * [conversation state guide](https://platform.openai.com/docs/guides/conversation-state#managing-the-context-window).
+   * [conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window).
    * For ZDR-compatible compaction details, see
-   * [Compaction (advanced)](https://platform.openai.com/docs/guides/conversation-state#compaction-advanced).
+   * [Compaction (advanced)](https://developers.openai.com/api/docs/guides/conversation-state#compaction-advanced).
    *
    * @example
    * ```ts
@@ -478,7 +478,7 @@ export type BetaComputerActionList = Array<BetaComputerAction>;
 
 /**
  * A tool that controls a virtual computer. Learn more about the
- * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ * [computer tool](https://developers.openai.com/api/docs/guides/tools-computer-use).
  */
 export interface BetaComputerTool {
   /**
@@ -489,7 +489,7 @@ export interface BetaComputerTool {
 
 /**
  * A tool that controls a virtual computer. Learn more about the
- * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ * [computer tool](https://developers.openai.com/api/docs/guides/tools-computer-use).
  */
 export interface BetaComputerUsePreviewTool {
   /**
@@ -595,7 +595,7 @@ export interface BetaContainerReference {
 
 /**
  * A custom tool that processes input using a specified format. Learn more about
- * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
+ * [custom tools](https://developers.openai.com/api/docs/guides/function-calling#custom-tools)
  */
 export interface BetaCustomTool {
   /**
@@ -704,7 +704,7 @@ export interface BetaEasyInputMessage {
 /**
  * A tool that searches for relevant content from uploaded files. Learn more about
  * the
- * [file search tool](https://platform.openai.com/docs/guides/tools-file-search).
+ * [file search tool](https://developers.openai.com/api/docs/guides/tools-file-search).
  */
 export interface BetaFileSearchTool {
   /**
@@ -879,7 +879,7 @@ export interface BetaFunctionShellTool {
 /**
  * Defines a function in your own code the model can choose to call. Learn more
  * about
- * [function calling](https://platform.openai.com/docs/guides/function-calling).
+ * [function calling](https://developers.openai.com/api/docs/guides/function-calling).
  */
 export interface BetaFunctionTool {
   /**
@@ -1139,8 +1139,8 @@ export interface BetaResponse {
    * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
    * range of models with different capabilities, performance characteristics, and
    * price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model:
     | 'gpt-6-astra'
@@ -1301,17 +1301,18 @@ export interface BetaResponse {
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
-   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+   *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+   *   or
+   *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
    *   Learn more about
-   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
    *   predefined connectors such as Google Drive and SharePoint. Learn more about
-   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+   *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
-   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+   *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
    *   You can also use custom tools to call your own code.
    */
   tools: Array<BetaTool>;
@@ -1327,7 +1328,7 @@ export interface BetaResponse {
 
   /**
    * Whether to run the model response in the background.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    */
   background?: boolean | null;
 
@@ -1346,7 +1347,7 @@ export interface BetaResponse {
   /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
 
@@ -1367,14 +1368,14 @@ export interface BetaResponse {
   /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
   /**
    * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: BetaResponsePrompt | null;
 
@@ -1390,7 +1391,7 @@ export interface BetaResponse {
   /**
    * Used by OpenAI to cache responses for similar requests to optimize your cache
    * hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string | null;
 
@@ -1406,7 +1407,7 @@ export interface BetaResponse {
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
    * This field expresses a maximum retention policy, while
    * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
    * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -1423,7 +1424,7 @@ export interface BetaResponse {
 
   /**
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   reasoning?: BetaResponse.Reasoning | null;
 
@@ -1433,7 +1434,7 @@ export interface BetaResponse {
    * identifies each user, with a maximum length of 64 characters. We recommend
    * hashing their username or email address, in order to avoid sending us any
    * identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   safety_identifier?: string | null;
 
@@ -1445,13 +1446,15 @@ export interface BetaResponse {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - If set to 'ultrafast', then the request will be processed with the
    *   access-controlled Ultrafast Processing service tier. This tier is currently
    *   available for `gpt-5.6-sol`; a response served through it will show
@@ -1475,8 +1478,8 @@ export interface BetaResponse {
    * Configuration options for a text response from the model. Can be plain text or
    * structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   text?: BetaResponseTextConfig;
 
@@ -1510,7 +1513,7 @@ export interface BetaResponse {
    * optimizations. A stable identifier for your end-users. Used to boost cache hit
    * rates by better bucketing similar requests and to help OpenAI detect and prevent
    * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -1742,7 +1745,7 @@ export namespace BetaResponse {
 
   /**
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   export interface Reasoning {
     /**
@@ -1760,7 +1763,7 @@ export namespace BetaResponse {
      * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
      * reasoning effort can result in faster responses and fewer tokens used on
      * reasoning in a response. Not all reasoning models support every value. See the
-     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
      * model-specific support.
      */
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -2442,7 +2445,7 @@ export namespace BetaResponseCodeInterpreterToolCall {
 
 /**
  * A compaction item generated by the
- * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ * [`v1/responses/compact` API](https://developers.openai.com/api/reference/resources/responses/methods/compact).
  */
 export interface BetaResponseCompactionItem {
   /**
@@ -2485,7 +2488,7 @@ export namespace BetaResponseCompactionItem {
 
 /**
  * A compaction item generated by the
- * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ * [`v1/responses/compact` API](https://developers.openai.com/api/reference/resources/responses/methods/compact).
  */
 export interface BetaResponseCompactionItemParam {
   /**
@@ -2560,7 +2563,7 @@ export namespace BetaResponseCompletedEvent {
 
 /**
  * A tool call to a computer use tool. See the
- * [computer use guide](https://platform.openai.com/docs/guides/tools-computer-use)
+ * [computer use guide](https://developers.openai.com/api/docs/guides/tools-computer-use)
  * for more information.
  */
 export interface BetaResponseComputerToolCall {
@@ -3620,7 +3623,7 @@ export namespace BetaResponseFileSearchCallSearchingEvent {
 
 /**
  * The results of a file search tool call. See the
- * [file search guide](https://platform.openai.com/docs/guides/tools-file-search)
+ * [file search guide](https://developers.openai.com/api/docs/guides/tools-file-search)
  * for more information.
  */
 export interface BetaResponseFileSearchToolCall {
@@ -3704,7 +3707,7 @@ export namespace BetaResponseFileSearchToolCall {
  *
  * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
  * ensures the model will match your supplied JSON schema. Learn more in the
- * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
  *
  * The default format is `{ "type": "text" }` with no additional options.
  *
@@ -3746,7 +3749,7 @@ export namespace BetaResponseFormatTextConfig {
 /**
  * JSON Schema response format. Used to generate structured JSON responses. Learn
  * more about
- * [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
  */
 export interface BetaResponseFormatTextJSONSchemaConfig {
   /**
@@ -3777,7 +3780,7 @@ export interface BetaResponseFormatTextJSONSchemaConfig {
    * true, the model will always follow the exact schema defined in the `schema`
    * field. Only a subset of JSON Schema is supported when `strict` is `true`. To
    * learn more, read the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    */
   strict?: boolean | null;
 }
@@ -4165,7 +4168,7 @@ export namespace BetaResponseFunctionShellToolCallOutput {
 
 /**
  * A tool call to run a function. See the
- * [function calling guide](https://platform.openai.com/docs/guides/function-calling)
+ * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling)
  * for more information.
  */
 export interface BetaResponseFunctionToolCall {
@@ -4248,7 +4251,7 @@ export namespace BetaResponseFunctionToolCall {
 
 /**
  * A tool call to run a function. See the
- * [function calling guide](https://platform.openai.com/docs/guides/function-calling)
+ * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling)
  * for more information.
  */
 export interface BetaResponseFunctionToolCallItem extends BetaResponseFunctionToolCall {
@@ -4359,8 +4362,8 @@ export namespace BetaResponseFunctionToolCallOutputItem {
 
 /**
  * The results of a web search tool call. See the
- * [web search guide](https://platform.openai.com/docs/guides/tools-web-search) for
- * more information.
+ * [web search guide](https://developers.openai.com/api/docs/guides/tools-web-search)
+ * for more information.
  */
 export interface BetaResponseFunctionWebSearch {
   /**
@@ -5056,7 +5059,7 @@ export namespace BetaResponseInputFileContent {
 
 /**
  * An image input to the model. Learn about
- * [image inputs](https://platform.openai.com/docs/guides/vision).
+ * [image inputs](https://developers.openai.com/api/docs/guides/images-vision).
  */
 export interface BetaResponseInputImage {
   /**
@@ -5105,7 +5108,7 @@ export namespace BetaResponseInputImage {
 
 /**
  * An image input to the model. Learn about
- * [image inputs](https://platform.openai.com/docs/guides/vision)
+ * [image inputs](https://developers.openai.com/api/docs/guides/images-vision)
  */
 export interface BetaResponseInputImageContent {
   /**
@@ -5781,15 +5784,35 @@ export namespace BetaResponseInputItem {
     type: 'image_generation_call';
 
     /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
      * The agent that produced this item.
      */
     agent?: ImageGenerationCall.Agent | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
 
     /**
      * The quality of the image generated by the image generation tool call. One of
      * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
      */
     quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
 
     /**
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
@@ -7270,15 +7293,35 @@ export namespace BetaResponseItem {
     type: 'image_generation_call';
 
     /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
      * The agent that produced this item.
      */
     agent?: ImageGenerationCall.Agent | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
 
     /**
      * The quality of the image generated by the image generation tool call. One of
      * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
      */
     quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
 
     /**
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
@@ -8485,15 +8528,35 @@ export namespace BetaResponseOutputItem {
     type: 'image_generation_call';
 
     /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
      * The agent that produced this item.
      */
     agent?: ImageGenerationCall.Agent | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
 
     /**
      * The quality of the image generated by the image generation tool call. One of
      * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
      */
     quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
 
     /**
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
@@ -9371,7 +9434,7 @@ export namespace BetaResponseOutputTextAnnotationAddedEvent {
 
 /**
  * Reference to a prompt template and its variables.
- * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+ * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
  */
 export interface BetaResponsePrompt {
   /**
@@ -9435,7 +9498,7 @@ export namespace BetaResponseQueuedEvent {
  * A description of the chain of thought used by a reasoning model while generating
  * a response. Be sure to include these items in your `input` to the Responses API
  * for subsequent turns of a conversation if you are manually
- * [managing context](https://platform.openai.com/docs/guides/conversation-state).
+ * [managing context](https://developers.openai.com/api/docs/guides/conversation-state).
  */
 export interface BetaResponseReasoningItem {
   /**
@@ -10933,8 +10996,8 @@ export type BetaResponseStreamEvent =
  * Configuration options for a text response from the model. Can be plain text or
  * structured JSON data. Learn more:
  *
- * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
- * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+ * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+ * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
  */
 export interface BetaResponseTextConfig {
   /**
@@ -10942,7 +11005,7 @@ export interface BetaResponseTextConfig {
    *
    * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
    * ensures the model will match your supplied JSON schema. Learn more in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * The default format is `{ "type": "text" }` with no additional options.
    *
@@ -11349,7 +11412,7 @@ export namespace BetaResponseUsage {
 
     /**
      * The number of tokens that were retrieved from the cache.
-     * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
+     * [More on prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     cached_tokens: number;
   }
@@ -11519,7 +11582,7 @@ export namespace BetaResponsesClientEvent {
 
     /**
      * Whether to run the model response in the background.
-     * [Learn more](https://platform.openai.com/docs/guides/background).
+     * [Learn more](https://developers.openai.com/api/docs/guides/background).
      */
     background?: boolean | null;
 
@@ -11563,11 +11626,11 @@ export namespace BetaResponsesClientEvent {
      *
      * Learn more:
      *
-     * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-     * - [Image inputs](https://platform.openai.com/docs/guides/images)
-     * - [File inputs](https://platform.openai.com/docs/guides/pdf-files)
-     * - [Conversation state](https://platform.openai.com/docs/guides/conversation-state)
-     * - [Function calling](https://platform.openai.com/docs/guides/function-calling)
+     * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+     * - [Image inputs](https://developers.openai.com/api/docs/guides/images-vision)
+     * - [File inputs](https://developers.openai.com/api/docs/guides/file-inputs)
+     * - [Conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
+     * - [Function calling](https://developers.openai.com/api/docs/guides/function-calling)
      */
     input?: string | ResponsesAPI.BetaResponseInput;
 
@@ -11583,7 +11646,7 @@ export namespace BetaResponsesClientEvent {
     /**
      * An upper bound for the number of tokens that can be generated for a response,
      * including visible output tokens and
-     * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+     * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
      */
     max_output_tokens?: number | null;
 
@@ -11609,8 +11672,8 @@ export namespace BetaResponsesClientEvent {
      * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
      * range of models with different capabilities, performance characteristics, and
      * price points. Refer to the
-     * [model guide](https://platform.openai.com/docs/models) to browse and compare
-     * available models.
+     * [model guide](https://developers.openai.com/api/docs/models) to browse and
+     * compare available models.
      */
     model?:
       | 'gpt-6-astra'
@@ -11736,21 +11799,21 @@ export namespace BetaResponsesClientEvent {
     /**
      * The unique ID of the previous response to the model. Use this to create
      * multi-turn conversations. Learn more about
-     * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+     * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
      * Cannot be used in conjunction with `conversation`.
      */
     previous_response_id?: string | null;
 
     /**
      * Reference to a prompt template and its variables.
-     * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+     * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
      */
     prompt?: ResponsesAPI.BetaResponsePrompt | null;
 
     /**
      * Used by OpenAI to cache responses for similar requests to optimize your cache
      * hit rates. Replaces the `user` field.
-     * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+     * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     prompt_cache_key?: string | null;
 
@@ -11762,7 +11825,7 @@ export namespace BetaResponsesClientEvent {
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
      * `ttl` defaults to `30m`, which is currently the only supported value. See the
-     * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+     * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
     prompt_cache_options?: ResponseCreate.PromptCacheOptions;
@@ -11773,7 +11836,7 @@ export namespace BetaResponsesClientEvent {
      * The retention policy for the prompt cache. Set to `24h` to enable extended
      * prompt caching, which keeps cached prefixes active for longer, up to a maximum
      * of 24 hours.
-     * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+     * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
      * This field expresses a maximum retention policy, while
      * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
      * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -11790,7 +11853,7 @@ export namespace BetaResponsesClientEvent {
 
     /**
      * Configuration options for
-     * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+     * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
      */
     reasoning?: ResponseCreate.Reasoning | null;
 
@@ -11800,7 +11863,7 @@ export namespace BetaResponsesClientEvent {
      * identifies each user, with a maximum length of 64 characters. We recommend
      * hashing their username or email address, in order to avoid sending us any
      * identifying information.
-     * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+     * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
      */
     safety_identifier?: string | null;
 
@@ -11812,13 +11875,15 @@ export namespace BetaResponsesClientEvent {
      *   will use 'default'.
      * - If set to 'default', then the request will be processed with the standard
      *   pricing and performance for the selected model.
-     * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-     *   then the request will be processed with the Flex Processing service tier.
-     * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-     *   include the `service_tier=fast` or `service_tier=priority` parameter for
-     *   Responses or Chat Completions. The response will show `service_tier=priority`
-     *   regardless of if you specify `service_tier=fast` or `priority` in your
-     *   request.
+     * - If set to
+     *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+     *   the request will be processed with the Flex Processing service tier.
+     * - To opt-in to
+     *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+     *   request level, include the `service_tier=fast` or `service_tier=priority`
+     *   parameter for Responses or Chat Completions. The response will show
+     *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+     *   `priority` in your request.
      * - If set to 'ultrafast', then the request will be processed with the
      *   access-controlled Ultrafast Processing service tier. This tier is currently
      *   available for `gpt-5.6-sol`; a response served through it will show
@@ -11836,7 +11901,7 @@ export namespace BetaResponsesClientEvent {
      * Whether to store the generated model response for later retrieval via API.
      * Defaults to true when omitted. If set to true, response data will be stored for
      * at least 30 days, subject to the
-     * [data retention exceptions](/api/docs/guides/your-data#v1responses).
+     * [data retention exceptions](https://developers.openai.com/api/docs/guides/your-data#v1responses).
      */
     store?: boolean | null;
 
@@ -11845,7 +11910,7 @@ export namespace BetaResponsesClientEvent {
      * generated using
      * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
      * See the
-     * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+     * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
      * for more information.
      */
     stream?: boolean | null;
@@ -11876,8 +11941,8 @@ export namespace BetaResponsesClientEvent {
      * Configuration options for a text response from the model. Can be plain text or
      * structured JSON data. Learn more:
      *
-     * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-     * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+     * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+     * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
      */
     text?: ResponsesAPI.BetaResponseTextConfig;
 
@@ -11905,17 +11970,18 @@ export namespace BetaResponsesClientEvent {
      *
      * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
      *   capabilities, like
-     *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-     *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+     *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+     *   or
+     *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
      *   Learn more about
-     *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+     *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
      * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
      *   predefined connectors such as Google Drive and SharePoint. Learn more about
-     *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+     *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
      * - **Function calls (custom tools)**: Functions that are defined by you, enabling
      *   the model to call your own code with strongly typed arguments and outputs.
      *   Learn more about
-     *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+     *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
      *   You can also use custom tools to call your own code.
      */
     tools?: Array<ResponsesAPI.BetaTool>;
@@ -11953,7 +12019,7 @@ export namespace BetaResponsesClientEvent {
      * optimizations. A stable identifier for your end-users. Used to boost cache hit
      * rates by better bucketing similar requests and to help OpenAI detect and prevent
      * abuse.
-     * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+     * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
      */
     user?: string;
   }
@@ -12048,7 +12114,7 @@ export namespace BetaResponsesClientEvent {
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
      * `ttl` defaults to `30m`, which is currently the only supported value. See the
-     * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+     * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
     export interface PromptCacheOptions {
@@ -12078,7 +12144,7 @@ export namespace BetaResponsesClientEvent {
 
     /**
      * Configuration options for
-     * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+     * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
      */
     export interface Reasoning {
       /**
@@ -12096,7 +12162,7 @@ export namespace BetaResponsesClientEvent {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -12993,13 +13059,15 @@ export namespace BetaResponsesServerEvent {
  *   will use 'default'.
  * - If set to 'default', then the request will be processed with the standard
  *   pricing and performance for the selected model.
- * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
- *   then the request will be processed with the Flex Processing service tier.
- * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
- *   include the `service_tier=fast` or `service_tier=priority` parameter for
- *   Responses or Chat Completions. The response will show `service_tier=priority`
- *   regardless of if you specify `service_tier=fast` or `priority` in your
- *   request.
+ * - If set to
+ *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+ *   the request will be processed with the Flex Processing service tier.
+ * - To opt-in to
+ *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+ *   request level, include the `service_tier=fast` or `service_tier=priority`
+ *   parameter for Responses or Chat Completions. The response will show
+ *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+ *   `priority` in your request.
  * - If set to 'ultrafast', then the request will be processed with the
  *   access-controlled Ultrafast Processing service tier. This tier is currently
  *   available for `gpt-5.6-sol`; a response served through it will show
@@ -13063,7 +13131,7 @@ export namespace BetaTool {
   /**
    * Give the model access to additional tools via remote Model Context Protocol
    * (MCP) servers.
-   * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+   * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    */
   export interface Mcp {
     /**
@@ -13097,7 +13165,7 @@ export namespace BetaTool {
      * Identifier for service connectors, like those available in ChatGPT. One of
      * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
      * service connectors
-     * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+     * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
      *
@@ -13544,12 +13612,12 @@ export interface BetaToolChoiceShell {
 
 /**
  * Indicates that the model should use a built-in tool to generate a response.
- * [Learn more about built-in tools](https://platform.openai.com/docs/guides/tools).
+ * [Learn more about built-in tools](https://developers.openai.com/api/docs/guides/tools).
  */
 export interface BetaToolChoiceTypes {
   /**
    * The type of hosted tool the model should to use. Learn more about
-   * [built-in tools](https://platform.openai.com/docs/guides/tools).
+   * [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    *
    * Allowed values are:
    *
@@ -13600,7 +13668,7 @@ export interface BetaToolSearchTool {
 /**
  * This tool searches the web for relevant results to use in a response. Learn more
  * about the
- * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+ * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
  */
 export interface BetaWebSearchPreviewTool {
   /**
@@ -13659,7 +13727,7 @@ export namespace BetaWebSearchPreviewTool {
 
 /**
  * Search the Internet for sources related to the prompt. Learn more about the
- * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+ * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
  */
 export interface BetaWebSearchTool {
   /**
@@ -13743,7 +13811,7 @@ export type ResponseCreateParams = ResponseCreateParamsNonStreaming | ResponseCr
 export interface ResponseCreateParamsBase {
   /**
    * Body param: Whether to run the model response in the background.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    */
   background?: boolean | null;
 
@@ -13788,11 +13856,11 @@ export interface ResponseCreateParamsBase {
    *
    * Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Image inputs](https://platform.openai.com/docs/guides/images)
-   * - [File inputs](https://platform.openai.com/docs/guides/pdf-files)
-   * - [Conversation state](https://platform.openai.com/docs/guides/conversation-state)
-   * - [Function calling](https://platform.openai.com/docs/guides/function-calling)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Image inputs](https://developers.openai.com/api/docs/guides/images-vision)
+   * - [File inputs](https://developers.openai.com/api/docs/guides/file-inputs)
+   * - [Conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
+   * - [Function calling](https://developers.openai.com/api/docs/guides/function-calling)
    */
   input?: string | BetaResponseInput;
 
@@ -13808,7 +13876,7 @@ export interface ResponseCreateParamsBase {
   /**
    * Body param: An upper bound for the number of tokens that can be generated for a
    * response, including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
 
@@ -13834,8 +13902,8 @@ export interface ResponseCreateParamsBase {
    * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model?:
     | 'gpt-6-astra'
@@ -13962,21 +14030,21 @@ export interface ResponseCreateParamsBase {
   /**
    * Body param: The unique ID of the previous response to the model. Use this to
    * create multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
   /**
    * Body param: Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: BetaResponsePrompt | null;
 
   /**
    * Body param: Used by OpenAI to cache responses for similar requests to optimize
    * your cache hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string | null;
 
@@ -13989,7 +14057,7 @@ export interface ResponseCreateParamsBase {
    * conversation, without a content-block lookback limit. Set `mode` to `explicit`
    * to disable the implicit breakpoint. The `ttl` defaults to `30m`, which is
    * currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   prompt_cache_options?: ResponseCreateParams.PromptCacheOptions;
@@ -14000,7 +14068,7 @@ export interface ResponseCreateParamsBase {
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
    * This field expresses a maximum retention policy, while
    * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
    * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -14017,7 +14085,7 @@ export interface ResponseCreateParamsBase {
 
   /**
    * Body param: Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   reasoning?: ResponseCreateParams.Reasoning | null;
 
@@ -14027,7 +14095,7 @@ export interface ResponseCreateParamsBase {
    * uniquely identifies each user, with a maximum length of 64 characters. We
    * recommend hashing their username or email address, in order to avoid sending us
    * any identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   safety_identifier?: string | null;
 
@@ -14039,13 +14107,15 @@ export interface ResponseCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - If set to 'ultrafast', then the request will be processed with the
    *   access-controlled Ultrafast Processing service tier. This tier is currently
    *   available for `gpt-5.6-sol`; a response served through it will show
@@ -14063,7 +14133,7 @@ export interface ResponseCreateParamsBase {
    * Body param: Whether to store the generated model response for later retrieval
    * via API. Defaults to true when omitted. If set to true, response data will be
    * stored for at least 30 days, subject to the
-   * [data retention exceptions](/api/docs/guides/your-data#v1responses).
+   * [data retention exceptions](https://developers.openai.com/api/docs/guides/your-data#v1responses).
    */
   store?: boolean | null;
 
@@ -14072,7 +14142,7 @@ export interface ResponseCreateParamsBase {
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: boolean | null;
@@ -14095,8 +14165,8 @@ export interface ResponseCreateParamsBase {
    * Body param: Configuration options for a text response from the model. Can be
    * plain text or structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   text?: BetaResponseTextConfig;
 
@@ -14124,17 +14194,18 @@ export interface ResponseCreateParamsBase {
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
-   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+   *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+   *   or
+   *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
    *   Learn more about
-   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
    *   predefined connectors such as Google Drive and SharePoint. Learn more about
-   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+   *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
-   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+   *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
    *   You can also use custom tools to call your own code.
    */
   tools?: Array<BetaTool>;
@@ -14174,7 +14245,7 @@ export interface ResponseCreateParamsBase {
    * optimizations. A stable identifier for your end-users. Used to boost cache hit
    * rates by better bucketing similar requests and to help OpenAI detect and prevent
    * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 
@@ -14274,7 +14345,7 @@ export namespace ResponseCreateParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   export interface PromptCacheOptions {
@@ -14304,7 +14375,7 @@ export namespace ResponseCreateParams {
 
   /**
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   export interface Reasoning {
     /**
@@ -14322,7 +14393,7 @@ export namespace ResponseCreateParams {
      * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
      * reasoning effort can result in faster responses and fewer tokens used on
      * reasoning in a response. Not all reasoning models support every value. See the
-     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
      * model-specific support.
      */
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -14386,7 +14457,7 @@ export interface ResponseCreateParamsNonStreaming extends ResponseCreateParamsBa
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: false | null;
@@ -14398,7 +14469,7 @@ export interface ResponseCreateParamsStreaming extends ResponseCreateParamsBase 
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream: true;
@@ -14434,7 +14505,7 @@ export interface ResponseRetrieveParamsBase {
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: boolean;
@@ -14456,7 +14527,7 @@ export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrievePara
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: false;
@@ -14468,7 +14539,7 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream: true;
@@ -14493,8 +14564,8 @@ export interface ResponseCompactParams {
    * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model:
     | 'gpt-6-astra'
@@ -14620,7 +14691,7 @@ export interface ResponseCompactParams {
   /**
    * Body param: The unique ID of the previous response to the model. Use this to
    * create multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
@@ -14639,7 +14710,7 @@ export interface ResponseCompactParams {
    * conversation, without a content-block lookback limit. Set `mode` to `explicit`
    * to disable the implicit breakpoint. The `ttl` defaults to `30m`, which is
    * currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   prompt_cache_options?: ResponseCompactParams.PromptCacheOptions | null;
@@ -14656,17 +14727,17 @@ export interface ResponseCompactParams {
    * in the Project settings. Unless otherwise configured, the Project will use
    * 'default'. - If set to 'default', then the request will be processed with the
    * standard pricing and performance for the selected model. - If set to
-   * '[flex](https://platform.openai.com/docs/guides/flex-processing)', then the
-   * request will be processed with the Flex Processing service tier. - To opt-in to
-   * [Fast mode](/api/docs/guides/fast-mode) at the request level, include the
-   * `service_tier=fast` or `service_tier=priority` parameter for Responses or Chat
-   * Completions. For models with a dedicated Fast tier, either value resolves to
-   * `service_tier=fast`; for other models, either value resolves to
-   * `service_tier=priority`. - When not set, the default behavior is 'auto'. When
-   * the `service_tier` parameter is set, the response body will include the
-   * `service_tier` value based on the processing mode actually used to serve the
-   * request. This response value may be different from the value set in the
-   * parameter.
+   * '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   * the request will be processed with the Flex Processing service tier. - To opt-in
+   * to [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   * request level, include the `service_tier=fast` or `service_tier=priority`
+   * parameter for Responses or Chat Completions. For models with a dedicated Fast
+   * tier, either value resolves to `service_tier=fast`; for other models, either
+   * value resolves to `service_tier=priority`. - When not set, the default behavior
+   * is 'auto'. When the `service_tier` parameter is set, the response body will
+   * include the `service_tier` value based on the processing mode actually used to
+   * serve the request. This response value may be different from the value set in
+   * the parameter.
    */
   service_tier?: 'auto' | 'default' | 'fast' | 'flex' | 'priority' | null;
 
@@ -14685,7 +14756,7 @@ export namespace ResponseCompactParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   export interface PromptCacheOptions {

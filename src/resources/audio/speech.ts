@@ -46,7 +46,8 @@ export interface SpeechCreateParams {
   input: string;
 
   /**
-   * One of the available [TTS models](https://platform.openai.com/docs/models#tts):
+   * One of the available
+   * [TTS models](https://developers.openai.com/api/docs/guides/text-to-speech):
    * `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, or `gpt-4o-mini-tts-2025-12-15`.
    */
   model: (string & {}) | SpeechModel;
@@ -57,7 +58,7 @@ export interface SpeechCreateParams {
    * `shimmer`, `verse`, `marin`, and `cedar`. You may also provide a custom voice
    * object with an `id`, for example `{ "id": "voice_1234" }`. Previews of the
    * voices are available in the
-   * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
+   * [Text to speech guide](https://developers.openai.com/api/docs/guides/text-to-speech#voice-options).
    */
   voice:
     | string
