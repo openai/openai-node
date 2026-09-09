@@ -366,7 +366,7 @@ export interface TranscriptionSegment {
 /**
  * Emitted when a diarized transcription returns a completed segment with speaker
  * information. Only emitted when you
- * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * [create a transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
  * with `stream` set to `true` and `response_format` set to `diarized_json`.
  */
 export type TranscriptionStreamEvent =
@@ -377,7 +377,7 @@ export type TranscriptionStreamEvent =
 /**
  * Emitted when there is an additional text delta. This is also the first event
  * emitted when the transcription starts. Only emitted when you
- * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * [create a transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
  * with the `Stream` parameter set to `true`.
  */
 export interface TranscriptionTextDeltaEvent {
@@ -393,7 +393,7 @@ export interface TranscriptionTextDeltaEvent {
 
   /**
    * The log probabilities of the delta. Only included if you
-   * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+   * [create a transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
    * with the `include[]` parameter set to `logprobs`.
    */
   logprobs?: Array<TranscriptionTextDeltaEvent.Logprob>;
@@ -427,7 +427,7 @@ export namespace TranscriptionTextDeltaEvent {
 /**
  * Emitted when the transcription is complete. Contains the complete transcription
  * text. Only emitted when you
- * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * [create a transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
  * with the `Stream` parameter set to `true`.
  */
 export interface TranscriptionTextDoneEvent {
@@ -450,7 +450,7 @@ export interface TranscriptionTextDoneEvent {
   /**
    * The log probabilities of the individual tokens in the transcription. Only
    * included if you
-   * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+   * [create a transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
    * with the `include[]` parameter set to `logprobs`.
    */
   logprobs?: Array<TranscriptionTextDoneEvent.Logprob>;
@@ -530,7 +530,7 @@ export namespace TranscriptionTextDoneEvent {
 /**
  * Emitted when a diarized transcription returns a completed segment with speaker
  * information. Only emitted when you
- * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * [create a transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
  * with `stream` set to `true` and `response_format` set to `diarized_json`.
  */
 export interface TranscriptionTextSegmentEvent {
@@ -721,7 +721,7 @@ export interface TranscriptionCreateParamsBase {
   /**
    * An optional text to guide the model's style or continue a previous audio
    * segment. The
-   * [prompt](https://platform.openai.com/docs/guides/speech-to-text#prompting)
+   * [prompt](https://developers.openai.com/api/docs/guides/speech-to-text#prompting)
    * should match the audio language. This field is not supported when using
    * `gpt-4o-transcribe-diarize`.
    */
@@ -741,7 +741,7 @@ export interface TranscriptionCreateParamsBase {
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section of the Speech-to-Text guide](https://platform.openai.com/docs/guides/speech-to-text?lang=curl#streaming-transcriptions)
+   * [Streaming section of the Speech-to-Text guide](https://developers.openai.com/api/docs/guides/speech-to-text?lang=curl#streaming)
    * for more information.
    *
    * Note: Streaming is not supported for the `whisper-1` model and will be ignored.
@@ -805,7 +805,7 @@ export interface TranscriptionCreateParamsNonStreaming extends TranscriptionCrea
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section of the Speech-to-Text guide](https://platform.openai.com/docs/guides/speech-to-text?lang=curl#streaming-transcriptions)
+   * [Streaming section of the Speech-to-Text guide](https://developers.openai.com/api/docs/guides/speech-to-text?lang=curl#streaming)
    * for more information.
    *
    * Note: Streaming is not supported for the `whisper-1` model and will be ignored.
@@ -819,7 +819,7 @@ export interface TranscriptionCreateParamsStreaming extends TranscriptionCreateP
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section of the Speech-to-Text guide](https://platform.openai.com/docs/guides/speech-to-text?lang=curl#streaming-transcriptions)
+   * [Streaming section of the Speech-to-Text guide](https://developers.openai.com/api/docs/guides/speech-to-text?lang=curl#streaming)
    * for more information.
    *
    * Note: Streaming is not supported for the `whisper-1` model and will be ignored.

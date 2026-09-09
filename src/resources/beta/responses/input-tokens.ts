@@ -69,8 +69,8 @@ export interface InputTokenCountParams {
    * Body param: Model ID used to generate the response, like `gpt-4o` or `o3`.
    * OpenAI offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model?: string | null;
 
@@ -89,14 +89,14 @@ export interface InputTokenCountParams {
   /**
    * Body param: The unique ID of the previous response to the model. Use this to
    * create multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
   /**
    * Body param: **gpt-5 and o-series models only** Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   reasoning?: InputTokenCountParams.Reasoning | null;
 
@@ -104,8 +104,8 @@ export interface InputTokenCountParams {
    * Body param: Configuration options for a text response from the model. Can be
    * plain text or structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   text?: InputTokenCountParams.Text | null;
 
@@ -149,7 +149,7 @@ export interface InputTokenCountParams {
 export namespace InputTokenCountParams {
   /**
    * **gpt-5 and o-series models only** Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   export interface Reasoning {
     /**
@@ -167,7 +167,7 @@ export namespace InputTokenCountParams {
      * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
      * reasoning effort can result in faster responses and fewer tokens used on
      * reasoning in a response. Not all reasoning models support every value. See the
-     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
      * model-specific support.
      */
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -203,8 +203,8 @@ export namespace InputTokenCountParams {
    * Configuration options for a text response from the model. Can be plain text or
    * structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   export interface Text {
     /**
@@ -212,7 +212,7 @@ export namespace InputTokenCountParams {
      *
      * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
      * ensures the model will match your supplied JSON schema. Learn more in the
-     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
      *
      * The default format is `{ "type": "text" }` with no additional options.
      *
