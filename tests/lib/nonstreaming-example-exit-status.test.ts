@@ -42,6 +42,7 @@ async function runExample(file: string, baseURL: string, bedrock: boolean) {
         OPENAI_LOG: 'off',
         TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
         DISABLE_V8_COMPILE_CACHE: '1',
+        NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
         NO_PROXY: '127.0.0.1',
         no_proxy: '127.0.0.1',
       },

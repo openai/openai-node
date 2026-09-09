@@ -80,6 +80,7 @@ async function runExample(events: readonly BetaResponseStreamEvent[], ending: 'd
         OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
         TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
         DISABLE_V8_COMPILE_CACHE: '1',
+        NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
         SystemRoot: process.env['SystemRoot'],
       },
       stdio: ['ignore', 'pipe', 'pipe'],

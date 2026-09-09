@@ -31,6 +31,7 @@ async function runExample(directory: string, baseURL: string) {
         NO_PROXY: '127.0.0.1',
         no_proxy: '127.0.0.1',
         DISABLE_V8_COMPILE_CACHE: '1',
+        NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
         TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
         TS_NODE_TRANSPILE_ONLY: 'true',
       },

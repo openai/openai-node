@@ -114,6 +114,9 @@ jobs:
 
   test:
     name: test (${{ matrix.node-version }})
+    # Reuse V8 compilation within this job only; never restore executable caches across runs.
+    env:
+      NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
     needs: node_matrix
     timeout-minutes: 15
     runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
