@@ -17,6 +17,7 @@ function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}
     process.execPath,
     [
       path.join(root, 'node_modules/ts-node/dist/bin.js'),
+      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       path.join(root, 'ecosystem-tests/cli.ts'),

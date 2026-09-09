@@ -225,6 +225,7 @@ function runCloudflare(
     process.execPath,
     [
       path.join(repositoryRoot, 'node_modules/ts-node/dist/bin.js'),
+      '--swc',
       '-r',
       path.join(repositoryRoot, 'node_modules/tsconfig-paths/register.js'),
       path.join(repositoryRoot, 'ecosystem-tests/cli.ts'),

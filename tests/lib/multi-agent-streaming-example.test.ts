@@ -68,7 +68,7 @@ async function runExample(events: readonly BetaResponseStreamEvent[], ending: 'd
     process.execPath,
     [
       path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '-T',
+      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       path.join(root, 'examples/responses/multi-agent-streaming.ts'),
