@@ -589,6 +589,25 @@ test('keeps observing a direct hook after it resolves a provider credential', as
   expect(provider).toHaveBeenCalledTimes(1);
 });
 
+test('restarts credential observation when a direct hook writes before and after provider resolution', async () => {
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      this.apiKey = null;
+      await this._callApiKey();
+      this.apiKey = null;
+      return super.authHeaders(options);
+    }
+  }
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const client = new Credentials({ apiKey: provider, adminAPIKey: null });
+
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+
+  expect(provider).toHaveBeenCalledTimes(1);
+});
+
 test('restores credential data-property metadata changed during a build', async () => {
   class Credentials extends OpenAI {
     protected override async authHeaders(options: FinalRequestOptions) {
@@ -630,6 +649,64 @@ test('restores the ordinary apiKey data descriptor after observing a direct buil
   Object.defineProperty(client, 'apiKey', { writable: false });
   expect(client.apiKey).toBe('synthetic-provider');
 });
+
+test.each(['authHeaders', 'bearerAuth'] as const)(
+  'observes null writes through a prototype accessor in a direct %s hook',
+  async (hook) => {
+    class PrototypeCredentials extends OpenAI {}
+    class NullCredentials extends PrototypeCredentials {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        if (hook === 'authHeaders') {
+          this.apiKey = null;
+        }
+        return super.authHeaders(options);
+      }
+
+      protected override async bearerAuth(options: FinalRequestOptions) {
+        if (hook === 'bearerAuth') {
+          this.apiKey = null;
+        }
+        return super.bearerAuth(options);
+      }
+    }
+    const values = new WeakMap<OpenAI, string | null>();
+    const getter = function getter(this: OpenAI) {
+      return values.get(this) ?? null;
+    };
+    const setter = vi.fn(function setter(this: OpenAI, value: string | null) {
+      values.set(this, value);
+    });
+    Object.defineProperty(PrototypeCredentials.prototype, 'apiKey', {
+      get: getter,
+      set: setter,
+      configurable: true,
+      enumerable: false,
+    });
+    const original = Object.getOwnPropertyDescriptor(PrototypeCredentials.prototype, 'apiKey');
+    const provider = vi.fn(async () => 'synthetic-provider');
+    const client = new NullCredentials({ apiKey: provider, adminAPIKey: null });
+    const sibling = new NullCredentials({ apiKey: provider, adminAPIKey: null });
+    Reflect.deleteProperty(client, 'apiKey');
+    Reflect.deleteProperty(sibling, 'apiKey');
+    values.set(sibling, 'synthetic-sibling');
+    setter.mockClear();
+
+    await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+      'Could not resolve authentication method.',
+    );
+    await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+      'Could not resolve authentication method.',
+    );
+
+    expect(provider).not.toHaveBeenCalled();
+    expect(setter).toHaveBeenCalledTimes(2);
+    expect(setter.mock.contexts).toEqual([client, client]);
+    expect(Object.getOwnPropertyDescriptor(client, 'apiKey')).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(PrototypeCredentials.prototype, 'apiKey')).toEqual(original);
+    expect(Object.getOwnPropertyDescriptor(sibling, 'apiKey')).toBeUndefined();
+    expect(sibling.apiKey).toBe('synthetic-sibling');
+  },
+);
 
 test('preserves the credential failure when upload cleanup throws during a direct build', async () => {
   const failure = new OpenAIError('synthetic provider failure');
@@ -1585,4 +1662,92 @@ test('does not resolve the OpenAI callback for admin-only requests', async () =>
 
   expect(provider).not.toHaveBeenCalled();
   expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-admin');
+});
+
+function preparationGate() {
+  let release!: () => void;
+  // oxlint-disable-next-line promise/avoid-new -- Gates select the order of asynchronous hook delegation.
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
+describe('delayed credential preparation', () => {
+  test.each([true, false])('handles pre-delegation overlap with shared options: %s', async (shared) => {
+    const entered = [preparationGate(), preparationGate()] as const;
+    const releases = [preparationGate(), preparationGate()] as const;
+    const seenOptions: FinalRequestOptions[] = [];
+    class DelayedPreparation extends OpenAI {
+      protected override async prepareOptions(options: FinalRequestOptions) {
+        const index = seenOptions.push(options) - 1;
+        if (index === 0 || index === 1) {
+          entered[index].release();
+          await releases[index].promise;
+        }
+        return super.prepareOptions(options);
+      }
+    }
+    const provider = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce('synthetic-first')
+      .mockResolvedValueOnce('synthetic-second')
+      .mockResolvedValueOnce('synthetic-third');
+    const fetch = mockFetch();
+    const client = new DelayedPreparation({ apiKey: provider, fetch, maxRetries: 0 });
+    const options: FinalRequestOptions = { method: 'get', path: '/items' };
+    const secondOptions = shared ? options : { ...options };
+
+    const first = client.request(options);
+    await entered[0].promise;
+    const second = client.request(secondOptions);
+    await entered[1].promise;
+    releases[0].release();
+    try {
+      if (shared) {
+        await expect(first).rejects.toThrow('overlapping requests that share the same options object');
+        expect(provider).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+      } else {
+        await first;
+        expect(provider).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      releases[1].release();
+      await second;
+    }
+    await client.request(options);
+
+    expect(seenOptions[0]).toBe(options);
+    expect(seenOptions[1]).toBe(secondOptions);
+    expect(provider).toHaveBeenCalledTimes(shared ? 2 : 3);
+    expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual(
+      shared
+        ? ['Bearer synthetic-first', 'Bearer synthetic-second']
+        : ['Bearer synthetic-first', 'Bearer synthetic-second', 'Bearer synthetic-third'],
+    );
+  });
+
+  test('preserves shared-options captures when preparation delegates synchronously', async () => {
+    class DelegatingPreparation extends OpenAI {
+      protected override async prepareOptions(options: FinalRequestOptions) {
+        await super.prepareOptions(options);
+      }
+    }
+    const provider = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce('synthetic-first')
+      .mockResolvedValueOnce('synthetic-second');
+    const fetch = mockFetch();
+    const client = new DelegatingPreparation({ apiKey: provider, fetch, maxRetries: 0 });
+    const options: FinalRequestOptions = { method: 'get', path: '/items' };
+
+    await Promise.all([client.request(options), client.request(options)]);
+
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(sentHeaders(fetch).map((headers) => headers.get('authorization'))).toEqual([
+      'Bearer synthetic-first',
+      'Bearer synthetic-second',
+    ]);
+  });
 });

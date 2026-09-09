@@ -512,6 +512,8 @@ export class OpenAI {
   #lastProviderAPIKeyWriteVersion = 0;
   #writingProviderAPIKey = false;
   #apiKeyWriteObservations = new Map<Function, APIKeyWriteObservation>();
+  #apiKeyBuildObservationDepth = 0;
+  #deferredAPIKeyWriteObserverReleases: Array<() => void> = [];
   #baseAPIKeyCapture: { apiKey: string | null } | undefined;
   #apiKeyPreparationAttempts = new WeakMap<FinalRequestOptions, APIKeyPreparationAttempt[]>();
   #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
@@ -913,6 +915,12 @@ export class OpenAI {
     }
 
     const resolved = await this.resolveAPIKeyProvider(apiKey);
+    if (this.#apiKeyBuildObservationDepth > 0) {
+      const releaseAPIKeyWriteObserver = this.#observeAPIKeyWrites();
+      if (releaseAPIKeyWriteObserver) {
+        this.#deferredAPIKeyWriteObserverReleases.push(releaseAPIKeyWriteObserver);
+      }
+    }
     this.#writingProviderAPIKey = true;
     try {
       this.apiKey = resolved;
@@ -1174,6 +1182,18 @@ export class OpenAI {
   }
 
   protected async [Opts.prepareAPIKey](options: FinalRequestOptions): Promise<void> {
+    if (!this.#synchronousCredentialAttempt) {
+      let requestSeen = false;
+      for (const candidate of this.#apiKeyPreparationAttempts.get(options) ?? []) {
+        if (candidate.kind !== 'request') continue;
+        if (requestSeen) {
+          throw new Errors.OpenAIError(
+            'Cannot safely resolve credentials for overlapping requests that share the same options object after a preparation hook awaits before delegating. Pass a distinct options object to each request.',
+          );
+        }
+        requestSeen = true;
+      }
+    }
     const attempt = this.#synchronousCredentialAttempt ?? this.currentAPIKeyPreparationAttempt(options);
     const remember = (prepared: PreparedAPIKey) => {
       if (attempt) {
@@ -2140,11 +2160,18 @@ export class OpenAI {
     properties: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
     // A hook can intentionally assign the function credential's initial null value.
+    this.#apiKeyBuildObservationDepth++;
     const releaseAPIKeyWriteObserver = this.#observeAPIKeyWrites();
     try {
       return await this.#buildRequest(inputOptions, properties);
     } finally {
       releaseAPIKeyWriteObserver?.();
+      this.#apiKeyBuildObservationDepth--;
+      if (this.#apiKeyBuildObservationDepth === 0) {
+        for (const release of this.#deferredAPIKeyWriteObserverReleases.splice(0).reverse()) {
+          release();
+        }
+      }
     }
   }
 
