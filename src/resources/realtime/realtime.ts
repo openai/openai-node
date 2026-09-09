@@ -71,7 +71,7 @@ export interface AudioTranscription {
   /**
    * An optional text to guide the model's style or continue a previous audio
    * segment. For `whisper-1`, the
-   * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
+   * [prompt is a list of keywords](https://developers.openai.com/api/docs/guides/speech-to-text#prompting).
    * For `gpt-4o-transcribe` models (excluding `gpt-4o-transcribe-diarize`), the
    * prompt is a free text string, for example "expect words related to technology".
    * Prompt is not supported with `gpt-realtime-whisper` in GA Realtime sessions.
@@ -1140,7 +1140,7 @@ export type NoiseReductionType = 'near_field' | 'far_field';
  * trigger the server to stop generating audio and emit a
  * `output_audio_buffer.cleared` event. This event should be preceded by a
  * `response.cancel` client event to stop the generation of the current response.
- * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
+ * [Learn more](https://developers.openai.com/api/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
  */
 export interface OutputAudioBufferClearEvent {
   /**
@@ -1230,7 +1230,7 @@ export interface RealtimeAudioConfigInput {
    * `null` to turn off once on. Input audio transcription is not native to the
    * model, since the model consumes audio directly. Transcription runs
    * asynchronously through
-   * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+   * [the /audio/transcriptions endpoint](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
    * and should be treated as guidance of input audio content rather than precisely
    * what the model heard. The client can optionally set the language and prompt for
    * transcription, these offer additional guidance to the transcription service.
@@ -2232,7 +2232,7 @@ export namespace RealtimeResponseCreateAudioOutput {
 /**
  * Give the model access to additional tools via remote Model Context Protocol
  * (MCP) servers.
- * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+ * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
  */
 export interface RealtimeResponseCreateMcpTool {
   /**
@@ -2266,7 +2266,7 @@ export interface RealtimeResponseCreateMcpTool {
    * Identifier for service connectors, like those available in ChatGPT. One of
    * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
    * service connectors
-   * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+   * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
    *
    * Currently supported `connector_id` values are:
    *
@@ -2470,7 +2470,7 @@ export interface RealtimeResponseCreateParams {
 
   /**
    * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
 
@@ -2724,7 +2724,7 @@ export namespace RealtimeServerEvent {
    * **WebRTC/SIP Only:** Emitted when the server begins streaming audio to the
    * client. This event is emitted after an audio content part has been added
    * (`response.content_part.added`) to the response.
-   * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
+   * [Learn more](https://developers.openai.com/api/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
   export interface OutputAudioBufferStarted {
     /**
@@ -2747,7 +2747,7 @@ export namespace RealtimeServerEvent {
    * **WebRTC/SIP Only:** Emitted when the output audio buffer has been completely
    * drained on the server, and no more audio is forthcoming. This event is emitted
    * after the full response data has been sent to the client (`response.done`).
-   * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
+   * [Learn more](https://developers.openai.com/api/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
   export interface OutputAudioBufferStopped {
     /**
@@ -2772,7 +2772,7 @@ export namespace RealtimeServerEvent {
    * (`input_audio_buffer.speech_started`), or when the client has emitted the
    * `output_audio_buffer.clear` event to manually cut off the current audio
    * response.
-   * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
+   * [Learn more](https://developers.openai.com/api/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
   export interface OutputAudioBufferCleared {
     /**
@@ -2835,7 +2835,7 @@ export interface RealtimeSession {
    * `null` to turn off once on. Input audio transcription is not native to the
    * model, since the model consumes audio directly. Transcription runs
    * asynchronously through
-   * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+   * [the /audio/transcriptions endpoint](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
    * and should be treated as guidance of input audio content rather than precisely
    * what the model heard. The client can optionally set the language and prompt for
    * transcription, these offer additional guidance to the transcription service.
@@ -2905,7 +2905,7 @@ export interface RealtimeSession {
 
   /**
    * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
 
@@ -3207,7 +3207,7 @@ export interface RealtimeSessionCreateRequest {
 
   /**
    * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
 
@@ -3278,7 +3278,7 @@ export type RealtimeToolsConfig = Array<RealtimeToolsConfigUnion>;
 /**
  * Give the model access to additional tools via remote Model Context Protocol
  * (MCP) servers.
- * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+ * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
  */
 export type RealtimeToolsConfigUnion = RealtimeFunctionTool | RealtimeToolsConfigUnion.Mcp;
 
@@ -3286,7 +3286,7 @@ export namespace RealtimeToolsConfigUnion {
   /**
    * Give the model access to additional tools via remote Model Context Protocol
    * (MCP) servers.
-   * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+   * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    */
   export interface Mcp {
     /**
@@ -3320,7 +3320,7 @@ export namespace RealtimeToolsConfigUnion {
      * Identifier for service connectors, like those available in ChatGPT. One of
      * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
      * service connectors
-     * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+     * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
      *
@@ -3515,7 +3515,7 @@ export interface RealtimeTranscriptionSessionAudioInput {
    * `null` to turn off once on. Input audio transcription is not native to the
    * model, since the model consumes audio directly. Transcription runs
    * asynchronously through
-   * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+   * [the /audio/transcriptions endpoint](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
    * and should be treated as guidance of input audio content rather than precisely
    * what the model heard. The client can optionally set the language and prompt for
    * transcription, these offer additional guidance to the transcription service.

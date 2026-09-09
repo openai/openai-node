@@ -85,7 +85,7 @@ export type ConversationItemsPage = ConversationCursorPage<ConversationItem>;
 /**
  * A single item within a conversation. The set of possible types are the same as
  * the `output` type of a
- * [Response object](https://platform.openai.com/docs/api-reference/responses/object#responses/object-output).
+ * [Response object](https://developers.openai.com/api/reference/resources/responses#%28resource%29%20responses%20%3E%20%28model%29%20response%20%3E%20%28schema%29%20%3E%20%28property%29%20output).
  */
 export type ConversationItem =
   | ConversationsAPI.Message
@@ -534,7 +534,7 @@ export interface ItemCreateParams {
   /**
    * Query param: Additional fields to include in the response. See the `include`
    * parameter for
-   * [listing Conversation items above](https://platform.openai.com/docs/api-reference/conversations/list-items#conversations_list_items-include)
+   * [listing Conversation items above](https://developers.openai.com/api/reference/resources/conversations/subresources/items/methods/list#%28resource%29%20conversations.items%20%3E%20%28method%29%20list%20%3E%20%28params%29%20default%20%3E%20%28param%29%20include%20%3E%20%28schema%29)
    * for more information.
    */
   include?: Array<ResponsesAPI.ResponseIncludable>;
@@ -549,7 +549,7 @@ export interface ItemRetrieveParams {
   /**
    * Query param: Additional fields to include in the response. See the `include`
    * parameter for
-   * [listing Conversation items above](https://platform.openai.com/docs/api-reference/conversations/list-items#conversations_list_items-include)
+   * [listing Conversation items above](https://developers.openai.com/api/reference/resources/conversations/subresources/items/methods/list#%28resource%29%20conversations.items%20%3E%20%28method%29%20list%20%3E%20%28params%29%20default%20%3E%20%28param%29%20include%20%3E%20%28schema%29)
    * for more information.
    */
   include?: Array<ResponsesAPI.ResponseIncludable>;

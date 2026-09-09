@@ -544,7 +544,9 @@ export namespace LiveCallIncomingWebhookEvent {
     session_id: string;
 
     /**
-     * Headers from the SIP Invite.
+     * Headers from the SIP INVITE, excluding SIP authorization headers. Retained
+     * names, values, repeated entries, and order are preserved. Treat these values as
+     * untrusted call metadata.
      */
     sip_headers: Array<Data.SipHeader>;
   }
@@ -613,7 +615,9 @@ export namespace RealtimeCallIncomingWebhookEvent {
     call_id: string;
 
     /**
-     * Headers from the SIP Invite.
+     * Headers from the SIP INVITE, excluding SIP authorization headers. Retained
+     * names, values, repeated entries, and order are preserved. Treat these values as
+     * untrusted call metadata.
      */
     sip_headers: Array<Data.SipHeader>;
   }
