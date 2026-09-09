@@ -1,3 +1,4 @@
+import { compileTestScript } from './utils/compile-test-script';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -18,6 +19,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const repositoryRoot = process.cwd();
+let compiledCLI: ReturnType<typeof compileTestScript>;
+beforeAll(() => {
+  compiledCLI = compileTestScript(path.join(repositoryRoot, 'ecosystem-tests/cli.ts'));
+});
+afterAll(() => compiledCLI?.cleanup());
 const apiKey = 'sk-synthetic-cloudflare-lifecycle-private-83d4';
 const stagedContents = Buffer.from(`OPENAI_API_KEY='${apiKey}'`);
 const originalContents = Buffer.from([
@@ -224,11 +230,7 @@ function runCloudflare(
   const result = spawnSync(
     process.execPath,
     [
-      path.join(repositoryRoot, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
-      '-r',
-      path.join(repositoryRoot, 'node_modules/tsconfig-paths/register.js'),
-      path.join(repositoryRoot, 'ecosystem-tests/cli.ts'),
+      compiledCLI.file,
       'cloudflare-worker',
       '--fromNpm=openai',
       '--skipPack',

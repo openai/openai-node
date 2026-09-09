@@ -1,3 +1,4 @@
+import { compileTestScript } from './utils/compile-test-script';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -5,6 +6,11 @@ import path from 'node:path';
 import { expect } from 'vitest';
 
 const root = process.cwd();
+let compiledCLI: ReturnType<typeof compileTestScript>;
+beforeAll(() => {
+  compiledCLI = compileTestScript(path.join(root, 'ecosystem-tests/cli.ts'));
+});
+afterAll(() => compiledCLI?.cleanup());
 const protectedMainCondition =
   "github.repository == 'openai/openai-node' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'dependabot[bot]'";
 
@@ -13,30 +19,19 @@ function normalizeLineEndings(value: string) {
 }
 
 function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}) {
-  return spawnSync(
-    process.execPath,
-    [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
-      '-r',
-      path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'ecosystem-tests/cli.ts'),
-      ...args,
-    ],
-    {
-      cwd,
-      encoding: 'utf-8',
-      env: {
-        ...process.env,
-        OPENAI_API_KEY: undefined,
-        DISABLE_V8_COMPILE_CACHE: '1',
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
-        TS_NODE_TRANSPILE_ONLY: 'true',
-        ...env,
-      },
-      timeout: 15_000,
+  return spawnSync(process.execPath, [compiledCLI.file, ...args], {
+    cwd,
+    encoding: 'utf-8',
+    env: {
+      ...process.env,
+      OPENAI_API_KEY: undefined,
+      DISABLE_V8_COMPILE_CACHE: '1',
+      TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+      TS_NODE_TRANSPILE_ONLY: 'true',
+      ...env,
     },
-  );
+    timeout: 15_000,
+  });
 }
 
 function workflowJob(workflow: string, name: string) {
