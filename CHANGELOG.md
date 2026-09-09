@@ -1,5 +1,19 @@
 # Changelog
 
+## [7.12.0](https://github.com/openai/openai-node/compare/v7.11.0...v7.12.0) (2026-09-08)
+
+
+### Features
+
+* **api:** add GPT Image 2.5 models and image options ([#2705](https://github.com/openai/openai-node/issues/2705)) ([6500a16](https://github.com/openai/openai-node/commit/6500a1670911e8f5a6cbbd9f7ff42800af6450cd))
+
+
+### Bug Fixes
+
+* **assistants:** reject root IDs in run-step deltas ([#2698](https://github.com/openai/openai-node/issues/2698)) ([63dfa4c](https://github.com/openai/openai-node/commit/63dfa4cf506218bcc241c169339e392c0f693dfc))
+* **files:** use a monotonic clock for processing timeout ([#2657](https://github.com/openai/openai-node/issues/2657)) ([bb0f51b](https://github.com/openai/openai-node/commit/bb0f51bed84bf60b0639af7a894fcf538264e435))
+* preserve suppressed workload authorization ([#2699](https://github.com/openai/openai-node/issues/2699)) ([57bbfd3](https://github.com/openai/openai-node/commit/57bbfd37232abd2923e8a2b62435eab14589cbb0))
+
 ## [7.11.0](https://github.com/openai/openai-node/compare/v7.10.0...v7.11.0) (2026-09-08)
 
 
