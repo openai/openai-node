@@ -114,6 +114,39 @@ test('does not use a custom Bedrock bearer fallback for an admin-only request', 
   expect(client.bearerCalls).toBe(0);
 });
 
+test.each(['buildRequest', 'request'] as const)(
+  '%s allows shared options when static Bedrock authentication bypasses bearerAuth',
+  async (operation) => {
+    class CustomBearerClient extends BedrockOpenAI {
+      bearerCalls = 0;
+
+      protected override async bearerAuth(options: Parameters<BedrockOpenAI['buildRequest']>[0]) {
+        this.bearerCalls += 1;
+        return super.bearerAuth(options);
+      }
+    }
+    const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => Response.json({ ok: true }));
+    const client = new CustomBearerClient({ baseURL, apiKey: 'synthetic-static', fetch });
+    const options = { method: 'get' as const, path: '/items' };
+    let headers: Headers[];
+    if (operation === 'buildRequest') {
+      const built = await Promise.all([client.buildRequest(options), client.buildRequest(options)]);
+      headers = built.map(({ req }) => req.headers);
+      expect(fetch).not.toHaveBeenCalled();
+    } else {
+      await Promise.all([client.request(options), client.request(options)]);
+      headers = fetch.mock.calls.map(([, init]) => new Headers(init?.headers));
+      expect(fetch).toHaveBeenCalledTimes(2);
+    }
+
+    expect(headers.map((header) => header.get('authorization'))).toEqual([
+      'Bearer synthetic-static',
+      'Bearer synthetic-static',
+    ]);
+    expect(client.bearerCalls).toBe(0);
+  },
+);
+
 test('validates a replaced buildURL result before direct-build body or credential effects', async () => {
   class ReplacedURL extends BedrockOpenAI {
     override buildURL(
@@ -233,6 +266,51 @@ test('dispatches the constructed Bedrock URL without rebuilding it during prepar
   expect(provider).toHaveBeenCalledTimes(1);
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(fetch.mock.calls[0]?.[0]).toBe(`${baseURL}/items?cursor=synthetic&route=2`);
+  expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('manual');
+  expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+    'Bearer synthetic-request',
+  );
+});
+
+test('initializes Bedrock routing before inherited URL validation', async () => {
+  const events: string[] = [];
+  class PreparedRouting extends BedrockOpenAI {
+    route: string | undefined;
+
+    protected override async prepareOptions(options: Parameters<BedrockOpenAI['buildRequest']>[0]) {
+      events.push('prepare');
+      this.route = '/prepared/items';
+      await super.prepareOptions(options);
+    }
+
+    override buildURL(
+      _path: string,
+      query: Record<string, unknown> | null | undefined,
+      defaultBaseURL?: string,
+    ) {
+      events.push('url');
+      if (this.route === undefined) {
+        throw new Error('Routing state has not been prepared.');
+      }
+      return super.buildURL(this.route, query, defaultBaseURL);
+    }
+  }
+  const provider = vi.fn(async () => {
+    events.push('credential');
+    return 'synthetic-request';
+  });
+  const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => {
+    events.push('fetch');
+    return Response.json({ ok: true });
+  });
+  const client = new PreparedRouting({ baseURL, bedrockTokenProvider: provider, fetch });
+
+  await expect(client.get('/items')).resolves.toEqual({ ok: true });
+
+  expect(events).toEqual(['prepare', 'url', 'credential', 'url', 'fetch']);
+  expect(provider).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch.mock.calls[0]?.[0]).toBe(`${baseURL}/prepared/items`);
   expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('manual');
   expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
     'Bearer synthetic-request',

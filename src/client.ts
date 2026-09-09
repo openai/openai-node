@@ -299,6 +299,7 @@ type PreparedAPIKey = {
 type APIKeyPreparationAttempt = {
   kind: 'request' | 'build';
   prepared?: PreparedAPIKey | undefined;
+  customAuthentication?: boolean;
 };
 type APIKeyBuildContext = {
   owner: OpenAI;
@@ -811,6 +812,9 @@ export class OpenAI {
     ) {
       return await this.adminAPIKeyAuth(opts);
     }
+    if (schemes.bearerAuth && !this.#safeCredentialHooks.has(this.bearerAuth)) {
+      this.#markCustomAuthentication(opts);
+    }
     return buildHeaders([
       schemes.bearerAuth ? await this.bearerAuth(opts) : null,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
@@ -959,14 +963,20 @@ export class OpenAI {
     ].every((hook) => this.#safeCredentialHooks.has(hook));
   }
 
-  private hasCustomAuthenticationDelegationHooks(schemes: {
-    bearerAuth?: boolean;
-    adminAPIKeyAuth?: boolean;
-  }): boolean {
-    return (
-      !this.#safeCredentialHooks.has(this.authHeaders) ||
-      (!!schemes.bearerAuth && !this.#safeCredentialHooks.has(this.bearerAuth))
+  #throwOverlappingAuthentication(): never {
+    throw new Errors.OpenAIError(
+      'Cannot safely resolve credentials for overlapping requests that share the same options object while an authentication hook is pending. Pass a distinct options object to each request.',
     );
+  }
+
+  #markCustomAuthentication(options: FinalRequestOptions): void {
+    let build: APIKeyPreparationAttempt | undefined;
+    for (const attempt of this.#apiKeyPreparationAttempts.get(options) ?? []) {
+      if (attempt.kind !== 'build') continue;
+      if (build) this.#throwOverlappingAuthentication();
+      build = attempt;
+    }
+    if (build) build.customAuthentication = true;
   }
 
   private addAPIKeyPreparationAttempt(options: FinalRequestOptions, attempt: APIKeyPreparationAttempt): void {
@@ -1113,6 +1123,16 @@ export class OpenAI {
       });
     };
     await this._callApiKey(captureAPIKey);
+    const prepared = attempt?.prepared;
+    if (
+      prepared &&
+      !prepared.explicitCapture &&
+      !this.#safeCredentialHooks.has(this._callApiKey) &&
+      this.apiKey !== this.#lastProviderAPIKey
+    ) {
+      prepared.apiKey = this.apiKey;
+      prepared.tracksClientValue = true;
+    }
     if (!captured) {
       remember({
         apiKey: this.apiKey,
@@ -1157,13 +1177,18 @@ export class OpenAI {
       resolved = apiKey;
       capturedByBase = this.#baseAPIKeyCapture?.apiKey === apiKey;
     });
-    const apiKey = captured ? resolved : this.apiKey;
+    const explicitCapture = captured && !this.#safeCredentialHooks.has(this._callApiKey) && !capturedByBase;
+    const postDelegationOverride =
+      !explicitCapture &&
+      !this.#safeCredentialHooks.has(this._callApiKey) &&
+      this.apiKey !== this.#lastProviderAPIKey;
+    const apiKey = captured && !postDelegationOverride ? resolved : this.apiKey;
     if (attempt) {
       attempt.prepared = {
         apiKey,
         tracksClientValue: apiKey === this.apiKey,
         allowClientOverride: this.hasCustomRequestCredentialHooks(),
-        explicitCapture: captured && !this.#safeCredentialHooks.has(this._callApiKey) && !capturedByBase,
+        explicitCapture,
       };
     }
     return apiKey;
@@ -2178,18 +2203,19 @@ export class OpenAI {
     let authenticationHeaders: NullableHeaders | undefined;
     if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
       const security = options.__security ?? { bearerAuth: true };
+      const customAuthHeaders = !this.#safeCredentialHooks.has(this.authHeaders);
       if (
-        this.hasCustomAuthenticationDelegationHooks(security) &&
-        this.#apiKeyPreparationAttempts.get(options)?.some((attempt) => attempt.kind === 'build')
+        this.#apiKeyPreparationAttempts
+          .get(options)
+          ?.some((attempt) => attempt.kind === 'build' && (customAuthHeaders || attempt.customAuthentication))
       ) {
-        throw new Errors.OpenAIError(
-          'Cannot safely resolve credentials for overlapping requests that share the same options object while an authentication hook is pending. Pass a distinct options object to each request.',
-        );
+        this.#throwOverlappingAuthentication();
       }
       // A build may inherit request preparation, but never another build's cached credential.
       const buildAttempt: APIKeyPreparationAttempt = {
         kind: 'build',
         prepared: preparedAPIKey ?? this.currentAPIKeyPreparationAttempt(options, 'request')?.prepared,
+        customAuthentication: customAuthHeaders,
       };
       this.addAPIKeyPreparationAttempt(options, buildAttempt);
       try {

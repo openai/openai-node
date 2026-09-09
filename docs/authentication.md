@@ -71,7 +71,9 @@ restored when the build settles. Subclasses that make `apiKey` non-configurable
 should return custom authentication headers instead.
 
 `_callApiKey` overrides can forward the existing optional `capture` callback to
-preserve the credential belonging to their invocation. Legacy overrides that omit
+preserve the credential belonging to their invocation. Changes to `this.apiKey`
+after the delegated call are honored; an explicit replacement passed to `capture`
+takes precedence over the shared property. Legacy overrides that omit
 it retain their shared-property behavior. Custom hooks that write `this.apiKey`
 remain responsible for coordinating concurrent writes. Prepared credentials are
 discarded when request construction finishes or fails.
